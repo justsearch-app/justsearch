@@ -196,6 +196,11 @@ export interface Sv3AskRequest {
   readonly conversationId: string;
   /** The composer's effort rung for THIS send; omitted is the default rung, not "no parameters". */
   readonly effort?: Sv3Effort;
+  /**
+   * WP1.1 — the document PATHS retrieval is limited to (what the backend's `docIds` filter
+   * matches). Omitted asks the whole index; the window never sends an empty list for a choice.
+   */
+  readonly docIds?: readonly string[];
   readonly signal?: AbortSignal;
 }
 
@@ -347,7 +352,9 @@ function claimsOf(acc: Map<number, ClaimAcc>, scorer: string | null): Claim[] {
  * FE invented.
  */
 export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void> {
-  const body = buildRequestBody(SV3_ASK_SHAPE_ID, req.question, req.conversationId, '', []);
+  const body = buildRequestBody(SV3_ASK_SHAPE_ID, req.question, req.conversationId, '', [
+    ...(req.docIds ?? []),
+  ]);
   // The turn is recorded against THIS window's session, exactly as the shipped window stamps it.
   body.conversationId = req.conversationId;
   // The effort rung's parameters, added AFTER the shared builder rather than inside it: the builder

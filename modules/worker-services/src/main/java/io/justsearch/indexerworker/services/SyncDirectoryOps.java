@@ -73,6 +73,8 @@ final class SyncDirectoryOps {
    */
   private volatile java.util.function.Function<Path, PruneOps.PresenceGuard> pruneGuardFactory =
       root -> RootPresenceGuard.capture(root, null);
+  /** Holds off file publications while the prune applies a batch; the ingest service supplies it. */
+  private volatile PruneOps.WriterFence pruneWriterFence = PruneOps.WriterFence.NONE;
 
   SyncDirectoryOps(
       ReadPathOps readPathOps,
@@ -140,6 +142,14 @@ final class SyncDirectoryOps {
    */
   void setPruneGuardFactory(java.util.function.Function<Path, PruneOps.PresenceGuard> factory) {
     this.pruneGuardFactory = java.util.Objects.requireNonNull(factory, "factory");
+  }
+
+  /**
+   * Supplies the fence primary ingestion, VDU chunk replacement and renames hold while they write a
+   * file's rows, so the prune never removes part of a file or misses a chunk written meanwhile.
+   */
+  void setPruneWriterFence(PruneOps.WriterFence fence) {
+    this.pruneWriterFence = java.util.Objects.requireNonNull(fence, "fence");
   }
 
   /** A complete, bounded serving-index/disk difference. No queue or Lucene mutation occurs here. */
@@ -671,7 +681,8 @@ final class SyncDirectoryOps {
         () -> cancelled.getAsBoolean() || (!force && indexingPacing.paceAndContinue()),
         SYNC_PRUNE_THROTTLE_BATCH_SIZE,
         guard,
-        deletionMarker::markIfAbsent);
+        deletionMarker::markIfAbsent,
+        pruneWriterFence);
   }
 
   private Set<String> indexedPathsForSync(String rootPath, boolean force,

@@ -12,4 +12,4 @@ were removed with the D1-4 route retirement. The supported inference refresh
 path is an accepted `core.reconfigure` operation with a settings witness and
 explicit refresh intent. The corresponding metric categories remain covered by
 focused inference telemetry tests; Lane F installed-process evidence lives in
-`docs/design/lane-f-engine-jvm/handoff.md`.
+[`docs/design/lane-f-engine-jvm/stages/D1.md`](../../../docs/design/lane-f-engine-jvm/stages/D1.md).

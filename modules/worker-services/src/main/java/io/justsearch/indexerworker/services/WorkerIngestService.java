@@ -259,6 +259,7 @@ public final class WorkerIngestService {
         // this constructor runs, so capturing the field here would capture the UNAVAILABLE sentinel.
         confirmedDeletionMarker);
     this.syncOps.setPruneGuardFactory(this::pruneGuard);
+    this.syncOps.setPruneWriterFence(pruneWriterFence);
     this.candidateDiscoveryOps = new SyncDirectoryOps(
         searchLifecycle != null ? searchLifecycle.readPathOps() : null,
         null,
@@ -357,6 +358,10 @@ public final class WorkerIngestService {
     return mutationAdmission == null || indexingLoop == null
         ? mutation.get() : indexingLoop.withFileMutationFence(mutation);
   }
+
+  /** A prune applies each batch of deletions inside the same fence as the file writers. */
+  private final io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence pruneWriterFence =
+      batch -> withFileMutationFence(batch::getAsBoolean);
 
   private boolean hasDistinctWritableServingTarget() {
     return searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active
@@ -1475,7 +1480,21 @@ public final class WorkerIngestService {
           return updateVduErrorResponse("VDU procedure no longer owns this document: " + docId);
         }
         try {
-          if (!VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled())) {
+          // The chunk replacement holds the file-mutation fence, so a prune of this file never
+          // sees part of it and no replacement chunk lands after the file was removed.
+          boolean applied;
+          try {
+            applied = withFileMutationFence(() -> {
+              try {
+                return VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled());
+              } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+              }
+            });
+          } catch (java.io.UncheckedIOException e) {
+            throw e.getCause();
+          }
+          if (!applied) {
             return updateVduErrorResponse("Document not found: " + docId);
           }
           vduProcessingClaims.remove(docId);
@@ -1691,7 +1710,8 @@ public final class WorkerIngestService {
               indexingPacing::paceAndContinue,
               100, // Throttle batch size
               pruneGuard(pruneRoot),
-              ignoredConfirmedDeletion -> {}); // unchanged: this path never marked identities
+              ignoredConfirmedDeletion -> {}, // unchanged: this path never marked identities
+              pruneWriterFence);
 
       switch (result.completion()) {
         case ABORTED -> {
@@ -2540,7 +2560,9 @@ public final class WorkerIngestService {
         var identityRekey =
             documentIdentityStore.rekey(oldPathHash, newPathHash, System.currentTimeMillis());
 
-        int count = ingestLifecycle.indexingCoordinator().updateDocumentPaths(oldPath, newPath);
+        // Inside the file-mutation fence: a prune applying a batch never sees a rename half done.
+        int count = withFileMutationFence(
+            () -> ingestLifecycle.indexingCoordinator().updateDocumentPaths(oldPath, newPath));
         // Green may not contain the document yet while Blue still serves it. Moving the durable
         // identity is therefore a successful rename even when this generation has no Lucene row.
         // Store-first is deliberate: if Lucene throws after the move, the RPC fails and retry or

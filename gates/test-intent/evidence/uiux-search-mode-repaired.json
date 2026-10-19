@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T17:06:36.700Z",
+  "revision": "0bae5c52383ab13671449f32bc50f99dd8941922",
+  "tree": "a438f2f83b3e1b9d49c46eeb55df18601c497759",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/documentPane/DocumentPane.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-search-mode/tmp/evidence-work/test-intent-vitest-3504407-1792429592830.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1263
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts#says the file is no longer in the index",
+      "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:661e9204f106085b0d0449fd685b7ba6687be0257ec803343d97d3d4b1f6a8c6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DocumentPane — a document the index no longer has (WP1.1 S1.5) says the file is no longer in the index",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c933b207f",
+    "revision": "c933b207fd035b1c301aab5c33fc57db9af1a57a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/documentPane/DocumentPane.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-search-mode/tmp/evidence-work/test-intent-vitest-3504407-1792429595176.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1332,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-search-mode/tmp/evidence-work/test-intent-vitest-3504407-1792429595176.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts#says the file is no longer in the index",
+        "classification": "assertion",
+        "detail": "DocumentPane — a document the index no longer has (WP1.1 S1.5) says the file is no longer in the index:  AssertionError: expected 'HTTP 404' to match /no longer in (your|the) index/i\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-search-mode/tmp/evidence-work/test-intent-before-M7vr9M/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts:278:32\n    at runNextTicks (node:int"
+      }
+    ]
+  },
+  "digest": "sha256:6cfed3ad9857455931b6d0a38bf7201ccf12093cf9840461d438e24463cd05c3"
+}

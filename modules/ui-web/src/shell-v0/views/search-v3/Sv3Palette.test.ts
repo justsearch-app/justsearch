@@ -30,7 +30,7 @@ import type { Sv3Palette } from './Sv3Palette.js';
 import type { Sv3Empty } from './Sv3Empty.js';
 import { SV3_PALETTE_RUN } from './Sv3Palette.js';
 import { SV3_PALETTE_REQUEST } from './Sv3Topbar.js';
-import { COMMANDS, COMMAND_GROUPS, SIDEBAR_EMPTY, SV3_COMMAND_SEARCH_TEXT } from './fixtures.js';
+import { COMMANDS, COMMAND_GROUPS, SIDEBAR_EMPTY, SV3_COMMAND_SEARCH } from './fixtures.js';
 import { COMPONENT_TAGS } from '../../renderers/component-vocabulary.generated.js';
 import { modalOwnsFocus, __resetModalityForTest } from '../../primitives/modality.js';
 
@@ -243,7 +243,7 @@ describe('the open palette keeps the keyboard, and hands it back on close', () =
     const el = await mount();
     const { palette, trigger } = await openViaTopbar(el);
     const input = palette.shadowRoot!.querySelector('input')!;
-    const item = palette.shadowRoot!.querySelector<HTMLElement>(`#sv3-palette-item-${SV3_COMMAND_SEARCH_TEXT}`)!;
+    const item = palette.shadowRoot!.querySelector<HTMLElement>(`#sv3-palette-item-${SV3_COMMAND_SEARCH}`)!;
     const label = item.querySelector<HTMLElement>('.item-label')!;
     const commands: string[] = [];
     el.addEventListener(SV3_PALETTE_RUN, (event) => {
@@ -267,7 +267,7 @@ describe('the open palette keeps the keyboard, and hands it back on close', () =
     label.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, composed: true, button: 0 }));
     label.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, button: 0 }));
     await palette.updateComplete;
-    expect(commands).toEqual([SV3_COMMAND_SEARCH_TEXT]);
+    expect(commands).toEqual([SV3_COMMAND_SEARCH]);
     expect(palette.open).toBe(false);
     expect(refocused()).toBe(true);
   });

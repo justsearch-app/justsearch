@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
 /**
- * Search v3's wiring to the SHARED search store (tempdoc 822 Phase A1).
+ * Search v3's wiring to the SHARED search store (tempdoc 822 Phase A1), driven since WP1.1 through
+ * Search mode — Enter in the composer — and read off the shared results card.
  *
  * The store is the real one (`state/searchState.ts`) in every case here — mocking it would leave the
  * one thing this slice adds untested. What is stubbed is the store's single exit, the global fetch,
@@ -22,7 +23,7 @@ import type { SearchV3View } from './SearchV3View.js';
 import type { Sv3Empty } from './Sv3Empty.js';
 import { resetSearchState } from '../../state/searchState.js';
 import { matchCountLabel } from '../../components/searchResults/matchCountLabel.js';
-import { MAIN_EMPTY, MAIN_UNREACHABLE, SV3_COMMAND_SEARCH_TEXT } from './fixtures.js';
+import { MAIN_EMPTY, MAIN_UNREACHABLE } from './fixtures.js';
 import { __resetConversationListForTest } from '../../state/conversationListStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
@@ -106,57 +107,72 @@ async function type(el: Mounted, draft: string): Promise<HTMLTextAreaElement> {
 }
 
 /**
- * Type a draft and run the palette's "Search this text" — the affordance a user has, not an internal
- * call. Phase F1 moved the SEND control onto the ask tier, so this command is now the only way into
- * the search seam (`SearchV3View.onPaletteRun`); everything below it is unchanged, which is the
- * point: the seam still behaves exactly as A1 proved it did.
+ * Type a draft and press Enter in Search mode, the window's default since WP1.1 — the affordance a
+ * user has, not an internal call. The keystroke path schedules the store's quick pass; Enter
+ * supersedes it with the full search at once, so one Enter is one request.
  */
 async function send(el: Mounted, draft: string): Promise<void> {
-  await type(el, draft);
-  const palette = el.shadowRoot?.querySelector('jf-sv3-palette') as
-    | (HTMLElement & { show(i: HTMLElement | null): Promise<void>; updateComplete: Promise<unknown> })
-    | null;
-  if (!palette) throw new Error('no palette in the window');
-  await palette.show(null);
-  await palette.updateComplete;
-  palette.shadowRoot
-    ?.querySelector<HTMLElement>(`#sv3-palette-item-${SV3_COMMAND_SEARCH_TEXT}`)
-    ?.click();
+  const field = await type(el, draft);
+  field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await el.updateComplete;
 }
 
 /**
- * Settle the round trip: token resolution, the fetch, its `json()`, and then the two renders (the
- * window's and the region's). Each await is a macrotask turn, which also drains the microtasks.
+ * Settle the round trip: token resolution, the fetch, its `json()`, and then the renders (the
+ * window's, the main surface's, the results region's and the card's). Each await is a macrotask
+ * turn, which also drains the microtasks. Returns the results region.
  */
 async function settle(el: Mounted): Promise<Mounted> {
-  for (let turn = 0; turn < 4; turn += 1) await new Promise<void>((r) => setTimeout(r, 0));
+  for (let turn = 0; turn < 6; turn += 1) await new Promise<void>((r) => setTimeout(r, 0));
   await el.updateComplete;
-  return region(el, 'jf-sv3-main');
+  const main = await region(el, 'jf-sv3-main');
+  const results = main.shadowRoot?.querySelector('jf-sv3-results') as Mounted | null;
+  if (!results) throw new Error('no results region on the main surface');
+  await results.updateComplete;
+  const card = results.shadowRoot?.querySelector('jf-results-card') as Mounted | null;
+  if (card) await card.updateComplete;
+  return results;
 }
 
-const rowsOf = (main: Mounted): HTMLElement[] => [
-  ...(main.shadowRoot?.querySelectorAll<HTMLElement>('[data-testid="sv3-main-row"]') ?? []),
+const cardOf = (results: Mounted): Mounted | null =>
+  results.shadowRoot?.querySelector('jf-results-card') as Mounted | null;
+
+const rowsOf = (results: Mounted): HTMLElement[] => [
+  ...(cardOf(results)?.shadowRoot?.querySelectorAll<HTMLElement>(
+    '[data-testid="search-result-row"]',
+  ) ?? []),
 ];
 
-const textOf = (main: Mounted, testid: string): string =>
-  main.shadowRoot?.querySelector(`[data-testid="${testid}"]`)?.textContent?.trim() ?? '';
+const textOf = (host: Mounted | null, testid: string): string =>
+  host?.shadowRoot?.querySelector(`[data-testid="${testid}"]`)?.textContent?.trim() ?? '';
 
-async function emptyElementOf(main: Mounted, testid: string): Promise<Sv3Empty & Mounted> {
-  const el = main.shadowRoot?.querySelector(`[data-testid="${testid}"]`) as
+/**
+ * The count label as the card shows it: its meta line, read off the screen, less the latency the
+ * shared card appends (" · found in 0.02s"). Anything else on that line stays in, so the equality
+ * below is still an equality.
+ */
+const countLabelOf = (results: Mounted): string =>
+  (cardOf(results)?.shadowRoot?.querySelector('.meta-info')?.textContent ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/ · found in \S+$/, '');
+
+async function emptyElementOf(results: Mounted, testid: string): Promise<Sv3Empty & Mounted> {
+  const el = results.shadowRoot?.querySelector(`[data-testid="${testid}"]`) as
     | (Sv3Empty & Mounted)
     | null;
-  if (!el) throw new Error(`no [data-testid="${testid}"] in the content surface`);
+  if (!el) throw new Error(`no [data-testid="${testid}"] in the results region`);
   await el.updateComplete;
   return el;
 }
 
-describe('a send issues exactly one search, through the shared store', () => {
+describe('Enter in Search mode issues exactly one search, through the shared store', () => {
   it('runs one request for the draft and docks in the same act', async () => {
     vi.useFakeTimers();
     const el = await mount();
     await send(el, 'northfield lease');
-    // Past the store's 200ms keystroke debounce AND its 600ms settle: an explicit submit supersedes
-    // both, so a second request here would be a search the user never asked for.
+    // Past the store's 200ms keystroke debounce AND its 600ms settle: Enter supersedes both, so a
+    // second request here would be a search the user never asked for.
     await vi.advanceTimersByTimeAsync(2000);
 
     expect(searches()).toHaveLength(1);
@@ -177,25 +193,24 @@ describe('a send issues exactly one search, through the shared store', () => {
     expect(el.getAttribute('composer-state')).toBe('hero');
   });
 
-  it('is NOT what a plain send does any more — the composer talks to the model', async () => {
-    // The course correction, asserted: the send control must not reach the search endpoint. It
-    // reaches the ask tier instead, which is refused here because no model has reported in — so the
-    // observable fact is that NOTHING was dispatched to the search store.
+  it('is NOT what a send on the ask tier does — that one talks to the model', async () => {
+    // The ask tier is refused here because no model has reported in — so the observable fact is
+    // that NOTHING was dispatched to the search store.
     vi.useFakeTimers();
     const el = await mount();
+    (el as unknown as { tier: string }).tier = 'ask';
+    await el.updateComplete;
     await type(el, 'northfield lease');
     const composer = await region(el, 'jf-sv3-composer');
     composer.shadowRoot
       ?.querySelector<HTMLButtonElement>('[data-testid="sv3-composer-send"]')
       ?.click();
     await vi.advanceTimersByTimeAsync(2000);
-    expect(
-      fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/knowledge/search')),
-    ).toEqual([]);
+    expect(searches()).toEqual([]);
   });
 });
 
-describe('the rows are the response, and the count describes the rows', () => {
+describe('the rows are the response, on the shared results card', () => {
   it('renders one row per hit, from the response fields', async () => {
     respond({
       results: [hit('Contracts/Northfield.pdf'), hit('Ops/Reviews/Q2.md')],
@@ -204,18 +219,40 @@ describe('the rows are the response, and the count describes the rows', () => {
     });
     const el = await mount();
     await send(el, 'northfield');
-    const main = await settle(el);
+    const results = await settle(el);
 
-    const rows = rowsOf(main);
+    const rows = rowsOf(results);
     expect(rows).toHaveLength(2);
-    expect(rows.map((r) => r.querySelector('.row-title')?.textContent?.trim())).toEqual([
+    expect(rows.map((r) => r.querySelector('.title-text')?.textContent?.trim())).toEqual([
       'Northfield.pdf',
       'Q2.md',
     ]);
-    expect(rows.map((r) => r.querySelector('.row-path')?.textContent?.trim())).toEqual([
-      'Contracts/Northfield.pdf',
-      'Ops/Reviews/Q2.md',
-    ]);
+  });
+
+  it('shows each hit’s path as the shared card does: its folders on the row, the full path on hover', async () => {
+    respond({
+      results: [hit('Contracts/Northfield.pdf'), hit('Ops/Reviews/Q2.md')],
+      totalHits: 2,
+      matchCount: 2,
+    });
+    const el = await mount();
+    await send(el, 'northfield');
+    const results = await settle(el);
+
+    // Each row carries its own hit's path; the row order is not what this checks.
+    const rows = rowsOf(results);
+    expect(rows).toHaveLength(2);
+    const pathOf = (title: string): Element | null | undefined =>
+      rows
+        .find((r) => r.querySelector('.title-text')?.textContent?.trim() === title)
+        ?.querySelector('.path');
+    const northfield = pathOf('Northfield.pdf');
+    const q2 = pathOf('Q2.md');
+    expect(northfield?.getAttribute('title')).toBe('Contracts/Northfield.pdf');
+    expect(q2?.getAttribute('title')).toBe('Ops/Reviews/Q2.md');
+    expect(northfield?.textContent).toContain('Contracts');
+    expect(q2?.textContent).toContain('Ops');
+    expect(q2?.textContent).toContain('Reviews');
   });
 
   it('counts what is on screen, through the shared label authority', async () => {
@@ -226,26 +263,26 @@ describe('the rows are the response, and the count describes the rows', () => {
     });
     const el = await mount();
     await send(el, 'vendor');
-    const main = await settle(el);
+    const results = await settle(el);
 
-    const label = textOf(main, 'sv3-main-count');
+    const label = countLabelOf(results);
     expect(label).toBe(matchCountLabel(12, 4, false, 40, false));
     // The probe: whatever the label leads with is the number of rows actually rendered. A projection
     // that counted one set and rendered another (or a row list sliced on the way out) fails HERE.
     const leading = Number(/\d+/.exec(label)?.[0]);
-    expect(leading).toBe(rowsOf(main).length);
-    expect(rowsOf(main)).toHaveLength(4);
+    expect(leading).toBe(rowsOf(results).length);
+    expect(rowsOf(results)).toHaveLength(4);
   });
 
   it('names the surplus rather than hiding it when more renders than matched exactly', async () => {
     respond({ results: [hit('a/1.md'), hit('a/2.md'), hit('a/3.md')], totalHits: 3, matchCount: 1 });
     const el = await mount();
     await send(el, 'freight');
-    const main = await settle(el);
+    const results = await settle(el);
 
-    const label = textOf(main, 'sv3-main-count');
+    const label = countLabelOf(results);
     expect(label).toBe(matchCountLabel(1, 3, false, 3, false));
-    expect(Number(/\d+/.exec(label)?.[0])).toBe(rowsOf(main).length);
+    expect(Number(/\d+/.exec(label)?.[0])).toBe(rowsOf(results).length);
   });
 });
 
@@ -259,15 +296,13 @@ describe('the four outcomes are distinct, and each says only what it knows', () 
     );
     const el = await mount();
     await send(el, 'insurance');
-    const main = await settle(el);
+    const results = await settle(el);
 
-    expect(
-      main.shadowRoot?.querySelectorAll('[data-testid="sv3-main-skeleton"]').length,
-    ).toBeGreaterThan(0);
+    expect(results.shadowRoot?.querySelector('[data-testid="sv3-results-loading"]')).not.toBeNull();
     // Pending is not emptiness and not a result: neither verdict may be on screen yet.
-    expect(main.shadowRoot?.querySelector('[data-testid="sv3-main-empty"]')).toBeNull();
-    expect(main.shadowRoot?.querySelector('[data-testid="sv3-main-count"]')).toBeNull();
-    expect(rowsOf(main)).toHaveLength(0);
+    expect(results.shadowRoot?.querySelector('[data-testid="sv3-results-empty"]')).toBeNull();
+    expect(cardOf(results)).toBeNull();
+    expect(rowsOf(results)).toHaveLength(0);
 
     release({
       ok: true,
@@ -275,7 +310,7 @@ describe('the four outcomes are distinct, and each says only what it knows', () 
       json: () => Promise.resolve({ results: [hit('Admin/Insurance/2026.pdf')], matchCount: 1 }),
     });
     const settled = await settle(el);
-    expect(settled.shadowRoot?.querySelector('[data-testid="sv3-main-skeleton"]')).toBeNull();
+    expect(settled.shadowRoot?.querySelector('[data-testid="sv3-results-loading"]')).toBeNull();
     expect(rowsOf(settled)).toHaveLength(1);
   });
 
@@ -283,9 +318,9 @@ describe('the four outcomes are distinct, and each says only what it knows', () 
     respond({ results: [], totalHits: 0, matchCount: 0 });
     const el = await mount();
     await send(el, 'zzzz');
-    const main = await settle(el);
+    const results = await settle(el);
 
-    const empty = await emptyElementOf(main, 'sv3-main-empty');
+    const empty = await emptyElementOf(results, 'sv3-results-empty');
     expect(empty.shadowRoot?.querySelector('[data-testid="sv3-empty-title"]')?.textContent?.trim())
       .toBe(MAIN_EMPTY.title);
     expect(
@@ -293,38 +328,42 @@ describe('the four outcomes are distinct, and each says only what it knows', () 
     ).toBe(MAIN_EMPTY.description);
     // The roomier region gets the roomier padding — the spec's one breakpoint on this component.
     expect(empty.hasAttribute('roomy')).toBe(true);
-    expect(rowsOf(main)).toHaveLength(0);
-    expect(main.shadowRoot?.querySelector('[data-testid="sv3-main-unreachable"]')).toBeNull();
+    expect(rowsOf(results)).toHaveLength(0);
+    expect(cardOf(results)).toBeNull();
+    expect(results.shadowRoot?.querySelector('[data-testid="sv3-results-failed"]')).toBeNull();
   });
 
   it('explains a transport failure with safe recovery guidance', async () => {
     fetchMock.mockRejectedValue(new Error('Failed to fetch'));
     const el = await mount();
     await send(el, 'northfield');
-    const main = await settle(el);
+    const results = await settle(el);
 
-    const unreachable = await emptyElementOf(main, 'sv3-main-unreachable');
+    const failed = await emptyElementOf(results, 'sv3-results-failed');
     expect(
-      unreachable.shadowRoot?.querySelector('[data-testid="sv3-empty-title"]')?.textContent?.trim(),
+      failed.shadowRoot?.querySelector('[data-testid="sv3-empty-title"]')?.textContent?.trim(),
     ).toBe(MAIN_UNREACHABLE.title);
     // The store's own words for the failure, kept as checkable detail beside the state.
-    expect(textOf(main, 'sv3-main-failure-detail')).toContain('Open Health to check the connection');
-    expect(textOf(main, 'sv3-main-failure-detail')).not.toContain('Failed to fetch');
-    expect(unreachable.getAttribute('role')).toBe('alert');
+    expect(textOf(results, 'sv3-results-failure-detail')).toContain('Open Health to check the connection');
+    expect(textOf(results, 'sv3-results-failure-detail')).not.toContain('Failed to fetch');
+    expect(failed.getAttribute('role')).toBe('alert');
     // ...and it is NOT the zero state: claiming "nothing matched" here would invent a fact about a
     // corpus nothing was ever asked of.
-    expect(main.shadowRoot?.querySelector('[data-testid="sv3-main-empty"]')).toBeNull();
-    expect(rowsOf(main)).toHaveLength(0);
+    expect(results.shadowRoot?.querySelector('[data-testid="sv3-results-empty"]')).toBeNull();
+    expect(rowsOf(results)).toHaveLength(0);
+    expect(cardOf(results)).toBeNull();
   });
 
   it('treats a refused response the same way, and words it differently from zero results', async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 502, json: () => Promise.resolve({}) });
     const el = await mount();
     await send(el, 'northfield');
-    const main = await settle(el);
+    const results = await settle(el);
 
-    await emptyElementOf(main, 'sv3-main-unreachable');
-    expect(textOf(main, 'sv3-main-failure-detail')).toContain('Search could not be completed. Open Health');
+    await emptyElementOf(results, 'sv3-results-failed');
+    expect(textOf(results, 'sv3-results-failure-detail')).toContain(
+      'Search could not be completed. Open Health',
+    );
     // The two states must be distinguishable on screen, not merely in the code that picked them.
     expect(MAIN_UNREACHABLE.title).not.toBe(MAIN_EMPTY.title);
     expect(MAIN_UNREACHABLE.description).not.toBe(MAIN_EMPTY.description);
@@ -337,15 +376,17 @@ describe('the four outcomes are distinct, and each says only what it knows', () 
     }) });
     const el = await mount();
     await send(el, 'northfield');
-    const main = await settle(el);
-    const failure = await emptyElementOf(main, 'sv3-main-unreachable');
+    const results = await settle(el);
+    const failure = await emptyElementOf(results, 'sv3-results-failed');
     expect(failure.getAttribute('role')).toBe('alert');
-    expect(textOf(main, 'sv3-main-failure-detail')).toContain('The search index is not available. Try searching again.');
-    expect(main.shadowRoot?.querySelector('[data-testid="sv3-main-empty"]')).toBeNull();
+    expect(textOf(results, 'sv3-results-failure-detail')).toContain(
+      'The search index is not available. Try searching again.',
+    );
+    expect(results.shadowRoot?.querySelector('[data-testid="sv3-results-empty"]')).toBeNull();
     expect(searches()).toHaveLength(1);
   });
 
-  it('recovers: a second send replaces the failure with the results it gets', async () => {
+  it('recovers: a second search replaces the failure with the results it gets', async () => {
     fetchMock.mockRejectedValueOnce(new Error('Failed to fetch'));
     const el = await mount();
     await send(el, 'northfield');
@@ -353,8 +394,8 @@ describe('the four outcomes are distinct, and each says only what it knows', () 
 
     respond({ results: [hit('Contracts/Northfield.pdf')], totalHits: 1, matchCount: 1 });
     await send(el, 'northfield contract');
-    const main = await settle(el);
-    expect(main.shadowRoot?.querySelector('[data-testid="sv3-main-unreachable"]')).toBeNull();
-    expect(rowsOf(main)).toHaveLength(1);
+    const results = await settle(el);
+    expect(results.shadowRoot?.querySelector('[data-testid="sv3-results-failed"]')).toBeNull();
+    expect(rowsOf(results)).toHaveLength(1);
   });
 });

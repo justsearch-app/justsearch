@@ -37,9 +37,108 @@ const IS_LINUX = process.platform === 'linux';
 // Fixtures
 // ---------------------------------------------------------------------------
 
+/** Fail with what was being waited for when promise has not settled within ms. */
+function within(promise, ms, what) {
+  let timer;
+  const expiry = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${what}: nothing within ${ms} ms`)), ms);
+  });
+  return Promise.race([promise, expiry]).finally(() => clearTimeout(timer));
+}
+
+const STOP_MS = 5000;
+
+/**
+ * Every child process a test starts, until it has exited. stop says how it is meant to end:
+ * 'self' (it exits on its own; still running at cleanup is reported), 'stdin' (it exits when its
+ * stdin closes; a kill is reported) or 'kill' (a helper server stopped by a signal).
+ */
+const liveChildren = new Set();
+
+function spawnNode(args, options, stop) {
+  const child = spawn(process.execPath, args, options);
+  const entry = { child, stop, what: path.basename(String(args[0])).slice(0, 40), exited: new Promise((resolve) => child.once('exit', resolve)) };
+  liveChildren.add(entry);
+  entry.exited.then(() => liveChildren.delete(entry));
+  return child;
+}
+
+/**
+ * Stop one child and wait for it to exit: its own way first, then SIGTERM, then SIGKILL.
+ * Returns { problem, alive }. A child alive after SIGKILL is let go (unref'd, pipes closed) so
+ * the runner can still exit; the caller must not remove its folders.
+ */
+async function stopChild({ child, stop, what, exited }) {
+  const name = `child pid ${child.pid} (${what})`;
+  const gone = () => within(exited, STOP_MS, '').then(() => true, () => false);
+  const notes = [];
+  if (stop === 'stdin') {
+    child.stdin.end();
+    if (await gone()) return { problem: null, alive: false };
+    notes.push(`did not exit within ${STOP_MS} ms of its stdin closing`);
+  } else if (stop === 'self') {
+    notes.push('was still running at cleanup');
+  }
+  child.kill('SIGTERM');
+  if (await gone()) {
+    return { problem: notes.length ? `${name} ${notes.join(', ')}; terminated` : null, alive: false };
+  }
+  notes.push(`ignored SIGTERM for ${STOP_MS} ms`);
+  child.kill('SIGKILL');
+  if (await gone()) return { problem: `${name} ${notes.join(', ')}; force-killed`, alive: false };
+  child.unref();
+  for (const stream of [child.stdin, child.stdout, child.stderr]) stream?.destroy();
+  return { problem: `${name} ${notes.join(', ')}; STILL ALIVE ${STOP_MS} ms after SIGKILL`, alive: true };
+}
+
+/**
+ * The test's resources, released by one after hook in a fixed order: every child stops and has
+ * exited, then the services close, then the temp folders are removed (Windows refuses to remove
+ * a folder that is a live process's cwd). A failing step does not skip the later ones; all
+ * problems fail the test together.
+ */
+const resources = new WeakMap();
+
+function cleanup(t) {
+  let held = resources.get(t);
+  if (!held) {
+    held = { services: [], roots: [] };
+    resources.set(t, held);
+    t.after(async () => {
+      const problems = [];
+      let survivors = 0;
+      for (const entry of [...liveChildren]) {
+        const { problem, alive } = await stopChild(entry);
+        if (problem) problems.push(problem);
+        if (alive) {
+          survivors++;
+          liveChildren.delete(entry); // reported here; later tests do not wait on it again
+        }
+      }
+      for (const close of held.services) await close();
+      for (const root of held.roots) {
+        if (survivors) {
+          problems.push(`left ${root} in place: a child is still alive`);
+          continue;
+        }
+        try {
+          fs.rmSync(root, { recursive: true, force: true });
+        } catch (e) {
+          problems.push(`could not remove ${root}: ${e.code || e.message}`);
+        }
+      }
+      if (problems.length) {
+        for (const problem of problems) t.diagnostic(`cleanup: ${problem}`); // shown even when the test already failed
+        throw new Error(`cleanup:\n${problems.join('\n')}`);
+      }
+    });
+  }
+  return held;
+}
+
 function tempRoot(t) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'js-engine-discovery-')));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  cleanup(t).roots.push(root);
   return root;
 }
 
@@ -102,6 +201,9 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
   const requests = [];
   // holdUrl: a request to it is answered only when release(body) is called (a slow Engine call).
   let held = null;
+  // lastAnswers(): from then on every answer closes its connection, as a stopping Engine's does,
+  // so the client keeps no idle connection to reuse once the Engine is gone.
+  let closing = false;
   let heldArrived;
   const arrived = new Promise((resolve) => (heldArrived = resolve));
   const server = http.createServer((req, res) => {
@@ -110,7 +212,7 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
     req.on('end', () => {
       requests.push({ method: req.method, url: req.url, headers: req.headers, body, health: healthStatus });
       const json = (status, obj) => {
-        res.writeHead(status, { 'content-type': 'application/json' });
+        res.writeHead(status, { 'content-type': 'application/json', ...(closing ? { connection: 'close' } : {}) });
         res.end(JSON.stringify(obj));
       };
       if (holdUrl && req.url === holdUrl && !held) {
@@ -170,28 +272,34 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
     }
     return closed;
   };
-  t.after(close);
+  cleanup(t).services.push(close);
   const setHealth = (status) => {
     healthStatus = status;
   };
   /** Stop listening but keep open connections (a held response can still be sent). */
   const stopListening = () => new Promise((resolve) => server.close(resolve) && resolve());
   const release = (obj) => held(obj);
-  return { kind, pid, instanceId: id, port: server.address().port, requests, token, close, setHealth, arrived, release, stopListening, stats };
+  const lastAnswers = () => {
+    closing = true;
+  };
+  return { kind, pid, instanceId: id, port: server.address().port, requests, token, close, setHealth, arrived, release, stopListening, lastAnswers, stats };
 }
 
 /** Resolve once the service has received the client's notifications/initialized (its handshake is done). */
-async function handshakeDone(service, { stream = false } = {}) {
+async function handshakeDone(service, { stream = false, timeoutMs = 10000 } = {}) {
   const done = () =>
     service.requests.some((r) => r.url === '/mcp' && r.body.includes('notifications/initialized')) &&
     (!stream || service.requests.some((r) => r.url === '/mcp' && r.method === 'GET'));
-  while (!done()) await new Promise((resolve) => setTimeout(resolve, 10));
+  const deadline = Date.now() + timeoutMs;
+  while (!done()) {
+    if (Date.now() >= deadline) throw new Error(`handshake: not done within ${timeoutMs} ms`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 }
 
 /** A live process that serves nothing (it only sleeps): an unrelated live pid. */
 async function unrelatedLivePid(t) {
-  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
-  t.after(() => child.kill());
+  const child = spawnNode(['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' }, 'kill');
   await once(child, 'spawn');
   return child.pid;
 }
@@ -222,20 +330,23 @@ const server = http.createServer((req, res) => {
     json(404, {});
   });
 });
+server.on('connection', () => process.stdout.write('CONN\\n'));
 server.listen(port, '127.0.0.1', () => process.stdout.write('LISTENING ' + server.address().port + '\\n'));
 `;
 
 /**
  * A foreign HTTP server in its own process that copies an Engine's identity: it answers
  * /api/runtime/live with the given pid and instanceId, /api/health 200, a token and /mcp.
- * Every request it receives is recorded in requests.
+ * Every connection it accepts and every request it receives is reported on its stdout;
+ * settled() resolves to { connections, requests } once everything it got before the call is in.
  */
 async function startImpostor(t, { port = 0, pid, instanceId, token = 'impostor-token' }) {
-  const child = spawn(process.execPath, ['-e', IMPOSTOR_SOURCE, JSON.stringify({ port, pid, instanceId, token })], {
+  const child = spawnNode(['-e', IMPOSTOR_SOURCE, JSON.stringify({ port, pid, instanceId, token })], {
     stdio: ['ignore', 'pipe', 'inherit'],
-  });
-  t.after(() => child.kill());
+  }, 'kill');
   const requests = [];
+  let connections = 0;
+  let synced = null;
   let out = '';
   const listening = new Promise((resolve, reject) => {
     child.once('exit', (code) => reject(new Error(`impostor exited ${code}`)));
@@ -246,16 +357,41 @@ async function startImpostor(t, { port = 0, pid, instanceId, token = 'impostor-t
         const line = out.slice(0, nl);
         out = out.slice(nl + 1);
         if (line.startsWith('LISTENING ')) resolve(Number(line.slice(10)));
-        if (line.startsWith('REQ ')) requests.push(JSON.parse(line.slice(4)));
+        if (line === 'CONN') connections++;
+        if (line.startsWith('REQ ')) {
+          const req = JSON.parse(line.slice(4));
+          if (req.url === '/__settled') synced?.();
+          else requests.push(req);
+        }
       }
     });
   });
-  return { port: await listening, pid: child.pid, instanceId, requests };
+  const boundPort = await within(listening, 10000, 'impostor listening');
+  /**
+   * The test's own request goes through the same accept queue after everything the clients
+   * sent; once the impostor reports it, every earlier connection and request is recorded.
+   */
+  const settled = async () => {
+    const seen = new Promise((resolve) => (synced = resolve));
+    const req = http.get({ host: '127.0.0.1', port: boundPort, path: '/__settled', agent: false });
+    const answered = new Promise((resolve, reject) => {
+      req.on('response', (res) => res.resume().on('end', resolve).on('error', reject));
+      req.on('error', reject);
+    });
+    try {
+      // One deadline for the whole exchange: connect, the impostor's report, its response.
+      await within(Promise.all([answered, seen]), 10000, 'impostor report');
+    } finally {
+      req.destroy();
+    }
+    return { connections: connections - 1, requests: [...requests] };
+  };
+  return { port: boundPort, pid: child.pid, instanceId, requests, settled };
 }
 
 /** A pid that existed and has exited. */
 async function deadPid() {
-  const child = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
+  const child = spawnNode(['-e', ''], { stdio: 'ignore' }, 'self');
   await new Promise((resolve) => child.on('exit', resolve));
   return child.pid;
 }
@@ -271,7 +407,7 @@ async function closedPort() {
 
 function run(args, { env, cwd, input, timeoutMs = 20000 }) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, args, { env, cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawnNode(args, { env, cwd, stdio: ['pipe', 'pipe', 'pipe'] }, 'self');
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (d) => (stdout += d));
@@ -334,7 +470,7 @@ async function bridgeSession(m, entry, envExtra = {}) {
     `${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'justsearch_ingest', arguments: { paths: ['/x'] } } })}\n`;
   // The bridge exits when stdin closes; give it the messages, then close after the replies.
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [entry], { env: { ...m.env, ...envExtra }, cwd: m.cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawnNode([entry], { env: { ...m.env, ...envExtra }, cwd: m.cwd, stdio: ['pipe', 'pipe', 'pipe'] }, 'self');
     let stdout = '';
     let stderr = '';
     const messages = [];
@@ -364,7 +500,7 @@ async function bridgeSession(m, entry, envExtra = {}) {
  * tools/call. Returns the parsed stdout messages and stderr.
  */
 async function bridgeInteractive(m, entry, between) {
-  const child = spawn(process.execPath, [entry], { env: m.env, cwd: m.cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawnNode([entry], { env: m.env, cwd: m.cwd, stdio: ['pipe', 'pipe', 'pipe'] }, 'self');
   const messages = [];
   let stdout = '';
   let stderr = '';
@@ -456,6 +592,8 @@ test('D1/D2/D3: the extracted MCPB bundle connects to the desktop Engine and a m
   writeManifest(m.desktop, manifestFor(engine));
   const entry = bundle(root);
   assert.ok(!entry.startsWith(repoRoot), 'the bundle runs outside the checkout');
+  // Dependency-free even where the SDK is installed: from there it cannot resolve the SDK.
+  assert.throws(() => createRequire(entry).resolve('@modelcontextprotocol/sdk/server/mcp.js'), { code: 'MODULE_NOT_FOUND' });
   assertConnectedTo(await bridgeSession(m, entry), engine);
 });
 
@@ -652,7 +790,7 @@ test('D4/D9: a foreign server copying the manifest identity with an unrelated li
   const session = await bridgeSession(m, bundle(root), { JUSTSEARCH_DATA_DIR: impostorDir });
   assertConnectedTo(session, engine);
   assert.match(session.stderr, /using the Engine in .*io\.justsearch\.shell/);
-  assert.deepEqual(impostor.requests, [], 'nothing at all is sent to the impostor');
+  assert.deepEqual((await impostor.settled()).requests, [], 'nothing at all is sent to the impostor');
 });
 
 test('D4: a proven Engine still starting (/api/health 503) is waited for and admitted once it answers 200 — by both clients, no token before 200', async (t) => {
@@ -748,7 +886,7 @@ test('D9: after initialize the Engine goes away and a foreign server takes its p
   assert.equal(session.messages.find((x) => x.id === 1)?.result?.serverInfo?.name, `engine ${engine.instanceId}`, session.stderr);
   assert.ok(impostor, 'the foreign server bound the freed port');
   assert.deepEqual(
-    impostor.requests.filter((r) => r.url === '/mcp' || r.session),
+    (await impostor.settled()).requests.filter((r) => r.url === '/mcp' || r.session),
     [],
     `no MCP traffic and no token reach the foreign server\n${session.stderr}`,
   );
@@ -775,17 +913,15 @@ test('D9: when the Engine restarts on a new port, the bridge re-proves it and us
   assert.ok(!second.requests.some((r) => r.headers['x-justsearch-session'] === 'token-first'), 'the old token never reaches the new Engine');
 });
 
-let sdkAvailable = true;
-try {
-  require.resolve('@modelcontextprotocol/sdk/server/mcp.js', { paths: [path.join(repoRoot, 'scripts', 'prod')] });
-} catch {
-  sdkAvailable = false;
-}
-
 /** The production MCP server over stdio, initialized; call(name, args) runs one tool. */
 async function startProdMcp(t, m) {
-  const child = spawn(process.execPath, [PROD_MCP_ENTRY], { env: m.env, cwd: m.cwd, stdio: ['pipe', 'pipe', 'pipe'] });
-  t.after(() => child.kill());
+  // The SDK is a root devDependency: without it these cases fail, they are never skipped.
+  assert.doesNotThrow(
+    () => require.resolve('@modelcontextprotocol/sdk/server/mcp.js', { paths: [path.join(repoRoot, 'scripts', 'prod')] }),
+    'production MCP needs the MCP SDK: run npm ci at the repository root',
+  );
+  const child = spawnNode([PROD_MCP_ENTRY], { env: m.env, cwd: m.cwd, stdio: ['pipe', 'pipe', 'pipe'] }, 'stdin');
+  child.stdin.on('error', () => {}); // a failed test may leave it exiting while we write
   let stderr = '';
   child.stderr.on('data', (d) => (stderr += d));
   const replies = new Map();
@@ -802,16 +938,19 @@ async function startProdMcp(t, m) {
     }
   });
   let nextId = 1;
-  const request = (method, params) =>
-    new Promise((resolve, reject) => {
-      const id = nextId++;
-      const timer = setTimeout(() => reject(new Error(`${method} timed out\n${stderr}`)), 30000);
-      replies.set(id, (msg) => {
-        clearTimeout(timer);
-        resolve(msg);
-      });
-      child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+  const exited = new Promise((resolve) => child.once('exit', resolve));
+  // A reply, or a failure: no reply within 30 s, or the server exited first.
+  const request = (method, params) => {
+    const id = nextId++;
+    const reply = new Promise((resolve) => replies.set(id, resolve));
+    const gone = exited.then((code) => {
+      throw new Error(`production MCP exited (${code}) before answering ${method}`);
     });
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+    return within(Promise.race([reply, gone]), 30000, method).catch((e) => {
+      throw new Error(`${e.message}\n${stderr}`);
+    });
+  };
   await request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } });
   child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
   return {
@@ -822,42 +961,53 @@ async function startProdMcp(t, m) {
   };
 }
 
-const NEEDS_SDK = { skip: !sdkAvailable && 'needs the MCP SDK (npm ci)' };
-
-test('D9: production MCP stops sending its token once the Engine no longer holds the port', NEEDS_SDK, async (t) => {
+test('D9: production MCP stops sending its token once the Engine no longer holds the port', async (t) => {
   const root = tempRoot(t);
   const m = machine(root);
   const engine = await startService(t);
   writeManifest(m.desktop, manifestFor(engine));
   const prod = await startProdMcp(t, m);
   const ingest = { paths: [path.join(root, 'doc.txt')] };
+  // The Engine's last answer closes its connection, so the next call opens a new one to the port and
+  // meets the proof. Without it the client may reuse its idle connection before it notices the
+  // Engine closed it: that call fails with a reset (NOT_CONNECTED) and never tries the port.
+  engine.lastAnswers();
   assert.match(await prod.call('justsearch_ingest', ingest), new RegExp(`ingest by ${engine.instanceId}`), prod.stderr);
   assert.equal(engine.requests.find((r) => r.url === '/api/knowledge/ingest')?.headers['x-justsearch-session'], engine.token);
 
   await engine.close();
   const impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
   assert.match(await prod.call('justsearch_ingest', ingest), /ENGINE_GONE/, prod.stderr);
-  assert.deepEqual(impostor.requests, [], 'nothing, and no token, reaches the foreign server');
+  const seen = await impostor.settled();
+  assert.deepEqual(seen.requests, [], 'nothing, and no token, reaches the foreign server');
+  assert.ok(seen.connections > 0, `the call tried the port and was refused there\n${prod.stderr}`);
 });
 
-test('D9: production MCP re-proves the Engine before each request inside one answer call (port taken over while retrieve-context is pending, old process alive)', NEEDS_SDK, async (t) => {
+test('D9: production MCP re-proves the Engine before each request inside one answer call (port taken over while retrieve-context is pending, old process alive)', async (t) => {
   const root = tempRoot(t);
   const m = machine(root);
   const engine = await startService(t, { holdUrl: '/api/knowledge/retrieve-context' });
   writeManifest(m.desktop, manifestFor(engine));
   const prod = await startProdMcp(t, m);
   const answer = prod.call('justsearch_answer', { query: 'tides', verify_citations: { answer_text: 'The keeper writes notes.' } });
-  await engine.arrived;
+  await within(engine.arrived, 10000, 'retrieve-context arriving at the Engine');
   await engine.stopListening(); // the listener goes; this process (the manifest pid) stays alive
   const impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
   engine.release({ context: `context by ${engine.instanceId}`, total_found: 1, chunks: [], quality: {} });
   const result = await answer;
-  assert.deepEqual(impostor.requests, [], `no continuation request reaches the process that took the port\n${prod.stderr}`);
+  const seen = await impostor.settled();
+  assert.deepEqual(seen.requests, [], `no continuation request reaches the process that took the port\n${prod.stderr}`);
   assert.ok(!engine.requests.some((r) => r.url === '/api/knowledge/search'), 'the continuation did not slip through on the old connection');
   assert.doesNotMatch(result, /impostor/, 'nothing from the replacement ends up in the answer');
+  // The observed refusal: the continuations connected to the port, were refused before writing,
+  // and the answer is the proven Engine's context without the refused citation check.
+  assert.ok(seen.connections > 0, `the continuation tried the port and was refused there\n${prod.stderr}`);
+  const answered = JSON.parse(result).structuredContent;
+  assert.equal(answered?.context, `context by ${engine.instanceId}`, result);
+  assert.equal(answered.citations, undefined, 'the refused citation check adds nothing');
 });
 
-test('D9: production MCP status and operation outcome never contact a replacement on the port', NEEDS_SDK, async (t) => {
+test('D9: production MCP status and operation outcome never contact a replacement on the port', async (t) => {
   const root = tempRoot(t);
   const m = machine(root);
   const engine = await startService(t);
@@ -865,13 +1015,16 @@ test('D9: production MCP status and operation outcome never contact a replacemen
   const prod = await startProdMcp(t, m);
   assert.match(await prod.call('justsearch_status', {}), /"ok":true/, prod.stderr);
   assert.match(await prod.call('justsearch_operation_outcome', { operationKey: '01a151fd-a1a7-7afe-b8a8-6a7100a146f6' }), new RegExp(engine.instanceId), prod.stderr);
+  engine.lastAnswers(); // the next calls need a new connection to the port (see the ingest case)
   assert.match(await prod.call('justsearch_status', {}), /"ok":true/, prod.stderr);
   assert.equal(engine.stats.connections, 1, 'discovery, the token and every call share one proven connection');
   await engine.stopListening();
   const impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
   assert.match(await prod.call('justsearch_status', {}), /ENGINE_GONE/, prod.stderr);
   assert.match(await prod.call('justsearch_operation_outcome', { operationKey: '01a151fd-a1a7-7afe-b8a8-6a7100a146f6' }), /ENGINE_GONE/, prod.stderr);
-  assert.deepEqual(impostor.requests, [], 'neither call contacts the replacement');
+  const seen = await impostor.settled();
+  assert.deepEqual(seen.requests, [], 'neither call contacts the replacement');
+  assert.ok(seen.connections > 0, `the calls tried the port and were refused there\n${prod.stderr}`);
 });
 
 /**
@@ -879,7 +1032,7 @@ test('D9: production MCP status and operation outcome never contact a replacemen
  * different process bind the same port, then answer the held request. Resolves to that process.
  */
 async function takeOverWhileHeld(t, service, answer) {
-  await service.arrived;
+  await within(service.arrived, 10000, `the held request arriving at the Engine on port ${service.port}`);
   await service.stopListening();
   const impostor = await startImpostor(t, { port: service.port, pid: service.pid, instanceId: service.instanceId });
   service.release(answer);
@@ -895,7 +1048,20 @@ test('D9: the port is taken while /api/health is pending — neither client send
     writeManifest(m.desktop, manifestFor(engine));
     const run = client === 'production MCP' ? prodDiscover(m) : bridgeSession(m, bundle(root));
     const [res, impostor] = await Promise.all([run, takeOverWhileHeld(t, engine, { ok: true })]);
-    reached[client] = { requests: impostor.requests, answersFromIt: /impostor/.test(JSON.stringify(res.result ?? res.messages)) };
+    const seen = await impostor.settled();
+    reached[client] = { requests: seen.requests, answersFromIt: /impostor/.test(JSON.stringify(res.result ?? res.messages)) };
+    // The observed refusal, never a timeout or a crash: it tried the port, wrote nothing, and ...
+    assert.ok(seen.connections > 0, `${client}: it tried the replacement's port\n${res.stderr}`);
+    if (client === 'production MCP') {
+      // ... discovery returns the proven Engine with no token.
+      assert.equal(res.code, 0, res.stderr);
+      assert.equal(res.result.instanceId, engine.instanceId, res.stderr);
+      assert.equal(res.result.token, null, 'the token bootstrap to the replacement is refused');
+    } else {
+      // ... the bridge exits naming the refusal.
+      assert.equal(res.code, 1, res.stderr);
+      assert.match(res.stderr, new RegExp(`owner-mismatch: the connection to port ${engine.port} is held by `));
+    }
   }
   const none = { requests: [], answersFromIt: false };
   assert.deepEqual(reached, { 'production MCP': none, bundle: none }, 'nothing reaches the process that took the port, and nothing from it is used');
@@ -915,10 +1081,13 @@ async function bridgeReconnectSwap(t, holdUrl, answer) {
     writeManifest(m.desktop, manifestFor(second));
     swap = takeOverWhileHeld(t, second, answer); // runs while the bridge reconnects for the next call
   });
-  const impostor = await swap;
-  assert.deepEqual(impostor.requests, [], `no request, and neither token, reaches the process that took the port\n${session.stderr}`);
+  const seen = await (await swap).settled();
+  assert.deepEqual(seen.requests, [], `no request, and neither token, reaches the process that took the port\n${session.stderr}`);
   const call = session.messages.find((x) => x.id === 2);
   assert.ok(call?.error, `the call fails instead of reaching the replacement: ${JSON.stringify(call)}\n${session.stderr}`);
+  // The observed refusal: it tried the port and the call's error names why it wrote nothing.
+  assert.ok(seen.connections > 0, `the bridge tried the replacement's port\n${session.stderr}`);
+  assert.match(call.error.message, /owner-mismatch/, session.stderr);
 }
 
 test('D9: bridge reconnect — the restarted Engine\'s port is taken while its token response is pending', async (t) => {
