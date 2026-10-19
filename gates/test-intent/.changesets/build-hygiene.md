@@ -59,3 +59,14 @@ was unavailable. Independent acceptance is intentionally absent.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-build-hygiene-cc6d91b2",
+  "verdict": "accept",
+  "digest": "sha256:d85510396bb8b6e3365a0e99b7a1ca7946fc40b15799a94ff3c419bfd831be75",
+  "note": "Verifier reproduced: ORT test cache off /tmp, tmpdir no longer a CC input (mutation caught), no tests changed, ORT/cross-module tests and build+spotless pass"
+}
+```
