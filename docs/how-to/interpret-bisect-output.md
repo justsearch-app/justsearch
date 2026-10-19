@@ -186,5 +186,5 @@ this in production.
   `--synthesize`.
 - `docs/reference/configuration/environment-variables.md` —
   `JUSTSEARCH_MANIFEST_OVERRIDE` + `_DANGEROUS` semantics.
-- `scripts/jseval/jseval/cli.py::cmd_bisect` — tool.
+- `scripts/jseval/jseval/commands/analysis.py::cmd_bisect` — tool.
 - `scripts/jseval/jseval/bisection.py` — implementation.

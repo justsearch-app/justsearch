@@ -9,7 +9,7 @@ description: "Launch the JustSearch backend as a local loopback service without 
 
 ## What this does
 
-Runs the JustSearch backend (the Head process + its Worker) as a local, loopback-only
+Runs the JustSearch backend (one Engine JVM with API and index halves) as a local, loopback-only
 service **without** the Tauri desktop shell, in a chosen install/runtime **mode** (tempdoc 657):
 
 | Mode | What it is | Model tiers |
@@ -42,18 +42,19 @@ On Windows, the PowerShell form is:
 .\justsearch-headless.ps1 -Mode mcp-lite
 ```
 
-To reuse an existing install's data and models, set these before launching:
+To reuse the desktop app's index, settings, and models, quit the desktop app first, then
+set both roots to its data folder before launching. Do not run two Engines against the same data:
 
 ```bat
-set JUSTSEARCH_DATA_DIR=%LOCALAPPDATA%\JustSearch\data
+set JUSTSEARCH_DATA_DIR=%APPDATA%\io.justsearch.shell
 set JUSTSEARCH_HOME=%APPDATA%\io.justsearch.shell
 ```
 
 On Linux, set the corresponding paths in Bash before invoking the launcher:
 
 ```sh
-export JUSTSEARCH_DATA_DIR=/absolute/path/to/engine-data
-export JUSTSEARCH_HOME=/absolute/path/to/ai-assets
+export JUSTSEARCH_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/io.justsearch.shell"
+export JUSTSEARCH_HOME="$JUSTSEARCH_DATA_DIR"
 ```
 
 The desktop shell retains its platform app-data directory. On Linux its private
@@ -73,7 +74,10 @@ variable is `JUSTSEARCH_MODE` (see `docs/reference/configuration/environment-var
 
 ## Confirm the active mode
 
-The runtime manifest reports the mode. With the API port known (default dev port `33221`):
+The launcher prints `JUSTSEARCH_API_PORT=<port>` on stdout and records `head.apiPort` in
+`<data>/runtime/manifest.json`. Bundle launchers default to `8080`, falling back to a free port
+if taken; `JUSTSEARCH_API_PORT` overrides the requested port. The Gradle `runHeadless` task
+defaults to `33221`. Substitute the actual port below (these examples use `33221`):
 
 ```bash
 curl -s http://127.0.0.1:33221/api/runtime/manifest | jq '.mode'
@@ -82,7 +86,7 @@ curl -s http://127.0.0.1:33221/api/runtime/manifest | jq '.mode'
 
 - `intent` is the mode you launched with.
 - `realized` is the coarse capability actually up: `full` (retrieval + LLM ready),
-  `retrieval-only` (retrieval up, LLM not present/needed), or `degraded` (worker not ready).
+  `retrieval-only` (retrieval up, LLM not present/needed), or `degraded` (index half not ready).
   `realized` reflects reality, so it can differ from `intent` while things start up or if a
   component is down.
 
@@ -94,7 +98,10 @@ curl -s http://127.0.0.1:33221/api/ai/install/plan-preview | jq '.tiers'
 
 ## Notes
 
-- The service binds to `127.0.0.1` only, like the desktop app.
+- The service binds to `127.0.0.1` only. These launchers do not set production mode, so they
+  do not mint or enforce the desktop app's per-boot mutation token by default. Host/Origin
+  filters still apply; local callers can mutate without that token. Use these launchers
+  only where all local callers are trusted. The desktop shell explicitly enables production mode.
 - Agent clients connect over the production MCP endpoint (`POST /mcp`); which tools a lite
   deployment exposes is governed separately (see the MCP production server reference).
 - This is a launch mode, not a separate build — the same `ui-headless.jar` runs every mode.
