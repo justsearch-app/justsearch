@@ -93,7 +93,9 @@ export function buildTrendReport({ runs = [], policy = {} }) {
   for (const lane of lanes) {
     const ceiling = lane?.advisoryBudgets?.maxWallSeconds;
     const samples = [];
+    const parts = lanes.filter((part) => part.requiredCheck === lane.job && part.job !== lane.job).map((part) => part.job);
     for (const run of runs) {
+      if (parts.length && !parts.every((name) => run.jobs?.some((job) => job.name === name))) continue;
       const job = (run.jobs || []).find((j) => j.name === lane.job);
       if (job && Number.isFinite(job.wallSeconds)) samples.push(job.wallSeconds);
     }

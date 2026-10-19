@@ -111,7 +111,12 @@ export function buildWalltimeBudgetReport({ attribution, policy, now = new Date(
 
   const evaluated = [];
   for (const job of jobs) {
-    const lane = laneByJob.get(job.name);
+    let lane = laneByJob.get(job.name);
+    const parts = [...laneByJob.values()].filter((part) => part.requiredCheck === job.name && part.job !== job.name);
+    if (parts.length && parts.every((part) => !jobNames.has(part.job))) {
+      warnings.push(warn('legacy-unsplit-lane', `${job.name} predates the split; its work duration is not an aggregate duration.`, { job: job.name }));
+      lane = undefined;
+    }
     const ceiling = lane?.advisoryBudgets?.maxWallSeconds;
     const hasCeiling = Number.isFinite(ceiling);
     if (hasCeiling && job.wallSeconds > ceiling) {
