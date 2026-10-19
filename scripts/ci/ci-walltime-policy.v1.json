@@ -19,8 +19,8 @@
       "job": "Unit tests (app-ui)",
       "requiredCheck": "Unit tests (app-ui)",
       "owner": "app and UI hosted unit evidence",
-      "hardTimeoutSeconds": 1500,
-      "notes": "Recent median 111s, observed max 390s.",
+      "hardTimeoutSeconds": 2700,
+      "notes": "Recent median 111s, observed max 390s, both with Gradle cache hits. Uncached after the Linux port: about 2200s (2026-10-19), hence the 45-minute job cap.",
       "advisoryBudgets": { "maxWallSeconds": 450 }
     },
     {
