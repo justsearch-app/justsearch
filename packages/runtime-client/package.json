@@ -46,7 +46,7 @@
   },
   "devDependencies": {
     "@types/node": "20.19.43",
-    "orval": "8.27.0",
+    "orval": "8.32.0",
     "typescript": "5.9.3"
   },
   "publishConfig": {
