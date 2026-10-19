@@ -115,6 +115,11 @@ testing {
       targets {
         all {
           testTask.configure {
+            // The launcher regression test reads these files outside the Java source sets.
+            inputs.files(
+              rootProject.file("packaging/headless/justsearch-headless.cmd"),
+              rootProject.file("packaging/headless/justsearch-headless.ps1"),
+            ).withPathSensitivity(PathSensitivity.RELATIVE)
             jvmArgs(
               // Enable ByteBuddy experimental mode for JDK 25 support (until ByteBuddy 1.17.5+)
               "-Dnet.bytebuddy.experimental=true"

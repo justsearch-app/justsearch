@@ -30,10 +30,11 @@ From an installed bundle (the launcher sits next to `ui-headless.jar`):
 justsearch-headless.cmd mcp-lite
 ```
 
-On Linux, from an installed Gradle distribution, use its native launcher:
+On Linux, from a source checkout after `:modules:ui:installDist`, start the installed
+distribution's native launcher in production mode:
 
 ```sh
-JUSTSEARCH_MODE=mcp-lite /absolute/path/to/ui/bin/ui
+JAVA_OPTS=-Djustsearch.prod=true JUSTSEARCH_MODE=mcp-lite modules/ui/build/install/ui/bin/ui
 ```
 
 On Windows, the PowerShell form is:
@@ -70,6 +71,25 @@ node scripts/lib/tool-invoker.cjs gradle :modules:ui:runHeadless -Pmode=mcp-lite
 
 `-Pmode` sets `-Djustsearch.mode`; omit it for `full-desktop`. The equivalent environment
 variable is `JUSTSEARCH_MODE` (see `docs/reference/configuration/environment-variables.md`).
+This dev task stays in development mode and does not require a session token.
+
+## Authenticate API changes
+
+The packaged headless launchers and the Linux production command above require a
+per-boot session token for API changes. Read `head.sessionToken` from the local
+`<data>/runtime/manifest.json` file, where `<data>` is the Engine data directory
+(or `JUSTSEARCH_DATA_DIR` when set), and send it in the `X-JustSearch-Session` header:
+
+```bash
+SESSION_TOKEN=$(jq -r '.head.sessionToken' "$JUSTSEARCH_DATA_DIR/runtime/manifest.json")
+curl -s -X POST http://127.0.0.1:33221/api/knowledge/search \
+  -H "X-JustSearch-Session: $SESSION_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"example"}'
+```
+
+Use the Engine's actual API port in place of `33221` if different. The token changes
+on each boot; missing or incorrect tokens receive HTTP `401` on protected requests.
 
 ## Confirm the active mode
 
@@ -94,7 +114,8 @@ curl -s http://127.0.0.1:33221/api/ai/install/plan-preview | jq '.tiers'
 
 ## Notes
 
-- The service binds to `127.0.0.1` only, like the desktop app.
+- The service binds only to loopback (`127.0.0.1`); production API changes also
+  require the per-boot session token.
 - Agent clients connect over the production MCP endpoint (`POST /mcp`); which tools a lite
   deployment exposes is governed separately (see the MCP production server reference).
 - This is a launch mode, not a separate build — the same `ui-headless.jar` runs every mode.
