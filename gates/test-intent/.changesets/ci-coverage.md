@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: ci-coverage
 author-role: builder
-author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
+author-session: 01a153ce-3f19-7fa0-a7cf-5b554794f7f8
 ---
 
 # CI coverage and test lifetime cleanup
