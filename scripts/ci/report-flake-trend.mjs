@@ -219,11 +219,12 @@ export function ensureRunRecord(ghBin, repo, run, laneMap, cacheDir) {
   const lanes = {};
   for (const [laneName, { artifact, file }] of Object.entries(laneMap)) {
     const scratchDir = path.join(cacheDir, '_scratch', String(run.id), laneName);
-    const job = jobs.find((j) => j.name === `Unit tests (${laneName})`);
+    const jobName = laneName === 'integration-tests' ? 'Integration tests (system-tests tier)' : `Unit tests (${laneName})`;
+    const job = jobs.find((j) => j.name === jobName);
     const selected = job ? selectJobArtifact(artifacts, artifact, job) : null;
     const json = selected ? downloadAndReadJson(ghBin, repo, run.id, selected.name, file, scratchDir) : null;
     fs.rmSync(scratchDir, { recursive: true, force: true });
-    if (json && Array.isArray(json.flakyTests)) {
+    if (json && Number(json.totals?.suites) > 0 && Array.isArray(json.flakyTests)) {
       lanes[laneName] = { hasData: true, artifact: selected?.name || null, runAttempt: selected ? Number(selected.name.split('-attempt-')[1] || job?.run_attempt || 1) : null, flakyTests: json.flakyTests };
     } else {
       lanes[laneName] = { hasData: false, artifact: selected?.name || null, runAttempt: selected ? Number(selected.name.split('-attempt-')[1] || job?.run_attempt || 1) : null, flakyTests: null };
