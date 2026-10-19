@@ -469,6 +469,34 @@ async function chooseFromTurnMenu(el: Mounted, index: number, label: string): Pr
   await settle(el);
 }
 
+/** Delay one response AFTER the stateful endpoint has saved its write, as on the real HTTP race. */
+function holdWriteResponse(tail: string, method = 'POST'): () => void {
+  const serve = fetchMock.getMockImplementation() as (
+    url: unknown, init: { method?: string },
+  ) => Promise<unknown>;
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  let claimed = false;
+  fetchMock.mockImplementation(async (url: unknown, init: { method?: string } = {}) => {
+    const hold = !claimed && String(url).endsWith(tail) && init.method === method;
+    if (hold) claimed = true;
+    const response: unknown = await serve(url, init);
+    if (hold) await held;
+    return response;
+  });
+  return release;
+}
+
+/** Read the next prompt, then finish its stream so no work survives the case. */
+async function nextContext(el: Mounted): Promise<unknown> {
+  await ask(el, 'and the third?');
+  const context = backend.dispatches.at(-1)?.context;
+  stream.emit('done', {});
+  stream.end();
+  await settle(el);
+  return context;
+}
+
 const toasts = (): string[] => {
   const seen: string[] = [];
   document.addEventListener(EPHEMERAL_TOAST_EVENT, (e) => {
@@ -1514,6 +1542,197 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
 
     expect(backend.histories['uc-ctx']?.contextFloor).toBe(storedId(0));
     expect(el.sessions.sessions[0]?.history?.contextFloor).toBe(storedId(0));
+  });
+
+  it('keeps the newer floor and next Ask when an older Restore response arrives and its refresh fails', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.contextFloor = storedId(0);
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    const release = holdWriteResponse('/context-floor', 'DELETE');
+    try {
+      const main = await region(el, 'jf-sv3-main');
+      await press(main.shadowRoot?.querySelector('[data-testid="sv3-context-floor-restore"]'));
+      await settle(el);
+      expect(backend.histories['uc-ctx']?.contextFloor).toBeUndefined();
+      await chooseFromTurnMenu(el, 1, CONTEXT_MENU_RESET);
+      expect(el.sessions.sessions[0]?.history?.contextFloor).toBe(storedId(3));
+      backend.failHistoryFor.add('uc-ctx');
+    } finally {
+      release();
+      await settle(el);
+    }
+
+    expect(backend.histories['uc-ctx']?.contextFloor).toBe(storedId(3));
+    // Capture both observations before asserting: the prompt must agree with the divider.
+    const floor = el.sessions.sessions[0]?.history?.contextFloor;
+    const main = await region(el, 'jf-sv3-main');
+    const divider = main.shadowRoot?.querySelector('[data-testid="sv3-context-floor-label"]');
+    const context = await nextContext(el);
+    expect({ floor, divider: divider !== null, context }).toEqual({
+      floor: storedId(3),
+      divider: true,
+      context: [
+        { role: 'user', content: 'and the second one?' },
+        { role: 'assistant', content: 'The same lock.' },
+      ],
+    });
+  });
+
+  it('keeps a newer saved snapshot when a delayed Restore response arrives and its refresh fails', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.contextFloor = storedId(0);
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    const release = holdWriteResponse('/context-floor', 'DELETE');
+    try {
+      const main = await region(el, 'jf-sv3-main');
+      await press(main.shadowRoot?.querySelector('[data-testid="sv3-context-floor-restore"]'));
+      await settle(el);
+      // Another client changes the floor. Reopening reads that saved snapshot without issuing a
+      // context write in this window, so a write-only ordering guard cannot protect it.
+      backend.histories['uc-ctx']!.contextFloor = storedId(3);
+      await openTheOnlyConversation(el);
+      expect(el.sessions.sessions[0]?.history?.contextFloor).toBe(storedId(3));
+      backend.failHistoryFor.add('uc-ctx');
+    } finally {
+      release();
+      await settle(el);
+    }
+    expect(el.sessions.sessions[0]?.history?.contextFloor).toBe(storedId(3));
+    expect(await nextContext(el)).toEqual([
+      { role: 'user', content: 'and the second one?' },
+      { role: 'assistant', content: 'The same lock.' },
+    ]);
+  });
+
+  it('keeps the last saved snapshot when a newer floor write also cannot refresh before an older Restore response', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.contextFloor = storedId(0);
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    const release = holdWriteResponse('/context-floor', 'DELETE');
+    try {
+      const main = await region(el, 'jf-sv3-main');
+      await press(main.shadowRoot?.querySelector('[data-testid="sv3-context-floor-restore"]'));
+      await settle(el);
+      backend.failHistoryFor.add('uc-ctx');
+      await chooseFromTurnMenu(el, 1, CONTEXT_MENU_RESET);
+      expect(el.sessions.sessions[0]?.history?.contextFloor).toBe(storedId(0));
+    } finally {
+      release();
+      await settle(el);
+    }
+    expect(backend.histories['uc-ctx']?.contextFloor).toBe(storedId(3));
+    // Neither refresh confirmed a new snapshot. Retain what was last read instead of assuming
+    // the older Restore is still saved after a newer write has superseded it.
+    expect(el.sessions.sessions[0]?.history?.contextFloor).toBe(storedId(0));
+  });
+
+  it.each([
+    { action: 'exclude', initiallyHidden: false },
+    { action: 'include', initiallyHidden: true },
+    { action: 'include-all', initiallyHidden: true },
+  ])('keeps the newer exclusions and next Ask when an older $action response arrives and its refresh fails', async ({ action, initiallyHidden }) => {
+    twoTurnConversation();
+    const ids = [storedId(0), storedId(1)];
+    backend.histories['uc-ctx']!.excludedMessageIds = initiallyHidden ? ids : [];
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    // Hold the LAST message's response: both older writes are already saved, and none is pending
+    // at the server when the newer action starts. Only the success response is delayed.
+    const release = holdWriteResponse(`/messages/${storedId(1)}/exclude`);
+    try {
+      if (action === 'include-all') {
+        const bar = await region(el, 'jf-sv3-context-bar');
+        await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-include-all"]'));
+        await settle(el);
+      } else {
+        await chooseFromTurnMenu(el, 0, initiallyHidden ? CONTEXT_MENU_INCLUDE : CONTEXT_MENU_EXCLUDE);
+      }
+      expect(backend.histories['uc-ctx']?.excludedMessageIds).toEqual(initiallyHidden ? [] : ids);
+      // Dispatch the opposite context intent while the earlier response is pending.
+      const main = await region(el, 'jf-sv3-main');
+      main.dispatchEvent(new CustomEvent('sv3-context-action', {
+        detail: { action: initiallyHidden ? 'exclude' : 'include', turnId: turnsIn(main)[0]?.querySelector('[data-turn-id]')?.getAttribute('data-turn-id') },
+        bubbles: true,
+        composed: true,
+      }));
+      await settle(el);
+      expect(el.sessions.sessions[0]?.history?.excludedMessageIds).toEqual(initiallyHidden ? ids : []);
+      backend.failHistoryFor.add('uc-ctx');
+    } finally {
+      release();
+      await settle(el);
+    }
+
+    expect(backend.histories['uc-ctx']?.excludedMessageIds).toEqual(initiallyHidden ? ids : []);
+    const excluded = el.sessions.sessions[0]?.history?.excludedMessageIds;
+    const bar = await region(el, 'jf-sv3-context-bar');
+    const hidden = bar.shadowRoot?.querySelector('[data-testid="sv3-context-hidden"]') !== null;
+    const context = await nextContext(el);
+    expect({ excluded, hidden, context }).toEqual({
+      excluded: initiallyHidden ? ids : [],
+      hidden: initiallyHidden,
+      context: [
+        ...(initiallyHidden ? [] : [
+          { role: 'user', content: 'why did the renewal fail?' },
+          { role: 'assistant', content: 'The lock held.' },
+        ]),
+        { role: 'user', content: 'and the second one?' },
+        { role: 'assistant', content: 'The same lock.' },
+      ],
+    });
+  });
+
+  it.each([
+    { action: 'floor', tail: '/context-floor' },
+    { action: 'compact', tail: '/compact' },
+    { action: 'summary', tail: '/context-floor/summary' },
+  ])('preserves the newer saved context after a delayed $action response and failed refresh', async ({ action, tail }) => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.contextFloor = storedId(0);
+    backend.histories['uc-ctx']!.contextFloorSummary = 'Original summary';
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    const release = holdWriteResponse(tail);
+    const main = await region(el, 'jf-sv3-main');
+    const act = (name: string, index: number, text?: string): void => {
+      main.dispatchEvent(new CustomEvent('sv3-context-action', {
+        detail: {
+          action: name,
+          turnId: turnsIn(main)[index]?.querySelector('[data-turn-id]')?.getAttribute('data-turn-id'),
+          text,
+        },
+        bubbles: true,
+        composed: true,
+      }));
+    };
+    try {
+      act(action, 0, 'Older correction');
+      await settle(el);
+      act(action === 'summary' ? 'summary' : 'floor', 1, 'Newest correction');
+      await settle(el);
+      backend.failHistoryFor.add('uc-ctx');
+    } finally {
+      release();
+      await settle(el);
+    }
+    const expectedFloor = action === 'summary' ? storedId(0) : storedId(3);
+    const expectedSummary = action === 'summary' ? 'Newest correction' : undefined;
+    expect(backend.histories['uc-ctx']?.contextFloor).toBe(expectedFloor);
+    expect(backend.histories['uc-ctx']?.contextFloorSummary).toBe(expectedSummary);
+    expect(el.sessions.sessions[0]?.history?.contextFloor).toBe(expectedFloor);
+    expect(el.sessions.sessions[0]?.history?.contextFloorSummary).toBe(expectedSummary);
+    expect(await nextContext(el)).toEqual([
+      ...(action === 'summary' ? [
+        { role: 'system', content: `${SUMMARY_PREFIX}Newest correction` },
+        { role: 'user', content: 'why did the renewal fail?' },
+        { role: 'assistant', content: 'The lock held.' },
+      ] : []),
+      { role: 'user', content: 'and the second one?' },
+      { role: 'assistant', content: 'The same lock.' },
+    ]);
   });
 
   it('keeps the conversation the reader moved to on ITS saved state while the undo finishes', async () => {

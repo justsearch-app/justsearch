@@ -345,6 +345,12 @@ import './Sv3Palette.js';
 // surface by its own side-effect import; this host owns only where it sits and how wide it may be.
 import './Sv3Pane.js';
 
+/** The snapshot and identity captured BEFORE a context write starts, never when it responds. */
+interface Sv3ContextWrite {
+  readonly sessionId: string;
+  readonly history: Sv3SessionHistory | null;
+}
+
 const COMPOSER_STATE_ATTR = 'composer-state';
 
 /** Tempdoc 867 — a stable empty-set identity for when no run controller exists yet. */
@@ -843,12 +849,12 @@ export class SearchV3View extends JfElement {
   /** Which conversation the newest `/history` load is for. */
   private historyLoadFor: string | null = null;
   /**
-   * What landed context writes confirmed, per conversation, until a `/history` load settles them:
-   * one that lands has them already, one that does not land applies them to the copy the window
-   * holds (S2.10). A load superseded by a newer one of the same conversation leaves them to it.
+   * The newest context intent per conversation. A late response is not a newer write (S2.10).
    */
+  private contextWrites = new Map<string, Sv3ContextWrite>();
+  /** Confirmed changes may only amend their original snapshot while their write is still newest. */
   private contextConfirms: {
-    readonly sessionId: string;
+    readonly write: Sv3ContextWrite;
     readonly confirmed: (history: Sv3SessionHistory) => Sv3SessionHistory;
   }[] = [];
   /**
@@ -1457,9 +1463,10 @@ export class SearchV3View extends JfElement {
    *
    * A FAILED read (`resumeConversation`'s `failed`, a server error or no answer) changes nothing:
    * the window keeps what it last read rather than taking the empty result for "no floor, nothing
-   * hidden" (S2.10): what earlier writes confirmed (`contextConfirms`) is applied to the copy the
-   * window holds instead. A load superseded by a newer load of the SAME conversation applies nothing
-   * and leaves those to the newer one, so an older answer can never undo a newer saved state.
+   * hidden" (S2.10). A write's confirmation may amend only the snapshot it started from, and only
+   * while no newer context write has started. A successful read replaces that snapshot, invalidating
+   * even confirmations whose write responses have not arrived yet. A load superseded by a newer
+   * load of the SAME conversation applies nothing and leaves confirmations to the newer read.
    *
    * A reload for a conversation that is NOT the active one is not run at all — it would only be
    * dropped on landing, and starting it would supersede (and so discard) the active conversation's
@@ -1491,15 +1498,19 @@ export class SearchV3View extends JfElement {
     this.settleContextConfirms(conversationId, landed);
   }
 
-  /** Settles what landed writes confirmed: a fresh reading has them, and a missing one needs them. */
+  /** A fresh reading wins; a failed one can use only an unsuperseded write's confirmation. */
   private settleContextConfirms(conversationId: string, read: boolean): void {
-    const pending = this.contextConfirms.filter((entry) => entry.sessionId === conversationId);
+    const pending = this.contextConfirms.filter((entry) => entry.write.sessionId === conversationId);
     if (pending.length === 0) return;
-    this.contextConfirms = this.contextConfirms.filter((entry) => entry.sessionId !== conversationId);
+    this.contextConfirms = this.contextConfirms.filter((entry) => entry.write.sessionId !== conversationId);
     if (read) return;
     const history = sessionById(this.sessions, conversationId)?.history ?? null;
     if (history === null) return;
-    const confirmed = pending.reduce((held, entry) => entry.confirmed(held), history);
+    const current = pending.filter(
+      (entry) => this.contextWrites.get(conversationId) === entry.write && entry.write.history === history,
+    );
+    if (current.length === 0) return;
+    const confirmed = current.reduce((held, entry) => entry.confirmed(held), history);
     this.sessions = applySv3History(this.sessions, conversationId, confirmed);
   }
 
@@ -1603,12 +1614,14 @@ export class SearchV3View extends JfElement {
     }
     const contexts = this.turnContexts();
     const turn = detail.turnId === undefined ? null : sv3TurnContextFor(contexts, detail.turnId);
+    const write: Sv3ContextWrite = { sessionId, history: session.history };
+    this.contextWrites.set(sessionId, write);
     switch (detail.action) {
       case 'floor': {
         const messageId = turn?.floorMessageId ?? null;
         if (messageId === null) return;
         await this.settleContextWrite(
-          sessionId,
+          write,
           await setContextFloor(sessionId, messageId),
           CONTEXT_FLOOR_FAILED,
         );
@@ -1620,7 +1633,7 @@ export class SearchV3View extends JfElement {
         // when the reload fails; a refused one changed nothing, so the bar keeps the saved floor.
         const cleared = await clearContextFloor(sessionId);
         await this.settleContextWrite(
-          sessionId,
+          write,
           cleared,
           CONTEXT_RESTORE_FAILED,
           cleared
@@ -1637,7 +1650,7 @@ export class SearchV3View extends JfElement {
           // The summary comes back on the response, and is then re-read from `/history` like every
           // other field: one place decides what the floor currently says.
           const summary = await compactContext(sessionId, messageId);
-          await this.settleContextWrite(sessionId, summary !== null, CONTEXT_COMPACT_FAILED);
+          await this.settleContextWrite(write, summary !== null, CONTEXT_COMPACT_FAILED);
         } finally {
           this.compacting = false;
         }
@@ -1646,7 +1659,7 @@ export class SearchV3View extends JfElement {
       case 'summary':
         if (detail.text === undefined) return;
         await this.settleContextWrite(
-          sessionId,
+          write,
           await editContextFloorSummary(sessionId, detail.text),
           CONTEXT_SUMMARY_FAILED,
         );
@@ -1660,7 +1673,7 @@ export class SearchV3View extends JfElement {
         // prompt while dropping the answer would send the model a question it never answered.
         const landed = await this.excludeInTurn(sessionId, ids, excluded);
         await this.settleContextWrite(
-          sessionId,
+          write,
           landed.length === ids.length,
           excluded ? CONTEXT_EXCLUDE_FAILED : CONTEXT_INCLUDE_FAILED,
           (history) => sv3WithExclusions(history, landed, excluded),
@@ -1674,7 +1687,7 @@ export class SearchV3View extends JfElement {
         if (ids.length === 0) return;
         const landed = await this.excludeInTurn(sessionId, ids, false);
         await this.settleContextWrite(
-          sessionId,
+          write,
           landed.length === ids.length,
           CONTEXT_INCLUDE_ALL_FAILED,
           (history) => sv3WithExclusions(history, landed, false),
@@ -1723,19 +1736,19 @@ export class SearchV3View extends JfElement {
    * differ (a refused floor is the store; a compaction that returned nothing is usually the model).
    *
    * When no reload lands after it (it failed, or the reader has moved to another conversation),
-   * `confirmed` applies what the write ITSELF confirmed to the copy the window holds — never more:
-   * a refused toggle is not in it, so the bar cannot show a state that was not saved, and a write
-   * that did land is not shown as still pending (S2.10). A reload overtaken by a newer one of the
-   * same conversation leaves the write to it ({@link refreshHistory}).
+   * `confirmed` applies only while this write and its starting snapshot have not been superseded:
+   * a newer write or saved snapshot makes the response's assumed result unsafe (S2.10). Refused
+   * toggles are never included. A reload overtaken by a newer one of the same conversation leaves
+   * the confirmation to it ({@link refreshHistory}).
    */
   private async settleContextWrite(
-    sessionId: string,
+    write: Sv3ContextWrite,
     ok: boolean,
     failure: string,
     confirmed?: (history: Sv3SessionHistory) => Sv3SessionHistory,
   ): Promise<void> {
-    if (confirmed !== undefined) this.contextConfirms.push({ sessionId, confirmed });
-    await this.refreshHistory(sessionId);
+    if (confirmed !== undefined) this.contextConfirms.push({ write, confirmed });
+    await this.refreshHistory(write.sessionId);
     if (ok) return;
     emitEphemeralToast({ message: failure, severity: 'warning' });
   }

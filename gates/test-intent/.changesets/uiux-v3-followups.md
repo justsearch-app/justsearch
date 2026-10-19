@@ -30,6 +30,12 @@ Context writes (S2.10): a reload overtaken by a newer reload of the same convers
 
 Coverage limits: no live check was run. The client's switch from the turn's position to a random dispatch id has no check of its own; the existing SearchV3View.ask.test.ts cases pin that each dispatch carries an id and the Stop names that same id. Exempting the stop route from Engine admission (backend review F6) is not done; the client waits and retries a Stop refused for capacity, as it does every request the Engine marks retry-safe, and says so when the Stop fails.
 
+Review history. Delayed-write repair (2026-10-20): the independent verifier rejected S2.10/S2.0 on cd9ee2673: an older Restore success response arrived after a newer floor write and saved history snapshot, then its refresh failed and its fallback cleared the newer floor. This round binds every context write to its starting snapshot and intent identity, repairs the same fallback in Exclude/Include/Include all, and adds six fail-before checks on 917d7d60b plus three preservation checks. The prior acceptance record remains unchanged below and is stale for this candidate.
+
+Evidence for this round: uiux-v3-followups-context-write-races.json runs the nine new checks against 917d7d60b. uiux-v3-followups-context-preservation.json refreshes evidence for the existing context checks against their original 117e89be9 baseline because their test file's content digest changed; the earlier evidence is preserved. Runs use shared clones under the builder session's temporary directory, leaving the source repository's Git metadata untouched. Failed before-state test commands exit nonzero; their per-check assertion/pass classifications are recorded.
+
+Audit: floor reset, compact, and summary edits use guarded history reads rather than assumed-result fallbacks. Question edits create branches and replace the transcript; rewrite notes come from the turn's record/stream, guarded by the record load's abort identity. Their existing branch, record, and cold-reload note checks remain preservation checks. No Java changes or live stack checks are part of this round.
+
 No acceptance record is supplied by the builder.
 
 ```json
@@ -334,7 +340,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends the earlier turns as context, oldest first, on the conversation’s own id",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#leaves out excluded messages and everything above the floor, and leads with the summary",
@@ -377,7 +383,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends no context with the first question of a new conversation",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends no older turns when the conversation’s context settings cannot be read"
@@ -405,7 +411,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows each note on its own turn live, after the record refresh, and after a reload"
       ],
@@ -433,7 +439,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#counts unique hidden messages not shown here beside the hidden turns on screen",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows and undoes exclusions that are ALL off screen, without inventing a turn count",
@@ -457,7 +463,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#reports a PARTIALLY refused Include all as a failure and shows what was really saved",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#does not wipe the bar when the reload after Include all fails",
@@ -1025,7 +1031,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer saved state when an older write’s reload lands after a newer one"
       ]
@@ -1096,6 +1102,68 @@ No acceptance record is supplied by the builder.
         }
       ],
       "conflictSearch": "decision records searched for a conflict (docs/decisions/*.md for stop, halt, stopped by you, cancel, abort, leaving, new session): none"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Delayed write responses cannot overwrite a newer saved snapshot or a newer context intent when their own refresh fails. Restore, Exclude, Include, and Include all retain the newer floor/exclusions in the bar and next Ask; a snapshot from another client also supersedes an outstanding response. If both refreshes fail, keep the last snapshot read instead of an older Restore assumption. All six checks fail by assertion on 917d7d60b.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS10",
+          "quote": "A failed or partially refused Include all / Restore does not announce success; a failed refresh, out-of-order responses or navigating away during the undo never leave the bar showing a state that is not the saved one.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS0",
+          "quote": "A follow-up Ask in Search v3 is answered in the light of the conversation, as in the current window: retrieval runs on the rewritten standalone question (a real second question produces the rewrite), and the answer can refer to the earlier turn. Messages excluded from context and messages before the context starting point are not sent with the follow-up; the context bar's numbers match what was sent.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-write-races.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer floor and next Ask when an older Restore response arrives and its refresh fails",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps a newer saved snapshot when a delayed Restore response arrives and its refresh fails",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the last saved snapshot when a newer floor write also cannot refresh before an older Restore response",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer exclusions and next Ask when an older 'exclude' response arrives and its refresh fails",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer exclusions and next Ask when an older 'include' response arrives and its refresh fails",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer exclusions and next Ask when an older 'include-all' response arrives and its refresh fails"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preservation audit: floor reset, compaction, and summary correction have no confirmation fallback. A delayed response followed by a failed history refresh keeps a newer saved floor/summary and sends that context on the next Ask. These three checks pass on 917d7d60b.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS10",
+          "quote": "A failed or partially refused Include all / Restore does not announce success; a failed refresh, out-of-order responses or navigating away during the undo never leave the bar showing a state that is not the saved one.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS0",
+          "quote": "A follow-up Ask in Search v3 is answered in the light of the conversation, as in the current window: retrieval runs on the rewritten standalone question (a real second question produces the rewrite), and the answer can refer to the earlier turn. Messages excluded from context and messages before the context starting point are not sent with the follow-up; the context bar's numbers match what was sent.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-write-races.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#preserves the newer saved context after a delayed 'floor' response and failed refresh",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#preserves the newer saved context after a delayed 'compact' response and failed refresh",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#preserves the newer saved context after a delayed 'summary' response and failed refresh"
+      ]
     }
   ]
 }
