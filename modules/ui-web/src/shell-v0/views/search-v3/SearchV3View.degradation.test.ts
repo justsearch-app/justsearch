@@ -288,6 +288,8 @@ async function mountComposer(over: {
 }): Promise<Sv3Composer & Mounted> {
   const el = document.createElement('jf-sv3-composer') as Sv3Composer & Mounted;
   el.state = 'docked';
+  // WP1.1 — Search mode needs no model and shows no ask notice; these cases are about Ask's.
+  el.tier = 'ask';
   el.degradation = over.degradation ?? null;
   el.detailed = over.detailed ?? false;
   el.unavailableReason = over.unavailableReason ?? '';

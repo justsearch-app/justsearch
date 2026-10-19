@@ -208,6 +208,8 @@ async function mount(): Promise<SearchV3View & Mounted> {
   const el = document.createElement('jf-sv3-window') as SearchV3View & Mounted;
   el.setAttribute('api-base', 'http://127.0.0.1:9999');
   document.body.appendChild(el);
+  // WP1.1 — a fresh window starts in Search mode; these cases are about Ask, so they choose it.
+  (el as unknown as { tier: string }).tier = 'ask';
   await el.updateComplete;
   return el;
 }
