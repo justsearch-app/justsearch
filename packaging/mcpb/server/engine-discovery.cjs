@@ -30,8 +30,9 @@
  *     what a pin trusts) but never a token it did not hand out itself. The connection also
  *     asks GET /api/runtime/live for the Engine's identity, so an MCP session opened on one
  *     Engine is never sent to the next one on the port (engineRequest's session).
- *  5. Idle pooled connections are retired after IDLE_RETIRE_MS (http.Agent timeout), before the
- *     Engine's own idle expiry (Jetty: 30 s) can close one just as a request is written on it.
+ *  5. Idle pooled connections are retired after IDLE_RETIRE_MS (http.Agent timeout, idleRetireMs),
+ *     before the Engine's own idle expiry (Jetty: 30 s) can close one just as a request is
+ *     written on it.
  *
  * Why the socket owner: whatever answers on the port can claim any pid and instanceId, so only
  * the OS's record of who holds the connection ties the endpoint to the manifest's process.
@@ -76,6 +77,18 @@ function startupWaitMs(env = process.env) {
 const PROBE_MAX_BYTES = 64 * 1024;
 /** A pooled connection idle this long is closed by the agent (the Engine closes idle ones at 30 s). */
 const IDLE_RETIRE_MS = 25000;
+const IDLE_RETIRE_ENV = 'JUSTSEARCH_DISCOVERY_IDLE_RETIRE_MS';
+
+/**
+ * The idle retirement both clients' agents use: IDLE_RETIRE_MS, unless
+ * JUSTSEARCH_DISCOVERY_IDLE_RETIRE_MS holds a whole number of milliseconds. That variable is a
+ * test seam (so a test can scale the boundary down with its fixture's idle expiry) and is read
+ * only here.
+ */
+function idleRetireMs(env = process.env) {
+  const raw = String(env[IDLE_RETIRE_ENV] ?? '').trim();
+  return /^\d+$/.test(raw) ? Number(raw) : IDLE_RETIRE_MS;
+}
 const OS_QUERY_TIMEOUT_MS = 10000;
 /** The server may not have accepted a fresh connection yet; it is looked up again this often. */
 const PROOF_RETRY_MS = 10;
@@ -417,7 +430,7 @@ function agentFor(target) {
   const key = engine ? engineKey(engine) : String(target.port);
   let agent = map.get(key);
   if (!agent) {
-    agent = new http.Agent({ keepAlive: true, timeout: IDLE_RETIRE_MS });
+    agent = new http.Agent({ keepAlive: true, timeout: idleRetireMs() });
     agent.createConnection = engine ? (options, done) => provenConnection(engine, options, done) : tokenBoundConnection;
     map.set(key, agent);
   }
@@ -700,6 +713,7 @@ module.exports = {
   DESKTOP_APP_IDENTIFIER,
   STARTUP_WAIT_MS,
   IDLE_RETIRE_MS,
+  idleRetireMs,
   startupWaitMs,
   desktopAppDataDir,
   validateCandidate,

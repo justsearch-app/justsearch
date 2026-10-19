@@ -1772,13 +1772,17 @@ for (const status of [400, 404]) {
   });
 }
 
-test('P3/P7: a connection idle past the agent\'s retirement (25 s) is not reused — the Engine\'s idle expiry crossing a request never costs a call (production MCP and bundle)', async (t) => {
-  // The fixture drops (unanswered) any request arriving on a connection idle 25.75 s or more;
-  // the second call comes 26.5 s after the first.
-  const expireIdleMs = 25750;
-  const idleMs = 26500;
+test('P3/P7: a connection idle past the agent\'s retirement is not reused — the Engine\'s idle expiry crossing a request never costs a call (production MCP and bundle; the 25 s / 30 s boundary scaled down)', async (t) => {
+  // Scaled from production (retire at 25 s, before the Engine's expiry; the call after a longer
+  // gap): the agents retire idle connections at 250 ms, the fixture drops (unanswered) any
+  // request arriving on a connection idle 300 ms or more, and the second call comes 400 ms
+  // after the first.
+  const retireMs = 250;
+  const expireIdleMs = 300;
+  const idleMs = 400;
   const root = tempRoot(t);
   const m = machine(root);
+  m.env.JUSTSEARCH_DISCOVERY_IDLE_RETIRE_MS = String(retireMs);
   const prodEngine = await startService(t, { expireIdleMs });
   const bridgeEngine = await startService(t, { expireIdleMs });
   const ingest = { paths: [path.join(root, 'doc.txt')] };
@@ -1802,8 +1806,22 @@ test('P3/P7: a connection idle past the agent\'s retirement (25 s) is not reused
   for (const [client, engine] of [['production MCP', prodEngine], ['bundle', bridgeEngine]]) {
     assert.deepEqual(engine.requests.filter((r) => r.expired).map((r) => `${r.method} ${r.url}`), [], `${client}: nothing was written on a connection past its idle retirement`);
   }
-  const { IDLE_RETIRE_MS } = require(ENGINE_DISCOVERY);
-  assert.equal(IDLE_RETIRE_MS, 25000, 'retired 5 s before the Engine\'s 30 s idle expiry');
+});
+
+test('P3/P7: production retires idle connections at 25 000 ms, below the Engine\'s 30 s idle expiry; the seam is read only in engine-discovery.cjs', () => {
+  const { IDLE_RETIRE_MS, idleRetireMs } = require(ENGINE_DISCOVERY);
+  assert.equal(IDLE_RETIRE_MS, 25000);
+  assert.ok(IDLE_RETIRE_MS < 30000, 'retired before the Engine (Jetty) closes an idle connection at 30 s');
+  assert.equal(idleRetireMs({}), 25000);
+  assert.equal(idleRetireMs({ JUSTSEARCH_DISCOVERY_IDLE_RETIRE_MS: '' }), 25000);
+  assert.equal(idleRetireMs({ JUSTSEARCH_DISCOVERY_IDLE_RETIRE_MS: 'soon' }), 25000);
+  assert.equal(idleRetireMs({ JUSTSEARCH_DISCOVERY_IDLE_RETIRE_MS: '250' }), 250);
+  const shared = fs.readFileSync(ENGINE_DISCOVERY, 'utf8');
+  assert.match(shared, /new http\.Agent\(\{ keepAlive: true, timeout: idleRetireMs\(\) \}\)/, 'every agent is created with the retirement');
+  for (const rel of ['scripts/prod/justsearch-mcp/server.mjs', 'scripts/prod/justsearch-mcp/discovery.mjs', 'packaging/mcpb/server/index.js']) {
+    const src = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+    assert.ok(!/idleRetireMs|IDLE_RETIRE/.test(src), `${rel} uses the shared retirement`);
+  }
 });
 
 test('D1: a Windows-style lazily resolved folder (the OS-reported Roaming folder) is tried after the home-folder guess', async (t) => {
