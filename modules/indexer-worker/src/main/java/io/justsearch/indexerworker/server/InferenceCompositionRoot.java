@@ -6,6 +6,7 @@ import io.justsearch.configuration.model.ExecutionProvider;
 import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.configuration.model.HardwareProfile;
 import io.justsearch.configuration.model.InstallContract;
+import io.justsearch.configuration.model.InstallContractIO;
 import io.justsearch.configuration.model.VariantSelection;
 import io.justsearch.configuration.model.VariantSelector;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -101,6 +102,71 @@ public final class InferenceCompositionRoot {
         EncoderConfigurationProjection.from(cfg), hardware, contract, modelsDir, null);
   }
 
+  /**
+   * The encoder roles {@code cfg} places on the GPU, each with the size in MiB of the model file its
+   * session loads there: the device-memory plan's R (Spec E revision 4 section 2.2, step E7b).
+   *
+   * <p>The roles are this composition root's: the variant each role resolves, kept when it is
+   * CUDA-shaped. With BGE-M3 selected, its SPLADE fallback is counted as well, since it is composed
+   * when BGE-M3 is not. Reads files only; it builds no session.
+   */
+  public static Map<EncoderRole, Double> gpuRoleWeightsMiB(ResolvedConfig cfg) {
+    Objects.requireNonNull(cfg, "cfg");
+    Path aiHome = cfg.paths().dataDir();
+    InstallContract contract = aiHome == null ? null : InstallContractIO.read(aiHome);
+    // KnowledgeServer.resolveModelsDir's rule, without initializing KnowledgeServer at boot.
+    Path modelsDir = contract != null && contract.modelsDir() != null ? contract.modelsDir()
+        : cfg.paths().modelsDir() != null ? cfg.paths().modelsDir()
+        : aiHome != null ? aiHome.resolve("models") : null;
+    HardwareProfile hardware = contract != null && contract.hardwareProfile() != null
+        ? contract.hardwareProfile()
+        : cfg.ai().masterGpuEnabled() ? HardwareProfile.gpuFull(0) : HardwareProfile.cpuOnly();
+    EncoderConfigurationProjection projection = EncoderConfigurationProjection.from(cfg);
+    Map<EncoderRole, Double> weights = new EnumMap<>(EncoderRole.class);
+    if ("bge-m3".equalsIgnoreCase(projection.sparseModel())) {
+      putGpuWeight(weights, EncoderRole.BGE_M3, "embedding", projection.bgeM3().isReady(),
+          projection.bgeM3().modelPath(), projection.bgeM3().gpuEnabled(), contract, hardware,
+          modelsDir);
+    } else {
+      putGpuWeight(weights, EncoderRole.EMBEDDING, "embedding", projection.embedding().isReady(),
+          projection.embedding().modelPath(), projection.embedding().gpuEnabled(), contract,
+          hardware, modelsDir);
+    }
+    putGpuWeight(weights, EncoderRole.SPLADE, "splade", projection.splade().isReady(),
+        projection.splade().modelPath(), projection.splade().gpuEnabled(), contract, hardware,
+        modelsDir);
+    putGpuWeight(weights, EncoderRole.NER, "ner", projection.ner().isReady(),
+        projection.ner().modelPath(), projection.ner().gpuEnabled(), contract, hardware, modelsDir);
+    putGpuWeight(weights, EncoderRole.RERANKER, "reranker", projection.reranker().isReady(),
+        projection.reranker().modelPath(), projection.reranker().gpuEnabled(), contract, hardware,
+        modelsDir);
+    return weights;
+  }
+
+  private static void putGpuWeight(
+      Map<EncoderRole, Double> weights,
+      EncoderRole role,
+      String packageId,
+      boolean ready,
+      Path configModelPath,
+      boolean gpuEnabled,
+      InstallContract contract,
+      HardwareProfile hardware,
+      Path modelsDir) {
+    if (!ready || !gpuEnabled) return;
+    // resolveVariant's selection without its degraded-variant WARN: composition logs that once.
+    VariantSelection variant = contract != null
+        ? VariantSelector.select(packageId, contract, hardware, modelsDir, true)
+        : DevModeVariantProbe.probe(configModelPath, true);
+    if (variant == null || variant.executionProvider() != ExecutionProvider.CUDA) return;
+    try {
+      weights.put(role, java.nio.file.Files.size(variant.modelFile()) / (1024.0 * 1024.0));
+    } catch (IOException | RuntimeException unreadable) {
+      log.debug("{}: model file size unreadable for the device-memory plan", packageId,
+          unreadable);
+    }
+  }
+
   /** Owner path for a candidate whose exact generation files have already been selected. */
   static long estimateCandidateFootprintBytes(
       EncoderConfigurationProjection projection,
@@ -109,6 +175,9 @@ public final class InferenceCompositionRoot {
       Path modelsDir,
       GenerationModelSelection selection) {
     ResolvedConfig cfg = projection.config();
+    if (!cfg.ai().gpuMemoryPlan().isBlank() && !"no_gpu".equals(cfg.ai().gpuMemoryPlan())) {
+      return plannedCandidateFootprint(projection, hardware, contract, modelsDir, selection);
+    }
     long arenaCapBytes = 0L;
     boolean bgeM3Selected = "bge-m3".equalsIgnoreCase(projection.sparseModel());
 
@@ -217,13 +286,71 @@ public final class InferenceCompositionRoot {
     return withCompositionHeadroom(arenaCapBytes);
   }
 
+  /** Shrinking arenas retain weights; device seats, not role count, bound concurrent activation. */
+  private static long plannedCandidateFootprint(EncoderConfigurationProjection projection,
+      HardwareProfile hardware, InstallContract contract, Path modelsDir,
+      GenerationModelSelection selection) {
+    var inputs = new CandidateMemoryInputs(projection.config(), hardware, contract, modelsDir, selection);
+    var embedding = inputs.memory(projection.embedding().isReady(), "embedding",
+        EncoderRole.EMBEDDING, projection.embedding().modelPath(), projection.embedding().gpuEnabled());
+    var splade = inputs.memory(projection.splade().isReady(), "splade", EncoderRole.SPLADE,
+        projection.splade().modelPath(), projection.splade().gpuEnabled());
+    CandidateMemory sparse;
+    if ("bge-m3".equalsIgnoreCase(projection.sparseModel())) {
+      var bge = inputs.memory(projection.bgeM3().isReady(), "embedding", EncoderRole.BGE_M3,
+          projection.bgeM3().modelPath(), projection.bgeM3().gpuEnabled());
+      sparse = new CandidateMemory(Math.max(bge.weights(), splade.weights()),
+          Math.max(bge.activation(), splade.activation()));
+    } else {
+      sparse = embedding.beside(splade);
+    }
+    var all = sparse.beside(inputs.memory(projection.ner().isReady(), "ner", EncoderRole.NER,
+        projection.ner().modelPath(), projection.ner().gpuEnabled())).beside(inputs.memory(projection.reranker().isReady(),
+            "reranker", EncoderRole.RERANKER, projection.reranker().modelPath(),
+            projection.reranker().gpuEnabled()));
+    if (all.weights() == 0 && all.activation() == 0) return 0;
+    long peak = Math.addExact(all.weights(), Math.multiplyExact(all.activation(),
+        io.justsearch.ort.DeviceGatePolicy.DEFAULTS.seats()));
+    return withCompositionHeadroom(Math.addExact(peak,
+        (long) (io.justsearch.ort.GpuArenaPlan.ENGINE_NON_ARENA_MIB * 1024 * 1024)));
+  }
+
+  private record CandidateMemory(long weights, long activation) {
+    CandidateMemory beside(CandidateMemory other) {
+      return new CandidateMemory(Math.addExact(weights, other.weights),
+          Math.max(activation, other.activation));
+    }
+  }
+
+  private record CandidateMemoryInputs(ResolvedConfig cfg, HardwareProfile hardware,
+      InstallContract contract, Path modelsDir, GenerationModelSelection selection) {
+    CandidateMemory memory(boolean ready, String packageId, EncoderRole role, Path path,
+        boolean gpuEnabled) {
+      if (!ready) return new CandidateMemory(0, 0);
+      var variant = resolveVariantForEstimate(packageId, contract, hardware, modelsDir, path,
+          gpuEnabled, selection);
+      if (variant == null) return new CandidateMemory(0, 0);
+      long cap = ModelSessionPolicyResolver.resolve(role, cfg, hardware, variant).gpu().arenaCapBytes();
+      if (cap == 0) return new CandidateMemory(0, 0);
+      try {
+        long weights = java.nio.file.Files.size(variant.modelFile());
+        return new CandidateMemory(weights, Math.max(0, cap - weights));
+      } catch (IOException unreadable) {
+        throw new java.io.UncheckedIOException("Cannot measure candidate encoder weights", unreadable);
+      }
+    }
+  }
+
   /**
    * Estimates only the independently rebuilt query-role sessions for a committed selection.
    *
    * <p>The plans are resolved by the same helpers as {@link #composeQueryRoles}; retained index
-   * roles cannot enter this total. The returned value uses the same ten-percent headroom as the
-   * generation candidate estimator so {@link io.justsearch.core.component.DeviceMemoryLine}
-   * compares candidate and releasable source bytes on one convention.
+   * roles cannot enter this total. Planned self-contained sessions retain their weights between
+   * calls; their activation allowance is already reserved by the shared device plan and must not
+   * be demanded again when preparing a replacement. External or uninspectable weight layouts
+   * and unplanned sessions retain their existing conservative arena estimate.
+   * The returned value includes ten-percent composition headroom for admission through
+   * {@link io.justsearch.core.component.DeviceMemoryLine}.
    */
   static long estimateQueryFootprintBytes(EncoderConfigurationProjection projection,
       QueryRoleSelection selection, HardwareProfile hardware) {
@@ -235,59 +362,80 @@ public final class InferenceCompositionRoot {
         null, selection.reranker());
     QueryPlan citationPlan = resolveCitationPlan(projection.citation(), hardware, null, null,
         null, selection.citation());
-    long arenaCapBytes = queryPlanArenaCapBytes(EncoderRole.RERANKER, rerankerPlan, cfg, hardware);
-    arenaCapBytes = Math.addExact(arenaCapBytes,
-        queryPlanArenaCapBytes(EncoderRole.CITATION, citationPlan, cfg, hardware));
-    return withCompositionHeadroom(arenaCapBytes);
+    long retainedBytes = queryPlanCompositionBytes(EncoderRole.RERANKER, rerankerPlan, cfg, hardware);
+    retainedBytes = Math.addExact(retainedBytes,
+        queryPlanCompositionBytes(EncoderRole.CITATION, citationPlan, cfg, hardware));
+    return withCompositionHeadroom(retainedBytes);
+  }
+
+  /** Same retained-session admission as query replacement, for a settings-owned full rebuild. */
+  static long estimateSettingsFootprintBytes(IndexCompositionPlan plan,
+      EncoderConfigurationProjection queryProjection, QueryRoleSelection selection) {
+    long indexBytes = 0L;
+    for (var entry : plan.roles().entrySet()) {
+      if (plan.bgeM3Selected() && (entry.getKey() == EncoderRole.BGE_M3
+          || entry.getKey() == EncoderRole.SPLADE)) continue;
+      indexBytes = Math.addExact(indexBytes, capturedCompositionBytes(entry.getValue()));
+    }
+    if (plan.bgeM3Selected()) {
+      indexBytes = Math.addExact(indexBytes, Math.max(
+          capturedCompositionBytes(plan.role(EncoderRole.BGE_M3)),
+          capturedCompositionBytes(plan.role(EncoderRole.SPLADE))));
+    }
+    return Math.addExact(withCompositionHeadroom(indexBytes),
+        estimateQueryFootprintBytes(queryProjection, selection, plan.hardware()));
+  }
+
+  private static long capturedCompositionBytes(IndexCompositionPlan.RolePlan role) {
+    return role.variant() == null ? 0L : sessionCompositionBytes(role.variant(), role.policy());
   }
 
   /**
-   * Returns the releasable footprint of query sessions that are GPU-backed right now.
+   * Returns a conservative lower bound on memory released by the source query sessions.
    *
    * <p>A CPU fallback releases no device memory. A live GPU assembly without its resolved policy
-   * is unknown rather than guessed from desired configuration. The source total carries the same
-   * headroom as candidate estimates to preserve the device-line admission convention.
+   * is unknown rather than guessed from desired configuration. An allocator ceiling is not evidence
+   * of a retained allocation. Credit only the realized artifact's retained weights.
    */
   static Long sourceQueryReleasableBytes(QueryRoleSet source) {
     if (source == null || source.isClosed()) return 0L;
-    InferenceSurface surface = source.surfaceForOwner();
-    long arenaCapBytes = 0L;
-    if (surface.reranker().isPresent()
-        && surface.reranker().orElseThrow().sessions().isGpuAvailable()) {
-      ModelSessionPolicy policy = surface.policies() == null ? null
-          : surface.policies().models().get(EncoderRole.RERANKER);
-      if (policy == null) return null;
-      arenaCapBytes = Math.addExact(arenaCapBytes, policy.gpu().arenaCapBytes());
-    }
-    if (surface.citation().isPresent()
-        && surface.citation().orElseThrow().sessions().isGpuAvailable()) {
-      ModelSessionPolicy policy = surface.policies() == null ? null
-          : surface.policies().models().get(EncoderRole.CITATION);
-      if (policy == null) return null;
-      arenaCapBytes = Math.addExact(arenaCapBytes, policy.gpu().arenaCapBytes());
-    }
-    return withCompositionHeadroom(arenaCapBytes);
+    return sourceRetainedLowerBound(source.surfaceForOwner());
   }
 
-  private static long queryPlanArenaCapBytes(EncoderRole role, QueryPlan plan,
+  private static long queryPlanCompositionBytes(EncoderRole role, QueryPlan plan,
       ResolvedConfig cfg, HardwareProfile hardware) {
-    return plan.variant() == null ? 0L
-        : ModelSessionPolicyResolver.resolve(role, cfg, hardware, plan.variant())
-            .gpu().arenaCapBytes();
+    if (plan.variant() == null) return 0L;
+    return sessionCompositionBytes(plan.variant(),
+        ModelSessionPolicyResolver.resolve(role, cfg, hardware, plan.variant()));
+  }
+
+  private static long sessionCompositionBytes(VariantSelection variant, ModelSessionPolicy policy) {
+    var gpu = policy.gpu();
+    if (gpu.arenaCapBytes() == 0L) return 0L;
+    if (!gpu.plannedProfile()) return gpu.arenaCapBytes();
+    try {
+      if (io.justsearch.ort.OnnxExternalData.hasExternalData(variant.modelFile())) {
+        return gpu.arenaCapBytes();
+      }
+      return java.nio.file.Files.size(variant.modelFile());
+    } catch (IOException unmeasuredLayout) {
+      // A graph alone cannot prove retained weights for external or uninspectable layouts.
+      return gpu.arenaCapBytes();
+    }
   }
 
   /** Both source owners retire during generation replacement; count only their realized sessions. */
   static Long sourceGenerationReleasableBytes(EncoderSet index, QueryRoleSet query) {
     Long indexBytes = index == null || index.isClosed() ? Long.valueOf(0L)
-        : sourceArenaCapBytes(index.surfaceForOwner());
+        : sourceRetainedLowerBound(index.surfaceForOwner());
     Long queryBytes = query == null || query.isClosed() ? Long.valueOf(0L)
-        : sourceArenaCapBytes(query.surfaceForOwner());
+        : sourceRetainedLowerBound(query.surfaceForOwner());
     if (indexBytes == null || queryBytes == null) return null;
-    return withCompositionHeadroom(Math.addExact(indexBytes, queryBytes));
+    return Math.addExact(indexBytes, queryBytes);
   }
 
-  private static Long sourceArenaCapBytes(InferenceSurface surface) {
-    long arenaCapBytes = 0L;
+  private static Long sourceRetainedLowerBound(InferenceSurface surface) {
+    long weights = 0L;
     for (SessionHandle handle : surface.handles()) {
       if (!handle.isGpuAvailable()) continue;
       EncoderRole role = surface.handleRoles().entrySet().stream()
@@ -296,9 +444,23 @@ public final class InferenceCompositionRoot {
       ModelSessionPolicy policy = role == null || surface.policies() == null ? null
           : surface.policies().models().get(role);
       if (policy == null) return null;
-      arenaCapBytes = Math.addExact(arenaCapBytes, policy.gpu().arenaCapBytes());
+      var retained = handle.retainedGpuWeightsBytes();
+      if (retained != null && retained.isPresent()) {
+        weights = Math.addExact(weights, retained.getAsLong());
+        continue;
+      }
+      // The captured variant identifies the manifest-selected artifact, not a desired sibling.
+      // Missing evidence stays unknown, so unknown free memory cannot admit beside a GPU source.
+      if (policy.variant() == null) return null;
+      try {
+        long bytes = java.nio.file.Files.size(policy.variant().modelFile());
+        if (bytes <= 0) return null;
+        weights = Math.addExact(weights, bytes);
+      } catch (IOException unavailable) {
+        return null;
+      }
     }
-    return arenaCapBytes;
+    return weights;
   }
 
   private static long withCompositionHeadroom(long arenaCapBytes) {
@@ -488,6 +650,7 @@ public final class InferenceCompositionRoot {
       QueryRoleSelection witnessedQuery,
       Consumer<InferenceSurface.ComponentObservation> queryWitness,
       Consumer<CapturedCompositionPlan> planWitness) {
+    if (projection.config().ai().gpuDeviceUnavailable()) hardware = HardwareProfile.cpuOnly();
     QueryPlan rerankerPlan = resolveRerankerPlan(projection.reranker(), hardware, contract,
         modelsDir, selection, witnessedQuery == null ? null : witnessedQuery.reranker());
     QueryPlan citationPlan = resolveCitationPlan(projection.citation(), hardware, contract,
@@ -551,6 +714,10 @@ public final class InferenceCompositionRoot {
     ResolvedConfig cfg = projection.config();
     ResolvedConfig queryCfg = currentQueryProjection.config();
     HardwareProfile hardware = plan.hardware();
+    if (plan.roles().values().stream().anyMatch(IndexCompositionPlan.RolePlan::requested)
+        || !currentQuery.requestedRoles().isEmpty()) {
+      io.justsearch.indexerworker.tokenizer.HuggingFaceNativeRuntime.prepareCpuCache();
+    }
     QueryPlan rerankerPlan = resolveRerankerPlan(currentQueryProjection.reranker(), hardware,
         null, null,
         null, querySelection.reranker());
@@ -663,7 +830,8 @@ public final class InferenceCompositionRoot {
         handles.sessions(),
         InferenceSurface.ComponentObservation.composed(
             projection.withQueryFrom(currentQueryProjection).digest(), requestedRoles,
-            presentRoles, Optional.of(querySelection)), handles.roles());
+            presentRoles, Optional.of(querySelection)), handles.roles(),
+        handles.failures().get(EncoderRole.EMBEDDING));
   }
 
   /** Pure pre-admission validation; the physical owner calls this before retirement. */
@@ -734,6 +902,7 @@ public final class InferenceCompositionRoot {
     Objects.requireNonNull(projection, "projection");
     Objects.requireNonNull(hardware, "hardware");
     ResolvedConfig cfg = projection.config();
+    if (cfg.ai().gpuDeviceUnavailable()) hardware = HardwareProfile.cpuOnly();
     RuntimePolicy runtime = RuntimePolicyResolver.resolve(cfg, hardware);
     boolean bgeSelected = "bge-m3".equalsIgnoreCase(projection.sparseModel());
     EnumMap<EncoderRole, IndexCompositionPlan.RolePlan> roles =
@@ -845,6 +1014,9 @@ public final class InferenceCompositionRoot {
     }
     VariantSelection variant = rolePlan.variant();
     if (variant == null) {
+      if (rolePlan.captureFailed()) {
+        handles.failures().put(EncoderRole.EMBEDDING, rolePlan.captureFailure());
+      }
       log.warn(
           "Embedding: no variant resolved (dev mode without contract or model absent); vector"
               + " search disabled.");
@@ -868,6 +1040,7 @@ public final class InferenceCompositionRoot {
           variant.modelFile());
       return Optional.of(assembly);
     } catch (Exception e) {
+      handles.failures().put(EncoderRole.EMBEDDING, e);
       retireFailedHandle(sessions, e);
       // Tempdoc 710 Wave 2 Move 1: widened from OrtException — ModelCapabilityResolver throws
       // IllegalStateException under justsearch.models.capability_contract_strict, and that must
@@ -1187,9 +1360,10 @@ public final class InferenceCompositionRoot {
   }
 
   private record CompositionHandles(
-      List<SessionHandle> sessions, Map<EncoderRole, SessionHandle> roles) {
+      List<SessionHandle> sessions, Map<EncoderRole, SessionHandle> roles,
+      Map<EncoderRole, Throwable> failures) {
     private CompositionHandles() {
-      this(new ArrayList<>(), new EnumMap<>(EncoderRole.class));
+      this(new ArrayList<>(), new EnumMap<>(EncoderRole.class), new EnumMap<>(EncoderRole.class));
     }
 
     private void add(EncoderRole role, SessionHandle handle) {

@@ -1,0 +1,58 @@
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ProcessTerminator.java b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ProcessTerminator.java
+new file mode 100644
+index 000000000..9ae8f5b6d
+--- /dev/null
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/ProcessTerminator.java
+@@ -0,0 +1,52 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.app.api.runtime.child;
++
++import java.io.IOException;
++import java.time.Instant;
++import java.util.Optional;
++import java.util.concurrent.TimeUnit;
++
++/**
++ * Compat (fail-before only): the later terminator, reduced to what EngineJobHelperContainmentTest
++ * calls. Its terminate is the {@code taskkill /F /PID} the check used when it was added
++ * (624dcfc92). No production code here reads it.
++ */
++public interface ProcessTerminator {
++  OsProcess open(Process process) throws IOException;
++
++  static ProcessTerminator forCurrentOs() {
++    return process -> new OsProcess() {
++      @Override
++      public Optional<String> creationFileTime() {
++        return Optional.of(process.info().startInstant().map(Instant::toString).orElse("unknown"));
++      }
++
++      @Override
++      public TerminateResult terminate(int code) {
++        try {
++          Process kill = new ProcessBuilder("taskkill", "/F", "/PID", Long.toString(process.pid()))
++              .redirectErrorStream(true).start();
++          return kill.waitFor(30, TimeUnit.SECONDS) && kill.exitValue() == 0
++              ? TerminateResult.OK : TerminateResult.failed(1);
++        } catch (IOException failed) {
++          return TerminateResult.failed(1);
++        } catch (InterruptedException interrupted) {
++          Thread.currentThread().interrupt();
++          return TerminateResult.failed(1);
++        }
++      }
++
++      @Override
++      public void close() {}
++    };
++  }
++
++  /** Compat: the later held process identity. */
++  interface OsProcess {
++    Optional<String> creationFileTime();
++
++    TerminateResult terminate(int code);
++
++    void close();
++  }
++}

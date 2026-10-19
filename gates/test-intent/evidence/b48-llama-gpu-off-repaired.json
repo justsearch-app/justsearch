@@ -1,0 +1,178 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T15:49:57.894Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "1ad80f7419b3e2fa7b6e25260bcaefa189094fdd",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaGpuOffPlanTest\" --tests \"io.justsearch.app.inference.LlamaDevicePlanArchitectureTest\" --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.cpuLaunchDisablesDevices\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6633
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaGpuOffPlanTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaGpuOffPlanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:208db0f7b442cf9212df3d5b06d388a922495450f9ac4e51d4ff36d47ee50c4c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gpuOffDisablesDevicesAndProjectorEvenWhenOffloadDefaultsToTrue()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaDevicePlanArchitectureTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaDevicePlanArchitectureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e4f779868af415a627a95cbe17a73b36e0948a09904f5d5e27ae81b25efae4a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "noLaunchOwnerConstructsDeviceArgumentsOrVisibilityOutsideThePlan()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:595544a9c61ea4a35316ef03700e9829d92bcb1e20f95598113554af4327fd38",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the CPU argv carries the CPU rung and -ngl 0, same flag set",
+          "status": "passed"
+        },
+        {
+          "name": "declaredConfigurationIdentity()",
+          "status": "passed"
+        },
+        {
+          "name": "the memory-plan block is present and complete — dropping it must fail",
+          "status": "passed"
+        },
+        {
+          "name": "K and V cache types are the same type, from one key",
+          "status": "passed"
+        },
+        {
+          "name": "an override rung reaches -c unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "VDU pins one slot and disables the prompt cache, without a duplicate -np",
+          "status": "passed"
+        },
+        {
+          "name": "flash attention is 'on', never 'auto' — a quantized V-cache aborts without it",
+          "status": "passed"
+        },
+        {
+          "name": "the full GPU argv, in order, including -fit off",
+          "status": "passed"
+        },
+        {
+          "name": "-fit is off: the ladder needs an unfittable -c to abort, not be absorbed",
+          "status": "passed"
+        },
+        {
+          "name": "-kvu is always emitted alongside an explicit -np",
+          "status": "passed"
+        },
+        {
+          "name": "thinking off drops the reasoning flags and nothing else",
+          "status": "passed"
+        },
+        {
+          "name": "projectorOnTheCpuAddsOneFlagAfterTheProjector()",
+          "status": "passed"
+        },
+        {
+          "name": "window flags carry the ladder rung and the offload layers, in that order",
+          "status": "passed"
+        },
+        {
+          "name": "aPlannedRungTopsTheDerivedLadder()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#cpuLaunchDisablesDevices",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ef92814c079d3838c9ebaabee6eb3b9693d153ab00a8442a6dec0b4816999aab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cpuLaunchDisablesDevices()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f6d579a86",
+    "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaGpuOffPlanTest\" --tests \"io.justsearch.app.inference.LlamaDevicePlanArchitectureTest\" --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.cpuLaunchDisablesDevices\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 15911
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaGpuOffPlanTest.java",
+        "classification": "assertion",
+        "detail": "gpuOffDisablesDevicesAndProjectorEvenWhenOffloadDefaultsToTrue(): org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (2 failures)&#13;&#10;&#9;org.opentest4j.AssertionFailedError: [llama-server.exe, -m, chat.gguf, --mmproj, mmproj.gguf, --jinja, --reasoning-format, deepseek, --reasoning-budget, 512, --host, 127.0.0.1, --metrics, --port, 8082, -c, 8192, -ngl,"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaDevicePlanArchitectureTest.java",
+        "classification": "assertion",
+        "detail": "noLaunchOwnerConstructsDeviceArgumentsOrVisibilityOutsideThePlan(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: device policy built outside the launch plan: [modules\\app-inference\\src\\main\\java\\io\\justsearch\\app\\inference\\LlamaServerOps.java, modules\\app-services\\src\\main\\java\\io\\justsearch\\app\\services\\ai\\runtime\\RuntimeActivationService.java] ==> expected: <true> but was"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java",
+        "classification": "assertion",
+        "detail": "the CPU argv carries the CPU rung and -ngl 0, same flag set: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[-c, 8192, -ngl, 0, --device, none, -np, 2, -kvu, -ctk, q8_0, -ctv, q8_0, -fa, on, -fit, off]> but was: <[-c, 8192, -ngl, 0, -np, 2, -kvu, -ctk, q8_0, -ctv, q8_0, -fa, on, -fit, off]> | the full GPU argv, in order, including -fit off: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[bin\\llama-server.exe, -m, models\\ch"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#cpuLaunchDisablesDevices",
+        "classification": "assertion",
+        "detail": "cpuLaunchDisablesDevices(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <none> but was: <bin\\llama-server.exe>"
+      }
+    ]
+  },
+  "digest": "sha256:c66d6451dfa09b51bb6a86c7306c12753f294970247d64a992f9dd5a66eef41c"
+}

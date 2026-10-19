@@ -18,6 +18,9 @@
  */
 'use strict';
 import fs from 'node:fs';
+import runtime from './lib/dev-runtime.cjs';
+import nativeTargets from '../lib/native-targets.cjs';
+import processRecords from './lib/process-record.cjs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -26,19 +29,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..', '..');
 const asJson = process.argv.includes('--json');
 
-/** Resolve the MAIN checkout root (worktrees carry a `.git` FILE pointing at the real gitdir). */
-function resolveMainRepoRoot() {
-  try {
-    const dotGit = path.join(repoRoot, '.git');
-    const st = fs.statSync(dotGit);
-    if (st.isFile()) {
-      const m = fs.readFileSync(dotGit, 'utf8').trim().match(/^gitdir:\s*(.+)$/);
-      if (m) return path.resolve(repoRoot, m[1], '..', '..', '..');
-    }
-  } catch { /* not a worktree */ }
-  return repoRoot;
-}
-const mainRepoRoot = resolveMainRepoRoot();
+const mainRepoRoot = runtime.resolveMainRepoRoot(repoRoot);
 
 /** The models dir the runtime resolves (env override, else main checkout, else this checkout). */
 function resolveModelsDir() {
@@ -55,10 +46,10 @@ function readRegistry() {
 }
 
 /** cuda12 GPU llama-server runtime resolvable (worktree-own first, else shared main checkout)? */
+function runtimeModuleDetails() { return runtime.resolveDevRuntime(repoRoot, mainRepoRoot); }
+
 function cuda12Resolvable() {
-  const exe = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server';
-  const tail = ['modules', 'ui', 'native-bin', 'llama-server', 'variants', 'cuda12', exe];
-  return [path.join(repoRoot, ...tail), path.join(mainRepoRoot, ...tail)].some((p) => fs.existsSync(p));
+  return runtime.resolveDevRuntime(repoRoot, mainRepoRoot).valid;
 }
 
 /**
@@ -71,7 +62,7 @@ function cuda12Resolvable() {
  */
 function gpuPresenceCheck() {
   try {
-    const out = execFileSync('nvidia-smi', ['--query-gpu=memory.total', '--format=csv,noheader'], {
+    const out = execFileSync(nativeTargets.executableName('nvidia-smi'), ['--query-gpu=memory.total', '--format=csv,noheader'], {
       timeout: 3000,
       stdio: ['ignore', 'pipe', 'ignore'],
     }).toString().trim();
@@ -106,11 +97,11 @@ function detectOffline() {
   for (const pkg of reg.packages || []) present[pkg.id] = packagePresent(pkg, modelsDir, aiHome);
   const runtime = cuda12Resolvable();
   const gpuVerified = gpuPresenceCheck();
-  return { present, runtime, gpuVerified, modelsDir };
+  return { present, runtime, gpuVerified, modelsDir, runtimeDetails: runtimeModuleDetails() };
 }
 
 /** Map presence → a tier + what each higher tier needs + the single next remedy. */
-function deriveTier({ present, runtime, gpuVerified }) {
+function deriveTier({ present, runtime, gpuVerified, runtimeDetails }) {
   const embedding = !!present.embedding;
   const chat = !!present.chat;
   const missing = [];
@@ -135,13 +126,15 @@ function deriveTier({ present, runtime, gpuVerified }) {
   } else {
     nextRemedy = null; // Tier 2 — nothing missing for the onramp.
   }
+  if (runtimeDetails?.source === 'override' && !runtimeDetails.valid) nextRemedy = 'JUSTSEARCH_SERVER_EXE must name a regular executable file.';
+  else if (!runtime && process.platform === 'linux') nextRemedy = 'Export JUSTSEARCH_SERVER_EXE to the pinned CUDA llama-server executable; make its shared libraries available to the loader.';
   return { tier, missing, nextRemedy };
 }
 
 /** Detect a running stack: active.json → runId → the run's run.json carries apiBaseUrl. */
 function detectStack() {
   try {
-    const stateRoot = path.join(mainRepoRoot, 'tmp', 'dev-runner');
+    const stateRoot = processRecords.resolveRegisterDir(mainRepoRoot, '');
     const active = JSON.parse(fs.readFileSync(path.join(stateRoot, 'active.json'), 'utf8'));
     if (!active.runId) return null;
     const run = JSON.parse(fs.readFileSync(path.join(stateRoot, 'runs', active.runId, 'run.json'), 'utf8'));

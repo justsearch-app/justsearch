@@ -1,0 +1,191 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:83d8dd3cdaf29665ab7d4d5208d8f1950aa0fdbf948556d275c256efabd8b9b7"
+  },
+  "createdAt": "2026-10-16T07:37:36.658Z",
+  "revision": "ad6ce2ef14ac474623c86c19a1ed2ee39d709d39",
+  "tree": "615b85e421318a73ef662c0ba491c0f5681aba3b",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/api/statusInvalidation.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-28468-1792136243425.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1812
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/api/statusInvalidation.test.ts",
+      "file": "modules/ui-web/src/api/statusInvalidation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:69560e6525a09af78360b76ea5fe501561181e9dda5f5afb7d03da80fcbb11cf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "core.set-chat-enabled publishes canonical state from its actual operation receipt",
+          "status": "passed"
+        },
+        {
+          "name": "core.activate-runtime-variant publishes canonical state from its actual operation receipt",
+          "status": "passed"
+        },
+        {
+          "name": "core.deactivate-runtime-variant publishes canonical state from its actual operation receipt",
+          "status": "passed"
+        },
+        {
+          "name": "core.activate-installed-models publishes canonical state from its actual operation receipt",
+          "status": "passed"
+        },
+        {
+          "name": "core.reconfigure publishes canonical state from its actual operation receipt",
+          "status": "passed"
+        },
+        {
+          "name": "core.recover-component publishes canonical state from its actual operation receipt",
+          "status": "passed"
+        },
+        {
+          "name": "core.add-watched-root publishes canonical state from its actual operation receipt",
+          "status": "passed"
+        },
+        {
+          "name": "core.remove-watched-root publishes canonical state from its actual operation receipt",
+          "status": "passed"
+        },
+        {
+          "name": "core.reindex publishes canonical state from its actual operation receipt",
+          "status": "passed"
+        },
+        {
+          "name": "core.cancel-reindex publishes canonical state from its actual operation receipt",
+          "status": "passed"
+        },
+        {
+          "name": "core.accept-gaps publishes canonical state from its actual operation receipt",
+          "status": "passed"
+        },
+        {
+          "name": "core.reset-settings publishes canonical state from its actual operation receipt",
+          "status": "passed"
+        },
+        {
+          "name": "undo publishes canonical state from its actual receipt",
+          "status": "passed"
+        },
+        {
+          "name": "direct /api/ai/install/pause updates the production poller",
+          "status": "passed"
+        },
+        {
+          "name": "direct /api/ai/install/resume updates the production poller",
+          "status": "passed"
+        },
+        {
+          "name": "direct /api/ai/runtime/activate updates the production poller",
+          "status": "passed"
+        },
+        {
+          "name": "direct /api/indexing/migration/pause updates the production poller",
+          "status": "passed"
+        },
+        {
+          "name": "direct /api/indexing/migration/resume updates the production poller",
+          "status": "passed"
+        },
+        {
+          "name": "direct /api/indexing/roots updates the production poller",
+          "status": "passed"
+        },
+        {
+          "name": "direct /api/lifecycle/shutdown updates the production poller",
+          "status": "passed"
+        },
+        {
+          "name": "direct /api/upgrade/cancel updates the production poller",
+          "status": "passed"
+        },
+        {
+          "name": "direct /api/upgrade/reconcile updates the production poller",
+          "status": "passed"
+        },
+        {
+          "name": "direct /api/upgrade/commit-shutdown updates the production poller",
+          "status": "passed"
+        },
+        {
+          "name": "direct /api/upgrade/prepare updates the production poller",
+          "status": "passed"
+        },
+        {
+          "name": "direct /api/worker/restart updates the production poller",
+          "status": "passed"
+        },
+        {
+          "name": "the real load-anyway handler publishes canonical state after a successful load request",
+          "status": "passed"
+        },
+        {
+          "name": "domain HTTP root removal uses the same canonical read",
+          "status": "passed"
+        },
+        {
+          "name": "coalesces a concurrent burst of successful actions into one fresh read",
+          "status": "passed"
+        },
+        {
+          "name": "keeps a successful action behind real status admission until the shared read publishes",
+          "status": "passed"
+        },
+        {
+          "name": "waits for COMPLETE settings before publishing GPU/profile state",
+          "status": "passed"
+        },
+        {
+          "name": "failed operations and read-only operations do not request fresh status",
+          "status": "passed"
+        },
+        {
+          "name": "shows a change made by another client after this UI next makes a read-only request",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1939ad02c",
+    "revision": "1939ad02ce2c23bae1146e6b01b8055aa8b3fff8",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/api/statusInvalidation.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-28468-1792136252618.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1922,
+        "output": "JSON report written to C:/Users/Elias/AppData/Local/Temp/test-intent-vitest-28468-1792136252618.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/api/statusInvalidation.test.ts",
+        "classification": "assertion",
+        "detail": "core.set-chat-enabled publishes canonical state from its actual operation receipt:  AssertionError: expected 'READY' to be 'OFF' // Object.is equality\n    at F:/agent-sandbox/design-b6d536/ci759/round4/status-asi/before/test-intent-before-uZ0wRy/modules/ui-web/src/api/statusInvalidation.test.ts:47:44\n    at file:///F:/agent-sandbox/design-b6d536/ci759/round4/status-asi/before/test- | core.activate-runtime-variant publishes canonical state from its actual operation receipt:  AssertionError: expec"
+      }
+    ]
+  },
+  "digest": "sha256:f3afb6eafb54f157b175cc98ef275139bcbb43e7b6639d6279a044275884e0c8"
+}

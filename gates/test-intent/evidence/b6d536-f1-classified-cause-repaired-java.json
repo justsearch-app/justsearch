@@ -1,0 +1,243 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T09:14:44.592Z",
+  "revision": "947a6a72fa6b67b09e526242f0914ccf39cd3c09",
+  "tree": "b71b8207110a72e23efe37d6d5c674eb4a4e5b19",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedRetryNamesItsOwnClassifiedCauseAndAddsTypedFailureEvidence\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aFailedOperatorRetryOfACorruptModelSaysTheModelDidNotLoad\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aSettingsApplyThatStartsChatFromOfflineAndFailsShowsItsOwnFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aPreparedSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aPreparedSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3684
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeChatCauseTest.aChatModelThatDidNotLoadIsNamedByItsCauseNotTheEvidence\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeChatCauseTest.everyChatFailureCauseHasWordsOnBothHealthEvents\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2288
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedRetryNamesItsOwnClassifiedCauseAndAddsTypedFailureEvidence",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedRetryNamesItsOwnClassifiedCauseAndAddsTypedFailureEvidence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aFailedOperatorRetryOfACorruptModelSaysTheModelDidNotLoad",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedOperatorRetryOfACorruptModelSaysTheModelDidNotLoad()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aSettingsApplyThatStartsChatFromOfflineAndFailsShowsItsOwnFailure",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSettingsApplyThatStartsChatFromOfflineAndFailsShowsItsOwnFailure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aPreparedSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPreparedSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aPreparedSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPreparedSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java#aChatModelThatDidNotLoadIsNamedByItsCauseNotTheEvidence",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15273c990c23102a9ec716b6d2bf0e41ed05aaad429cd37a5e477cdf26b2d381",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aChatModelThatDidNotLoadIsNamedByItsCauseNotTheEvidence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java#everyChatFailureCauseHasWordsOnBothHealthEvents",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15273c990c23102a9ec716b6d2bf0e41ed05aaad429cd37a5e477cdf26b2d381",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyChatFailureCauseHasWordsOnBothHealthEvents()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "5e4f4e698",
+    "revision": "5e4f4e6983f647c89f979b7b12e751d70789c895",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-f1-classified-cause-repaired-java-compat.patch",
+        "contentDigest": "sha256:8a603a700622c975dc8f6fcc08a72f1135588e2425a30b2157ad06ed88d9f64f"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedRetryNamesItsOwnClassifiedCauseAndAddsTypedFailureEvidence\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aFailedOperatorRetryOfACorruptModelSaysTheModelDidNotLoad\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aSettingsApplyThatStartsChatFromOfflineAndFailsShowsItsOwnFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aPreparedSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.aPreparedSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7154
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeChatCauseTest.aChatModelThatDidNotLoadIsNamedByItsCauseNotTheEvidence\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeChatCauseTest.everyChatFailureCauseHasWordsOnBothHealthEvents\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 50236
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedRetryNamesItsOwnClassifiedCauseAndAddsTypedFailureEvidence",
+        "classification": "assertion",
+        "detail": "failedRetryNamesItsOwnClassifiedCauseAndAddsTypedFailureEvidence(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <inference.startup_timeout> but was: <inference.crashed>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aFailedOperatorRetryOfACorruptModelSaysTheModelDidNotLoad",
+        "classification": "assertion",
+        "detail": "aFailedOperatorRetryOfACorruptModelSaysTheModelDidNotLoad(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the retry's own start failure, not the earlier crash ==> expected: <inference.model_load_failed> but was: <inference.crashed>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aSettingsApplyThatStartsChatFromOfflineAndFailsShowsItsOwnFailure",
+        "classification": "assertion",
+        "detail": "aSettingsApplyThatStartsChatFromOfflineAndFailsShowsItsOwnFailure(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the apply's landing names its own failure, not the CRASH_LOOP before it ==> expected: <[MODEL_LOAD_FAILED]> but was: <[CRASH_LOOP]>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure",
+        "classification": "assertion",
+        "detail": "aSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: chat is down because A did not start again: that start's cause ==> expected: <[MODEL_LOAD_FAILED]> but was: <[null]>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aPreparedSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure",
+        "classification": "assertion",
+        "detail": "aPreparedSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[MODEL_LOAD_FAILED]> but was: <[null]>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes",
+        "classification": "assertion",
+        "detail": "aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <null> but was: <CRASH_LOOP>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#aPreparedSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes",
+        "classification": "assertion",
+        "detail": "aPreparedSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <null> but was: <CRASH_LOOP>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java#aChatModelThatDidNotLoadIsNamedByItsCauseNotTheEvidence",
+        "classification": "assertion",
+        "detail": "aChatModelThatDidNotLoadIsNamedByItsCauseNotTheEvidence(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the cause the catalog words, as ai.not-ready carries it ==> expected: <InferenceModelLoadFailed> but was: <Degraded>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java#everyChatFailureCauseHasWordsOnBothHealthEvents",
+        "classification": "assertion",
+        "detail": "everyChatFailureCauseHasWordsOnBothHealthEvents(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: health-events.inference.capability.reason.InferenceOutOfMemory.message is missing ==> expected: not <null>"
+      }
+    ]
+  },
+  "digest": "sha256:8b9e302e320ee03f55eb111a2af118256b0bad4b62cf01fc7cb050b5685c37ba"
+}

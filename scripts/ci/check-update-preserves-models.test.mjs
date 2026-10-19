@@ -6,6 +6,7 @@ import {
   checkBundleResources,
   checkNsisHooks,
   checkSidecarStaging,
+  runCheck,
 } from './check-update-preserves-models.mjs';
 
 const failures = [];
@@ -109,6 +110,16 @@ test('deleting under a user-data root fails even when non-recursive', () => {
 test('a commented-out recursive delete is not a violation', () => {
   const nsh = '  ; RMDir /r "$LOCALAPPDATA\\JustSearch"\n';
   assert.deepEqual(checkNsisHooks(nsh), []);
+});
+
+test('the Windows resource overlay cannot ship model weights past a clean base', () => {
+  const files = {
+    'modules/shell/src-tauri/tauri.conf.json': CLEAN_CONF,
+    'modules/shell/src-tauri/tauri.windows.conf.json': JSON.stringify({ bundle: { resources: ['models/chat.gguf'] } }),
+    'modules/ui/build.gradle.kts': CLEAN_GRADLE,
+    'modules/shell/src-tauri/nsis/installer-hooks.nsh': CLEAN_NSH,
+  };
+  assert.equal(runCheck('', file => files[file]).length, 1);
 });
 
 if (failures.length > 0) {

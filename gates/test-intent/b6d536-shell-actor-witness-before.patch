@@ -1,0 +1,17 @@
+diff --git a/modules/shell/src-tauri/src/updater.rs b/modules/shell/src-tauri/src/updater.rs
+--- a/modules/shell/src-tauri/src/updater.rs
++++ b/modules/shell/src-tauri/src/updater.rs
+@@ -2423,3 +2423,7 @@
+ #[cfg(test)]
+ #[path = "updater_handoff_tests.rs"]
+ mod handoff_tests;
++
++#[cfg(test)]
++#[path = "updater_actor_hold_witness_tests.rs"]
++mod actor_hold_witness_tests;
+diff --git a/modules/shell/src-tauri/resources/headless/b20-placeholder b/modules/shell/src-tauri/resources/headless/b20-placeholder
+new file mode 100644
+--- /dev/null
++++ b/modules/shell/src-tauri/resources/headless/b20-placeholder
+@@ -0,0 +1 @@
++Test-build resource placeholder; no Engine executable.

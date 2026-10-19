@@ -1,0 +1,661 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-07T02:21:35.017Z",
+  "revision": "ce8ddb55b349b3551c79b60bfcacd0973d8b7414",
+  "tree": "0c8b474f984a975d2910f86c586fff49c7016621",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.AiInstallAcquisitionFreezeSeamTest.theAcquisitionWindowFreezesConvergenceAndTheEngineFollowsTheSpecOnceAfter\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationSelfTestSeamTest.theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter\" --tests \"io.justsearch.app.services.bootstrap.phases.BootstrapProjectionsTest.nullManager_returnsOfflineDefaultsIncludingNewFields\" --tests \"io.justsearch.app.services.bootstrap.phases.BootstrapProjectionsTest.managerPresent_nullReconciler_newFieldsDefaultOldFieldsUnchanged\" --tests \"io.justsearch.app.services.bootstrap.phases.BootstrapProjectionsTest.managerAndReconcilerPresent_projectsRuntimeAuthorityFields\" --tests \"io.justsearch.app.services.bootstrap.phases.BootstrapProjectionsTest.activeProcedure_projectsProcedureKind\" --tests \"io.justsearch.app.services.bootstrap.phases.BootstrapProjectionsTest.indexingLease_projectsIndexingHolderToStatus\" --tests \"io.justsearch.app.services.brainruntime.BrainRuntimeServiceImplTest.switchOnline_writesSpecTrue_nudges_noRawSwitch\" --tests \"io.justsearch.app.services.brainruntime.BrainRuntimeServiceImplTest.switchIndexing_writesSpecFalse_nudges_noRawSwitch\" --tests \"io.justsearch.app.services.brainruntime.BrainRuntimeServiceImplTest.switchInvalidMode_throwsIllegalArgument\" --tests \"io.justsearch.app.services.chat.ChatActivationSeamTest.bootForwardsOneActivationAndAForeignUnloadIsNeverReloaded\" --tests \"io.justsearch.app.services.chat.SelfTestSessionSeamTest.theMainServerStopsBeforeTheCandidateAndLoadsOnceAfterTheCommit\" --tests \"io.justsearch.app.services.chat.SelfTestSessionSeamTest.fromIdleTheSessionGoesStraightInAndClosingReturnsToAnOffIntent\" --tests \"io.justsearch.app.services.registry.operations.handlers.SetChatEnabledHandlerTest.enableWritesOnlyAfterAcceptanceAndRetryDoesNotNudgeAgain\" --tests \"io.justsearch.app.services.registry.operations.handlers.SetChatEnabledHandlerTest.disableWritesSpecFalseAndFiresNudge\" --tests \"io.justsearch.app.services.registry.operations.handlers.SetChatEnabledHandlerTest.stalePreparedFullWitnessRefusesWithoutOverwritingNewerIntent\" --tests \"io.justsearch.app.services.registry.operations.handlers.SetChatEnabledHandlerTest.invalidAndUnavailableRequestsFailWithoutRawExecution\" --tests \"io.justsearch.app.services.registry.operations.handlers.SwitchInferenceModeHandlerTest.onlineMapsToChatEnabledTrueAndRetryDoesNotNudgeAgain\" --tests \"io.justsearch.app.services.registry.operations.handlers.SwitchInferenceModeHandlerTest.indexingMapsToChatEnabledFalse\" --tests \"io.justsearch.app.services.registry.operations.handlers.SwitchInferenceModeHandlerTest.invalidModesFailThroughDispatcher\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerHoldsTest.followHoldsMirrorsEachHoldKindAsItsProcedureAndDefersForwarding\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.failedActivationLeavesRetriesToComponentOwnerAndNewIntentStillConverges\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.componentRecoveryDoesNotSuppressRetryOfDisabledIntentShutdown\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.explicitEnableDuringProcedureSurvivesPendingRecoveryAndDeferredConvergence\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.specOnEngineDown_switchesOnlineExactlyOnce\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.convergenceRunsOnReconcilerThreadNotCaller\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.policyOffWinsOverSpecOn\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.specDisableWhileOnline_callsStopPrimitive\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.procedureWithSpecOn_returnsEngineOnlineAfterEnd\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.procedureWithSpecOff_engineStaysDownAfterEnd\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.foreignUnloadWithChatEnabled_neverReloads\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.procedureHoldsEngineUpSpecOff_engineReasonIsBackground\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.specWriteDuringProcedure_deferredUntilEnd\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.activationProcedure_specOffEngineOnlineDrift_noDownSwitch_thenStaysOnline\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.installSmokeTestProcedure_specOff_engineUpNoDown_thenOneDownAtEnd\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.concurrentProcedures_driftSuppressedUntilBothEnd_thenOneConvergence\" --tests \"io.justsearch.app.services.runtimestate.RuntimeStatusTest.engineAxisDerivation\" --tests \"io.justsearch.app.services.runtimestate.RuntimeStatusTest.adoptionAxisDerivation\" --tests \"io.justsearch.app.services.runtimestate.RuntimeStatusTest.leaseAxisDerivation\" --tests \"io.justsearch.app.services.runtimestate.RuntimeStatusTest.indexingLeaseSurvivesTransitionUntilModeCommits\" --tests \"io.justsearch.app.services.runtimestate.RuntimeStatusTest.fullDeriveHasAllThreeAxes\" --tests \"io.justsearch.app.services.vdu.OfflinePassChatSeamTest.aPassWithEmbeddingsPendingLeavesChatRunning\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 33630
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallAcquisitionFreezeSeamTest.java#theAcquisitionWindowFreezesConvergenceAndTheEngineFollowsTheSpecOnceAfter",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallAcquisitionFreezeSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4af38dc3153f6bba9e44f7d747972db57a73566c52dbd00ded6b0b3511752eb7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theAcquisitionWindowFreezesConvergenceAndTheEngineFollowsTheSpecOnceAfter()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestSeamTest.java#theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fc0e6597da2cd2487c390687ea3ab289423d67229880d642d5d298aec3abaa8f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/BootstrapProjectionsTest.java#nullManager_returnsOfflineDefaultsIncludingNewFields",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/BootstrapProjectionsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b93683c04166a6eecc0fe7009f18f44828d1cef97874871d2e59c7b6ebf44",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nullManager_returnsOfflineDefaultsIncludingNewFields()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/BootstrapProjectionsTest.java#managerPresent_nullReconciler_newFieldsDefaultOldFieldsUnchanged",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/BootstrapProjectionsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b93683c04166a6eecc0fe7009f18f44828d1cef97874871d2e59c7b6ebf44",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "managerPresent_nullReconciler_newFieldsDefaultOldFieldsUnchanged()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/BootstrapProjectionsTest.java#managerAndReconcilerPresent_projectsRuntimeAuthorityFields",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/BootstrapProjectionsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b93683c04166a6eecc0fe7009f18f44828d1cef97874871d2e59c7b6ebf44",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "managerAndReconcilerPresent_projectsRuntimeAuthorityFields()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/BootstrapProjectionsTest.java#activeProcedure_projectsProcedureKind",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/BootstrapProjectionsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b93683c04166a6eecc0fe7009f18f44828d1cef97874871d2e59c7b6ebf44",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "activeProcedure_projectsProcedureKind()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/BootstrapProjectionsTest.java#indexingLease_projectsIndexingHolderToStatus",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/BootstrapProjectionsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:952b93683c04166a6eecc0fe7009f18f44828d1cef97874871d2e59c7b6ebf44",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexingLease_projectsIndexingHolderToStatus()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/brainruntime/BrainRuntimeServiceImplTest.java#switchOnline_writesSpecTrue_nudges_noRawSwitch",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/brainruntime/BrainRuntimeServiceImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:30f122f8fe4a76b383c24303e8eb88f8024d4c9ff03676c0ab83cefbfa3e8675",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "switchOnline_writesSpecTrue_nudges_noRawSwitch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/brainruntime/BrainRuntimeServiceImplTest.java#switchIndexing_writesSpecFalse_nudges_noRawSwitch",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/brainruntime/BrainRuntimeServiceImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:30f122f8fe4a76b383c24303e8eb88f8024d4c9ff03676c0ab83cefbfa3e8675",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "switchIndexing_writesSpecFalse_nudges_noRawSwitch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/brainruntime/BrainRuntimeServiceImplTest.java#switchInvalidMode_throwsIllegalArgument",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/brainruntime/BrainRuntimeServiceImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:30f122f8fe4a76b383c24303e8eb88f8024d4c9ff03676c0ab83cefbfa3e8675",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "switchInvalidMode_throwsIllegalArgument()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatActivationSeamTest.java#bootForwardsOneActivationAndAForeignUnloadIsNeverReloaded",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatActivationSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:675e0ce3cbfa273786fe6101c96fdc628e52bc1fe1d04902ce55936c85ba9acf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootForwardsOneActivationAndAForeignUnloadIsNeverReloaded()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestSessionSeamTest.java#theMainServerStopsBeforeTheCandidateAndLoadsOnceAfterTheCommit",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestSessionSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:780a7b39edc93cef158bccd19f8497c37fbd2facbfa328e43b92a2876a6821da",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theMainServerStopsBeforeTheCandidateAndLoadsOnceAfterTheCommit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestSessionSeamTest.java#fromIdleTheSessionGoesStraightInAndClosingReturnsToAnOffIntent",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestSessionSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:780a7b39edc93cef158bccd19f8497c37fbd2facbfa328e43b92a2876a6821da",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fromIdleTheSessionGoesStraightInAndClosingReturnsToAnOffIntent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SetChatEnabledHandlerTest.java#enableWritesOnlyAfterAcceptanceAndRetryDoesNotNudgeAgain",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SetChatEnabledHandlerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:df291c82a356d19e456c7854650790cac9fdc86189aad85683d3e804b3c98d67",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "enableWritesOnlyAfterAcceptanceAndRetryDoesNotNudgeAgain()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SetChatEnabledHandlerTest.java#disableWritesSpecFalseAndFiresNudge",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SetChatEnabledHandlerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:df291c82a356d19e456c7854650790cac9fdc86189aad85683d3e804b3c98d67",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "disableWritesSpecFalseAndFiresNudge()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SetChatEnabledHandlerTest.java#stalePreparedFullWitnessRefusesWithoutOverwritingNewerIntent",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SetChatEnabledHandlerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:df291c82a356d19e456c7854650790cac9fdc86189aad85683d3e804b3c98d67",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "stalePreparedFullWitnessRefusesWithoutOverwritingNewerIntent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SetChatEnabledHandlerTest.java#invalidAndUnavailableRequestsFailWithoutRawExecution",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SetChatEnabledHandlerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:df291c82a356d19e456c7854650790cac9fdc86189aad85683d3e804b3c98d67",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "invalidAndUnavailableRequestsFailWithoutRawExecution()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SwitchInferenceModeHandlerTest.java#onlineMapsToChatEnabledTrueAndRetryDoesNotNudgeAgain",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SwitchInferenceModeHandlerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:38c1d1fa30375acfe4b41d7179e82e19895805a05559908fc72661abea6072d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "onlineMapsToChatEnabledTrueAndRetryDoesNotNudgeAgain()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SwitchInferenceModeHandlerTest.java#indexingMapsToChatEnabledFalse",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SwitchInferenceModeHandlerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:38c1d1fa30375acfe4b41d7179e82e19895805a05559908fc72661abea6072d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexingMapsToChatEnabledFalse()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SwitchInferenceModeHandlerTest.java#invalidModesFailThroughDispatcher",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/SwitchInferenceModeHandlerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:38c1d1fa30375acfe4b41d7179e82e19895805a05559908fc72661abea6072d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "invalidModesFailThroughDispatcher()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerHoldsTest.java#followHoldsMirrorsEachHoldKindAsItsProcedureAndDefersForwarding",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a323562dd7450cf0a4e71a54d27348657a018b1e451c2b0c1cd217ac0b739bdd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "followHoldsMirrorsEachHoldKindAsItsProcedureAndDefersForwarding()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#failedActivationLeavesRetriesToComponentOwnerAndNewIntentStillConverges",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedActivationLeavesRetriesToComponentOwnerAndNewIntentStillConverges()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#componentRecoveryDoesNotSuppressRetryOfDisabledIntentShutdown",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "componentRecoveryDoesNotSuppressRetryOfDisabledIntentShutdown()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#explicitEnableDuringProcedureSurvivesPendingRecoveryAndDeferredConvergence",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitEnableDuringProcedureSurvivesPendingRecoveryAndDeferredConvergence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#specOnEngineDown_switchesOnlineExactlyOnce",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "specOnEngineDown_switchesOnlineExactlyOnce()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#convergenceRunsOnReconcilerThreadNotCaller",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "convergenceRunsOnReconcilerThreadNotCaller()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#policyOffWinsOverSpecOn",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "policyOffWinsOverSpecOn()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#specDisableWhileOnline_callsStopPrimitive",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "specDisableWhileOnline_callsStopPrimitive()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#procedureWithSpecOn_returnsEngineOnlineAfterEnd",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "procedureWithSpecOn_returnsEngineOnlineAfterEnd()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#procedureWithSpecOff_engineStaysDownAfterEnd",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "procedureWithSpecOff_engineStaysDownAfterEnd()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#foreignUnloadWithChatEnabled_neverReloads",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "foreignUnloadWithChatEnabled_neverReloads()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#procedureHoldsEngineUpSpecOff_engineReasonIsBackground",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "procedureHoldsEngineUpSpecOff_engineReasonIsBackground()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#specWriteDuringProcedure_deferredUntilEnd",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "specWriteDuringProcedure_deferredUntilEnd()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#activationProcedure_specOffEngineOnlineDrift_noDownSwitch_thenStaysOnline",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "activationProcedure_specOffEngineOnlineDrift_noDownSwitch_thenStaysOnline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#installSmokeTestProcedure_specOff_engineUpNoDown_thenOneDownAtEnd",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "installSmokeTestProcedure_specOff_engineUpNoDown_thenOneDownAtEnd()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#concurrentProcedures_driftSuppressedUntilBothEnd_thenOneConvergence",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55993accddfe11704a786948335f59f8da2908a7f72e5070ed301156496c7de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrentProcedures_driftSuppressedUntilBothEnd_thenOneConvergence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeStatusTest.java#engineAxisDerivation",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1d2dbe46ba3820e5db4ff7d11aaaa3ffab2eb9c1764d15831b7d12ffb0199ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engineAxisDerivation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeStatusTest.java#adoptionAxisDerivation",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1d2dbe46ba3820e5db4ff7d11aaaa3ffab2eb9c1764d15831b7d12ffb0199ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "adoptionAxisDerivation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeStatusTest.java#leaseAxisDerivation",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1d2dbe46ba3820e5db4ff7d11aaaa3ffab2eb9c1764d15831b7d12ffb0199ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "leaseAxisDerivation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeStatusTest.java#indexingLeaseSurvivesTransitionUntilModeCommits",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1d2dbe46ba3820e5db4ff7d11aaaa3ffab2eb9c1764d15831b7d12ffb0199ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexingLeaseSurvivesTransitionUntilModeCommits()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeStatusTest.java#fullDeriveHasAllThreeAxes",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1d2dbe46ba3820e5db4ff7d11aaaa3ffab2eb9c1764d15831b7d12ffb0199ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fullDeriveHasAllThreeAxes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflinePassChatSeamTest.java#aPassWithEmbeddingsPendingLeavesChatRunning",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflinePassChatSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:90b95b0694e01156a158aaf8a3505e48b841e207ed34c8851381a050313ac172",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPassWithEmbeddingsPendingLeavesChatRunning()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b9d8b2688887bb5524f94ca40e3bc9c4d7347807da5c3448293f1350ef1e2040"
+}

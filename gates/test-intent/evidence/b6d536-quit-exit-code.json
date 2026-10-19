@@ -1,0 +1,85 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T22:49:38.527Z",
+  "revision": "bca7dd0dd4a9534263f0c832240103327044ff7b",
+  "tree": "a2a55ad4ac61b708fd93784e964ed958cb6777b7",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineExitTest.supervisorForcedExitIsNamedAndTransient\" --tests \"io.justsearch.app.engine.EngineSupervisionPolicyTest.registerCarriesTheSupervisorForcedExit\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4399
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineExitTest.java#supervisorForcedExitIsNamedAndTransient",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineExitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2ff435123c43de2e8885d13ba9a6e4923b491d3d6aabcb2b4e787fdfa45af2f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "supervisorForcedExitIsNamedAndTransient()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSupervisionPolicyTest.java#registerCarriesTheSupervisorForcedExit",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSupervisionPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2a03a5a345e290382e8e884ac8e465464ee96d2340c2195a2605bc9488165c70",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "registerCarriesTheSupervisorForcedExit()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bca7dd0dd",
+    "revision": "bca7dd0dd4a9534263f0c832240103327044ff7b",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineExitTest.supervisorForcedExitIsNamedAndTransient\" --tests \"io.justsearch.app.engine.EngineSupervisionPolicyTest.registerCarriesTheSupervisorForcedExit\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 64235
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineExitTest.java#supervisorForcedExitIsNamedAndTransient",
+        "classification": "assertion",
+        "detail": "supervisorForcedExitIsNamedAndTransient(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a forced stop must be told apart from a crash in the state file and logs ==> expected: <supervisor_forced> but was: <unknown(1246953474)>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSupervisionPolicyTest.java#registerCarriesTheSupervisorForcedExit",
+        "classification": "assertion",
+        "detail": "registerCarriesTheSupervisorForcedExit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the register has no exitCodes row for 1246953474 (JS_ENGINE_STOP) ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:28ef2a9f312beee97d59a3c831f8903ecd54fe204ebf3652d160ff8557329c89"
+}

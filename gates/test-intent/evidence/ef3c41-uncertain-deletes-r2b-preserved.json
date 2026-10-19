@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:3f2d61f763377fbd05b2063160ccfd7945561c99d4a93fe60fe2c29730829380"
+  },
+  "createdAt": "2026-10-13T16:34:13.976Z",
+  "revision": "9f9c1da1644069da66b36da4fd5e930f323bde75",
+  "tree": "e3948ebbe926365673966516c616c78b5a9d9be2",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-core:test --tests \"io.justsearch.indexerworker.index.IndexRebuildBrakeTest.aReadableBrakeForAnotherTargetStillCountsFromOne\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2313
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexRebuildBrakeTest.java#aReadableBrakeForAnotherTargetStillCountsFromOne",
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexRebuildBrakeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4ba63d4e6a5ec33b8f1968b5f5969c9577f77047debadc690d59066410a72161",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReadableBrakeForAnotherTargetStillCountsFromOne(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bf41272f9",
+    "revision": "bf41272f98f4a1119da2ad809793ebd8740a569d",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-core:test --tests \"io.justsearch.indexerworker.index.IndexRebuildBrakeTest.aReadableBrakeForAnotherTargetStillCountsFromOne\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 6237
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexRebuildBrakeTest.java#aReadableBrakeForAnotherTargetStillCountsFromOne",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:d9cf231a1b17c74b0d4a6f7779bdd688225a843f468580eb3cb0851ad32ffa5a"
+}

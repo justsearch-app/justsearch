@@ -37,6 +37,7 @@ final class SyncRootReplayProvenanceTest {
   void maintenanceCoalescesAtomicallyAndSurvivesRestartReplay() throws Exception {
     Path root = Files.createDirectories(tempDir.resolve("coalesced"));
     Files.writeString(root.resolve("doc.txt"), "content");
+    addedByThePerson(tempDir.resolve("base"), root);
     Path db = tempDir.resolve("coalesced.db");
     var agent = new JobQueue.EnqueueProvenance("agent", "MCP");
     var user = new JobQueue.EnqueueProvenance("user", "BUTTON");
@@ -148,6 +149,24 @@ final class SyncRootReplayProvenanceTest {
   private String syncRootJson() throws Exception {
     Path root = Files.createDirectories(tempDir.resolve("root-" + System.nanoTime()));
     Files.writeString(root.resolve("document.txt"), "content");
+    addedByThePerson(tempDir.resolve("base"), root);
     return root.toAbsolutePath().toString().replace("\\", "\\\\");
+  }
+
+  /**
+   * The person's add of {@code root}: its watch request with the add marker, which records the
+   * root's volume under {@code indexBasePath}. Task t-20261013-ef3c41, round 8 (refined decision
+   * 2): only the add records a root's volume, and every other path refuses a root with none
+   * recorded.
+   */
+  private static void addedByThePerson(Path indexBasePath, Path root) {
+    var adding = new io.justsearch.indexerworker.services.WorkerIngestService(null, null, null,
+        IndexingPacing.unthrottled(), indexBasePath, null,
+        null, null, null, 0L);
+    var added = adding.watchRoot(io.justsearch.ipc.WatchRootRequest.newBuilder()
+            .setRootPath(root.toString()).setRootAdded(true).build(),
+        io.justsearch.indexerworker.services.CallContext.none());
+    assertTrue(added.getWatching(),
+        "precondition: the person adds " + root + ": " + added.getErrorMessage());
   }
 }

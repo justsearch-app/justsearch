@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-07T13:24:27.962Z",
+  "revision": "f6b5b019a963b098365b3f3365fcc5a27d7d0e2f",
+  "tree": "526947c6e0ebbef64aae64d3d059ecb94984e74f",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"quit::tests::other_stop_causes_do_not_request_session_exit\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 610
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/quit.rs#quit::tests::other_stop_causes_do_not_request_session_exit",
+      "file": "modules/shell/src-tauri/src/quit.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:64c058ca909e8a0437e5b73204d342fef7a468dbb0ba665afbf9ee3e3e9625b2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "quit::tests::other_stop_causes_do_not_request_session_exit",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:8262b26ce983c7c0975b92e1d86b013bd7ed250e0be13fb976033c30184a4aa0"
+}

@@ -1,0 +1,146 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T07:58:39.388Z",
+  "revision": "c4f2405b4cc34ff9cdc3da4749a930002f17c55b",
+  "tree": "bc74fe67a84e1cf429c760fd9f0cc57339fa7284",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.failedSelfIntentPersistenceCannotAuthorizeADeviceLossRestart\" --tests \"io.justsearch.ui.api.OperatingStateAssemblerTest.ledgerWriteFailureIsVisibleUntilDurableRecovery\" --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.theEarlierRestartsAreThisDataDirectorysDeviceLostSelfIntents\" --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.aFailedSelfIntentWriteFailsTheCountClosed\" --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.theRestartRecordsTheIntentTheNextIncarnationCountsAndExitsFour\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 22578
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#failedSelfIntentPersistenceCannotAuthorizeADeviceLossRestart",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ef6ce567d6fa30e6167342b3c79c7c0a958156d9576fbf286a333699439d9fc5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedSelfIntentPersistenceCannotAuthorizeADeviceLossRestart(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java#ledgerWriteFailureIsVisibleUntilDurableRecovery",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ecf8c1c6dc2cf7618ccc810d377916539d09e4e63192732d1624f4832552fadf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ledgerWriteFailureIsVisibleUntilDurableRecovery(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#theEarlierRestartsAreThisDataDirectorysDeviceLostSelfIntents",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ef6ce567d6fa30e6167342b3c79c7c0a958156d9576fbf286a333699439d9fc5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theEarlierRestartsAreThisDataDirectorysDeviceLostSelfIntents(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#aFailedSelfIntentWriteFailsTheCountClosed",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ef6ce567d6fa30e6167342b3c79c7c0a958156d9576fbf286a333699439d9fc5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedSelfIntentWriteFailsTheCountClosed(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#theRestartRecordsTheIntentTheNextIncarnationCountsAndExitsFour",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ef6ce567d6fa30e6167342b3c79c7c0a958156d9576fbf286a333699439d9fc5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theRestartRecordsTheIntentTheNextIncarnationCountsAndExitsFour(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "61ff9b955",
+    "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.failedSelfIntentPersistenceCannotAuthorizeADeviceLossRestart\" --tests \"io.justsearch.ui.api.OperatingStateAssemblerTest.ledgerWriteFailureIsVisibleUntilDurableRecovery\" --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.theEarlierRestartsAreThisDataDirectorysDeviceLostSelfIntents\" --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.aFailedSelfIntentWriteFailsTheCountClosed\" --tests \"io.justsearch.ui.HeadlessAppDeviceLostRestartTest.theRestartRecordsTheIntentTheNextIncarnationCountsAndExitsFour\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 100595
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#failedSelfIntentPersistenceCannotAuthorizeADeviceLossRestart",
+        "classification": "assertion",
+        "detail": "failedSelfIntentPersistenceCannotAuthorizeADeviceLossRestart(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: unwritten DEVICE_LOST must not become an uncounted restart ==> expected: <-1> but was: <4>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateAssemblerTest.java#ledgerWriteFailureIsVisibleUntilDurableRecovery",
+        "classification": "assertion",
+        "detail": "ledgerWriteFailureIsVisibleUntilDurableRecovery(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: failed owner receipts must be visible through the production status projection ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#theEarlierRestartsAreThisDataDirectorysDeviceLostSelfIntents",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#aFailedSelfIntentWriteFailsTheCountClosed",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java#theRestartRecordsTheIntentTheNextIncarnationCountsAndExitsFour",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:82b29b72fc814749ebe7b682abc9c3a18e5587792ec9bed7778ae4c9408cf84d"
+}

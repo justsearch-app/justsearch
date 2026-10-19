@@ -8,12 +8,12 @@
  * specifics removed (runId, NDJSON logging, process lifecycle, evidence capture).
  */
 
-import http from 'node:http';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 import { discover } from './discovery.mjs';
+import { engineRequest } from '../../../packaging/mcpb/server/engine-discovery.cjs';
 import {
   AnswerInputSchema,
   AnswerOutputSchema,
@@ -64,6 +64,30 @@ function ensureLoopbackUrl(urlStr, label = 'url') {
 }
 
 /**
+ * The Engine discovery selected: { port, engine }, engine being the manifest candidate (null for
+ * --port / JUSTSEARCH_API_PORT, the operator's choice). Every request goes through
+ * engine-discovery.cjs engineRequest(), which writes nothing on a new connection until the OS says
+ * its server end belongs to the manifest pid; a refusal comes back as error.message
+ * 'engine_gone', which parseJsonResponse turns into ENGINE_GONE. No handler, and no follow-up
+ * request inside one tool call, can reach an endpoint that is not that Engine.
+ */
+let engineTarget = null;
+
+function transportFailure(err) {
+  return err?.code === 'ENGINE_NOT_PROVEN'
+    ? { message: 'engine_gone', detail: `${err.status}: ${err.detail}` }
+    : { message: err?.message || String(err) };
+}
+
+function engineGoneError(res) {
+  return makeError(
+    'ENGINE_GONE',
+    `The JustSearch Engine this server connected to (pid ${engineTarget?.engine?.pid}, port ${engineTarget?.port}) ` +
+      `is no longer the one serving that port (${res.error.detail}). Nothing was sent. Restart the MCP server to reconnect.`,
+  );
+}
+
+/**
  * HTTP GET with size limiting and timeout.
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:96-161.
  */
@@ -83,13 +107,11 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
       resolve(payload);
     };
 
-    const req = http.request(
+    const req = engineRequest(
+      engineTarget,
       {
-        hostname: u.hostname,
-        port: Number(u.port),
         path: u.pathname + u.search,
-        method: 'GET',
-        timeout: timeoutMs,
+        timeoutMs,
         headers: { Accept: 'application/json', 'User-Agent': 'justsearch-mcp/0.1.0', ...headers },
       },
       (res) => {
@@ -127,9 +149,7 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
     req.on('timeout', () => {
       req.destroy(new Error('timeout'));
     });
-    req.on('error', (err) =>
-      finish({ ok: false, statusCode: null, text: null, error: { message: err?.message || String(err) } }),
-    );
+    req.on('error', (err) => finish({ ok: false, statusCode: null, text: null, error: transportFailure(err) }));
     req.end();
   });
 }
@@ -156,13 +176,12 @@ function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }
       resolve(payload);
     };
 
-    const req = http.request(
+    const req = engineRequest(
+      engineTarget,
       {
-        hostname: u.hostname,
-        port: Number(u.port),
-        path: u.pathname + u.search,
         method: 'POST',
-        timeout: timeoutMs,
+        path: u.pathname + u.search,
+        timeoutMs,
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(bodyStr),
@@ -206,9 +225,7 @@ function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }
     req.on('timeout', () => {
       req.destroy(new Error('timeout'));
     });
-    req.on('error', (err) =>
-      finish({ ok: false, statusCode: null, text: null, error: { message: err?.message || String(err) } }),
-    );
+    req.on('error', (err) => finish({ ok: false, statusCode: null, text: null, error: transportFailure(err) }));
     req.write(bodyStr);
     req.end();
   });
@@ -314,6 +331,7 @@ function makeError(code, message) {
 }
 
 function parseJsonResponse(res, { preserveOperationError = false } = {}) {
+  if (res.error?.message === 'engine_gone') return { parsed: null, error: engineGoneError(res) };
   // Size-limit abort — check first, regardless of HTTP status code.
   // When the response body exceeds maxBytes, res.destroy() fires res.on('error')
   // which passes through the real HTTP statusCode (e.g. 200), so this check must
@@ -430,6 +448,7 @@ export async function main() {
   // Discover backend
   const backend = await discover({ port: args.port, verbose: args.verbose });
   const { baseUrl, token } = backend;
+  engineTarget = { port: backend.port, engine: backend.engine || null };
 
   ensureLoopbackUrl(baseUrl, 'baseUrl');
   log(`Backend: ${baseUrl}`);
@@ -790,6 +809,7 @@ export async function main() {
         maxBytes: 2_000_000,
         headers: { ...tokenHeaders, 'X-JustSearch-Transport': 'MCP' },
       });
+      if (res.error?.message === 'engine_gone') return engineGoneError(res);
 
       let operationResponse;
       let parseError = null;

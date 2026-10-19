@@ -1,0 +1,17 @@
+diff --git a/modules/ui/src/main/java/io/justsearch/ui/api/ActivityRole.java b/modules/ui/src/main/java/io/justsearch/ui/api/ActivityRole.java
+new file mode 100644
+index 000000000..49ec402e9
+--- /dev/null
++++ b/modules/ui/src/main/java/io/justsearch/ui/api/ActivityRole.java
+@@ -0,0 +1,11 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.ui.api;
++
++import io.javalin.security.RouteRole;
++
++/** Compat scaffolding for fail-before evidence: declarations only; no before-state code reads it. */
++public enum ActivityRole implements RouteRole {
++  USER_ACTION,
++  OBSERVATION,
++  PROTOCOL
++}

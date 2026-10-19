@@ -22,7 +22,7 @@ update it before closing.
 - When your work opens a new question, add it to Open Questions.
 - Keep entries terse. Evidence lives in tempdocs; this file is the index.
 - After ORT/session concurrency changes, run the stress-tagged Gradle tests
-  explicitly with `./gradlew.bat test -PincludeStress=true --tests "*Stress*"`.
+  explicitly with `node scripts/lib/tool-invoker.cjs gradle test -PincludeStress=true --tests "*Stress*"`.
   There is no scheduled stress cadence, so runtime agents touching
   `NativeSessionHandle` or `SessionHandle` are one trigger point for this
   opt-in verification.
@@ -362,7 +362,7 @@ Design choices in the current inference runtime, with rationale.
 - **Rationale:** All encoders used identical session options (`kSameAsRequested` arena, no CUDA graph, device allocator for initializers, no memory pattern optimization). The factory encoded these once.
 - **Evidence:** tempdoc 349 (factory extraction), tempdoc 352 (module split), tempdoc 359 (`OrtSessionManager`), tempdoc 360 (Worker co-location), tempdoc 397 (factory absorbed into assembler + handle; closure property §6).
 - **Current shape:** See D-007 below. The identical-session-options claim is now enforced by `SessionOptionsApplier` walking `RuntimePolicy` records (tempdoc 397 §14.24 FA) rather than by a shared factory class.
-- **Verification:** `./gradlew.bat :modules:worker-core:verifyModel -Pmodel=<path>` task — routes through `OrtSessionAssembler.verifyModelSession`, which shares the applier apply path with production (§14.24 FA).
+- **Verification:** `node scripts/lib/tool-invoker.cjs gradle :modules:worker-core:verifyModel -Pmodel=<path>` task — routes through `OrtSessionAssembler.verifyModelSession`, which shares the applier apply path with production (§14.24 FA).
 
 ### D-005: Model file manifest convention (`model_manifest.json`) — SHIPPED
 
@@ -570,7 +570,8 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
   successful activation), Condition-shaped `RuntimeStatus`
   (ENGINE/ADOPTION/LEASE/PROCEDURE axes with reason codes),
   `RuntimeGpuLease` (binary grants; size-admitting interface for future
-  co-residency), and a single-thread level-triggered `RuntimeReconciler` —
+  co-residency; deleted in Spec A step 12, the LEASE axis is now derived
+  from the observed mode), and a single-thread level-triggered `RuntimeReconciler` —
   the ONLY sanctioned caller of `switchToOnlineMode/switchToIndexingMode`
   (ArchUnit-forced, `RuntimeReconcilerGuardrailsTest`). Machine actors hold
   non-spec engine states only inside declared procedures (VDU_BATCH);
@@ -590,8 +591,13 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
   `governance/runtime-state.v1.json` (fork gate fails the build otherwise).
 - **Re-entrancy contract:** listeners fire under the transition lock;
   reconciliation never runs on a listener thread (level-triggered dirty
-  flag). Anti-flap: repeated foreign flips (>3 in 5 min) hold convergence
-  with reason `convergence-held-flap-suspected`.
+  flag). Since Spec A step 2 an observed foreign flip only republishes
+  status: foreign-flip convergence and its anti-flap hold (reason
+  `convergence-held-flap-suspected`) were removed, and the chat controller
+  (`ChatServerControllerImpl`) runs every start, stop and relaunch; the
+  reconciler forwards boot, spec and procedure intent to it as
+  `setActivation`, and no lifecycle lock is held during a health wait or
+  a drain.
 - **Evidence:** tempdoc 737 (§8 diagnosis, §12 design, §14 derisk, §15
   implementation log; live Checkpoint 1 record).
 - **Revisit when:** sized GPU grants (12 GB+ co-residency) are implemented —

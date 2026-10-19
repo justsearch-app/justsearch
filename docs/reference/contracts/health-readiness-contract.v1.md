@@ -134,7 +134,7 @@ Interpretation:
 1. Registry `index` state maps to `readiness.components.workerControlPlane.state`.
 2. Registry `index` state supplies the essential part of `readiness.components.indexServing`; compatibility, embedding and throughput observations can still degrade that diagnostic while the registry component remains `READY`. During a Flow B in-place model change, the Worker owned `encoders=RELOADING` state means A's dense encoder has been retired while its lexical view still serves. `indexServing` reports `DEGRADED` with `encoders.reloading` until the new encoder is published, including while the Green index compatibility probe is `INITIALIZING`. A BESIDE build leaves encoders ready and does not assert this reason. A missing or changed model selected by the active generation reports `index.model_not_installed` while lexical search remains available. Migration `SWITCHING` reports `index.activating`; a parked recorded candidate awaiting a gap decision reports `migration.awaiting_gap_acceptance` while A continues serving.
 3. Registry `generative` state maps to `readiness.components.ai.state` with source `lifecycle_inference`: `READY` → `READY`, `ABSENT` → `NOT_CONFIGURED`, `STARTING` → `NOT_READY`, and `RELOADING`/`FAILED`/`UNAVAILABLE` → `DEGRADED`.
-4. Worker embedding probe maps to `readiness.components.embedding.state` with source `worker_health_check`.
+4. Worker embedding probe maps to `readiness.components.embedding.state` with source `worker_health_check`. The probe first reads ready once the query encoders are warm, or once the Worker's query readiness bound has passed while they are not; it then stays ready. Afterwards a query encoder without a warm session (`health_check.query_encoders_cold`, e.g. a GPU session being re-created) reports `embedding` as `DEGRADED` with `encoders.reloading`; readiness reached once does not return to `NOT_READY`. While a device's breaker has been open for at least `breakerStandingMs` (5 s; `health_check.semantic_stuck_since_ms` is non-zero and that old), because a GPU encoder run that is not its session's first has held its seat past `stuckAfterMs` (10 s), `embedding` is `DEGRADED` with `encoders.health.semantic_stuck`; searches meanwhile skip their semantic legs with `SEMANTIC_BUDGET_EXCEEDED` (cause `stuck`) and the code clears with the release of the stuck run (Spec D §2, §6.3). A foreground query leg the GPU turns away (no seat within about 1 s or half its budget, or the breaker open) encodes on the warm CPU session instead when there is one. While the CPU recourse took a query leg within the last `QueryCpuRecourse.RECENT_MS` (60 s; `health_check.query_cpu_recourse_at_ms` is non-zero and that recent), `embedding` is `READY` with the informational `encoders.health.query_on_cpu` (rule 10): semantic search is answered, from the CPU. A standing breaker is then reported beside it, on `gpu`: `DEGRADED` with `encoders.health.semantic_stuck`, because work on that device (bulk embedding) waits for the stuck run.
 5. Worker visual extraction status maps missing baseline readable visual text to `readiness.components.visualTextExtraction` with source `worker_status`.
 6. Head VDU capability status maps enrichment-only visual understanding blockers to `readiness.components.visualDocumentUnderstanding` with source `head_vdu_status`.
 7. OCR and VDU blockers degrade `retrieval` only while baseline visual text is still missing. VDU enrichment-only blockers degrade `aiFeatures`, not `retrieval`.
@@ -158,12 +158,12 @@ Common reason codes:
 1. `engine.not_started`, `index.starting`, `index.unavailable`, `index.failed`, `index.shut_down`
 2. `component.start_deadline`, `component.recovering`, `component.recovery_exhausted`
 3. `index.corrupt`, `index.schema_open_refused` (fatal open refusal), `index.schema_mismatch` (serving advisory), `index.not_healthy`
-4. `encoders.reloading`, `encoders.health.embedding_not_ready`, `encoders.health.embedding_probe_missing`
+4. `encoders.reloading`, `encoders.health.embedding_not_ready`, `encoders.health.embedding_probe_missing`, `encoders.health.semantic_stuck`, `encoders.health.query_on_cpu` (informational: searches the GPU turned away are answered on the CPU)
 5. `index.model_not_installed`, `index.activating`, `migration.awaiting_gap_acceptance`
 6. `index.throughput_stalled`, `index.throughput_degraded`
 7. `inference.starting`, `inference.offline`
 8. `ocr.disabled`, `ocr.engine_missing`, `ocr.language_missing`
-9. `vdu.ai_offline`, `vdu.insufficient_vram`, `vdu.missing_mmproj`, `vdu.circuit_open`
+9. `vdu.ai_offline`, `vdu.insufficient_vram`, `vdu.missing_mmproj`, `vdu.circuit_open`, `vdu.breaker_open.refused`, `vdu.breaker_open.entry_failed` (automatic picture reading paused after three automatic passes in a row made no progress; see `docs/reference/automatic-vdu.md`)
 10. `index.embedding_rebuilding` — semantic retrieval is paused during an in-place embedding rebuild; keyword retrieval remains available.
 
 For a serving migration, `LifecycleSnapshotTap` asserts distinct
@@ -211,12 +211,27 @@ performs the `indexStatus` port call (10 s while idle, 2 s while indexing/backfi
 flight, plus one sample on every capability transition), and a request reports what the last sample
 found. Consequently `meta.workerRpcAtMs` is the **sample's** observation time, not a per-request
 timestamp, and successive responses within one sampling period carry the same value by design.
-`GET /api/status?fresh=true` forces one synchronous sample.
+`GET /api/status?fresh=true` requests one asynchronous sample and waits for it at most 100 ms
+(`StatusLifecycleHandler.FRESH_READ_DEADLINE_MS`). The deadline ends only that response's wait. It
+is not evidence about any source: a source that has not answered keeps its last published value and
+freshness markers, and the deadline neither marks it stale nor advances the status change counter.
+So when a fresh read misses its deadline, it shows the last published value labelled current,
+rather than unknown, and right after an action it can briefly show the pre-action value until that
+source publishes. Before the first completed observation, status reports unknown/stale. A stalled or failed sampler retains the last observation with the existing freshness markers; HTTP requests never perform probes, RPCs, file reads or component-lock acquisition.
 
 When the sample failed — the call threw, or the worker capability was unavailable — the Head
-substitutes a fallback view, so those arms answer from placeholder data. A sample older than three
-sampling periods is treated the same way, so a stalled sampler surfaces as loss of contact rather
-than as a frozen snapshot presented as fresh. Then:
+substitutes a fallback view, so those arms answer from placeholder data. A sample is treated the
+same way when it is older than three of its own lane's effective cadences, so a stalled sampler
+surfaces as loss of contact rather than as a frozen snapshot presented as fresh. Each source is
+sampled in its own lane. A lane's effective cadence is its sampling period plus the largest of its
+recent data ages at publish (from the source reading's own timestamp, or from the probe's start, to
+publication). Only data ages up to three periods count; a value whose data was already older than
+that when it was published is stale at once. A lane therefore goes stale between 3 and 12 of its
+periods after its last real observation: 6 to 24 s on the busy 2 s period, 30 to 120 s on the idle
+10 s period. A lane sampled at the lifetime of its source's cache uses that longer period. A hung
+lane is reported stale only after 3 of its own update intervals, so detection is later when idle,
+about 30 to 120 s. This is accepted as the cost of no longer flipping current values to unknown
+under load. Then:
 
 4. `stale` is `true`, and `observedAt` carries the epoch of the newest *successful* Worker
    observation in this Head process — not the response-build time, which would be a false freshness

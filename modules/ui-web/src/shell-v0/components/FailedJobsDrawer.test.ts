@@ -252,6 +252,61 @@ describe('FailedJobsDrawer', () => {
     }
   });
 
+  it('an indexed file whose source cannot be read reads as "indexed, source unreadable", not missing (t-20261013-ef3c41 S7)', async () => {
+    // A locked or access-denied file keeps its indexed content and is retried without end. The
+    // listing carries the reason as the row state; the row must say the content is still
+    // searchable and must not read as a broken, missing or abandoned file.
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: unknown) => {
+      if (String(url).includes('/api/indexing-jobs/failed/by-prefix')) {
+        return new Response(
+          byPrefixBody([
+            job({
+              pathHash: 'h-locked',
+              state: 'INDEXED_SOURCE_UNREADABLE',
+              errorMessage: 'The process cannot access the file because it is being used by another process',
+              attempts: 4,
+            }),
+            job({ pathHash: 'h-new-locked', state: 'SOURCE_UNREADABLE', attempts: 2 }),
+          ]),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }) as typeof fetch;
+    try {
+      const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+      el.apiBase = 'http://x';
+      document.body.appendChild(el);
+      await settle(el);
+      openFailedJobs('folder-hash');
+      await pump(el);
+
+      const rows = Array.from(el.shadowRoot?.querySelectorAll('.row') ?? []);
+      expect(rows.length).toBe(2);
+      const indexedRow = rows[0]!;
+      const notYetIndexedRow = rows[1]!;
+      expect(indexedRow.getAttribute('data-state')).toBe('INDEXED_SOURCE_UNREADABLE');
+
+      const line = indexedRow.querySelector('[data-testid="failed-job-source-unreadable"]');
+      expect(line, 'an unreadable indexed source must say so').toBeTruthy();
+      const text = (line!.textContent ?? '').replace(/\s+/g, ' ').trim();
+      expect(text).toContain('Indexed, source unreadable');
+      expect(text).toContain('stays searchable');
+      expect(text).not.toMatch(/missing|deleted/i);
+      expect(indexedRow.querySelector('[data-testid="failed-job-exhausted"]')).toBeNull();
+
+      const other = notYetIndexedRow.querySelector('[data-testid="failed-job-source-unreadable"]');
+      expect(other, 'a never-indexed unreadable source is unreadable too').toBeTruthy();
+      const otherText = (other!.textContent ?? '').replace(/\s+/g, ' ').trim();
+      expect(otherText).toContain('Source unreadable');
+      expect(otherText).not.toContain('stays searchable');
+      el.remove();
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
   it('renders the owning scan id per row, and omits the line for a row with no scan (941 F2)', async () => {
     // Tempdoc 911 plumbed `scanId` all the way to this wire; the drawer never rendered it, so a
     // failed row could not be tied to the scan that produced it. `""` is the contract's declared

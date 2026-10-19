@@ -321,4 +321,25 @@ final class RemoteIndexingJobsBridgeTest {
       active.accept(frame);
     }
   }
+
+  private static long statusCounter() {
+    try {
+      var type = Class.forName("io.justsearch.core.status.StatusChangeCounter");
+      return (long) type.getMethod("current").invoke(type.getMethod("process").invoke(null));
+    } catch (ClassNotFoundException baseline) { return 0L; }
+    catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+  }
+
+  @Test void statusCounterTracksJobsAndNotReadOnlyReattachment() throws Exception {
+    long before = statusCounter();
+    var pending = view("counter", "PENDING", 0, 1000L, "");
+    stub.queueSnapshot(1L, List.of(pending)); bridge.start().get(2, TimeUnit.SECONDS);
+    assertEquals(before + 1, statusCounter(), "worker queue publication must invalidate status");
+    bridge.latestSnapshot(); bridge.latestSnapshotPair();
+    stub.queueSnapshot(2L, List.of(pending));
+    assertEquals(before + 1, statusCounter(), "same snapshot at a new cursor must not invalidate");
+    stub.queueDelta(3L, IndexingJobsDelta.newBuilder()
+        .setUpdate(view("counter", "PROCESSING", 1, 2000L, "")).build());
+    assertEquals(before + 2, statusCounter());
+  }
 }

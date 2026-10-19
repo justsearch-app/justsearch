@@ -93,6 +93,12 @@ public interface IngestServiceCalls {
   /** {@code IngestService/MarkVduProcessing}. */
   io.justsearch.ipc.MarkVduProcessingResponse markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest request);
 
+  /**
+   * Returns a PROCESSING document the pass could not attempt to PENDING and gives back the attempt
+   * its mark counted; false when it is absent or no longer PROCESSING. In-process only.
+   */
+  boolean releaseVduProcessing(String docId);
+
   /** {@code IngestService/RecoverVduProcessing}. */
   io.justsearch.ipc.RecoverVduProcessingResponse recoverVduProcessing(io.justsearch.ipc.RecoverVduProcessingRequest request);
 
@@ -173,6 +179,20 @@ public interface IngestServiceCalls {
       io.justsearch.ipc.WatchRootRequest request, WatchedRootsState.RootProducerFence fence) {
     return fence.run(() -> watchRoot(request),
         () -> io.justsearch.ipc.WatchRootResponse.newBuilder().setWatching(false).build());
+  }
+
+  /**
+   * Whether the folder at {@code rootPath} is not on the volume recorded for the root (task
+   * t-20261013-ef3c41, round 6): one volume identity read, no walk.
+   */
+  boolean refusesRootVolume(String rootPath);
+
+  /**
+   * {@link #refusesRootVolume} with the root-level reason: empty when the root is not refused
+   * (round 8). A root whose drive is not confirmed after an upgrade answers with that reason.
+   */
+  default String rootVolumeRefusal(String rootPath) {
+    return refusesRootVolume(rootPath) ? RootLifecycleOps.ROOT_MISSING_REASON : "";
   }
 
   /** {@code IngestService/UnwatchRoot}. */

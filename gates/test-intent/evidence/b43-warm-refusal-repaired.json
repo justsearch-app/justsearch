@@ -1,0 +1,214 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T18:08:04.007Z",
+  "revision": "2e6fca66dfa480c0b294a81c015d5eaa9b46a2a0",
+  "tree": "db444552a38bc57d6def53fe55a859058f54dd2c",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 32650
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb126beaa6f3fd66cc761c135c41cf3180c73ee1b1db02316d9e33d07223dce7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "closedExecutorsAreReportedAsClosedNotAsCapacity(true)",
+          "status": "passed"
+        },
+        {
+          "name": "closedExecutorsAreReportedAsClosedNotAsCapacity(false)",
+          "status": "passed"
+        },
+        {
+          "name": "shutdownCancelsQueuedRequestsReleasesTheirSlotsAndDrains(true)",
+          "status": "passed"
+        },
+        {
+          "name": "shutdownCancelsQueuedRequestsReleasesTheirSlotsAndDrains(false)",
+          "status": "passed"
+        },
+        {
+          "name": "queuedVectorOnlySearchPastItsSemanticBudgetIsTheTypedDeadline()",
+          "status": "passed"
+        },
+        {
+          "name": "requestWhoseDeadlinePassesInTheQueueNeverRunsAndReleasesItsOwnersAtOnce(0)",
+          "status": "passed"
+        },
+        {
+          "name": "requestWhoseDeadlinePassesInTheQueueNeverRunsAndReleasesItsOwnersAtOnce(1)",
+          "status": "passed"
+        },
+        {
+          "name": "requestWhoseDeadlinePassesInTheQueueNeverRunsAndReleasesItsOwnersAtOnce(2)",
+          "status": "passed"
+        },
+        {
+          "name": "requestWhoseDeadlinePassesInTheQueueNeverRunsAndReleasesItsOwnersAtOnce(3)",
+          "status": "passed"
+        },
+        {
+          "name": "requestWhoseDeadlinePassesInTheQueueNeverRunsAndReleasesItsOwnersAtOnce(4)",
+          "status": "passed"
+        },
+        {
+          "name": "requestWhoseDeadlinePassesInTheQueueNeverRunsAndReleasesItsOwnersAtOnce(5)",
+          "status": "passed"
+        },
+        {
+          "name": "requestWhoseDeadlinePassesInTheQueueNeverRunsAndReleasesItsOwnersAtOnce(6)",
+          "status": "passed"
+        },
+        {
+          "name": "inferenceLaneQueuesAsManyRequestsAsItHasThreadsWithinTheForegroundQueueBound(16, 48, 8, 8)",
+          "status": "passed"
+        },
+        {
+          "name": "inferenceLaneQueuesAsManyRequestsAsItHasThreadsWithinTheForegroundQueueBound(1, 1, 1, 1)",
+          "status": "passed"
+        },
+        {
+          "name": "inferenceLaneQueuesAsManyRequestsAsItHasThreadsWithinTheForegroundQueueBound(2, 1, 1, 1)",
+          "status": "passed"
+        },
+        {
+          "name": "inferenceLaneQueuesAsManyRequestsAsItHasThreadsWithinTheForegroundQueueBound(16, 4, 8, 4)",
+          "status": "passed"
+        },
+        {
+          "name": "queuedRequestIsNotForegroundLoadUntilItStarts()",
+          "status": "passed"
+        },
+        {
+          "name": "requestDeadlineWinningBeforeVectorCaptureStaysUntyped()",
+          "status": "passed"
+        },
+        {
+          "name": "queuedSearchBehindExpiredNativeWorkEndsByItsOwnDeadline()",
+          "status": "passed"
+        },
+        {
+          "name": "fullInferenceThreadsAndQueueRefuseTheNextRequestWithInferenceBusy()",
+          "status": "passed"
+        },
+        {
+          "name": "queuedSearchPastItsSemanticCapAnswersKeywordOnlyWithoutStartingItsEncoder()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "clientCancellationRemovesAQueuedRequestWithoutRunningIt(true)",
+          "status": "passed"
+        },
+        {
+          "name": "clientCancellationRemovesAQueuedRequestWithoutRunningIt(false)",
+          "status": "passed"
+        },
+        {
+          "name": "queuedRequestRunsUnderTheDeadlineItWasSubmittedWith(0)",
+          "status": "passed"
+        },
+        {
+          "name": "queuedRequestRunsUnderTheDeadlineItWasSubmittedWith(1)",
+          "status": "passed"
+        },
+        {
+          "name": "queuedRequestRunsUnderTheDeadlineItWasSubmittedWith(2)",
+          "status": "passed"
+        },
+        {
+          "name": "queuedRequestRunsUnderTheDeadlineItWasSubmittedWith(3)",
+          "status": "passed"
+        },
+        {
+          "name": "queuedRequestRunsUnderTheDeadlineItWasSubmittedWith(4)",
+          "status": "passed"
+        },
+        {
+          "name": "queuedRequestRunsUnderTheDeadlineItWasSubmittedWith(5)",
+          "status": "passed"
+        },
+        {
+          "name": "queuedRequestRunsUnderTheDeadlineItWasSubmittedWith(6)",
+          "status": "passed"
+        },
+        {
+          "name": "admissionLimitsKeepTheirCodesWhileTheInferenceLaneHasRoom()",
+          "status": "passed"
+        },
+        {
+          "name": "concurrentInferenceRequestsBeyondTheThreadsWaitAndAllRun(9)",
+          "status": "passed"
+        },
+        {
+          "name": "concurrentInferenceRequestsBeyondTheThreadsWaitAndAllRun(16)",
+          "status": "passed"
+        },
+        {
+          "name": "fullInferenceLaneLeavesTextSearchAndIngestAdmittedAndTheTextSlotReserved()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a37c6ef33",
+    "revision": "a37c6ef33eb7c966d5a6c0874e26d48b6f8357ec",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineKnowledgeClientInferenceQueueTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 41426
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientInferenceQueueTest.java",
+        "classification": "assertion",
+        "detail": "[1] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: idle seat refused: refused:INFERENCE_BUSY ==> expected: <false> but was: <true> | [2] true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: idle seat refused: refused:INFERENCE_BUSY ==> expected: <false> but was: <true>"
+      }
+    ]
+  },
+  "digest": "sha256:b74b2fdde5cfcbad8a09c1323513c5dc941a07720c9a2e8adf0c4b44d8d073de"
+}

@@ -1,0 +1,86 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T22:53:04.142Z",
+  "revision": "f648453b5063af0bd852979e22a246b3d86d9726",
+  "tree": "a4a121bd30e8399f7f66350abd86f059869fb749",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.ChildPathPrefixTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3691
+    },
+    {
+      "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.EnvRegistryTest.engineIncarnationEntryShape\" --tests \"io.justsearch.configuration.EnvRegistryTest.evalModeEntryShape\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2590
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChildPathPrefixTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChildPathPrefixTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:748f78ffb90167532abcd480a8b18f2631a8cb92e6e1a4b8a423213a5eb16566",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theInheritedSpellingIsKeptSoTheChildHasOnePathVariable()",
+          "status": "passed"
+        },
+        {
+          "name": "withoutAnInheritedPathThePrefixIsThePath()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/EnvRegistryTest.java#engineIncarnationEntryShape",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/EnvRegistryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ff7e1c593146e12cab3d2e21f2b73912729f4471d2266e7f59845b658e2e8594",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engineIncarnationEntryShape()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/EnvRegistryTest.java#evalModeEntryShape",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/EnvRegistryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ff7e1c593146e12cab3d2e21f2b73912729f4471d2266e7f59845b658e2e8594",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "evalModeEntryShape()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:6bc97dc9308e5e17c449b2fa4ee50fe70c89d4793de6f4688217957b25b666cc"
+}

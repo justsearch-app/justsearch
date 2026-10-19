@@ -194,6 +194,12 @@ export class CommandPalette extends JfElement {
       outline: none;
       font-family: inherit;
     }
+    /* Transparent, not none: invisible here as before, but forced colors repaint it, so a High
+       Contrast reader still sees where focus is once the panel's own styling is gone. */
+    .search-row input:focus-visible {
+      outline: 2px solid transparent;
+      outline-offset: -2px;
+    }
     .search-hint {
       font-size: var(--font-size-xs);
       color: var(--text-muted);

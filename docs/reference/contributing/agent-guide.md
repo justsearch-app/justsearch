@@ -1,13 +1,11 @@
 ---
-title: Agent Guide
+title: Development Guide
 type: reference
 status: stable
-description: "Development workflows, static analysis, and testing reference for autonomous agents."
+description: "Development workflows, static analysis, and testing reference for contributors."
 ---
 
-> **Note, 2026-10-05.** JustSearch now uses agent-system for agent work: the projected `AGENTS.md` entry, private project knowledge and the system's own role contracts and guides. Passages here about the former agent layer (`CLAUDE.md`, `.claude/rules`, skills, Codex agents, hooks) are historical; the development, static-analysis and testing reference remains current.
-
-# Agent Guide
+# Development Guide
 
 ## 1. Configuration & Single Source of Truth (SSOT)
 
@@ -51,9 +49,9 @@ Use the right Gradle command for the verification level you need:
 
 | Command | What runs | When to use |
 |---------|-----------|-------------|
-| `./gradlew test` | Unit tests only (`src/test/java`) | **Fast inner loop** — after every code change |
-| `./gradlew check` | Unit + integration + PMD + Spotless | **Pre-commit** — before pushing |
-| `./gradlew fullTestSuite` | Unit + integration + system (system tier requires `-PincludeSystemTests=true`) | Full verification (system-tests module) |
+| `node scripts/lib/tool-invoker.cjs gradle test` | Unit tests only (`src/test/java`) | **Fast inner loop** — after every code change |
+| `node scripts/lib/tool-invoker.cjs gradle check` | Unit + integration + PMD + Spotless | **Pre-commit** — before pushing |
+| `node scripts/lib/tool-invoker.cjs gradle fullTestSuite` | Unit + integration + system (system tier requires `-PincludeSystemTests=true`) | Full verification (system-tests module) |
 
 **Opt-in flags** (system-tests module only):
 
@@ -71,7 +69,7 @@ from the suite that `check` depends on, and run it from a dedicated task on an i
 
 | Command | What runs |
 |---------|-----------|
-| `./gradlew :modules:app-services:loadSensitiveTest` | the `load-sensitive` latency gates, thresholds unchanged |
+| `node scripts/lib/tool-invoker.cjs gradle :modules:app-services:loadSensitiveTest` | the `load-sensitive` latency gates, thresholds unchanged |
 
 There is **no perf-ratchet CI lane** today, so these tasks are manual by construction: wiring one
 into hosted CI would reproduce the flake there instead of here. If a perf lane is ever added, wire
@@ -98,7 +96,7 @@ and unstaged changes. This has caused silent data loss in production agent sessi
 
 Use wrapper-first orchestration for long-running evaluation and benchmark sessions:
 
-- Canonical wrapper: `python -m jseval` (see the `/jseval` skill)
+- Canonical wrapper: `python -m jseval`
 - Do not treat raw backgrounded PowerShell eval commands as the normal orchestration path
 - Use `--progress-file <path>` when a run may survive agent compaction or handoff
 
@@ -106,7 +104,7 @@ Path and dependency rules:
 
 - Model/native path environment variables used for Java or ONNX launches should be absolute
 - After changing Gradle dependencies or telemetry/exporter coordinates, regenerate lockfiles before handoff:
-  `./gradlew.bat --no-configuration-cache resolveAndLockAll --write-locks`
+  `node scripts/lib/tool-invoker.cjs gradle --no-configuration-cache resolveAndLockAll --write-locks`
 
 ### 3.3. Pre-commit Verification
 
@@ -114,7 +112,7 @@ Before pushing changes, run the local gate to ensure code quality passes:
 
 ```powershell
 # Heavy verification
-./gradlew check --no-configuration-cache
+node scripts/lib/tool-invoker.cjs gradle check --no-configuration-cache
 
 # Pre-merge checks (run individually when their subjects change — see
 # docs/reference/contributing/pre-merge-checks.md for the canonical list)
@@ -148,7 +146,7 @@ working directory, and an unresolvable ref makes PMD analyse **zero files while 
 success**. `scripts/ci/check-pmd-ruleset-sync.mjs` therefore enforces that each derived ruleset is
 the authority minus its declared, description-justified subtraction, and that no ref is a file path.
 
-Run everything with `./gradlew.bat pmdAll` (root aggregate over all 93 PMD tasks); CI runs the same
+Run everything with `node scripts/lib/tool-invoker.cjs gradle pmdAll` (root aggregate over all 93 PMD tasks); CI runs the same
 task in the required `Build (no model blobs)` job, measured at 188 s there. Running it instead on
 `Unit tests (platform-contracts)` was tried and measured worse (201 s, and that lane over its
 advisory budget) — `pmdAll` compiles every source set of every module either way, so the placement
@@ -209,7 +207,7 @@ Only use an empty catch when the exception is genuinely expected and silence is 
 **Dependency Analysis (DAGP):**
 
 ```bash
-./gradlew buildHealth  # Full dependency analysis
+node scripts/lib/tool-invoker.cjs gradle buildHealth  # Full dependency analysis
 ```
 
 Detects unused dependencies, wrong configurations (api vs implementation), and used-but-undeclared transitive dependencies. Report at `build/reports/dependency-analysis/build-health-report.txt`.
@@ -231,13 +229,13 @@ CI and the local gate both run `resolveAndLockAll --write-locks` then `git diff 
 Regenerate lockfiles after changing versions in `libs.versions.toml`, adding/removing dependencies, or changing plugin versions:
 
 ```bash
-./gradlew.bat --no-configuration-cache resolveAndLockAll --write-locks
+node scripts/lib/tool-invoker.cjs gradle --no-configuration-cache resolveAndLockAll --write-locks
 ```
 
 **Unreferenced Code Detection (ArchUnit):**
 
 ```bash
-./gradlew :modules:app-launcher:test --tests "*UnreferencedCodeTest*"
+node scripts/lib/tool-invoker.cjs gradle :modules:app-launcher:test --tests "*UnreferencedCodeTest*"
 ```
 
 Detects unreferenced private methods across the codebase using bytecode analysis. Known false positives (FFM callbacks, test infrastructure) are frozen in `archunit_store/`.
@@ -270,15 +268,15 @@ Records in `app-api` that have **>10 positional parameters** and are **construct
 
 1. Add the field to the record parameter list.
 2. If collection type, add null-coalescing in compact constructor (e.g., `myList = myList == null ? List.of() : List.copyOf(myList)`).
-3. Compile: `./gradlew.bat :modules:app-api:compileJava` -- the builder regenerates automatically.
+3. Compile: `node scripts/lib/tool-invoker.cjs gradle :modules:app-api:compileJava` -- the builder regenerates automatically.
 4. Update production construction site (e.g., `KnowledgeHttpApiAdapter`) to pass the new field.
 5. If part of API contract, update the controller (`KnowledgeSearchController`) -- the controller uses a manual HashMap build, NOT direct record serialization. Adding a field to the record does NOT change API output unless the controller is also updated.
-6. Regenerate schemas and fixtures: `./gradlew.bat :modules:app-api:updateSchemas`
+6. Regenerate schemas and fixtures: `node scripts/lib/tool-invoker.cjs gradle :modules:app-api:updateSchemas`
 7. If the record is part of `/api/status` or `/api/knowledge/search`, also update the Zod schema in `modules/ui-web/src/api/schemas.ts` and the TypeScript type in `stores/systemTypes.ts` (for status) or `api/domains/search.ts` (for search). Zod schemas use `.loose()` -- new fields pass validation without being declared, so contract tests alone won't catch a missing Zod field.
 8. Run frontend contract tests: `cd modules/ui-web && npm run test:unit:run`
 9. Note: v1 contract files (`status-v1.json`, `knowledge-status-v1.json`, `debug-state-v1.json`) are intentionally manual -- only update on breaking changes (field removal/rename), not field additions.
 
-### 3.4. UI smoke checks (Agent workflow)
+### 3.4. UI smoke checks
 
 #### 3.4.1 Start the dev stack (backend + UI)
 
@@ -286,6 +284,12 @@ Records in `app-api` that have **>10 positional parameters** and are **construct
 # From repo root
 $env:JUSTSEARCH_API_PORT = "33221" # pick a deterministic base port (dev-all will try near this)
 npm --prefix ./modules/ui-web run dev:all
+```
+
+On Linux (Bash), from the same repository root:
+
+```sh
+JUSTSEARCH_API_PORT=33221 npm --prefix ./modules/ui-web run dev:all
 ```
 
 #### 3.4.2 Deterministic readiness checks
@@ -297,9 +301,9 @@ Before interacting with the UI, verify the backend is ready:
 
 `dev:all` prints the chosen backend endpoint (it may pick a nearby port if the base port is busy).
 
-#### 3.4.3 Open the UI in a browser (Agent browser tools)
+#### 3.4.3 Open the UI in a browser
 
-When an agent has access to an embedded browser tool, open the UI with an explicit backend port:
+Open the UI with an explicit backend port:
 
 - `http://localhost:5173/?api_port=<apiPort>`
 
@@ -318,7 +322,7 @@ Notes:
 
 Desktop-only features (native folder picker, file dialogs) are unavailable in a pure browser run. A warning banner is expected.
 
-#### 3.4.5 Debugging tools (agent-friendly)
+#### 3.4.5 Debugging tools
 
 - Prefer inspecting API responses directly (`/api/status`, `/api/health`) over inferring state from UI text.
 - If the UI is blank or unresponsive:
@@ -338,7 +342,6 @@ When editing files under `modules/ui-web/src/`, use `jseval ui-shot` for targete
 - **Step discovery**: `jseval ui-shot --list` shows all available steps (chain and isolated) with their dependency relationships.
 - **Affected steps**: `jseval ui-shot --affected <file>` finds which steps exercise a given source file. Works with full Windows paths.
 - **Measurement companion (615 §6.2)**: every capture also writes a `<step>.measure.json` (accessibility tree + axe violations + element geometry/overflow + console errors) and prints a one-line fact summary. Judge correctness from the **facts** (cheaper + more reliable than the PNG); read the PNG for gestalt. The harness drives the **live Lit `shell-v0`** — there is no mock-data demo mode, so data/AI steps need the dev stack running (AI also needs `ai_activate`).
-- **Full reference**: Load the `/ui-check` skill for the complete step registry, file-to-step index, and worktree-aware auto-serve details.
 
 ### 3.5. CI signal model
 
@@ -400,8 +403,8 @@ gate:
 
 - `docs-lint.yml` after edits under `docs/**`, `scripts/docs/**`, or
   `scripts/architecture/module-deps.mjs` if you need remote docs verification.
-- `codeql.yml` when you need semantic code scanning outside GitHub's managed
-  security surfaces.
+- `codeql.yml` when you need semantic code scanning before its weekly run
+  (Mondays, ADR-0052).
 - `build-installer.yml --ref <vX.Y.Z>` for installer/release attach validation.
 - `update-preserves-models.yml` after editing NSIS hooks, `tauri.conf.json`
   bundle resources, or sidecar staging — it installs a published release, seeds
@@ -454,20 +457,20 @@ pull-request `GITHUB_TOKEN` cannot read branch-protection settings.
 **Test failure:**
 
 - Symptom: `dorny/test-reporter` Check Run shows failing test names with line numbers.
-- Reproduce: `./gradlew.bat :modules:<m>:test --tests "*FailingTest"`
+- Reproduce: `node scripts/lib/tool-invoker.cjs gradle :modules:<m>:test --tests "*FailingTest"`
 - Fix: Read the failing test, fix the code or test expectation, re-run.
 
 **PMD violation:**
 
-- Symptom: `./gradlew check` fails with "PMD rule violations found".
+- Symptom: `node scripts/lib/tool-invoker.cjs gradle check` fails with "PMD rule violations found".
 - Reproduce: Check `build/reports/pmd/main.xml` under the failing module for `file:line:rule` detail.
 - Fix: Fix the flagged code pattern. See §3.3 for intentionally excluded rules and accepted patterns.
 
 **Spotless formatting:**
 
-- Symptom: `./gradlew check` fails with "Spotless violations found".
-- Reproduce: `./gradlew.bat spotlessCheck`
-- Fix: Run `./gradlew.bat spotlessApply`, then re-stage the changed files.
+- Symptom: `node scripts/lib/tool-invoker.cjs gradle check` fails with "Spotless violations found".
+- Reproduce: `node scripts/lib/tool-invoker.cjs gradle spotlessCheck`
+- Fix: Run `node scripts/lib/tool-invoker.cjs gradle spotlessApply`, then re-stage the changed files.
 
 **Docs lint (markdownlint):**
 
@@ -505,10 +508,10 @@ When you've changed a specific module, you don't need to test everything:
 
 ```powershell
 # Build + test the changed module and everything that depends on it
-./gradlew :modules:adapters-lucene:buildDependents
+node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:buildDependents
 
 # Build + test only the changed module (faster, but won't catch breaks in dependents)
-./gradlew :modules:adapters-lucene:build
+node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:build
 ```
 
 Rule of thumb:
@@ -621,8 +624,7 @@ longer applies once a PR is enqueued). Practical sequence:
 - **Enqueue with `node scripts/dev/run-gh.mjs enqueue <N>`.** The repository-owned
   gateway checks the live `PR_TITLE` / `PR_BODY` squash projection and exact managed
   review record, then issues the ordinary strategy-free queue request. Direct
-  `gh pr merge` and the generic `run-gh.mjs pr merge` passthrough bypass that proof
-  and are blocked by the shared agent hook. Under the queue the accepted request
+  `gh pr merge` and the generic `run-gh.mjs pr merge` passthrough bypass that proof. Under the queue the accepted request
   does not merge directly; it adds the PR to the queue. The queue runs its own
   `merge-group` CI pass against the PR merged with the latest `main` and merges
   (squash) autonomously on success.
@@ -646,8 +648,7 @@ longer applies once a PR is enqueued). Practical sequence:
 
 **Axis 2 — whether a change deserves its own PR (judgment, your call).** Squash
 fixes *intra*-PR noise; it does nothing about *inter*-PR noise — one trivial PR
-per edit still produces one standalone public commit each. The convention (rule
-`docs-ride-along` in `branch-safety.md`; industry-standard — Microsoft's
+per edit still produces one standalone public commit each. The convention (industry-standard — Microsoft's
 engineering playbook puts docs in the code PR, Kubernetes' guide says batch tiny
 fixes rather than open a PR each):
 
@@ -680,8 +681,8 @@ How:
 
 - **Find the governing ADR** — grep `governance/adr-probes.v1.json` for the surface
   you changed, or scan the Decision Log in `docs/decisions/README.md`. The
-  `architecture-decisions` row in `governance/consult-register.v1.json` pushes the
-  procedure at you the moment you edit anything under `docs/decisions/`.
+  `architecture-decisions` row in `governance/consult-register.v1.json` lists the
+  procedure for changes under `docs/decisions/`.
 - **Amend, don't rewrite** — follow `docs/decisions/README.md` § How to re-examine
   an ADR. Amendments are append-only; the superseded reasoning is the record, so add
   a dated amendment rather than editing Context/Decision in place.
@@ -689,7 +690,7 @@ How:
   restates the new premise, and set `last_reviewed:` to today. Never edit a probe
   merely to make it pass.
 - **Verify** — `node scripts/governance/run.mjs --gate adr-coverage --mode gate`.
-  Review staleness is also listed by the orientation command AGENTS.md points you at,
+  Review staleness is also listed by the orientation command
   `node scripts/agent-analytics/world-state.mjs` (§ ADR review) — run it, nothing runs it
   for you — because a CI-only
   warning about a decision nobody is scheduled to re-read is the pile that produced

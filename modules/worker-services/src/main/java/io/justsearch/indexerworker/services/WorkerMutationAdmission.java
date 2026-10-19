@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.services;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
@@ -17,6 +18,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public final class WorkerMutationAdmission {
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
+  private final ReentrantLock routingLock = new ReentrantLock(true);
   private final Object replayCertificateMonitor = new Object();
   private final Object fencedOwner = new Object();
   private boolean replayUncertain;
@@ -42,11 +44,76 @@ public final class WorkerMutationAdmission {
   public Lease enter(Object expectedOwner) {
     Objects.requireNonNull(expectedOwner, "expectedOwner");
     lock.readLock().lock();
-    if (owner != expectedOwner) {
-      lock.readLock().unlock();
-      throw new IllegalStateException("Mutation producer belongs to a retired serving view");
+    routingLock.lock();
+    try {
+      if (owner != expectedOwner) {
+        lock.readLock().unlock();
+        throw new IllegalStateException("Mutation producer belongs to a retired serving view");
+      }
+      return new Lease();
+    } finally {
+      routingLock.unlock();
     }
-    return new Lease();
+  }
+
+  /**
+   * Transfers a deferred producer to its first writer on the same durable queue and generation.
+   * Issued queue effects may finish; admission and callback routing change together. The retained
+   * read lease still prevents a concurrent generation cutover from bypassing those effects.
+   */
+  public DeferredQueueHandoff beginDeferredQueueHandoff(Object expectedOwner)
+      throws InterruptedException {
+    Objects.requireNonNull(expectedOwner, "expectedOwner");
+    lock.readLock().lockInterruptibly();
+    boolean retained = false;
+    try {
+      routingLock.lockInterruptibly();
+      if (owner != expectedOwner) {
+        routingLock.unlock();
+        throw new IllegalStateException("Deferred producer is no longer serving");
+      }
+      retained = true;
+      return new DeferredQueueHandoff(expectedOwner);
+    } finally {
+      if (!retained) lock.readLock().unlock();
+    }
+  }
+
+  public final class DeferredQueueHandoff implements AutoCloseable {
+    private final Object prior;
+    private final Thread holder = Thread.currentThread();
+    private boolean installed;
+    private boolean closed;
+
+    private DeferredQueueHandoff(Object prior) { this.prior = prior; }
+
+    /** The routing transfer must validate before its assignment-only ownership changes. */
+    public void install(Object successor, Runnable routingTransfer) {
+      requireOpen();
+      Objects.requireNonNull(successor, "successor");
+      Objects.requireNonNull(routingTransfer, "routingTransfer");
+      if (successor == prior) throw new IllegalArgumentException("Successor must be distinct");
+      if (installed) throw new IllegalStateException("Successor already installed");
+      routingTransfer.run();
+      owner = successor;
+      installed = true;
+    }
+
+    private void requireOpen() {
+      if (closed || Thread.currentThread() != holder) {
+        throw new IllegalStateException("Deferred queue handoff belongs to its preparing thread");
+      }
+    }
+
+    @Override public void close() {
+      if (Thread.currentThread() != holder) {
+        throw new IllegalStateException("Deferred queue handoff belongs to its preparing thread");
+      }
+      if (closed) return;
+      closed = true;
+      routingLock.unlock();
+      lock.readLock().unlock();
+    }
   }
 
   /** Waits for issued effects to finish; timeout leaves the serving owner unchanged. */

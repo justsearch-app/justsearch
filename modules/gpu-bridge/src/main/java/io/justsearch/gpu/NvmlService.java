@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.gpu;
 
+import io.justsearch.configuration.NativeTargets;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
@@ -44,24 +45,17 @@ public final class NvmlService {
           I32.withName("memory"));
 
   public GpuCapabilities.Nvml probe() {
-    if (!isWindows()) {
-      return new GpuCapabilities.Nvml(
-          false,
-          null,
-          null,
-          "NVML probe is only supported on Windows in v3.",
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null);
-    }
+    return probe(null);
+  }
 
-    Path preferred = preferredNvmlPath();
+  /**
+   * Probes the device with this PCI bus id ({@code domain:bus:device.function}, as {@code
+   * cuDeviceGetPCIBusId} gives it), so the memory figures are the device the Engine computes on
+   * (Spec E section 3.2 / 5.3). Null, or a bus id NVML does not know, reads device 0 as before; on
+   * one GPU both are the same device.
+   */
+  public GpuCapabilities.Nvml probe(String pciBusId) {
+    Path preferred = io.justsearch.configuration.PlatformPaths.isWindows() ? preferredNvmlPath() : null;
     String attemptedPath = preferred != null ? preferred.toString() : null;
     String loadedPath = null;
 
@@ -71,15 +65,22 @@ public final class NvmlService {
         loadedPath = preferred.toString();
       } else {
         // Best-effort fallback: rely on DLL search path.
-        System.loadLibrary("nvml");
-        loadedPath = "nvml";
+        if (io.justsearch.configuration.PlatformPaths.isWindows()) {
+          System.loadLibrary("nvml");
+          loadedPath = "nvml";
+        } else {
+          loadedPath = NativeTargets.current().libraryName("nvml");
+          // libraryLookup accepts the SONAME; System.loadLibrary would add lib/.so again.
+        }
       }
     } catch (Throwable t) {
       return new GpuCapabilities.Nvml(
           false,
           attemptedPath,
           loadedPath,
-          "Failed to load nvml.dll: " + safeMsg(t),
+          "Failed to load "
+              + (io.justsearch.configuration.PlatformPaths.isWindows() ? "nvml.dll" : "NVML")
+              + ": " + safeMsg(t),
           null,
           null,
           null,
@@ -174,10 +175,11 @@ public final class NvmlService {
           deviceCount = countOut.get(I32, 0);
         }
 
-        // First device memory and utilization
+        // The pinned device's (else the first device's) memory and utilization
         if (deviceCount != null && deviceCount > 0) {
           MemorySegment deviceOut = arena.allocate(ADDRESS);
-          int hrc = (int) getHandle.invokeExact(0, deviceOut);
+          int hrc = pciBusId == null ? -1 : handleByBusId(linker, lookup, arena, pciBusId, deviceOut);
+          if (hrc != 0) hrc = (int) getHandle.invokeExact(0, deviceOut);
           if (hrc == 0) {
             MemorySegment device = deviceOut.get(ADDRESS, 0);
 
@@ -263,6 +265,22 @@ public final class NvmlService {
     }
   }
 
+  /** {@code nvmlDeviceGetHandleByPciBusId_v2}; non-zero (and a debug line) when it cannot. */
+  private static int handleByBusId(
+      Linker linker, SymbolLookup lookup, Arena arena, String pciBusId, MemorySegment deviceOut) {
+    try {
+      MethodHandle byBusId =
+          downcall(linker, lookup, "nvmlDeviceGetHandleByPciBusId_v2",
+              FunctionDescriptor.of(I32, ADDRESS, ADDRESS));
+      int rc = (int) byBusId.invokeExact(arena.allocateFrom(pciBusId), deviceOut);
+      if (rc != 0) LOG.debug("NVML has no device at PCI bus id {} (rc={}); reading device 0", pciBusId, rc);
+      return rc;
+    } catch (Throwable t) {
+      LOG.debug("NVML lookup by PCI bus id {} failed; reading device 0: {}", pciBusId, safeMsg(t));
+      return -1;
+    }
+  }
+
   private static MethodHandle downcall(
       Linker linker, SymbolLookup lookup, String symbol, FunctionDescriptor fd) {
     MemorySegment fn =
@@ -288,10 +306,6 @@ public final class NvmlService {
     }
   }
 
-  private static boolean isWindows() {
-    String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-    return os.contains("win");
-  }
 
   private static Path preferredNvmlPath() {
     try {
@@ -299,7 +313,7 @@ public final class NvmlService {
       if (root == null || root.isBlank()) {
         root = "C:\\Windows";
       }
-      return Path.of(root).resolve("System32").resolve("nvml.dll");
+      return Path.of(root).resolve("System32").resolve(NativeTargets.current().libraryName("nvml"));
     } catch (Exception e) {
       return null;
     }

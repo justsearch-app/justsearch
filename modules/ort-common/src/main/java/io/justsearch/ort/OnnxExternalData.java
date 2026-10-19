@@ -12,10 +12,11 @@ import java.nio.file.Path;
  * skipped, never materialized. Field numbers come from https://github.com/onnx/onnx/blob/main/onnx/onnx.proto.
  * Unknown fields are skipped; malformed or uninspectable models bypass the disk cache.
  */
-final class OnnxExternalData {
+public final class OnnxExternalData {
   private OnnxExternalData() {}
 
-  static boolean hasExternalData(Path model) throws IOException {
+  /** Whether graph-file size alone omits external tensors; unreadable layouts throw. */
+  public static boolean hasExternalData(Path model) throws IOException {
     Path parent = model.toAbsolutePath().getParent();
     try (var files = Files.newDirectoryStream(parent, "*.onnx_data")) {
       if (files.iterator().hasNext()) return true;

@@ -1,14 +1,33 @@
 // SPDX-License-Identifier: Apache-2.0
 import { reportAdmissionWait } from '../shell-v0/state/admissionWaitNotice.js';
+import { withClientKind } from './clientKind.js';
+import { observeStatusResponse } from './statusInvalidation.js';
 
-const CAPACITY_CODES = new Set(['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT']);
+const CAPACITY_CODES = new Set(['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT', 'ADMISSION_INFERENCE_BUSY']);
+const waitObservers = new WeakMap<AbortSignal, (delayMs: number) => void>();
 
-/** Retry only explicit pre-execution refusals. Network failures and committed streams are never replayed. */
+/**
+ * Tells the owner of a request's signal when the server refused it for capacity or an upgrade and
+ * the request now waits {@code delayMs} before retrying. That wait follows the server's answer, so
+ * an owner that bounds unanswered requests can tell it apart from silence.
+ */
+export function observeAdmissionWait(signal: AbortSignal, observer: (delayMs: number) => void): void {
+  waitObservers.set(signal, observer);
+}
+
+/**
+ * Retry only explicit pre-execution refusals. Network failures and committed streams are never replayed.
+ *
+ * Every Engine request from the webview passes here (`api/http`, `api/streams`, shell-v0's
+ * `authorizedFetch`), so this is also where the webview declares its client kind on the requests
+ * that are already preflighted (see `clientKind.ts`).
+ */
 export async function fetchWithAdmissionWait(
   send: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
   input: RequestInfo | URL,
-  init?: RequestInit,
+  callerInit?: RequestInit,
 ): Promise<Response> {
+  const init = withClientKind(input, callerInit);
   const reusable = typeof Request !== 'undefined' && input instanceof Request ? input.clone() : input;
   const signal = init?.signal ?? (typeof Request !== 'undefined' && input instanceof Request ? input.signal : undefined);
   // A streaming upload is single-use. Its caller must supply a fresh body before retrying.
@@ -17,6 +36,8 @@ export async function fetchWithAdmissionWait(
   for (;;) {
     signal?.throwIfAborted();
     const response = await send(attemptInput, init);
+    // Even a refusal consumed by the admission retry can announce another client's publication.
+    await observeStatusResponse(input, response);
     if (response.status !== 429 && response.status !== 503) return response;
     let code: unknown;
     let retrySafe: boolean;
@@ -32,6 +53,7 @@ export async function fetchWithAdmissionWait(
     if ((!capacity && !upgrade) || !retrySafe || !replayable) return response;
     const delay = retryDelay(response.headers.get('Retry-After'));
     reportAdmissionWait(upgrade, delay);
+    if (signal) waitObservers.get(signal)?.(delay);
     await response.body?.cancel();
     await wait(delay, signal);
     attemptInput = typeof Request !== 'undefined' && reusable instanceof Request ? reusable.clone() : reusable;

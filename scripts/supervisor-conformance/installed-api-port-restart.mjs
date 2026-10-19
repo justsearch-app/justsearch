@@ -311,30 +311,14 @@ async function applyPort(binding, requestedPort, label) {
 
 async function terminateOwnedShellTree() {
   if (shell.exitCode !== null || shell.signalCode !== null) return;
-  const killer = spawn('taskkill.exe', ['/PID', String(shell.pid), '/T', '/F'], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    windowsHide: true,
-  });
-  let output = '';
-  killer.stdout?.on('data', (bytes) => { output += bytes.toString(); });
-  killer.stderr?.on('data', (bytes) => { output += bytes.toString(); });
-  const result = await Promise.race([
-    new Promise((resolve) => killer.once('exit', (code, signal) => resolve({ code, signal }))),
-    delay(20_000).then(() => ({ timeout: true })),
-  ]);
-  if (result.timeout) {
-    killer.kill();
-    throw new Error(`taskkill timed out for owned packaged shell pid ${shell.pid}`);
-  }
-  requireThat(result.code === 0 && result.signal == null,
-    `taskkill failed for owned packaged shell pid ${shell.pid}: ${JSON.stringify(result)} ${output}`);
+  requireThat(shell.kill(), `held packaged shell ${shell.pid} could not be stopped`);
   await Promise.race([
     shell.exitCode !== null || shell.signalCode !== null
       ? Promise.resolve() : new Promise((resolve) => shell.once('exit', resolve)),
     delay(10_000),
   ]);
   requireThat(shell.exitCode !== null || shell.signalCode !== null,
-    `owned packaged shell tree remained alive after taskkill pid ${shell.pid}: ${JSON.stringify(result)} ${output}`);
+    `owned packaged shell tree remained alive after taskkill pid ${shell.pid}: held shell`);
 }
 
 const fixedPort = await reserveFixedPort();

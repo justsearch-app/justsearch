@@ -1,0 +1,90 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T15:36:17.895Z",
+  "revision": "8ba4bff646012cd726f8cd7c3d6d20701d110763",
+  "tree": "e90116cafa0f1846e24650811bdfc1a85d9b08f3",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleCpuPrewarmTest\" --tests \"io.justsearch.ort.NativeSessionHandleCpuRecourseTraceTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7452
+    },
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.QueryEncoderPrewarmCpuWarmTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3929
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleCpuPrewarmTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleCpuPrewarmTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9aecf7454fb82e167ed3c5bdb1224fea71da2fff8eabfe6ff2c93d3e616cda16",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aModelWhoseInputsAreNotTokenIdsIsNotRunOnMadeUpInput()",
+          "status": "passed"
+        },
+        {
+          "name": "prewarmRunsTheCpuSessionOnceSoATurnedAwayQueryCanUseIt()",
+          "status": "passed"
+        },
+        {
+          "name": "aHandleWithoutAGpuHasNoCpuSessionToWarmForTurnedAwayQueries()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleCpuRecourseTraceTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleCpuRecourseTraceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55116e70383a3a59268e371bf412abbcde94a138e60be004b6892f38aa0e0084",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aTurnedAwayLegRecordsThatItRanOnTheCpu()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/QueryEncoderPrewarmCpuWarmTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/QueryEncoderPrewarmCpuWarmTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7ce57e74e5ceda7e528f8e8d67469c685dd05a0fa866143f6e31e4b2e2b6490e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gpuQueryEncodersGetTheirCpuSessionWarmedAfterReady()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:a7f7983e982c55b39809453f0e500df7cb878d69d0fddff435f032c14fb9a9eb"
+}

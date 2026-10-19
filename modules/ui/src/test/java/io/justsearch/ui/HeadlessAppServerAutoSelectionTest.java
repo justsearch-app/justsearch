@@ -30,8 +30,13 @@ class HeadlessAppServerAutoSelectionTest {
     String priorSource = System.getProperty("justsearch.server.exe.source");
     try {
       ConfigStore.setGlobal(config);
-      assertEquals(cuda.resolve("llama-server.exe").toAbsolutePath(),
-          HeadlessApp.maybeAutoSelectCuda12Variant(new UiSettings(), config));
+      if (io.justsearch.configuration.PlatformPaths.isWindows()) {
+        assertEquals(cuda.resolve("llama-server.exe").toAbsolutePath(),
+            HeadlessApp.maybeAutoSelectCuda12Variant(new UiSettings(), config));
+      } else {
+        assertNull(HeadlessApp.maybeAutoSelectCuda12Variant(new UiSettings(), config),
+            "a packaged Windows CUDA variant is never selected as a Linux runtime");
+      }
       assertEquals(priorExe, System.getProperty("justsearch.server.exe"));
       assertEquals(priorSource, System.getProperty("justsearch.server.exe.source"));
     } finally {

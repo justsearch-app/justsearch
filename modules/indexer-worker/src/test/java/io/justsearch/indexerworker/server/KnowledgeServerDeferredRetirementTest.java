@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.server;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -217,6 +218,57 @@ final class KnowledgeServerDeferredRetirementTest {
         encoder.close();
         verify(surface).close();
       } finally {
+        server.close();
+      }
+    }
+  }
+
+  @Test
+  void deferredHandoffDrainsWatcherBeforeTakingServingPublicationLocks(@TempDir Path tempDir)
+      throws Exception {
+    try (var executors = new TestEngineExecutors()) {
+      var server = new KnowledgeServer(
+          executors, WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+      var source = mock(DefaultWorkerAppServices.class);
+      var successor = mock(DefaultWorkerAppServices.class);
+      var runtime = mock(RunningRuntime.class);
+      var preparation = mock(DeferredRuntime.PreparedUpgrade.class);
+      var owner = new Object();
+      var mutations = new io.justsearch.indexerworker.services.WorkerMutationAdmission(owner);
+      var entered = new CountDownLatch(1);
+      var publish = new CountDownLatch(1);
+      var callbackFinished = new CountDownLatch(1);
+      var callbackFailure = new AtomicReference<Throwable>();
+      setField(server, "searchLifecycle", runtime);
+      setField(server, "ingestLifecycle", runtime);
+      server.publishServingView(source);
+      Thread callback = Thread.ofPlatform().start(() -> {
+        try (var _ = mutations.enter(owner)) {
+          entered.countDown();
+          assertTrue(publish.await(5, TimeUnit.SECONDS));
+          try (var view = server.captureServingView()) { assertNotNull(view.services()); }
+        } catch (Throwable failure) { callbackFailure.set(failure); }
+        finally { callbackFinished.countDown(); }
+      });
+      try {
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+        org.mockito.Mockito.doAnswer(invocation -> {
+          publish.countDown();
+          try (var fence = mutations.beginFinalFence(owner, 500)) {
+            assertNotNull(fence, "watcher can finish its serving read before handoff drains it");
+          }
+          return null;
+        }).when(source).prepareDeferredWatcherHandoffTo(successor);
+        invoke(server, "publishDeferredSuccessor",
+            new Class<?>[] {WorkerAppServices.class, WorkerAppServices.class,
+                RunningRuntime.class, DeferredRuntime.PreparedUpgrade.class},
+            successor, source, runtime, preparation);
+        assertTrue(callbackFinished.await(5, TimeUnit.SECONDS));
+        assertNull(callbackFailure.get());
+        try (var view = server.captureServingView()) { assertSame(successor, view.services()); }
+      } finally {
+        publish.countDown();
+        callback.join(5_000);
         server.close();
       }
     }

@@ -1,0 +1,150 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T12:45:55.297Z",
+  "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+  "tree": "48a915925b22f2320ef6002a62315c2ea61c4918",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.PromptCacheEnvironmentVariableTest.evaluationEnvironmentDisablesDefaultCache\" --tests \"io.justsearch.app.inference.PromptCacheEnvironmentVariableTest.evaluationEnvironmentDisablesOverriddenCache\" --tests \"io.justsearch.app.inference.PromptCacheEnvironmentVariableTest.evaluationBooleanAliasDisablesCache\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.settingsPreparationCannotReplaceAHeldVduServer\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.adoptedExternalServerRefusesSelfTestBeforeAnyCandidateCanStart\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 45142
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java#evaluationEnvironmentDisablesDefaultCache",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:215deb5b8fa0280b37d6eb6d25bc03f951b09221188febb654f7f3d4cc1edb0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "evaluationEnvironmentDisablesDefaultCache()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java#evaluationEnvironmentDisablesOverriddenCache",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:215deb5b8fa0280b37d6eb6d25bc03f951b09221188febb654f7f3d4cc1edb0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "evaluationEnvironmentDisablesOverriddenCache()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java#evaluationBooleanAliasDisablesCache",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:215deb5b8fa0280b37d6eb6d25bc03f951b09221188febb654f7f3d4cc1edb0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "evaluationBooleanAliasDisablesCache()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#settingsPreparationCannotReplaceAHeldVduServer",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "settingsPreparationCannotReplaceAHeldVduServer(false)",
+          "status": "passed"
+        },
+        {
+          "name": "settingsPreparationCannotReplaceAHeldVduServer(true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#adoptedExternalServerRefusesSelfTestBeforeAnyCandidateCanStart",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "adoptedExternalServerRefusesSelfTestBeforeAnyCandidateCanStart()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "61ff9b955",
+    "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.PromptCacheEnvironmentVariableTest.evaluationEnvironmentDisablesDefaultCache\" --tests \"io.justsearch.app.inference.PromptCacheEnvironmentVariableTest.evaluationEnvironmentDisablesOverriddenCache\" --tests \"io.justsearch.app.inference.PromptCacheEnvironmentVariableTest.evaluationBooleanAliasDisablesCache\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.settingsPreparationCannotReplaceAHeldVduServer\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.adoptedExternalServerRefusesSelfTestBeforeAnyCandidateCanStart\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 41607
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java#evaluationEnvironmentDisablesDefaultCache",
+        "classification": "assertion",
+        "detail": "evaluationEnvironmentDisablesDefaultCache(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <CACHE_RAM=0> but was: <CACHE_RAM=1024>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java#evaluationEnvironmentDisablesOverriddenCache",
+        "classification": "assertion",
+        "detail": "evaluationEnvironmentDisablesOverriddenCache(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <CACHE_RAM=0> but was: <CACHE_RAM=256>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java#evaluationBooleanAliasDisablesCache",
+        "classification": "assertion",
+        "detail": "evaluationBooleanAliasDisablesCache(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <CACHE_RAM=0> but was: <CACHE_RAM=256>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#settingsPreparationCannotReplaceAHeldVduServer",
+        "classification": "assertion",
+        "detail": "settingsPreparationCannotReplaceAHeldVduServer(false): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected io.justsearch.app.api.ModeTransitionException to be thrown, but nothing was thrown. | settingsPreparationCannotReplaceAHeldVduServer(true): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected io.justsearch.app.api.ModeTransitionException to be thrown, but nothing was thrown."
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#adoptedExternalServerRefusesSelfTestBeforeAnyCandidateCanStart",
+        "classification": "assertion",
+        "detail": "adoptedExternalServerRefusesSelfTestBeforeAnyCandidateCanStart(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected io.justsearch.app.api.ModeTransitionException to be thrown, but nothing was thrown."
+      }
+    ]
+  },
+  "digest": "sha256:042e10c7543593fc463a265398bacbe4ecb586d3d08206990079c3bcfa8af2f4"
+}

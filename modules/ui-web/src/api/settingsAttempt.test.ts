@@ -252,3 +252,12 @@ describe('absolute intents and shared mode ordering', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+// The settings API's hot GPU switch must survive the client's validated partial patch.
+it('carries game detection off and auto in settings attempts', () => {
+  for (const gameDetection of ['off', 'auto'] as const) {
+    let attempt: SettingsAttempt | undefined;
+    expect(() => { attempt = createSettingsAttempt({ llm: { gameDetection } }, zero); }).not.toThrow();
+    expect(JSON.parse(attempt!.body).llm).toEqual({ gameDetection });
+  }
+});

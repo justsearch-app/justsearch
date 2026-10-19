@@ -66,6 +66,7 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
   private static final Logger log = LoggerFactory.getLogger(DiagnosticsServiceImpl.class);
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final long MAX_NDJSON_BYTES = 5L * 1024 * 1024; // 5 MB cap per file
+  private static final int MAX_EXIT_LEDGER_BYTES = 8 * 1024 * 1024;
   private static final int MAX_ROTATED_METRICS_FILES = 3;
 
   // Diagnostics-ZIP path redaction. Quoted JSON/log fields may contain spaces or commas, so a
@@ -154,6 +155,7 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
         addDirectoryRedacted(zos, aiLogsDir, "ai/logs");
       }
 
+      addExitLedgers(zos, dataDir);
       addTelemetryFiles(zos, dataDir);
       addCrashReports(zos, dataDir);
       addRuntimeSnapshots(zos, engineContext);
@@ -201,6 +203,103 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
                 lifecycle,
                 gpu,
                 crash));
+  }
+
+  private static void addExitLedgers(ZipOutputStream zos, Path dataDir) throws IOException {
+    Path directory = dataDir.resolve("runtime/exit-ledger");
+    if (!Files.exists(directory)) return;
+    List<String> failures = new ArrayList<>();
+    List<Path> retained = new ArrayList<>();
+    try (var files = Files.newDirectoryStream(directory)) {
+      for (Path file : files) {
+        String name = file.getFileName().toString();
+        if (!name.matches("(engine|children)\\.v1(?:\\.(?:[0-9]+|lost))?\\.jsonl")) continue;
+        if (!Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+          failures.add(name + ": not a regular ledger file");
+          continue;
+        }
+        retained.add(file);
+      }
+    } catch (IOException unavailable) { failures.add("ledger directory: collection failed"); }
+    retained.sort(Comparator.comparingLong((Path file) -> {
+      try { return Files.getLastModifiedTime(file).toMillis(); }
+      catch (IOException unavailable) { return Long.MIN_VALUE; }
+    }).reversed().thenComparing(file -> file.getFileName().toString()));
+    int exported = 0;
+    long omitted = 0;
+    int skippedLines = 0;
+    for (Path file : retained) {
+      try {
+        LedgerTail tail = exitLedgerTail(file, MAX_EXIT_LEDGER_BYTES - exported);
+        addBytesRedacted(zos, tail.bytes(), "runtime/exit-ledger/" + file.getFileName());
+        exported += tail.bytes().length;
+        omitted += tail.omitted();
+        skippedLines += tail.skippedLines();
+      } catch (IOException unavailable) { failures.add(file.getFileName() + ": collection failed"); }
+    }
+    if (omitted > 0) addBytesRedacted(zos,
+        ("Truncated exit-ledger export: " + omitted + " source bytes omitted; newest records retained within 8388608 bytes.\n")
+            .getBytes(StandardCharsets.UTF_8), "runtime/exit-ledger/truncation.txt");
+    if (skippedLines > 0) addBytesRedacted(zos,
+        ("Skipped " + skippedLines + " malformed or incomplete lines in the bounded exit-ledger suffixes.\n")
+            .getBytes(StandardCharsets.UTF_8), "runtime/exit-ledger/skipped-lines.txt");
+    if (!failures.isEmpty()) addBytesRedacted(zos,
+        String.join("\n", failures).getBytes(StandardCharsets.UTF_8),
+        "runtime/exit-ledger/collection-failures.txt");
+  }
+
+  private record LedgerTail(byte[] bytes, long omitted, int skippedLines) {}
+
+  /** Reads only a bounded suffix, drops a partial leading record, then enforces the redacted byte cap. */
+  private static LedgerTail exitLedgerTail(Path file, int budget) throws IOException {
+    try (RandomAccessFile input = new RandomAccessFile(file.toFile(), "r")) {
+      long size = input.length(), start = Math.max(0, size - budget);
+      if (budget == 0) return new LedgerTail(new byte[0], size, 0);
+      input.seek(start == 0 ? 0 : start - 1);
+      if (start > 0 && input.read() != '\n') {
+        byte[] scan = new byte[8192];
+        boolean boundary = false;
+        while (!boundary && input.getFilePointer() < size) {
+          long position = input.getFilePointer();
+          int count = input.read(scan, 0, (int) Math.min(scan.length, size - position));
+          if (count < 0) break;
+          for (int i = 0; i < count; i++) if (scan[i] == '\n') {
+            input.seek(position + i + 1); boundary = true; break;
+          }
+        }
+      }
+      byte[] raw = new byte[(int) (size - input.getFilePointer())];
+      input.readFully(raw);
+      List<byte[]> records = new ArrayList<>();
+      int used = 0, skippedLines = 0, end = raw.length;
+      long sourceKept = 0;
+      // A writer may be appending the last record. Only newline-terminated records are complete.
+      if (end > 0 && raw[end - 1] != '\n') {
+        while (end > 0 && raw[end - 1] != '\n') end--;
+        skippedLines++;
+      }
+      while (end > 0) {
+        int startLine = end - 1;
+        while (startLine > 0 && raw[startLine - 1] != '\n') startLine--;
+        int length = end - startLine - 1;
+        if (length > 0 && raw[startLine + length - 1] == '\r') length--;
+        final String line;
+        try {
+          line = StandardCharsets.UTF_8.newDecoder()
+              .decode(java.nio.ByteBuffer.wrap(raw, startLine, length)).toString();
+        } catch (java.nio.charset.CharacterCodingException malformed) {
+          skippedLines++; end = startLine; continue;
+        }
+        byte[] redacted = (redactPaths(line) + "\n").getBytes(StandardCharsets.UTF_8);
+        if (used + redacted.length > budget) break;
+        records.add(redacted); used += redacted.length;
+        sourceKept += end - startLine;
+        end = startLine;
+      }
+      var bytes = new java.io.ByteArrayOutputStream(used);
+      for (int i = records.size() - 1; i >= 0; i--) bytes.writeBytes(records.get(i));
+      return new LedgerTail(bytes.toByteArray(), size - sourceKept, skippedLines);
+    }
   }
 
   private void addTelemetryFiles(ZipOutputStream zos, Path dataDir) {

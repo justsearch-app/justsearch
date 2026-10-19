@@ -1,0 +1,193 @@
+Compat before-patch for b6d536-chat-controller-step56-seam, applied to d3fe74ef2 (the parent of the
+lane commit 0b7b9df44 that introduced the repaired behaviour; coordinator decision 2).
+
+Production, one constructor only: RuntimeReconciler's lease-free Engine constructor, which later
+checks call (5e4f4e698 deleted the lease). It delegates to this state's own Engine constructor with
+a fresh RuntimeGpuLease, as ServicePhase builds it, so the reconciler drives its control exactly as
+this state does. No production code in this state calls it, and it supplies no stop-before-launch or
+embedding hand-off behaviour.
+
+Test helper, before-API variant (passed through this patch, not as an overlay): ManagedChatSeam as
+the candidate has it, without its ChildControl branch (this state's factory takes
+ManagedChildRegistry; the named checks never pass a ChildControl). It changes no assertion.
+
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeReconciler.java b/modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeReconciler.java
+index 54ef560ff..f5b436cfc 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeReconciler.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeReconciler.java
+@@ -193,6 +193,24 @@ public final class RuntimeReconciler implements AutoCloseable {
+         componentRecoveryPending);
+   }
+ 
++  /**
++   * Compatibility only (compat before-patch): the lease-free constructor later checks call. It
++   * delegates to this state's Engine constructor with a fresh lease, as ServicePhase builds it, so
++   * the reconciler drives {@code control} exactly as this state does. No production code in this
++   * state calls it.
++   */
++  public RuntimeReconciler(
++      OnlineAiLifecycleControl control,
++      Supplier<Mode> modeSupplier,
++      BooleanSupplier externalAdoption,
++      EnterprisePolicyService policy,
++      RuntimeSpecStore specStore,
++      ActivationForwarder forwarder,
++      BooleanSupplier componentRecoveryPending) {
++    this(control, modeSupplier, externalAdoption, policy, specStore, new RuntimeGpuLease(),
++        forwarder, componentRecoveryPending);
++  }
++
+   /**
+    * The Engine's reconciler: every boot, spec and procedure request becomes one {@code
+    * setActivation} on the chat controller.
+diff --git a/modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java b/modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java
+index 4b5fa66c7..6154820fd 100644
+--- a/modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java
++++ b/modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java
+@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
+  * The Engine's lifecycle manager as its composition root builds it, launching {@link
+  * SlowStartFakeLlamaServer}: the real seam the chat controller tests run against.
+  */
+-final class ManagedChatSeam implements AutoCloseable {
++public final class ManagedChatSeam implements AutoCloseable {
+ 
+   private final Path directory;
+   private final Path fakeHome;
+@@ -37,7 +37,12 @@ final class ManagedChatSeam implements AutoCloseable {
+   private final InferenceConfig base;
+   private InferenceLifecycleManager manager;
+ 
+-  ManagedChatSeam(Path directory, long startDelayMs) throws Exception {
++  public ManagedChatSeam(Path directory, long startDelayMs) throws Exception {
++    this(directory, startDelayMs, null);
++  }
++
++  ManagedChatSeam(Path directory, long startDelayMs,
++      io.justsearch.app.api.runtime.child.ChildControl control) throws Exception {
+     this.directory = directory;
+     previousStore = ConfigStore.globalOrNull();
+     previousLite = System.getProperty("justsearch.lite.mode");
+@@ -48,6 +53,9 @@ final class ManagedChatSeam implements AutoCloseable {
+     ResolvedConfig resolved = snapshot(model, freePort());
+     ConfigStore.setGlobal(new ConfigStore(resolved));
+     executors = new TestEngineExecutors();
++    // Before-API variant (compat before-patch): this state's factory takes ManagedChildRegistry, not
++    // ChildControl. The named checks use the two-argument constructor, so control is always null.
++    if (control != null) throw new UnsupportedOperationException("before-state variant: no ChildControl");
+     manager = BootstrapInferenceFactory.createInferenceManager(executors, true, resolved,
+         directory.toString(), null, LoggerFactory.getLogger(getClass()),
+         ManagedChildRegistry.noop());
+@@ -55,28 +63,33 @@ final class ManagedChatSeam implements AutoCloseable {
+     base = manager.currentConfig();
+   }
+ 
+-  InferenceLifecycleManager manager() {
++  public InferenceLifecycleManager manager() {
+     return manager;
+   }
+ 
+-  InferenceConfig base() {
++  public InferenceConfig base() {
+     return base;
+   }
+ 
++  /** Where the fake servers are installed and record their launches. */
++  public Path fakeHome() {
++    return fakeHome;
++  }
++
+   /** Changes how long each later launch takes to become healthy. */
+   void startDelay(long startDelayMs) throws IOException {
+     SlowStartFakeLlamaServer.install(fakeHome, startDelayMs);
+   }
+ 
+   /** Closes the manager now (quit); {@link #close} then only cleans up. */
+-  void quit() {
++  public void quit() {
+     InferenceLifecycleManager closing = manager;
+     manager = null;
+     if (closing != null) closing.close();
+   }
+ 
+   /** The {@code -m} model file name of every launch, in order. */
+-  List<String> models() {
++  public List<String> models() {
+     try {
+       return SlowStartFakeLlamaServer.launches(fakeHome).stream()
+           .map(SlowStartFakeLlamaServer.Launch::model).toList();
+@@ -85,7 +98,7 @@ final class ManagedChatSeam implements AutoCloseable {
+     }
+   }
+ 
+-  boolean noneAlive() {
++  public boolean noneAlive() {
+     try {
+       return SlowStartFakeLlamaServer.noneAlive(fakeHome);
+     } catch (IOException failure) {
+@@ -94,7 +107,7 @@ final class ManagedChatSeam implements AutoCloseable {
+   }
+ 
+   /** The base configuration with another model file. */
+-  InferenceConfig withModel(String name) throws IOException {
++  public InferenceConfig withModel(String name) throws IOException {
+     Path model = model(name);
+     return new InferenceConfig(base.serverExecutable(), model, base.mmprojPath(),
+         base.serverPort(), base.contextSize(), base.gpuLayers(), false);
+@@ -111,7 +124,7 @@ final class ManagedChatSeam implements AutoCloseable {
+     return model;
+   }
+ 
+-  static void await(BooleanSupplier condition, String what) throws Exception {
++  public static void await(BooleanSupplier condition, String what) throws Exception {
+     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+     while (!condition.getAsBoolean()) {
+       if (System.nanoTime() > deadline) throw new AssertionError("timed out waiting for " + what);
+@@ -128,6 +141,7 @@ final class ManagedChatSeam implements AutoCloseable {
+         executors.close();
+       } finally {
+         SlowStartFakeLlamaServer.endAll(fakeHome);
++        awaitFilesReleased();
+         TestResolvedConfigHelper.restoreGlobal(previousStore);
+         if (previousLite == null) System.clearProperty("justsearch.lite.mode");
+         else System.setProperty("justsearch.lite.mode", previousLite);
+@@ -135,6 +149,40 @@ final class ManagedChatSeam implements AutoCloseable {
+     }
+   }
+ 
++  /**
++   * Waits until Windows has let go of what the ended servers had open: their inherited log and
++   * working directory. Every launched server has exited by now and the Restart Manager names no
++   * process holding them, yet the file system keeps them shared for a few milliseconds after the
++   * last exit — long enough for the {@code @TempDir} delete that follows to fail. A path is free
++   * when it can be renamed, which needs the same access the delete does. Only what a server
++   * process held is probed: the server logs, the self-test logs and the fake's home, its working
++   * directory.
++   */
++  private void awaitFilesReleased() throws IOException, InterruptedException {
++    List<Path> paths = new java.util.ArrayList<>();
++    for (Path root : List.of(directory.resolve("data").resolve("logs"), fakeHome,
++        directory.resolve("selftest"))) {
++      if (!Files.isDirectory(root)) continue;
++      try (var walk = Files.walk(root)) {
++        walk.sorted(java.util.Comparator.reverseOrder()).forEach(paths::add);
++      }
++    }
++    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
++    for (Path path : paths) {
++      Path probe = path.resolveSibling(path.getFileName() + ".release-probe");
++      while (Files.exists(path)) {
++        try {
++          Files.move(path, probe);
++          Files.move(probe, path);
++          break;
++        } catch (IOException stillShared) {
++          if (System.nanoTime() > deadline) throw stillShared;
++          Thread.sleep(5);
++        }
++      }
++    }
++  }
++
+   private ResolvedConfig snapshot(Path model, int port) {
+     var builder = new ResolvedConfigBuilder();
+     builder.putDefault("justsearch.home", directory.toString());

@@ -654,7 +654,8 @@ final class OperationExecutorImplTest {
     // Health may attach after failure during composition; the degradation must not disappear.
     var conditions = new io.justsearch.app.observability.health.ConditionStore();
     io.justsearch.app.services.operations.OperationRecoveryNotice.observePersistenceFailures(
-        attempts, conditions, new io.justsearch.app.observability.health.HealthEventChangeRegistry(),
+        attempts, conditions, new io.justsearch.app.observability.health.HealthEventChangeRegistry(
+            java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()),
         new io.justsearch.app.observability.health.Source("head", "fixture", Optional.empty()), Clock.systemUTC());
     var event = conditions.find("operations.persistence_failed", "operations").orElseThrow();
     assertEquals(io.justsearch.app.observability.health.Severity.ERROR, event.severity());

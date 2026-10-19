@@ -1,0 +1,17 @@
+{
+  "description": "A PR touching nothing in the test scope (a production edit plus a contract document edited alone) passes the test-intent gate with no entry (S1, P5, D1 corpus 'contract document edited with no test change').",
+  "main": {
+    "modules/core/src/main/java/io/x/Calc.java": "package io.x;\nclass Calc {\n  static int add(int a, int b) { return a + b; }\n}\n",
+    "modules/core/src/test/java/io/x/CalcTest.java": "package io.x;\nclass CalcTest {\n  @Test void adds() { assertEquals(3, Calc.add(1, 2)); }\n}\n",
+    "docs/contracts/calc-contract.md": "# Calc contract\n\nThe calculator adds two numbers.\n"
+  },
+  "branch": [
+    {
+      "write": {
+        "modules/core/src/main/java/io/x/Calc.java": "package io.x;\nclass Calc {\n  static int add(int a, int b) { return b + a; }\n}\n",
+        "docs/contracts/calc-contract.md": "# Calc contract\n\nThe calculator adds two integers.\n"
+      }
+    }
+  ],
+  "event": { "name": "pull_request", "pr": 7 }
+}

@@ -131,7 +131,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   private final UiSettingsStore store;
   private final ConfigStore config;
   private final Runnable restart;
-  private final Function<UiSettings, ResolvedConfig> prepareConfig;
+  private final java.util.function.BiFunction<UiSettings,
+      io.justsearch.app.api.settings.SettingsCandidateContext, ResolvedConfig> prepareConfig;
   private final Function<UiSettings, OperationResult> prepareResponse;
   private final Replacement replacement;
   private final BooleanSupplier processClosing;
@@ -169,7 +170,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       Function<UiSettings, OperationResult> prepareResponse, BooleanSupplier processClosing,
       SettingsComponentComposer components,
       java.util.function.Consumer<OperationAttemptRunnerImpl.FaultBoundary> faultHook) {
-    this(store, config, restart, ConfigStoreRebuilder::prepare, prepareResponse,
+    this(store, config, restart,
+        (candidate, context) -> ConfigStoreRebuilder.prepare(candidate, context.chatProfile(), config.get()), prepareResponse,
         store::replacePrepared, processClosing, components, faultHook);
   }
 
@@ -201,6 +203,16 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       Function<UiSettings, OperationResult> prepareResponse, Replacement replacement,
       BooleanSupplier processClosing, SettingsComponentComposer components,
       java.util.function.Consumer<OperationAttemptRunnerImpl.FaultBoundary> faultHook) {
+    this(store, config, restart, (candidate, context) -> prepareConfig.apply(candidate),
+        prepareResponse, replacement, processClosing, components, faultHook);
+  }
+
+  private SettingsCommitCoordinator(UiSettingsStore store, ConfigStore config, Runnable restart,
+      java.util.function.BiFunction<UiSettings,
+          io.justsearch.app.api.settings.SettingsCandidateContext, ResolvedConfig> prepareConfig,
+      Function<UiSettings, OperationResult> prepareResponse, Replacement replacement,
+      BooleanSupplier processClosing, SettingsComponentComposer components,
+      java.util.function.Consumer<OperationAttemptRunnerImpl.FaultBoundary> faultHook) {
     this.store = Objects.requireNonNull(store, "store");
     this.config = Objects.requireNonNull(config, "config");
     this.restart = Objects.requireNonNull(restart, "restart");
@@ -224,7 +236,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
 
   @Override
   public Reservation reserve(long id, String key, SettingsWitness expected) {
-    if (!mutex.tryLock()) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+    if (!mutex.tryLock()) throw reconfigureInProgress();
     try {
       return reserveOwned(id, key, expected, false);
     } finally {
@@ -241,7 +253,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     if (fence != null && (reset || !Objects.equals(recoveredId, id) || fence.id != id
         || !fence.key.equals(key) || fence.phase != Phase.PREPARING
         || fence.preparationStarted)) {
-      throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+      throw reconfigureInProgress();
     }
     if (!store.mode().isWritable()) throw refused("SETTINGS_READ_ONLY", "Settings persistence is disabled", Map.of());
     OperationKeys.timestampMillis(key);
@@ -267,7 +279,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (fence.prior.equals(prior)) {
         return fence;
       }
-      throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+      throw reconfigureInProgress();
     }
     var reserved = new SettingsCommitFence(id, key, prior, snapshot.settings(),
         snapshot.queryRoles(), null, reset);
@@ -280,18 +292,18 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     var intent = SettingsResetPreparation.decode(row, accepted);
     if (!intent.recovery()) {
       // The common checks create the final reset fence once under this mutex.
-      if (!mutex.tryLock()) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+      if (!mutex.tryLock()) throw reconfigureInProgress();
       try {
         return reserveOwned(row.id(), row.key(), intent.expected(), true);
       } finally { mutex.unlock(); publishIssue(); }
     }
-    if (!mutex.tryLock()) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+    if (!mutex.tryLock()) throw reconfigureInProgress();
     try {
       if (!inspected || recoveredId != null
           || (blocked && (issue == null || issue.reason() != RecoveryReason.UNREADABLE_WITNESS))) {
         throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings recovery is unresolved", Map.of());
       }
-      if (fence != null) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+      if (fence != null) throw reconfigureInProgress();
       if (!store.mode().isWritable()) throw refused("SETTINGS_READ_ONLY", "Settings persistence is disabled", Map.of());
       if (row.id() <= 0) throw new IllegalArgumentException("Invalid settings reservation");
       if (!matchesQuarantine(intent.quarantineFingerprint())) {
@@ -363,7 +375,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       // candidate, including ordinary settings that accompanied the model paths.
       var preparedSettings = store.prepareExact(candidate, successor,
           InstallerQueryRoleSelection.fromPlan(plan).orElse(null));
-      ResolvedConfig desired = Objects.requireNonNull(prepareConfig.apply(preparedSettings.settings()),
+      ResolvedConfig desired = Objects.requireNonNull(prepareConfig.apply(preparedSettings.settings(),
+          io.justsearch.app.api.settings.SettingsCandidateContext.NONE),
           "Prepared installer configuration");
       requireSelectedInstallerEncoderPaths(desired, plan);
       ResolvedConfig serving = config.get();
@@ -682,7 +695,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       // Its committed defaults are applied by the already-required successor boot.
       boolean chatComponentChanged = !active.recoveryReset() && !Objects.equals(
           active.priorSettings.getChatEnabled(), preparedCandidate.getChatEnabled());
-      ResolvedConfig resolved = Objects.requireNonNull(prepareConfig.apply(preparedCandidate), "Prepared config");
+      ResolvedConfig resolved = Objects.requireNonNull(prepareConfig.apply(preparedCandidate, candidateContext), "Prepared config");
       ResolvedConfig serving = config.get();
       var changedKeys = active.recoveryReset()
           ? new ConfigApplyScopes.ChangedKeys(Set.of(), Map.of(),
@@ -835,6 +848,15 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
                 active.key, active.key, active.id, "encoders", 0, 0));
             config.installPrepared(preparedConfig);
             if (preparedForPublish != null) preparedForPublish.install();
+            // A recovery reset has no readable prior settings to compare: leaving quarantine is
+            // itself the change. An ordinary commit changes status only when chat enablement does.
+            if (active.recoveryReset()) {
+              io.justsearch.core.status.StatusChangeCounter.process().changed();
+            } else {
+              io.justsearch.core.status.StatusChangeCounter.process().changed(
+                  Boolean.TRUE.equals(active.priorSettings.getChatEnabled()),
+                  Boolean.TRUE.equals(prepared.settings().getChatEnabled()));
+            }
           } catch (RuntimeException | Error publicationFailure) {
             // The durable witness already names B. A broken prepared installer must not be
             // reported as a clean serving commit; boot reconstructs from that witness.
@@ -1091,6 +1113,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   @Override
   public boolean recoverCommittedComposition() {
     SettingsComponentComposer.Prepared prepared = null;
+    ConfigStore.PreparedSwap recoveredConfig = null;
     boolean installed = false;
     mutex.lock();
     try {
@@ -1112,7 +1135,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         block(new RecoveryIssue(RecoveryReason.CONTRADICTORY_WITNESS, active.id));
         throw new IllegalStateException("Committed settings witness changed during boot recovery");
       }
-      ResolvedConfig desired = Objects.requireNonNull(prepareConfig.apply(snapshot.settings()), "Recovered config");
+      ResolvedConfig desired = Objects.requireNonNull(prepareConfig.apply(snapshot.settings(), recoveredContext), "Recovered config");
       var generativeKeys = new java.util.TreeSet<String>();
       if (recoveredContext.hasChatProfile()) {
         generativeKeys.add("chatProfile");
@@ -1120,9 +1143,16 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (recoveredContext.forceGenerativeRefresh()) {
         generativeKeys.add("modelRefresh");
       }
-      var affected = Map.<String, Set<String>>of("generative", Set.copyOf(generativeKeys));
+      var affected = new java.util.TreeMap<String, Set<String>>();
+      affected.put("generative", Set.copyOf(generativeKeys));
+      var changed = ConfigApplyScopes.classify(config.get(), desired);
+      if (changed.component().containsKey("encoders")) {
+        affected.put("encoders", changed.component().get("encoders"));
+      }
       prepared = Objects.requireNonNull(components.prepare(snapshot.settings(), desired, affected,
           recoveredContext), "Recovered component transaction");
+      recoveredConfig = config.prepareSwap(desired);
+      ConfigStore.PreparedSwap chosenConfig = recoveredConfig;
       SettingsComponentComposer.Prepared chosen = prepared;
       var publication = config.publicationLock();
       chosen.withOwnerLocks(() -> {
@@ -1131,7 +1161,9 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
           if (!active.prior.equals(store.inspect().witness())) {
             throw new IllegalStateException("Committed settings witness changed during recovery publication");
           }
+          config.validatePrepared(chosenConfig);
           chosen.validate();
+          config.installPrepared(chosenConfig);
           chosen.install();
         } finally { publication.writeLock().unlock(); }
       });
@@ -1157,6 +1189,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     }
     // A completed install is externally visible. Arbitrary observation and retirement run
     // outside the settings mutex and the shared publication writer.
+    config.notifyListeners(recoveredConfig.event());
     try { prepared.notifyObservers(); }
     catch (RuntimeException notificationFailure) {
       LOG.warn("Recovered generative component notification failed", notificationFailure);
@@ -1222,6 +1255,12 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
 
   private static Refused refused(String code, String message, Map<String, Object> details) {
     return new Refused(OperationResult.failure(message, code, details, false));
+  }
+
+  /** A contender for the one settings transaction: transient, so retryable (configuration SSOT). */
+  private static Refused reconfigureInProgress() {
+    return new Refused(OperationResult.failure(
+        "Another settings transaction is active", "RECONFIGURE_IN_PROGRESS", Map.of(), true));
   }
 
   private static OperationResult withRestartScheduled(OperationResult response) {

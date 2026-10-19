@@ -48,6 +48,25 @@ public final class McpProtocolHandler {
   private static final Duration SESSION_TTL = Duration.ofMinutes(30);
 
   /**
+   * The activity role of each method this server answers, other than tools/call (each tool
+   * declares its own) and resources/read (each resource declares its own): true for a person's
+   * deliberate request, false for an observation. An unanswered method is refused and is not
+   * activity; a notification is never activity.
+   */
+  static final Map<String, Boolean> METHOD_USER_ACTIVITY = Map.of(
+      "initialize", false,
+      "tools/list", false,
+      "resources/list", false,
+      "prompts/list", false,
+      "ping", false,
+      "prompts/get", true);
+
+  static {
+    io.justsearch.ui.api.ObservationJustifications.validateMcpProtocol(
+        METHOD_USER_ACTIVITY, McpToolSurface.RESOURCE_USER_ACTIVITY);
+  }
+
+  /**
    * MCP {@code serverInfo.version} — the version of the SERVER IMPLEMENTATION, i.e. this build
    * (tempdoc 804 §B9 / round-10 F12: it reported the curated tool-surface version {@code 0.5.0} on a
    * {@code 0.2.0} build, so an MCP host that logs or gates on server version saw a version this
@@ -133,7 +152,14 @@ public final class McpProtocolHandler {
         }
         final io.justsearch.app.api.EngineWorkHandle work;
         try {
-          work = admission.admit(engineContext, false);
+          boolean observation = "tools/call".equals(method) && params.has("name")
+              && surface.observationTool(params.get("name").asText())
+              || "resources/read".equals(method) && params.has("uri")
+                  && surface.observationResource(params.get("uri").asText());
+          if (observation) engineContext = engineContext.withUrgency(EngineContext.Urgency.BACKGROUND);
+          boolean userActivity = isUserActivity(method, params, isNotification);
+          work = observation ? admission.admitObservationRequest(engineContext, userActivity)
+              : admission.admitRequest(engineContext, false, userActivity);
         } catch (io.justsearch.app.api.EngineAdmissionException failure) {
           ctx.attribute(io.justsearch.ui.api.RequestEngineWork.REFUSAL_ATTRIBUTE, failure);
           io.justsearch.ui.api.RequestEngineWork.status(ctx, failure);
@@ -204,6 +230,17 @@ public final class McpProtocolHandler {
       log.warn("MCP protocol error", e);
       writeError(ctx, null, -32603, "Internal error: " + e.getMessage());
     }
+  }
+
+  private static boolean isUserActivity(String method, tools.jackson.databind.JsonNode params,
+      boolean notification) {
+    if (notification) return false;
+    return switch (method) {
+      case "tools/call" -> McpToolSurface.isUserActivity(params.path("name").asText());
+      case "resources/read" -> McpToolSurface.isResourceReadUserActivity(
+          params.path("uri").isString() ? params.path("uri").asText() : null);
+      default -> METHOD_USER_ACTIVITY.getOrDefault(method, false);
+    };
   }
 
   /**
@@ -309,7 +346,12 @@ public final class McpProtocolHandler {
         // one server-level surface that reaches an autonomous agent at tool-selection time. Content
         // is the comparative tool-selection guidance owned by Layer 2 (McpToolSurface) — Layer 1
         // holds no tool knowledge, so it asks the surface for the string rather than authoring it.
-        "instructions", surface.instructions());
+        "instructions", surface.instructions() + (admission == null ? "" :
+            " The per-session ownership limit is " + admission.limits().perContextLimit()
+                + " retained work items. Search concurrency is bounded separately by the shared"
+                + " execution lane. Excess work returns a typed 429"
+                + " ADMISSION_CONTEXT_LIMIT or ADMISSION_ENGINE_LIMIT with Retry-After."
+                + " Observation reads use their own bounded admission reservation."));
   }
 
   @SuppressWarnings("unchecked")

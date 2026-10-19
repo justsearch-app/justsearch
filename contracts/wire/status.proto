@@ -71,6 +71,113 @@ message StatusResponse {
   // Tempdoc 630: post-restart reconcile ("catching up") flag.
   bool catching_up = 34 [json_name = "catchingUp"];
   EngineComponents engine_components = 35 [json_name = "components"];
+  // ADR-0050: chat, indexing and GPU operating state (OperatingStateView record).
+  OperatingStateView operating = 36 [json_name = "operating"];
+}
+
+// === Operating state (ADR-0050; Java records in app-api status/operating/) ===
+//
+// Enum-valued fields are strings carrying the Java enum's wire value, as elsewhere in this file;
+// the generated JSON Schema states each closed set. No `buf.validate in:` on discriminators, so a
+// new value is additive. Present-as-null fields are proto3 `optional`.
+
+message OperatingStateView {
+  int32 schema_version = 1 [json_name = "schemaVersion"];
+  int64 seq = 2 [json_name = "seq"];
+  string assembled_at = 3 [json_name = "assembledAt"];
+  // Absent while the Engine is leaving; lifecycle speaks then.
+  OperatingChatView chat = 4 [json_name = "chat"];
+  // Absent until the Worker has been sampled.
+  OperatingIndexingView indexing = 5 [json_name = "indexing"];
+  OperatingGpuView gpu = 6 [json_name = "gpu"];
+  repeated OperatingDegradationView degradations = 7 [json_name = "degradations"];
+  OperatingFreshnessView freshness = 8 [json_name = "freshness"];
+}
+
+message OperatingChatView {
+  // ChatState: OFF | LOADING | READY | UNLOADED | REFUSED | FAILED.
+  string state = 1 [json_name = "state"];
+  // The state's reason: LoadingCause | UnloadReason | RefusedCode | FailedCode constant name.
+  optional string reason = 2 [json_name = "reason"];
+  // StopDetail token (lower case).
+  optional string detail = 3 [json_name = "detail"];
+  // Lifecycle reason code; equals components.generative.reason_code in the same response.
+  optional string reason_code = 4 [json_name = "reasonCode"];
+  string since = 5 [json_name = "since"];
+  bool managed = 6 [json_name = "managed"];
+  optional bool generating = 7 [json_name = "generating"];
+  optional int32 in_flight = 8 [json_name = "inFlight"];
+  optional int32 queued = 9 [json_name = "queued"];
+  // BlockedBy: GPU_BUSY | GAME_MODE | RELOAD_BACKOFF.
+  optional string blocked_by = 10 [json_name = "blockedBy"];
+  ChatLoadView load = 11 [json_name = "load"];
+  optional bool reload_allowed = 12 [json_name = "reloadAllowed"];
+  optional string next_reload_not_before = 13 [json_name = "nextReloadNotBefore"];
+  string sampled_at = 14 [json_name = "sampledAt"];
+}
+
+message ChatLoadView {
+  // LoadPhase: SPAWNING | LOADING_MODEL | WARMING.
+  string phase = 1 [json_name = "phase"];
+  string started_at = 2 [json_name = "startedAt"];
+  int64 elapsed_ms = 3 [json_name = "elapsedMs"];
+  optional int64 expected_ms = 4 [json_name = "expectedMs"];
+  // LoadEstimateSource: HISTORY | PROFILE_DEFAULT.
+  optional string expected_source = 5 [json_name = "expectedSource"];
+}
+
+message OperatingIndexingView {
+  // IndexingState: IDLE | RUNNING | SLOWED | PAUSED.
+  string state = 1 [json_name = "state"];
+  // IndexingReason tokens in precedence order: game_mode, gpu_busy_external, energy_saver,
+  // chat_generating.
+  repeated string reasons = 2 [json_name = "reasons"];
+  optional string reason_code = 3 [json_name = "reasonCode"];
+  string since = 4 [json_name = "since"];
+  // BulkWorkKind: INDEXING | VDU.
+  repeated string affects = 5 [json_name = "affects"];
+  int64 pending_jobs = 6 [json_name = "pendingJobs"];
+  optional string aging_release_at = 7 [json_name = "agingReleaseAt"];
+  string sampled_at = 8 [json_name = "sampledAt"];
+}
+
+message OperatingGpuView {
+  // Profile: P16_PLUS | P12 | P8 | NO_GPU | UNRESOLVED.
+  string profile = 1 [json_name = "profile"];
+  // ProfileSource: MEASURED | USER_OVERRIDE.
+  optional string profile_source = 2 [json_name = "profileSource"];
+  optional string adapter = 3 [json_name = "adapter"];
+  optional int64 adapter_total_bytes = 4 [json_name = "adapterTotalBytes"];
+  optional int64 adapter_free_bytes = 5 [json_name = "adapterFreeBytes"];
+  optional int64 our_dedicated_bytes = 6 [json_name = "ourDedicatedBytes"];
+  optional int64 our_shared_bytes = 7 [json_name = "ourSharedBytes"];
+  // Adapter use minus our processes' dedicated use (PDH only): the external-use reading.
+  optional int64 external_used_bytes = 13 [json_name = "externalUsedBytes"];
+  optional bool spill_suspected = 8 [json_name = "spillSuspected"];
+  // GpuMemorySource: PDH | NVML | NONE.
+  string source = 9 [json_name = "source"];
+  optional string sampled_at = 10 [json_name = "sampledAt"];
+  optional int64 age_ms = 11 [json_name = "ageMs"];
+  bool stale = 12 [json_name = "stale"];
+}
+
+message OperatingDegradationView {
+  // DegradationCode token: user_setting_unmet | device_below_p8 | exit_ledger_unwritable |
+  // child_survived.
+  string code = 1 [json_name = "code"];
+  optional string cause = 2 [json_name = "cause"];
+  // DegradationScope: SEARCH | RAG | CHAT | INDEXING | RUNTIME.
+  string scope = 3 [json_name = "scope"];
+  string reason_code = 4 [json_name = "reasonCode"];
+  string since = 5 [json_name = "since"];
+  string last_seen_at = 6 [json_name = "lastSeenAt"];
+  int64 count = 7 [json_name = "count"];
+}
+
+message OperatingFreshnessView {
+  int64 stale_after_ms = 1 [json_name = "staleAfterMs"];
+  // OperatingBlock tokens: chat | indexing | gpu.
+  repeated string stale_sources = 2 [json_name = "staleSources"];
 }
 
 // Tempdoc 630 — OS energy-intent snapshot (PowerStatusView record).
@@ -186,6 +293,14 @@ message CoreIndexView {
   // unmerged index.
   int64 index_max_doc = 16 [json_name = "indexMaxDoc"];
   int64 index_num_docs = 17 [json_name = "indexNumDocs"];
+  // Task t-20261013-ef3c41: true when indexedDocuments and searchableDocuments are NOT counts — the
+  // index could not be counted and no earlier count exists. Both then carry 0 for older readers; a
+  // surface that knows this field shows the count as checking/unknown, never as an empty index.
+  // Absent or false means the counts are known.
+  bool indexed_documents_unknown = 18 [json_name = "indexedDocumentsUnknown"];
+  // Spec E step E1: whether the VDU backlog (pendingVduCount) can drain right now. Set by the Head:
+  // VDU is wired, a vision-capable chat model is configured and no capability block is standing.
+  bool vdu_available = 19 [json_name = "vduAvailable"];
 }
 
 message FailureTrackingView {
@@ -285,6 +400,14 @@ message EnrichmentProgressView {
   // mirroring the Java constants and drifting.
   int32 chunk_min_chars = 23 [json_name = "chunkMinChars"];
   double vector_ready_percent = 24 [json_name = "vectorReadyPercent"];
+  // Spec E step E0b: whole documents BOTH embedded and sparse-encoded, one joint Lucene count (the
+  // S5 throughput unit). Not derivable from the per-stage counters above.
+  int64 embedded_and_sparse_count = 25 [json_name = "embeddedAndSparseCount"];
+  // Spec E step E1: whether each stage can drain its backlog right now, by the loop's own provider
+  // checks. Operating status skips a backlog in a disabled or unavailable stage when deciding IDLE.
+  bool embedding_available = 26 [json_name = "embeddingAvailable"];
+  bool splade_available = 27 [json_name = "spladeAvailable"];
+  bool ner_available = 28 [json_name = "nerAvailable"];
 }
 
 message StageCompletenessView {
@@ -544,11 +667,14 @@ message GpuStatusView {
 // (needs admin). NOT_APPLICABLE (the volume cannot be OS-encrypted at all) is deliberately distinct
 // from UNKNOWN (indeterminate) — only the latter is a case elevation could resolve. This is a `string`
 // rather than a proto enum precisely so the state set can grow without a wire-shape change.
+// probed_at_ms (task b6d536 b101): when the probe that gave this value read the volume (epoch ms);
+// the volume is read at most once per ten minutes, and a value kept after a failed probe keeps it.
 message AtRestProtectionView {
   optional string disk_encryption = 1 [json_name = "diskEncryption"];
   optional string source = 2 [json_name = "source"];
   optional string confidence = 3 [json_name = "confidence"];
   bool quality_known = 4 [json_name = "qualityKnown"];
+  optional int64 probed_at_ms = 5 [json_name = "probedAtMs"];
 }
 
 // Tempdoc 629 (#2): conversation (AUTHORED-store) encryption state.

@@ -33,6 +33,18 @@ public final class RootWatcherRegistry {
   private static final Logger log = LoggerFactory.getLogger(RootWatcherRegistry.class);
 
   private final Map<Path, Subscription> subscriptions = new ConcurrentHashMap<>();
+  /**
+   * Task t-20261013-ef3c41, round 5 (S8): roots whose watch waits for the volume recorded for them
+   * to be back at their path, with the collection each was asked for ({@code ""} for none).
+   */
+  private final Map<Path, String> awaitingVolume = new ConcurrentHashMap<>();
+  /**
+   * Round 8 (S8): the removal count at which each root was last unwatched, the person's removal,
+   * so work that captured {@link #removalMark()} before it can tell the root was removed since,
+   * even when it was added again in between.
+   */
+  private final Map<Path, Long> removedAt = new ConcurrentHashMap<>();
+  private long removals;
   private final WorkerMethvinWatcher watcher;
 
   public RootWatcherRegistry() {
@@ -103,7 +115,52 @@ public final class RootWatcherRegistry {
     } else {
       log.debug("Root watcher subscription replaced for {}", normalized);
     }
+    awaitingVolume.remove(normalized);
     return new WatchResult(true, null);
+  }
+
+  /**
+   * Holds the watch of {@code root} until the volume recorded for it is back at its path (task
+   * t-20261013-ef3c41, round 5, S8): the folder there now is another volume, whose files must not
+   * be indexed into the root, so no watcher is registered on it. A watch the root already had is
+   * retired. {@link #resumeAwaitingVolume} registers it once a walk or sync finds the volume back.
+   */
+  synchronized WatchResult watchWhenVolumeReturns(Path root, String collection) {
+    Path normalized = root.toAbsolutePath().normalize();
+    Subscription prior = subscriptions.remove(normalized);
+    if (prior != null) {
+      retireAndDrain(prior);
+      if (watcher != null) {
+        watcher.unregisterRoot(normalized);
+      }
+    }
+    awaitingVolume.put(normalized, collection == null ? "" : collection);
+    log.info("Root watcher waits for the volume first seen at {}; another volume is there now",
+        normalized);
+    return new WatchResult(false, "ROOT_NOT_DIRECTORY: " + normalized
+        + " is not on the volume it was first seen on; watching starts when that volume is back");
+  }
+
+  /** Whether the watch of {@code root} is held until its recorded volume is back. */
+  boolean awaitsVolume(Path root) {
+    return awaitingVolume.containsKey(root.toAbsolutePath().normalize());
+  }
+
+  /**
+   * Registers the held watch of {@code root}, if there is one, now that the volume recorded for it
+   * is back at its path. Returns whether a watch was registered.
+   */
+  synchronized boolean resumeAwaitingVolume(Path root) {
+    Path normalized = root.toAbsolutePath().normalize();
+    String collection = awaitingVolume.get(normalized);
+    if (collection == null) {
+      return false;
+    }
+    WatchResult result = watch(normalized.toString(), collection);
+    if (result.watching()) {
+      log.info("Root watcher resumed: the volume first seen at {} is back", normalized);
+    }
+    return result.watching();
   }
 
   synchronized boolean unwatch(String rootPath) {
@@ -113,6 +170,11 @@ public final class RootWatcherRegistry {
     } catch (InvalidPathException e) {
       return false;
     }
+    removedAt.put(normalized, ++removals);
+    if (watcher != null) {
+      watcher.forgetRoot(normalized);
+    }
+    boolean wasAwaiting = awaitingVolume.remove(normalized) != null;
     Subscription removed = subscriptions.remove(normalized);
     if (removed != null) {
       retireAndDrain(removed);
@@ -125,12 +187,51 @@ public final class RootWatcherRegistry {
           normalized);
       return true;
     }
-    return false;
+    return wasAwaiting;
   }
 
-  @SuppressWarnings("unused") // RootWatcherRegistryTest only — see UnreferencedCodeTest exemption.
+  /** The current removal count; {@link #removedSince} compares against it. */
+  synchronized long removalMark() {
+    return removals;
+  }
+
+  /** Whether {@code root} was unwatched (removed by the person) after {@code mark} was taken. */
+  boolean removedSince(Path root, long mark) {
+    Long at = removedAt.get(root.toAbsolutePath().normalize());
+    return at != null && at > mark;
+  }
+
+  /**
+   * {@link #watch} unless {@code root} was removed after {@code mark}, checked under the same
+   * monitor as {@link #unwatch}, so a removed root never gets its watcher back from work that
+   * started before the removal (round 8, S8).
+   */
+  synchronized WatchResult watchUnlessRemovedSince(Path root, String collection, long mark) {
+    if (removedSince(root, mark)) {
+      return new WatchResult(false, "ROOT_REMOVED: " + root + " was removed");
+    }
+    return watch(root.toString(), collection);
+  }
+
+  @SuppressWarnings("unused") // RootWatcherRegistryTest only; frozen in UnreferencedCodeTest's store.
   Set<Path> watchedRoots() {
     return Collections.unmodifiableSet(subscriptions.keySet());
+  }
+
+  /**
+   * Round 8 (refined decision 2): whether a watched root, or a root whose watch is held for its
+   * volume, is at or above {@code folder}, so the folder is answered for by that declared root.
+   */
+  boolean declaresRootCovering(Path folder) {
+    if (folder == null) return false;
+    Path normalized = folder.toAbsolutePath().normalize();
+    for (Path root : subscriptions.keySet()) {
+      if (normalized.startsWith(root)) return true;
+    }
+    for (Path root : awaitingVolume.keySet()) {
+      if (normalized.startsWith(root)) return true;
+    }
+    return false;
   }
 
   /** Immutable registration snapshot used by a root reconciliation admission. */

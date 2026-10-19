@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:114bfca66efcf8587aa4e5aaf3db7527a6da4e90a718af1f0ecbc138ba3dd5b0"
+  },
+  "createdAt": "2026-10-07T07:56:18.971Z",
+  "revision": "4cdbcfe793ef5c7a34ec5c5c74fa6b0be49d7460",
+  "tree": "7714abf90ff92d8cf9b286b47424bad312b6a1bd",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.app.engine.GameDetectionSettingsApiTest.settingsApiTurnsDetectionOffAndBackOnWithoutRestart\" --tests \"io.justsearch.app.engine.GameDetectionSettingsApiTest.settingsApiRejectsInvalidDetectionWithoutCommit\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10967,
+      "environment": {
+        "LIGHTGBM_NATIVE_LIB_PATH": "F:\\justsearch-public\\.claude\\worktrees\\b6d536-bulk-gate-2\\build\\test-intent-native\\run-Ky2TLK"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/app/engine/GameDetectionSettingsApiTest.java#settingsApiTurnsDetectionOffAndBackOnWithoutRestart",
+      "file": "modules/ui/src/test/java/io/justsearch/app/engine/GameDetectionSettingsApiTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4070c0c8e02b893e652e5ee29889e1671a1696bf6f5307d43f21f505fec03476",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "settingsApiTurnsDetectionOffAndBackOnWithoutRestart(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/app/engine/GameDetectionSettingsApiTest.java#settingsApiRejectsInvalidDetectionWithoutCommit",
+      "file": "modules/ui/src/test/java/io/justsearch/app/engine/GameDetectionSettingsApiTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4070c0c8e02b893e652e5ee29889e1671a1696bf6f5307d43f21f505fec03476",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "settingsApiRejectsInvalidDetectionWithoutCommit(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4cdbcfe79",
+    "revision": "4cdbcfe793ef5c7a34ec5c5c74fa6b0be49d7460",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.app.engine.GameDetectionSettingsApiTest.settingsApiTurnsDetectionOffAndBackOnWithoutRestart\" --tests \"io.justsearch.app.engine.GameDetectionSettingsApiTest.settingsApiRejectsInvalidDetectionWithoutCommit\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 18627,
+        "environment": {
+          "LIGHTGBM_NATIVE_LIB_PATH": "F:\\justsearch-public\\.claude\\worktrees\\b6d536-bulk-gate-2\\build\\test-intent-native\\run-x0zR2Y"
+        }
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/app/engine/GameDetectionSettingsApiTest.java#settingsApiTurnsDetectionOffAndBackOnWithoutRestart",
+        "classification": "assertion",
+        "detail": "settingsApiTurnsDetectionOffAndBackOnWithoutRestart(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: settings API off resumes bulk on the next tick without a restart ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/app/engine/GameDetectionSettingsApiTest.java#settingsApiRejectsInvalidDetectionWithoutCommit",
+        "classification": "assertion",
+        "detail": "settingsApiRejectsInvalidDetectionWithoutCommit(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: invalid game-detection values must be refused ==> expected: <400> but was: <200>"
+      }
+    ]
+  },
+  "digest": "sha256:92a3878461e9eb89672f870d0f2c5bdb4ce7871e8a29ac9932689d58f4707c73"
+}

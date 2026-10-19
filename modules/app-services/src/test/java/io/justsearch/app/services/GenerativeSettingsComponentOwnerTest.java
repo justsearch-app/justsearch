@@ -32,6 +32,37 @@ import org.mockito.ArgumentCaptor;
 final class GenerativeSettingsComponentOwnerTest {
   @TempDir Path directory;
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "heldPictureBatchRefusesSettingsWithoutReplacingItsChild({0})")
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void heldPictureBatchRefusesSettingsWithoutReplacingItsChild(boolean enabled) throws Exception {
+    try (var seam = new io.justsearch.app.services.chat.ManagedChatSeam(directory, 0);
+        var _ = seam.manager().chatHolds().holdVdu("settings-vdu-check")) {
+      var desired = io.justsearch.configuration.resolved.ConfigStore.global().get();
+      var handle = mock(ComponentHandle.class);
+      var spec = new ComponentSpec("generative", false, Set.of(),
+          ComponentSpec.ComposeCapability.IN_PLACE, Duration.ofMinutes(3), 1);
+      var before = new EngineComponentSnapshot.Component(spec, ComponentState.READY, null,
+          Instant.parse("2026-09-23T00:00:00Z"), 1L, "A", "A", null, 0, "VDU");
+      var staging = new EngineComponentSnapshot.Component(spec, ComponentState.RELOADING, null,
+          before.stateSince(), 1L, "A", "A", null, 0, "preparing");
+      when(handle.snapshot()).thenReturn(before, staging);
+      when(handle.transitionIfUnchanged(eq(before), eq(ComponentState.RELOADING), any(), any()))
+          .thenReturn(true);
+      when(handle.transitionIfUnchanged(eq(staging), eq(before.state()), eq(before.reasonCode()),
+          eq(before.evidence()))).thenReturn(true);
+      var settings = new UiSettings();
+      settings.setChatEnabled(enabled);
+      var owner = new GenerativeSettingsComponentOwner(seam.manager(), handle, directory, false);
+      int launches = seam.models().size();
+      assertThrows(SettingsCommitOwner.Refused.class,
+          () -> owner.prepare(settings, desired, Set.of("chatEnabled"), SettingsCandidateContext.NONE).abort());
+      assertEquals(launches, seam.models().size(), "settings must not replace the held child");
+      org.junit.jupiter.api.Assertions.assertTrue(seam.manager().isOnline());
+      org.junit.jupiter.api.Assertions.assertTrue(seam.manager().currentConfig().vduMode());
+      verify(handle).transitionIfUnchanged(staging, before.state(), before.reasonCode(), before.evidence());
+    }
+  }
+
   @Test
   void transientProfilePreparesTheModelAndProjectorPairWithoutChangingResolvedSettings()
       throws Exception {
@@ -44,6 +75,9 @@ final class GenerativeSettingsComponentOwnerTest {
     Files.writeString(projector, "projector");
     Path executable = directory.resolve("llama-server.exe");
     Files.writeString(executable, "server");
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
+      org.junit.jupiter.api.Assertions.assertTrue(executable.toFile().setExecutable(true, true));
+    }
     ResolvedConfig desired = ResolvedConfig.builder()
         .putDefault("justsearch.models.dir", models.toString())
         .putDefault("justsearch.server.exe", executable.toString())
@@ -127,6 +161,44 @@ final class GenerativeSettingsComponentOwnerTest {
     assertEquals(ComponentState.ABSENT, candidate.observation().state());
     assertEquals("A", candidate.observation().appliedVersion());
     org.junit.jupiter.api.Assertions.assertNotEquals("A", candidate.observation().desiredVersion());
+  }
+
+  /*
+   * Spec A §7.2: a server stepped down to a smaller window serves with the context_reduced notice.
+   * The step-down is sticky for an unchanged configuration, so the candidate a settings apply
+   * relaunches comes back on the reduced window, and the READY observation the apply publishes
+   * must still carry the notice rather than a bare READY.
+   */
+  @Test
+  void aSettingsApplyKeepsTheContextReducedNoticeOfASteppedDownServer() throws Exception {
+    var desired = ResolvedConfig.builder().putDefault("justsearch.llm.enabled", "true").build();
+    var manager = mock(InferenceLifecycleManager.class);
+    var prepared = mock(InferenceLifecycleManager.PreparedConfigApply.class);
+    when(manager.prepareResolvedConfig(any(), eq(desired), eq(true), eq(false))).thenReturn(prepared);
+    when(prepared.targetsOnline()).thenReturn(true);
+    when(manager.launchedContextWindow()).thenReturn(
+        new io.justsearch.app.api.OnlineAiRuntimeIntrospection.ContextWindow(
+            4096, "stepped-from:8192", null, 1, "q8_0"));
+    var handle = mock(ComponentHandle.class);
+    var spec = new ComponentSpec("generative", false, Set.of(),
+        ComponentSpec.ComposeCapability.IN_PLACE, Duration.ofMinutes(3), 1);
+    var before = new EngineComponentSnapshot.Component(spec, ComponentState.READY,
+        "inference.context_reduced", Instant.parse("2026-09-23T00:00:00Z"), 1L, "A", "A", null,
+        0, "serving");
+    var staging = new EngineComponentSnapshot.Component(spec, ComponentState.RELOADING, null,
+        before.stateSince(), before.stateSinceMonotonicNanos(), "A", "A", null, 0, "preparing");
+    when(handle.snapshot()).thenReturn(before, staging);
+    when(handle.transitionIfUnchanged(eq(before), eq(ComponentState.RELOADING),
+        any(), any())).thenReturn(true);
+    var settings = new UiSettings();
+    settings.setChatEnabled(true);
+
+    var candidate = new GenerativeSettingsComponentOwner(manager, handle, directory, false)
+        .prepare(settings, desired, Set.of("theme"), SettingsCandidateContext.NONE);
+
+    assertEquals(ComponentState.READY, candidate.observation().state());
+    assertEquals("inference.context_reduced", candidate.observation().reasonCode(),
+        "the relaunched candidate serves on the reduced window, so the notice stays");
   }
 
   @Test

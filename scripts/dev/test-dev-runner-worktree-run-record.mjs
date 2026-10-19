@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 //
 // The run record of a stack started from a worktree. The dev-runner keeps its state under the
 // MAIN checkout, but a stack launched from a worktree used to store `active.runPath` relative to
@@ -73,8 +74,29 @@ const sleepers = [];
 function spawnAliveProc() {
   // The holder's "supervisor": a harmless child a proceed may kill (never this test process).
   const p = spawn(process.execPath, ['-e', 'setTimeout(()=>{}, 600000)'], { stdio: 'ignore' });
+  p.recordedIdentity = recordedIdentity(p.pid);
   sleepers.push(p);
   return p.pid;
+}
+
+/**
+ * The runner identity a current dev-runner records at spawn (pid + creation FILETIME + executable):
+ * a stop kills a recorded process only on that identity (Spec F §5.3, S17). Null when the pid names
+ * no process.
+ */
+function recordedIdentity(pid) {
+  // Portable ownership refusals need the live PID, but never a Windows termination identity.
+  if (process.platform === 'linux') {
+    const seen = require('./lib/process-identity.cjs').readLinuxProcess(pid);
+    return seen?.present ? { pid, processIdentity: seen.processIdentity, executable: seen.executable } : null;
+  }
+  if (process.platform !== 'win32') return null;
+  if (!Number.isInteger(pid) || pid <= 0) return null;
+  const res = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    `$p = Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if ($p) { $p.CreationDate.ToFileTimeUtc().ToString() + '|' + $p.ExecutablePath }`],
+  { encoding: 'utf8', windowsHide: true, timeout: 15_000 });
+  const [creation, executable] = String(res.stdout || '').trim().split('|');
+  return /^[1-9]\d*$/.test(creation ?? '') ? { pid, creationFileTimeUtc: creation, executable: executable || null } : null;
 }
 function alive(pid) { try { process.kill(pid, 0); return true; } catch { return false; } }
 
@@ -98,7 +120,8 @@ function craftWorktreeStack({ runnerPid, owner = 'alive', touchAgoMs = 300, leas
   fs.rmSync(runDir, { recursive: true, force: true });
   if (runRecord) {
     fs.mkdirSync(runDir, { recursive: true });
-    fs.writeFileSync(runFile, JSON.stringify({ schemaVersion: 1, runId: RUN_ID, pids: { runnerPid, backend: 999_999, frontend: 999_998 } }));
+    fs.writeFileSync(runFile, JSON.stringify({ schemaVersion: 1, runId: RUN_ID, pids: { runnerPid, backend: 999_999, frontend: 999_998 },
+      identities: { runner: recordedIdentity(runnerPid) } }));
   }
   fs.writeFileSync(activePath, JSON.stringify({
     kind: 'backend-shared-lease.v1', schemaVersion: 1, runId: RUN_ID,
@@ -195,9 +218,9 @@ const tests = [
     assert.equal(stop?.code, 'OWNER_CONFLICT');
   }],
 
-  ['an unreadable run record behind an EXPIRED lease is still reclaimable (no evidence of life left)', async () => {
+  ['an unreadable run record behind an EXPIRED lease is reclaimable with explicit warn', async () => {
     craftWorktreeStack({ runnerPid: null, runRecord: false, leaseMsAhead: -60_000 });
-    const r = await acquireAdmission({ takeover: 'deny', sessionId: INTRUDER.sessionId, callerIdentity: INTRUDER });
+    const r = await acquireAdmission({ takeover: 'warn', sessionId: INTRUDER.sessionId, callerIdentity: INTRUDER });
     assert.equal(r.action, 'proceed');
     assert.equal(r.verdict, 'RECLAIM_DEAD');
   }],
@@ -208,7 +231,7 @@ const tests = [
     assert.equal(r.action, 'proceed');
     assert.equal(r.disposition, 'owner_restart', JSON.stringify(r));
     assert.equal(stopDisposition(), 'owner_restart', 'the stop report records owner_restart');
-  }],
+  }, 'Windows identity-checked stop'],
 
   ['stop reports over worktree-started stacks record idle_takeover / abandoned_reclaim, never stale_reclaim', async () => {
     craftWorktreeStack({ runnerPid: spawnAliveProc(), touchAgoMs: 10_000 });
@@ -217,10 +240,10 @@ const tests = [
     assert.equal(stopDisposition(), 'idle_takeover');
 
     craftWorktreeStack({ runnerPid: spawnAliveProc(), owner: 'ended' });
-    const abandoned = await acquireAdmission({ takeover: 'deny', sessionId: INTRUDER.sessionId, callerIdentity: INTRUDER });
+    const abandoned = await acquireAdmission({ takeover: 'warn', sessionId: INTRUDER.sessionId, callerIdentity: INTRUDER });
     assert.equal(abandoned.disposition, 'abandoned_reclaim', JSON.stringify(abandoned));
     assert.equal(stopDisposition(), 'abandoned_reclaim');
-  }],
+  }, 'Windows identity-checked stop'],
 
   ['the MCP ownership projection reads a worktree-started run record and fails safe on an unreadable one', async () => {
     const { buildOwnershipProjection } = await import(pathToFileURL(path.join(__dirname, 'justsearch-dev-mcp', 'server.mjs')).href);
@@ -244,12 +267,13 @@ const tests = [
   }],
 ];
 
-let pass = 0, fail = 0;
-for (const [name, fn] of tests) {
+let pass = 0, fail = 0, skipped = 0;
+for (const [name, fn, prerequisite] of tests) {
+  if (prerequisite && !['win32', 'linux'].includes(process.platform)) { skipped++; console.log(`  SKIP  ${name}: ${prerequisite}`); continue; }
   try { await fn(); console.log(`  PASS  ${name}`); pass++; }
   catch (e) { console.error(`  FAIL  ${name}: ${e.message}`); fail++; }
 }
-for (const p of sleepers) { try { process.kill(p.pid); } catch {} }
+for (const p of sleepers) { try { p.kill(); } catch {} }
 try { fs.rmSync(STATE, { recursive: true, force: true }); } catch {}
-console.log(`test-dev-runner-worktree-run-record: ${pass} passed, ${fail} failed`);
+console.log(`test-dev-runner-worktree-run-record: ${pass} passed, ${fail} failed${skipped ? `, ${skipped} skipped (Windows identity-checked stop)` : ''}`);
 process.exit(fail === 0 ? 0 : 1);

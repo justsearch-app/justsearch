@@ -1,0 +1,103 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-07T15:19:08.750Z",
+  "revision": "addcf3b7341fc44f3abf666b29fac57a443f278e",
+  "tree": "43c20db16ce8f0218a1ff546088a203da61ffc13",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::actor_hold_witness_tests::hold_returns_at_once_and_engine_stays_supervised\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5651
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::actor_hold_witness_tests::release_after_failed_prepare_resumes_the_same_actor\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 596
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater_actor_hold_witness_tests.rs#updater::actor_hold_witness_tests::hold_returns_at_once_and_engine_stays_supervised",
+      "file": "modules/shell/src-tauri/src/updater_actor_hold_witness_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:4ce011753734c6bf531b146dd359f78d10b56e271d804f2b9b37e540fb949be9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::actor_hold_witness_tests::hold_returns_at_once_and_engine_stays_supervised",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_actor_hold_witness_tests.rs#updater::actor_hold_witness_tests::release_after_failed_prepare_resumes_the_same_actor",
+      "file": "modules/shell/src-tauri/src/updater_actor_hold_witness_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:4ce011753734c6bf531b146dd359f78d10b56e271d804f2b9b37e540fb949be9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::actor_hold_witness_tests::release_after_failed_prepare_resumes_the_same_actor",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "547b96083",
+    "revision": "547b960835e03b0437052dc744c70c08b3c3ef19",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/b6d536-shell-actor-witness-before.patch",
+        "contentDigest": "sha256:0b383d837149ecd5a09023c1f94f5ea21b4ee97d42cbd3ea445a725c4d8798ac"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::actor_hold_witness_tests::hold_returns_at_once_and_engine_stays_supervised\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 14283
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::actor_hold_witness_tests::release_after_failed_prepare_resumes_the_same_actor\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 697
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/updater_actor_hold_witness_tests.rs#updater::actor_hold_witness_tests::hold_returns_at_once_and_engine_stays_supervised",
+        "classification": "assertion",
+        "detail": "updater::actor_hold_witness_tests::hold_returns_at_once_and_engine_stays_supervised:  ---- updater::actor_hold_witness_tests::hold_returns_at_once_and_engine_stays_supervised stdout ----\nwitness child started: pid=31516, creationFileTime=134358599468526713\nwitness original actor entered: ThreadId(3)\nhold result=Ok(()), elapsed=20.2744ms, continues=false, actor=false, live=true\n\nthread 'updater::actor_hold_witness_tests::hold_returns_at_once_and_engine_stays_supervised' (37728) panicked at src\\up"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/updater_actor_hold_witness_tests.rs#updater::actor_hold_witness_tests::release_after_failed_prepare_resumes_the_same_actor",
+        "classification": "assertion",
+        "detail": "updater::actor_hold_witness_tests::release_after_failed_prepare_resumes_the_same_actor:  ---- updater::actor_hold_witness_tests::release_after_failed_prepare_resumes_the_same_actor stdout ----\nwitness child started: pid=36760, creationFileTime=134358599475262464\nwitness original actor entered: ThreadId(3)\nfailed prepare=Err(\"injected failed prepare; Engine replacement remains held; update recovery is required\"), released=false, same_actor=false, live=true, resumes=0\n\nthread 'updater::actor_hold_"
+      }
+    ]
+  },
+  "digest": "sha256:d4defab86625302b715bf871c5c79613916f22bef0798a01b9ce9821e1dda791"
+}

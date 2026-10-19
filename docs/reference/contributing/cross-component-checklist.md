@@ -23,7 +23,7 @@ If yes, use this checklist.
 
 - [ ] New files staged to correct location
 - [ ] Task dependencies correct (use `dependsOn`, `mustRunAfter`)
-- [ ] Clean build tested (`./gradlew clean build`)
+- [ ] Clean build tested (`node scripts/lib/tool-invoker.cjs gradle clean build`)
 - [ ] Verify staged files exist after build
 
 ## Tauri Shell (Rust)

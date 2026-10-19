@@ -36,7 +36,7 @@ final class CudaRuntimeDetection {
     }
 
     // Check if ggml-cuda.dll exists
-    Path ggmlCuda = serverDir.resolve("ggml-cuda.dll");
+    Path ggmlCuda = serverDir.resolve(io.justsearch.configuration.NativeTargets.forTarget("windows-x86_64").libraryName("ggml-cuda"));
     if (!Files.exists(ggmlCuda)) {
       LOG.warn(
           "GPU mode requested (-ngl > 0) but ggml-cuda.dll not found in {}. "

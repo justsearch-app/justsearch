@@ -1,10 +1,12 @@
 """V1 feasibility spike: can the local model extract structured filters from NL queries?
 
-Calls llama-server directly with GBNF-constrained JSON output.
-No JustSearch backend needed — only llama-server on the specified port.
+Calls the chat model with GBNF-constrained JSON output through the Engine's
+/v1 proxy on the specified port (the backend's API port by default). The proxy
+forwards the request body unchanged and holds a generation lease per call, so a
+reconfigure drains the reply instead of cutting it.
 
 Usage:
-    python -m jseval qu-spike [--port 8080] [--with-grounding] [--json] [--verbose]
+    python -m jseval qu-spike [--port 33221] [--with-grounding] [--json] [--verbose]
 """
 
 from __future__ import annotations
@@ -277,7 +279,8 @@ def print_summary(results: list[dict], json_output: bool) -> None:
 
 
 @click.command("qu-spike")
-@click.option("--port", default=8080, help="llama-server port")
+@click.option("--port", default=33221, show_default=True,
+              help="Engine API port whose /v1 proxy reaches the chat model")
 @click.option("--with-grounding", is_flag=True, help="Inject index facet values into prompt")
 @click.option("--prompt-version", default=2, type=int, help="Prompt version (1 or 2)")
 @click.option("--thinking", is_flag=True, help="Enable model thinking/reasoning mode")

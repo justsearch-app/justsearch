@@ -1,0 +1,105 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T09:16:47.738Z",
+  "revision": "98fd416d05d602854a605f310c9e176758a39264",
+  "tree": "2c086886619fd428e91d1d110f67a2ddb3a429ed",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerChildControlTest\" --tests \"io.justsearch.app.inference.SelfTestGpuBarrierTest\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.aSurvivingServerIsRetriedAndBlocksEveryStartUntilItEnds\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8495
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppTerminalStopTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4004
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerChildControlTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerChildControlTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e4ff6ee7e4d1afd5a0196bda9ec9761fd93c411ce8b485a6e7ac0bb51bc5c06",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyControllerStepStopsForAKnownSpecificReason()",
+          "status": "passed"
+        },
+        {
+          "name": "aRequestedStopIsRecordedWithItsReasonAndIsNotACrash()",
+          "status": "passed"
+        },
+        {
+          "name": "anExitNobodyAskedForIsStillACrash()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestGpuBarrierTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestGpuBarrierTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eb290b5a35a02901f96eb8e15f51df0eac5a959275a037bb1b4d80fd9573573f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theCandidateIsStoppedForTheSelfTestAndReleasedBeforeTheMainStart()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppTerminalStopTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppTerminalStopTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bb7c184829c86b8d9a755ea778032a937428bb818bd676403dcfdd626e2de523",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyShutdownReasonMapsToItsRecordedStop()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#aSurvivingServerIsRetriedAndBlocksEveryStartUntilItEnds",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cbd1a0578bdacfa0eaf98d78412968d1829f88f9f018c64ce7a24a7c120bb46d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSurvivingServerIsRetriedAndBlocksEveryStartUntilItEnds(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:d2a30cc54cc6183ebee657c8cc3f3f0ce0ed054868a00c52744bbc557bb83824"
+}

@@ -508,6 +508,21 @@
       "config": {
         "register": "governance/engine-ports.v1.json"
       }
+    },
+    {
+      "id": "test-intent",
+      "title": "Test intent (tempdoc 966 D1) — every expected outcome that enters, changes or leaves the product test suite names a source of intent and carries a non-author acceptance record bound to the exact flagged content",
+      "enforcer": "scripts/governance/gates/test-intent/enforcer.mjs",
+      "ruleDescriptions": "scripts/governance/gates/test-intent/rule-descriptions.mjs",
+      "changesetsDir": "gates/test-intent/.changesets",
+      "classifications": "scripts/governance/gates/test-intent/classifications.mjs",
+      "config": {
+        "rulesDoc": "docs/reference/testing/test-intent.md",
+        "evidenceDir": "gates/test-intent/evidence",
+        "auditEvery": 5,
+        "baseResolution": "the gate's own, not the runner's: pull_request merge-base(origin/$GITHUB_BASE_REF, HEAD), merge_group base_sha, push HEAD^1, local merge-base(origin/main, HEAD); a shallow clone fails closed"
+      },
+      "selfTestFixturesDir": "scripts/governance/_fixtures/test-intent"
     }
   ]
 }

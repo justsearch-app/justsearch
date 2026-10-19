@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 //
 // Tempdoc 606 — hermetic integration test for the admission GATE (acquireAdmission).
 // Drives the REAL acquireAdmission end-to-end against an ISOLATED temp state root
@@ -16,10 +17,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const windows = process.platform === 'win32';
 // Temp state MUST be on the same drive as the repo: acquireAdmission resolves run.json via
 // path.join(mainRepoRoot, runPath), and a cross-drive path.relative yields an absolute path
 // that path.join garbles. Use the worktree's gitignored tmp/ (same F: drive as mainRepoRoot).
@@ -85,8 +87,29 @@ function spawnAliveProc() {
   // A harmless long-lived child whose pid is "alive" for supervisor-liveness, and which
   // stopRun may safely kill on a proceed (it is NOT this test process).
   const p = spawn(process.execPath, ['-e', 'setTimeout(()=>{}, 600000)'], { stdio: 'ignore' });
+  p.recordedIdentity = recordedIdentity(p.pid);
   sleepers.push(p);
   return p.pid;
+}
+
+/**
+ * The runner identity a current dev-runner records at spawn (pid + creation FILETIME + executable):
+ * a stop kills a recorded process only on that identity (Spec F §5.3, S17). Null when the pid names
+ * no process.
+ */
+function recordedIdentity(pid) {
+  // Refusal-only gate checks need liveness, not the Windows stop's native process identity.
+  if (process.platform === 'linux') {
+    const seen = require('./lib/process-identity.cjs').readLinuxProcess(pid);
+    return seen?.present ? { pid, processIdentity: seen.processIdentity, executable: seen.executable } : null;
+  }
+  if (!windows) return null;
+  if (!Number.isInteger(pid) || pid <= 0) return null;
+  const res = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    `$p = Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if ($p) { $p.CreationDate.ToFileTimeUtc().ToString() + '|' + $p.ExecutablePath }`],
+  { encoding: 'utf8', windowsHide: true, timeout: 15_000 });
+  const [creation, executable] = String(res.stdout || '').trim().split('|');
+  return /^[1-9]\d*$/.test(creation ?? '') ? { pid, creationFileTimeUtc: creation, executable: executable || null } : null;
 }
 
 function writeTable({ holderAlive }) {
@@ -109,7 +132,9 @@ function craft({ runnerPid, leaseMsAhead = 30_000, owner = 'alive', touchAgoMs =
   const runDir = path.join(runsDir, runId);
   fs.mkdirSync(runDir, { recursive: true });
   const runFile = path.join(runDir, 'run.json');
-  fs.writeFileSync(runFile, JSON.stringify({ runId, pids: { runnerPid, backend: 999999, frontend: 999998 } }));
+  fs.rmSync(path.join(runDir, 'stop-report.json'), { force: true }); // no report left over from an earlier case
+  fs.writeFileSync(runFile, JSON.stringify({ runId, pids: { runnerPid, backend: 999999, frontend: 999998 },
+    identities: { runner: recordedIdentity(runnerPid) } }));
   fs.writeFileSync(activePath, JSON.stringify({
     kind: 'backend-shared-lease.v1', schemaVersion: 1, runId,
     // runPath is resolved by acquireAdmission via path.join(mainRepoRoot, runPath).
@@ -129,6 +154,16 @@ function craft({ runnerPid, leaseMsAhead = 30_000, owner = 'alive', touchAgoMs =
 
 function clearActive() { try { fs.unlinkSync(activePath); } catch {} }
 function ago(ms) { return new Date(Date.now() - ms).toISOString(); }
+const windowsNative = (name, fn) => [name, fn, true];
+
+function staleOwnershipCases() {
+  return [
+    ['dead supervisor, owner ended', () => craft({ runnerPid: 999_997, owner: 'ended', touchAgoMs: 300, leaseMsAhead: -5_000 })],
+    ['legacy holder (no owner block), lapsed lease', () => craft({ runnerPid: spawnAliveProc(), holderOwner: null, leaseMsAhead: -5_000 })],
+    ['override owner (no process identity: unknown), lapsed lease', () => craft({ runnerPid: spawnAliveProc(), holderOwner: { harness: 'unknown', pid: null, creationTime: null, key: 'override-some-other' }, leaseMsAhead: -5_000 })],
+    ['live owner, lapsed lease', () => craft({ runnerPid: spawnAliveProc(), owner: 'alive', touchAgoMs: 300, leaseMsAhead: -5_000 })],
+  ];
+}
 
 const tests = [
   ['NO_OWNER → proceed (no disposition)', async () => {
@@ -138,20 +173,20 @@ const tests = [
     assert.equal(r.disposition, undefined);
   }],
 
-  ['dead supervisor → proceed stale_reclaim', async () => {
+  ['dead supervisor + deny refuses reclaim', async () => {
     craft({ runnerPid: 999999, owner: 'alive', touchAgoMs: 500 }); // dead supervisor pid
     const r = await acquireAdmission({ takeover: 'deny' });
-    assert.equal(r.action, 'proceed');
-    assert.equal(r.disposition, 'stale_reclaim');
-    assert.ok(!fs.existsSync(activePath), 'active.json cleared on reclaim');
+    assert.equal(r.action, 'conflict');
+    assert.equal(r.disposition, undefined);
+    assert.ok(fs.existsSync(activePath), 'deny preserves previous ownership');
   }],
 
-  ['ABANDONED (holder harness process ended) + deny -> proceed abandoned_reclaim (KEY: deny proceeds)', async () => {
+  ['ABANDONED (holder harness process ended) + deny refuses reclaim', async () => {
     craft({ runnerPid: spawnAliveProc(), owner: 'ended', touchAgoMs: 300 });
     const r = await acquireAdmission({ takeover: 'deny' });
-    assert.equal(r.action, 'proceed');
-    assert.equal(r.disposition, 'abandoned_reclaim');
-    assert.ok(!fs.existsSync(activePath), 'active.json cleared on takeover');
+    assert.equal(r.action, 'conflict');
+    assert.equal(r.disposition, undefined);
+    assert.ok(fs.existsSync(activePath), 'deny preserves previous ownership');
   }],
 
   ['IDLE (harness running, dev-stack touch stale) + deny -> conflict idle_owner', async () => {
@@ -162,12 +197,12 @@ const tests = [
     assert.equal(r.verdict, 'IDLE_HOLD');
   }],
 
-  ['IDLE + warn → proceed idle_takeover', async () => {
+  windowsNative('IDLE + warn → proceed idle_takeover', async () => {
     craft({ runnerPid: spawnAliveProc(), owner: 'alive', touchAgoMs: 10_000 });
     const r = await acquireAdmission({ takeover: 'warn' });
     assert.equal(r.action, 'proceed');
     assert.equal(r.disposition, 'idle_takeover');
-  }],
+  }),
 
   ['ACTIVE (harness running, fresh touch) + deny -> conflict fresh_owner CONTENTION (two owners on start)', async () => {
     craft({ runnerPid: spawnAliveProc(), owner: 'alive', touchAgoMs: 300 });
@@ -177,12 +212,12 @@ const tests = [
     assert.equal(r.verdict, 'CONTENTION');
   }],
 
-  ['ACTIVE + warn → proceed warned_takeover', async () => {
+  windowsNative('ACTIVE + warn → proceed warned_takeover', async () => {
     craft({ runnerPid: spawnAliveProc(), owner: 'alive', touchAgoMs: 300 });
     const r = await acquireAdmission({ takeover: 'warn' });
     assert.equal(r.action, 'proceed');
     assert.equal(r.disposition, 'warned_takeover');
-  }],
+  }),
 
   ['UNKNOWN use (harness running, no touch record) + deny -> conflict CONTENTION (conservative, NOT abandoned)', async () => {
     craft({ runnerPid: spawnAliveProc(), owner: 'alive', touchAgoMs: null });
@@ -199,12 +234,12 @@ const tests = [
     assert.equal(r.verdict, 'CONTENTION');
   }],
 
-  ['self restart: the holder\'s owner key is the caller\'s -> proceed owner_restart even under deny', async () => {
+  windowsNative('self restart: the holder\'s owner key is the caller\'s -> proceed owner_restart even under deny', async () => {
     craft({ runnerPid: spawnAliveProc(), holderOwner: SELF_OWNER, agentSessionId: CALLER_ID, touchAgoMs: 300 });
     const r = await acquireAdmission({ takeover: 'deny' });
     assert.equal(r.action, 'proceed');
     assert.equal(r.disposition, 'owner_restart');
-  }],
+  }),
 
   ['legacy holder (no owner block) carrying the caller\'s own label is an unknown owner, never self -> conflict', async () => {
     craft({ runnerPid: spawnAliveProc(), holderOwner: null, agentSessionId: CALLER_ID });
@@ -257,14 +292,118 @@ const tests = [
     assert.equal(r.action, 'conflict');
     assert.equal(r.reason, 'fresh_owner');
   }],
+
+  // --- Late abandoned reclaims. The owner ended; its supervisor still runs and stopped renewing,
+  // so the lease lapsed after its declared hold. That is an abandoned reclaim, not a stale one,
+  // however long the hold was, and (like an early abandoned reclaim) it is not interference.
+  ['late abandoned, default 30 s lease: ended owner + lapsed lease + live supervisor -> refusal without interference', async () => {
+    const before = interferenceRows().length;
+    craft({ runnerPid: spawnAliveProc(), owner: 'ended', touchAgoMs: 300, durationSec: 30, leaseMsAhead: -5_000 });
+    const r = await acquireAdmission({ takeover: 'deny' });
+    assert.equal(r.action, 'conflict', JSON.stringify(r));
+    assert.equal(r.verdict, 'TAKEOVER_ABANDONED');
+    assert.equal(r.disposition, undefined);
+    assert.equal(r.reason, 'takeover_denied');
+    assert.equal(interferenceRows().length, before, 'no interference row for an abandoned reclaim');
+  }],
+  windowsNative('late abandoned, 600 s declared hold lapsed: abandoned_reclaim, not logged as interference', async () => {
+    const before = interferenceRows().length;
+    craft({ runnerPid: spawnAliveProc(), owner: 'ended', touchAgoMs: 650_000, durationSec: 600, leaseMsAhead: -1_000 });
+    const r = await acquireAdmission({ takeover: 'warn' });
+    assert.equal(r.action, 'proceed', JSON.stringify(r));
+    assert.equal(r.disposition, 'abandoned_reclaim');
+    assert.equal(stopReportDisposition(), 'abandoned_reclaim');
+    assert.equal(interferenceRows().length, before);
+  }),
+  windowsNative('late abandoned + MUST_COMPLETE op in flight is explicitly reclaimed under warn; only the recorded reason changes', async () => {
+    craft({ runnerPid: spawnAliveProc(), owner: 'ended', touchAgoMs: 300, durationSec: 30, leaseMsAhead: -5_000 });
+    writeOpLeases([{ opId: 'mc-1', opClass: 'indexing.migration', criticality: 'MUST_COMPLETE' }]);
+    try {
+      const r = await acquireAdmission({ takeover: 'warn' });
+      assert.equal(r.action, 'proceed', JSON.stringify(r));
+      assert.equal(r.disposition, 'abandoned_reclaim');
+      assert.equal(r.criticalOpsInterrupted, undefined, 'same fields as the stale reclaim it replaces');
+      assert.ok(!fs.existsSync(activePath), 'the stack was reclaimed');
+    } finally { writeOpLeases(null); }
+  }),
+  ['S2 at the gate: deny refuses dead, legacy and expired foreign ownership without interference', async () => {
+    for (const [label, setup] of staleOwnershipCases()) {
+      const before = interferenceRows().length;
+      setup();
+      const r = await acquireAdmission({ takeover: 'deny' });
+      assert.equal(r.action, 'conflict', `${label}: ${JSON.stringify(r)}`);
+      assert.equal(r.disposition, undefined, label);
+      assert.equal(r.reason, 'takeover_denied', label);
+      const rows = interferenceRows();
+      assert.equal(rows.length, before, `${label}: deny causes no interference`);
+    }
+  }],
+  windowsNative('S2 preservation: explicit takeover of dead, legacy and expired foreign ownership is a logged stale reclaim', async () => {
+    for (const [label, setup] of staleOwnershipCases()) {
+      const before = interferenceRows().length;
+      setup();
+      const r = await acquireAdmission({ takeover: 'warn' });
+      assert.equal(r.action, 'proceed', `${label} (warn): ${JSON.stringify(r)}`);
+      assert.equal(r.disposition, 'stale_reclaim', label);
+      assert.equal(stopReportDisposition(), 'stale_reclaim', label);
+      const rows = interferenceRows();
+      assert.equal(rows.length, before + 1, `${label}: a stale reclaim is still logged`);
+      assert.equal(rows.at(-1).disposition, 'stale_reclaim', label);
+    }
+  }),
+  ['S3 parity: quick_health (cheap), acquire_when_free (full) and the gate give the same late-abandoned verdict', async () => {
+    const { buildOwnershipProjection } = await import(pathToFileURL(path.join(__dirname, 'justsearch-dev-mcp', 'server.mjs')).href);
+    const recommendedTakeoverFor = require(path.join(__dirname, 'lib', 'ownership-verdict.cjs')).recommendedTakeoverFor;
+    // A fixture main root, so the projection reads no real repo state (op-leases, run records).
+    const fakeMain = path.join(STATE, 'main');
+    fs.mkdirSync(fakeMain, { recursive: true });
+    craft({ runnerPid: spawnAliveProc(), owner: 'ended', touchAgoMs: 300, durationSec: 30, leaseMsAhead: -5_000 });
+    const active = JSON.parse(fs.readFileSync(activePath, 'utf8'));
+    for (const evidence of ['cheap', 'full']) {
+      const { decision, ownership } = await buildOwnershipProjection({
+        mainRepoRoot: fakeMain, callerRepoRoot: fakeMain, callerIdentity: INTRUDER, takeover: 'deny', active, evidence, stateRoot: STATE,
+      });
+      assert.equal(decision.verdict, 'TAKEOVER_ABANDONED', `${evidence}: ${JSON.stringify(decision)}`);
+      assert.equal(ownership.verdict, 'TAKEOVER_ABANDONED', evidence);
+      assert.equal(ownership.grade, 'abandoned', evidence);
+      assert.equal(recommendedTakeoverFor(decision), 'warn', `${evidence}: explicit takeover required`);
+    }
+    const gate = await acquireAdmission({ takeover: 'deny', sessionId: INTRUDER.sessionId, callerIdentity: INTRUDER });
+    assert.equal(gate.verdict, 'TAKEOVER_ABANDONED');
+    assert.equal(gate.disposition, undefined);
+    assert.equal(gate.action, 'conflict');
+  }],
 ];
 
-let pass = 0, fail = 0;
-for (const [name, fn] of tests) {
+function stopReportDisposition() {
+  try { return JSON.parse(fs.readFileSync(path.join(runsDir, 'run-TEST', 'stop-report.json'), 'utf8')).disposition ?? null; } catch { return null; }
+}
+
+function interferenceRows() {
+  try {
+    return fs.readFileSync(path.join(STATE, 'interference-events.ndjson'), 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l));
+  } catch { return []; }
+}
+
+/** The backend's op-lease registry under the isolated state root; null removes it. */
+function writeOpLeases(entries) {
+  const file = path.join(STATE, 'op-leases.json');
+  if (!entries) { fs.rmSync(file, { force: true }); return; }
+  const expiresAt = new Date(Date.now() + 600_000).toISOString();
+  fs.writeFileSync(file, JSON.stringify({ schema: 'op-leases.v1', opLeases: entries.map((e) => ({ expiresAt, ...e })) }));
+}
+
+let pass = 0, fail = 0, skipped = 0;
+for (const [name, fn, windowsOnly] of tests) {
+  if (windowsOnly && !windows && process.platform !== 'linux') {
+    console.log(`  SKIP  ${name}: Windows native identity-bound predecessor stop`);
+    skipped++;
+    continue;
+  }
   try { await fn(); console.log(`  PASS  ${name}`); pass++; }
   catch (e) { console.error(`  FAIL  ${name}: ${e.message}`); fail++; }
 }
-for (const p of sleepers) { try { process.kill(p.pid); } catch {} }
+for (const p of sleepers) { try { p.kill(); } catch {} }
 try { fs.rmSync(STATE, { recursive: true, force: true }); } catch {}
-console.log(`test-dev-runner-gate-integration: ${pass} passed, ${fail} failed`);
+console.log(`test-dev-runner-gate-integration: ${pass} passed, ${fail} failed, ${skipped} skipped`);
 process.exit(fail === 0 ? 0 : 1);

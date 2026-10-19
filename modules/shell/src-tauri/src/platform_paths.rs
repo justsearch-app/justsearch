@@ -55,13 +55,18 @@ fn user_home() -> Option<String> {
 ///        macos:   `userHome/Library/Application Support/JustSearch`
 ///        linux:   `userHome/.justsearch`
 pub fn resolve_data_dir() -> PathBuf {
+    explicit_data_dir().unwrap_or_else(platform_default)
+}
+
+/// Non-shell tools honor this override. The desktop shell keeps Tauri's platform app-data directory.
+pub fn explicit_data_dir() -> Option<PathBuf> {
     if let Ok(env_val) = env::var("JUSTSEARCH_DATA_DIR") {
         let trimmed = env_val.trim();
         if !trimmed.is_empty() {
-            return PathBuf::from(expand_user_home_placeholders(trimmed));
+            return Some(PathBuf::from(expand_user_home_placeholders(trimmed)));
         }
     }
-    platform_default()
+    None
 }
 
 fn platform_default() -> PathBuf {
@@ -190,6 +195,18 @@ mod tests {
             failures.join("\n"),
         );
         assert!(ran > 0, "no rust-targeted fixtures executed — harness regression");
+    }
+
+    #[test]
+    fn explicit_override_expands_home_and_preserves_spaces_and_unicode() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let overrides = HashMap::from([("JUSTSEARCH_DATA_DIR".into(), "  ${user.home}/scratch space/検索  ".into())]);
+        let actual = with_env_overrides(&overrides, "/test-home", explicit_data_dir);
+        assert_eq!(actual, Some(PathBuf::from("/test-home/scratch space/検索")));
+        let empty = HashMap::from([("JUSTSEARCH_DATA_DIR".into(), "  ".into())]);
+        assert_eq!(with_env_overrides(&empty, "/test-home", explicit_data_dir), None);
+        let absent = HashMap::from([("JUSTSEARCH_DATA_DIR".into(), String::new())]);
+        assert_eq!(with_env_overrides(&absent, "/test-home", explicit_data_dir), None);
     }
 
     fn matches_current_platform(p: &str) -> bool {

@@ -1,0 +1,19 @@
+diff --git a/modules/ort-common/src/main/java/io/justsearch/ort/QueryCpuRecourse.java b/modules/ort-common/src/main/java/io/justsearch/ort/QueryCpuRecourse.java
+new file mode 100644
+index 000000000..3cb8aae45
+--- /dev/null
++++ b/modules/ort-common/src/main/java/io/justsearch/ort/QueryCpuRecourse.java
+@@ -0,0 +1,13 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.ort;
++
++import java.util.OptionalLong;
++
++/** Compat declaration for fail-before runs only; nothing in this state reads it. */
++public final class QueryCpuRecourse {
++  private QueryCpuRecourse() {}
++
++  public static OptionalLong lastTakenNanos() {
++    return OptionalLong.empty();
++  }
++}

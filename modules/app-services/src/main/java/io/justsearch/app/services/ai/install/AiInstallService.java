@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.ai.install;
 
+import io.justsearch.configuration.NativeTargets;
 import io.justsearch.app.api.AiInstallException;
 import io.justsearch.app.api.AiInstallStatus;
 import io.justsearch.app.api.ApiErrorCode;
@@ -11,8 +12,9 @@ import io.justsearch.app.api.OpLeaseOutcome;
 import io.justsearch.app.api.OperationLeaseHandle;
 import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
-import io.justsearch.app.services.runtimestate.RuntimeReconciler;
-import io.justsearch.app.services.runtimestate.RuntimeStatus;
+import io.justsearch.app.api.chat.ChatRefusal;
+import io.justsearch.app.api.chat.Hold;
+import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.SystemPropertyUtils;
@@ -93,12 +95,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   // Late-bound after the index half starts; volatile publishes it to later install invocations.
   private volatile KnowledgeServerBootstrap knowledgeServer;
   private final EnterprisePolicyService policyService;
-  // Tempdoc 737 fix pack (fix 3): the single-writer runtime authority. When present, the post-
-  // install smoke test brackets its engine use in an INSTALL_SMOKE_TEST procedure and requests the
-  // engine through the reconciler instead of a raw switchToOnlineMode() — so the reconciler does not
-  // fight the smoke test's engine-up (spec is still false during a fresh install: install ≠ enable).
+  // Spec A step 6: the chat controller's holds. The acquisition window is a convergence freeze; the
+  // post-install smoke test is a running hold, so the controller keeps the engine up for it although
+  // spec is still false during a fresh install (install ≠ enable), and returns it to spec on close.
   // Nullable; the legacy raw path is retained for test / non-configured constructions.
-  private final RuntimeReconciler reconciler;
+  private final ChatHolds chatHolds;
   // Tempdoc 374 alpha.27: VramDetector dependency removed; HardwareProfile build
   // now uses GpuCapabilitiesService (NVML-first) directly.
 
@@ -260,26 +261,26 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     this(onlineAi, settingsStore, knowledgeServer, policyService, aiHomeDir, null);
   }
 
-  /** Tempdoc 737 fix pack (fix 3): canonical constructor threading the nullable reconciler. */
+  /** Canonical constructor threading the nullable chat controller holds. */
   public AiInstallService(
       OnlineAiService onlineAi,
       UiSettingsStore settingsStore,
       KnowledgeServerBootstrap knowledgeServer,
       EnterprisePolicyService policyService,
       Path aiHomeDir,
-      RuntimeReconciler reconciler) {
-    this(onlineAi, settingsStore, knowledgeServer, policyService, aiHomeDir, reconciler, null);
+      ChatHolds chatHolds) {
+    this(onlineAi, settingsStore, knowledgeServer, policyService, aiHomeDir, chatHolds, null);
   }
 
   public AiInstallService(OnlineAiService onlineAi, UiSettingsStore settingsStore,
       KnowledgeServerBootstrap knowledgeServer, EnterprisePolicyService policyService,
-      Path aiHomeDir, RuntimeReconciler reconciler, io.justsearch.app.api.SettingsService settingsService) {
+      Path aiHomeDir, ChatHolds chatHolds, io.justsearch.app.api.SettingsService settingsService) {
     this.settingsService = settingsService;
     this.onlineAi = onlineAi;
     this.settingsStore = settingsStore;
     this.knowledgeServer = knowledgeServer;
     this.policyService = policyService;
-    this.reconciler = reconciler;
+    this.chatHolds = chatHolds;
     this.homeDir = aiHomeDir;
     // Honor JUSTSEARCH_MODELS_DIR (env or sysprop) so Install AI checks the
     // operator-supplied dir for already-present models. When all required
@@ -311,23 +312,23 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   }
 
   /**
-   * Tempdoc 737 fix pack (fix 3): production constructor resolving AI Home and threading the nullable
-   * {@link RuntimeReconciler} used to bracket the post-install smoke test.
+   * Production constructor resolving AI Home and threading the nullable chat controller holds that
+   * bracket the acquisition window and the post-install smoke test.
    */
   public AiInstallService(
       OnlineAiService onlineAi,
       UiSettingsStore settingsStore,
       KnowledgeServerBootstrap knowledgeServer,
       EnterprisePolicyService policyService,
-      RuntimeReconciler reconciler) {
-    this(onlineAi, settingsStore, knowledgeServer, policyService, resolveHomeDir(), reconciler);
+      ChatHolds chatHolds) {
+    this(onlineAi, settingsStore, knowledgeServer, policyService, resolveHomeDir(), chatHolds);
   }
 
   /** Production composition with the shared accepted settings producer. */
   public AiInstallService(OnlineAiService onlineAi, UiSettingsStore settingsStore,
       KnowledgeServerBootstrap knowledgeServer, EnterprisePolicyService policyService,
-      RuntimeReconciler reconciler, io.justsearch.app.api.SettingsService settingsService) {
-    this(onlineAi, settingsStore, knowledgeServer, policyService, resolveHomeDir(), reconciler, settingsService);
+      ChatHolds chatHolds, io.justsearch.app.api.SettingsService settingsService) {
+    this(onlineAi, settingsStore, knowledgeServer, policyService, resolveHomeDir(), chatHolds, settingsService);
   }
 
   /** Publishes the index bootstrap after LocalApiServer late binding. */
@@ -550,7 +551,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
             switch (skipped.cause() == null ? SkipCause.HARDWARE : skipped.cause()) {
               case USER_DECLINED -> "declined";
               case INTENT -> "not-in-mode";
-              case HARDWARE -> "unavailable";
+              case HARDWARE, PLATFORM -> "unavailable";
               // Not reachable today — devOnly packages are filtered out of this loop above. The arm
               // exists so the switch stays exhaustive: if that filter is ever removed, a dev package
               // reads as "this build does not install it" rather than as a hardware failure.
@@ -1330,19 +1331,14 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
             });
     publishStagePlan(slices);
 
-    // ONE reconciler procedure for the whole install window (tempdoc 840 Phase 3). Staged
-    // acquisition churns the runtime several times where a monolithic run churned it once — a
-    // configuration application per stage, plus the engine's runtime overrides when the chat model lands — and
-    // drift convergence must stay suppressed across all of it, not per burst. The engine returns to
-    // spec exactly once, at the end. INSTALL_SMOKE_TEST nests inside this; overlapping kinds are
-    // supported and only the LAST end re-arms convergence.
-    RuntimeReconciler reconciler = this.reconciler;
-    boolean acquisitionProcedure = false;
-    if (reconciler != null) {
-      reconciler.beginProcedure(
-          RuntimeStatus.ProcedureKind.INSTALL_ACQUISITION, "staged-model-acquisition");
-      acquisitionProcedure = true;
-    }
+    // ONE convergence freeze for the whole install window (tempdoc 840 Phase 3; Spec A step 6).
+    // Staged acquisition churns the runtime several times where a monolithic run churned it once —
+    // a configuration application per stage, plus the engine's runtime overrides when the chat model
+    // lands — and drift convergence must stay suppressed across all of it, not per burst. The engine
+    // returns to spec exactly once, at the end. The smoke test's running hold nests inside this; a
+    // hold taken inside a freeze still acts, and only the LAST close re-arms convergence.
+    Hold acquisitionFreeze =
+        chatHolds == null ? null : chatHolds.freezeConvergence("staged-model-acquisition");
     try {
       if (!runStages(slices, plan, registry, placement, attempts, retryPolicy, firstStageLease)) {
         return;
@@ -1400,8 +1396,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         markActivationRequired();
       }
     } finally {
-      if (acquisitionProcedure) {
-        reconciler.endProcedure(RuntimeStatus.ProcedureKind.INSTALL_ACQUISITION);
+      if (acquisitionFreeze != null) {
+        acquisitionFreeze.close();
       }
     }
   }
@@ -2329,10 +2325,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    *     override was respected
    */
   private boolean applyCudaServerExe() {
+    if (!PlatformPaths.isWindows()) return false;
     Path cuda12Exe =
         homeDir
             .resolve("native-bin/llama-server/variants/cuda12")
-            .resolve("llama-server.exe");
+            .resolve(NativeTargets.current().executableName("llama-server"));
     if (!Files.isRegularFile(cuda12Exe)) {
       log.debug(
           "alpha.15: cuda12 llama-server.exe not at {} — skipping (cuda-runtime"
@@ -2486,15 +2483,15 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   /**
    * Post-install smoke test: bring the engine up, ask one question, confirm a non-empty reply.
    *
-   * <p>Tempdoc 737 fix pack (fix 3): when a {@link RuntimeReconciler} is wired, the engine use is a
-   * reconciler procedure ({@code INSTALL_SMOKE_TEST}) and the engine is requested via {@link
-   * RuntimeReconciler#procedureRequireEngine(boolean)} rather than a raw {@code switchToOnlineMode()}.
-   * This stops the reconciler from converging the freshly-started engine straight back DOWN while
-   * the procedure is answering (spec is {@code chatEnabled=false} during a fresh install — the user
-   * has not enabled chat yet). When the procedure ends, the reconciler returns the engine to spec:
-   * with chat still disabled the engine converges DOWN, which is correct — <b>install is not
-   * enable</b>. When no reconciler is wired (test / non-configured constructions) the legacy raw
-   * {@code switchToOnlineMode()} path is kept.
+   * <p>Spec A step 6: when the chat controller is wired, the engine use is a running hold ({@link
+   * ChatHolds#holdRunning}) rather than a raw {@code switchToOnlineMode()}: the controller starts
+   * the engine for the hold and keeps the reconciler from converging it straight back DOWN while it
+   * answers (spec is {@code chatEnabled=false} during a fresh install — the user has not enabled
+   * chat yet). A refused hold (a latched chat failure, a self-test, the Engine stopping) fails the
+   * smoke test. When the hold closes, the reconciler returns the engine to spec: with chat still
+   * disabled the engine converges DOWN, which is correct — <b>install is not enable</b>. When no
+   * controller is wired (test / non-configured constructions) the legacy raw {@code
+   * switchToOnlineMode()} path is kept.
    *
    * <p>The answer is waited for in {@link TransportRetryPolicy#CANCEL_POLL_SLICE_MS} slices with the
    * cancel flag polled between them, for the reason that method's javadoc gives: {@link #cancel()}
@@ -2504,16 +2501,19 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    */
   private boolean smokeTestBestEffort() {
     OnlineAiService onlineAi = this.onlineAi;
-    RuntimeReconciler reconciler = this.reconciler;
-    boolean procedureBegun = false;
+    ChatHolds chatHolds = this.chatHolds;
+    Hold runningHold = null;
     try {
-      if (reconciler != null) {
-        reconciler.beginProcedure(
-            RuntimeStatus.ProcedureKind.INSTALL_SMOKE_TEST, "post-install-smoke-test");
-        procedureBegun = true;
-        reconciler.procedureRequireEngine(true);
+      if (chatHolds != null) {
+        try {
+          runningHold = chatHolds.holdRunning("post-install-smoke-test");
+        } catch (ChatRefusal refused) {
+          fail("SMOKE_TEST_FAILED",
+              "Smoke test failed: the chat server was not started (" + refused.reason() + ")");
+          return false;
+        }
       } else {
-        onlineAi.switchToOnlineMode(); // LEGACY-FALLBACK: no reconciler wired (test/non-configured)
+        onlineAi.switchToOnlineMode(); // LEGACY-FALLBACK: no controller wired (test/non-configured)
       }
       CompletableFuture<String> answer = onlineAi.askQuestion("Reply with exactly OK.", "OK",
           io.justsearch.app.services.intent.EngineProvenance.internal("post-install-smoke-test",
@@ -2552,10 +2552,10 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       fail("SMOKE_TEST_FAILED", "Smoke test failed: " + e.getMessage());
       return false;
     } finally {
-      // Balanced on every exit — including the cancellation return above — so the reconciler always
-      // gets the engine back to spec.
-      if (procedureBegun) {
-        reconciler.endProcedure(RuntimeStatus.ProcedureKind.INSTALL_SMOKE_TEST);
+      // Balanced on every exit — including the cancellation return above — so the engine always
+      // goes back to spec.
+      if (runningHold != null) {
+        runningHold.close();
       }
     }
   }
@@ -3034,8 +3034,20 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
           throw new IOException(
               "Refusing zip entry that escapes target directory: " + entry.getName());
         }
-        if (Files.exists(resolved)) continue; // idempotent re-extract
+        if (!PlatformPaths.isWindows() && Files.isSymbolicLink(resolved)) {
+          throw new IOException("Refusing symbolic-link archive target: " + entry.getName());
+        }
+        if (Files.exists(resolved)) {
+          if (!PlatformPaths.isWindows() && !resolved.toRealPath().startsWith(normalizedTarget.toRealPath())) {
+            throw new IOException("Refusing archive target outside directory: " + entry.getName());
+          }
+          applyExecutablePermission(resolved);
+          continue;
+        }
         Files.createDirectories(resolved.getParent());
+        if (!PlatformPaths.isWindows() && !resolved.getParent().toRealPath().startsWith(normalizedTarget.toRealPath())) {
+          throw new IOException("Refusing archive parent outside directory: " + entry.getName());
+        }
         // Extract to a sibling .partial then atomically rename, so a crash mid-copy never leaves a
         // half-written file at the final path (which the existence-skip above would then trust
         // forever). Mirrors the download path's partial-then-moveAtomicBestEffort discipline.
@@ -3044,6 +3056,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         try (var in = zip.getInputStream(entry)) {
           Files.copy(in, partial);
         }
+        applyExecutablePermission(partial, resolved.getFileName().toString());
         DownloadExecutor.moveAtomicBestEffort(partial, resolved);
         extracted++;
       }
@@ -3053,6 +3066,20 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         extracted,
         zipFile.getFileName(),
         normalizedTarget);
+  }
+
+  private static void applyExecutablePermission(Path file) throws IOException {
+    applyExecutablePermission(file, file.getFileName().toString());
+  }
+
+  private static void applyExecutablePermission(Path file, String declaredName) throws IOException {
+    if (PlatformPaths.isWindows()) return;
+    // Archives do not carry trustworthy executable modes. Only a declared executable gets +x.
+    if (declaredName.equals(NativeTargets.current().executableName("llama-server"))) {
+      var permissions = Files.getPosixFilePermissions(file);
+      permissions.add(java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE);
+      Files.setPosixFilePermissions(file, permissions);
+    }
   }
 
   private long countPackagesByState(String state) {

@@ -11,6 +11,10 @@ import { gcLogOption, parseGc, heapTrend, summedHeapTrend, ownedProcesses, memor
 import { settingsPatch, requestLive, executableFrom, projectChildPolicies, LiveCollector, jobRows, logEventTime, hangRequestTime } from './e456-live.mjs';
 import { packet, readIds, loopbackEndpoint, attachFault } from '../../supervisor-conformance/jdwp-fault.mjs';
 import { killOwned } from '../../supervisor-conformance/verified-crash.mjs';
+import { createRequire } from 'node:module';
+// Namespace imports, so a missing export fails only the test that uses it.
+import * as instruments from './e456-instruments.mjs';
+import * as live from './e456-live.mjs';
 
 const values = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs/design/lane-f-engine-jvm/evidence/E/values.json'), 'utf8')).values;
 test('E6 hard phase cannot reuse earlier launches, persistent data logs or soft-phase narration', t => {
@@ -244,9 +248,123 @@ test('child policy never passes vacuously and any orphan/reload dominates a gap'
   projectChildPolicies(r); assert.equal(r.clauses['restart-quit-upgrade-child-policy'], undefined);
   r.metrics.childPaths.crash = { extractionStopped: false }; projectChildPolicies(r);
   assert.equal(r.clauses['restart-quit-upgrade-child-policy'], false);
+  // Every OS observation good, but no children ledger: Spec B step 9 reads the ledger, so unmeasured.
   for (const reason of ['crash', 'restart', 'quit', 'upgrade']) r.metrics.childPaths[reason] = {
-    extractionStopped: true, healthyLlamaAdopted: true, llamaStopped: true };
-  projectChildPolicies(r); assert.equal(r.clauses['restart-quit-upgrade-child-policy'], true);
+    extractionStopped: true, llamaEndedAndChatReady: true, llamaStopped: true };
+  projectChildPolicies(r); assert.equal(r.clauses['restart-quit-upgrade-child-policy'], undefined);
+});
+// Spec B T24 on recorded child-path fixtures: the shape childPathExperiment saves (child-path.json),
+// with `childLedger` as compareChildLedger returned it from the arm's children.v1.jsonl.
+const ledgerPath = (exitClass, reason, extra = {}) => ({ extractionStopped: true, llamaEndedAndChatReady: true, llamaStopped: true,
+  childLedger: { present: true, disagreements: [], exits: [
+    { pid: 3, role: 'extraction-child', childId: 'x', alive: false, exit: { type: exitClass === 'OWNER_DIED' ? 'owner-died' : 'child-exit', exitClass, reason } },
+    { pid: 4, role: 'llama-server', childId: 'l', alive: false, exit: { type: exitClass === 'OWNER_DIED' ? 'owner-died' : 'child-exit', exitClass, reason } }] },
+  ...extra });
+const policyOf = paths => {
+  const r = { metrics: { childPaths: paths }, clauses: {}, gaps: {} };
+  projectChildPolicies(r);
+  return r;
+};
+test('Spec B T24: each child path passes only with the ledger class its policy requires', () => {
+  const good = { crash: ledgerPath('OWNER_DIED', null), restart: ledgerPath('REQUESTED', 'ENGINE_RESTART'),
+    quit: ledgerPath('REQUESTED', 'QUIT'), upgrade: ledgerPath('REQUESTED', 'UPGRADE') };
+  const pass = policyOf(good);
+  assert.equal(pass.clauses['restart-quit-upgrade-child-policy'], true);
+  // The OS says stopped, but the ledger says the children ended for another reason: a failure.
+  for (const [reason, wrong] of [['crash', ledgerPath('UNEXPECTED', null)], ['restart', ledgerPath('REQUESTED', 'QUIT')],
+    ['quit', ledgerPath('UNEXPECTED', null)], ['upgrade', ledgerPath('REQUESTED', 'QUIT')]]) {
+    const r = policyOf({ ...good, [reason]: wrong });
+    assert.equal(r.clauses['restart-quit-upgrade-child-policy'], false, reason);
+    assert.match(r.gaps['restart-quit-upgrade-child-policy'], new RegExp(`^${reason}: expected`));
+  }
+  assert.deepEqual(pass.metrics.childPolicyBasis, { crash: 'ledger', restart: 'ledger', quit: 'ledger', upgrade: 'ledger' });
+  // The ledger and the OS disagree: a gap, never a pass.
+  const disagree = policyOf({ ...good, quit: ledgerPath('REQUESTED', 'QUIT', { childLedger: { ...good.quit.childLedger,
+    disagreements: [{ pid: 3, reason: 'ledger records an exit; the OS shows the process alive' }] } }) });
+  assert.equal(disagree.clauses['restart-quit-upgrade-child-policy'], undefined);
+  assert.match(disagree.gaps['restart-quit-upgrade-child-policy'], /quit: ledger and OS disagree/);
+  // UNKNOWN (an owner-died whose OS check could not decide) is unmeasured, not failed.
+  assert.equal(policyOf({ ...good, crash: ledgerPath('UNKNOWN', null) }).clauses['restart-quit-upgrade-child-policy'], undefined);
+});
+test('Spec B step 9 (T24): the child policy reads the ledger; without it the path is a gap, never an OS-only pass', () => {
+  const good = { crash: ledgerPath('OWNER_DIED', null), restart: ledgerPath('REQUESTED', 'ENGINE_RESTART'),
+    quit: ledgerPath('REQUESTED', 'QUIT'), upgrade: ledgerPath('REQUESTED', 'UPGRADE') };
+  const noLedger = { extractionStopped: true, llamaEndedAndChatReady: true, llamaStopped: true,
+    childLedger: { present: false, reason: 'ledger-unavailable: no children.v1.jsonl', exits: [], disagreements: [] } };
+  const branch = policyOf({ ...good, restart: noLedger });
+  assert.equal(branch.clauses['restart-quit-upgrade-child-policy'], undefined);
+  assert.match(branch.gaps['restart-quit-upgrade-child-policy'], /restart: no children ledger to read \(ledger-unavailable: no children\.v1\.jsonl\)$/);
+  assert.equal(branch.metrics.childPolicyBasis.restart, 'ledger-unavailable: no children.v1.jsonl');
+  // MAIN writes no exit ledger: its verdict is the OS's, and says so.
+  const main = { metrics: { childPaths: { ...good, restart: noLedger } }, clauses: {}, gaps: {}, arm: 'main' };
+  projectChildPolicies(main);
+  assert.equal(main.clauses['restart-quit-upgrade-child-policy'], true);
+  assert.equal(main.metrics.childPolicyBasis.restart, 'os-only (MAIN writes no exit ledger)');
+});
+test('Spec B T24 and D2: the old llama-server stopped on every path, crash and restart included', () => {
+  const good = { crash: ledgerPath('OWNER_DIED', null), restart: ledgerPath('REQUESTED', 'ENGINE_RESTART'),
+    quit: ledgerPath('REQUESTED', 'QUIT'), upgrade: ledgerPath('REQUESTED', 'UPGRADE') };
+  for (const reason of ['crash', 'restart']) {
+    // Chat came back, but the old Engine's llama-server is still running: adoption, which D2 forbids.
+    const survived = policyOf({ ...good, [reason]: { ...good[reason], llamaStopped: false } });
+    assert.equal(survived.clauses['restart-quit-upgrade-child-policy'], false, reason);
+    const unobserved = { ...good[reason] };
+    delete unobserved.llamaStopped;
+    assert.equal(policyOf({ ...good, [reason]: unobserved }).clauses['restart-quit-upgrade-child-policy'], undefined, reason);
+  }
+});
+test('Spec F §6.2: the children ledger is read from the data directory and compared with the OS table', t => {
+  fs.mkdirSync(path.join(ROOT, 'tmp'), { recursive: true });
+  const data = fs.mkdtempSync(path.join(ROOT, 'tmp/e456-child-ledger-'));
+  t.after(() => fs.rmSync(data, { recursive: true, force: true }));
+  assert.equal(live.readChildLedger(data).present, false);
+  const ledgerLib = createRequire(import.meta.url)('../../dev/lib/exit-ledger.cjs');
+  const writer = ledgerLib.createLedgerWriter({ ledgerDir: ledgerLib.ledgerDirectory(data), family: 'children',
+    writer: { role: 'engine', pid: 7400, startedAt: Date.UTC(2026, 9, 6, 9) } });
+  const birth = n => String(134044416604000000n + BigInt(n) * 10000000n);
+  const owner = { pid: 7400, creationFileTime: '134044416020000000', instanceId: 'inst-1' };
+  for (const [childId, kind, pid] of [['c-llama', 'LLAMA_SERVER', 8800], ['c-x', 'EXTRACTION', 8801], ['c-alive', 'EXTRACTION', 8802], ['c-silent', 'EXTRACTION', 8803]]) {
+    writer.append('child-spawn', { childId, kind, label: kind, owner, gpu: false });
+    writer.append('child-start', { childId, pid, processStartedAt: null, creationFileTime: birth(pid - 8800), executable: 'C:/x/child.exe',
+      argvHash: 'a'.repeat(64), contained: true, gpuDevice: null });
+  }
+  const ownerDied = childId => writer.append('owner-died', { childId, previousOwner: owner, basis: 'OPEN_START', osCheck: 'GONE', exitClass: 'OWNER_DIED' });
+  ['c-llama', 'c-x', 'c-alive'].forEach(ownerDied);
+  const os = (pid, alive, role = 'extraction-child') => ({ ProcessId: pid, CreationFileTimeUtc: birth(pid - 8800), role, alive });
+  const read = live.readChildLedger(data);
+  assert.equal(read.present, true);
+  const compared = instruments.compareChildLedger([os(8800, false, 'llama-server'), os(8801, false), os(8802, true), os(8803, false), os(8899, false)], read);
+  assert.deepEqual(compared.exits.map(e => [e.childId, e.exit?.exitClass ?? null]),
+    [['c-llama', 'OWNER_DIED'], ['c-x', 'OWNER_DIED'], ['c-alive', 'OWNER_DIED'], ['c-silent', null]]);
+  assert.deepEqual(compared.disagreements.map(d => [d.pid, d.reason]), [
+    [8802, 'ledger records an exit; the OS shows the process alive'],
+    [8803, 'the OS shows the process gone; the ledger has no exit'],
+    [8899, 'no child-start in the ledger for an observed child']]);
+});
+test('CH9 and Spec F §6.2: console hosts are their parent\'s, and extractionStopped reads extraction children only', () => {
+  const head = row(1, 0, 'java HeadlessApp --data=owned'), host = row(6, 1, '\\??\\C:\\WINDOWS\\system32\\conhost.exe 0xffffffff -ForceV1', 'conhost.exe');
+  const root = { pid: 1, creationFileTimeUtc: head.CreationFileTimeUtc, cmdlineFingerprint: head.CommandLine };
+  const owned = ownedProcesses([head, host], root, 'branch');
+  assert.deepEqual(owned.map(p => p.role), ['engine', 'console-host']);
+  const parser = { ...row(3, 1, 'java ExtractionSandboxChild'), role: 'extraction-child' };
+  const other = { ...row(7, 1, 'cmd.exe /c helper', 'cmd.exe'), role: 'other-child' };
+  const engineHost = { ...host, role: 'console-host' };
+  const known = [{ ...head, role: 'engine' }, parser, other, engineHost];
+  const cleanup = (table, nowMs = 10000, goneMs = 0) => instruments.childCleanup([parser, other, engineHost], known, table, nowMs, () => goneMs);
+  // A surviving unrelated helper is an orphan, but it is not an extraction child.
+  const helperLeft = cleanup([other]);
+  assert.equal(helperLeft.extractionStopped, true);
+  assert.equal(helperLeft.noOrphanedChild, false);
+  // The Engine's console host alive past the grace after the Engine died: an orphan host.
+  const hostLeft = cleanup([engineHost], 10000, 10000 - instruments.CONHOST_EXIT_GRACE_MS - 1);
+  assert.deepEqual(hostLeft.orphaned.map(p => p.ProcessId), [6]);
+  // Inside the grace it is pending (unmeasured), not an orphan.
+  const inside = cleanup([engineHost], 10000, 10000 - instruments.CONHOST_EXIT_GRACE_MS);
+  assert.deepEqual(inside.orphaned, []); assert.equal(inside.noOrphanedChild, undefined);
+  // Its console parent still alive (a restart that kept the head): not an orphan.
+  assert.equal(cleanup([{ ...head }, engineHost]).noOrphanedChild, true);
+  assert.equal(cleanup([parser]).extractionStopped, false);
+  assert.equal(instruments.childCleanup([other], known, [], 0, () => 0).extractionStopped, undefined);
 });
 test('hang verdict requires the real fault/channel and rejects the wrong actuator outcome', () => {
   const policy = { gracefulStopDeadlineMs: 15000, cooldownIncrementMs: 1000 };

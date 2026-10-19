@@ -1,0 +1,370 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T10:11:29.215Z",
+  "revision": "688a340f929ddf19ba561d099db3bc432e35cdf0",
+  "tree": "fb5d421305b59eb78723440efa6e3daeed1e64d5",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerPromptCacheTest\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11240
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPromptCacheTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPromptCacheTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5bdabb3b9f1075d01b6057cc2dbffb7d136b3fe912355eadcae4e3014ccb9c51",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] 0",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 256",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 2048",
+          "status": "passed"
+        },
+        {
+          "name": "[4] 2147483647",
+          "status": "passed"
+        },
+        {
+          "name": "evaluationDisablesCacheEvenWithOverride()",
+          "status": "passed"
+        },
+        {
+          "name": "vduDisablesCacheEvenWithOverrideAndRestoresChatBoundOnExit()",
+          "status": "passed"
+        },
+        {
+          "name": "chatDefaultsTo1024MiB()",
+          "status": "passed"
+        },
+        {
+          "name": "configuredCacheBoundChangesManagedLaunchIdentity()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] -1",
+          "status": "passed"
+        },
+        {
+          "name": "[2] ",
+          "status": "passed"
+        },
+        {
+          "name": "[3]  ",
+          "status": "passed"
+        },
+        {
+          "name": "[4] +1",
+          "status": "passed"
+        },
+        {
+          "name": "[5] 1.5",
+          "status": "passed"
+        },
+        {
+          "name": "[6] garbage",
+          "status": "passed"
+        },
+        {
+          "name": "[7] 2147483648",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:60528fd4f7e042e69b2ea35f357813d6a319fd05a96fda1ad07288e0d28c9f5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preparedCandidateStaysPrivateUntilAssignmentOnlyInstallAndFencesRecovery()",
+          "status": "passed"
+        },
+        {
+          "name": "applyOnlyRejectsInvalidWithoutChangeAndRetainsValidResolvedSnapshotForLaterStart()",
+          "status": "passed"
+        },
+        {
+          "name": "managedFailureOnlyDemotesAndLeavesPhysicalCleanupToAdmittedRecovery()",
+          "status": "passed"
+        },
+        {
+          "name": "settingsPreparationCannotReplaceAHeldVduServer(false)",
+          "status": "passed"
+        },
+        {
+          "name": "settingsPreparationCannotReplaceAHeldVduServer(true)",
+          "status": "passed"
+        },
+        {
+          "name": "candidateFailureRollsBackUsingActualAContextDespiteGlobalC()",
+          "status": "passed"
+        },
+        {
+          "name": "aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitIndexingDuringFailedPrelaunchDrainSupersedesRetainedInitialRequest()",
+          "status": "passed"
+        },
+        {
+          "name": "failedCandidateAndFailedRollbackPreserveBothCausesAndLeaveOffline()",
+          "status": "passed"
+        },
+        {
+          "name": "aPreparedSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "aSettingsApplyThatStartsChatFromOfflineAndFailsShowsItsOwnFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "rollbackRetriesFormerGpuIncumbentWithoutSecondAdmissionGate()",
+          "status": "passed"
+        },
+        {
+          "name": "failedStopForIndexingCannotRepublishOnlineWithoutHealth()",
+          "status": "passed"
+        },
+        {
+          "name": "admittedRecoveryDrainsARealRequestBeforeOnePhysicalReplacement()",
+          "status": "passed"
+        },
+        {
+          "name": "preparedModelSwitchPublishesCandidateIdentityInsteadOfIncumbentProps()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitIndexingStopDuringDrainSupersedesTheSameRetainedStartRequest()",
+          "status": "passed"
+        },
+        {
+          "name": "coldEnablePublishesModeAtCommitBeforeRetirement()",
+          "status": "passed"
+        },
+        {
+          "name": "aFailedOperatorRetryOfACorruptModelSaysTheModelDidNotLoad()",
+          "status": "passed"
+        },
+        {
+          "name": "cancellationAfterPhysicalClosePreventsLaunchButKeepsSpentAttempt()",
+          "status": "passed"
+        },
+        {
+          "name": "disableRetainsIncumbentUntilCommitThenRetiresIt()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] 1024",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 0",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 256",
+          "status": "passed"
+        },
+        {
+          "name": "timeoutPublicationDoesNotCancelLateSameOwnerReady()",
+          "status": "passed"
+        },
+        {
+          "name": "queuedVduEnterCannotLaunchAfterAutonomousOwnerFails()",
+          "status": "passed"
+        },
+        {
+          "name": "wrongManagedCandidateHashIsRefusedAndIncumbentRestored()",
+          "status": "passed"
+        },
+        {
+          "name": "appliedVersionMismatchRefusesWithoutSpendingAttemptOrStoppingOwner()",
+          "status": "passed"
+        },
+        {
+          "name": "failedRetryNamesItsOwnClassifiedCauseAndAddsTypedFailureEvidence()",
+          "status": "passed"
+        },
+        {
+          "name": "retainedFailedInitialAIsPreferredAfterDesiredChangesToB()",
+          "status": "passed"
+        },
+        {
+          "name": "rollbackReplacesApplyOnlyDesiredConfigWithServingAAndRetainsStrictPolicy()",
+          "status": "passed"
+        },
+        {
+          "name": "managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "precommitCrashCallbackInvalidatesCandidateWithoutRecoveringIt()",
+          "status": "passed"
+        },
+        {
+          "name": "failedCandidateCleanupDoesNotAttemptIncumbentRestart()",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedRequestDrainCountsFailureWithoutPhysicalReplacement()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryQueuedDuringPreparationCannotOvertakeTheStagedCandidate()",
+          "status": "passed"
+        },
+        {
+          "name": "failedColdStartupCleansItsUnhealthyChildBeforeReturning()",
+          "status": "passed"
+        },
+        {
+          "name": "cancelledRecoveryWaitingForARealRequestNeverStopsOrLaunches()",
+          "status": "passed"
+        },
+        {
+          "name": "abortPreparedCandidateStopsBAndRestoresCapturedA()",
+          "status": "passed"
+        },
+        {
+          "name": "candidatePublishesOnlyAfterStartAndHealthComplete()",
+          "status": "passed"
+        },
+        {
+          "name": "autonomousActivationCannotStealRetainedFailureButExplicitUserActivationCan()",
+          "status": "passed"
+        },
+        {
+          "name": "foreignExternalOwnerRefusesBeforeAdmission()",
+          "status": "passed"
+        },
+        {
+          "name": "adoptedExternalServerRefusesSelfTestBeforeAnyCandidateCanStart()",
+          "status": "passed"
+        },
+        {
+          "name": "admittedRecoveryRestartsServingAButNeverNewDesiredB()",
+          "status": "passed"
+        },
+        {
+          "name": "vduEnterAndExitPreserveCapturedResolvedContextAndStrictPolicy()",
+          "status": "passed"
+        },
+        {
+          "name": "failedIncumbentStopNeverStartsCandidate()",
+          "status": "passed"
+        },
+        {
+          "name": "failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal()",
+          "status": "passed"
+        },
+        {
+          "name": "failedPrecommitCandidateRestoresABeforeReturningFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "failedColdStartupCleanupRetainsOwnershipAndReportsBothFailuresOffline()",
+          "status": "passed"
+        },
+        {
+          "name": "aSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "preparedCandidateDeathRefusesCommitAndRestoresIncumbent()",
+          "status": "passed"
+        },
+        {
+          "name": "unknownVramStillAllowsExplicitGpuCandidate()",
+          "status": "passed"
+        },
+        {
+          "name": "insufficientVramRefusesBeforeStopOrCacheClearAndEmitsOneFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "aPreparedSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes()",
+          "status": "passed"
+        },
+        {
+          "name": "restartIfOnlineRefreshRetainsOfflineConfigurationWithoutStartingServer()",
+          "status": "passed"
+        },
+        {
+          "name": "lifecycleCallbackFencesRecoveryBeforePublicationLockAcquisition()",
+          "status": "passed"
+        },
+        {
+          "name": "queuedFailureSignalWaitsForApplyThenRejectsItsReplacedPhysicalOwner()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f6d579a86",
+    "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerPromptCacheTest\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8879
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPromptCacheTest.java",
+        "classification": "assertion",
+        "detail": "[1] 0: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: every launch must explicitly bound the host cache: [llama.exe, -m, model.gguf, --jinja, --reasoning-format, deepseek, --reasoning-budget, 512, --host, 127.0.0.1, --metrics, --port, 8082, -c, 32768, -ngl, 99, --device, CUDA0, -sm, none, -np, 2, -kvu, -ctk, q8_0, - | [2] 256: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: every launch must explicitly bound the host cache: [llama.exe, -m, model"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+        "classification": "assertion",
+        "detail": "settingsPreparationCannotReplaceAHeldVduServer(false): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected io.justsearch.app.api.ModeTransitionException to be thrown, but nothing was thrown. | settingsPreparationCannotReplaceAHeldVduServer(true): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected io.justsearch.app.api.ModeTransitionException to be thrown, but nothing was thrown. | aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnAct"
+      }
+    ]
+  },
+  "digest": "sha256:899d141e35e05a0f7c29c25c9b0c0afd8412de2ea81ce296f7dd192813a0c7ca"
+}

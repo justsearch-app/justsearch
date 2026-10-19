@@ -13,15 +13,39 @@
       "owner": "installed Engine model-free lifecycle evidence",
       "hardTimeoutSeconds": 2100,
       "notes": "Initial budget: the existing lifecycleIntegrationTest task allows 30 minutes; the hosted job adds 5 minutes for setup and artifact upload. This is headroom, not a hosted measurement; review after the first successful runs.",
-      "advisoryBudgets": { "maxWallSeconds": 1800 }
+      "advisoryBudgets": {
+        "maxWallSeconds": 1800
+      }
+    },
+    {
+      "job": "Unit tests (app-ui-ui)",
+      "requiredCheck": "Unit tests (app-ui)",
+      "owner": "app and UI hosted unit evidence",
+      "hardTimeoutSeconds": 1500,
+      "notes": "Initial split budget: preserves all tests and per-test budgets; review after comparable uncached hosted runs.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 1200
+      }
+    },
+    {
+      "job": "Unit tests (app-ui-services)",
+      "requiredCheck": "Unit tests (app-ui)",
+      "owner": "app and UI hosted unit evidence",
+      "hardTimeoutSeconds": 1800,
+      "notes": "Initial split budget: preserves all tests and per-test budgets; review after comparable uncached hosted runs.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 1440
+      }
     },
     {
       "job": "Unit tests (app-ui)",
       "requiredCheck": "Unit tests (app-ui)",
       "owner": "app and UI hosted unit evidence",
-      "hardTimeoutSeconds": 1500,
-      "notes": "Recent median 111s, observed max 390s.",
-      "advisoryBudgets": { "maxWallSeconds": 450 }
+      "hardTimeoutSeconds": 120,
+      "notes": "Required aggregate checks every expected part result after scheduling.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 30
+      }
     },
     {
       "job": "Unit tests (search-worker)",
@@ -29,23 +53,29 @@
       "owner": "search and worker hosted unit evidence",
       "hardTimeoutSeconds": 1500,
       "notes": "Recent median 89s, observed max 330s.",
-      "advisoryBudgets": { "maxWallSeconds": 390 }
+      "advisoryBudgets": {
+        "maxWallSeconds": 390
+      }
     },
     {
       "job": "Unit tests (platform-contracts)",
       "requiredCheck": "Unit tests (platform-contracts)",
       "owner": "platform, inference, contract, and governance hosted unit evidence",
       "hardTimeoutSeconds": 1500,
-      "notes": "Recent median 92s, observed max 248s. PMD does not run here, and the record of why is the point of this note: tempdoc 930 §22.2 follow-up 10 briefly put the `Static analysis (PMD, all source sets)` step in this lane (matrix `if`) on the expectation that a lane already compiling test sources would run `pmdAll` cheaper than `Build (no model blobs)`, where it measured 188s. Measured, the expectation was wrong — 201s here, and the lane at 487-488s (259s tests + 201s PMD) OVER its 360s advisory budget, while the origin job runs 469s against 600s. `pmdAll` needs main AND every non-main source set for all ~30 modules, whereas this lane compiles `test` for only fifteen and `assemble` had already compiled all of main. The step went back to `Build (no model blobs)`. Do not relocate it here again without re-measuring — that is the move this note exists to stop.",
-      "advisoryBudgets": { "maxWallSeconds": 360 }
+      "notes": "Recent median 92s, observed max 248s. PMD does not run here, and the record of why is the point of this note: tempdoc 930 \u00a722.2 follow-up 10 briefly put the `Static analysis (PMD, all source sets)` step in this lane (matrix `if`) on the expectation that a lane already compiling test sources would run `pmdAll` cheaper than `Build (no model blobs)`, where it measured 188s. Measured, the expectation was wrong \u2014 201s here, and the lane at 487-488s (259s tests + 201s PMD) OVER its 360s advisory budget, while the origin job runs 469s against 600s. `pmdAll` needs main AND every non-main source set for all ~30 modules, whereas this lane compiles `test` for only fifteen and `assemble` had already compiled all of main. The step went back to `Build (no model blobs)`. Do not relocate it here again without re-measuring \u2014 that is the move this note exists to stop.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 360
+      }
     },
     {
       "job": "Build (no model blobs)",
       "requiredCheck": "Build (no model blobs)",
       "owner": "no-model assemble, web-bundle build and repo-wide PMD static analysis",
       "hardTimeoutSeconds": 1500,
-      "notes": "Recent median 131s, observed max 498s. Follow-up 2 of tempdoc 930 §22.2 added a pmdMain step on top of the completed assemble (49s of a 352s job, run 33958691983); follow-up 10 widened it to `pmdAll` over every Java source set, measured at 188s here (run 33967299967, job 469s against this 600s budget). PMD's own analysis is only ~22s for all 72 tasks once classes exist, so the rest is compiling test sources, which `assemble` does not do. That step was then tried in `Unit tests (platform-contracts)` on the theory that a lane already compiling tests would run it cheaper: it did NOT — 201s there, that lane at 488s against its 360s budget, and this job down to 214-261s (runs 33967790388 and the head after it). `pmdAll` needs main plus every non-main source set for all ~30 modules, so neither placement avoids the compile and this is the job with the headroom; the step lives here. Do not relocate it again without re-measuring — relocating on an untested expectation is what produced that detour. The advisory budget is unchanged; re-read it against the next observed median.",
-      "advisoryBudgets": { "maxWallSeconds": 600 }
+      "notes": "Recent median 131s, observed max 498s. Follow-up 2 of tempdoc 930 \u00a722.2 added a pmdMain step on top of the completed assemble (49s of a 352s job, run 33958691983); follow-up 10 widened it to `pmdAll` over every Java source set, measured at 188s here (run 33967299967, job 469s against this 600s budget). PMD's own analysis is only ~22s for all 72 tasks once classes exist, so the rest is compiling test sources, which `assemble` does not do. That step was then tried in `Unit tests (platform-contracts)` on the theory that a lane already compiling tests would run it cheaper: it did NOT \u2014 201s there, that lane at 488s against its 360s budget, and this job down to 214-261s (runs 33967790388 and the head after it). `pmdAll` needs main plus every non-main source set for all ~30 modules, so neither placement avoids the compile and this is the job with the headroom; the step lives here. Do not relocate it again without re-measuring \u2014 relocating on an untested expectation is what produced that detour. The advisory budget is unchanged; re-read it against the next observed median.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 600
+      }
     },
     {
       "job": "License and notices",
@@ -53,7 +83,9 @@
       "owner": "license allowlist and NOTICE projection",
       "hardTimeoutSeconds": 1200,
       "notes": "Recent median 175s, observed max 668s.",
-      "advisoryBudgets": { "maxWallSeconds": 780 }
+      "advisoryBudgets": {
+        "maxWallSeconds": 780
+      }
     },
     {
       "job": "Public claims",
@@ -61,15 +93,39 @@
       "owner": "public-claim and docs projection checks",
       "hardTimeoutSeconds": 1800,
       "notes": "Recent median 133s, observed max 1060s; the former 120s ceiling was already below the median.",
-      "advisoryBudgets": { "maxWallSeconds": 1200 }
+      "advisoryBudgets": {
+        "maxWallSeconds": 1200
+      }
+    },
+    {
+      "job": "Windows-native tests (node)",
+      "requiredCheck": "Windows-native tests",
+      "owner": "Windows-only tagged tests and release signing contract",
+      "hardTimeoutSeconds": 1500,
+      "notes": "Initial split budget: preserves all tests and per-test budgets; review after comparable uncached hosted runs.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 1200
+      }
+    },
+    {
+      "job": "Windows-native tests (contracts)",
+      "requiredCheck": "Windows-native tests",
+      "owner": "Windows-only tagged tests and release signing contract",
+      "hardTimeoutSeconds": 1500,
+      "notes": "Initial split budget: preserves all tests and per-test budgets; review after comparable uncached hosted runs.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 1200
+      }
     },
     {
       "job": "Windows-native tests",
       "requiredCheck": "Windows-native tests",
       "owner": "Windows-only tagged tests and release signing contract",
-      "hardTimeoutSeconds": 900,
-      "notes": "Recent median 123s, observed max 329s; added to close required-lane coverage.",
-      "advisoryBudgets": { "maxWallSeconds": 390 }
+      "hardTimeoutSeconds": 120,
+      "notes": "Required aggregate checks every expected part result after scheduling.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 30
+      }
     },
     {
       "job": "Shell crate tests (Rust)",
@@ -77,7 +133,9 @@
       "owner": "MSVC shell crate tests",
       "hardTimeoutSeconds": 1800,
       "notes": "Recent median 97s, observed max 295s; added to close required-lane coverage.",
-      "advisoryBudgets": { "maxWallSeconds": 360 }
+      "advisoryBudgets": {
+        "maxWallSeconds": 360
+      }
     },
     {
       "job": "jseval Python suite",
@@ -85,7 +143,9 @@
       "owner": "scripts/jseval pytest suite on the hosted Linux runner",
       "hardTimeoutSeconds": 1200,
       "notes": "Measured 2026-09-05 over the 13 successful main push and merge_group runs since the lane landed at 18e2833f: median 384s, observed max 432s, min 257s, zero failures. Separate evidence window from the other lanes; re-measure with them at the next reviewBy.",
-      "advisoryBudgets": { "maxWallSeconds": 540 }
+      "advisoryBudgets": {
+        "maxWallSeconds": 540
+      }
     },
     {
       "job": "Secret scan",
@@ -93,7 +153,9 @@
       "owner": "gitleaks public history scan",
       "hardTimeoutSeconds": 300,
       "notes": "Recent median 18s, observed max 22s.",
-      "advisoryBudgets": { "maxWallSeconds": 60 }
+      "advisoryBudgets": {
+        "maxWallSeconds": 60
+      }
     }
   ]
 }

@@ -69,7 +69,14 @@ abstract class LocalApiIntegrationTestBase {
 
     // Subclass seam: sysprops + on-disk state that must be in place BEFORE the Head boots (the data
     // dir is already resolved to `aiHome` at this point). Tempdoc 804 §B4.2.
+    rememberProp("policy.gpu_acceleration_enabled");
+    rememberProp("justsearch.policy.disallowExternalInferenceServers");
     beforeServerStart();
+
+    // Policy discovery publishes process sources. Do this before the first configuration
+    // snapshot, just as HeadlessApp.loadPolicySources() does, so settings candidates retain
+    // the same restart-only source fingerprint. Both publications were saved before the hook.
+    new io.justsearch.app.services.policy.EnterprisePolicyServiceImpl().snapshot();
 
     // Resolved the way the shipped Head resolves it — the persistence mode is part of the
     // configuration under test, not a harness constant (tempdoc 804 §B1/§B4.2). With no override
@@ -97,9 +104,11 @@ abstract class LocalApiIntegrationTestBase {
         settingsResources.components());
     settingsComponents.register("generative",
         new io.justsearch.app.services.GenerativeSettingsComponentOwner(
-            null, generativeObservation,
+            settingsInferenceManager(), generativeObservation,
             io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.resolveBaseDir(
                 settingsConfig.get(), System.getProperty("user.dir")), false));
+    configureSettingsComponents(settingsComponents, settingsResources.components(), settingsConfig,
+        settingsStore);
     settingsComponents.seal();
     var settingsOwner =
         new io.justsearch.app.services.settings.SettingsCommitCoordinator(
@@ -194,6 +203,17 @@ abstract class LocalApiIntegrationTestBase {
    */
   protected void beforeServerStart() throws Exception {}
 
+  protected io.justsearch.app.inference.InferenceLifecycleManager settingsInferenceManager()
+      throws Exception {
+    return null;
+  }
+
+  protected void configureSettingsComponents(
+      io.justsearch.app.services.settings.FixedSettingsComponentComposer composer,
+      io.justsearch.core.component.EngineComponentRegistry registry,
+      io.justsearch.configuration.resolved.ConfigStore config, UiSettingsStore settings)
+      throws Exception {}
+
   /** Hook for subclasses that need to customize the server under test (e.g. a session token). */
   protected LocalApiServer.Builder configureServer(LocalApiServer.Builder builder) {
     return builder;
@@ -210,11 +230,18 @@ abstract class LocalApiIntegrationTestBase {
 
   /** Sets a system property for the duration of the test, recording the previous value. */
   protected void setPropForTest(String key, String value) {
-    extraProps.putIfAbsent(key, System.getProperty(key));
+    rememberProp(key);
     if (value == null) {
       System.clearProperty(key);
     } else {
       System.setProperty(key, value);
+    }
+  }
+
+  private void rememberProp(String key) {
+    // A null previous value is meaningful: putIfAbsent would overwrite it on a later call.
+    if (!extraProps.containsKey(key)) {
+      extraProps.put(key, System.getProperty(key));
     }
   }
 

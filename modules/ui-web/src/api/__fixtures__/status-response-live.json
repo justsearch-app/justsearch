@@ -53,7 +53,9 @@
       "pendingUnknownSizeJobs" : 0,
       "searchableDocuments" : 0,
       "indexMaxDoc" : 0,
-      "indexNumDocs" : 0
+      "indexNumDocs" : 0,
+      "indexedDocumentsUnknown" : false,
+      "vduAvailable" : true
     },
     "failure" : {
       "failedJobs" : 0,
@@ -152,7 +154,11 @@
       "embeddingEnabled" : true,
       "spladeEnabled" : true,
       "nerEnabled" : true,
-      "backfillMode" : "idle"
+      "backfillMode" : "idle",
+      "embeddedAndSparseCount" : 0,
+      "embeddingAvailable" : true,
+      "spladeAvailable" : true,
+      "nerAvailable" : true
     },
     "gpu" : {
       "rerankerOrtCuda" : {
@@ -441,5 +447,70 @@
   "meta" : {
     "workerRpcAtMs" : 1704067200000,
     "workerRpcStale" : false
+  },
+  "operating" : {
+    "schemaVersion" : 1,
+    "seq" : 7,
+    "assembledAt" : "2025-01-01T00:00:00Z",
+    "chat" : {
+      "state" : "LOADING",
+      "reason" : "RELOAD",
+      "detail" : null,
+      "reasonCode" : "inference.starting",
+      "since" : "2024-12-31T23:59:50Z",
+      "managed" : true,
+      "generating" : false,
+      "inFlight" : 0,
+      "queued" : 1,
+      "blockedBy" : null,
+      "load" : {
+        "phase" : "LOADING_MODEL",
+        "startedAt" : "2024-12-31T23:59:50Z",
+        "elapsedMs" : 10000,
+        "expectedMs" : 25000,
+        "expectedSource" : "HISTORY"
+      },
+      "reloadAllowed" : null,
+      "nextReloadNotBefore" : null,
+      "sampledAt" : "2025-01-01T00:00:00Z"
+    },
+    "indexing" : {
+      "state" : "PAUSED",
+      "reasons" : [ "energy_saver" ],
+      "reasonCode" : null,
+      "since" : "2024-12-31T23:00:00Z",
+      "affects" : [ "INDEXING" ],
+      "pendingJobs" : 12,
+      "agingReleaseAt" : null,
+      "sampledAt" : "2025-01-01T00:00:00Z"
+    },
+    "gpu" : {
+      "profile" : "P12",
+      "profileSource" : "MEASURED",
+      "adapter" : "NVIDIA GeForce RTX 4070",
+      "adapterTotalBytes" : 12878610432,
+      "adapterFreeBytes" : 1610612736,
+      "ourDedicatedBytes" : 3221225472,
+      "ourSharedBytes" : 104857600,
+      "externalUsedBytes" : 8046582272,
+      "spillSuspected" : false,
+      "source" : "PDH",
+      "sampledAt" : "2024-12-31T23:59:59Z",
+      "ageMs" : 212,
+      "stale" : false
+    },
+    "degradations" : [ {
+      "code" : "exit_ledger_unwritable",
+      "cause" : null,
+      "scope" : "RUNTIME",
+      "reasonCode" : "runtime.exit_ledger_unwritable",
+      "since" : "2024-12-31T22:00:00Z",
+      "lastSeenAt" : "2024-12-31T23:59:00Z",
+      "count" : 1
+    } ],
+    "freshness" : {
+      "staleAfterMs" : 6000,
+      "staleSources" : [ "gpu" ]
+    }
   }
 }

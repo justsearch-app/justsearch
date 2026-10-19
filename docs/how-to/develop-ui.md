@@ -14,8 +14,7 @@ description: "Demo mode (no backend), real backend mode, and frontend verificati
 > In practice: **view/chrome work needs only a served frontend (no backend); search/inspector/AI need the dev
 > stack running** (AI also needs `ai_activate`). Re-wiring `?demo=true` into `resolveApiEndpoint` to restore a
 > no-backend data mode is a worthwhile follow-up, but it does NOT work today. The demo-mode sections below are
-> kept as the (currently non-functional) spec; for the live verification workflow + the measurement companion,
-> load the **`/ui-check` skill**.
+> kept as the (currently non-functional) spec. For live verification, see [Capture UI Evidence](capture-ui-evidence.md).
 
 ## Quick start — no backend needed (CHROME/LAYOUT ONLY — demo DATA is orphaned, see notice above)
 
@@ -25,7 +24,7 @@ npm install          # first time only
 npm run dev          # starts Vite
 ```
 
-Open `http://localhost:5173/`. The live Lit shell renders its chrome, rail, and surfaces with no backend
+Open `http://127.0.0.1:5173/`. The live Lit shell renders its chrome, rail, and surfaces with no backend
 (empty/`Connecting…` data). `?demo=true` is inert for the shell-v0 boot — it does **not** load fixture data
 (see the correction notice above). For real data, run the dev stack.
 
@@ -103,7 +102,7 @@ Agents can use Claude Code's Chrome extension for real-time visual feedback:
 
 ```text
 /chrome                          # enable in session
-# then ask Claude to navigate to localhost:5173 and inspect
+# then ask Claude to navigate to 127.0.0.1:5173 and inspect
 ```
 
 Claude can take screenshots, click elements, read the DOM, execute JS in

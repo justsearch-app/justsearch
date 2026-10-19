@@ -2,17 +2,12 @@
 title: Common Workflows
 type: reference
 status: stable
-description: "Step-by-step recipes for recurring JustSearch contribution tasks — add a proto message field / REST endpoint / configuration key / frontend component / agent tool; modify SSOT catalogs; add a field to an API record or registry declaration; run test suites; regenerate after doc edits. Relocated out of the always-loaded layer (tempdoc 620 Phase 2); the path-triggerable recipes are also delivered just-in-time via governance/consult-register.v1.json."
+description: "Step-by-step recipes for recurring JustSearch contribution tasks — add a proto message field / REST endpoint / configuration key / frontend component / agent tool; modify SSOT catalogs; add a field to an API record or registry declaration; run test suites; regenerate after doc edits."
 ---
 
 # Common Workflows
 
-On-demand recipes for recurring contribution tasks. This file is **not** loaded
-every session (tempdoc 620 residence relocation) — load it when you start one of
-these tasks. The four path-triggerable recipes (proto message, REST, config key, agent
-tool) are *also* registered for just-in-time consultation in
-`governance/consult-register.v1.json` when you edit the relevant region; this
-file is the full reference behind those recipes.
+Recipes for recurring contribution tasks.
 
 ## Add a proto message field (retained wire messages; retired gRPC method)
 
@@ -31,23 +26,22 @@ To add a **field**:
 2. Produce it in `modules/worker-services/`
 3. Consume it in `modules/app-services/` (`KnowledgeClient` or the relevant port)
 4. Add a contract test
-5. Verify: `./gradlew.bat :modules:ipc-common:build :modules:worker-services:test :modules:indexer-worker:test`, plus `node scripts/governance/run.mjs --gate wire --mode gate` (buf breaking-change detection over this directory)
+5. Verify: `node scripts/lib/tool-invoker.cjs gradle :modules:ipc-common:build :modules:worker-services:test :modules:indexer-worker:test`, plus `node scripts/governance/run.mjs --gate wire --mode gate` (buf breaking-change detection over this directory)
 
 ## Add a REST endpoint
 1. Add handler/controller in `modules/ui/src/main/java/.../api/`
 2. Register the route through the relevant `modules/ui/src/main/java/io/justsearch/ui/api/routes/*Routes.java` class, then wire that route class from `LocalApiServer.java` if needed
 3. Update `docs/reference/api-contract-map.md` if public
-4. Verify: `./gradlew.bat :modules:ui:test`
+4. Verify: `node scripts/lib/tool-invoker.cjs gradle :modules:ui:test`
 
 ## Add a configuration key
 1. Add entry in `EnvRegistry.java` (operator-facing) or `ConfigKey.java` (YAML-only)
 2. Wire in `ResolvedConfigBuilder.java` — add `putYaml*()` contribution + `resolve*()` call in `build*()`
 3. Expose via `ResolvedConfig` record field
 4. Document in `docs/reference/configuration/environment-variables.md`
-5. Verify: `./gradlew.bat :modules:configuration:test`
+5. Verify: `node scripts/lib/tool-invoker.cjs gradle :modules:configuration:test`
 
 ## Add a frontend component
-Load `/ui-check` for visual verification via `jseval ui-shot`.
 1. Create in `modules/ui-web/src/components/` or appropriate subdirectory
 2. Follow patterns in neighboring components
 3. Verify: `cd modules/ui-web && npm run typecheck && npm run test:unit:run`
@@ -63,29 +57,28 @@ explicitly with `cd modules/ui-web && npm install`, then commit the updated
 1. Add or update the operation entry in `AgentToolsOperationCatalog` (including its `OperationPolicy` — risk tier, confirm strategy, audit policy) and implement it as an `OperationHandler`. For a new knowledge/file-shaped tool, these are the same file pair in the same package, `modules/app-agent/src/main/java/io/justsearch/agent/tools/`. When the work isn't tool-shaped — as `core.remember` and `core.navigate-to-surface` show — the handler instead goes under `modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/`
 2. Confirm `AgentToolEmitter` projects the intended model-visible wire name and schema; a deliberate schema/policy change also requires updating `modules/app-services/src/test/resources/agent-tools-wire-baseline.json` (pinned by `AgentToolCatalogBaselineTest`)
 3. Update `docs/explanation/22-agent-system-architecture.md`
-4. Verify: `./gradlew.bat :modules:app-agent:test :modules:app-services:test`
+4. Verify: `node scripts/lib/tool-invoker.cjs gradle :modules:app-agent:test :modules:app-services:test`
 
 ## Modify SSOT catalogs (fields, analyzers, synonyms)
-Load `/ssot-catalog` for the dual-copy checklist and field role reference.
 1. Edit JSON in `SSOT/catalogs/`
 2. **If adding fields**: also update the classpath copy at `modules/adapters-lucene/src/main/resources/SSOT/catalogs/fields.v1.json` — production loads this when the repo root is unavailable
 3. **If adding fields with extraction logic**: update IndexingDocumentOps.java to populate the new field during ingestion. Existing indices will NOT have the new field; test corpora must be re-indexed (jseval run --reset or --start-backend --clean). --clean is fail-closed: it verifies the wipe and raises rather than silently re-running against a stale index if a registered Engine process survivor remains; see docs/reference/jseval-pipeline-reference.md.
 4. Regenerate fingerprints if needed
-5. Verify pinned-hash tests: `./gradlew.bat :modules:ssot-tools:test`
-6. Check commit metadata compatibility: `./gradlew.bat :modules:adapters-lucene:test`
+5. Verify pinned-hash tests: `node scripts/lib/tool-invoker.cjs gradle :modules:ssot-tools:test`
+6. Check commit metadata compatibility: `node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:test`
 
 ## Run specific test suites
-- Single module: `./gradlew.bat :modules:<module>:test`
-- Full unit suite: `./gradlew.bat test`
+- Single module: `node scripts/lib/tool-invoker.cjs gradle :modules:<module>:test`
+- Full unit suite: `node scripts/lib/tool-invoker.cjs gradle test`
 - Frontend unit: `cd modules/ui-web && npm run test:unit:run`
 - Frontend typecheck: `cd modules/ui-web && npm run typecheck`
-- System/integration: `./gradlew.bat :modules:system-tests:test`
-- Format check: `./gradlew.bat spotlessCheck`
-- Format fix: `./gradlew.bat spotlessApply`
+- System/integration: `node scripts/lib/tool-invoker.cjs gradle :modules:system-tests:test`
+- Format check: `node scripts/lib/tool-invoker.cjs gradle spotlessCheck`
+- Format fix: `node scripts/lib/tool-invoker.cjs gradle spotlessApply`
 
 ### Collect independent static failures together
 
-At a coherent source checkpoint, use `./gradlew.bat spotlessCheck pmdAll --continue`
+At a coherent source checkpoint, use `node scripts/lib/tool-invoker.cjs gradle spotlessCheck pmdAll --continue`
 to collect independent formatting and PMD failures in one pass. Gradle's default
 early stop can leave later modules unchecked, turning one correction batch into
 several discovery runs. `--continue` runs only tasks whose prerequisites permit it;
@@ -113,7 +106,7 @@ use `@RecordBuilder` to generate fluent builders. When adding a field:
 1. Add the field to the record's parameter list
 2. If the field is a collection type, add null-coalescing in the compact
    constructor (e.g., `myList = myList == null ? List.of() : List.copyOf(myList)`)
-3. Compile: `./gradlew.bat :modules:app-api:compileJava` — the builder
+3. Compile: `node scripts/lib/tool-invoker.cjs gradle :modules:app-api:compileJava` — the builder
    regenerates automatically
 4. Update the production construction site (e.g., `KnowledgeHttpApiAdapter`)
    to pass the new field
@@ -124,7 +117,7 @@ use `@RecordBuilder` to generate fluent builders. When adding a field:
    and will need manual updates. Check `@RecordBuilder` annotation presence.
 6. If the record is part of the API contract, update the controller
    (`KnowledgeSearchController`) to include the field in the response map
-7. Regenerate schemas and fixtures: `./gradlew.bat :modules:app-api:updateSchemas`
+7. Regenerate schemas and fixtures: `node scripts/lib/tool-invoker.cjs gradle :modules:app-api:updateSchemas`
 8. If the record is an FE wire surface, it is a generated record→JSON-Schema→{TS,Zod}
    projection (tempdoc 564). Emit/refresh its JSON Schema via the owning module's
    `updateSchemas` task (`:modules:app-api:updateSchemas` for app-api records;
@@ -137,7 +130,7 @@ use `@RecordBuilder` to generate fluent builders. When adding a field:
    fail-open). New fields flow through the generated schema-types; do not hand-author a
    second `.loose()` Zod (the `wire-type-single-authority` gate refuses a hand copy).
 10. Run frontend contract tests: `cd modules/ui-web && npm run test:unit:run`
-11. Verify: `./gradlew.bat :modules:app-api:test :modules:app-agent:test :modules:app-observability:test`
+11. Verify: `node scripts/lib/tool-invoker.cjs gradle :modules:app-api:test :modules:app-agent:test :modules:app-observability:test`
 
 `status-v1.json`, `knowledge-status-v1.json`, and `debug-state-v1.json` are deliberately
 manual backward-compatibility baselines. An ordinary field **addition** must not touch them;
@@ -151,8 +144,8 @@ The `/api/registry/{operations,resources}` wire is a generated projection of a t
    in the emitter (`UIOperationEmitter`/`UIResourceEmitter`). Mark nullability on the wire view:
    `Optional<>` or `@Nullable` for present-as-null; `@JsonInclude(NON_NULL)` for omitted-when-absent;
    plain for required + non-null (the `PreciseWire` rule drives the generated `required`/nullable).
-3. Regenerate + sync the schema: `./gradlew.bat :modules:app-api:updateSchemas` then
-   `./gradlew.bat :modules:ui:syncSsotSchemas`, then `node scripts/codegen/gen-wire-schema-types.mjs`
+3. Regenerate + sync the schema: `node scripts/lib/tool-invoker.cjs gradle :modules:app-api:updateSchemas` then
+   `node scripts/lib/tool-invoker.cjs gradle :modules:ui:syncSsotSchemas`, then `node scripts/codegen/gen-wire-schema-types.mjs`
 4. The FE re-exports/derives from the generated wire in `modules/ui-web/src/api/types/registry.ts`
    (derive nested types from the wire — do not hand-mirror); update fixtures the precise types flag.
 5. Verify: the `UI{Operation,Resource}ViewConformanceTest` pins the wire byte-for-byte;
@@ -160,7 +153,6 @@ The `/api/registry/{operations,resources}` wire is a generated projection of a t
    `wire-type-single-authority` gates.
 
 ## After modifying docs
-See [docs maintenance](../../agent-knowledge/docs-maintenance.md) for the full regeneration checklist and doc quality rules.
 - Regenerate llms.txt: `node scripts/docs/llmstxt-generate.mjs`
 - After module changes: `node scripts/architecture/module-deps.mjs --update-canonical`
 - After config changes: `node scripts/docs/generate-runtime-config-matrix.mjs --write-doc docs/reference/configuration/runtime-config-ownership-matrix.md`
@@ -246,7 +238,7 @@ of tempdoc 656** (supersedes 618 §3's CPU-baseline auto-stage): the dev-runner 
 **shared cuda12** llama-server — the worktree's own `native-bin/llama-server/variants/cuda12/`
 if deliberately Install-AI'd there, else the **main checkout's** shared cuda12 — and provisions
 the main checkout's copy once from the Gradle cuda stage if absent
-(`./gradlew :modules:ui:stageLlamaCudaVariant`, a one-time ~600 MB download). Every worktree then
+(`node scripts/lib/tool-invoker.cjs gradle :modules:ui:stageLlamaCudaVariant`, a one-time ~600 MB download). Every worktree then
 references that one shared copy with zero per-worktree download. Dev does not stage or fall back
 to a CPU llama-server baseline — a CPU 9B fallback runs ~10x slower and saturates every core,
 DOSing concurrent worktrees (tempdoc 381, 656) — so with no cuda12 resolvable, inference fails
@@ -276,5 +268,5 @@ gradle-cache `onnxruntime_gpu-<version>.jar` (found under
 `<GRADLE_USER_HOME>/caches/modules-2/files-2.1/com.microsoft.onnxruntime/onnxruntime_gpu/<version>/`,
 version read from `OrtCudaHelper.EXPECTED_ORT_NATIVE_VERSION`), writes the marker, and exits nonzero
 if it cannot complete the pack. It never deletes anything. If the jar is absent, run any build that
-resolves `onnxruntime_gpu` first (e.g. `./gradlew.bat :modules:ort-common:dependencies`) to populate
+resolves `onnxruntime_gpu` first (e.g. `node scripts/lib/tool-invoker.cjs gradle :modules:ort-common:dependencies`) to populate
 the cache.

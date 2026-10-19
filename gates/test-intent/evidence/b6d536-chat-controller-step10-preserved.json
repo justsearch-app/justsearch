@@ -1,0 +1,409 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-07T00:54:46.495Z",
+  "revision": "a3e96417e161d214848b2ec28557b3ae05598ec5",
+  "tree": "afba7a99920930bdf9347d1b15258d7162b315b8",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatCrashRestartTest.aCrashAfterTenMinutesOfReadyRelaunchesOnceWithTheSameConfiguration\" --tests \"io.justsearch.app.inference.ChatCrashRestartTest.aCrashWithinTenMinutesOfReadyFailsAsACrashLoopWithoutRelaunch\" --tests \"io.justsearch.app.inference.ChatCrashRestartTest.anOutOfMemoryWhileServingStepsDownOneRungAndServesThere\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9597
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppComponentEscalationTest.waitsForTheBoundSequencePublishesBeforeCloseAndExitsFiveOnce\" --tests \"io.justsearch.ui.HeadlessAppComponentEscalationTest.uncleanOrderedCloseSelectsFatalOneInsteadOfEscalatedFive\" --tests \"io.justsearch.ui.HeadlessAppComponentEscalationTest.publicationFailureHaltsFatallyWithoutEnteringOrderedClose\" --tests \"io.justsearch.ui.HeadlessAppComponentEscalationTest.dispatchFailureHaltsFatallyWithoutStartingTheSequence\" --tests \"io.justsearch.ui.HeadlessAppComponentEscalationTest.exceptionalStartupBindingDoesNotCompeteWithStartupFatalExit\" --tests \"io.justsearch.ui.HeadlessAppSelfIntentTest.selfIntentsLandInTheEngineLedgerNamingThisProcess\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2773
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.eachCooperativeExitRecordsItsReasonAndExpectedCodeBeforeTheClose\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.escalatedRestartRecordsAnEngineRestartExpectingCodeFive\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.updaterExitRecordsAnUpgradeExpectingCodeZero\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.aCloseTheJvmHookStartsRecordsItsReasonOnce\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.aFatalExitRecordsNoIntentAndItsHookAddsNone\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.theHookJoiningACooperativeExitAddsNoSecondIntent\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.aFailedIntentRecordDoesNotChangeTheExit\" --tests \"io.justsearch.app.engine.EncoderDeviceLossReporterTest.aLostDeviceIsReportedOncePerIncarnationAndItsQueriesMoveToCpu\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3943
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashRestartTest.java#aCrashAfterTenMinutesOfReadyRelaunchesOnceWithTheSameConfiguration",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8a71ac75d9fb1c76724f9d5b65405ce040e2d4ab7cfaaf3dc318ffa52fa2796a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCrashAfterTenMinutesOfReadyRelaunchesOnceWithTheSameConfiguration()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashRestartTest.java#aCrashWithinTenMinutesOfReadyFailsAsACrashLoopWithoutRelaunch",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8a71ac75d9fb1c76724f9d5b65405ce040e2d4ab7cfaaf3dc318ffa52fa2796a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCrashWithinTenMinutesOfReadyFailsAsACrashLoopWithoutRelaunch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashRestartTest.java#anOutOfMemoryWhileServingStepsDownOneRungAndServesThere",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8a71ac75d9fb1c76724f9d5b65405ce040e2d4ab7cfaaf3dc318ffa52fa2796a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anOutOfMemoryWhileServingStepsDownOneRungAndServesThere()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java#waitsForTheBoundSequencePublishesBeforeCloseAndExitsFiveOnce",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c1d8d6398230f7ec100aa1042df0105482d078c1a42eab4278cb0d7df14b5576",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "waitsForTheBoundSequencePublishesBeforeCloseAndExitsFiveOnce(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java#uncleanOrderedCloseSelectsFatalOneInsteadOfEscalatedFive",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c1d8d6398230f7ec100aa1042df0105482d078c1a42eab4278cb0d7df14b5576",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "uncleanOrderedCloseSelectsFatalOneInsteadOfEscalatedFive(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java#publicationFailureHaltsFatallyWithoutEnteringOrderedClose",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c1d8d6398230f7ec100aa1042df0105482d078c1a42eab4278cb0d7df14b5576",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "publicationFailureHaltsFatallyWithoutEnteringOrderedClose(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java#dispatchFailureHaltsFatallyWithoutStartingTheSequence",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c1d8d6398230f7ec100aa1042df0105482d078c1a42eab4278cb0d7df14b5576",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "dispatchFailureHaltsFatallyWithoutStartingTheSequence(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java#exceptionalStartupBindingDoesNotCompeteWithStartupFatalExit",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c1d8d6398230f7ec100aa1042df0105482d078c1a42eab4278cb0d7df14b5576",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exceptionalStartupBindingDoesNotCompeteWithStartupFatalExit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppSelfIntentTest.java#selfIntentsLandInTheEngineLedgerNamingThisProcess",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:303752168660d62d51db31dd76edb2b7a52719a4e640b6ad263c6aeeffe39d40",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "selfIntentsLandInTheEngineLedgerNamingThisProcess(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#eachCooperativeExitRecordsItsReasonAndExpectedCodeBeforeTheClose",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eachCooperativeExitRecordsItsReasonAndExpectedCodeBeforeTheClose(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#escalatedRestartRecordsAnEngineRestartExpectingCodeFive",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "escalatedRestartRecordsAnEngineRestartExpectingCodeFive(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#updaterExitRecordsAnUpgradeExpectingCodeZero",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updaterExitRecordsAnUpgradeExpectingCodeZero(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#aCloseTheJvmHookStartsRecordsItsReasonOnce",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCloseTheJvmHookStartsRecordsItsReasonOnce(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#aFatalExitRecordsNoIntentAndItsHookAddsNone",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFatalExitRecordsNoIntentAndItsHookAddsNone(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#theHookJoiningACooperativeExitAddsNoSecondIntent",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theHookJoiningACooperativeExitAddsNoSecondIntent(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#aFailedIntentRecordDoesNotChangeTheExit",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedIntentRecordDoesNotChangeTheExit(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EncoderDeviceLossReporterTest.java#aLostDeviceIsReportedOncePerIncarnationAndItsQueriesMoveToCpu",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EncoderDeviceLossReporterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:315c0a05d3364a95925a6bddb6e640adb29e4c23078e2555ddeffc700952c608",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLostDeviceIsReportedOncePerIncarnationAndItsQueriesMoveToCpu()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a3e96417e",
+    "revision": "a3e96417e161d214848b2ec28557b3ae05598ec5",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatCrashRestartTest.aCrashAfterTenMinutesOfReadyRelaunchesOnceWithTheSameConfiguration\" --tests \"io.justsearch.app.inference.ChatCrashRestartTest.aCrashWithinTenMinutesOfReadyFailsAsACrashLoopWithoutRelaunch\" --tests \"io.justsearch.app.inference.ChatCrashRestartTest.anOutOfMemoryWhileServingStepsDownOneRungAndServesThere\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 41641
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppComponentEscalationTest.waitsForTheBoundSequencePublishesBeforeCloseAndExitsFiveOnce\" --tests \"io.justsearch.ui.HeadlessAppComponentEscalationTest.uncleanOrderedCloseSelectsFatalOneInsteadOfEscalatedFive\" --tests \"io.justsearch.ui.HeadlessAppComponentEscalationTest.publicationFailureHaltsFatallyWithoutEnteringOrderedClose\" --tests \"io.justsearch.ui.HeadlessAppComponentEscalationTest.dispatchFailureHaltsFatallyWithoutStartingTheSequence\" --tests \"io.justsearch.ui.HeadlessAppComponentEscalationTest.exceptionalStartupBindingDoesNotCompeteWithStartupFatalExit\" --tests \"io.justsearch.ui.HeadlessAppSelfIntentTest.selfIntentsLandInTheEngineLedgerNamingThisProcess\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 26325
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.eachCooperativeExitRecordsItsReasonAndExpectedCodeBeforeTheClose\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.escalatedRestartRecordsAnEngineRestartExpectingCodeFive\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.updaterExitRecordsAnUpgradeExpectingCodeZero\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.aCloseTheJvmHookStartsRecordsItsReasonOnce\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.aFatalExitRecordsNoIntentAndItsHookAddsNone\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.theHookJoiningACooperativeExitAddsNoSecondIntent\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.aFailedIntentRecordDoesNotChangeTheExit\" --tests \"io.justsearch.app.engine.EncoderDeviceLossReporterTest.aLostDeviceIsReportedOncePerIncarnationAndItsQueriesMoveToCpu\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 7078
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashRestartTest.java#aCrashAfterTenMinutesOfReadyRelaunchesOnceWithTheSameConfiguration",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashRestartTest.java#aCrashWithinTenMinutesOfReadyFailsAsACrashLoopWithoutRelaunch",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashRestartTest.java#anOutOfMemoryWhileServingStepsDownOneRungAndServesThere",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java#waitsForTheBoundSequencePublishesBeforeCloseAndExitsFiveOnce",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java#uncleanOrderedCloseSelectsFatalOneInsteadOfEscalatedFive",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java#publicationFailureHaltsFatallyWithoutEnteringOrderedClose",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java#dispatchFailureHaltsFatallyWithoutStartingTheSequence",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppComponentEscalationTest.java#exceptionalStartupBindingDoesNotCompeteWithStartupFatalExit",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppSelfIntentTest.java#selfIntentsLandInTheEngineLedgerNamingThisProcess",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#eachCooperativeExitRecordsItsReasonAndExpectedCodeBeforeTheClose",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#escalatedRestartRecordsAnEngineRestartExpectingCodeFive",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#updaterExitRecordsAnUpgradeExpectingCodeZero",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#aCloseTheJvmHookStartsRecordsItsReasonOnce",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#aFatalExitRecordsNoIntentAndItsHookAddsNone",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#theHookJoiningACooperativeExitAddsNoSecondIntent",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#aFailedIntentRecordDoesNotChangeTheExit",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EncoderDeviceLossReporterTest.java#aLostDeviceIsReportedOncePerIncarnationAndItsQueriesMoveToCpu",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:12bbeb2ff42fd1989acdc2798cc314463913ea73d4264ddbb360123e7d617507"
+}

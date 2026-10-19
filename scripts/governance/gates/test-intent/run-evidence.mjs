@@ -1,0 +1,397 @@
+#!/usr/bin/env node
+/**
+ * Execution evidence for new checks — tempdoc 966 D4. The script, not the agent, writes the file.
+ *
+ *   node scripts/governance/gates/test-intent/run-evidence.mjs \
+ *     --out gates/test-intent/evidence/<name>.json \
+ *     --check <check id> [--check <check id> ...] \
+ *     [--before <ref> [--overlay <path> ...] [--before-patch <compatibility.patch> ...]] \
+ *     [--copy-node-modules]
+ *
+ * It runs the named checks itself (Gradle → JUnit XML, vitest → JSON report, cargo → libtest
+ * output), validates its own output (a fresh result file per run; a check that matched nothing is
+ * `not-found`, a skipped one is `skipped` — neither is executed), and records: revision, working-tree
+ * hash, the exact commands, the environment, a content digest of every named check's file, and
+ * executed versus skipped per check.
+ *
+ * `--before <ref>`: the fail-before run for repaired behaviour. A detached worktree of <ref> gets
+ * the candidate's check files (for a Rust production file, only its #[cfg(test)] items are
+ * transplanted) plus any `--overlay` paths, the same commands run there, and each check's failure is
+ * classified: `assertion` (the only one that shows the old behaviour is wrong), `exception`,
+ * `compile`, `environment`, `passed`, `skipped`.
+ * `--copy-node-modules`: copy candidate vitest dependencies into the before-worktree as ordinary
+ * files, dereferencing dependency links; by default the dependency directory is linked.
+ *
+ * Exit: 0 when every check executed and passed on the candidate (and, with --before, failed with an
+ * assertion before); 1 otherwise; 2 usage/infrastructure error. Completed results are written
+ * even when removing the before-worktree fails.
+ */
+
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { normalizeText } from './changeset.mjs';
+import { EVIDENCE_PRODUCER, EVIDENCE_SCHEMA, checkFile, checkName, contentDigest, evidenceSelfDigest } from './evidence.mjs';
+import {
+  classifyFailBefore,
+  gradleTarget,
+  parseJUnitXml,
+  parseLibtest,
+  parseVitestJson,
+  runnerFor,
+  selectJUnitCases,
+  selectVitestCases,
+  summarize,
+} from './evidence-runners.mjs';
+import { extractTestItems, testModuleFiles } from './rust-tests.mjs';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(HERE, '..', '..', '..', '..');
+const IS_WIN = process.platform === 'win32';
+
+function sh(command, cwd) {
+  const started = Date.now();
+  // Native test extraction must be private to this invocation and checkout. Sharing the default
+  // path with another Gradle run silently skips app-services' native checks on Windows.
+  const env = { ...process.env };
+  if (/gradlew/.test(command) && env.LIGHTGBM_NATIVE_LIB_PATH) {
+    // Resolve the named directory itself (it may be a junction); links inside it are not followed.
+    const nativeSource = fs.realpathSync(env.LIGHTGBM_NATIVE_LIB_PATH);
+    env.LIGHTGBM_NATIVE_LIB_PATH = path.join(cwd, 'build', `lightgbm-evidence-${process.pid}-${Date.now()}`);
+    fs.mkdirSync(env.LIGHTGBM_NATIVE_LIB_PATH, { recursive: true });
+    // Copy the complete tree, skipping symlinks and Windows junctions rather than following
+    // them into shared or external directories. The source remains untouched.
+    fs.cpSync(nativeSource, env.LIGHTGBM_NATIVE_LIB_PATH, {
+      recursive: true,
+      filter: (source) => !fs.lstatSync(source).isSymbolicLink(),
+    });
+  }
+  const res = spawnSync(command, { cwd, env, shell: true, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
+  const signal = res.signal ?? (IS_WIN && (res.status >>> 0) === 0xC000013A ? 'STATUS_CONTROL_C_EXIT' : null);
+  return {
+    command,
+    cwd: path.relative(REPO_ROOT, cwd).replaceAll('\\', '/') || '.',
+    exitCode: res.status ?? -1,
+    durationMs: Date.now() - started,
+    output: [res.stdout ?? '', res.stderr ?? '',
+      ...(signal ? [`command interrupted: ${signal}`] : []),
+      ...(res.error ? [res.error.message] : []),
+    ].join('\n'),
+  };
+}
+
+function gitOut(args, cwd, env) {
+  const res = spawnSync('git', ['-c', 'core.longpaths=true', ...args], { cwd, encoding: 'utf8', env: env ?? process.env });
+  if (res.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${res.stderr}`);
+  return res.stdout.trim();
+}
+
+/** Tree hash of the working tree (tracked + untracked, ignored excluded), via a throwaway index. */
+function workingTreeHash(root) {
+  const idx = path.join(os.tmpdir(), `test-intent-index-${process.pid}-${Date.now()}`);
+  const env = { ...process.env, GIT_INDEX_FILE: idx };
+  try {
+    gitOut(['read-tree', 'HEAD'], root, env);
+    gitOut(['add', '-A'], root, env);
+    return gitOut(['write-tree'], root, env);
+  } finally {
+    fs.rmSync(idx, { force: true });
+  }
+}
+
+function toolVersion(cmd) {
+  const r = spawnSync(cmd, { shell: true, encoding: 'utf8' });
+  return r.status === 0 ? `${r.stdout}${r.stderr}`.trim().split(/\r?\n/)[0] : null;
+}
+
+/** Run every check in `root`; returns {runs, results: Map<checkId, {cases, buildOutput, fileStatus, fileMessage}>}. */
+function runChecks(checks, root) {
+  const runs = [];
+  const results = new Map();
+  const gradleGroups = new Map();
+  const vitestFiles = new Map();
+  for (const id of checks) {
+    const r = runnerFor(id);
+    if (r === 'gradle') {
+      const t = gradleTarget(id);
+      if (t.error) throw new Error(t.error);
+      const key = `${t.project}:${t.task}`;
+      if (!gradleGroups.has(key)) gradleGroups.set(key, []);
+      gradleGroups.get(key).push({ id, t });
+    } else if (r === 'vitest') {
+      const lockdown = /-lockdown\.test\./.test(checkFile(id));
+      const key = lockdown ? 'lockdown' : 'default';
+      if (!vitestFiles.has(key)) vitestFiles.set(key, []);
+      vitestFiles.get(key).push(id);
+    } else if (r === 'cargo') {
+      if (!checkName(id)) throw new Error(`${id}: a Rust check needs '#<libtest name>' (e.g. updater::tests::rejects_bad_sig)`);
+      const name = checkName(id);
+      const run = sh(`cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact ${JSON.stringify(name)}`, root);
+      runs.push(run);
+      results.set(id, { runner: 'cargo', cases: parseLibtest(run.output).filter((c) => c.name === name), buildOutput: run.output });
+    } else {
+      throw new Error(`${id}: no runner for this path (JVM test source set, ui-web test file, or shell crate .rs)`);
+    }
+  }
+  for (const group of gradleGroups.values()) {
+    for (const { t } of group) fs.rmSync(path.join(root, t.resultFile), { force: true });
+    const filters = [...new Set(group.map(({ t }) => (t.method ? `${t.fqcn}.${t.method}` : t.fqcn)))];
+    const wrapper = IS_WIN ? '.\\gradlew.bat' : './gradlew';
+    const { project, task } = group[0].t;
+    const run = sh(`${wrapper} ${project}:${task} ${filters.map((f) => `--tests ${JSON.stringify(f)}`).join(' ')} --rerun -PskipWebBuild=true --console=plain`, root);
+    runs.push(run);
+    for (const { id, t } of group) {
+      const xmlPath = path.join(root, t.resultFile);
+      const cases = fs.existsSync(xmlPath) ? selectJUnitCases(parseJUnitXml(fs.readFileSync(xmlPath, 'utf8')), t) : [];
+      results.set(id, { runner: 'gradle', cases, buildOutput: run.output });
+    }
+  }
+  for (const [kind, ids] of vitestFiles) {
+    const out = path.join(os.tmpdir(), `test-intent-vitest-${process.pid}-${Date.now()}.json`);
+    const files = [...new Set(ids.map((id) => checkFile(id).replace(/^modules\/ui-web\//, '')))];
+    const config = kind === 'lockdown' ? ' --config vitest.config.lockdown.ts' : '';
+    const run = sh(`npx vitest run ${files.map((f) => JSON.stringify(f)).join(' ')}${config} --reporter=json --outputFile=${JSON.stringify(out)}`, path.join(root, 'modules', 'ui-web'));
+    runs.push(run);
+    const parsed = fs.existsSync(out) ? parseVitestJson(fs.readFileSync(out, 'utf8')) : [];
+    fs.rmSync(out, { force: true });
+    for (const id of ids) {
+      const sel = selectVitestCases(parsed, id);
+      results.set(id, { runner: 'vitest', ...sel, buildOutput: run.output });
+    }
+  }
+  return { runs, results };
+}
+
+/** Put the candidate's checks into the before-worktree. */
+function overlayInto(worktree, checks, overlays) {
+  const files = [...new Set([...checks.map(checkFile), ...overlays])];
+  for (const rel of files) {
+    const src = path.join(REPO_ROOT, rel);
+    const dst = path.join(worktree, rel);
+    if (!fs.existsSync(src)) continue;
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    const isRustProd = rel.endsWith('.rs') && fs.existsSync(dst) && !overlays.includes(rel) && !rustTestFiles().has(rel);
+    if (!isRustProd) {
+      fs.copyFileSync(src, dst);
+      continue;
+    }
+    // Transplant only the #[cfg(test)] items: the production half must stay the before-state.
+    const cand = extractTestItems(normalizeText(fs.readFileSync(src, 'utf8')));
+    const before = normalizeText(fs.readFileSync(dst, 'utf8'));
+    if (cand.wholeFile) {
+      fs.copyFileSync(src, dst);
+      continue;
+    }
+    const old = extractTestItems(before);
+    let text = before;
+    for (const it of [...old.items].reverse()) text = text.slice(0, it.start) + text.slice(it.end);
+    fs.writeFileSync(dst, `${text.replace(/\s+$/, '')}\n\n${cand.text}\n`, 'utf8');
+  }
+}
+
+/** Files the candidate crate loads through a test-only `mod` declaration (whole-file test code). */
+let rustTestFileCache = null;
+function rustTestFiles() {
+  if (rustTestFileCache) return rustTestFileCache;
+  rustTestFileCache = new Set();
+  const crate = 'modules/shell/src-tauri';
+  const list = spawnSync('git', ['ls-files', '-co', '--exclude-standard', '--', crate], { cwd: REPO_ROOT, encoding: 'utf8' });
+  for (const rel of (list.stdout ?? '').split(/\s+/).filter((p) => p.endsWith('.rs'))) {
+    const abs = path.join(REPO_ROOT, rel);
+    if (!fs.existsSync(abs)) continue;
+    for (const f of testModuleFiles(rel, normalizeText(fs.readFileSync(abs, 'utf8')))) rustTestFileCache.add(f);
+  }
+  return rustTestFileCache;
+}
+
+function prepareNodeModules(worktree, copyNodeModules = false) {
+  const src = path.join(REPO_ROOT, 'modules', 'ui-web', 'node_modules');
+  const dst = path.join(worktree, 'modules', 'ui-web', 'node_modules');
+  if (!fs.existsSync(src) || fs.existsSync(dst)) return;
+  // Node 24's native directory copier recreates POSIX symlinks even with dereference enabled.
+  // An all-pass filter selects its stat-based copier, which follows each dependency link.
+  if (copyNodeModules) fs.cpSync(src, dst, { recursive: true, dereference: true, filter: () => true });
+  else fs.symlinkSync(src, dst, IS_WIN ? 'junction' : 'dir');
+}
+
+/** Detach links without visiting their targets, including dangling links and linked ancestors. */
+function unlinkWorktreeLinks(entry) {
+  const stat = fs.lstatSync(entry, { throwIfNoEntry: false });
+  if (!stat) return;
+  if (stat.isSymbolicLink()) {
+    fs.unlinkSync(entry);
+  } else if (stat.isDirectory()) {
+    for (const name of fs.readdirSync(entry)) unlinkWorktreeLinks(path.join(entry, name));
+  }
+}
+
+function removeBeforeWorktree(worktree, created) {
+  // An invalid ref never creates/registers a worktree. Remove only our still-empty, real
+  // reservation, non-recursively; anything populated still goes through guarded Git removal.
+  if (!created && fs.lstatSync(worktree, { throwIfNoEntry: false })?.isDirectory()
+      && fs.readdirSync(worktree).length === 0) {
+    fs.rmdirSync(worktree);
+    return;
+  }
+  // Git for Windows can traverse junctions during recursive removal. Detach every link first,
+  // not only the node_modules link we created: a check or partial checkout can leave others.
+  // An unreadable directory or failed unlink aborts removal, leaving the tree for inspection.
+  unlinkWorktreeLinks(worktree);
+  const removed = spawnSync('git', ['-c', 'core.longpaths=true', 'worktree', 'remove', '--force', worktree], { cwd: REPO_ROOT });
+  if (removed.status !== 0) throw new Error(`before-state cleanup failed (${worktree}): ${removed.error?.message ?? removed.stderr}`);
+}
+
+function parseArgs(argv) {
+  const a = { checks: [], overlays: [], beforePatches: [] };
+  for (let i = 0; i < argv.length; i++) {
+    const k = argv[i];
+    const v = () => {
+      if (argv[i + 1] === undefined) throw new Error(`${k} needs a value`);
+      return argv[++i];
+    };
+    if (k === '--check') a.checks.push(v().replaceAll('\\', '/'));
+    else if (k === '--out') a.out = v();
+    else if (k === '--before') a.before = v();
+    else if (k === '--before-patch') a.beforePatches.push(v().replaceAll('\\', '/'));
+    else if (k === '--before-root') a.beforeRoot = path.resolve(v());
+    else if (k === '--overlay') a.overlays.push(v().replaceAll('\\', '/'));
+    else if (k === '--copy-node-modules') a.copyNodeModules = true;
+    else throw new Error(`unknown argument ${k}`);
+  }
+  if (!a.out || a.checks.length === 0) throw new Error('usage: --out <file> --check <id> [--check <id>...] [--before <ref> [--overlay <path>...]] [--copy-node-modules]');
+  if (a.beforePatches.length && !a.before) throw new Error('--before-patch requires --before');
+  return a;
+}
+
+function main() {
+  let args;
+  try {
+    args = parseArgs(process.argv.slice(2));
+  } catch (e) {
+    console.error(e.message);
+    return 2;
+  }
+  for (const id of args.checks) {
+    if (!fs.existsSync(path.join(REPO_ROOT, checkFile(id)))) {
+      console.error(`${id}: ${checkFile(id)} does not exist`);
+      return 2;
+    }
+  }
+  const digestsBefore = new Map(args.checks.map((id) => [id, contentDigest(fs.readFileSync(path.join(REPO_ROOT, checkFile(id)), 'utf8'))]));
+  const scriptText = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8');
+
+  const { runs, results } = runChecks(args.checks, REPO_ROOT);
+  const checks = args.checks.map((id) => {
+    const r = results.get(id);
+    const now = contentDigest(fs.readFileSync(path.join(REPO_ROOT, checkFile(id)), 'utf8'));
+    if (now !== digestsBefore.get(id)) throw new Error(`${checkFile(id)} changed while the checks ran; re-run`);
+    return {
+      id,
+      file: checkFile(id),
+      runner: r.runner,
+      contentDigest: now,
+      ...summarize(r.cases),
+      cases: r.cases.map((c) => ({ name: c.name, status: c.status })),
+    };
+  });
+
+  let failBefore = null;
+  let cleanupError;
+  if (args.before) {
+    const wt = fs.mkdtempSync(path.join(args.beforeRoot ?? os.tmpdir(), 'test-intent-before-'));
+    let beforeError;
+    let created = false;
+    try {
+      // Git accepts the reserved empty directory. Keep creation inside the cleanup scope so a
+      // failed checkout cannot leave links behind without even attempting to detach them.
+      gitOut(['worktree', 'add', '--detach', wt, args.before], REPO_ROOT);
+      created = true;
+      // Explicit compatibility scaffolding for checks using newly added interfaces. Its bytes are
+      // part of the evidence; repaired behavior must remain absent from this before-state patch.
+      const patches = args.beforePatches.map((rel) => {
+        const absolute = path.resolve(REPO_ROOT, rel);
+        const digest = contentDigest(fs.readFileSync(absolute, 'utf8'));
+        gitOut(['apply', absolute], wt);
+        return { path: rel, contentDigest: digest };
+      });
+      overlayInto(wt, args.checks, args.overlays);
+      if (args.checks.some(id => runnerFor(id) === 'vitest')) prepareNodeModules(wt, args.copyNodeModules);
+      const fb = runChecks(args.checks, wt);
+      failBefore = {
+        ref: args.before,
+        revision: gitOut(['rev-parse', `${args.before}^{commit}`], REPO_ROOT),
+        overlays: args.overlays,
+        patches,
+        runs: fb.runs.map(({ output, ...r }) => ({ ...r, cwd: '<before-worktree>', ...(r.exitCode !== 0 ? { output } : {}) })),
+        checks: args.checks.map((id) => ({ id, ...classifyFailBefore(fb.results.get(id)) })),
+      };
+    } catch (e) {
+      beforeError = e;
+    }
+    try {
+      removeBeforeWorktree(wt, created);
+    } catch (e) {
+      cleanupError = e;
+    }
+    if (beforeError) {
+      throw cleanupError
+        ? new AggregateError([beforeError, cleanupError], `${beforeError.message}; ${cleanupError.message}`)
+        : beforeError;
+    }
+  }
+
+  const evidence = {
+    schema: EVIDENCE_SCHEMA,
+    producer: { script: EVIDENCE_PRODUCER, scriptDigest: contentDigest(scriptText) },
+    createdAt: new Date().toISOString(),
+    revision: gitOut(['rev-parse', 'HEAD'], REPO_ROOT),
+    tree: workingTreeHash(REPO_ROOT),
+    environment: {
+      platform: process.platform,
+      arch: process.arch,
+      osRelease: os.release(),
+      node: process.version,
+      java: runs.some((r) => /gradlew/.test(r.command)) ? toolVersion('java -version') : null,
+      cargo: runs.some((r) => /^cargo /.test(r.command)) ? toolVersion('cargo --version') : null,
+      ci: Boolean(process.env.CI),
+    },
+    runs: runs.map(({ output, ...r }) => ({ ...r, ...(r.exitCode !== 0 ? { output } : {}) })),
+    checks,
+    failBefore,
+  };
+  evidence.digest = evidenceSelfDigest(evidence);
+  const outAbs = path.resolve(REPO_ROOT, args.out);
+  fs.mkdirSync(path.dirname(outAbs), { recursive: true });
+  fs.writeFileSync(outAbs, JSON.stringify(evidence, null, 2) + '\n', 'utf8');
+
+  let ok = true;
+  for (const c of checks) {
+    const line = `${c.id}: ${c.outcome}${c.executed ? '' : ' (NOT executed)'}`;
+    if (!c.executed || c.outcome !== 'passed') ok = false;
+    console.log(line);
+  }
+  for (const c of failBefore?.checks ?? []) {
+    console.log(`fail-before ${c.id}: ${c.classification} — ${c.detail}`);
+    if (c.classification !== 'assertion') ok = false;
+  }
+  for (const [label, completed] of [['candidate', runs], ['fail-before', failBefore?.runs ?? []]]) {
+    for (const run of completed.filter(r => r.exitCode !== 0)) {
+      console.error(`${label} command exited ${run.exitCode}: ${run.command}\n${run.output}`);
+    }
+  }
+  console.log(`evidence written: ${path.relative(REPO_ROOT, outAbs).replaceAll('\\', '/')}`);
+  // A failed child is a result, not an exception. Keep both its evidence/diagnostic and the
+  // cleanup error; report infrastructure failure only after publishing the completed results.
+  if (cleanupError) throw cleanupError;
+  return ok ? 0 : 1;
+}
+
+try {
+  process.exitCode = main();
+} catch (e) {
+  console.error(`run-evidence: ${e.message}`);
+  process.exitCode = 2;
+}

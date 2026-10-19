@@ -430,7 +430,6 @@ final class HeadlessAppShutdownWiringTest {
     order.verify(watcher).close();
     order.verify(health).close();
     order.verify(api).stop();
-    order.verify(assembly).setStopGenerativeBackendOnClose(false);
     order.verify(assembly).close();
     order.verify(operations).checkpointDurableOperations();
     order.verify(knowledge).closeForUpgrade();
@@ -520,8 +519,10 @@ final class HeadlessAppShutdownWiringTest {
   }
 
   @Test
-  @DisplayName("every reason configures the inference close before HeadAssembly closes")
-  void everyReasonConfiguresInferenceCloseBeforeAssemblyClose() {
+  void everyReasonClosesTheAssemblyAndItsChatServer() {
+    // Every reason closes HeadAssembly, which stops the chat server, after the API stops.
+    // ADR-0051 decision 2: closing HeadAssembly always stops its llama-server (HeadAssemblyTest
+    // heldInferenceManagerAlwaysStopsItsServerOnClose); no reason may skip that close.
     for (Reason reason : Reason.values()) {
       HeadAssembly assembly = mock(HeadAssembly.class);
       OperationLeaseService leases = mock(OperationLeaseService.class);
@@ -541,8 +542,11 @@ final class HeadlessAppShutdownWiringTest {
       order.verify(leases).freezeAdmission(reason.wire());
       order.verify(admission).cancelInteractive(reason.wire());
       order.verify(api).stop();
-      order.verify(assembly).setStopGenerativeBackendOnClose(reason.stopsGenerativeBackend());
       order.verify(assembly).close();
+      assertTrue(
+          Mockito.mockingDetails(assembly).getInvocations().stream()
+              .noneMatch(call -> call.getMethod().getName().equals("setStopGenerativeBackendOnClose")),
+          "no shutdown reason may tell the assembly to leave its chat server running");
     }
   }
 

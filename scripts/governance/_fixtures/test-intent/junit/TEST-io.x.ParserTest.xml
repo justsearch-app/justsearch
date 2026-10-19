@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.x.ParserTest" tests="2" skipped="0" failures="2" errors="0" timestamp="2026-10-05T18:48:55.832Z" hostname="redacted" time="0.043">
+  <properties/>
+  <testcase name="bare()" classname="io.x.ParserTest" time="0.021">
+    <failure message="java.lang.IllegalStateException: empty header" type="java.lang.IllegalStateException">java.lang.IllegalStateException: empty header
+	at io.x.ParserTest.parseHeader(ParserTest.java:10)
+	at io.x.ParserTest.bare(ParserTest.java:15)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <testcase name="wrapped()" classname="io.x.ParserTest" time="0.005">
+    <failure message="org.opentest4j.AssertionFailedError: Unexpected exception thrown: java.lang.IllegalStateException: empty header" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: Unexpected exception thrown: java.lang.IllegalStateException: empty header
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)
+	at org.junit.jupiter.api.AssertDoesNotThrow.createAssertionFailedError(AssertDoesNotThrow.java:84)
+	at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertDoesNotThrow.java:53)
+	at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertDoesNotThrow.java:36)
+	at org.junit.jupiter.api.Assertions.assertDoesNotThrow(Assertions.java:3199)
+	at io.x.ParserTest.wrapped(ParserTest.java:13)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+Caused by: java.lang.IllegalStateException: empty header
+	at io.x.ParserTest.parseHeader(ParserTest.java:10)
+	at io.x.ParserTest.lambda$wrapped$0(ParserTest.java:13)
+	at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertDoesNotThrow.java:49)
+	... 6 more
+</failure>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

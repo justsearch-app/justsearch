@@ -15,7 +15,7 @@ toolkit (tempdoc 615). The harness drives the **live Lit `shell-v0`** UI.
 > view/chrome steps need only a served frontend (the tool auto-serves Vite), but **search/inspector/AI steps
 > need the dev stack running** (AI also needs `ai_activate`). Every capture also writes a `.measure.json`
 > (accessibility tree + axe + geometry + console) — **judge correctness from those facts, the PNG for
-> gestalt.** Full reference: the **`/ui-check` skill**.
+> gestalt.**
 
 ## Single-Step Capture (Agent Feedback)
 

@@ -39,6 +39,7 @@
  *      finish, not merely "safe" in the no-data-loss sense.
  */
 'use strict';
+const { formatTerminationCommand } = require('./lib/recorded-termination.cjs');
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
@@ -148,6 +149,10 @@ function longPathDelete(p) {
  * `readProcessTable` in `process-identity.cjs` is the tri-state an identity check uses instead.
  */
 function getProcessTable() {
+  if (process.platform === 'linux') {
+    const result = readProcessTable();
+    return result.ok ? result.table : [];
+  }
   if (process.platform !== 'win32') return [];
   const psCmd = PROCESS_TABLE_PS_COMMAND;
   const res = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', psCmd], {
@@ -227,9 +232,13 @@ function filterHolders(table, targetPath, ownPid) {
 }
 
 function formatHolderLines(entry) {
+  const pid = Number(entry.ProcessId);
+  const birth = String(entry.CreationFileTimeUtc ?? '');
+  const command = formatTerminationCommand({ pid, creationFileTimeUtc: birth,
+    ...(entry.processIdentity ? { processIdentity: entry.processIdentity } : {}) });
   return [
     `PID ${entry.ProcessId}: ${entry.Name} — ${entry.CommandLine}`,
-    `  kill: taskkill /F /PID ${entry.ProcessId}`,
+    `  kill: ${command}`,
   ];
 }
 
@@ -304,14 +313,7 @@ function flagValue(argv, name) {
 
 const QUERY_ENV = Object.freeze({ GIT_OPTIONAL_LOCKS: '0' });
 
-function pathKey(p) {
-  const resolved = path.resolve(p).replace(/\\/g, '/').replace(/\/+$/, '');
-  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
-}
-
-function samePath(a, b) {
-  return pathKey(a) === pathKey(b);
-}
+const { pathKey, samePath } = require('../lib/path-identity.cjs');
 
 function isWithin(candidate, root) {
   const child = pathKey(candidate);

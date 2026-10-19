@@ -1,0 +1,233 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:83d8dd3cdaf29665ab7d4d5208d8f1950aa0fdbf948556d275c256efabd8b9b7"
+  },
+  "createdAt": "2026-10-16T04:08:44.854Z",
+  "revision": "31bbdf349527234907d0378966df178e66ef3e0e",
+  "tree": "570f5d5afba489e90a7548495e385f8cc145e17e",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.idleLoadedChatProcessesOneBoundedPassAndRestoresItsConfiguration\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.humanDemandFinishesAfterOnlyTheCurrentDocumentAndOneRestore\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.activityBetweenDocumentsRestoresChatAndDoesNotRelaunchAgainInTheSameIdlePeriod\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.failedAutomaticLaunchRestoresLoadedChatAndBacksOff\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.automaticEntryRefusesARacingLeaseWithoutWaitingOrChangingChat\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.shutdownDuringAutomaticPassStopsTheServerAndRefusesTheWaitingPerson\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.generationAuxLeasePowerPressureAndShortIdleAllBlockAutomaticEntry\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.explicitPassStillWorksWithoutAnIdleWindow\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.chatOffAutomaticPathStillReturnsToTheOffIntent\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 30822
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#idleLoadedChatProcessesOneBoundedPassAndRestoresItsConfiguration",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "idleLoadedChatProcessesOneBoundedPassAndRestoresItsConfiguration()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#humanDemandFinishesAfterOnlyTheCurrentDocumentAndOneRestore",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "humanDemandFinishesAfterOnlyTheCurrentDocumentAndOneRestore()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#activityBetweenDocumentsRestoresChatAndDoesNotRelaunchAgainInTheSameIdlePeriod",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "activityBetweenDocumentsRestoresChatAndDoesNotRelaunchAgainInTheSameIdlePeriod()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#failedAutomaticLaunchRestoresLoadedChatAndBacksOff",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedAutomaticLaunchRestoresLoadedChatAndBacksOff()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#automaticEntryRefusesARacingLeaseWithoutWaitingOrChangingChat",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "automaticEntryRefusesARacingLeaseWithoutWaitingOrChangingChat()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#shutdownDuringAutomaticPassStopsTheServerAndRefusesTheWaitingPerson",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shutdownDuringAutomaticPassStopsTheServerAndRefusesTheWaitingPerson()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#generationAuxLeasePowerPressureAndShortIdleAllBlockAutomaticEntry",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generationAuxLeasePowerPressureAndShortIdleAllBlockAutomaticEntry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#explicitPassStillWorksWithoutAnIdleWindow",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitPassStillWorksWithoutAnIdleWindow()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#chatOffAutomaticPathStillReturnsToTheOffIntent",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:50cdce2cbe51c22383d9bd88917032ff4952b1ca8922c5c9fe3224f8dfe4bf96",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatOffAutomaticPathStillReturnsToTheOffIntent()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "13524ddf0",
+    "revision": "13524ddf01e92a273111ec752cacd74c0eeea233",
+    "overlays": [
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/SlowStartFakeLlamaServer.java"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b85-auto-vdu-r2-preservation-compat.patch",
+        "contentDigest": "sha256:615c1ad7073d93097ed48b5cfa4899f8898c174e16b8fdfb11dd926ca8e5abc8"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.idleLoadedChatProcessesOneBoundedPassAndRestoresItsConfiguration\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.humanDemandFinishesAfterOnlyTheCurrentDocumentAndOneRestore\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.activityBetweenDocumentsRestoresChatAndDoesNotRelaunchAgainInTheSameIdlePeriod\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.failedAutomaticLaunchRestoresLoadedChatAndBacksOff\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.automaticEntryRefusesARacingLeaseWithoutWaitingOrChangingChat\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.shutdownDuringAutomaticPassStopsTheServerAndRefusesTheWaitingPerson\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.generationAuxLeasePowerPressureAndShortIdleAllBlockAutomaticEntry\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.explicitPassStillWorksWithoutAnIdleWindow\" --tests \"io.justsearch.app.services.vdu.AutomaticVduLoadedChatTest.chatOffAutomaticPathStillReturnsToTheOffIntent\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 39915
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#idleLoadedChatProcessesOneBoundedPassAndRestoresItsConfiguration",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#humanDemandFinishesAfterOnlyTheCurrentDocumentAndOneRestore",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#activityBetweenDocumentsRestoresChatAndDoesNotRelaunchAgainInTheSameIdlePeriod",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#failedAutomaticLaunchRestoresLoadedChatAndBacksOff",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#automaticEntryRefusesARacingLeaseWithoutWaitingOrChangingChat",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#shutdownDuringAutomaticPassStopsTheServerAndRefusesTheWaitingPerson",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#generationAuxLeasePowerPressureAndShortIdleAllBlockAutomaticEntry",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#explicitPassStillWorksWithoutAnIdleWindow",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#chatOffAutomaticPathStillReturnsToTheOffIntent",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:0b788e757072a312df52f8c15df8884d67834f85e2888ce95aad22e8407acd1f"
+}

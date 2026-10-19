@@ -65,7 +65,12 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
     this.inputFactory = inputFactory;
     // Same detector as the structured extractor, so this flat fallback cannot disagree with it
     // about what is text (tempdoc 803).
-    this.tika = new Tika(TextNameMagicConflictDetector.wrapDefault());
+    // No owner window: constructing the parser graph launches nothing beyond the recorded runtime's
+    // one-time check, which carries its own window (OwnedTikaParsers excludes Tika's Tesseract
+    // parser), and this flat fallback never launches Tesseract (task b6d536 b101).
+    this.tika = new Tika(TextNameMagicConflictDetector.wrapDefault(),
+        OwnedTikaParsers.create(TextNameMagicConflictDetector.wrapDefault()),
+        new org.apache.tika.language.translate.DefaultTranslator());
     this.maxContentLength = maxContentLength;
     // Set default max string length for Tika parser
     this.tika.setMaxStringLength(maxContentLength);
@@ -126,8 +131,10 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
 
     log.debug("Extracting content from: {} ({} bytes)", file.getFileName(), fileSize);
 
+    StructuredContentExtractor.configureTesseractSkipOcr(context);
     Metadata metadata = input.metadata();
 
+    // No owner window: this parser graph cannot launch Tesseract (OwnedTikaParsers excludes it).
     try (InputStream is = input.openParserStream(tika)) {
       org.apache.tika.sax.BodyContentHandler handler =
           new org.apache.tika.sax.BodyContentHandler(maxContentLength);

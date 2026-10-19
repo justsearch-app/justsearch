@@ -23,9 +23,16 @@ public sealed interface BgeM3Encoding
     }
   }
 
-  record Failed(SearchReasonCode reason) implements BgeM3Encoding {
+  /** As {@link VectorEncoding.Failed}: the reason, and its cause for a semantic budget miss. */
+  record Failed(SearchReasonCode reason, SearchReasonCode.LegCause cause) implements BgeM3Encoding {
     public Failed {
       Objects.requireNonNull(reason, "reason");
+      Objects.requireNonNull(cause, "cause");
+      LegCauses.requireConsistent(reason, cause);
+    }
+
+    public Failed(SearchReasonCode reason) {
+      this(reason, SearchReasonCode.LegCause.NONE);
     }
   }
 }

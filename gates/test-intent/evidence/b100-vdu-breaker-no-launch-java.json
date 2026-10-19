@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T11:22:11.278Z",
+  "revision": "d72a8a90ca0ff08417535e5881aa8e73183dd9ab",
+  "tree": "b87256b462e380b7d1a4f800546a12852c5938e8",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.anEntryRefusalThatLaunchedNothingNeitherCountsNorResets\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13459
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#anEntryRefusalThatLaunchedNothingNeitherCountsNorResets",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:38dfe18b62ed419770328b5289ad65a2570d5cd014906246292db2dfc4494931",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anEntryRefusalThatLaunchedNothingNeitherCountsNorResets()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d72a8a90c",
+    "revision": "d72a8a90ca0ff08417535e5881aa8e73183dd9ab",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.AutomaticVduBreakerSeamTest.anEntryRefusalThatLaunchedNothingNeitherCountsNorResets\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 69535
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduBreakerSeamTest.java#anEntryRefusalThatLaunchedNothingNeitherCountsNorResets",
+        "classification": "assertion",
+        "detail": "anEntryRefusalThatLaunchedNothingNeitherCountsNorResets(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the refusal that launched nothing did not count: this automatic pass runs ==> expected: <4> but was: <3>"
+      }
+    ]
+  },
+  "digest": "sha256:4681cc92b0a24838e01cfd9dc4ab70374ecbb3454e1551c0051795a61572b548"
+}

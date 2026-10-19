@@ -13,6 +13,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import { selectJobArtifact } from './lib/ci-artifact-attempts.mjs';
 import { loadPublicCiLocalRepro, localReproCommandMap } from './lib/public-ci-local-repro.mjs';
 
 const KIND = 'justsearch-ci-evidence-digest.v1';
@@ -33,10 +34,13 @@ const RUN_FIELDS = [
   'workflowName',
 ].join(',');
 
+const SHARD_POLICY = JSON.parse(fs.readFileSync(new URL('./unit-test-shard-policy.v1.json', import.meta.url), 'utf8'));
 const UNIT_ARTIFACTS = new Map([
-  ['Unit tests (app-ui)', 'unit-test-attribution-app-ui'],
-  ['Unit tests (search-worker)', 'unit-test-attribution-search-worker'],
-  ['Unit tests (platform-contracts)', 'unit-test-attribution-platform-contracts'],
+  ...SHARD_POLICY.lanes.map((lane) => [lane.jobName || `Unit tests (${lane.lane})`, lane.artifact]),
+  ...Object.entries(SHARD_POLICY.historicalArtifacts || {}).map(([lane, artifact]) => [`Unit tests (${lane})`, artifact]),
+]);
+const WINDOWS_ARTIFACTS = new Map([
+  ['Windows-native tests (contracts)', 'windows-native-contracts'],
 ]);
 const BUILD_ATTRIBUTION_ARTIFACT = 'build-attribution';
 const BUILD_ATTRIBUTION_KIND = 'justsearch-build-attribution.v1';
@@ -166,7 +170,7 @@ function loadJobs(run, opts) {
   if (opts.runJson) throw new Error('Fixture mode requires --jobs-json so the digest stays offline');
   const id = run.databaseId || opts.runId;
   if (!id) throw new Error('Cannot load jobs without a run id');
-  const api = JSON.parse(execGh(['api', `repos/${opts.repo}/actions/runs/${id}/jobs`]));
+  const api = JSON.parse(execGh(['api', `repos/${opts.repo}/actions/runs/${id}/jobs?filter=latest&per_page=100`]));
   return { jobs: api.jobs || [] };
 }
 
@@ -175,7 +179,7 @@ function loadArtifacts(run, opts) {
   if (opts.runJson) return { artifacts: [] };
   const id = run.databaseId || opts.runId;
   if (!id) return { artifacts: [] };
-  return JSON.parse(execGh(['api', `repos/${opts.repo}/actions/runs/${id}/artifacts`]));
+  return JSON.parse(execGh(['api', `repos/${opts.repo}/actions/runs/${id}/artifacts?per_page=100`]));
 }
 
 function loadCacheUsage(opts) {
@@ -241,7 +245,7 @@ function normalizeStep(step) {
   };
 }
 
-function normalizeJob(job, policyEntry) {
+function normalizeJob(job, policyEntry, artifacts, splitRun) {
   const steps = (job.steps || []).map(normalizeStep);
   const failedSteps = steps.filter((step) => {
     const conclusion = String(step.conclusion || '').toLowerCase();
@@ -250,7 +254,14 @@ function normalizeJob(job, policyEntry) {
   });
   const name = job.name || 'unknown job';
   const expected = new Set(policyEntry?.requiredStatusChecks || []);
-  const artifactName = UNIT_ARTIFACTS.get(name) || null;
+  const baseArtifact = name === 'Unit tests (app-ui)' && (splitRun || steps.some((s) => /Require every app-ui part/.test(s.name)))
+    ? null : UNIT_ARTIFACTS.get(name) || null;
+  const localCommand = SHARD_POLICY.lanes.find((lane) => lane.jobName === name)?.localCommand;
+  const part = /^(?:Unit tests \(app-ui-(?:ui|services)\)|Windows-native tests \((?:node|contracts)\))$/.test(name);
+  const partBase = baseArtifact || WINDOWS_ARTIFACTS.get(name);
+  const selected = partBase ? selectJobArtifact(artifacts, partBase, job) : null;
+  const partArtifact = part && partBase ? selected?.name || `${partBase}-attempt-${job.run_attempt || 1}` : null;
+  const artifactName = baseArtifact && part ? partArtifact : baseArtifact;
   return {
     id: job.id || job.databaseId || null,
     name,
@@ -264,7 +275,7 @@ function normalizeJob(job, policyEntry) {
     labels: Array.isArray(job.labels) ? job.labels.map(String) : [],
     runnerName: job.runner_name || job.runnerName || null,
     runnerGroupName: job.runner_group_name || job.runnerGroupName || null,
-    factLane: expected.has(name) ? {
+    factLane: (expected.has(name) || (part && expected.has(name.startsWith('Unit tests') ? 'Unit tests (app-ui)' : 'Windows-native tests'))) ? {
       workflow: policyEntry.name,
       class: policyEntry.class,
       owner: policyEntry.owner,
@@ -277,8 +288,11 @@ function normalizeJob(job, policyEntry) {
       failureDefault: 'advisory-unknown',
       required: false,
     },
-    localReproduction: LOCAL_REPRO_COMMANDS.get(name) || [],
+    localReproduction: LOCAL_REPRO_COMMANDS.get(name) || (localCommand ? [localCommand] : []),
     unitAttributionArtifact: artifactName,
+    partArtifact,
+    runAttempt: selected ? Number(selected.name.split('-attempt-')[1] || job.run_attempt || 1) : null,
+    workflowAttempt: job.run_attempt || null,
     failedSteps,
     steps,
   };
@@ -308,6 +322,7 @@ function artifactList(artifactsDoc) {
     sizeBytes: artifact.size_in_bytes ?? artifact.sizeBytes ?? null,
     digest: artifact.digest || null,
     expired: Boolean(artifact.expired),
+    createdAt: artifact.created_at || artifact.createdAt || null,
     expiresAt: artifact.expires_at || artifact.expiresAt || null,
     url: artifact.html_url || artifact.url || null,
     downloadUrl: artifact.archive_download_url || artifact.archiveDownloadUrl || null,
@@ -488,10 +503,15 @@ export function buildDigest({
   payloadWarnings = [],
 }) {
   const ciPolicy = (policy.workflows || []).find((workflow) => workflow.name === 'CI') || null;
-  const jobs = (jobsDoc?.jobs || []).map((job) => normalizeJob(job, ciPolicy));
   const artifacts = artifactList(artifactsDoc);
+  const splitRun = (jobsDoc?.jobs || []).some((job) => job.name === 'Unit tests (app-ui-ui)' || job.name === 'Unit tests (app-ui-services)');
+  const jobs = (jobsDoc?.jobs || []).map((job) => normalizeJob(job, ciPolicy, artifacts, splitRun));
   const unitAttribution = summarizeUnitAttribution(jobs, artifacts, unitPayloads);
   const buildEvidence = summarizeBuildEvidence(jobs, artifacts, buildPayloads);
+  const partEvidence = jobs.filter((job) => job.partArtifact).map((job) => ({
+    job: job.name, attempt: job.runAttempt, artifactName: job.partArtifact,
+    artifactPresent: artifacts.some((a) => a.name === job.partArtifact && !a.expired),
+  }));
   const critical = criticalPathJob(jobs);
   const cache = normalizeCacheUsage(cacheUsage);
   return {
@@ -529,9 +549,13 @@ export function buildDigest({
     jobs,
     artifacts,
     unitAttribution,
+    partEvidence,
     buildEvidence,
     cacheUsage: cache,
-    warnings: warningsFor(jobs, unitAttribution, buildEvidence, payloadWarnings),
+    warnings: [
+      ...warningsFor(jobs, unitAttribution, buildEvidence, payloadWarnings),
+      ...partEvidence.filter((p) => !p.artifactPresent).map((p) => `${p.job} has no ${p.artifactName} artifact listed`),
+    ],
   };
 }
 
@@ -595,6 +619,12 @@ export function renderMarkdown(report) {
     }
   }
 
+  if (report.partEvidence.length) {
+    lines.push('', '## Part Evidence', '', '| Job | Attempt | Artifact |', '|---|---:|---|');
+    for (const part of report.partEvidence) {
+      lines.push(`| ${part.job} | ${part.attempt ?? 'unknown'} | ${part.artifactName}${part.artifactPresent ? '' : ' missing'} |`);
+    }
+  }
   lines.push('', '## Build Evidence', '');
   if (report.buildEvidence) {
     lines.push(`Build job: ${report.buildEvidence.conclusion || 'unknown'}, ${fmtSeconds(report.buildEvidence.durationSeconds)}.`);

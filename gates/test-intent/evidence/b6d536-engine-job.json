@@ -1,0 +1,135 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T17:01:03.521Z",
+  "revision": "b3a8926916f14b260e5b75550439c696f6203fed",
+  "tree": "84837e1b207cba166dfc6f864dbcd75f0107b10b",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.EngineJobHelperContainmentTest.killedEngineLeavesNoHelperOrConsoleHost\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4328
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsEngineJobTest.bootJoinsAKillOnCloseJobWithExactlyThatLimit\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4557
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.EngineContainmentArchTest.engineMainJoinsItsJobBeforeAnyOtherCall\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7162
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobHelperContainmentTest.java#killedEngineLeavesNoHelperOrConsoleHost",
+      "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobHelperContainmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:98ccfe7e349ca33c08ebc264e01512fcbf2e673d34ad708eff69b857ae4591f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "killedEngineLeavesNoHelperOrConsoleHost()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsEngineJobTest.java#bootJoinsAKillOnCloseJobWithExactlyThatLimit",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsEngineJobTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:94e7417182703efba54ea778f7df1179e4f5feceff8dff8c560148c157b3cae7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootJoinsAKillOnCloseJobWithExactlyThatLimit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/EngineContainmentArchTest.java#engineMainJoinsItsJobBeforeAnyOtherCall",
+      "file": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/EngineContainmentArchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c35e2fcc6d6648409d8dc919349982e9dce04f5d55d6ec5e90685a1073292598",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engineMainJoinsItsJobBeforeAnyOtherCall()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f75486245",
+    "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-engine-job-compat.patch",
+        "contentDigest": "sha256:614033eb10aa050b2e606a39aee7366ad6943bc8eb2b99c77ad712e631854076"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.EngineJobHelperContainmentTest.killedEngineLeavesNoHelperOrConsoleHost\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8899
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsEngineJobTest.bootJoinsAKillOnCloseJobWithExactlyThatLimit\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3292
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.EngineContainmentArchTest.engineMainJoinsItsJobBeforeAnyOtherCall\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 65565
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobHelperContainmentTest.java#killedEngineLeavesNoHelperOrConsoleHost",
+        "classification": "assertion",
+        "detail": "killedEngineLeavesNoHelperOrConsoleHost(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: nothing the killed Engine started is alive 3000 ms later ==> expected: <[]> but was: <[PING.EXE, PING.EXE, conhost.exe]>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsEngineJobTest.java#bootJoinsAKillOnCloseJobWithExactlyThatLimit",
+        "classification": "assertion",
+        "detail": "bootJoinsAKillOnCloseJobWithExactlyThatLimit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: {status=ABSENT} ==> expected: <CONTAINED> but was: <ABSENT>"
+      },
+      {
+        "id": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/EngineContainmentArchTest.java#engineMainJoinsItsJobBeforeAnyOtherCall",
+        "classification": "assertion",
+        "detail": "engineMainJoinsItsJobBeforeAnyOtherCall(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the first call of HeadlessApp.main, at (HeadlessApp.java:1062) ==> expected: <io.justsearch.app.api.runtime.containment.EngineContainment.installAtBoot> but was: <io.justsearch.ui.HeadlessApp.fatalUncaughtHandler>"
+      }
+    ]
+  },
+  "digest": "sha256:5accd49748f0452c920a317b719128255484f30aa205e178c24a5af2b9f5e458"
+}

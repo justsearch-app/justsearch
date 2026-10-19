@@ -34,6 +34,8 @@ testing {
 }
 
 tasks.named<Test>("test") {
+  // Cross-language native fixture driver consumes this test output, including after cache restores.
+  outputs.file(layout.buildDirectory.file("native-targets-fixtures.json"))
   // ConfigApplyRegisterTest reads this governed input outside the Java source tree.
   inputs.file(rootProject.layout.projectDirectory.file("governance/config-apply.v1.json"))
     .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -42,6 +44,9 @@ tasks.named<Test>("test") {
 // D1-3 runtime projection: the governed apply register is the only source of apply scope
 // classification. Package the exact repository file so production and tests parse the same bytes.
 tasks.named<ProcessResources>("processResources") {
+  from(rootProject.layout.projectDirectory.file("contracts/native-targets/spec.v1.json")) {
+    into("contracts/native-targets")
+  }
   from(rootProject.layout.projectDirectory.file("governance/config-apply.v1.json")) {
     into("governance")
   }

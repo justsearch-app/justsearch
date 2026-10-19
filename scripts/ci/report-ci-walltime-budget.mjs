@@ -80,7 +80,7 @@ export function buildWalltimeBudgetReport({ attribution, policy, now = new Date(
     if (lane.job) laneByJob.set(lane.job, lane);
   }
   const jobs = Array.isArray(attribution.jobs) ? attribution.jobs : [];
-  const warnings = [];
+  const warnings = (attribution.requiredCompletion?.missingChecks || []).map((job) => warn('missing-required-check', `${job} is missing or incomplete.`, { job }));
 
   const reviewByMs = Date.parse(policy.reviewBy || '');
   if (!Number.isFinite(reviewByMs)) {
@@ -111,7 +111,12 @@ export function buildWalltimeBudgetReport({ attribution, policy, now = new Date(
 
   const evaluated = [];
   for (const job of jobs) {
-    const lane = laneByJob.get(job.name);
+    let lane = laneByJob.get(job.name);
+    const parts = [...laneByJob.values()].filter((part) => part.requiredCheck === job.name && part.job !== job.name);
+    if (parts.length && parts.every((part) => !jobNames.has(part.job))) {
+      warnings.push(warn('legacy-unsplit-lane', `${job.name} predates the split; its work duration is not an aggregate duration.`, { job: job.name }));
+      lane = undefined;
+    }
     const ceiling = lane?.advisoryBudgets?.maxWallSeconds;
     const hasCeiling = Number.isFinite(ceiling);
     if (hasCeiling && job.wallSeconds > ceiling) {
@@ -138,6 +143,7 @@ export function buildWalltimeBudgetReport({ attribution, policy, now = new Date(
     advisory: true,
     run: attribution.run || {},
     criticalPath: attribution.criticalPath || null,
+    requiredCompletion: attribution.requiredCompletion || null,
     lanes: evaluated,
     warningCount: warnings.length,
     warnings,

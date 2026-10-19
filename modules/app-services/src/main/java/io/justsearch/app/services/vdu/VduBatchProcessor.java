@@ -46,7 +46,7 @@ public class VduBatchProcessor {
     // in the batch loop — mirrors EmbeddingBackfillOps.checkInterrupt()'s shape on the Worker
     // side. Composed by the caller (ServicePhase) from activity/energy/LLM-exclusivity signals;
     // this class only needs "should I stop now", not the individual signal sources.
-    private final java.util.function.BooleanSupplier shouldInterruptBatch;
+    private final Supplier<java.util.function.BooleanSupplier> interruptBatchFactory;
 
     // Circuit breaker to prevent hammering dead LLM (5 failures, 1 minute recovery)
     private final EngineCircuitBreaker circuitBreaker = new EngineCircuitBreaker(5, Duration.ofMinutes(1));
@@ -105,13 +105,24 @@ public class VduBatchProcessor {
                              VduMetricCatalog catalog,
                              VduCapabilityState vduCapabilityState,
                              java.util.function.BooleanSupplier shouldInterruptBatch) {
+        this(vduProcessor, gpuCapabilitiesService, knowledgeClientSupplier, catalog,
+            vduCapabilityState, () -> shouldInterruptBatch != null ? shouldInterruptBatch : () -> false);
+    }
+
+    /** Creates a fresh interruption checkpoint before each pass, including model startup. */
+    public VduBatchProcessor(VduProcessor vduProcessor,
+                             GpuCapabilitiesService gpuCapabilitiesService,
+                             Supplier<KnowledgeClient> knowledgeClientSupplier,
+                             VduMetricCatalog catalog,
+                             VduCapabilityState vduCapabilityState,
+                             Supplier<java.util.function.BooleanSupplier> interruptBatchFactory) {
         this.vduProcessor = vduProcessor;
         this.gpuCapabilitiesService = gpuCapabilitiesService;
         this.knowledgeClientSupplier = knowledgeClientSupplier;
         this.catalog = catalog != null ? catalog : VduMetricCatalog.noop();
         this.vduCapabilityState =
             vduCapabilityState != null ? vduCapabilityState : new VduCapabilityState();
-        this.shouldInterruptBatch = shouldInterruptBatch != null ? shouldInterruptBatch : () -> false;
+        this.interruptBatchFactory = Objects.requireNonNull(interruptBatchFactory, "interruptBatchFactory");
     }
 
     // Counter recording helpers
@@ -141,9 +152,17 @@ public class VduBatchProcessor {
 
     public OfflineProcessingOutcome processPendingFiles(
             EngineContext engineContext, Consumer<OfflineProcessingOutcome> progress) {
+        return processPendingFiles(engineContext, progress, null);
+    }
+
+    /** Automatic loaded-chat entry is rechecked at the real controller boundary. */
+    public OfflineProcessingOutcome processPendingFiles(
+            EngineContext engineContext, Consumer<OfflineProcessingOutcome> progress,
+            java.util.function.BooleanSupplier automaticEligibility) {
         Objects.requireNonNull(engineContext, "engineContext");
         Objects.requireNonNull(progress, "progress");
         checkInterrupted();
+        var shouldInterruptBatch = Objects.requireNonNull(interruptBatchFactory.get(), "batch interrupt");
         KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
         if (knowledgeClient == null) {
             return report(progress, 0, 0, 0, BlockReason.WORKER_UNAVAILABLE);
@@ -171,10 +190,17 @@ public class VduBatchProcessor {
         vduCapabilityState.clear(VduCapabilityState.REASON_MISSING_MMPROJ);
 
         try {
-            vduProcessor.enterVduMode();
+            if (automaticEligibility == null) vduProcessor.enterVduMode();
+            else vduProcessor.enterVduMode(automaticEligibility);
         } catch (VduProcessor.VduException failure) {
-            vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
-            var modeFailure = new IllegalStateException("Failed to enter VDU mode", failure);
+            if (automaticEligibility != null
+                    && failure.getCause() instanceof io.justsearch.app.api.chat.ChatRefusal refusal
+                    && refusal.reason() == io.justsearch.app.api.chat.RefusalReason.BUSY) {
+                vduCapabilityState.clearAll();
+                return report(progress, selected, 0, 0, BlockReason.NONE);
+            }
+            vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE, rootMessage(failure));
+            var modeFailure = new IllegalStateException(ENTRY_FAILURE_MESSAGE, failure);
             try {
                 report(progress, selected, 0, 0, BlockReason.AI_OFFLINE);
             } catch (RuntimeException checkpointFailure) {
@@ -194,8 +220,16 @@ public class VduBatchProcessor {
         try {
             for (String docId : pendingDocIds) {
                 checkInterrupted();
-                if (shouldInterruptBatch.getAsBoolean()) {
+                if (shouldInterruptBatch.getAsBoolean()
+                        || automaticEligibility != null && !automaticEligibility.getAsBoolean()) {
                     blocked = BlockReason.ACTIVITY_OR_ENERGY;
+                    LOG.info("VDU pass interrupted before {}: activity during this pass, energy or bulk hold", docId);
+                    break;
+                }
+                // The chat controller wants the server back (it is stopping for good; residency
+                // pressure joins with Spec A step 9): finish the batch early, leaving the rest pending.
+                if (vduProcessor.vduInterruptRequested()) {
+                    blocked = BlockReason.PROCESSING_REFUSED;
                     break;
                 }
                 if (!circuitBreaker.isClosed()) {
@@ -225,6 +259,23 @@ public class VduBatchProcessor {
                 } catch (VduProcessor.VduException | RuntimeException failure) {
                     EngineFutures.rethrowCancellation(failure);
                     checkInterrupted();
+                    if (io.justsearch.app.api.chat.GenerationUnavailableException.causedBy(failure)) {
+                        // Chat is draining, starting or stopping: the same outcome as AI being
+                        // offline. Not this document's failure; the selected unit stays remaining.
+                        // It goes back to PENDING with its attempt returned, so idle scheduling,
+                        // which looks only at PENDING, starts the next pass for it and refusals
+                        // never spend the retries kept for documents that really fail.
+                        LOG.info("VDU pass deferred at {}: generation unavailable", docId);
+                        try { knowledgeClient.releaseVduProcessing(docId, engineContext); }
+                        catch (RuntimeException | Error writeFailure) {
+                            if (writeFailure != failure) writeFailure.addSuppressed(failure);
+                            throw writeFailure;
+                        }
+                        vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE,
+                            "generation refused: " + rootMessage(failure));
+                        blocked = BlockReason.AI_OFFLINE;
+                        break;
+                    }
                     LOG.warn("VDU processing failed for {}", docId, failure);
                     circuitBreaker.recordFailure(failure);
                     // Control/write failures are outside the model catch: never recursively mark
@@ -276,6 +327,35 @@ public class VduBatchProcessor {
         } finally {
             finishVduMode(primaryFailure);
         }
+    }
+
+    /** The chat controller's holds the processor enters VDU mode through, or {@code null}. */
+    io.justsearch.app.inference.chat.ChatHolds chatHolds() {
+        return vduProcessor.chatHolds();
+    }
+
+    /** The message of the failure a pass ends with when entering VDU mode failed. */
+    static final String ENTRY_FAILURE_MESSAGE = "Failed to enter VDU mode";
+
+    /**
+     * Whether {@code failure} is the one a pass ends with when entering VDU mode failed after
+     * launching or relaunching llama-server for it (the chat controller refused after a launch, or
+     * the vision launch failed), as opposed to a failure after entry or a refusal that launched
+     * nothing. The automatic-pass breaker counts these failed entries.
+     */
+    static boolean isEntryFailure(Throwable failure) {
+        return failure != null && failure.getClass() == IllegalStateException.class
+            && ENTRY_FAILURE_MESSAGE.equals(failure.getMessage())
+            && failure.getCause() instanceof VduProcessor.VduException
+            && !(failure.getCause() instanceof VduProcessor.EntryRefusedWithoutLaunch);
+    }
+
+    private static String rootMessage(Throwable failure) {
+        Throwable root = failure;
+        var seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
+        while (root.getCause() != null && seen.add(root)) root = root.getCause();
+        String message = root.getMessage();
+        return message == null || message.isBlank() ? root.getClass().getSimpleName() : message;
     }
 
     private void finishVduMode(Throwable primaryFailure) {

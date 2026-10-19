@@ -86,7 +86,7 @@ class TokenEndpointOpsTest {
 
     ops =
         new TokenEndpointOps(
-            HttpClient.newHttpClient(), MAPPER, mode::get, () -> port);
+            HttpClient.newHttpClient(), MAPPER, mode::get, () -> port, () -> () -> {});
   }
 
   @AfterEach

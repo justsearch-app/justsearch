@@ -7,8 +7,9 @@ package io.justsearch.app.api.knowledge;
  *
  * <p>The Head owns this vocabulary: the cross-encoder is orchestrated in {@code
  * KnowledgeSearchEngine}, so unlike the Worker-owned {@code SearchReasonCode} (which populates the
- * three query-level degradation fields) these codes are emitted head-side. Three of them
- * ({@link #DEADLINE_EXCEEDED}, {@link #MODEL_NOT_LOADED}, {@link #INFERENCE_FAILED}) originate in
+ * three query-level degradation fields) these codes are emitted head-side. Four of them
+ * ({@link #DEADLINE_EXCEEDED}, {@link #MODEL_NOT_LOADED}, {@link #INFERENCE_FAILED}, and {@link
+ * #SEARCH_DEADLINE_EXCEEDED}, which the Head also produces) can originate in
  * the Worker's {@code RerankResponse.skip_reason} and are normalised in through {@link
  * #fromWorkerSkipReason(String)} — an unrecognised Worker string resolves to {@link #UNKNOWN}
  * rather than passing through raw, so a code with no FE wording can never reach a user.
@@ -52,10 +53,24 @@ public enum CrossEncoderSkipReason {
    * stamped with it too, naming a knob (the deadline) that cannot fix an OOM.
    */
   DEADLINE_EXCEEDED,
+  /**
+   * The search's own deadline (the one deadline {@code D} the Head fixed for the request, Spec D
+   * §1.2) bounded the rerank: either what remained of it could not cover the reranker's budget, so
+   * the RPC was not made, or the rerank did not return before it, so the Head stopped waiting. The
+   * Worker reports it too, for a rerank call that could not finish by the deadline the Head gave
+   * it: the models were still loading, the native run did not return in time (it continues on the
+   * reranker's own run threads), or every reranker run thread already held such a run, so it was
+   * skipped at once. The results keep their fusion order and the search still answers within
+   * {@code D}. The rerank budget ({@code justsearch.rerank.deadline_ms}) is not the knob for this
+   * one.
+   */
+  SEARCH_DEADLINE_EXCEEDED,
   /** The rerank RPC threw — transport, Worker error, or circuit breaker. */
   RPC_FAILED,
   /** The Worker is configured for reranking but the model was not loaded when the RPC arrived. */
   MODEL_NOT_LOADED,
+  /** The model is wired, but prewarm has not provided a usable native session yet. */
+  MODEL_LOADING,
   /**
    * Inference was attempted and the runtime threw — ONNX Runtime memory-arena exhaustion, a dead
    * session, a bad output shape. Register F-054: the deadline is irrelevant to this class, and the
@@ -76,7 +91,13 @@ public enum CrossEncoderSkipReason {
    */
   public boolean isDrop() {
     return switch (this) {
-      case DEADLINE_EXCEEDED, RPC_FAILED, MODEL_NOT_LOADED, INFERENCE_FAILED, UNKNOWN -> true;
+      case DEADLINE_EXCEEDED,
+          SEARCH_DEADLINE_EXCEEDED,
+          RPC_FAILED,
+          MODEL_NOT_LOADED,
+          MODEL_LOADING,
+          INFERENCE_FAILED,
+          UNKNOWN -> true;
       case NAVIGATIONAL_QUERY,
           DISABLED,
           BELOW_MIN_THRESHOLD,

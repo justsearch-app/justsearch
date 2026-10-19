@@ -1,0 +1,350 @@
+---
+schema: test-intent.v1
+task: t-20261005-b6d536
+author-role: builder
+author-session: 886833dd-a08f-492f-a40a-cc0976b5ce5e
+---
+
+# Test-intent entries
+
+Task t-20261005-b6d536, item 5, Spec E step E6, on b6d536/bulk-gate-2 (base 79b5e2e25, the E4
+commit). Device pinning (section 5). GpuDriverApiProbe reads each CUDA ordinal's LUID, UUID, PCI
+bus id and total memory, and says how it ended (OK, NO_DEVICE with the driver's code, FAILED).
+DeviceFactsSource (app-services) is the process's device facts: the probe plus DXGI's adapter list,
+probed once. DevicePinning chooses the device: among DXGI's hardware NVIDIA adapters that a CUDA
+device maps to by LUID, the largest dedicated memory, ties in DXGI order; with no such adapter one
+CUDA device is ordinal 0's device and several are not pinned (WARN). The pinned device is used in
+four places: (1) its CUDA ordinal is the auto-detected value (ordinal 150) of the six per-role ORT
+device-id keys, so a role's explicit id keeps its value; (2) the Engine's GPU memory reader opens
+with it (LUID and ordinal); (3) admission's live NVML read selects the device by its PCI bus id; (4)
+a GPU launch of llama-server with a pinned UUID carries `--device CUDA0 -sm none` and runs with
+CUDA_VISIBLE_DEVICES=GPU-<uuid>. The UUID is handed to llama-server only when the driver's CUDA API
+version (cuDriverGetVersion) is at least the bundled llama-server runtime's CUDA major, 12 for
+`variants/cuda12` (coordinator's instruction); otherwise a WARN says why and the GPU launch keeps
+E4's unpinned line and environment. The flags were checked against the bundled llama-server b8571
+(`--help`, `--list-devices`, and `--list-devices` under CUDA_VISIBLE_DEVICES set to this machine's
+UUID).
+
+Delegated choices recorded here: (1) The argv builder still writes `--device CUDA0 -sm none` after
+`-ngl` on a GPU line; a launch with no UUID for llama-server removes the four flags, so the
+unpinned line is exactly E4's. The driver gate applies to llama-server only: the ORT ordinal, the
+reader and admission keep the pinned device, since they name a device rather than require a CUDA
+12 runtime. (2) Without a pinned UUID the environment is left as inherited. (3) A bus id NVML does not know
+falls back to device 0, as before. (4) Departure from Spec E section 5.2, accepted by
+the coordinator: rule 1's explicit choices (`justsearch.gpu.device`, agreeing per-role ids,
+USER_SETTING_UNMET) are not built in E6; step E7 owns the explicit keys. Until then the pin is always
+rule 2's or the single-device rule's.
+
+Checked on this machine with the bundled b8571 and the 9B model: with the UUID in
+CUDA_VISIBLE_DEVICES and the exact pinned launch line, the server is healthy, logs "using device
+CUDA0 (NVIDIA GeForce RTX 4070) (0000:01:00.0)" and "offloaded 33/33 layers to GPU", and holds about
+6.4 GB on that GPU. When the CUDA runtime finds no device (CUDA_VISIBLE_DEVICES=-1, or a UUID the
+driver does not have) the pinned line exits 1 with `invalid device: CUDA0`, where the E4 line warned
+"no usable GPU found" and loaded on the CPU; the driver gate keeps the E4 line where the driver is
+known to be too old for the runtime. With no CUDA device at all nothing is pinned and the
+auto-detected GPU layers stay 0, so the launch line and environment are unchanged. Not covered: a
+driver that reports CUDA 12 but still cannot start the runtime, and a user-supplied llama-server
+built for another CUDA major (the gate compares with 12).
+
+DevicePinningTest#aDriverBelowTheLlamaRuntimesCudaMajorHandsLlamaServerNoDevice was run on the
+uncommitted E6 tree before the gate existed and failed by assertion ("below CUDA 12 llama-server is
+launched unpinned, as before the pin existed ==> expected: <Optional.empty> but was:
+<Optional[GPU-x]>"); that tree is not a commit, so this is not in an evidence file.
+
+Evidence files (all written by run-evidence.mjs):
+
+- `b6d536-bulk-gate-e6-repaired.json`: E-S10a, failing by assertion on 79b5e2e25 (the GPU launch
+  line named no device).
+- `b6d536-bulk-gate-e6-preservation.json`: E-P7b, the DeviceMemoryLine table and the NVML-first
+  precedence pass on 79b5e2e25 and on the change; exits 1 by design because it shows no repair.
+  These test files are unchanged, so no entry below names them.
+- `b6d536-bulk-gate-e6-new.json`: checks of classes and signatures added in this change.
+
+Records phase B (batch 3) re-ran `b6d536-bulk-gate-e6-new.json` and `b6d536-e6-intent-repair.json`
+on b599d4d7e because their check files changed after the first runs. In the intent repair (entry 7),
+LlamaServerLaunchFlagsTest passes on the change (14 cases) and again fails by assertion on
+79b5e2e25. LlamaServerPinnedDeviceEnvironmentTest#cpuLaunchNamesNoDevice no longer exists:
+3241289f5 (b48) deliberately changed a CPU launch to carry `--device none`, renamed the check
+cpuLaunchDisablesDevices, and covers it in b48's own changeset. So entry 2 no longer names it or
+describes the CPU launch, and the last entry records the old check as Obsolete, citing 3241289f5.
+`b6d536-bulk-gate-e6-new.json` was re-run without it, and its other 22 checks pass (no
+before-state).
+
+```json
+{
+  "entries": [
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDevicePinningTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "E-S10a: LlamaServerOps.buildLaunchCommand(cfg, rc, 99, plan) contains --device CUDA0 -sm none, so a GPU launch offloads to one device rather than llama.cpp's default layer split across every CUDA device. On 79b5e2e25 the launch line named no device, failing by assertion.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S10",
+          "quote": "On multi-GPU and hybrid laptops, chat and encoders use the same chosen GPU.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
+          "choice": "The argv builder writes the single-device flags after -c and -ngl on a GPU line; the memory-plan block stays the tail of the line; a launch with no UUID for llama-server removes the four flags.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-bulk-gate-e6-repaired.json",
+      "newChecks": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDevicePinningTest.java#gpuLaunchOffloadsToTheOnePinnedDevice"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The launch environment names the pinned device: a pinned UUID gives exactly CUDA_VISIBLE_DEVICES=GPU-<uuid>; no UUID, or a blank one, adds nothing. On a GPU launch the four flags --device CUDA0 -sm none follow -ngl <layers> directly.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S10",
+          "quote": "On multi-GPU and hybrid laptops, chat and encoders use the same chosen GPU.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
+          "choice": "Without a pinned UUID the inherited environment is kept.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-bulk-gate-e6-new.json",
+      "newChecks": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#pinnedUuidBecomesTheOnlyVisibleCudaDevice",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#nothingPinnedLeavesTheInheritedEnvironment",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#pinningFlagsFollowTheWindowFlagsOnAGpuLaunch"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java"
+      ],
+      "class": "New",
+      "behaviour": "E-U6, the section 5.2 rule and the LUID / bus-id / UUID maps. The mapped NVIDIA adapter with the largest dedicated memory wins; a tie goes to DXGI's enumeration order, not CUDA's; a hybrid laptop's Intel adapter never counts; software adapters and NVIDIA adapters no CUDA device maps to are not candidates; one CUDA device without a LUID is pinned; several without a map, and none at all, pin nothing. Probe outcomes map to RAN_OK (with the pinned device), RAN_NO_DEVICE (with the driver code) and THREW. The pinned device gives the reader its GpuDevice (LUID and ordinal), admission its PCI bus id and llama-server its UUID; a driver whose CUDA API is below the llama-server runtime's CUDA major (11.8 against 12) gives llama-server no UUID, and 12.0 is enough; a pinned device without a LUID gives the reader no device; a pinned device outside the device list is refused. The pinned ordinal becomes the auto-detected value of the six per-role ORT device-id keys and reaches embedding, SPLADE, NER, BGE-M3, reranker and chunk reranker; a role set in settings keeps its value; with nothing pinned no key is contributed.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S10",
+          "quote": "On multi-GPU and hybrid laptops, chat and encoders use the same chosen GPU.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
+          "choice": "Candidates are DXGI hardware NVIDIA adapters that a CUDA device maps to by LUID; the pinned ordinal reaches ORT as an auto-detected default so explicit per-role ids win; the driver gate applies to llama-server's UUID only; the explicit device key and its unmet status wait for step E7.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-bulk-gate-e6-new.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#theLargestMappedNvidiaAdapterWins",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#aTieGoesToDxgiEnumerationOrderNotCudaOrder",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#aHybridLaptopsIntegratedGpuNeverCounts",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#softwareAndUnmappedAdaptersAreNotCandidates",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#oneDeviceWithoutALuidIsOrdinalZero",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#severalDevicesWithoutAMapAreUnresolved",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#probeOutcomesMapToFactsStatus",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#aDriverBelowTheLlamaRuntimesCudaMajorHandsLlamaServerNoDevice",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#thePinnedDeviceMapsToReaderBusIdAndUuid",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#thePinnedDeviceMustBeOneOfTheDevices",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#thePinnedOrdinalIsEveryOrtRolesDefaultDevice",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#anExplicitRoleDeviceIdKeepsItsValue",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#nothingPinnedLeavesTheDefaults"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLaunchTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A real managed launch (the HealthyFakeLlamaServer stand-in, 99 GPU layers): with a pinned UUID the launched argv carries --device CUDA0 -sm none; with none (nothing chosen, or a driver too old for the runtime) the argv has neither --device nor -sm, -ngl stays 99 and the memory-plan block follows it directly, which is E4's line.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S10",
+          "quote": "On multi-GPU and hybrid laptops, chat and encoders use the same chosen GPU.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "completing the agreed design for item 5 (GPU switches and profiles)",
+          "choice": "A GPU launch with no UUID for llama-server keeps E4's unpinned line rather than naming a device the runtime may not see.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-bulk-gate-e6-new.json",
+      "newChecks": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLaunchTest.java#aPinnedGpuLaunchNamesTheDevice",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLaunchTest.java#anUnpinnedGpuLaunchKeepsTheLineFromBeforeThePin"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DeviceFactsMachineTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Step E6 on this machine's real APIs (Windows only). The process's device facts pin a device when there is exactly one; its LUID from cuDeviceGetLuid names a DXGI hardware NVIDIA adapter; the GPU memory reader opened with the pinned device reads it without an unknown reason and carries its LUID and CUDA ordinal; NVML finds a device by the PCI bus id CUDA reports, and on one GPU it is device 0's handle; admission's snapshot by bus id has the same total memory as the device-0 snapshot (P7). On a machine without a CUDA device nothing is pinned.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S10",
+          "quote": "On multi-GPU and hybrid laptops, chat and encoders use the same chosen GPU.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-bulk-gate-e6-new.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DeviceFactsMachineTest.java#thePinnedDeviceIsTheSameDeviceAcrossCudaDxgiPdhAndNvml"
+      ]
+    },
+    {
+      "items": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/GpuDriverApiProbeDevicesTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The probe extension of section 5.3. A LUID's halves are formatted as PDH names its instances (luid_0x<high>_0x<low>, eight lower-case hex digits each, a negative high part as ffffffff); a 16-byte CUuuid is formatted as nvidia-smi and CUDA_VISIBLE_DEVICES name it (GPU-8-4-4-4-12). On a machine with a CUDA device every ordinal is listed in order with a UUID, a PCI bus id, total memory above zero and, on Windows, a LUID; without one, none is listed and the status is not OK.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S10",
+          "quote": "On multi-GPU and hybrid laptops, chat and encoders use the same chosen GPU.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-bulk-gate-e6-new.json",
+      "newChecks": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/GpuDriverApiProbeDevicesTest.java#luidIsFormattedAsPdhNamesItsInstances",
+        "modules/ort-common/src/test/java/io/justsearch/ort/GpuDriverApiProbeDevicesTest.java#uuidIsFormattedAsNvidiaSmiAndCudaVisibleDevicesName",
+        "modules/ort-common/src/test/java/io/justsearch/ort/GpuDriverApiProbeDevicesTest.java#everyOrdinalCarriesItsIdentity"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "S10 changes the exact ordered GPU launch line to include --device CUDA0 -sm none immediately after -ngl 99. This entry claims only that GPU pinning expectation. The current whole-class replay at 79b5e2e25, with no production patch or overlay, executes fourteen cases: four assertion failures and ten passes. The full-GPU ordered-list failure includes both the missing E6 pinning flags and the missing later --cache-ram 1024 pair. The CPU --device none failure belongs to b48; the projector case stops at its later prompt-cache prefix assertion; the planned-rung failure belongs to E7b. Those unrelated later expectations and failures are excluded from this entry’s E6 repair claim. The current candidate passes all fourteen cases; this whole-class evidence is not an isolated pinning-only failure.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S10",
+          "quote": "On multi-GPU and hybrid laptops, chat and encoders use the same chosen GPU.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-e6-intent-repair.json",
+      "newChecks": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java"
+      ],
+      "class": "Obsolete",
+      "removedChecks": "cpuLaunchNamesNoDevice: it expected a CPU launch (-ngl 0) to carry neither --device nor -sm. 3241289f5 (b48, gates/test-intent/.changesets/b48-llama-gpu-off.md) deliberately replaced that expectation: GPU off hides CUDA from the child and a CPU launch carries --device none. b48 renamed the check cpuLaunchDisablesDevices and records it, with its own source and evidence, in its own entry. This entry's GPU-launch and environment checks are unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z",
+          "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them.",
+          "choice": "make \"GPU off\" mean no CUDA use by the chat server and its self-test (b48, 3241289f5): a CPU launch carries --device none instead of naming no device",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none (docs/decisions searched for llama-server, --device, CUDA_VISIBLE_DEVICES, GPU off and -ngl 0; 0047 states only the CPU window rung, and no record decides which device flags a CPU launch carries)"
+    }
+  ]
+}
+```
+
+### Signoff repair, entry 7 (2026-10-15)
+
+The refreshed `b6d536-e6-intent-repair.json` runs the current whole class on the candidate and on
+79b5e2e25 with `-PskipWebBuild=true`, without production patches or overlays. Candidate: 14 pass.
+Before: 4 assertion failures, 10 pass. The first failing assertion in each failed case is:
+
+| Case | Observed before failure | Attribution and claim |
+| --- | --- | --- |
+| CPU argv | expected `[-c, 8192, -ngl, 0, --device, none, -np, 2, -kvu, -ctk, q8_0, -ctv, q8_0, -fa, on, -fit, off]`; actual omits `--device none` | b48 (3241289f5); excluded from E6. |
+| Full GPU argv | expected `--cache-ram 1024` after the model and `--device CUDA0 -sm none` after `-ngl 99`; actual has neither pair/block | Only the pinning block is E6 (c7b770a03). Prompt-cache expectation is later (7bf4ec112), excluded. The combined list assertion does not isolate these differences. |
+| projectorOnTheCpuAddsOneFlagAfterTheProjector | `the default places the projector where llama-server does: no flag ==> expected: <[bin\llama-server.exe, -m, models\chat.gguf, --mmproj, models\mmproj.gguf, --cache-ram, 1024, --jinja]> but was: <[bin\llama-server.exe, -m, models\chat.gguf, --mmproj, models\mmproj.gguf, --jinja, --reasoning-format, deepseek]>` | Stops at the later prompt-cache prefix (7bf4ec112), before the projector-placement assertions introduced by E7b (29d9cc527). Excluded from E6. |
+| aPlannedRungTopsTheDerivedLadder | `expected: <[8192, 4096]> but was: <[32768, 16384, 8192, 4096]>` | Later E7b (29d9cc527); excluded from E6. |
+
+No compatibility patch causes any of these four failures. Git history was checked at the named
+commits to distinguish E6's added flags from these later expectations. The ten other cases pass
+on the before-state; all fourteen pass on the candidate. The earlier statement of one failure
+and eleven passes is superseded by these actual current-class counts.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "a3a46d49-5d40-43d9-a1ad-d9e9e536d01b",
+  "verdict": "reject",
+  "digest": "sha256:dc24706768d5154c652263b540a85125fcd6000083f6de8fe0ca92331fe0491a",
+  "note": "LlamaServerLaunchFlagsTest is entered as Adaptation (moved: signature), but fullGpuLaunchCommand's expected ordered launch line gains --device CUDA0 -sm none: the expected outcome changed and no signature moved. test-intent.md keeps the whole oracle for an Adaptation; Spec E section 9 naming it Adaptation does not change the class rule. Re-enter it as New (changed intent) citing S10, with evidence of the assertion failing on 79b5e2e25. The pinning behaviour itself is supported live (llama launched with --device CUDA0 -sm none and CUDA_VISIBLE_DEVICES=GPU-8b20006f-...). Other E6 entries checked and would be acceptable."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "reject",
+  "digest": "sha256:554876a32103128d96e1183d7fc4c4967010f50fa85960124165a6c33f0fe339"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "reject",
+  "digest": "sha256:5493f05aa3d0222aa3fa3999eaf3ba0aec3d42adb2c712e8688573498ee3c876",
+  "note": "Reject entry 7: the exact 79b5e2e25 whole-class replay runs fourteen tests with four failures (CPU argv, full GPU argv, projector-on-CPU and planned rung), contradicting its claim that only the GPU ordered-line assertion fails and eleven other checks pass. The current candidate whole class passes."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS4c-20261015",
+  "verdict": "accept",
+  "digest": "sha256:7a8af5f9d3b2cd5caaaa727dd97ab9bdde0a6ba4edaf00ccab6cbed967ff14e1",
+  "note": "Reviewed the corrected mixed whole-class evidence and the original change history against VS1. All 14 candidate cases pass; the unpatched 79b5e2e25 rerun reproduces four declared assertion failures and ten passes, with unrelated failures disclosed."
+}
+```

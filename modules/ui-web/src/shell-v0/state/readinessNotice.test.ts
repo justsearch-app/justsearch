@@ -396,6 +396,16 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
  * from SEVERITY in two modules at once, both contradicting the same search trace.
  */
 describe('classifyConsequence (805 §G.2)', () => {
+  it('Spec D K3: a standing stuck encoder impairs retrieval and is worded as itself', () => {
+    const code = 'encoders.health.semantic_stuck';
+    expect(classifyConsequence([code])).toBe('retrieval-impaired');
+    expect(reasonFor(code).wording).toBe('The semantic search encoder is stalled');
+    expect(severityForCodes([code])).toBe('warn');
+    const notice = readinessNotice(degraded('warn', [code]));
+    expect(notice?.headline).toBe('Semantic search degraded.');
+    expect(notice?.causes).toEqual(['The semantic search encoder is stalled']);
+  });
+
   it('retrieval-impaired: a positively-known dense block', () => {
     expect(classifyConsequence(['index.dense_unavailable'])).toBe('retrieval-impaired');
     expect(classifyConsequence(['encoders.health.embedding_not_ready'])).toBe('retrieval-impaired');
@@ -690,5 +700,39 @@ describe('readinessNotice — index and inference rows', () => {
     // A deliberate switch-off is that case, and it ships at `info` where the set is never consulted.
     expect(classifyConsequence(['inference.deactivated'])).not.toBe('ai-unavailable');
     expect(warrantsSearchDegradationBanner(degraded('info', ['inference.deactivated']))).toBe(false);
+  });
+
+  // Spec A step 7: the classified chat failure is worded as itself, not as "stopped unexpectedly".
+  it('Spec A step 7: each classified chat failure words its own cause and is a warn', () => {
+    const cases: Array<[string, string]> = [
+      ['inference.out_of_memory', 'The local AI model ran out of graphics memory'],
+      ['inference.startup_timeout', 'The local AI model took too long to start'],
+      ['inference.start_failed', 'The local AI model failed to start'],
+      ['inference.model_load_failed', 'The local AI model file could not be loaded'],
+    ];
+    for (const [code, wording] of cases) {
+      expect(reasonFor(code).wording, code).toBe(wording);
+      expect(severityForCodes([code]), code).toBe('warn');
+      expect(reasonFor(code).remedy, code).toEqual({
+        kind: 'navigate',
+        target: 'core.brain-surface',
+        label: 'Open Brain',
+      });
+      // The `cosmetic` trap S5 names: a warn row outside every consequence set would tell the user
+      // results are fully semantic "but an optional capability is unavailable" about a dead model.
+      expect(classifyConsequence([code]), code).toBe('ai-unavailable');
+    }
+  });
+
+  // Spec A §7.2: a reduced context is a notice on a serving model, never a fault or an outage.
+  it('Spec A step 7: context_reduced is a calm notice that stays out of the banner', () => {
+    expect(reasonFor('inference.context_reduced').wording).toBe(
+      'The local AI model is running with a shorter context to fit in graphics memory',
+    );
+    expect(severityForCodes(['inference.context_reduced'])).toBe('info');
+    expect(classifyConsequence(['inference.context_reduced'])).not.toBe('ai-unavailable');
+    expect(
+      warrantsSearchDegradationBanner(degraded('info', ['inference.context_reduced'])),
+    ).toBe(false);
   });
 });

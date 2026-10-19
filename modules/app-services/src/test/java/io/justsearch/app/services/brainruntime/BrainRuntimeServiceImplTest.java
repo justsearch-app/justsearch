@@ -12,9 +12,9 @@ import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationStoreException;
 import io.justsearch.app.services.TestEngineContexts;
-import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
 import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
+import io.justsearch.app.services.runtimestate.TestActivationForwarders;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -97,7 +97,8 @@ final class BrainRuntimeServiceImplTest {
     // Unstarted reconciler: specChanged() is synchronous (bump version, reset flap, notify
     // spec-change listeners) and does not touch the null control.
     RuntimeReconciler reconciler =
-        new RuntimeReconciler(null, () -> Mode.OFFLINE, () -> false, null, null, spec, new RuntimeGpuLease());
+        new RuntimeReconciler(null, () -> Mode.OFFLINE, () -> false, null, spec,
+            TestActivationForwarders.switching(null, () -> false, null), () -> false);
     AtomicInteger nudged = new AtomicInteger();
     reconciler.addSpecChangeListener(nudged::incrementAndGet);
     RecordingOnlineAi onlineAi = new RecordingOnlineAi();

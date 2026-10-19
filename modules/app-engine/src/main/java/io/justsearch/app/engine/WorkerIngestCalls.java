@@ -137,6 +137,11 @@ final class WorkerIngestCalls implements IngestServiceCalls {
   }
 
   @Override
+  public boolean releaseVduProcessing(String docId) {
+    return service.releaseVduProcessing(docId, ctx);
+  }
+
+  @Override
   public io.justsearch.ipc.RecoverVduProcessingResponse recoverVduProcessing(io.justsearch.ipc.RecoverVduProcessingRequest request) {
     return service.recoverVduProcessing(request, ctx);
   }
@@ -259,6 +264,16 @@ final class WorkerIngestCalls implements IngestServiceCalls {
   @Override
   public io.justsearch.ipc.WatchRootResponse watchRoot(io.justsearch.ipc.WatchRootRequest request) {
     return service.watchRoot(request, ctx);
+  }
+
+  @Override
+  public boolean refusesRootVolume(String rootPath) {
+    return service.refusesRootVolume(rootPath, ctx);
+  }
+
+  @Override
+  public String rootVolumeRefusal(String rootPath) {
+    return service.rootVolumeRefusal(rootPath, ctx);
   }
 
   @Override

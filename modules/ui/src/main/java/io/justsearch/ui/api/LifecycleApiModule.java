@@ -20,6 +20,10 @@ import tools.jackson.databind.ObjectMapper;
  * <p>This is NOT the upgrade protocol (tempdoc 617): no preparation id, no shutdown nonce, no
  * receipt, no lease freeze. It shares the one ordered-shutdown routine those endpoints drive — one
  * routine, two callers — and nothing else.
+ *
+ * <p>The body may carry the supervisor's quit deadline ({@code deadlineAtEpochMs}), the incarnation
+ * it addressed and a stop detail (Spec F §4.3); an action that is a {@link LifecycleShutdownAction}
+ * receives them, so the ordered close finishes before the supervisor's force.
  */
 final class LifecycleApiModule implements ApiModule {
   private static final Set<String> ROUTES = Set.of("/api/lifecycle/shutdown");
@@ -33,7 +37,7 @@ final class LifecycleApiModule implements ApiModule {
 
   @Override
   public void register(Javalin app) {
-    app.post("/api/lifecycle/shutdown", this::shutdown);
+    app.post("/api/lifecycle/shutdown", this::shutdown, ActivityRole.USER_ACTION);
   }
 
   @Override
@@ -47,6 +51,8 @@ final class LifecycleApiModule implements ApiModule {
    * {@code UpgradeController.commitShutdown}'s response-before-exit ordering.
    */
   private void shutdown(Context ctx) {
+    // Read before the response is committed: the ack below flushes, and the body is the request's.
+    LifecycleShutdownRequest request = requestOf(ctx);
     byte[] response =
         JSON.writeValueAsBytes(
             Map.of(
@@ -62,6 +68,38 @@ final class LifecycleApiModule implements ApiModule {
     } catch (IOException e) {
       throw new UncheckedIOException("failed to acknowledge orderly lifecycle shutdown", e);
     }
-    Thread.ofPlatform().daemon(true).name("lifecycle-orderly-shutdown").start(orderlyShutdown);
+    Runnable shutdown = orderlyShutdown instanceof LifecycleShutdownAction action
+        ? () -> action.shutdown(request)
+        : orderlyShutdown;
+    Thread.ofPlatform().daemon(true).name("lifecycle-orderly-shutdown").start(shutdown);
+  }
+
+  /**
+   * The body's quit deadline, incarnation and detail (Spec F §4.3). Every field is optional and an
+   * unreadable body names nothing: the endpoint must still quit for today's shell, which posts
+   * {@code {}}, and a quit that fails on a malformed body is a quit that is force-killed instead.
+   */
+  static LifecycleShutdownRequest requestOf(Context ctx) {
+    String body;
+    try {
+      body = ctx.body();
+    } catch (RuntimeException unreadable) {
+      return LifecycleShutdownRequest.NONE;
+    }
+    if (body == null || body.isBlank()) return LifecycleShutdownRequest.NONE;
+    try {
+      var root = JSON.readTree(body);
+      if (root == null || !root.isObject()) return LifecycleShutdownRequest.NONE;
+      var deadline = root.get("deadlineAtEpochMs");
+      return new LifecycleShutdownRequest(
+          deadline != null && deadline.isIntegralNumber() ? deadline.asLong() : null,
+          text(root.get("incarnation")), text(root.get("detail")));
+    } catch (RuntimeException malformed) {
+      return LifecycleShutdownRequest.NONE;
+    }
+  }
+
+  private static String text(tools.jackson.databind.JsonNode node) {
+    return node == null || !node.isString() ? null : node.stringValue();
   }
 }

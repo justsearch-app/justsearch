@@ -15,6 +15,8 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Stable directory identity, independent of mutable timestamps and path spelling. */
 record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
@@ -31,7 +33,7 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
     if (PlatformPaths.isWindows()) {
       return WindowsRootIdentityLease.capture(normalized);
     }
-    try (RootIdentityLease lease = PortableRootIdentityLease.open(normalized)) {
+    try (RootIdentityLease lease = hold(normalized)) {
       lease.requireCurrent();
       return lease.identity();
     }
@@ -41,9 +43,10 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
   static RootIdentityLease hold(Path root) throws IOException {
     Path normalized = normalize(root);
     validateDirectory(normalized);
-    return PlatformPaths.isWindows()
-        ? WindowsRootIdentityLease.open(normalized)
-        : PortableRootIdentityLease.open(normalized);
+    if (PlatformPaths.isWindows()) {
+      return WindowsRootIdentityLease.open(normalized);
+    }
+    return PlatformPaths.isLinux() && LinuxRootIdentityLease.supportedArchitecture() ? LinuxRootIdentityLease.open(normalized) : PortableRootIdentityLease.open(normalized);
   }
 
   void requireCurrent(Path root) throws IOException {
@@ -95,7 +98,36 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
     return new RootIdentity(realPath(root), new ProviderFileIdentity(fileKey));
   }
 
-  sealed interface StableFileIdentity permits ProviderFileIdentity, WindowsFileIdentity {}
+
+  /**
+   * Test seam (task t-20261013-ef3c41, round 9): while set, {@link #volume()} answers as on a
+   * platform that exposes no volume identity, so a run on Windows covers that path.
+   * Nothing in production sets it.
+   */
+  static final AtomicBoolean VOLUME_IDENTITY_UNAVAILABLE = new AtomicBoolean();
+
+  /**
+   * The volume this root lives on, comparable across restarts, or {@code null} when stable volume
+   * evidence is unavailable (task t-20261013-ef3c41: a different volume at the same path must
+   * not vouch for the original's deletions).
+   */
+  String volume() {
+    if (VOLUME_IDENTITY_UNAVAILABLE.get()) {
+      return null;
+    }
+    if (stableFileIdentity instanceof WindowsFileIdentity windows) {
+      return "windows-volume:" + Long.toHexString(windows.volumeSerialNumber());
+    }
+    return stableFileIdentity instanceof LinuxFileIdentity linux ? linux.volume() : null;
+  }
+
+  sealed interface StableFileIdentity permits ProviderFileIdentity, WindowsFileIdentity, LinuxFileIdentity {}
+
+  record LinuxFileIdentity(Object fileKey, String volume) implements StableFileIdentity {
+    LinuxFileIdentity {
+      if (fileKey == null) throw new IllegalArgumentException("fileKey must be stable and non-null");
+    }
+  }
 
   record ProviderFileIdentity(Object fileKey) implements StableFileIdentity {
     ProviderFileIdentity {

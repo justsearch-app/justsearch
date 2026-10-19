@@ -35,7 +35,7 @@ Use the [feature request template](https://github.com/justsearch-app/justsearch/
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/your-feature`)
 3. Make your changes
-4. Verify locally: `./gradlew.bat build` (compile + tests), and for frontend changes `cd modules/ui-web && npm run typecheck && npm run test:unit:run`
+4. Verify locally: `node scripts/lib/tool-invoker.cjs gradle build` (compile + tests), and for frontend changes `cd modules/ui-web && npm run typecheck && npm run test:unit:run`
 5. Commit your changes
 6. Push and open a pull request
 
@@ -64,12 +64,12 @@ package the desktop application for Linux, mount models, or require a GPU.
 
 **For native development** (the dev container supplies these automatically):
 
-- Windows 10/11
+- Windows 10/11, or Linux with a C compiler (`cc`) and Tesseract
 - A JVM to launch the Gradle wrapper. The checked-in Daemon JVM criteria selects and, when necessary,
   auto-provisions Temurin JDK 25 for the build, independent of the wrapper client's ambient Java. Keeping
   `JAVA_HOME` and `PATH` on JDK 25 is still recommended so direct `java`/`javac` use and non-Gradle tooling
   agree; the dev-runner also resolves a suitable JDK explicitly for the Engine JVM.
-- Node.js 20+ (for the `modules/ui-web` frontend) — `scripts/setup/bootstrap-node-win.ps1` can install it for you
+- Node.js 24, what CI and the dev container use — `scripts/setup/bootstrap-node-win.ps1` can install it for you
 - Python 3.13+ for the repository's Python-backed checks and evaluation tooling
 - Rust stable only when working on the optional Tauri shell under `modules/shell`; its absence does
   not block core Java/web contribution
@@ -80,7 +80,7 @@ The bootstrap never chooses a host package manager or edits your shell profile.
 
 The core build does **not** require the Rust/Tauri toolchain (the desktop
 shell in `modules/shell` builds separately, only for packaging the installer), a **GPU**, or the **~9 GB model
-download** — the models are fetched on first *run* of the app, not to build or test it.
+download** — the models are needed only to *run* the app's semantic and AI features, not to build or test it.
 
 **To run the full desktop app** (not needed to contribute code):
 
@@ -90,11 +90,12 @@ download** — the models are fetched on first *run* of the app, not to build or
 
 ### Building
 
-```text
-# Windows                         # Dev container / Unix
-./gradlew.bat build               ./gradlew build
-./gradlew.bat build -x test       ./gradlew build -x test
-./gradlew.bat :modules:ui:run     ./gradlew :modules:ui:run
+Run these commands from the repository root on Windows or Linux:
+
+```sh
+node scripts/lib/tool-invoker.cjs gradle build
+node scripts/lib/tool-invoker.cjs gradle build -x test
+node scripts/lib/tool-invoker.cjs gradle :modules:ui:run
 ```
 
 ### First run from source (the onramp)
@@ -116,10 +117,10 @@ stack, indexes the demo corpus, and asserts a first result end-to-end.
 ### Testing
 
 ```text
-# Replace gradlew.bat with ./gradlew in the dev container or on Unix.
-./gradlew.bat test
-./gradlew.bat :modules:adapters-lucene:test
-./gradlew.bat build
+# The shared invoker works on Windows and Unix, including before npm ci.
+node scripts/lib/tool-invoker.cjs gradle test
+node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:test
+node scripts/lib/tool-invoker.cjs gradle build
 ```
 
 ### Code Style
@@ -133,8 +134,8 @@ Code style is enforced automatically:
 To fix formatting issues:
 
 ```text
-# Replace gradlew.bat with ./gradlew in the dev container or on Unix.
-./gradlew.bat spotlessApply
+# The shared invoker works on Windows and Unix, including before npm ci.
+node scripts/lib/tool-invoker.cjs gradle spotlessApply
 ```
 
 ## Contributor agreement: CLA
@@ -162,9 +163,9 @@ If you contribute on behalf of an employer, see §8 of the CLA (a Corporate CLA 
 
 | Directory | Purpose |
 |-----------|---------|
-| `modules/ui` | HTTP API (Head process) |
+| `modules/ui` | HTTP + MCP API (Engine JVM, application half) |
 | `modules/ui-web` | Frontend (Lit web components, TypeScript, Vite) |
-| `modules/indexer-worker` | Lucene indexing (Body process) |
+| `modules/indexer-worker` | Lucene indexing (Engine JVM, index half) |
 | `modules/gpu-bridge` | GPU/VRAM detection, hardware capability helpers |
 | `modules/app-inference` | Local `llama-server` lifecycle (chat/RAG) |
 | `modules/shell` | Tauri desktop shell |

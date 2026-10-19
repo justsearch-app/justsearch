@@ -9,7 +9,7 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
-import org.apache.tika.config.TikaConfig;
+import org.apache.tika.detect.DefaultDetector;
 import org.apache.tika.detect.Detector;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.TikaCoreProperties;
@@ -61,7 +61,7 @@ public final class TextNameMagicConflictDetector implements Detector {
 
   /** The detector every extractor in this package should use. */
   public static Detector wrapDefault() {
-    return new TextNameMagicConflictDetector(TikaConfig.getDefaultConfig().getDetector());
+    return new TextNameMagicConflictDetector(new DefaultDetector(MimeTypes.getDefaultMimeTypes()));
   }
 
   @Override

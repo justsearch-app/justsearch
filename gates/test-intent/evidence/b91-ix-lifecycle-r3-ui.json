@@ -1,0 +1,126 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T22:38:48.438Z",
+  "revision": "1ec62228922917dce61a10896d0ff24efd8c71ad",
+  "tree": "0aba76acfc2dc5f388155d5e1d73a437010a164d",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppRestartCommitFailureTest.failedCommitRefusesRestartWithoutClosingOrHalting\" --tests \"io.justsearch.ui.HeadlessAppRestartCommitFailureTest.aLaterQuitRecordsItsOwnIntentAndExitsCleanly\" --tests \"io.justsearch.ui.HeadlessAppRestartCommitFailureTest.commitFailureKeepsChatLatchedAndRetryable\" --tests \"io.justsearch.ui.HeadlessAppRestartCommitFailureTest.aFailedDispatchReleasesItsUnusedReservation\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 27317
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java#failedCommitRefusesRestartWithoutClosingOrHalting",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:37e4a3cd1a7cd9d9ab26a5fa46b27a8ebc08f3198897cfd4dc0fea4339479f76",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedCommitRefusesRestartWithoutClosingOrHalting(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java#aLaterQuitRecordsItsOwnIntentAndExitsCleanly",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:37e4a3cd1a7cd9d9ab26a5fa46b27a8ebc08f3198897cfd4dc0fea4339479f76",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLaterQuitRecordsItsOwnIntentAndExitsCleanly(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java#commitFailureKeepsChatLatchedAndRetryable",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:37e4a3cd1a7cd9d9ab26a5fa46b27a8ebc08f3198897cfd4dc0fea4339479f76",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "commitFailureKeepsChatLatchedAndRetryable(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java#aFailedDispatchReleasesItsUnusedReservation",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:37e4a3cd1a7cd9d9ab26a5fa46b27a8ebc08f3198897cfd4dc0fea4339479f76",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedDispatchReleasesItsUnusedReservation(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1ec622289",
+    "revision": "1ec62228922917dce61a10896d0ff24efd8c71ad",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppRestartCommitFailureTest.failedCommitRefusesRestartWithoutClosingOrHalting\" --tests \"io.justsearch.ui.HeadlessAppRestartCommitFailureTest.aLaterQuitRecordsItsOwnIntentAndExitsCleanly\" --tests \"io.justsearch.ui.HeadlessAppRestartCommitFailureTest.commitFailureKeepsChatLatchedAndRetryable\" --tests \"io.justsearch.ui.HeadlessAppRestartCommitFailureTest.aFailedDispatchReleasesItsUnusedReservation\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 44101
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java#failedCommitRefusesRestartWithoutClosingOrHalting",
+        "classification": "assertion",
+        "detail": "failedCommitRefusesRestartWithoutClosingOrHalting(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a failed second write refuses restart rather than charging crash recovery ==> expected: <-1> but was: <1>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java#aLaterQuitRecordsItsOwnIntentAndExitsCleanly",
+        "classification": "assertion",
+        "detail": "aLaterQuitRecordsItsOwnIntentAndExitsCleanly(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a failed commit must release the self-intent run-once flag ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java#commitFailureKeepsChatLatchedAndRetryable",
+        "classification": "assertion",
+        "detail": "commitFailureKeepsChatLatchedAndRetryable(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: commit refusal must latch chat like a failed reservation ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java#aFailedDispatchReleasesItsUnusedReservation",
+        "classification": "assertion",
+        "detail": "aFailedDispatchReleasesItsUnusedReservation(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a refused dispatch must not leave an unused reservation in the restart budget ==> expected: <0> but was: <1>"
+      }
+    ]
+  },
+  "digest": "sha256:5c080c2048cb5f2755f109383779e6e1e710d15061717a1d186d3059774254ea"
+}

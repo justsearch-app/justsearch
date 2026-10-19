@@ -37,7 +37,6 @@ import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.app.services.packimport.PackImportServiceImpl;
 import io.justsearch.app.services.policy.EnterprisePolicyServiceImpl;
 import io.justsearch.app.services.policy.PolicyServiceImpl;
-import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
 import io.justsearch.app.services.runtimevariant.RuntimeVariantServiceImpl;
@@ -99,7 +98,10 @@ public final class ServicePhase {
       Supplier<KnowledgeServerBootstrap> knowledgeServerBootstrapSupplier,
       OperationLeaseService operationLeases,
       io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
-      io.justsearch.configuration.resolved.ConfigStore configStore) {}
+      io.justsearch.configuration.resolved.ConfigStore configStore,
+      // Spec A step 8: the registry the KnowledgeServer publishes its encoder readiness to. Null
+      // when the Engine has none; chat's boot-order gate is then not armed.
+      io.justsearch.core.component.EngineComponentRegistry componentRegistry) {}
 
   /**
    * Inference-manager teardown handles (tempdoc 737 Phase 1). Bundles the GPU-broadcast listener
@@ -184,6 +186,7 @@ public final class ServicePhase {
     try {
     RuntimeReconciler runtimeReconciler = null;
     RuntimeSpecStore runtimeSpecStore = null;
+    io.justsearch.app.inference.chat.ChatHolds chatHolds = null;
     // §31 Phase 1.A: EnterprisePolicyService impl in app-services. Tempdoc 737: constructed up-front
     // (moved from below) so the runtime reconciler can read the online-AI policy ceiling.
     EnterprisePolicyService enterprisePolicy = new EnterprisePolicyServiceImpl();
@@ -191,19 +194,33 @@ public final class ServicePhase {
       onlineAiService = new OnlineAiServiceImpl(in.engineAdmission(), in.inferenceManager());
       gpuListener = InferenceWiring.wireGpuStatusBroadcast(
           in.inferenceManager(), in.knowledgeServerBootstrapSupplier());
-      // Tempdoc 672 follow-up: composed once here and threaded down as a single BooleanSupplier —
+      // Each accepted pass captures its own activity boundary before loading vision mode.
+      // Earlier searches must not self-interrupt an explicitly requested pass. The sampler still
+      // requires the full idle window before automatically accepting work.
+      // Tempdoc 672 follow-up: threaded down as an interruption signal —
       // VduBatchProcessor doesn't need to know about KnowledgeServerBootstrap/EnergyState itself,
       // only "should I stop now". Deliberately does NOT include inferenceManager.isOnline() — see
       // VduPacingPolicy.shouldInterrupt's javadoc: the LLM is legitimately Online for the whole
       // batch (this batch itself put it there), so that signal would self-interrupt immediately.
-      java.util.function.BooleanSupplier shouldInterruptVduBatch =
+      Supplier<java.util.function.BooleanSupplier> interruptVduBatchFactory =
           () -> {
-            var ks = in.knowledgeServerBootstrapSupplier().get();
-            long now = System.currentTimeMillis();
-            long msSinceActivity = ks != null ? ks.msSinceLastUserActivity(now) : Long.MAX_VALUE;
-            boolean energyReduced = ks != null && ks.energyState().reduced();
-            return io.justsearch.app.services.vdu.VduPacingPolicy.shouldInterrupt(
-                msSinceActivity, energyReduced);
+            var activityOwner = in.knowledgeServerBootstrapSupplier().get();
+            long activityVersion = activityOwner != null ? activityOwner.userActivityVersion() : 0L;
+            long acceptedAt = System.currentTimeMillis();
+            return () -> {
+              var ks = in.knowledgeServerBootstrapSupplier().get();
+              // Activity during this pass: recorded after acceptance, of input made at or after it.
+              // A report arriving now of input made before acceptance (the web UI's end-of-interval
+              // presence report) is recorded, but its input is placed before the pass began.
+              long now = System.currentTimeMillis();
+              boolean newActivity = ks != null && ks.userActivityVersion() != activityVersion
+                  && ks.msSinceLastUserActivity(now) <= now - acceptedAt;
+              boolean energyReduced = ks != null && ks.energyState().reduced();
+              // Spec E section 1.3 item 6: the bulk work gate's hold (held() only).
+              var bulkWork = ks != null ? ks.bulkWork() : null;
+              boolean bulkHeld = bulkWork != null && bulkWork.held();
+              return newActivity || energyReduced || bulkHeld;
+            };
           };
       // Tempdoc 737 Phase 1/2: the single-writer runtime authority. Constructed BEFORE the offline
       // coordinator (which now routes procedure-scoped engine control through it) and pre-start so
@@ -211,40 +228,48 @@ public final class ServicePhase {
       // The env autostart flag seeds the persisted spec (item 1); the reconciler then converges the
       // engine toward spec — replacing the former direct InferenceWiring.tryStartOnlineMode switch.
       runtimeSpecStore = new RuntimeSpecStore(in.settingsStore(), in.attempts());
-      RuntimeGpuLease runtimeGpuLease = new RuntimeGpuLease();
       InferenceLifecycleManager manager = in.inferenceManager();
       runtimeReconciler =
           new RuntimeReconciler(
               manager, // OnlineAiLifecycleControl (ILM implements it)
               manager::getCurrentMode,
               () -> manager.view().usingExternalLlamaServer(),
-              manager::detachExternalServer, // DetachAction — throws ModeTransitionException
               enterprisePolicy,
               runtimeSpecStore,
-              runtimeGpuLease,
-              // Tempdoc 737 (task 5): reason-bearing switches — reconciler/procedure transitions
-              // carry AUTO_START/VDU_* reasons into TransitionRunner.run instead of USER_SWITCH.
-              // Wired here at the composition root because the app-api OnlineAiLifecycleControl
-              // interface cannot reference the app-inference TransitionReason type.
-              manager::switchToOnlineMode,
-              manager::switchToIndexingMode,
+              // Spec A step 2 (reconciliation F6): boot, spec and procedure intent reach the chat
+              // controller only as setActivation; its steps carry AUTO_START/USER_SWITCH/VDU_*
+              // reasons into TransitionRunner.run.
+              manager::setActivation,
               manager::componentRecoveryPending);
+      // Spec A step 6: the reconciler's procedures are now the chat controller's holds; it
+      // follows them for the status overlay, for deferral and for the replan on the last close.
+      chatHolds = manager.chatHolds();
+      if (chatHolds != null) {
+        var _ = runtimeReconciler.followHolds(chatHolds);
+      }
 
       offlineCoordinator =
           OfflineCoordinatorBuilder.build(
               in.executors(), in.engineAdmission(),
               in.inferenceManager(),
-              runtimeReconciler,
               onlineAiService,
               in.knowledgeClientSupplier(),
               in.telemetry(),
-              shouldInterruptVduBatch);
+              interruptVduBatchFactory);
       InferenceCapabilityWiring.attachInferenceModeListener(
           in.inferenceManager(), in.generativeComponent(), runtimeSpecStore, runtimeReconciler,
           in.configStore().publicationLock());
 
+      // Spec A §6.2 (step 8): the first GPU start of chat waits for the query encoders, or for the
+      // gate's 45 s. The gate is armed only where the encoder signal is wired (HeadAssembly
+      // attaches it as the composition root's last step), before the first activation is
+      // forwarded; when it opens, the reconciler converges to the spec of that time.
+      io.justsearch.app.inference.chat.ChatBootOrder bootOrder = manager.chatBootOrder();
+      if (bootOrder != null && in.componentRegistry() != null) {
+        bootOrder.armBootOrderGate(runtimeReconciler::requestBootConvergence);
+      }
+
       runtimeReconciler.start();
-      InferenceWiring.seedAutostartSpec(runtimeSpecStore);
       runtimeReconciler.requestBootConvergence();
     } else {
       onlineAiService = OnlineAiService.unavailable();
@@ -255,7 +280,7 @@ public final class ServicePhase {
 
     // §31 Phase 3: offlineProcessingTrigger derived from offlineCoordinator (computed above).
     java.util.function.BiFunction<io.justsearch.core.context.EngineContext, java.util.function.Consumer<io.justsearch.app.api.OfflineProcessingOutcome>, java.util.concurrent.CompletionStage<io.justsearch.app.api.OfflineProcessingOutcome>> offlineProcessingTrigger =
-        offlineCoordinator != null ? offlineCoordinator::startOfflineProcessing : null;
+        offlineCoordinator != null ? offlineCoordinator::startExplicitProcessing : null;
 
     AgentToolFactory.Output agentTools =
         AgentToolFactory.build(
@@ -284,7 +309,7 @@ public final class ServicePhase {
             in.settingsStore(),
             in.knowledgeServer(),
             enterprisePolicy,
-            runtimeReconciler, settings);
+            chatHolds, settings);
     PackAllowlistService packAllowlistService = new PackAllowlistService();
     AiPackImportService aiPackImportHelper =
         new AiPackImportService(
@@ -310,10 +335,10 @@ public final class ServicePhase {
             workerFeatureCache,
             in.generativeComponent(),
             aiInstallHelper,
-            // Tempdoc 737 fix pack (fix 2): brackets the activation engine-online + intent-write
-            // window in an ACTIVATION procedure and nudges specChanged (null in the no-inference
-            // branch).
-            runtimeReconciler, settings);
+            // Spec A step 5: the self-test is a chat controller session (the candidate launched
+            // by the controller, the main server stopped first); the reconciler is nudged with
+            // specChanged after the commit. Both null in the no-inference branch.
+            chatHolds, runtimeReconciler, settings);
     // Tempdoc 805 G.3: observed ONNX execution provider beside the intent fields on
     // /api/ai/runtime/status. Same live-supplier shape as workerFeatureCache above — the RPC client
     // is null at bootstrap, so it must not be captured by value.

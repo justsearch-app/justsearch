@@ -73,12 +73,15 @@ final class WorkerExecutorRegistrationsTest {
           registrations.deferredModelInit().spec());
       assertEquals(new EngineExecutorSpec(WorkerExecutorRegistrations.PDF_OCR,
           Kind.BACKGROUND, Mode.PLATFORM, 7, 23, 1), registrations.pdfOcr().spec());
+      assertEquals(new EngineExecutorSpec(WorkerExecutorRegistrations.QUERY_PREWARM,
+          Kind.BACKGROUND, Mode.SCHEDULED, 1, 23, 1), registrations.queryPrewarm().spec());
       assertTrue(registry.registrations.stream().noneMatch(RecordingRegistration::closed));
     }
 
     assertTrue(registry.registrations.stream().allMatch(RecordingRegistration::closed));
     assertEquals(
         List.of(
+            WorkerExecutorRegistrations.QUERY_PREWARM,
             WorkerExecutorRegistrations.PDF_OCR,
             WorkerExecutorRegistrations.DEFERRED_MODEL_INIT,
             WorkerExecutorRegistrations.STUCK_JOB_REAPER,

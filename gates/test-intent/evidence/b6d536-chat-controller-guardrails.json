@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T14:06:43.912Z",
+  "revision": "56b1c91e33870dd77b6fd9fea318eeff7d7ab102",
+  "tree": "9139a33973fa8cb114d143ce749934547e919f33",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.onlyChatControllerMayCallActuationPrimitives\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.onlyCompositionRootInstallsTheChatController\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4803
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerGuardrailsTest.java#onlyChatControllerMayCallActuationPrimitives",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerGuardrailsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0cfff26af152c6d33b10d38c99ebef01aecb5ce1c05793604bb256270b77c200",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "onlyChatControllerMayCallActuationPrimitives",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerGuardrailsTest.java#onlyCompositionRootInstallsTheChatController",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerGuardrailsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0cfff26af152c6d33b10d38c99ebef01aecb5ce1c05793604bb256270b77c200",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "onlyCompositionRootInstallsTheChatController",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:4bed4948556fa3688acbc902baa4ba55bd5ae0faf9b46b560e235be2669f77db"
+}

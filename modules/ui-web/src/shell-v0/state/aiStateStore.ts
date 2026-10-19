@@ -86,6 +86,7 @@ import {
   type AiEngineVerdict,
 } from './aiVerdict.js';
 import type { NoticeTone } from '../utils/statusTone.js';
+import { chatFailureReason, chatUnloadedReason } from './chatResidency.js';
 
 // Re-export the raw snapshot types — the store is the single observed-state
 // authority, so consumers type `aiState.status` / `aiState.inference` from here.
@@ -264,6 +265,20 @@ export interface AiState {
    */
   snapshotLive: boolean;
   /**
+   * Spec A step 9 — the AI readiness reason when the Engine unloaded the chat model for another GPU
+   * user (`inference.unloaded_gpu_pressure` / `inference.unloaded_game_mode`), else null. Chat is
+   * then not offline: a person's chat request loads it again, and the chat window offers "Load
+   * anyway". Optional so hand-built fixtures without it read as "not unloaded".
+   */
+  chatUnloadedReason?: string | null;
+  /**
+   * Spec A step 7 (F1) — the AI readiness reason that says why chat failed, as the chat controller
+   * classified it (`inference.model_load_failed`, `inference.out_of_memory`, ...), else null. The
+   * controls and Health say that cause instead of a bare "offline". Optional so hand-built fixtures
+   * without it read as "no classified failure".
+   */
+  chatFailureReason?: string | null;
+  /**
    * The last-known raw poll snapshots (B7). Consumers that need fields beyond
    * the projection above (GPU, memory ceiling, uptime, index state, inference
    * queues) read these instead of running a SECOND status/inference poll — the
@@ -402,6 +417,38 @@ function friendlyModel(id: string | null | undefined): string | null {
   return stripped.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Task t-20261013-ef3c41 — how long after the server starts an uncounted index reads "Checking…"
+ * rather than "Unknown". The first count is read while the index opens, so a count still missing
+ * this long after start is not a start-up delay any more. Measured on the server's own clock
+ * (`uptimeMs`), so a page opened late into a session does not restart the window.
+ */
+const DOCUMENT_COUNT_STARTUP_WINDOW_MS = 120_000;
+
+/**
+ * Task t-20261013-ef3c41 — whether the backend reported that it could not count the index
+ * (`indexedDocumentsUnknown`). Its `indexedDocuments`/`searchableDocuments` then carry a 0 kept only
+ * for older readers; it is not a count and must never read as an empty index. Absent ⇒ known.
+ */
+function documentCountUnknown(status: StatusSnapshot | null | undefined): boolean {
+  return status?.worker?.core?.indexedDocumentsUnknown === true;
+}
+
+/**
+ * The words shown in place of a document count the backend could not read: "Checking…" during the
+ * start-up window, "Unknown" after it (or when the server's uptime is not reported). `null` when the
+ * count is a count, so a caller renders the number as before.
+ */
+export function unknownDocumentCountLabel(
+  status: StatusSnapshot | null | undefined,
+): 'Checking…' | 'Unknown' | null {
+  if (!documentCountUnknown(status)) return null;
+  const uptimeMs = status?.uptimeMs;
+  return typeof uptimeMs === 'number' && uptimeMs >= 0 && uptimeMs < DOCUMENT_COUNT_STARTUP_WINDOW_MS
+    ? 'Checking…'
+    : 'Unknown';
+}
+
 function computeCapabilities(): AiCapabilities {
   const inference = inferenceSig.get();
   const status = statusSig.get();
@@ -409,11 +456,15 @@ function computeCapabilities(): AiCapabilities {
   // has DISABLED chat (chatEnabledSpec=false) — chat is NOT available then, even though mode==='online'.
   // `chatEnabledSpec` undefined (older backend) leaves the legacy behaviour unchanged.
   const chatDisabledBySpec = status?.inference?.chatEnabledSpec === false;
-  const chat = inference?.mode === 'online' && inference?.available === true && !chatDisabledBySpec;
+  const chatState = status?.operating?.chat?.state;
+  const chat = !chatDisabledBySpec && (chatState !== undefined
+    ? chatState === 'READY'
+    : inference?.mode === 'online' && inference?.available === true);
   const docs = status?.worker?.core?.indexedDocuments ?? 0;
   return {
     chat,
-    rag: chat && docs > 0,
+    // Task t-20261013-ef3c41: an index the backend could not count is not an empty one.
+    rag: chat && (documentCountUnknown(status) || docs > 0),
     extract: chat,
     embedding: status?.embedding?.compatState === 'COMPATIBLE',
   };
@@ -686,9 +737,14 @@ function computeIndex(): AiIndex {
     status === null || v === undefined || v === null ? UNKNOWN : known(v);
   const fromInference = <T>(v: T | undefined | null): Maybe<T> =>
     inference === null || v === undefined || v === null ? UNKNOWN : known(v);
+  // Task t-20261013-ef3c41: when the backend could not count the index, the 0 it carries for older
+  // readers is not a count — both counts are UNKNOWN, never a known 0 that reads as an empty index.
+  const countsUnknown = documentCountUnknown(status);
   return {
-    documentCount: fromStatus(status?.worker?.core?.indexedDocuments),
-    searchableDocumentCount: fromStatus(status?.worker?.core?.searchableDocuments),
+    documentCount: countsUnknown ? UNKNOWN : fromStatus(status?.worker?.core?.indexedDocuments),
+    searchableDocumentCount: countsUnknown
+      ? UNKNOWN
+      : fromStatus(status?.worker?.core?.searchableDocuments),
     pendingJobs: fromStatus(status?.worker?.core?.pendingJobs),
     embeddingPending: fromStatus(status?.embedding?.pendingCount),
     embeddingBlocked:
@@ -911,6 +967,14 @@ function buildSnapshot(): AiState {
     runtimeStatus,
     packStatus: packStatusSig.get(),
     aiEngine,
+    chatUnloadedReason: chatUnloadedReason(
+      readiness.known ? readiness.value.reasonCodes : [],
+      status?.inference?.chatEnabledSpec,
+    ),
+    chatFailureReason: chatFailureReason(
+      readiness.known ? readiness.value.reasonCodes : [],
+      status?.inference?.chatEnabledSpec,
+    ),
   };
 }
 
@@ -986,7 +1050,14 @@ function onInferenceUpdate(snap: InferenceSnapshot | null): void {
   }
 }
 
-function onStatusUpdate(snap: StatusSnapshot | null): void {
+function onStatusUpdate(snap: StatusSnapshot | null, invalidated = false): void {
+  // A producer epoch change revokes everything the previous producer reported: its status body and
+  // its inference snapshot. Capabilities and runtime fall back to inference data when no status is
+  // held, so keeping it would show the previous process as Online. Only the new head's reads restore.
+  if (invalidated) {
+    statusSig.set(null);
+    ingestInferenceSnapshot(null);
+  }
   if (snap) {
     statusSig.set(snap);
     lastStatusSuccessSig.set(Date.now());
@@ -1039,6 +1110,8 @@ function stampSettledIndex(snap: StatusSnapshot): void {
     catchingUp: snap.catchingUp,
   });
   if (stability.kind !== 'settled') return;
+  // Task t-20261013-ef3c41: an uncounted index has no count to retain; the last settled one stays.
+  if (documentCountUnknown(snap)) return;
   const documentCount = snap.worker?.core?.indexedDocuments;
   if (documentCount == null) return;
   lastSettledIndexSig.set({
@@ -1130,6 +1203,8 @@ export function stopAiStateStore(): void {
     stalenessTimer = null;
   }
   started = false;
+  // The stopped poller has discarded its epoch and replay state.
+  statusSig.set(null);
 }
 
 export function subscribeAiState(listener: (s: AiState) => void): () => void {

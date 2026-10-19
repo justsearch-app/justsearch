@@ -29,6 +29,7 @@ import org.junit.jupiter.api.io.TempDir;
  * so callers can retry on the upgraded holder reference (tempdoc 410 V1 promoted this from
  * IllegalStateException); (3) a failed drain retains resources for a later bounded retry.
  */
+@Tag("cross-platform")
 class DrainAndCloseTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
@@ -155,9 +156,7 @@ class DrainAndCloseTest extends LuceneExecutorTestBase {
    * production-owned read lease without acquiring a test-owned barrier lock.
    */
   @Test
-  // Windows-native exercises the real Lucene directory and waits for production admission before
-  // drain begins, so the earlier write and its read lease are observable.
-  @Tag("windows")
+  // The real directory and production admission expose the writer read lease on either host.
   void drainAndCloseWaitsForInFlightWriter() throws Exception {
     Path indexPath = tempDir.resolve("drain-inflight");
     Files.createDirectories(indexPath);

@@ -1,0 +1,106 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:39:01.223Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "e0f19932038ed24922ea25ce288fe26aff640154",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.procedureWithSpecOn_returnsEngineOnlineAfterEnd\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.procedureWithSpecOff_engineStaysDownAfterEnd\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.procedureHoldsEngineUpSpecOff_engineReasonIsBackground\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.specWriteDuringProcedure_deferredUntilEnd\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.installSmokeTestProcedure_specOff_engineUpNoDown_thenOneDownAtEnd\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5463
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#procedureWithSpecOn_returnsEngineOnlineAfterEnd",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1cef1a7d75cbac83200480bf8d8daa5f2b70d2f37e753a2fd1b7d194ce758243",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "procedureWithSpecOn_returnsEngineOnlineAfterEnd()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#procedureWithSpecOff_engineStaysDownAfterEnd",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1cef1a7d75cbac83200480bf8d8daa5f2b70d2f37e753a2fd1b7d194ce758243",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "procedureWithSpecOff_engineStaysDownAfterEnd()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#procedureHoldsEngineUpSpecOff_engineReasonIsBackground",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1cef1a7d75cbac83200480bf8d8daa5f2b70d2f37e753a2fd1b7d194ce758243",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "procedureHoldsEngineUpSpecOff_engineReasonIsBackground()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#specWriteDuringProcedure_deferredUntilEnd",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1cef1a7d75cbac83200480bf8d8daa5f2b70d2f37e753a2fd1b7d194ce758243",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "specWriteDuringProcedure_deferredUntilEnd()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#installSmokeTestProcedure_specOff_engineUpNoDown_thenOneDownAtEnd",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1cef1a7d75cbac83200480bf8d8daa5f2b70d2f37e753a2fd1b7d194ce758243",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "installSmokeTestProcedure_specOff_engineUpNoDown_thenOneDownAtEnd()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:e4a918e410005f10158e7b147d4cbaf88b8565aafd8e34a2ae9c557ec88cfe7a"
+}

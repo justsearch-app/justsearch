@@ -328,6 +328,17 @@ public enum EnvRegistry {
         "JUSTSEARCH_GPU_DEVICE_MEMORY_CEILING_MB",
         LifecycleStage.PERMANENT),
 
+    /**
+     * Game detection (Spec E section 4.3): {@code auto} (default) pauses bulk GPU work while a game
+     * runs; {@code off} never detects a game. The settings API maps llm.gameDetection from
+     * settings.json at ordinal 300. Read on every residency-sampler tick (hot apply scope).
+     */
+    GPU_GAME_DETECTION(
+        "justsearch.gpu.game_detection",
+        "JUSTSEARCH_GPU_GAME_DETECTION",
+        "auto",
+        LifecycleStage.PERMANENT),
+
     /** GPU acceleration policy gate (true = allow GPU, false = CPU-only). */
     POLICY_GPU_ACCELERATION_ENABLED(
         "policy.gpu_acceleration_enabled",
@@ -1381,7 +1392,76 @@ public enum EnvRegistry {
     ENGINE_ADMISSION_AGGREGATE_LIMIT(
         "justsearch.engine.admission.aggregate_limit",
         "JUSTSEARCH_ENGINE_ADMISSION_AGGREGATE_LIMIT",
-        LifecycleStage.PERMANENT);
+        LifecycleStage.PERMANENT),
+
+    /**
+     * A user's own llama-server, as a loopback URL ({@code http://127.0.0.1:<port>}). ADR-0051
+     * decision 2: this explicit setting is the only way the Engine uses a server it did not start;
+     * such a server is reported and never stopped. Unset (the default), every chat server is
+     * launched and owned by the Engine on a fresh loopback port, and {@code justsearch.server.port}
+     * no longer makes the Engine adopt whatever answers there.
+     */
+    INFERENCE_EXTERNAL_ENDPOINT(
+        "justsearch.inference.external_endpoint",
+        "JUSTSEARCH_INFERENCE_EXTERNAL_ENDPOINT",
+        LifecycleStage.PERMANENT),
+
+    /**
+     * Eval mode: the dev and evaluation runs set it, and the synthetic debug routes answer only
+     * under it (otherwise 404). Read where a route decides, so a test can switch it per call.
+     */
+    EVAL_MODE("justsearch.eval.mode", "JUSTSEARCH_EVAL_MODE", LifecycleStage.PERMANENT),
+
+    /**
+     * The supervised Engine incarnation this process is, {@code <session>/<n>} (Spec F section
+     * 3.2). A supervisor (the dev runner, the shell) sets {@code JUSTSEARCH_ENGINE_INCARNATION} at
+     * each spawn; the Engine copies it into its runtime manifest. Unset when unsupervised.
+     */
+    ENGINE_INCARNATION(
+        "justsearch.engine.incarnation",
+        "JUSTSEARCH_ENGINE_INCARNATION",
+        LifecycleStage.PERMANENT),
+
+    /**
+     * Whether llama-server places the vision projector on the GPU (Spec E revision 4 section 2.2).
+     * Default {@code true}, today's launch. On a 12 GB or 8 GB device the device-memory plan sets
+     * it to {@code false} at the auto-detected ordinal ({@code --no-mmproj-offload}); an explicit
+     * value wins and changes the chat footprint the plan reserves.
+     */
+    MMPROJ_OFFLOAD(
+        "justsearch.mmproj.offload", "JUSTSEARCH_MMPROJ_OFFLOAD", "true", LifecycleStage.PERMANENT),
+
+    /**
+     * The device-memory plan the Engine applies (Spec E revision 4 section 2.2): the planned
+     * profile's token ({@code p16_plus}, {@code p12} or {@code p8}), blank when no plan applies.
+     * Derived, not a preference: only the Engine's own contribution at the auto-detected ordinal
+     * is read; an explicit value is ignored with a WARN. Encoder sessions on a planned profile pack
+     * their calls against the plan and refuse the FP32 fallback on the GPU.
+     */
+    GPU_MEMORY_PLAN(
+        "justsearch.gpu.memory_plan", "JUSTSEARCH_GPU_MEMORY_PLAN", LifecycleStage.PERMANENT),
+
+    /** Encoder roles explicitly placed outside the planned device. Engine-derived at ordinal 150. */
+    GPU_MEMORY_PLAN_UNPLANNED_ROLES(
+        "justsearch.gpu.memory_plan_unplanned_roles", "JUSTSEARCH_GPU_MEMORY_PLAN_UNPLANNED_ROLES",
+        LifecycleStage.PERMANENT),
+
+    /**
+     * Captured device availability, derived by the Engine. Only its auto-detected contribution
+     * is read; preferences and environment overrides cannot invent a usable device or disable one.
+     */
+    GPU_DEVICE_AVAILABLE(
+        "justsearch.gpu.device_available", "JUSTSEARCH_GPU_DEVICE_AVAILABLE", LifecycleStage.PERMANENT),
+
+    /**
+     * Development override of the managed llama-server's host prompt-cache bound for chat
+     * ({@code --cache-ram}, MiB). No registered default: the bound depends on the mode. Unset, chat
+     * uses 1024; evaluation mode and VDU always use 0, override or not. Read presence-sensitively
+     * by {@code InferenceConfig} when the inference configuration is created, so a blank or
+     * malformed value is refused rather than replaced by the default. Restart required.
+     */
+    LLM_PROMPT_CACHE_MIB(
+        "justsearch.llm.prompt_cache_mib", "JUSTSEARCH_LLM_PROMPT_CACHE_MIB", LifecycleStage.PERMANENT);
 
     // YAML-only keys moved to ConfigKey.java (tempdoc 347 D1).
 

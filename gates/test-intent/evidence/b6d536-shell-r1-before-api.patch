@@ -1,0 +1,91 @@
+--- a/modules/shell/src-tauri/src/lib.rs
++++ b/modules/shell/src-tauri/src/lib.rs
+@@ -1,4 +1,6 @@
+ mod binding;
++mod containment;
++mod shell_actuator;
+ mod engine_host;
+ mod engine_probe;
+ mod platform_paths;
+--- a/modules/shell/src-tauri/src/updater.rs
++++ b/modules/shell/src-tauri/src/updater.rs
+@@ -734,6 +734,10 @@
+         nonce: &str,
+     ) -> impl std::future::Future<Output = Result<ShutdownReceipt, String>> + Send;
+     fn wait_for_exit(&self, timeout: Duration) -> bool;
++    fn await_contained_exit(&self, _timeout: Duration) -> Result<crate::containment::JobEmpty, String> {
++        Ok(crate::containment::JobEmpty::Empty { waited: Duration::ZERO })
++    }
++    fn terminate_contained(&self) -> Result<(), String> { Ok(()) }
+     fn resume(&self) -> Result<(), String>;
+     fn launch(&self, path: &Path) -> Result<(u32, u128), String>;
+ }
+--- a/modules/shell/src-tauri/src/engine_host.rs
++++ b/modules/shell/src-tauri/src/engine_host.rs
+@@ -1297,3 +1297,14 @@
+         host.kill_and_reap();
+     }
+ }
++
++// Before-state interface scaffolding only. The old updater never calls these new methods.
++impl EngineHost {
++    pub(crate) fn supervisor_running(&self) -> bool { false }
++    pub(crate) fn await_contained_exit(&self, _timeout: Duration) -> Result<crate::containment::JobEmpty, String> {
++        Ok(crate::containment::JobEmpty::Empty { waited: Duration::ZERO })
++    }
++    pub(crate) fn force_stop(&self) -> Result<(), String> {
++        Ok(())
++    }
++}
+--- /dev/null
++++ b/modules/shell/src-tauri/src/containment.rs
+@@ -0,0 +1,6 @@
++// Before-state interface scaffolding: no job/spawn/containment implementation.
++pub(crate) const JOB_TERMINATE_CONFIRM_MS: u64 = 2000;
++pub(crate) enum JobEmpty {
++    Empty { waited: std::time::Duration },
++    TimedOut { active: u32 },
++}
+--- /dev/null
++++ b/modules/shell/src-tauri/src/shell_actuator.rs
+@@ -0,0 +1,24 @@
++//! Before-state interface scaffolding only; no actuator implementation.
++use crate::{engine_host::EngineHost,supervisor::{Actuator,Ready,StateRecord}};
++use std::{sync::Arc,path::PathBuf};
++pub(crate) struct ShellActuator;
++impl ShellActuator {
++    pub fn new(_host:Arc<EngineHost>,_data_dir:PathBuf,_spawn:impl FnMut()->Result<u32,String>+Send+'static,_event:impl FnMut(&StateRecord)+Send+'static)->Self {
++        Self
++    }
++}
++impl Actuator for ShellActuator {
++    fn spawn_engine(&mut self)->Result<u32,String> {Ok(0)}
++    fn await_ready(&mut self,_deadline:u64)->Result<Ready,String> {Ok(Ready::default())}
++    fn poll_exit(&mut self)->Option<i32> {None}
++    fn probe_health(&mut self)->bool {false}
++    fn probe_essential_ready(&mut self)->Option<crate::engine_probe::ReadyEpoch> {None}
++    fn observed_shutdown_reason(&mut self,_current:&Ready)->Option<String> {None}
++    fn write_shutdown_request(&mut self,_reason:&str,_deadline:u64)->Result<(),String> {Ok(())}
++    fn force_kill(&mut self) {}
++    fn wait_for_handle_release(&mut self)->bool {false}
++    fn sleep(&mut self,_ms:u64) {}
++    fn monotonic_ms(&mut self)->u64 {0}
++    fn publish_state(&mut self,_record:&StateRecord) {}
++    fn should_continue(&mut self)->bool {false}
++}
+--- a/modules/shell/src-tauri/src/supervisor.rs
++++ b/modules/shell/src-tauri/src/supervisor.rs
+@@ -183,5 +183,6 @@
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ pub struct Policy {
++    pub quit_force_margin_ms: u64,
+     pub max_restart_attempts: u32,
+     pub cooldown_increment_ms: u64,
+     pub max_cooldown_ms: u64,
+@@ -247,5 +248,6 @@
+     };
+     let mut policy = Policy {
++        quit_force_margin_ms: 0,
+         max_restart_attempts: num("maxRestartAttempts") as u32,
+         cooldown_increment_ms: num("cooldownIncrementMs"),
+         max_cooldown_ms: num("maxCooldownMs"),

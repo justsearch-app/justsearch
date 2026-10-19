@@ -1,0 +1,41 @@
+diff --git a/modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServer.java b/modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServer.java
+--- a/modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServer.java
++++ b/modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServer.java
+@@ -34,6 +34,13 @@
+     for (String line : Files.readAllLines(pids, StandardCharsets.US_ASCII)) {
+       if (line.isBlank()) continue;
+       ProcessHandle.of(Long.parseLong(line.trim())).ifPresent(server -> {
++        Path birth = dir.resolve("birth-" + server.pid());
++        try {
++          if (!Files.exists(birth) || !server.info().startInstant().orElseThrow().equals(
++              java.time.Instant.parse(Files.readString(birth, StandardCharsets.UTF_8)))) return;
++        } catch (IOException failure) {
++          throw new java.io.UncheckedIOException(failure);
++        }
+         server.destroyForcibly();
+         try {
+           server.onExit().get(5, TimeUnit.SECONDS);
+@@ -45,6 +52,12 @@
+   }
+ 
+   public static void main(String[] args) throws Exception {
++    String replayHome = System.getProperty(HOME_PROPERTY);
++    if (replayHome != null) {
++      var self = ProcessHandle.current();
++      Files.writeString(Path.of(replayHome, "birth-" + self.pid()),
++          self.info().startInstant().orElseThrow().toString(), StandardCharsets.UTF_8);
++    }
+     int port = Integer.parseInt(value(args, "--port", "-1"));
+     String model = value(args, "-m", "model.gguf").replace('\\', '/');
+     String window = value(args, "-c", "4096");
+@@ -72,8 +85,10 @@
+           java.nio.file.StandardOpenOption.APPEND);
+     }
+     ProcessHandle launcher = ProcessHandle.current().parent().orElse(null);
++    var launcherBirth = launcher == null ? null : launcher.info().startInstant().orElseThrow();
+     long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2);
+     while (launcher != null && launcher.isAlive() && System.nanoTime() < deadline) {
++      if (!launcher.info().startInstant().filter(launcherBirth::equals).isPresent()) break;
+       Thread.sleep(100);
+     }
+     server.stop(0);

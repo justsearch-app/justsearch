@@ -85,7 +85,7 @@ and **Node.js** — no GPU, no Rust toolchain, and no model download needed just
 
 ```bash
 git clone https://github.com/justsearch-app/justsearch && cd justsearch
-./gradlew.bat build
+node scripts/lib/tool-invoker.cjs gradle build
 ```
 
 To produce the actual Windows installer (not just build/test the code) rather than the CI build

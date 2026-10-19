@@ -55,9 +55,16 @@ public final class EngineFutures {
    */
   public static <T> CompletableFuture<T> supplyAsync(
       Supplier<T> supplier, Executor executor, Runnable onActualExit) {
+    return supplyAsync(supplier, executor, onActualExit, () -> {});
+  }
+
+  /** Signals caller abandonment before cancelling, without interrupting native/index work. */
+  public static <T> CompletableFuture<T> supplyAsync(
+      Supplier<T> supplier, Executor executor, Runnable onActualExit, Runnable onAbandon) {
     Objects.requireNonNull(executor, "executor");
     var result = new OwnedFuture<>(Objects.requireNonNull(supplier, "supplier"),
-        Objects.requireNonNull(onActualExit, "onActualExit"));
+        Objects.requireNonNull(onActualExit, "onActualExit"),
+        Objects.requireNonNull(onAbandon, "onAbandon"));
     try {
       executor.execute(result.task);
     } catch (RuntimeException | Error failure) {
@@ -89,8 +96,10 @@ public final class EngineFutures {
   private static final class OwnedFuture<T> extends CompletableFuture<T> {
     private final FutureTask<T> task;
     private volatile boolean timeoutCompleting;
+    private final Runnable onAbandon;
 
-    private OwnedFuture(Supplier<T> supplier, Runnable onActualExit) {
+    private OwnedFuture(Supplier<T> supplier, Runnable onActualExit, Runnable onAbandon) {
+      this.onAbandon = onAbandon;
       task = new FutureTask<>(supplier::get) {
         // 0 queued, 1 inside run(), 2 actually exited (or cancelled before entry).
         private final java.util.concurrent.atomic.AtomicInteger lifetime =
@@ -133,6 +142,7 @@ public final class EngineFutures {
 
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
+      if (!isDone()) onAbandon.run();
       // FutureTask changes state before done() invokes synchronous stage dependents. They may
       // block indefinitely, so the supplier must already be unable to start at that point.
       try {
@@ -147,6 +157,7 @@ public final class EngineFutures {
     @Override
     public boolean completeExceptionally(Throwable failure) {
       if (failure instanceof java.util.concurrent.TimeoutException && !isDone()) {
+        onAbandon.run();
         timeoutCompleting = true;
         try { task.cancel(false); }
         catch (RuntimeException | Error cleanupFailure) { failure.addSuppressed(cleanupFailure); }

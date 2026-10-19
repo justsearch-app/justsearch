@@ -6,6 +6,7 @@ import io.justsearch.app.api.stream.SseFrameKind;
 import io.justsearch.app.api.stream.StreamId;
 import io.justsearch.app.observability.stream.SseStreamChannel;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
 /**
@@ -38,12 +39,22 @@ public final class HealthEventChangeRegistry {
 
   private final SseStreamChannel channel;
 
-  public HealthEventChangeRegistry() {
-    this.channel = new SseStreamChannel(STREAM_ID);
+  /**
+   * Listener delivery runs on {@code deliveryOwner}, an executor the caller's owner created; the
+   * channel shuts it down when it closes. Production builds its channel from a registry
+   * registration instead, so the registration is released too (see the channel constructor).
+   */
+  public HealthEventChangeRegistry(ExecutorService deliveryOwner) {
+    this(new SseStreamChannel(STREAM_ID, deliveryOwner));
   }
 
+  /**
+   * @param channel a channel built with an owner-supplied delivery executor; Health listeners run
+   *     only on that owner's threads
+   * @throws IllegalStateException when {@code channel} has no delivery executor
+   */
   public HealthEventChangeRegistry(SseStreamChannel channel) {
-    this.channel = Objects.requireNonNull(channel, "channel");
+    this.channel = Objects.requireNonNull(channel, "channel").withInterruptibleDelivery();
   }
 
   /**
@@ -68,13 +79,23 @@ public final class HealthEventChangeRegistry {
   /**
    * Broadcasts a state change. Wraps the (kind, event) tuple into a {@link HealthDelta}
    * payload, assigns the next monotonic seq, appends the frame to the ring buffer, and
-   * delivers to every active envelope-listener. Listeners that throw are removed inline.
+   * delivers to every active envelope-listener. Listeners that throw are removed.
+   *
+   * <p>Listener code runs on the channel's own delivery threads, never on the caller's: the
+   * caller waits a bounded time for delivery and is never interrupted when a listener goes away.
    */
   public void broadcast(Kind kind, HealthEvent event) {
     Objects.requireNonNull(kind, "kind");
     Objects.requireNonNull(event, "event");
     HealthDelta payload = new HealthDelta(deltaKindName(kind), event);
     channel.publish(SseFrameKind.UPDATE, payload);
+  }
+
+  /** Publishes a condition transition without letting an observer gate state publication. */
+  public void broadcastAsync(Kind kind, HealthEvent event) {
+    Objects.requireNonNull(kind, "kind");
+    Objects.requireNonNull(event, "event");
+    channel.publishAsync(SseFrameKind.UPDATE, new HealthDelta(deltaKindName(kind), event));
   }
 
   private static String deltaKindName(Kind kind) {

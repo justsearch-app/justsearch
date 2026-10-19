@@ -17,6 +17,20 @@ import org.junit.jupiter.api.io.TempDir;
  * Tests for deterministic server executable discovery in InferenceConfig.findServerExecutable().
  */
 class InferenceConfigServerExeTest {
+  private String nativeFixtureOs;
+
+  @BeforeEach
+  void selectWindowsNativeFixture() {
+    nativeFixtureOs = System.getProperty("os.name");
+    System.setProperty("os.name", "Windows 11");
+  }
+
+  @AfterEach
+  void restoreNativeFixtureOs() {
+    if (nativeFixtureOs == null) System.clearProperty("os.name");
+    else System.setProperty("os.name", nativeFixtureOs);
+  }
+
 
   @TempDir Path tempDir;
 

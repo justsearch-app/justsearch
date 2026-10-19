@@ -436,6 +436,7 @@ final class ServerPropsOps {
       long lastPeriodicHealthOkAtMs,
       String lastPeriodicHealthError,
       int consecutiveHealthFailures) {
+    // The status note is owned by LlamaServerOps, which attaches it (withNote).
     return new InferenceLifecycleManager.ExternalServerDiagnostics(
         usingExternal,
         externalServerVerified.get(),
@@ -447,6 +448,7 @@ final class ServerPropsOps {
         externalServerAdoptedAtMs.get(),
         lastPeriodicHealthOkAtMs,
         lastPeriodicHealthError,
-        consecutiveHealthFailures);
+        consecutiveHealthFailures,
+        null);
   }
 }

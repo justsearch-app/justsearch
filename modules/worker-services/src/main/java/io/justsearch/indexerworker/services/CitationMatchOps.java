@@ -220,7 +220,10 @@ final class CitationMatchOps {
     long deadlineMs = csConfig != null ? csConfig.deadlineBudgetMs() : DEFAULT_DEADLINE_MS;
 
     CrossEncoderProducer crossEncoder = availableCrossEncoder();
-    if (crossEncoder == null && !embeddingProvider.isAvailable()) {
+    if (crossEncoder == null && !switch (embeddingProvider.availability().state()) {
+      case READY -> true;
+      case STARTING, ABSENT, FAILED -> false;
+    }) {
       // Neither producer exists: nothing is scored, and the response says so rather than
       // reporting an empty result that reads like "nothing was grounded".
       return emptyResponse(startTime, "EMBEDDING_UNAVAILABLE");
@@ -293,7 +296,10 @@ final class CitationMatchOps {
     }
 
     // Fallback: embedding-based cosine similarity
-    if (!embeddingProvider.isAvailable()) {
+    if (!switch (embeddingProvider.availability().state()) {
+      case READY -> true;
+      case STARTING, ABSENT, FAILED -> false;
+    }) {
       // Windows were prepared but nothing scored them: every source reports scored == 0, which is
       // the "never examined" state (tempdoc 836 S2S3-A.1), not "examined and unsupported".
       return emptyResponse(startTime, "EMBEDDING_UNAVAILABLE", sourceCoverage(prepared, false));

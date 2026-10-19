@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T15:18:36.185Z",
+  "revision": "6f85a257a07cbe374d76a059fb310a1ec0df4a23",
+  "tree": "e0fb052d5322139afc283a5fb5a057c65a8fef1e",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.clearedPressureEndsThePublishedReloadWaitAndRaisesSeq\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 39006
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#clearedPressureEndsThePublishedReloadWaitAndRaisesSeq",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "clearedPressureEndsThePublishedReloadWaitAndRaisesSeq()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b48ef2fcc",
+    "revision": "b48ef2fcc8e74753777e6b4c8ff6402eb2977c2f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.clearedPressureEndsThePublishedReloadWaitAndRaisesSeq\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 287849
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#clearedPressureEndsThePublishedReloadWaitAndRaisesSeq",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:349649e9561bd13e9de17e0428fb5557a6f9e917743239991f701be6f412bed0"
+}

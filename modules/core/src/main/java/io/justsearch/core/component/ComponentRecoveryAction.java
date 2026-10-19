@@ -18,6 +18,35 @@ public interface ComponentRecoveryAction {
    */
   Result recover(Request request) throws Exception;
 
+  /**
+   * Whether the component monitor may start attempts on its own. False for an owner that decides
+   * its own relaunches (the chat controller, Spec A §4.2 and §7.2): the monitor then never
+   * schedules an automatic attempt and never exhausts a budget for it, and each operator request
+   * is one attempt.
+   */
+  default boolean admitsAutomaticAttempts() {
+    return true;
+  }
+
+  /**
+   * An action the component monitor runs only on an operator's request (one attempt per request,
+   * Spec A O6), never on its own.
+   */
+  static ComponentRecoveryAction operatorOnly(ComponentRecoveryAction action) {
+    Objects.requireNonNull(action, "action");
+    return new ComponentRecoveryAction() {
+      @Override
+      public Result recover(Request request) throws Exception {
+        return action.recover(request);
+      }
+
+      @Override
+      public boolean admitsAutomaticAttempts() {
+        return false;
+      }
+    };
+  }
+
   /** Terminal outcome of one admitted same-configuration recovery attempt. */
   enum Outcome { RECOVERED, DEGRADED, FAILED, REFUSED, SUPERSEDED }
 

@@ -4,6 +4,7 @@ import com.diffplug.gradle.spotless.SpotlessExtension
 import com.diffplug.gradle.spotless.SpotlessTask
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.distribution.DistributionContainer
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.plugins.quality.Pmd
 import org.gradle.api.plugins.quality.PmdExtension
@@ -70,22 +71,16 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
 
       val includeExperiment = project.findProperty("includeExperiment")?.toString()?.toBoolean() ?: false
       val includeStress = project.findProperty("includeStress")?.toString()?.toBoolean() ?: false
-      // Tempdoc 668 Windows→Linux migration (option B): tests tagged "windows" exercise
-      // genuinely Windows-specific product behaviour (single-instance lock, job objects,
-      // power status). They are excluded on NON-Windows hosts (the Linux CI lanes) so the bulk
-      // of CI runs on the ~2.8x faster Linux runners; the dedicated windows-native lane runs
-      // ONLY the tagged tests via -PwindowsOnly=true (includeTags "windows"). On a Windows host
-      // (local dev, or that lane's runner) they run normally in the default flow — they can only
-      // be tested on Windows, so excluding them there would silently drop their local coverage
-      // (and make `--tests "*WindowsFooTest*"` fail with "no tests found").
+      // Windows-native CI also selects formerly Windows-only classes with portable OS branches.
+      // "cross-platform" keeps those classes in that lane and in the default Linux test tasks;
+      // genuinely Windows-only methods retain their "windows" tag and OS preconditions.
       val windowsOnly = project.findProperty("windowsOnly")?.toString()?.toBoolean() ?: false
-      val isWindowsHost =
-          System.getProperty("os.name").lowercase(java.util.Locale.ROOT).contains("windows")
+      val isWindowsHost = HostPlatform.isWindows
       project.tasks.withType(Test::class.java).configureEach {
         usesService(testGate)
         useJUnitPlatform {
           if (windowsOnly) {
-            includeTags("windows")
+            includeTags("windows", "cross-platform")
           } else {
             val excluded = mutableListOf<String>()
             // Skip the Windows-specific tests only where they cannot run (non-Windows CI).
@@ -134,12 +129,20 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
               parameters.overrideDir.set(
                   project.providers.environmentVariable("JUSTSEARCH_EMBED_ONNX_MODEL_PATH").orElse(""))
             })
-        // Tests that build real ORT sessions must not write optimized graphs into the
-        // developer's per-machine store (tempdoc 958). A short temp-based root keeps store paths
-        // under Windows MAX_PATH even from deep worktree checkouts (a build-dir root reached
-        // 269 characters), so tests exercise caching rather than the long-path fallback.
-        environment("JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR",
-            java.io.File(System.getProperty("java.io.tmpdir"), "js-ort-test-" + project.name).absolutePath)
+        // Keep optimized test graphs out of the developer's per-machine store (tempdoc 958).
+        // Linux /tmp may be RAM-backed, so use the build directory there. Windows retains its
+        // short temp-based path to stay under MAX_PATH in deep worktrees. Resolve at execution
+        // time so the daemon's tmpdir is not a configuration-cache input.
+        val optimizedCacheDir = project.layout.buildDirectory.dir("ort-optimized")
+        val optimizedCacheName = "js-ort-test-" + project.name
+        doFirst {
+          val cacheDir = if (isWindowsHost) {
+            java.io.File(System.getProperty("java.io.tmpdir"), optimizedCacheName)
+          } else {
+            optimizedCacheDir.get().asFile
+          }
+          (this as Test).environment("JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR", cacheDir.absolutePath)
+        }
         // Retry flaky tests in CI; surface them with failOnPassedAfterRetry.
         // The retry extension is registered by the Develocity plugin (settings.gradle.kts).
         // Accessed via reflection because the type is shaded inside the Develocity plugin.
@@ -253,6 +256,23 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
         )
 
     project.pluginManager.withPlugin("application") {
+      if (HostPlatform.isLinux) {
+        val nativeSpec = groovy.json.JsonSlurper().parseText(project.providers.fileContents(
+            project.rootProject.layout.projectDirectory.file("contracts/native-targets/spec.v1.json")).asText.get()) as Map<*, *>
+        val target = (nativeSpec["targets"] as Map<*, *>)["linux-x86_64"] as Map<*, *>
+        val relative = (target["paths"] as Map<*, *>)["bound-exec"] as String
+        val helper = project.project(":modules:app-api").layout.buildDirectory.file(relative)
+        project.extensions.configure(DistributionContainer::class.java) {
+          named("main") {
+            contents {
+              from(project.files(helper).builtBy(":modules:app-api:buildLinuxBoundExec")) {
+                into(java.io.File(relative).parent)
+                filePermissions { unix("rwxr-xr-x") }
+              }
+            }
+          }
+        }
+      }
       project.tasks.named("distTar") {
         enabled = false
       }

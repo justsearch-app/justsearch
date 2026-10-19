@@ -1,0 +1,140 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-08T01:26:22.808Z",
+  "revision": "9e8c7fae2e33db679f535acf083cad0e94460f9a",
+  "tree": "b52ab2435af56108e866cd13c13ad1b0fd263843",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResumeRepairTest.resumeDoesNotCreateADwellAfterTheUnloadedServerWasReloaded\" --tests \"io.justsearch.app.services.chat.ChatResumeTest\" --tests \"io.justsearch.app.services.chat.ChatDeviceLossTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8448
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeRepairTest.java#resumeDoesNotCreateADwellAfterTheUnloadedServerWasReloaded",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d667f9657397ab271b10ca00971335247ca9123af13d739a05ab4495b35e5c11",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "resumeDoesNotCreateADwellAfterTheUnloadedServerWasReloaded()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f98a7d0603e31efb5fece0a64fc721a3a7f594647dbbce3e78a8112abaa7c0e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPassingProbeChangesNothing()",
+          "status": "passed"
+        },
+        {
+          "name": "aResumeAfterTheControllerStoppedDoesNothing()",
+          "status": "passed"
+        },
+        {
+          "name": "theResidencyDwellRestartsInFullOnResume()",
+          "status": "passed"
+        },
+        {
+          "name": "aProbeThatFindsTheDeviceLostTakesTheDeviceLostPath()",
+          "status": "passed"
+        },
+        {
+          "name": "theServerTimersResetAtOnceAndAServingServerIsProbedAfterTheStepInProgress()",
+          "status": "passed"
+        },
+        {
+          "name": "theBootOrderDeadlineRestartsInFullOnResume()",
+          "status": "passed"
+        },
+        {
+          "name": "withoutALatchTheResumeDoesNotReplan()",
+          "status": "passed"
+        },
+        {
+          "name": "theResumeClearsAFailureLatchAndSendsTheIntentAgain()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatDeviceLossTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bb60e7f3673fb9eb90d324d336585ce4642796eca8be6bd47a780b1b2ddc9828",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRestartInTheLastTenMinutesFailsChatInsteadOfRestarting()",
+          "status": "passed"
+        },
+        {
+          "name": "overTheLimitTheServerAlsoStopsBeforeTheLedgerIsRead()",
+          "status": "passed"
+        },
+        {
+          "name": "aSecondReportWhileTheFirstIsHandledIsIgnored()",
+          "status": "passed"
+        },
+        {
+          "name": "twoEarlierRestartsInTheHourStillLeaveRoomForAThird()",
+          "status": "passed"
+        },
+        {
+          "name": "threeRestartsInTheLastHourFailChatInsteadOfRestarting()",
+          "status": "passed"
+        },
+        {
+          "name": "theServerStopsBeforeTheLedgerIsRead()",
+          "status": "passed"
+        },
+        {
+          "name": "anUnreadableLedgerFailsClosed()",
+          "status": "passed"
+        },
+        {
+          "name": "withinTheLimitTheServerStopsNowAndTheEngineRestarts()",
+          "status": "passed"
+        },
+        {
+          "name": "noBoundRestartPathFailsClosed()",
+          "status": "passed"
+        },
+        {
+          "name": "theLimitCountsTheNewRestartAgainstBothWindows()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:30a43b41e30e83a68b864336ea7070e1946cfadb303e2c58aa81e46d4ffabe69"
+}

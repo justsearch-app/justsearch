@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.inference;
 
+import io.justsearch.configuration.NativeTargets;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.ModelPathSource;
 import io.justsearch.configuration.SystemAccess;
@@ -37,6 +38,8 @@ import org.slf4j.LoggerFactory;
  *     (an operator-set path, or a bare path applied at runtime). Never a stale claim: whoever
  *     changes {@code modelPath} without a profile MUST clear this, because the id is what
  *     downstream surfaces report as the realized chat identity (tempdoc 842 §2.5).
+ * @param chatPromptCacheMiB host prompt-cache bound for chat, captured at configuration creation;
+ *     evaluation mode resolves to 0. VDU always uses 0 without losing the chat bound.
  */
 public record InferenceConfig(
     Path serverExecutable,
@@ -46,7 +49,8 @@ public record InferenceConfig(
     int contextSize,
     int gpuLayers,
     boolean vduMode,
-    String chatProfileId
+    String chatProfileId,
+    int chatPromptCacheMiB
 ) {
   private static final Logger log = LoggerFactory.getLogger(InferenceConfig.class);
 
@@ -63,9 +67,51 @@ public record InferenceConfig(
     if (gpuLayers < 0) {
       throw new IllegalArgumentException("gpuLayers must be non-negative");
     }
+    if (chatPromptCacheMiB < 0) {
+      throw new IllegalArgumentException(PROMPT_CACHE_PROPERTY + " must be a non-negative integer MiB");
+    }
     // A blank id is not a weaker claim than no claim — normalize so `chatProfileId() == null`
     // is the single "no profile governed this pair" test everywhere downstream.
     chatProfileId = (chatProfileId == null || chatProfileId.isBlank()) ? null : chatProfileId.trim();
+  }
+
+  /** Development override; boot-static, so restarts use the captured bound. */
+  public static final String PROMPT_CACHE_PROPERTY = EnvRegistry.LLM_PROMPT_CACHE_MIB.sysProp();
+
+  public InferenceConfig(
+      Path serverExecutable, Path modelPath, Path mmprojPath, int serverPort, int contextSize,
+      int gpuLayers, boolean vduMode, String chatProfileId) {
+    this(serverExecutable, modelPath, mmprojPath, serverPort, contextSize, gpuLayers, vduMode,
+        chatProfileId, configuredChatPromptCacheMiB());
+  }
+
+  private static int configuredChatPromptCacheMiB() {
+    // Preserve blank values here: SystemAccess and EnvRegistry.get treat them as absent, but an
+    // explicit invalid cache override must be refused rather than replaced by the default. The
+    // registry's precedence applies: the system property, then the environment variable.
+    EnvRegistry key = EnvRegistry.LLM_PROMPT_CACHE_MIB;
+    String source = key.sysProp();
+    String value = SystemAccess.rawSysProp(source);
+    if (value == null) {
+      source = key.envVar();
+      value = SystemAccess.rawEnvVar(source);
+    }
+    int bound = 1024;
+    if (value != null) {
+      try {
+        if (!value.matches("[0-9]+")) throw new NumberFormatException();
+        bound = Integer.parseInt(value);
+      } catch (NumberFormatException invalid) {
+        throw new IllegalArgumentException(
+            source + " must be a non-negative integer MiB (0..2147483647): " + value, invalid);
+      }
+    }
+    return EnvRegistry.EVAL_MODE.getBoolean(false) ? 0 : bound;
+  }
+
+  /** The host cache limit actually passed to the child for this mode. */
+  public int promptCacheMiB() {
+    return vduMode ? 0 : chatPromptCacheMiB;
   }
 
   /**
@@ -108,6 +154,15 @@ public record InferenceConfig(
 
   /** Resolves manager configuration from the same snapshot used by its composition decision. */
   public static InferenceConfig fromResolvedConfig(ResolvedConfig rc, Path baseDir) {
+    return resolve(rc, baseDir, false);
+  }
+
+  /** Planning uses launch selection and validation, without repeating launch INFO messages. */
+  public static InferenceConfig forPlanning(ResolvedConfig rc, Path baseDir) {
+    return resolve(rc, baseDir, true);
+  }
+
+  private static InferenceConfig resolve(ResolvedConfig rc, Path baseDir, boolean planning) {
     Objects.requireNonNull(rc, "rc");
     log.debug("Creating InferenceConfig from resolved configuration");
     Path resolvedBaseDir =
@@ -240,11 +295,35 @@ public record InferenceConfig(
       associatedModelsDir = configuredModelsDir;
     }
 
+    // The installer persists an absolute path even for a shipped profile member. Canonical
+    // paths and the filesystem's identity distinguish that same artifact from a same-named
+    // custom file elsewhere; the path's configuration source does not change its identity.
+    ChatModelProfile installedProfile = usingLlmModelOverride
+        ? profileForInstalledFile(modelPath, configuredModelsDir) : null;
+    if (installedProfile == null && usingLlmModelOverride
+        && !Path.of(llmModelPathOverride).isAbsolute() && !Files.exists(modelPath)) {
+      // Legacy managed relative selections also describe an installation still being prepared.
+      // Keep that intent independent of activation order; absolute missing overrides stay unknown.
+      for (ChatModelProfile candidate : ChatModelProfile.values()) {
+        if (modelPath.toAbsolutePath().normalize().equals(
+            configuredModelsDir.resolve(candidate.modelFile()).toAbsolutePath().normalize())) {
+          installedProfile = candidate;
+          break;
+        }
+      }
+    }
+    boolean customModelOverride = usingLlmModelOverride && installedProfile == null;
+    if (installedProfile != null) {
+      profile = installedProfile;
+      associatedModelsDir = configuredModelsDir;
+      mmprojModel = nonBlankOr(rc.ai().mmprojModel(), profile.mmprojFile());
+    }
+
     Path mmprojPath;
-    if (usingLlmModelOverride && !EnvRegistry.MMPROJ_MODEL.isSet()) {
+    if (customModelOverride && !EnvRegistry.MMPROJ_MODEL.isSet()) {
       // When the user explicitly picks a model file path, we should NOT assume a specific projector.
       // Passing a mismatched mmproj can cause llama-server startup to fail.
-      log.info(
+      log.atLevel(planning ? org.slf4j.event.Level.DEBUG : org.slf4j.event.Level.INFO).log(
           "LLM model override is set; mmproj not explicitly configured. Starting in text-only mode (mmproj disabled). "
               + "Set {} / {} to enable vision.",
           EnvRegistry.MMPROJ_MODEL.sysProp(),
@@ -261,7 +340,8 @@ public record InferenceConfig(
     // The claim is made only when the profile actually supplied the model file. A per-file
     // VLM_MODEL override displaces a profile member, and a stale "compact" stamp on someone
     // else's file is worse than no stamp at all.
-    String chatProfileId = (!usingLlmModelOverride && profileModelFileUsed) ? profile.id() : null;
+    String chatProfileId = installedProfile != null ? installedProfile.id()
+        : (!usingLlmModelOverride && profileModelFileUsed) ? profile.id() : null;
 
     log.debug("  Resolved paths:");
     log.debug("    Server executable: {} (exists: {})", serverExe, Files.exists(serverExe));
@@ -273,7 +353,7 @@ public record InferenceConfig(
 
     // ONE greppable line naming what governed. This is what a human reads when the wrong
     // model loads.
-    log.info(
+    log.atLevel(planning ? org.slf4j.event.Level.DEBUG : org.slf4j.event.Level.INFO).log(
         "Chat model governed by {}: model={} mmproj={} chatProfileId={}",
         governedByLabel(owner, usingLlmModelOverride, profile, chatProfileId),
         modelPath,
@@ -291,6 +371,38 @@ public record InferenceConfig(
         chatProfileId);
   }
 
+  /** Matches the selected file to the profile's canonical installed artifact and file identity. */
+  private static ChatModelProfile profileForInstalledFile(Path file, Path modelsDir) {
+    for (ChatModelProfile candidate : ChatModelProfile.values()) {
+      Path shipped = modelsDir.resolve(candidate.modelFile());
+      if (!Files.isRegularFile(shipped) || !Files.isRegularFile(file)) continue;
+      try {
+        Path canonical = file.toRealPath();
+        Path expected = shipped.toRealPath();
+        if ((canonical.equals(expected) || Files.isSameFile(canonical, expected))
+            && Files.isSameFile(file, shipped) && matchesManifest(canonical, candidate)) return candidate;
+      } catch (IOException unreadable) {
+        throw new java.io.UncheckedIOException("Cannot identify selected chat artifact", unreadable);
+      }
+    }
+    return null;
+  }
+
+  /** Configuration reads only a bounded receipt; an owned background lane verifies uncertain bytes. */
+  private static boolean matchesManifest(Path file, ChatModelProfile profile) throws IOException {
+    var registry = io.justsearch.configuration.model.ModelRegistryLoader
+        .loadFromClasspath("ai/model-registry.v2.json");
+    for (var pkg : registry.packages()) {
+      for (var variant : pkg.variants()) {
+        String relative = Path.of(pkg.targetDir() == null ? "" : pkg.targetDir())
+            .resolve(variant.filename()).toString().replace('\\', '/');
+        if (!relative.equals(profile.modelFile())) continue;
+        return ChatArtifactIdentity.matches(file, variant.sizeBytes(), variant.sha256());
+      }
+    }
+    return false;
+  }
+
   /** Who owns the stored {@code justsearch.llm.model_path} value, if anyone. */
   enum ModelPathOwner {
     /** No stored value at all. */
@@ -305,6 +417,13 @@ public record InferenceConfig(
     SYSTEM_STORED,
     /** settings.json / worker-snapshot / auto-detected value that never became an operator lock. */
     STORED_SETTINGS
+  }
+
+  /** Whether an operator locked the path independently of system-owned profile selection. */
+  public static boolean operatorModelPathSelected(ResolvedConfig cfg) {
+    var owner = classifyModelPathOwner(cfg, cfg.ai().llmModelPath() != null);
+    return owner == ModelPathOwner.OPERATOR_ENV || owner == ModelPathOwner.OPERATOR_SYSPROP
+        || owner == ModelPathOwner.OPERATOR_YAML;
   }
 
   /**
@@ -409,12 +528,17 @@ public record InferenceConfig(
     if (envPath != null && !envPath.isBlank()) {
       Path p = Path.of(envPath);
       log.debug("  JUSTSEARCH_SERVER_EXE set to: {}", envPath);
-      if (Files.exists(p)) {
+      if (Files.isRegularFile(p) && (io.justsearch.configuration.PlatformPaths.isWindows() || Files.isExecutable(p))) {
         log.debug("  Found via environment variable: {}", p);
         return p;
-      } else {
-        log.warn("  JUSTSEARCH_SERVER_EXE path does not exist: {}", p);
       }
+      if (!Files.notExists(p)) {
+        throw new IllegalStateException("Configured server executable must name a regular executable file: " + p);
+      }
+      // A saved runtime may have been removed. Preserve the target's bundled fallback policy;
+      // targets without one keep the missing path so availability reports the actual missing file.
+      if (!NativeTargets.current().hasCpuBaselineRuntime()) return p;
+      log.debug("  Configured executable is missing; trying bundled runtime: {}", p);
     } else {
       log.debug("  JUSTSEARCH_SERVER_EXE not set");
     }
@@ -440,7 +564,7 @@ public record InferenceConfig(
           "modules/shell/src-tauri/resources/headless");
       Path devFound = findExistingServerExecutable(devBase, preferCudaVariant);
       if (devFound != null) {
-        log.info("  Found via dev layout (Tauri resources): {}", devFound);
+        log.debug("  Found via dev layout (Tauri resources): {}", devFound);
         return devFound;
       }
       return canonicalServerExecutable(explicitRepoRoot);
@@ -457,14 +581,14 @@ public record InferenceConfig(
     log.debug("  Searching in: {} (exists: {})", nativeBin, Files.isDirectory(nativeBin));
 
     // 1. Check canonical baseline path FIRST (deterministic, preferred in release builds)
-    Path directPath = nativeBin.resolve("llama-server.exe");
+    Path directPath = nativeBin.resolve(NativeTargets.current().executableName("llama-server"));
     if (Files.exists(directPath)) {
       log.debug("  Found baseline at canonical path: {}", directPath);
       // If GPU requested, still check for CUDA variant which is better
       if (preferCudaVariant) {
         Path cudaVariant = findCudaVariant(nativeBin);
         if (cudaVariant != null) {
-          log.info("  Preferring CUDA variant over baseline: {}", cudaVariant);
+          log.debug("  Preferring CUDA variant over baseline: {}", cudaVariant);
           return cudaVariant;
         }
       }
@@ -487,7 +611,7 @@ public record InferenceConfig(
             .filter(d -> !"variants".equalsIgnoreCase(d.getFileName().toString()))
             .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase(Locale.ROOT)))
             .peek(d -> log.debug("    Checking subdirectory: {}", d))
-            .map(d -> d.resolve("llama-server.exe"))
+            .map(d -> d.resolve(NativeTargets.current().executableName("llama-server")))
             .filter(Files::exists)
             .findFirst();
         if (found.isPresent()) {
@@ -502,7 +626,7 @@ public record InferenceConfig(
     // 4. Last resort: any variant (CUDA binary works for CPU too, just larger)
     Path anyVariant = findCudaVariant(nativeBin);
     if (anyVariant != null) {
-      log.info("  No baseline found; falling back to variant: {}", anyVariant);
+      log.debug("  No baseline found; falling back to variant: {}", anyVariant);
       return anyVariant;
     }
 
@@ -516,11 +640,11 @@ public record InferenceConfig(
    */
   private static Path findCudaVariant(Path nativeBin) {
     Path variantsDir = nativeBin.resolve("variants");
-    if (!Files.isDirectory(variantsDir)) {
+    if (!io.justsearch.configuration.PlatformPaths.isWindows() || !Files.isDirectory(variantsDir)) {
       return null;
     }
     // Prefer cuda12 explicitly (deterministic, no scanning ambiguity)
-    Path cuda12 = variantsDir.resolve("cuda12").resolve("llama-server.exe");
+    Path cuda12 = variantsDir.resolve("cuda12").resolve(NativeTargets.current().executableName("llama-server"));
     if (Files.exists(cuda12)) {
       log.debug("  Found CUDA variant: {}", cuda12);
       return cuda12;
@@ -530,7 +654,7 @@ public record InferenceConfig(
   }
 
   private static Path canonicalServerExecutable(Path baseDir) {
-    Path directPath = baseDir.resolve("native-bin").resolve("llama-server").resolve("llama-server.exe");
+    Path directPath = baseDir.resolve("native-bin").resolve("llama-server").resolve(NativeTargets.current().executableName("llama-server"));
     log.debug("  Using fallback path: {} (exists: {})", directPath, Files.exists(directPath));
     return directPath;
   }
@@ -551,7 +675,8 @@ public record InferenceConfig(
         contextSize,
         gpuLayers,
         vdu,
-        chatProfileId);
+        chatProfileId,
+        chatPromptCacheMiB);
   }
 
   /**

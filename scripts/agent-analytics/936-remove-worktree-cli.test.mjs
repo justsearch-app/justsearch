@@ -21,16 +21,22 @@ const { readProcessTable } = require(path.join(SOURCE_ROOT, 'scripts', 'dev', 'l
 const FIXTURE_PROCESS_TABLE_ENV = 'JUSTSEARCH_936_FIXTURE_PROCESS_TABLE_PIDS';
 const PROCESS_IDENTITY_REL = 'scripts/dev/lib/process-identity.cjs';
 const CLI_FILES = [
+  'scripts/lib/native-targets.cjs',
+  'contracts/native-targets/spec.v1.json',
+  'scripts/lib/path-identity.cjs',
   'scripts/dev/remove-worktree.cjs',
   'scripts/dev/lib/process-identity.cjs',
   'scripts/dev/lib/process-record.cjs',
   'scripts/dev/lib/agent-spawn-record.cjs',
   'scripts/dev/lib/agent-spawn-reaper.cjs',
+  'scripts/dev/lib/recorded-termination.cjs',
+  'scripts/dev/lib/terminate-process.ps1',
   'scripts/dev/lib/agent-spawn-sweep.cjs',
   'scripts/dev/lib/ownership-verdict.cjs',
   'scripts/dev/lib/agent-identity.cjs',
   'scripts/dev/lib/owner-presence.cjs',
   'scripts/dev/lib/worktree-archive.cjs',
+  'scripts/dev/lib/worktree-resource-id.cjs',
   'scripts/dev/justsearch-dev-mcp/observations.mjs',
   'scripts/dev/justsearch-dev-mcp/files.mjs',
   'scripts/dev/justsearch-dev-mcp/paths.mjs',
@@ -221,16 +227,24 @@ async function snapshot(fixture, target, stateRoot) {
 
 const fixtures = [];
 try {
-  await check('native process-table evidence stays fail-closed off Windows and observes this test on Windows', () => {
-    const nonWindows = readProcessTable({ platform: 'linux' });
-    assert.equal(nonWindows.ok, false);
-    assert.match(nonWindows.reason, /implemented for win32 only \(platform=linux\)/i);
+  await check('native process-table evidence observes this test on supported OSes and fails closed elsewhere', () => {
+    if (process.platform !== 'linux') {
+      const nonWindows = readProcessTable({ platform: 'linux' });
+      assert.equal(nonWindows.ok, false);
+      assert.match(nonWindows.reason, /implemented for win32 only \(platform=linux\)/i);
+    }
 
     if (process.platform === 'win32') {
       const native = readProcessTable();
       assert.equal(native.ok, true, native.reason);
       assert.equal(native.table.some((row) => Number(row?.ProcessId) === process.pid), true,
         `native process table did not contain test pid ${process.pid}`);
+    } else if (process.platform === 'linux') {
+      const native = readProcessTable();
+      assert.equal(native.ok, true, native.reason);
+      const self = native.table.find((row) => Number(row?.ProcessId) === process.pid);
+      assert.equal(self?.processIdentity?.kind, 'linux-proc-v1');
+      assert.equal(self.processIdentity.pid, process.pid);
     } else {
       const native = readProcessTable();
       assert.equal(native.ok, false);
@@ -534,6 +548,8 @@ try {
       assert.equal(result.status, 1, result.output);
       if (process.platform === 'win32') {
         assert.match(result.output, /shared runtime.*active.*references/i);
+      } else if (process.platform === 'linux') {
+        assert.match(result.output, /shared runtime.*active.*references/i);
       } else {
         assert.match(result.output, /process liveness is unknown.*implemented for win32 only/i);
       }
@@ -693,7 +709,7 @@ try {
       assert.equal(fs.existsSync(allowed), false);
     });
   } finally {
-    try { process.kill(liveChild.pid, 'SIGKILL'); } catch { /* already exited */ }
+    try { liveChild.kill('SIGKILL'); } catch { /* already exited */ }
   }
 
   await check('malformed runtime state and obstructed register paths fail closed', async () => {
@@ -836,7 +852,7 @@ try {
       assert.match(result.output, /API probe is TIMED_OUT/i);
       assert.equal(fs.existsSync(timeoutTarget), true);
     } finally {
-      try { process.kill(server.pid, 'SIGKILL'); } catch { /* already exited */ }
+      try { server.kill('SIGKILL'); } catch { /* already exited */ }
     }
   });
 
@@ -844,6 +860,9 @@ try {
     const mutant = await makeRepo('mutant-membership');
     fixtures.push(mutant);
     await fsp.rm(path.join(mutant.repo, 'scripts'), { recursive: true, force: true });
+    // The copied native descriptor is fixture scaffolding too; it must not make this
+    // deliberately unguarded main checkout dirty before the destructive canary runs.
+    await fsp.rm(path.join(mutant.repo, 'contracts'), { recursive: true, force: true });
     const linked = addWorktree(mutant, 'mutant owner', 'codex/mutant-owner');
     const cli = await installProductionCli(linked);
     const linkedFixture = { root: mutant.root, repo: linked, cli };
@@ -882,7 +901,7 @@ try {
       assert.equal(result.status, 0, result.output);
       assert.equal(fs.existsSync(target), false, 'mutant proves the live-runtime blocker prevents deletion');
     } finally {
-      try { process.kill(child.pid, 'SIGKILL'); } catch { /* already exited */ }
+      try { child.kill('SIGKILL'); } catch { /* already exited */ }
     }
   });
 

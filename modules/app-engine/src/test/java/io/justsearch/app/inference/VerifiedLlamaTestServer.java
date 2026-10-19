@@ -67,7 +67,7 @@ public final class VerifiedLlamaTestServer implements AutoCloseable {
       when(server.activeStartResult()).thenAnswer(ignored -> Optional.ofNullable(active.get()));
       when(server.activeManagedCandidateAlive(any())).thenAnswer(invocation ->
           active.get() == invocation.getArgument(0));
-      doAnswer(ignored -> { active.set(null); return null; }).when(server).stopLlamaServer();
+      doAnswer(ignored -> { active.set(null); return null; }).when(server).stopLlamaServer(any());
       doAnswer(ignored -> { checkHealth(); return null; }).when(server).waitForServerHealth(any());
       doAnswer(ignored -> { checkHealth(); return null; }).when(server).waitForServerHealthOnce(any());
       doAnswer(ignored -> { retained.set(null); verified = true; return null; })

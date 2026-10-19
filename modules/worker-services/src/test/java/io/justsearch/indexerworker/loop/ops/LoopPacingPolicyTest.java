@@ -14,8 +14,17 @@ import org.junit.jupiter.api.Test;
  * defers regardless of GPU/CPU (power), while <b>GPU yield</b> defers only on a real VRAM conflict
  * (embeddings actually on the GPU). The headline case — energy-reduced + CPU embeddings — is the one
  * the pre-fix code got wrong (it kept running because of the {@code !isUsingGpu()} escape).
+ *
+ * <p>Spec E step E3 added the bulk hold to the signature ({@code bulkHeld}, {@code
+ * otherBulkEncoderOnGpu}). Every CPU-provider row runs with the hold raised ({@link #HELD}) and no
+ * other bulk encoder on the GPU, and keeps its expected value: CPU bulk is not deferred by the hold
+ * (E-P2a). The GPU-provider rows run with the hold clear. The held GPU rows are {@code
+ * LoopPacingBulkHoldTest}.
  */
 final class LoopPacingPolicyTest {
+
+  /** E-P2a: CPU rows run with the bulk hold raised; their oracles are unchanged. */
+  private static final boolean HELD = true;
 
   /** Minimal {@link EmbeddingProvider} where only {@code isUsingGpu()} matters to the gate. */
   private static EmbeddingProvider provider(boolean usingGpu) {
@@ -24,7 +33,7 @@ final class LoopPacingPolicyTest {
       @Override public float[] embedQuery(String text) { return new float[0]; }
       @Override public List<float[]> embedDocumentBatch(List<String> texts) { return List.of(); }
       @Override public int dimension() { return 0; }
-      @Override public boolean isAvailable() { return true; }
+      @Override public Availability availability() { return Availability.READY; }
       @Override public boolean isUsingGpu() { return usingGpu; }
       @Override
       public io.justsearch.indexerworker.embed.EmbeddingService.ChunkedEmbedding embedWithSpans(
@@ -41,44 +50,44 @@ final class LoopPacingPolicyTest {
   @DisplayName("energy-reduced defers backfill even on CPU embeddings (the CPU-escape bug)")
   void energyDefersOnCpu() {
     // Pre-fix this returned true (ran), silently no-opping energy saver on GPU-less laptops.
-    assertFalse(LoopPacingPolicy.shouldRunBackfill(false, true, CPU));
+    assertFalse(LoopPacingPolicy.shouldRunBackfill(false, true, HELD, false, CPU));
   }
 
   @Test
   @DisplayName("energy-reduced defers backfill on GPU embeddings too")
   void energyDefersOnGpu() {
-    assertFalse(LoopPacingPolicy.shouldRunBackfill(false, true, GPU));
+    assertFalse(LoopPacingPolicy.shouldRunBackfill(false, true, false, false, GPU));
   }
 
   @Test
   @DisplayName("no yield reason ⇒ backfill runs (CPU and GPU)")
   void runsWhenIdle() {
-    assertTrue(LoopPacingPolicy.shouldRunBackfill(false, false, CPU));
-    assertTrue(LoopPacingPolicy.shouldRunBackfill(false, false, GPU));
+    assertTrue(LoopPacingPolicy.shouldRunBackfill(false, false, HELD, false, CPU));
+    assertTrue(LoopPacingPolicy.shouldRunBackfill(false, false, false, false, GPU));
   }
 
   @Test
   @DisplayName("Main GPU active defers only when embeddings are on the GPU (VRAM conflict)")
   void gpuYieldIsConflictOnly() {
-    assertFalse(LoopPacingPolicy.shouldRunBackfill(true, false, GPU), "GPU embed + Main GPU ⇒ conflict");
-    assertTrue(LoopPacingPolicy.shouldRunBackfill(true, false, CPU), "CPU embed ⇒ no VRAM conflict");
+    assertFalse(LoopPacingPolicy.shouldRunBackfill(true, false, false, false, GPU), "GPU embed + Main GPU ⇒ conflict");
+    assertTrue(LoopPacingPolicy.shouldRunBackfill(true, false, HELD, false, CPU), "CPU embed ⇒ no VRAM conflict");
   }
 
   @Test
   @DisplayName("interrupt fires on energy-reduced + CPU (blocked), and on a GPU VRAM conflict")
   void interruptCovers() {
     // energy + CPU now blocks → interrupt true (pre-fix: not blocked on CPU).
-    assertTrue(LoopPacingPolicy.shouldInterruptBackfill(true, false, true, CPU));
+    assertTrue(LoopPacingPolicy.shouldInterruptBackfill(true, false, true, HELD, false, CPU));
     // Tempdoc 885 item 3: userActive left the signature — foreground contention paces the
     // backfill (IndexingPacing) instead of interrupting it. The surviving yield reason this slot
     // used to cover is the GPU VRAM conflict: Main claimed the GPU and embeddings are on the GPU.
     assertTrue(
-        LoopPacingPolicy.shouldInterruptBackfill(true, true, false, GPU),
+        LoopPacingPolicy.shouldInterruptBackfill(true, true, false, false, false, GPU),
         "GPU VRAM conflict blocks the backfill ⇒ interrupt");
     // running, idle, no yield ⇒ no interrupt.
-    assertFalse(LoopPacingPolicy.shouldInterruptBackfill(true, false, false, CPU));
+    assertFalse(LoopPacingPolicy.shouldInterruptBackfill(true, false, false, HELD, false, CPU));
     // not running ⇒ interrupt.
-    assertTrue(LoopPacingPolicy.shouldInterruptBackfill(false, false, false, CPU));
+    assertTrue(LoopPacingPolicy.shouldInterruptBackfill(false, false, false, HELD, false, CPU));
   }
 
   @Test
@@ -105,9 +114,14 @@ final class LoopPacingPolicyTest {
     assertTrue(shouldRunBackfill(gauge, GPU));
   }
 
+  /** CPU rows with the hold raised (E-P2a), GPU rows with it clear. */
   private static boolean shouldRunBackfill(GpuSchedulingGauge gauge, EmbeddingProvider provider) {
     return LoopPacingPolicy.shouldRunBackfill(
-        gauge.isMainGpuActive(), gauge.isEnergyReduced(), provider);
+        gauge.isMainGpuActive(),
+        gauge.isEnergyReduced(),
+        provider == CPU && HELD,
+        false,
+        provider);
   }
 
   @Test

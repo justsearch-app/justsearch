@@ -165,6 +165,16 @@ function apiProxyPlugin() {
     req.pipe(proxyReq)
   }
   const mountProxy = (server) => {
+    // Reject non-local authorities before our proxy rewrites Host for the
+    // loopback-only Engine. Vite's allowedHosts permits every IP address.
+    server.middlewares.use((req, res, next) => {
+      if (!/^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(req.headers.host ?? '')) {
+        res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
+        res.end('Forbidden: local Host required')
+        return
+      }
+      next()
+    })
     for (const p of forwardPaths) {
       server.middlewares.use(p, makeProxyHandler(p))
     }
@@ -220,6 +230,9 @@ export default defineConfig(({ command, mode }) => {
   ].filter(Boolean),
   base: isTauri ? './' : '/',
   server: {
+    // Match the explicit IPv4 URL printed by the dev stack, including on Windows
+    // where localhost may resolve to ::1 first. Never listen on a LAN interface.
+    host: '127.0.0.1',
     // The backend's runtime data dir (`.dev-data/`) lives INSIDE the Vite root
     // (see resolveBackend's extraDataDirs above) and is gitignored — it holds a
     // live Lucene index, SQLite WAL files, worker logs, and telemetry ndjson that

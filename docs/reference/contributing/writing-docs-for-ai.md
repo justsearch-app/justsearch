@@ -7,7 +7,7 @@ description: "How to keep docs agent-friendly."
 
 # Writing Docs for AI
 
-**ATTENTION AI AGENTS:** JustSearch’s documentation is written to be **agent-friendly** by default.
+JustSearch’s documentation is written to be **agent-friendly** by default.
 The canonical, must-not-drift docs live under:
 - `docs/explanation/`
 - `docs/reference/`
@@ -17,7 +17,7 @@ The canonical, must-not-drift docs live under:
 Noncanonical notes/ideas that may drift live under:
 - `docs/tempdocs/`
 
-Current LLMs consume documentation differently than humans. We scan, chunk, and embed. We do not "read" linearly. Therefore, when you write documentation in this repo—whether for humans or for other agents—you must follow these **LLM-Optimization Standards**.
+Current LLMs consume documentation through scanning, chunking, and embedding. The following **LLM-Optimization Standards** make documentation useful to both humans and agents.
 
 ---
 
@@ -99,9 +99,6 @@ Canonical docs follow a [Diataxis](https://diataxis.fr/)-inspired structure. Eac
 
 ADR conventions (template, numbering, append-only rules) are in `docs/decisions/README.md`.
 
-Prompt-surface ownership rules (historical, superseded) are in
-[Agent Prompt Surface Governance](agent-prompt-surface-governance.md).
-
 ---
 
 ## 5. Frontmatter
@@ -130,7 +127,8 @@ description: "Lucene internals, schema (SSOT), and locking strategies."
 **Status behavior:**
 - `stable` and `in-progress` → included in `llms.txt`
 - `advisory` → included in `llms.txt`; describes planned/G0 contracts not yet enforced
-- `draft` → excluded from `llms.txt`
+- `accepted` or `accepted - …` on a decision under `docs/decisions/` → included in `llms.txt` (a live ADR)
+- `draft`, `superseded`, `deprecated`, `rejected - …` and any other status → excluded from `llms.txt`
 - Missing `status` → CI error (build fails)
 
 ---

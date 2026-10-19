@@ -260,6 +260,9 @@ class PruneByPathPrefixTest extends LuceneExecutorTestBase {
       Path liveFile = createTestFile("outside/live.txt");
       String liveOwner = normalizePath(liveFile);
       String missingPath = normalizePath(testFilesDir.resolve("scope/missing.txt"));
+      // The pruned folder itself is present: only then is a missing file evidence of deletion
+      // (task t-20261013-ef3c41); a prune of a folder that is not there removes nothing.
+      Files.createDirectories(testFilesDir.resolve("scope"));
       String orphan = "chunk:" + java.util.UUID.randomUUID();
       String sibling = "chunk:" + java.util.UUID.randomUUID();
       runtime.indexingCoordinator().indexSingle(doc(liveOwner, Map.of("content", "live parent", "path", liveOwner)));
@@ -285,6 +288,9 @@ class PruneByPathPrefixTest extends LuceneExecutorTestBase {
       Path liveFile = createTestFile("outside/unmarked-owner.txt");
       String liveOwner = normalizePath(liveFile);
       String missingPath = normalizePath(testFilesDir.resolve("scope/unmarked-missing.txt"));
+      // The pruned folder itself is present: only then is a missing file evidence of deletion
+      // (task t-20261013-ef3c41); a prune of a folder that is not there removes nothing.
+      Files.createDirectories(testFilesDir.resolve("scope"));
       String orphan = "legacy:" + java.util.UUID.randomUUID();
       String sibling = "chunk:" + java.util.UUID.randomUUID();
       runtime.indexingCoordinator().indexSingle(doc(liveOwner, Map.of("content", "live parent", "path", liveOwner)));

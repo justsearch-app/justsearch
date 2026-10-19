@@ -25,6 +25,7 @@
  *  - Lit reactive controllers in slice 3a.2+ surface ports.
  */
 
+import { observeStatusEvent } from '../../api/statusInvalidation.js';
 import type { SseEnvelope } from './envelope-types.js';
 import { STREAM_WATCHDOG_STALE_MS } from '../../api/generated/stream-liveness-constants.js';
 import { bumpOriginContact } from '../state/originContact.js';
@@ -230,6 +231,7 @@ export class EnvelopeStream<T> {
     let envelope: SseEnvelope;
     try {
       envelope = JSON.parse(event.data) as SseEnvelope;
+      void observeStatusEvent(envelope.payload);
     } catch {
       // Malformed frame — ignore (the next valid frame will catch up
       // via seq + resumeToken).

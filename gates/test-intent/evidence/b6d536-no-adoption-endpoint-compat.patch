@@ -1,0 +1,38 @@
+diff --git a/modules/app-inference/src/main/java/io/justsearch/app/inference/ExternalInferenceEndpoint.java b/modules/app-inference/src/main/java/io/justsearch/app/inference/ExternalInferenceEndpoint.java
+new file mode 100644
+index 000000000..a3f8b66ba
+--- /dev/null
++++ b/modules/app-inference/src/main/java/io/justsearch/app/inference/ExternalInferenceEndpoint.java
+@@ -0,0 +1,13 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.app.inference;
++
++import java.util.Optional;
++
++/** Compat scaffolding for fail-before evidence: no before-state code reads it. */
++record ExternalInferenceEndpoint(String url, int port) {
++  static final String CONFIG_KEY = "justsearch.inference.external_endpoint";
++
++  static Optional<ExternalInferenceEndpoint> parse(String raw) {
++    throw new UnsupportedOperationException("compat stub");
++  }
++}
+diff --git a/modules/app-inference/src/main/java/io/justsearch/app/inference/LlamaServerOps.java b/modules/app-inference/src/main/java/io/justsearch/app/inference/LlamaServerOps.java
+index 473504650..c2f333c67 100644
+--- a/modules/app-inference/src/main/java/io/justsearch/app/inference/LlamaServerOps.java
++++ b/modules/app-inference/src/main/java/io/justsearch/app/inference/LlamaServerOps.java
+@@ -567,6 +567,14 @@ final class LlamaServerOps {
+     this.contextKvType = null;
+   }
+ 
++  /** Compat scaffolding for fail-before evidence: no before-state code reads it. */
++  static final String EXTERNAL_SERVER_IGNORED_NOTE = "external_server_ignored";
++
++  /** Compat scaffolding for fail-before evidence: no before-state code calls it. */
++  String externalServerNote() {
++    throw new UnsupportedOperationException("compat stub");
++  }
++
+   void stopLlamaServer() {
+     if (!stopLlamaServerAndConfirm()) {
+       throw new IllegalStateException("Managed llama-server survived terminal cleanup");

@@ -2538,14 +2538,16 @@ export class SearchV3View extends JfElement {
 
   /**
    * A11 — ask the model to name the conversation, through the store's own authority
-   * (`generateConversationTitle`, which dispatches a throwaway free-chat turn, cleans it up, and
-   * writes the result to `setConversationTitle`). The window neither prompts nor parses: it decides
+   * (`generateConversationTitle`, which asks the conversation's own auto-title route: background
+   * inference that never counts as a person acting, retried until the chat lane is free, and stored
+   * by the server only over no name). The window neither prompts nor parses: it decides
    * WHETHER, and `sv3-sessions.ts`'s `sv3ShouldGenerateTitle` is where that decision lives.
    *
-   * ONCE per conversation, and never over a rename. The second guard runs AFTER the call returns as
-   * well: naming takes a model round-trip, and a reader who renamed the row while it was in flight
-   * has answered the same question better — so their title is written back rather than lost to a
-   * result that was already stale when it landed.
+   * ONCE per conversation, and never over a rename. A rename made while naming is in flight needs
+   * nothing more from this window: the server stores the model's name only over no name, the rename
+   * was written through when it was made, and the store does not show a late model name over it.
+   * Writing the rename again when the answer lands would put this window's name back over a newer
+   * one from another tab, unattended, as a person's write.
    */
   private async maybeGenerateTitle(sessionId: string): Promise<void> {
     if (this.titledSessionIds.has(sessionId)) return;
@@ -2554,12 +2556,7 @@ export class SearchV3View extends JfElement {
     this.titledSessionIds.add(sessionId);
     const turn = session.turns.find((t) => t.kind === 'ask' && t.status === 'complete');
     if (turn === undefined) return;
-    const generated = await generateConversationTitle(sessionId, turn.question, turn.answer);
-    if (generated === null) return;
-    const after = sessionById(this.sessions, sessionId);
-    // The reader's name goes back as THEIRS, not as the model's: adopting the auto provenance here
-    // would license the next reload's first ask to name the conversation over them (tempdoc 838).
-    if (after !== null && after.renamed) void setConversationTitle(sessionId, after.title, 'user');
+    await generateConversationTitle(sessionId, turn.question, turn.answer);
   }
 
   /**

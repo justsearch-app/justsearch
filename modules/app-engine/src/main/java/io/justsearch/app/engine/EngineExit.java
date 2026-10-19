@@ -84,6 +84,18 @@ public final class EngineExit {
   public static final int ESCALATED_RESTART = 5;
 
   /**
+   * A supervisor forced the Engine down: {@code JS_ENGINE_STOP}, {@code 0x4A530002}, which is
+   * {@code io.justsearch.app.api.runtime.child.TerminateCodes.JS_ENGINE_STOP} (Spec F step 4, S15).
+   *
+   * <p>Written in decimal because the register and the conformance harness read the integer, and
+   * {@code scripts/supervisor-conformance/contract.mjs} parses these constants as decimal. A forced
+   * stop today is {@code taskkill /F}, which reads as exit 1, the same as a crash. This row is what
+   * lets a forced stop be told apart once a supervisor terminates with this code. It is TRANSIENT:
+   * a supervisor that forced a hung Engine down restarts it under the crash budget.
+   */
+  public static final int SUPERVISOR_FORCED = 1246953474;
+
+  /**
    * Classifies an observed exit code.
    *
    * @param code the child's exit code as the supervisor observed it
@@ -93,7 +105,8 @@ public final class EngineExit {
     return switch (code) {
       case OK, REQUESTED_RESTART -> ExitClass.REQUESTED;
       case DATA_DIR_LOCKED -> ExitClass.NON_TRANSIENT;
-      case FATAL_OR_UNCAUGHT, OUT_OF_MEMORY, ESCALATED_RESTART -> ExitClass.TRANSIENT;
+      case FATAL_OR_UNCAUGHT, OUT_OF_MEMORY, ESCALATED_RESTART, SUPERVISOR_FORCED ->
+          ExitClass.TRANSIENT;
       default -> ExitClass.TRANSIENT;
     };
   }
@@ -113,6 +126,7 @@ public final class EngineExit {
       case DATA_DIR_LOCKED -> "data_dir_locked";
       case OUT_OF_MEMORY -> "out_of_memory";
       case ESCALATED_RESTART -> "escalated_restart";
+      case SUPERVISOR_FORCED -> "supervisor_forced";
       default -> "unknown(" + code + ")";
     };
   }

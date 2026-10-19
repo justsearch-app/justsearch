@@ -79,8 +79,8 @@ final class RagContextOpsHybridCollectionScopeTest extends io.justsearch.adapter
     }
 
     @Override
-    public boolean isAvailable() {
-      return true;
+    public Availability availability() {
+      return Availability.READY;
     }
 
     @Override

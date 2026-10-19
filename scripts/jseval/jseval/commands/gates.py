@@ -9,6 +9,7 @@ import logging
 import click
 
 from .._paths import DEFAULT_JSEVAL_DATA_DIR
+from ._common import _DEFAULT_BASE_URL_EVAL
 
 log = logging.getLogger(__name__)
 
@@ -958,8 +959,9 @@ def cmd_ce_replay(ctx, run_dir, mode, report_out):
               help="Eval run dir (with leg + final per_query.json, qrels.json, projections/).")
 @click.option("--corpus-dir", type=click.Path(exists=True, resolve_path=True), default=None,
               help="Corpus dir with docs.jsonl (for candidate text). Optional (degrades to text-light).")
-@click.option("--llm-url", default="http://127.0.0.1:8080",
-              help="llama-server base URL (OpenAI-compatible /v1/chat/completions).")
+@click.option("--llm-url", default=_DEFAULT_BASE_URL_EVAL, show_default=True,
+              help="Judge base URL (OpenAI-compatible /v1/chat/completions): the Engine's /v1 "
+                   "proxy, which holds a generation lease per call.")
 @click.option("--engine-generator", default=None,
               help="Engine's generator model name; warns if the judge model matches it (self-preference bias).")
 @click.option("--report-out", type=click.Path(), default=None, help="Write the full report JSON here.")

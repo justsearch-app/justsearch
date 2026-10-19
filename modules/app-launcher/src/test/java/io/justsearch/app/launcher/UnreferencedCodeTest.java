@@ -4,6 +4,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 
+import com.tngtech.archunit.ArchConfiguration;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
@@ -16,10 +17,17 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchCondition;
+import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import com.tngtech.archunit.library.freeze.FreezingArchRule;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 /**
@@ -34,13 +42,23 @@ import java.util.Set;
  *   <li>Reflection-based calls are invisible to bytecode analysis
  *   <li>String constants may be inlined, causing false positives
  *   <li>Framework callbacks (Jackson, gRPC) need explicit exclusions
- *   <li>Test-only callers are invisible (ArchUnit excludes test sources)
+ *   <li>Test callers are not imported, on purpose: a method only tests call is reported (below)
  *   <li>Inherited method calls may resolve to the subclass rather than the declaring class
  * </ul>
  *
- * <p>Methods that ArchUnit cannot trace (test-only callers, reflection, inheritance) are listed in
- * {@link #KNOWN_UNREFERENCED} with a documented reason for each. These are also annotated with
- * {@code @SuppressWarnings("unused")} in source for IDE support.
+ * <p><b>Code kept alive only by tests (tempdoc 966 D6).</b> Test bytecode is not imported, so a
+ * non-public production method whose only callers are tests counts as unreferenced. There is no
+ * name-based escape ({@code *ForTest*}, {@code *ForTesting}, {@code install*} and {@code reset*}
+ * used to be exempt) and no simple-name exemption list. The methods that were exempt that way
+ * when this changed are the seeded contents of the frozen violation store, see {@link
+ * #no_unreferenced_non_public_methods}.
+ *
+ * <p>The only named exemption left is {@link #CROSS_MODULE_PRODUCTION_CALLERS}: a method whose
+ * caller is production code in a module that is not on app-launcher's test runtime classpath, so
+ * the caller is invisible here. Each entry names that caller.
+ *
+ * <p>Stated gaps: public and protected methods (no detector today; {@code WholeProgramDeadCodeTest}
+ * in {@code modules/dead-code-audit} checks classes, not methods) and frontend exports.
  *
  * @see <a href="https://jdriven.com/blog/2021/01/Detect-delete-unreferenced-code-with-ArchUnit">
  *     JDriven: Detect & delete unreferenced code with ArchUnit</a>
@@ -49,112 +67,31 @@ import java.util.Set;
 class UnreferencedCodeTest {
 
   /**
-   * Methods that ArchUnit's bytecode analysis cannot trace but are verified to have callers.
-   * Keyed by "SimpleClassName.methodName", value is the reason for exemption.
+   * Non-public methods whose callers are production code in a module that is NOT on
+   * app-launcher's test runtime classpath, so ArchUnit cannot see the call here. Keyed by
+   * {@link JavaMethod#getFullName()} (fully qualified owner plus parameter types); the value names
+   * the production caller (class and module).
    *
-   * <p>To add an entry: verify the method has callers (tests, reflection, inheritance), annotate
-   * the method with {@code @SuppressWarnings("unused")} in source, then add it here.
-   *
-   * <p>To audit: grep for the method name across the codebase. If no callers exist, remove the
-   * entry and delete the method.
+   * <p>Test callers never qualify: a method whose only callers are tests is a violation and is
+   * either removed or frozen in the violation store through an accepted addition (tempdoc 966
+   * D1/D6). Empty since tempdoc 966: a whole-program bytecode search plus a source search of every
+   * module's {@code src/main} found no production caller outside this classpath for any method
+   * the old map or name predicates exempted ({@code docs/tempdocs/966-evidence/d6-classification.md}).
    */
-  private static final Map<String, String> KNOWN_UNREFERENCED =
-      Map.ofEntries(
-          // Test-only callers (ArchUnit excludes test sources)
-          Map.entry("RetryDecision.action", "AgentRetryPolicyTest"),
-          Map.entry("Builder.operationLeaseService",
-              "UpgradeLifecycleContractTest (LocalApiServer.Builder op-lease test seam; production "
-                  + "resolves the service from HeadAssembly.serviceOut(), tempdoc 617)"),
-          Map.entry("LauncherEnvironment.HeadAssembly", "LauncherEnvironmentCloseTest"),
-          Map.entry("LauncherEnvironment.configManager", "LauncherEnvironmentCloseTest"),
-          Map.entry("LauncherEnvironment.telemetry", "LauncherEnvironmentCloseTest"),
-          Map.entry("InferenceLifecycleManager.formatContextAsNumberedPassages",
-              "RAGContextTest (tempdoc 849: the head's section-aware cut asserts its assembled "
-                  + "context still parses through the REAL online-path parser, so this delegate is "
-                  + "the cross-module seam it round-trips through; OnlineModeOpsTest calls "
-                  + "OnlineModeOps directly, not this)"),
-          Map.entry("InferenceLifecycleManager.extractUsageFromChatChunk", "LlamaServerUsageParsingTest"),
-          // Tempdoc 885 item 14: the pool's reuse and recycle properties have no other observable.
-          // "Three requests succeeded" is also true of three spawns, so the tests assert the child
-          // PID and the spawn/restart counts; without these they would pass for the wrong reason.
-          Map.entry("PersistentExtractionSandbox.spawnCount", "PersistentExtractionSandboxTest"),
-          Map.entry("PersistentExtractionSandbox.restartCount", "PersistentExtractionSandboxTest"),
-          Map.entry("PersistentExtractionSandbox.firstChildPid", "PersistentExtractionSandboxTest"),
-          Map.entry("InferenceLifecycleManager.asIntOrNull", "InferenceLifecycleManagerUtilsTest"),
-          Map.entry("InferenceLifecycleManager.asPositiveInt", "InferenceLifecycleManagerUtilsTest"),
-          Map.entry("InferenceLifecycleManager.startLlamaServer", "ExternalServerTest"),
-          Map.entry("InferenceLifecycleManager.handlePeriodicHealthFailure", "ExternalServerTest"),
-          Map.entry("InferenceLifecycleManager.updateFromPropsBestEffort", "ServerPropsOpsTest"),
-          Map.entry("InferenceLifecycleManager.extractContextTokensFromProps", "LlamaServerPropsParsingTest"),
-          Map.entry("InferenceLifecycleManager.isUsingExternalServer", "ExternalServerTest"),
-          Map.entry("SpladeEncoder.postProcess", "SpladePostProcessTest"),
-          Map.entry("KnowledgeSearchEngine.isLambdaMartEligible", "KnowledgeHttpApiAdapterHarmfulCombinationsTest (556 renamed KnowledgeHttpApiAdapter→KnowledgeSearchEngine)"),
-          Map.entry("ConfigStore.clearGlobal", "TestResolvedConfigHelper"),
-          Map.entry("JvmRuntimeGauges.getJvmGaugeErrorCount", "JvmRuntimeGaugesTest"),
-          Map.entry("AgentLoopService.forTesting", "AgentLoopServiceTest (test-only static factory)"),
-          Map.entry("RootWatcherRegistry.watchedRoots", "RootWatcherRegistryTest (tempdoc 418 Phase A)"),
-          Map.entry("ConsentCapsuleService.liveNonceCount", "ConsentCapsuleServiceTest (test-only nonce-eviction accessor)"),
-          Map.entry("ConsentCapsuleService.liveGrantCount", "ConsentCapsuleServiceTest (test-only grant-eviction accessor, tempdoc 550)"),
-          // Reflection / test contract (method signature verified via getDeclaredMethod)
-          // Tempdoc 516 Slice 4d (W6): IndexingLoop.handle*EmbeddingFailure removed —
-          // wrappers had no production callers; production uses EmbeddingBackfillOps statics.
-          Map.entry("HeadAssembly.chooseFirstNonBlank", "reflection shim for HeadAssemblyTest"),
-          // worker-services module not on app-launcher classpath — callers invisible
-          Map.entry("RagContextOps.executeRetrieval", "called from WorkerSearchService (worker-services)"),
-          Map.entry("RagContextOps.searchChunksWithMeta", "called from executeRetrieval overload (same class)"),
-          Map.entry("ChunkRerankResult.wasReranked", "called from RagContextOps (worker-services)"),
-          // Tempdoc 517 — static delegates called from SearchOrchestratorPipelineDispatchTest
-          // (worker-services classpath, invisible here).
-          Map.entry("SearchOrchestrator.deriveActualMode", "SearchOrchestratorPipelineDispatchTest (worker-services)"),
-          Map.entry("SearchOrchestrator.deriveEffectiveMode", "SearchOrchestratorPipelineDispatchTest (worker-services)"),
-          Map.entry("SearchOrchestrator.modeToDefaultPipeline", "SearchOrchestratorPipelineDispatchTest (worker-services)"),
-          // Tempdoc 516 — package-private test accessors. Used by worker-services tests
-          // (IndexingLoopTest direct; AdversarialCorpusIngestionTest via reflection on
-          // getWriter/getExtractor).
-          Map.entry("AgentController.isHeartbeatSchedulerShutdown", "AgentControllerShutdownTest (638 PE)"),
-          // 859 D live-defect D2 — ChatController acquired the same heartbeat scheduler, so it has
-          // the same test accessor asserting the same start/stop symmetry.
-          Map.entry("ChatController.isHeartbeatSchedulerShutdown", "ChatControllerHeartbeatTest (859 D2)"),
-          Map.entry("IndexingLoop.getJournal", "IndexingLoopTest + AdversarialCorpusIngestionTest"),
-          Map.entry("IndexingLoop.getEmbeddingLifecycle", "IndexingLoopTest (516 Slice 4c)"),
-          Map.entry("IndexingLoop.getWriter", "IndexingLoopTest + AdversarialCorpusIngestionTest (516 W5.1)"),
-          Map.entry("IndexingLoop.getExtractor", "IndexingLoopTest + AdversarialCorpusIngestionTest (516 W5.2)"),
-          Map.entry("IndexingLoop.getBackfillScheduler", "test accessor for the scheduler (516 W6)"),
-          Map.entry("OperationalMetrics.deregisterEncoder", "EncoderProfileAccumulatorTest"),
-          Map.entry("NativeSessionHandle.peekCpuSession", "NativeSessionHandleTest (same-package)"),
-          // Convenience overloads — internal self-calls only (flagged because ArchUnit's
-          // unreferenced check wants an external caller). Pre-existing; kept as part of
-          // the public overload surface for future callers.
-          Map.entry("WritePathOps.readModifyWriteBatch", "2-arg overload delegates to 3-arg; both kept for API symmetry"),
-          // Tempdoc 406 — phase types and RuntimeSession internals.
-          Map.entry("DeferredRuntime.session", "LifecycleTestAccessor (test-only) unwraps via this accessor"),
-          Map.entry("ReadOnlyRuntime.session", "LifecycleTestAccessor (test-only) unwraps via this accessor"),
-          Map.entry("RunningRuntime.session", "LifecycleTestAccessor + VectorSearchIntegrationTest unwrap via this accessor"),
-          // Pre-existing dead methods from other worktree merges — not introduced by slice 494.
-          Map.entry("SseWriter.writeSseComment", "pre-existing; added by slice 491 Phase E worktree"),
-          Map.entry("EngineConversationContext.mutableMessages", "pre-existing; added by slice 491 Phase E worktree"),
-          // Test-only / generics-blind callers the owning agents merged without registering (591 red-gate triage).
-          Map.entry("AgentSession.budgetGateHeld", "AgentSessionBudgetTest (577 R2 budget held-gate accessor)"),
-          Map.entry("AgentSession.contextGateHeld", "AgentSessionBudgetTest (577 R3 context held-gate accessor)"),
-          Map.entry("RouteContractPolicy.declaredSchemaFiles", "RouteContractPolicyCoverageTest (899 SDK schema-closure test)"),
-          Map.entry("RouteContractPolicy.validateSdkRoutes", "SDK snapshot projection and policy tests (899 test-source callers)"),
-          Map.entry("NdjsonAppendStore.storeFile", "called from GplJobCoordinator (app-services); ArchUnit resolves the call through the generic NdjsonAppendStore<T> to the erased type"),
-          // Tempdoc 638 F6 — pre-existing red-gate violations inherited from main merges (607/626
-          // visual-extraction + incremental-indexing). Classified by caller analysis; non-dead ones
-          // get the standard invisible-caller exemption. Suspected-dead ones flagged for owner review
-          // (docs/observations.d) rather than deleted from another agent's just-merged code.
-          Map.entry("SearchTraceProjector.project", "called from SearchResponseBuilder (worker-services, invisible to app-launcher classpath)"),
-          Map.entry("VisualExtractionEvidence.from", "called from PolicyDrivenTikaExtractor (worker-services, invisible to app-launcher classpath)"),
-          Map.entry("EmbeddingProviderLifecycle.unloadEmbeddingService", "invoked via reflection by IndexingLoopUnloadTelemetryEmitTest (worker-services)"),
-          Map.entry("SearchPipelinePresets.toProtoPipelineConfig", "1-arg convenience overload; production uses the 2-arg form via KnowledgeSearchEngine; 1-arg exercised by PipelineConfigPresetExpansionTest"),
-          Map.entry("ExcludeMatcher.isExcluded", "test-only (ExcludeMatcherBarePatternTest); production exclusion uses ExcludeGlobs.isExcludedDirectory/isExcludedPath — suspected dead, flagged for owner (638 F6)"),
-          Map.entry("SyncOps.getScheduler", "no caller found in any source — suspected dead, flagged for SyncOps owner (638 F6); not deleted (another agent's just-merged code)"),
-          Map.entry("AgentController.shutdown", "heartbeat-scheduler stop method ('Call on shutdown'); lifecycle wiring not located — flagged for owner (638 F6), not deleted"));
+  private static final Map<String, String> CROSS_MODULE_PRODUCTION_CALLERS = Map.of();
+
+  /**
+   * Description of the frozen method rule. It is the key of the rule in {@code
+   * modules/app-launcher/archunit_store/stored.rules}: changing it would orphan the seeded store, so
+   * {@link #assertSeededStoreInUse} fails the build instead of letting ArchUnit re-freeze every
+   * current violation under the new name.
+   */
+  static final String METHOD_RULE_DESCRIPTION =
+      "Private/package-private methods should be referenced by other code (potential dead code)";
 
   /**
    * Classes that ArchUnit's bytecode analysis cannot trace but are verified to have dependents.
-   * Keyed by simple class name, value is the reason for exemption. Same conventions as {@link
-   * #KNOWN_UNREFERENCED}.
+   * Keyed by simple class name, value is the reason for exemption.
    */
   private static final Map<String, String> KNOWN_UNREFERENCED_CLASSES = Map.of();
 
@@ -240,7 +177,8 @@ class UnreferencedCodeTest {
   // =========================================================================
 
   /**
-   * Detect private and package-private methods that are never called by any other code.
+   * Detect private and package-private production methods that no production code calls. Callers
+   * in tests do not count (test bytecode is not imported).
    *
    * <p>Excludes:
    *
@@ -249,25 +187,88 @@ class UnreferencedCodeTest {
    *   <li>Bridge methods (generated for generics)
    *   <li>Methods annotated with framework annotations (Jackson, etc.)
    *   <li>Methods with @Override in gRPC service implementations
-   *   <li>Methods listed in {@link #KNOWN_UNREFERENCED}
+   *   <li>Methods listed in {@link #CROSS_MODULE_PRODUCTION_CALLERS}
+   * </ul>
+   *
+   * <p><b>Frozen (tempdoc 966 D6).</b> The rule is wrapped in a {@link FreezingArchRule} whose
+   * committed store is {@code modules/app-launcher/archunit_store/}. A violation is identified by
+   * its text, {@code Method <fully qualified owner>.<name>(<parameter types>) is never referenced};
+   * no line number or position is part of it (ArchUnit's default line matcher additionally ignores
+   * anonymous-class and lambda numbering). Consequences:
+   *
+   * <ul>
+   *   <li>A new violation fails the build. Accepting one means adding its line to the store, which
+   *       needs a test-intent entry and acceptance (tempdoc 966 D1).
+   *   <li>A stored violation that disappears (the method was removed, or gained a production
+   *       caller) is dropped from the store by the next run ({@code allowStoreUpdate=true}); a
+   *       removal needs no other source change.
+   *   <li>Normal runs cannot re-freeze: store creation is disabled, and {@link
+   *       #assertSeededStoreInUse} rejects a store that lacks this rule or a configuration that
+   *       re-freezes. Seeding is the explicit step documented in {@code archunit.properties}.
    * </ul>
    */
   @ArchTest
   void no_unreferenced_non_public_methods(JavaClasses importedClasses) {
+    assertSeededStoreInUse();
     Set<String> referencedMethods = collectReferencedMethods(importedClasses);
 
-    methods()
-        .that(arePrivateOrPackagePrivate())
-        .and()
-        .doNotHaveModifier(JavaModifier.SYNTHETIC)
-        .and()
-        .doNotHaveModifier(JavaModifier.BRIDGE)
-        .and(isNotLambdaMethod())
-        .and(isNotFrameworkCallback())
-        .and(isNotKnownUnreferenced())
-        .should(beReferencedByOtherCodeUnits(referencedMethods))
-        .as("Private/package-private methods should be referenced by other code (potential dead code)")
-        .check(importedClasses);
+    ArchRule rule =
+        methods()
+            .that(arePrivateOrPackagePrivate())
+            .and()
+            .doNotHaveModifier(JavaModifier.SYNTHETIC)
+            .and()
+            .doNotHaveModifier(JavaModifier.BRIDGE)
+            .and(isNotLambdaMethod())
+            .and(isNotFrameworkCallback())
+            .and(hasNoCrossModuleProductionCaller())
+            .should(beReferencedByOtherCodeUnits(referencedMethods))
+            .as(METHOD_RULE_DESCRIPTION);
+
+    FreezingArchRule.freeze(rule).check(importedClasses);
+  }
+
+  // =========================================================================
+  // Frozen store guard
+  // =========================================================================
+
+  /**
+   * Fails unless the run uses the committed, seeded store for the method rule. ArchUnit itself
+   * freezes every current violation whenever it meets a rule it has not stored yet (store
+   * update is enabled so that the store can shrink) or when {@code freeze.refreeze=true}; either
+   * would silently accept new test-only code. Both are refused here unless store creation was
+   * deliberately enabled for the one seeding run documented in {@code archunit.properties}.
+   */
+  private static void assertSeededStoreInUse() {
+    ArchConfiguration config = ArchConfiguration.get();
+    if (Boolean.parseBoolean(
+        config.getPropertyOrDefault("freeze.store.default.allowStoreCreation", "false"))) {
+      return; // the documented seeding run
+    }
+    if (Boolean.parseBoolean(config.getPropertyOrDefault("freeze.refreeze", "false"))) {
+      throw new AssertionError(
+          "freeze.refreeze=true would re-freeze every current unreferenced method; it is only"
+              + " allowed in the seeding run documented in archunit.properties");
+    }
+    String storePath = config.getPropertyOrDefault("freeze.store.default.path", "");
+    Path storedRules = Path.of(storePath).resolve("stored.rules");
+    Properties rules = new Properties();
+    try (InputStream in = Files.newInputStream(storedRules)) {
+      rules.load(in);
+    } catch (IOException e) {
+      throw new AssertionError(
+          "frozen store not readable at "
+              + storedRules.toAbsolutePath()
+              + "; the store is committed under modules/app-launcher/archunit_store",
+          e);
+    }
+    if (!rules.containsKey(METHOD_RULE_DESCRIPTION)) {
+      throw new AssertionError(
+          "the frozen store has no entry for '"
+              + METHOD_RULE_DESCRIPTION
+              + "'; a renamed rule would re-freeze every current violation. Restore the description"
+              + " or re-seed deliberately as documented in archunit.properties");
+    }
   }
 
   // =========================================================================
@@ -329,30 +330,23 @@ class UnreferencedCodeTest {
   }
 
   /**
-   * Excludes methods that are framework callbacks or test infrastructure.
+   * Excludes methods that are framework callbacks.
    *
    * <p>Excludes:
    *
    * <ul>
    *   <li>Jackson serialization annotations
    *   <li>gRPC service method overrides
-   *   <li>Test infrastructure: *ForTest*, *ForTesting, install*, reset*
    * </ul>
+   *
+   * <p>Method names do not exempt anything: the former {@code *ForTest*}, {@code *ForTesting},
+   * {@code install*} and {@code reset*} exemptions were replaced by the methods they matched,
+   * frozen in the violation store (tempdoc 966 D6).
    */
   private static DescribedPredicate<JavaMethod> isNotFrameworkCallback() {
-    return new DescribedPredicate<>("is not a framework callback or test infrastructure") {
+    return new DescribedPredicate<>("is not a framework callback") {
       @Override
       public boolean test(JavaMethod method) {
-        String name = method.getName();
-
-        // Test infrastructure hooks (called via reflection/DI in tests)
-        if (name.contains("ForTest")
-            || name.endsWith("ForTesting")
-            || name.startsWith("install")
-            || name.startsWith("reset")) {
-          return false;
-        }
-
         // Jackson serialization callbacks
         if (method.isAnnotatedWith("com.fasterxml.jackson.annotation.JsonCreator")
             || method.isAnnotatedWith("com.fasterxml.jackson.annotation.JsonSetter")
@@ -380,15 +374,14 @@ class UnreferencedCodeTest {
   }
 
   /**
-   * Excludes methods listed in {@link #KNOWN_UNREFERENCED}. These are methods with verified callers
-   * that ArchUnit's bytecode analysis cannot trace (test-only, reflection, inheritance).
+   * Excludes methods listed in {@link #CROSS_MODULE_PRODUCTION_CALLERS}: production callers in
+   * modules outside this classpath, matched by fully qualified owner and signature.
    */
-  private static DescribedPredicate<JavaMethod> isNotKnownUnreferenced() {
-    return new DescribedPredicate<>("is not in the known-unreferenced exclusion list") {
+  private static DescribedPredicate<JavaMethod> hasNoCrossModuleProductionCaller() {
+    return new DescribedPredicate<>("have no named production caller outside this classpath") {
       @Override
       public boolean test(JavaMethod method) {
-        String key = method.getOwner().getSimpleName() + "." + method.getName();
-        return !KNOWN_UNREFERENCED.containsKey(key);
+        return !CROSS_MODULE_PRODUCTION_CALLERS.containsKey(method.getFullName());
       }
     };
   }
@@ -406,10 +399,9 @@ class UnreferencedCodeTest {
         String signature = method.getFullName();
 
         if (!referencedMethods.contains(signature)) {
-          String message =
-              String.format(
-                  "Method %s in %s is never referenced",
-                  method.getName(), method.getOwner().getSimpleName());
+          // The message is the frozen store's identity for this violation: fully qualified owner
+          // and full signature, nothing machine-, line- or order-dependent.
+          String message = "Method " + signature + " is never referenced";
           events.add(SimpleConditionEvent.violated(method, message));
         }
       }

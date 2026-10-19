@@ -1,0 +1,26 @@
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/chat/PressureSignal.java b/modules/app-api/src/main/java/io/justsearch/app/api/chat/PressureSignal.java
+index 8b6e896b3..871308109 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/chat/PressureSignal.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/chat/PressureSignal.java
+@@ -5,5 +5,7 @@ package io.justsearch.app.api.chat;
+ public enum PressureSignal {
+   NONE,
+   EXTERNAL_MEMORY,
+-  GAME
++  GAME,
++  // Compatibility only: lets later checks compile; nothing in this state reports it.
++  GAME_AND_EXTERNAL_MEMORY
+ }
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/chat/ChatServerControllerImpl.java b/modules/app-services/src/main/java/io/justsearch/app/services/chat/ChatServerControllerImpl.java
+index 24183d73b..c2e768091 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/chat/ChatServerControllerImpl.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/chat/ChatServerControllerImpl.java
+@@ -1102,6 +1102,8 @@ public final class ChatServerControllerImpl
+       case NONE -> null;
+       case EXTERNAL_MEMORY -> RefusalReason.GPU_BUSY;
+       case GAME -> RefusalReason.GAME_MODE;
++      // Compatibility only: this state never reports the combined signal.
++      case GAME_AND_EXTERNAL_MEMORY -> throw new IllegalStateException("not in this state");
+     };
+   }
+ 

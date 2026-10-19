@@ -196,6 +196,16 @@ public final class InstallPlanner {
         continue;
       }
 
+      // Native packages declare the descriptor's OS/architecture key. Portable model packages
+      // have no target. This decision is shared by preview, acquisition and saved contracts.
+      if (pkg.nativeTarget() != null
+          && !pkg.nativeTarget().equals(io.justsearch.configuration.NativeTargets.current().targetId())) {
+        skipped.add(new InstallPlan.SkippedPackage(pkg.id(), SkipCause.PLATFORM,
+            "Runtime artifacts target " + pkg.nativeTarget() + "; configure an external runtime for "
+                + io.justsearch.configuration.NativeTargets.current().targetId() + "."));
+        continue;
+      }
+
       // CUDA-requiring packages (e.g. the cuda-runtime CUDA DLLs) are a hardware-support payload,
       // not a capability: include them iff the profile uses CUDA — the same axis selectVariant uses
       // to pick the FP16/CUDA model variants those DLLs make runnable — independent of the GGUF VRAM

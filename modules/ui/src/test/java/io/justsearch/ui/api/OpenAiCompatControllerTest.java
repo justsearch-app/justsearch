@@ -271,7 +271,7 @@ class OpenAiCompatControllerTest {
             response.headers().allValues("Access-Control-Allow-Origin"));
         assertEquals(shell ? java.util.List.of("GET,POST,DELETE,OPTIONS") : java.util.List.of(),
             response.headers().allValues("Access-Control-Allow-Methods"));
-        assertEquals(shell ? java.util.List.of("Deprecation, Sunset, Link, Retry-After")
+        assertEquals(shell ? java.util.List.of("Deprecation, Sunset, Link, Retry-After, X-JustSearch-Status-Change, X-JustSearch-Status-Epoch, X-JustSearch-Status-Reflected")
                 : java.util.List.of(),
             response.headers().allValues("Access-Control-Expose-Headers"));
         for (String name : java.util.List.of("Access-Control-Allow-Credentials",

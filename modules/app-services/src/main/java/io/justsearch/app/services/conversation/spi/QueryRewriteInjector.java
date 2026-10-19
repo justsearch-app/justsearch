@@ -88,8 +88,12 @@ public final class QueryRewriteInjector implements ContextInjector {
           List.of(
               Map.of("role", "system", "content", SYSTEM_PROMPT),
               Map.of("role", "user", "content", buildUserPrompt(history, question)));
+      // Spec E step E2: the follow-up rewrite is query assistance (ASSIST); it never slows indexing.
       standalone =
-          svc.chatCompletion(messages, REWRITE_MAX_TOKENS, SamplingParams.DETERMINISTIC, ctx.engineContext())
+          io.justsearch.app.api.chat.DemandScope.call(
+                  io.justsearch.app.api.chat.DemandKind.ASSIST,
+                  () -> svc.chatCompletion(
+                      messages, REWRITE_MAX_TOKENS, SamplingParams.DETERMINISTIC, ctx.engineContext()))
               .get(budget.toMillis(), TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

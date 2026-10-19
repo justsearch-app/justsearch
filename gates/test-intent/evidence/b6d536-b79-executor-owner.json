@@ -1,0 +1,109 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T00:16:01.582Z",
+  "revision": "2e11960509892e40066bc3684c6205675e0fa27d",
+  "tree": "def01385b06c225ca94128926fcee11d59d3a3a8",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-observability:test --tests \"io.justsearch.app.observability.stream.SseStreamChannelDeliveryOwnerTest.interruptibleDeliveryWithoutAnOwnerSuppliedExecutorIsRefused\" --tests \"io.justsearch.app.observability.stream.SseStreamChannelDeliveryOwnerTest.asynchronousPublicationWithoutAnOwnerSuppliedExecutorIsRefusedBeforeSequencing\" --tests \"io.justsearch.app.observability.stream.SseStreamChannelDeliveryOwnerTest.healthDeliveryRunsOnTheOwnersThreadsAndEndsWithTheChannel\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13793
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.ExecutorArchitectureTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11470
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStreamChannelDeliveryOwnerTest.java#interruptibleDeliveryWithoutAnOwnerSuppliedExecutorIsRefused",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStreamChannelDeliveryOwnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d86d8933b908a22dba5fee1bfeaaca519060cc2201754f45ba2087b1a49decf8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptibleDeliveryWithoutAnOwnerSuppliedExecutorIsRefused()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStreamChannelDeliveryOwnerTest.java#asynchronousPublicationWithoutAnOwnerSuppliedExecutorIsRefusedBeforeSequencing",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStreamChannelDeliveryOwnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d86d8933b908a22dba5fee1bfeaaca519060cc2201754f45ba2087b1a49decf8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "asynchronousPublicationWithoutAnOwnerSuppliedExecutorIsRefusedBeforeSequencing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStreamChannelDeliveryOwnerTest.java#healthDeliveryRunsOnTheOwnersThreadsAndEndsWithTheChannel",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStreamChannelDeliveryOwnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d86d8933b908a22dba5fee1bfeaaca519060cc2201754f45ba2087b1a49decf8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "healthDeliveryRunsOnTheOwnersThreadsAndEndsWithTheChannel()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/ExecutorArchitectureTest.java",
+      "file": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/ExecutorArchitectureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:95fcc806861610224450d57a9779a4a9da3549abd8edbe1d9e3c1af39efdadfc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rawExecutorFactoriesHaveNamedOwners",
+          "status": "passed"
+        },
+        {
+          "name": "rawExecutorFactoriesStayInsideTheExactOwnerAllowlist()",
+          "status": "passed"
+        },
+        {
+          "name": "logicalRegistrationCensusHasANonVacuousFloor()",
+          "status": "passed"
+        },
+        {
+          "name": "engineHttpClientFactoriesAlwaysInjectTheirExecutor()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:527ffe042b5f7aadd40ad684b74d22f2dfc0f4cae0a65525d0dff16b3410c33b"
+}

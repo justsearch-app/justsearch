@@ -236,8 +236,24 @@ public final class FilterNormalizationService {
     final var capturedCategories = resolvedCategories;
 
     long startNs = System.nanoTime();
-    return aiService
-        .chatCompletion(messages, NORM_MAX_TOKENS, NORM_SAMPLING, engineContext)
+    CompletableFuture<String> completion;
+    try {
+      // Spec E step E2: query assistance (ASSIST) never slows indexing.
+      completion = io.justsearch.app.api.chat.DemandScope.call(
+          io.justsearch.app.api.chat.DemandKind.ASSIST,
+          () -> aiService.chatCompletion(messages, NORM_MAX_TOKENS, NORM_SAMPLING, engineContext));
+    } catch (io.justsearch.app.api.chat.GenerationUnavailableException refused) {
+      // Chat is draining, starting or stopping: the same result as when no LLM is available.
+      log.debug("Filter normalization LLM skipped, generation unavailable: {}", refused.getMessage());
+      var noLlmSources = mergeResolved(capturedSources);
+      var noLlmAuthors = mergeResolved(capturedAuthors);
+      var noLlmCategories = mergeResolved(capturedCategories);
+      return CompletableFuture.completedFuture(
+          new NormResult(rebuildFilters(filters, noLlmSources, noLlmAuthors, noLlmCategories),
+              buildOriginalMap(filters),
+              buildNormalizedMap(noLlmSources, noLlmAuthors, noLlmCategories), 0L, "deterministic"));
+    }
+    return completion
         .orTimeout(NORM_DEADLINE_MS, TimeUnit.MILLISECONDS)
         .thenApply(
             response -> {

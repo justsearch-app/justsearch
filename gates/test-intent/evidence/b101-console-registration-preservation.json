@@ -1,0 +1,126 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:83d8dd3cdaf29665ab7d4d5208d8f1950aa0fdbf948556d275c256efabd8b9b7"
+  },
+  "createdAt": "2026-10-15T23:45:26.526Z",
+  "revision": "8043f327fb6bb54b0ade2708b2ed8024d241fca9",
+  "tree": "9026c2a9d50b73044d6bb20e6d4b899de1287224",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.ConsoleRegistrationRaceTest.noIntentClientAndConsoleRemainUnexpectedAtTheExistingRegistrationBound\" --tests \"io.justsearch.app.api.runtime.containment.ConsoleRegistrationRaceTest.realCrashDuringAnIntendedStopStillMakesTheConsoleUnexpected\" --tests \"io.justsearch.app.api.runtime.containment.ConsoleRegistrationRaceTest.consoleCrashIsUnexpectedEvenWhenItsClientCompletedNormally\" --tests \"io.justsearch.app.api.runtime.containment.ConsoleRegistrationRaceTest.unknownNativeExitTimeRemainsUnknownInTheLedger\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6414
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#noIntentClientAndConsoleRemainUnexpectedAtTheExistingRegistrationBound",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9cbbe1b49c2837ae062b18999cf489192bf82b0295b33067df6c04c8be92492d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "noIntentClientAndConsoleRemainUnexpectedAtTheExistingRegistrationBound()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#realCrashDuringAnIntendedStopStillMakesTheConsoleUnexpected",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9cbbe1b49c2837ae062b18999cf489192bf82b0295b33067df6c04c8be92492d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realCrashDuringAnIntendedStopStillMakesTheConsoleUnexpected()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#consoleCrashIsUnexpectedEvenWhenItsClientCompletedNormally",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9cbbe1b49c2837ae062b18999cf489192bf82b0295b33067df6c04c8be92492d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "consoleCrashIsUnexpectedEvenWhenItsClientCompletedNormally()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#unknownNativeExitTimeRemainsUnknownInTheLedger",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9cbbe1b49c2837ae062b18999cf489192bf82b0295b33067df6c04c8be92492d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unknownNativeExitTimeRemainsUnknownInTheLedger()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "8043f327f",
+    "revision": "8043f327fb6bb54b0ade2708b2ed8024d241fca9",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.ConsoleRegistrationRaceTest.noIntentClientAndConsoleRemainUnexpectedAtTheExistingRegistrationBound\" --tests \"io.justsearch.app.api.runtime.containment.ConsoleRegistrationRaceTest.realCrashDuringAnIntendedStopStillMakesTheConsoleUnexpected\" --tests \"io.justsearch.app.api.runtime.containment.ConsoleRegistrationRaceTest.consoleCrashIsUnexpectedEvenWhenItsClientCompletedNormally\" --tests \"io.justsearch.app.api.runtime.containment.ConsoleRegistrationRaceTest.unknownNativeExitTimeRemainsUnknownInTheLedger\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 14619
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#noIntentClientAndConsoleRemainUnexpectedAtTheExistingRegistrationBound",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#realCrashDuringAnIntendedStopStillMakesTheConsoleUnexpected",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#consoleCrashIsUnexpectedEvenWhenItsClientCompletedNormally",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/ConsoleRegistrationRaceTest.java#unknownNativeExitTimeRemainsUnknownInTheLedger",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:d0551e1715a484b1ee64d73f9b06621d599c8f90db07d6f8a0d81baed061550e"
+}

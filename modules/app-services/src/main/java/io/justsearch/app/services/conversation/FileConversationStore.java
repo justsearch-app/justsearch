@@ -415,13 +415,35 @@ public final class FileConversationStore implements ConversationStore {
     writeMetaAtomic(sessionDir, meta, sessionId);
   }
 
+  /** Orders title writes, so a write made only while untitled cannot interleave with a rename. */
+  private final Object titleWrites = new Object();
+
   @Override
   public void setTitle(String sessionId, String title, String titleSource) {
+    synchronized (titleWrites) {
+      writeTitle(sessionId, readMeta(sessionId), title, titleSource);
+    }
+  }
+
+  @Override
+  public boolean setTitleIfUntitled(String sessionId, String title, String titleSource) {
+    if (title == null || title.isBlank()) return false;
+    synchronized (titleWrites) {
+      Map<String, Object> existing = readMeta(sessionId);
+      if (existing == null) return false;
+      Object named = existing.get("title");
+      if (named instanceof String s && !s.isBlank()) return false;
+      writeTitle(sessionId, existing, title, titleSource);
+      return true;
+    }
+  }
+
+  private void writeTitle(
+      String sessionId, Map<String, Object> existing, String title, String titleSource) {
     // Tempdoc 838 — the scalar-meta-field write, mirroring setContextFloor, with ONE deliberate
     // divergence: an unknown session is left alone rather than materialised. setContextFloor mints a
     // meta for an id it has never seen; doing that here would create a zero-message conversation that
     // listSessions then lists — a row that names nothing. The controller answers 404 for that case.
-    Map<String, Object> existing = readMeta(sessionId);
     if (existing == null) return;
     Map<String, Object> meta = new LinkedHashMap<>(existing);
     if (title == null || title.isBlank()) {

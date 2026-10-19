@@ -62,20 +62,16 @@ final class ComponentsFactory {
    *     resolvedConfig paths are both null)
    */
   static Components build(
-      ResolvedConfig resolvedConfig,
-      Path fallbackIndexPath,
-      Path indexPath,
-      boolean readOnly,
-      FieldMapper fieldMapper,
-      SsotAnalyzerRegistry analyzerRegistry,
-      KnnVectorsFormat knnVectorsFormatOverride,
-      SoftDeletesMetrics softDeletesMetrics,
-      IndexOpenGuard indexOpenGuard,
-      AtomicLong lastRefreshNanos,
-      NrtReopenStats nrtStats,
-      long nrtTargetMaxStaleMsDefault,
-      long nrtHardMaxStaleMsDefault)
-      throws IOException {
+      ResolvedConfig resolvedConfig, Path fallbackIndexPath, Path indexPath, boolean readOnly,
+      FieldMapper fieldMapper, SsotAnalyzerRegistry analyzerRegistry,
+      KnnVectorsFormat knnVectorsFormatOverride, SoftDeletesMetrics softDeletesMetrics,
+      IndexOpenGuard indexOpenGuard, AtomicLong lastRefreshNanos, NrtReopenStats nrtStats,
+      long nrtTargetMaxStaleMsDefault, long nrtHardMaxStaleMsDefault,
+      ChunkSetCompleteness... suppliedCompleteness) throws IOException {
+    if (suppliedCompleteness.length > 1)
+      throw new IllegalArgumentException("At most one admission cache can be supplied");
+    ChunkSetCompleteness completeness = suppliedCompleteness.length == 0
+        ? new ChunkSetCompleteness() : java.util.Objects.requireNonNull(suppliedCompleteness[0]);
     ResolvedConfig rc = resolvedConfig;
     ResolvedConfig.Index idx = rc.index();
     // A null explicit path means auto-temp, regardless of configured persistent paths.
@@ -308,22 +304,29 @@ final class ComponentsFactory {
               nrtOnDemandMaxStaleMs);
 
       if (readOnly) {
+        boolean exists;
         try {
-          if (!DirectoryReader.indexExists(dir)) {
-            throw new IOException(
-                "Read-only open requested but no index exists at " + resolvedPath);
-          }
+          exists = DirectoryReader.indexExists(dir);
         } catch (IOException e) {
+          // Task t-20261013-ef3c41: a folder that cannot be listed right now is not a corrupt
+          // index. Only corruption may reach the backup-and-empty recovery.
+          throw new IndexRuntimeIOException(
+              openFailureReason(e),
+              "Failed to determine whether an index exists at " + resolvedPath,
+              e);
+        }
+        if (!exists) {
+          // Nothing committed to lose: recovery materializes the empty index (fresh install).
           throw new IndexRuntimeIOException(
               IndexRuntimeIOException.Reason.CORRUPT_INDEX,
               "Failed to determine whether an index exists at " + resolvedPath,
-              e);
+              new IOException("Read-only open requested but no index exists at " + resolvedPath));
         }
 
         softDeletesReader =
             new SoftDeletesDirectoryReaderWrapper(
                 DirectoryReader.open(dir), softDeleteFieldResolved);
-        mgr = new SearcherManager(softDeletesReader, newNoCacheSearcherFactory());
+        mgr = new SearcherManager(softDeletesReader, newNoCacheSearcherFactory(completeness));
         stats.install(mgr, lastRefreshNanos, null);
 
         return new Components(
@@ -365,7 +368,7 @@ final class ComponentsFactory {
           new SoftDeletesDirectoryReaderWrapper(
               DirectoryReader.open(w, /*applyAllDeletes=*/ true, /*writeAllDeletes=*/ true),
               softDeleteFieldResolved);
-      mgr = new SearcherManager(softDeletesReader, newNoCacheSearcherFactory());
+      mgr = new SearcherManager(softDeletesReader, newNoCacheSearcherFactory(completeness));
       stats.install(mgr, lastRefreshNanos, w);
       thread = NrtReopenThreads.create(w, mgr, reopenTargetMs, reopenHardMs);
 
@@ -453,12 +456,14 @@ final class ComponentsFactory {
    * Returns a SearcherFactory that disables the query cache (shared by read-only and read-write
    * paths).
    */
-  private static SearcherFactory newNoCacheSearcherFactory() {
+  private static SearcherFactory newNoCacheSearcherFactory(ChunkSetCompleteness completeness) {
     return new SearcherFactory() {
       @Override
       public IndexSearcher newSearcher(IndexReader reader, IndexReader previous) throws IOException {
         IndexSearcher searcher = new IndexSearcher(reader);
         searcher.setQueryCache(null);
+        // Admission sees a validated immutable reader: it never performs child work itself.
+        completeness.prepare(searcher);
         return searcher;
       }
     };
@@ -498,7 +503,7 @@ final class ComponentsFactory {
       }
     } catch (IOException e) {
       throw new IndexRuntimeIOException(
-          IndexRuntimeIOException.Reason.CORRUPT_INDEX,
+          openFailureReason(e),
           "Failed to determine whether an index exists at " + resolvedPath,
           e);
     }
@@ -569,7 +574,7 @@ final class ComponentsFactory {
 
     } catch (IOException e) {
       throw new IndexRuntimeIOException(
-          IndexRuntimeIOException.Reason.CORRUPT_INDEX,
+          openFailureReason(e),
           "Failed to inspect index schema at " + resolvedPath,
           e);
     }
@@ -599,7 +604,7 @@ final class ComponentsFactory {
       }
     } catch (IOException e) {
       throw new IndexRuntimeIOException(
-          IndexRuntimeIOException.Reason.CORRUPT_INDEX,
+          openFailureReason(e),
           "Failed to determine whether an index exists at " + resolvedPath,
           e);
     }
@@ -634,9 +639,29 @@ final class ComponentsFactory {
           e);
     } catch (IOException e) {
       throw new IndexRuntimeIOException(
-          IndexRuntimeIOException.Reason.CORRUPT_INDEX,
+          openFailureReason(e),
           "Failed to verify index integrity at " + resolvedPath,
           e);
     }
+  }
+
+  /**
+   * How an I/O failure while opening or verifying the index is classified (task
+   * t-20261013-ef3c41).
+   *
+   * <p>Every such failure used to be {@code CORRUPT_INDEX}, which the recovery dispatch answers by
+   * moving the index aside and starting empty — so a sharing violation from a backup tool or an
+   * antivirus scan, or an access-denied blip on the index folder, discarded the whole index at
+   * startup. Only evidence of damage is corruption now: Lucene's own corruption and format
+   * exceptions, and a missing segment file ({@link LuceneRuntimeUtils#classifyIOException}). Any
+   * other failure keeps its transient reason ({@code DISK_IO}, {@code LOCKED}, ...), which fails the
+   * open without touching the index, so the worker reports itself unavailable and is retried.
+   */
+  static IndexRuntimeIOException.Reason openFailureReason(IOException e) {
+    if (e instanceof org.apache.lucene.index.IndexFormatTooOldException
+        || e instanceof org.apache.lucene.index.IndexFormatTooNewException) {
+      return IndexRuntimeIOException.Reason.CORRUPT_INDEX;
+    }
+    return LuceneRuntimeUtils.classifyIOException(e);
   }
 }

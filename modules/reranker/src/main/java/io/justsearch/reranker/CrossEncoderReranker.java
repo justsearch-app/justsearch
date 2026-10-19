@@ -5,7 +5,11 @@ import io.justsearch.core.execution.InferenceRequest;
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
+import io.justsearch.ort.EncoderRole;
+import io.justsearch.ort.GpuArenaPlan;
+import io.justsearch.ort.GpuCallPacker;
 import io.justsearch.ort.OrtCudaStatus;
+import io.justsearch.ort.SessionAcquireDeadlineExceededException;
 import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
 import io.opentelemetry.api.GlobalOpenTelemetry;
@@ -18,8 +22,11 @@ import java.util.Comparator;
 import java.util.HashMap;
 import io.justsearch.telemetry.OpenInferenceSpans;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.stream.IntStream;
 import net.logstash.logback.marker.Markers;
 import org.slf4j.Logger;
@@ -117,8 +124,8 @@ public final class CrossEncoderReranker implements Closeable {
   /**
    * Releases the GPU session to free VRAM.
    *
-   * <p>Called when Main claims GPU and Worker needs to yield. The session will be lazily recreated
-   * on next use when GPU becomes available again.
+   * <p>Called when Main claims GPU and Worker needs to yield. Lifecycle prewarm recreates the session
+   * when GPU becomes available again. Requests use ready sessions or skip reranking.
    *
    * <p>Thread-safe: concurrent rerank() calls will gracefully fall back to CPU during release.
    */
@@ -162,20 +169,63 @@ public final class CrossEncoderReranker implements Closeable {
    */
   public RerankedResult rerank(String query, List<String> documents, long deadlineMs) {
     return rerank(query, documents, deadlineMs, InferenceRequest.within(
-        InferenceRequest.Urgency.FOREGROUND, java.time.Duration.ofSeconds(30), () -> false));
+        InferenceRequest.Urgency.FOREGROUND, java.time.Duration.ofSeconds(30), () -> false), true);
   }
 
-  /** Reranks with the admitted caller's native waiting and cancellation authority. */
+  /** Lifecycle-only warm-up: session creation and GPU retries happen off request threads. */
+  public boolean prewarm(String text, InferenceRequest request) {
+    long budgetMs = Math.max(1L, Math.min(30_000L,
+        java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(request.remainingNanos())));
+    return !rerank(text, List.of(text), budgetMs, request, true).skipped();
+  }
+
+  public boolean isQueryWarm() { return sessions.isQueryWarm(); }
+  public io.justsearch.ort.QueryDevice queryDevice() { return sessions.queryDevice(); }
+  public boolean isGpuRetryDue() { return sessions.isGpuRetryDue(); }
+  public void addSessionGenerationListener(Runnable listener) {
+    sessions.addGenerationListener(listener);
+  }
+  public boolean prewarmCpuForQueries(InferenceRequest request) {
+    return sessions.prewarmCpuForQueries(SessionAcquisitionRequest.from(request));
+  }
+
+  /**
+   * Reranks with the admitted caller's native waiting and cancellation authority.
+   *
+   * <p>When {@code request} asks to be released at its deadline (a search's rerank, Spec D §1.5:
+   * its semantic budget is not {@code NONE}), the native run is handed to one of the reranker's own
+   * run threads and the rerank answers by {@link #answerBy} that deadline whether or not the run
+   * has returned: a run that has not returned continues there, its result dropped, and the rerank
+   * is skipped with {@link RerankSkipCause#RUN_DEADLINE_EXCEEDED}. When every reranker run thread
+   * already holds such a run, the rerank is skipped the same way at once, without queueing. The
+   * caller's thread, and everything the caller holds while it runs, is never held by an abandoned
+   * native run.
+   */
   public RerankedResult rerank(String query, List<String> documents, long deadlineMs,
       InferenceRequest request) {
+    return rerank(query, documents, deadlineMs, request, false);
+  }
+
+  private RerankedResult rerank(String query, List<String> documents, long deadlineMs,
+      InferenceRequest request, boolean mayCreateSessions) {
     var authority = SessionAcquisitionRequest.from(request);
     long startNanos = System.nanoTime();
     authority.remainingNanos();
     long localDeadline = startNanos + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(
         Math.max(1L, Math.min(deadlineMs, 30_000L)));
-    var acquisition = new SessionAcquisitionRequest(authority.urgency(),
-        startNanos + Math.min(authority.deadlineNanos() - startNanos, localDeadline - startNanos),
-        authority.cancellationRequested());
+    long runDeadline = answerBy(authority.deadlineNanos());
+    long callerAcquireDeadline = authority.releaseCallerAtDeadline()
+        ? runDeadline : authority.deadlineNanos();
+    long acquireDeadline = startNanos + Math.min(
+        callerAcquireDeadline - startNanos, localDeadline - startNanos);
+    var acquisition = new SessionAcquisitionRequest(authority.urgency(), acquireDeadline,
+        authority.cancellationRequested(), mayCreateSessions, false);
+    // Whether the rerank's own budget, not the caller's deadline, bounds the wait for a session.
+    boolean rerankBudgetBounds = localDeadline - callerAcquireDeadline <= 0;
+    OptionalLong releaseAt =
+        authority.releaseCallerAtDeadline()
+            ? OptionalLong.of(runDeadline)
+            : OptionalLong.empty();
 
     if (documents.isEmpty()) {
       return new RerankedResult(List.of(), List.of(), RerankSkipCause.NONE, 0);
@@ -192,7 +242,9 @@ public final class CrossEncoderReranker implements Closeable {
             .setAttribute("search.ce.scored", documents.size())
             .startSpan();
     try {
-      RerankedResult result = rerankInSpan(query, documents, deadlineMs, startNanos, acquisition);
+      RerankedResult result =
+          rerankInSpan(
+              query, documents, deadlineMs, startNanos, acquisition, rerankBudgetBounds, releaseAt);
       // Tempdoc 553 Phase D (head): OpenInference RERANKER projection of the CE-scored output (the
       // reranked candidate texts + scores, in the cross-encoder's chosen order). Same shared
       // OpenInferenceSpans projector the worker + head spans use — no per-module vocabulary fork.
@@ -203,6 +255,20 @@ public final class CrossEncoderReranker implements Closeable {
     } finally {
       rerankSpan.end();
     }
+  }
+
+  /** How long before its caller's deadline a rerank that releases its caller answers: 100 ms. */
+  private static final long ANSWER_MARGIN_NANOS =
+      java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(100);
+
+  /**
+   * When a rerank that releases its caller answers: 100 ms before the caller's {@code
+   * deadlineNanos} (at most half of what is left of it), so that the answer, and the end of the
+   * call it runs in, reach the caller before the caller stops waiting.
+   */
+  public static long answerBy(long deadlineNanos) {
+    long remaining = Math.max(0L, deadlineNanos - System.nanoTime());
+    return deadlineNanos - Math.min(ANSWER_MARGIN_NANOS, remaining / 2);
   }
 
   /** Map the reranked output (sorted order + per-doc scores) to the shared OpenInference Doc list. */
@@ -254,7 +320,7 @@ public final class CrossEncoderReranker implements Closeable {
 
   private RerankedResult rerankInSpan(
       String query, List<String> documents, long deadlineMs, long startNanos,
-      SessionAcquisitionRequest acquisition) {
+      SessionAcquisitionRequest acquisition, boolean rerankBudgetBounds, OptionalLong releaseAt) {
 
     // Track which session was used so D9 teardown only fires for CPU failures (tempdoc 397 §14.5
     // W3: the raw-session-identity compare moved to Lease.isCpu()).
@@ -285,6 +351,18 @@ public final class CrossEncoderReranker implements Closeable {
       int actualBatchSize = batch.batchSize();
       int paddedBatchSize = bucketBatchSize(actualBatchSize);
       int seqLength = batch.seqLength();
+
+      // Spec E §2.2: the device-memory plan read for this rerank may split it into several calls.
+      // Without a plan (and whenever one call fits) it is one call, as before.
+      if (callItems(actualBatchSize, seqLength) < actualBatchSize) {
+        boolean[] usedCpu = {false};
+        try {
+          return rerankSplit(
+              batch, deadlineMs, startNanos, acquisition, rerankBudgetBounds, releaseAt, usedCpu);
+        } finally {
+          wasCpu = usedCpu[0];
+        }
+      }
 
       long[][] inputIds = padBatch(batch.inputIds(), paddedBatchSize, seqLength);
       long[][] attentionMask = padAttentionMask(batch.attentionMask(), paddedBatchSize, seqLength);
@@ -326,12 +404,68 @@ public final class CrossEncoderReranker implements Closeable {
         // Run inference (select GPU or CPU session based on availability and arbitration)
         // Bind native waiting to this rerank's existing request budget, with a finite ceiling
         // even if a caller supplied an unusually large budget.
-        try (var lease = sessions.acquire(acquisition)) {
+        SessionHandle.Lease acquired;
+        try {
+          acquired = GpuCallPacker.acquireForCall(
+              sessions, acquisition, EncoderRole.RERANKER, paddedBatchSize, seqLength);
+        } catch (RuntimeException notAcquired) {
+          if (!(notAcquired instanceof InferenceRequest.DeadlineExceeded)) throw notAcquired;
+          // No session within the acquisition deadline (the device was busy, or a session was
+          // still being created): a budget skip, not a failure of the rerank call.
+          long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+          boolean loading = notAcquired instanceof SessionAcquireDeadlineExceededException missed
+              && missed.phase() == SessionAcquireDeadlineExceededException.Phase.LOADING
+              && !acquisition.mayCreateGpuSession()
+              && acquisition.deadlineNanos() - System.nanoTime() > 0;
+          RerankSkipCause cause =
+              loading ? RerankSkipCause.MODEL_LOADING : rerankBudgetBounds
+                  ? RerankSkipCause.ACQUIRE_BUDGET_EXCEEDED
+                  : RerankSkipCause.RUN_DEADLINE_EXCEEDED;
+          log.debug(
+              Markers.append("reason_code", loading ? "rerank_skipped_loading" : cause == RerankSkipCause.ACQUIRE_BUDGET_EXCEEDED
+                      ? "rerank_skipped_acquire_budget" : "rerank_skipped_run_deadline")
+                  .and(Markers.append("latency_ms", elapsedMs))
+                  .and(Markers.append("budget_ms", deadlineMs))
+                  .and(Markers.append("cause", cause.name())),
+              "Rerank skipped: no session within its acquisition deadline: {}",
+              notAcquired.getMessage());
+          return new RerankedResult(originalOrder(documents.size()), List.of(), cause, elapsedMs);
+        }
+        try (var lease = acquired) {
           wasCpu = lease.isCpu();
           // Tempdoc 710 Move 2: lease.run() is the ORT choke point — records elapsed time via
           // the recorder bound by the composition root (reranker/citation have no worker-core
           // dependency, so registration + binding happens in InferenceCompositionRoot).
-          try (OrtSession.Result result = lease.run(inputs)) {
+          OrtSession.Result ran;
+          if (releaseAt.isEmpty()) {
+            ran = lease.run(inputs);
+          } else {
+            // The lease's own deadline is checked here, as lease.run does, so the catch below
+            // sees only the run thread's answer: not returned in time, or not started.
+            try {
+              acquisition.remainingNanos();
+              ran = lease.runWithin(inputs, releaseAt.getAsLong());
+            } catch (SessionAcquireDeadlineExceededException notInTime) {
+              long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+              RerankSkipCause cause = notInTime.phase() != SessionAcquireDeadlineExceededException.Phase.RUN
+                      && rerankBudgetBounds && acquisition.deadlineNanos() - System.nanoTime() <= 0
+                  ? RerankSkipCause.ACQUIRE_BUDGET_EXCEEDED : RerankSkipCause.RUN_DEADLINE_EXCEEDED;
+              log.debug(
+                  Markers.append("reason_code", cause == RerankSkipCause.ACQUIRE_BUDGET_EXCEEDED
+                          ? "rerank_skipped_acquire_budget" : "rerank_skipped_run_deadline")
+                      .and(Markers.append("latency_ms", elapsedMs))
+                      .and(Markers.append("phase", notInTime.phase().name()))
+                      .and(Markers.append("cause", cause.name())),
+                  "Rerank skipped before its result was available: {}",
+                  notInTime.getMessage());
+              return new RerankedResult(
+                  originalOrder(documents.size()),
+                  List.of(),
+                  cause,
+                  elapsedMs);
+            }
+          }
+          try (OrtSession.Result result = ran) {
             // Extract scores — only for actual documents, not padding rows
             List<Float> scores = extractScores(result, actualBatchSize);
 
@@ -373,6 +507,149 @@ public final class CrossEncoderReranker implements Closeable {
       return new RerankedResult(
           originalOrder(documents.size()), List.of(), RerankSkipCause.INFERENCE_FAILED, elapsedMs);
     }
+  }
+
+  /**
+   * The pairs, of {@code remaining}, the next call of a rerank takes: all of them without a plan,
+   * otherwise as many as the plan's packing budget admits at this sequence length and padded pair
+   * count (Spec E §2.2).
+   */
+  private int callItems(int remaining, int seqLength) {
+    return callItems(sessions.arenaPlan(), remaining, seqLength);
+  }
+
+  private static int callItems(Optional<GpuArenaPlan> packingPlan, int remaining, int seqLength) {
+    return GpuCallPacker.itemsPerCall(
+        packingPlan,
+        EncoderRole.RERANKER,
+        Integer.MAX_VALUE,
+        remaining,
+        i -> seqLength,
+        length -> length,
+        CrossEncoderReranker::bucketBatchSize);
+  }
+
+  /**
+   * A rerank the plan splits into several calls (Spec E invariant 7). One lease, and so one device
+   * seat, is held for all of the calls, so aging cannot seat bulk work between them. The scores are
+   * used only when every call returned: a deadline miss on any call returns every document in its
+   * original order, and a failed call is the caller's {@code INFERENCE_FAILED}. Scored and unscored
+   * documents are never mixed.
+   *
+   * @param usedCpu set to whether the lease was a CPU lease, for the caller's failure report
+   */
+  private RerankedResult rerankSplit(
+      RerankerTokenizer.EncodedBatch batch,
+      long deadlineMs,
+      long startNanos,
+      SessionAcquisitionRequest acquisition,
+      boolean rerankBudgetBounds,
+      OptionalLong releaseAt,
+      boolean[] usedCpu)
+      throws OrtException {
+    int total = batch.batchSize();
+    int seqLength = batch.seqLength();
+    long preInferenceMs = (System.nanoTime() - startNanos) / 1_000_000;
+    if (preInferenceMs > deadlineMs * 0.7) {
+      log.debug(
+          Markers.append("reason_code", "rerank_skipped_prep_budget")
+              .and(Markers.append("latency_ms", preInferenceMs))
+              .and(Markers.append("budget_ms", deadlineMs)),
+          "Rerank skipped: prep took {}ms, insufficient budget for inference",
+          preInferenceMs);
+      return new RerankedResult(
+          originalOrder(total), List.of(), RerankSkipCause.PREP_BUDGET_EXCEEDED, preInferenceMs);
+    }
+    Optional<GpuArenaPlan> packingPlan = sessions.arenaPlan();
+    SessionHandle.Lease acquired;
+    try {
+      acquired = GpuCallPacker.acquireForCall(
+          sessions, acquisition, EncoderRole.RERANKER,
+          bucketBatchSize(callItems(packingPlan, total, seqLength)), seqLength, packingPlan);
+    } catch (RuntimeException notAcquired) {
+      if (!(notAcquired instanceof InferenceRequest.DeadlineExceeded)) throw notAcquired;
+      long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+      RerankSkipCause cause =
+          rerankBudgetBounds
+              ? RerankSkipCause.ACQUIRE_BUDGET_EXCEEDED
+              : RerankSkipCause.RUN_DEADLINE_EXCEEDED;
+      log.debug(
+          Markers.append("reason_code", "rerank_skipped_acquire_budget")
+              .and(Markers.append("latency_ms", elapsedMs))
+              .and(Markers.append("budget_ms", deadlineMs))
+              .and(Markers.append("cause", cause.name())),
+          "Rerank skipped: no session within its acquisition deadline: {}",
+          notAcquired.getMessage());
+      return new RerankedResult(originalOrder(total), List.of(), cause, elapsedMs);
+    }
+    List<Float> scores = new ArrayList<>(total);
+    int calls = 0;
+    try (var lease = acquired) {
+      usedCpu[0] = lease.isCpu();
+      int start = 0;
+      while (start < total) {
+        int items = lease.isCpu() ? total - start : callItems(packingPlan, total - start, seqLength);
+        int end = start + items;
+        int padded = bucketBatchSize(items);
+        long[][] inputIds =
+            padBatch(Arrays.copyOfRange(batch.inputIds(), start, end), padded, seqLength);
+        long[][] attentionMask =
+            padAttentionMask(
+                Arrays.copyOfRange(batch.attentionMask(), start, end), padded, seqLength);
+        long[][] tokenTypeIds =
+            padBatch(Arrays.copyOfRange(batch.tokenTypeIds(), start, end), padded, seqLength);
+        long[] shape = new long[] {padded, seqLength};
+        try (OnnxTensor inputIdsTensor =
+                OnnxTensor.createTensor(sessions.environment(), flatten(inputIds), shape);
+            OnnxTensor attentionMaskTensor =
+                OnnxTensor.createTensor(sessions.environment(), flatten(attentionMask), shape);
+            OnnxTensor tokenTypeIdsTensor =
+                needsTokenTypeIds
+                    ? OnnxTensor.createTensor(sessions.environment(), flatten(tokenTypeIds), shape)
+                    : null) {
+          Map<String, OnnxTensor> inputs = new HashMap<>();
+          inputs.put("input_ids", inputIdsTensor);
+          inputs.put("attention_mask", attentionMaskTensor);
+          if (tokenTypeIdsTensor != null) {
+            inputs.put("token_type_ids", tokenTypeIdsTensor);
+          }
+          OrtSession.Result ran;
+          try {
+            if (releaseAt.isEmpty()) {
+              ran = lease.run(inputs);
+            } else {
+              acquisition.remainingNanos();
+              ran = lease.runWithin(inputs, releaseAt.getAsLong());
+            }
+          } catch (RuntimeException notInTime) {
+            if (!(notInTime instanceof InferenceRequest.DeadlineExceeded)) throw notInTime;
+            long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+            log.debug(
+                Markers.append("reason_code", "rerank_skipped_run_deadline")
+                    .and(Markers.append("latency_ms", elapsedMs))
+                    .and(Markers.append("calls_returned", calls)),
+                "Rerank skipped: call {} of a split rerank could not finish by the deadline: {}",
+                calls + 1,
+                notInTime.getMessage());
+            return new RerankedResult(
+                originalOrder(total), List.of(), RerankSkipCause.RUN_DEADLINE_EXCEEDED, elapsedMs);
+          }
+          try (OrtSession.Result result = ran) {
+            scores.addAll(extractScores(result, items));
+          }
+        }
+        calls++;
+        start = end;
+      }
+    }
+    List<Integer> sortedIndices =
+        IntStream.range(0, scores.size())
+            .boxed()
+            .sorted(Comparator.comparingDouble(scores::get).reversed())
+            .toList();
+    long totalMs = (System.nanoTime() - startNanos) / 1_000_000;
+    log.debug("Rerank completed: {} docs in {} calls, {}ms", total, calls, totalMs);
+    return new RerankedResult(sortedIndices, scores, RerankSkipCause.NONE, totalMs);
   }
 
   /**

@@ -3,39 +3,61 @@ package io.justsearch.ui.runtime;
 
 import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
-import io.justsearch.core.execution.EngineExecutorRegistry;
-import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.app.api.runtime.ledger.ExitLedgerReader;
+import io.justsearch.app.api.runtime.ledger.LedgerFamily;
+import io.justsearch.app.api.runtime.ledger.LedgerRecord;
+import io.justsearch.app.api.runtime.ledger.LedgerRecordType;
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.util.Optional;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.HashSet;
 import java.util.Objects;
-import java.util.concurrent.ExecutorService;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/** Identity-safe predecessor cleanup performed before any child-capable bootstrap begins. */
-public final class ManagedChildReconciler implements AutoCloseable {
-  private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(2);
-  private static final String HTTP_EXECUTOR_NAME = "head.child-reconciliation.http";
+/**
+ * Identity-safe predecessor cleanup performed before any child-capable bootstrap begins.
+ *
+ * <p>ADR-0051 decision 2: no child outlives the Engine that started it. Spec B step 7: a child the
+ * children ledger records inside its Engine's job ({@code child-start contained: true}) ends with
+ * that job, and {@code LedgerReconciler} (run earlier, from {@code DefaultChildControl.openForEngine})
+ * records its end ({@code owner-died}, or {@code child-survived}); this class never ends such a
+ * child and keeps its record. Every other registered child whose identity (PID, start time and
+ * executable) still matches a live process is terminated, the predecessor's llama-server included:
+ * the fallback while this Engine has no job (containment unavailable) and for children of an
+ * earlier version, which recorded no containment. Spec F step 13 retires the fallback one release
+ * after the Engine job ships.
+ *
+ * <p>A record whose identity cannot be read is left alone with its live process (it may be
+ * unrelated), and a record proved stale by a mismatch is dropped without touching the process that
+ * now holds the PID.
+ */
+public final class ManagedChildReconciler {
+  private static final Logger log = LoggerFactory.getLogger(ManagedChildReconciler.class);
+  /** FILETIME ticks (100 ns since 1601) per millisecond, and the 1601 to 1970 offset in ms. */
+  private static final long TICKS_PER_MS = 10_000L;
+  private static final long FILETIME_EPOCH_OFFSET_MS = 11_644_473_600_000L;
 
   private final ManagedChildRegistry registry;
-  private final String declaredLlamaConfigHash;
+  private final ContainedPredecessors contained;
   private final Termination termination;
-  private final EngineExecutorRegistry.Registration httpRegistration;
-  private final HttpClient http;
-  private final ObjectMapper json = new ObjectMapper();
-  private boolean closed;
+  private RecordedFallback fallback;
 
-  public ManagedChildReconciler(
-      EngineExecutorRegistry processExecutors,
-      ManagedChildRegistry registry,
-      String declaredLlamaConfigHash) {
-    this(processExecutors, registry, declaredLlamaConfigHash, ManagedChildReconciler::terminateMatched);
+  @FunctionalInterface
+  private interface RecordedFallback {
+    boolean stop(ManagedChild child) throws IOException;
+  }
+
+  /** Whether the children ledger records a registered child inside its Engine's job. */
+  @FunctionalInterface
+  public interface ContainedPredecessors {
+    /** No child is known to be contained: every matched live child takes the fallback. */
+    ContainedPredecessors NONE = child -> false;
+
+    boolean contained(ManagedChild child);
   }
 
   @FunctionalInterface
@@ -43,55 +65,69 @@ public final class ManagedChildReconciler implements AutoCloseable {
     boolean terminate(ProcessHandle handle);
   }
 
-  ManagedChildReconciler(
-      EngineExecutorRegistry processExecutors,
-      ManagedChildRegistry registry,
-      String declaredLlamaConfigHash,
+  /** The fallback for every child: no containment is known. */
+  public ManagedChildReconciler(ManagedChildRegistry registry) {
+    this(registry, ContainedPredecessors.NONE, ManagedChildReconciler::terminateMatched);
+  }
+
+  /** Leaves the children {@code contained} names to their Engine's job; the rest take the fallback. */
+  public static ManagedChildReconciler withContainment(
+      ManagedChildRegistry registry, ContainedPredecessors contained) {
+    return new ManagedChildReconciler(registry, contained, ManagedChildReconciler::terminateMatched);
+  }
+
+  /** The boot fallback's intent and result belong to the Engine that performs the stop. */
+  public static ManagedChildReconciler withRecordedFallback(ManagedChildRegistry registry,
+      ContainedPredecessors contained,
+      io.justsearch.app.api.runtime.child.DefaultChildControl control, Path dataDir) {
+    ManagedChildReconciler reconciler = withContainment(registry, contained);
+    reconciler.fallback = child -> control.stopPredecessor(dataDir, child);
+    return reconciler;
+  }
+
+  ManagedChildReconciler(ManagedChildRegistry registry, Termination termination) {
+    this(registry, ContainedPredecessors.NONE, termination);
+  }
+
+  ManagedChildReconciler(ManagedChildRegistry registry, ContainedPredecessors contained,
       Termination termination) {
     this.registry = Objects.requireNonNull(registry, "registry");
-    this.declaredLlamaConfigHash = declaredLlamaConfigHash;
+    this.contained = Objects.requireNonNull(contained, "contained");
     this.termination = Objects.requireNonNull(termination, "termination");
-    HttpResources resources = openHttpResources(processExecutors);
-    this.httpRegistration = resources.registration();
-    this.http = resources.client();
   }
 
-  private static HttpResources openHttpResources(EngineExecutorRegistry processExecutors) {
-    Objects.requireNonNull(processExecutors, "processExecutors");
-    EngineExecutorRegistry.Limits background =
-        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
-    EngineExecutorRegistry.Registration registration =
-        processExecutors.register(
-            new EngineExecutorSpec(
-                HTTP_EXECUTOR_NAME,
-                EngineExecutorSpec.Kind.BACKGROUND,
-                EngineExecutorSpec.Mode.PLATFORM,
-                1,
-                background.maxQueue(),
-                1));
+  /**
+   * The children the ledger in {@code dataDir} records inside an Engine job, matched by PID and
+   * birth (the record's creation FILETIME at the millisecond of the manifest's start instant).
+   * {@link ContainedPredecessors#NONE} when this Engine has no job, when the ledger cannot be read,
+   * or for a child it has no such record of: each of those takes the fallback.
+   */
+  public static ContainedPredecessors fromChildrenLedger(Path dataDir, boolean engineContained) {
+    if (!engineContained) return ContainedPredecessors.NONE;
+    Set<String> births = new HashSet<>();
     try {
-      ExecutorService executor =
-          registration.open(
-              runnable -> {
-                Thread thread = new Thread(runnable, "head-child-reconciliation-http");
-                thread.setDaemon(true);
-                return thread;
-              });
-      HttpClient client =
-          HttpClient.newBuilder().connectTimeout(PROBE_TIMEOUT).executor(executor).build();
-      return new HttpResources(registration, client);
-    } catch (RuntimeException | Error failure) {
-      try {
-        registration.close();
-      } catch (RuntimeException | Error cleanupFailure) {
-        failure.addSuppressed(cleanupFailure);
+      for (LedgerRecord record : ExitLedgerReader.read(
+          LedgerFamily.directory(dataDir), LedgerFamily.CHILDREN).records()) {
+        if (record.type() != LedgerRecordType.CHILD_START) continue;
+        if (!record.field("contained").isBoolean() || !record.field("contained").asBoolean()) continue;
+        Optional<String> birth = record.text("creationFileTime");
+        if (birth.isEmpty() || !birth.get().matches("[1-9][0-9]{0,19}")) continue;
+        long ms = Long.parseLong(birth.get()) / TICKS_PER_MS - FILETIME_EPOCH_OFFSET_MS;
+        births.add(record.field("pid").asLong() + "/" + ms);
       }
-      throw failure;
+    } catch (IOException | RuntimeException unreadable) {
+      log.warn("children ledger unreadable; predecessor children take the boot fallback: {}",
+          unreadable.toString());
+      return ContainedPredecessors.NONE;
     }
+    return child -> {
+      try {
+        return births.contains(child.pid() + "/" + Instant.parse(child.startedAt()).toEpochMilli());
+      } catch (RuntimeException invalid) {
+        return false;
+      }
+    };
   }
-
-  private record HttpResources(
-      EngineExecutorRegistry.Registration registration, HttpClient client) {}
 
   public void reconcile() throws IOException {
     for (ManagedChild child : registry.snapshot()) reconcile(child);
@@ -100,6 +136,7 @@ public final class ManagedChildReconciler implements AutoCloseable {
   private void reconcile(ManagedChild child) throws IOException {
     Optional<ProcessHandle> found = ProcessHandle.of(child.pid());
     if (found.isEmpty() || !found.get().isAlive()) {
+      if (fallback != null) fallback.stop(child);
       registry.remove(child.id());
       return;
     }
@@ -112,39 +149,10 @@ public final class ManagedChildReconciler implements AutoCloseable {
       registry.remove(child.id()); // proved stale/mismatched record; live process is unrelated
       return;
     }
-
-    if (child.kind() == ManagedChild.Kind.LLAMA_SERVER
-        && declaredLlamaConfigHash != null
-        && declaredLlamaConfigHash.equals(child.declaredConfigHash())
-        && healthyLlama(child.endpoint())) {
-      return; // retained for managed adoption by app-inference
-    }
-    if (termination.terminate(handle)) registry.remove(child.id());
-  }
-
-  private boolean healthyLlama(String endpoint) {
-    if (endpoint == null || !endpoint.startsWith("http://127.0.0.1:")) return false;
-    try {
-      HttpResponse<String> health = get(endpoint + "/health");
-      if (health.statusCode() < 200 || health.statusCode() >= 300) return false;
-      HttpResponse<String> props = get(endpoint + "/props");
-      if (props.statusCode() < 200 || props.statusCode() >= 300) return false;
-      JsonNode root = json.readTree(props.body());
-      JsonNode alias = root.get("model_alias");
-      JsonNode model = root.get("model_path");
-      JsonNode ctx = root.get("n_ctx");
-      return (alias != null && alias.isTextual() && !alias.asText().isBlank())
-          || (model != null && model.isTextual() && !model.asText().isBlank())
-          || (ctx != null && ctx.canConvertToInt() && ctx.asInt() > 0);
-    } catch (Exception e) {
-      return false;
-    }
-  }
-
-  private HttpResponse<String> get(String uri) throws IOException, InterruptedException {
-    return http.send(
-        HttpRequest.newBuilder(URI.create(uri)).timeout(PROBE_TIMEOUT).GET().build(),
-        HttpResponse.BodyHandlers.ofString());
+    // A contained survivor is the ledger's to record (child-survived): left running, record kept.
+    if (contained.contained(child)) return;
+    // Fallback: a verified-owned predecessor child, of every kind, ends with its Engine.
+    if (fallback != null ? fallback.stop(child) : termination.terminate(handle)) registry.remove(child.id());
   }
 
   private static boolean terminateMatched(ProcessHandle handle) {
@@ -159,31 +167,5 @@ public final class ManagedChildReconciler implements AutoCloseable {
       if (e instanceof InterruptedException) Thread.currentThread().interrupt();
     }
     return !handle.isAlive();
-  }
-
-  /** Stops the probe client within the bounded HTTP shutdown window and releases its registration. */
-  @Override
-  public synchronized void close() {
-    if (closed) {
-      return;
-    }
-    closed = true;
-    try {
-      http.shutdownNow();
-      boolean terminated = false;
-      try {
-        terminated = http.awaitTermination(PROBE_TIMEOUT);
-      } catch (InterruptedException interrupted) {
-        Thread.currentThread().interrupt();
-      }
-      // HttpClient.close() waits indefinitely in the JDK when the client is not terminated. Only
-      // invoke it after the bounded shutdown has completed; the registry registration remains the
-      // owner of the supplied executor and is always released, even after a timeout.
-      if (terminated || http.isTerminated()) {
-        http.close();
-      }
-    } finally {
-      httpRegistration.close();
-    }
   }
 }

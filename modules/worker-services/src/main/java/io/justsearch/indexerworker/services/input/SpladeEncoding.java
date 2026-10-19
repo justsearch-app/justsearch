@@ -22,9 +22,16 @@ public sealed interface SpladeEncoding
     }
   }
 
-  record Failed(SearchReasonCode reason) implements SpladeEncoding {
+  /** As {@link VectorEncoding.Failed}: the reason, and its cause for a semantic budget miss. */
+  record Failed(SearchReasonCode reason, SearchReasonCode.LegCause cause) implements SpladeEncoding {
     public Failed {
       Objects.requireNonNull(reason, "reason");
+      Objects.requireNonNull(cause, "cause");
+      LegCauses.requireConsistent(reason, cause);
+    }
+
+    public Failed(SearchReasonCode reason) {
+      this(reason, SearchReasonCode.LegCause.NONE);
     }
   }
 }

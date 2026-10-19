@@ -37,14 +37,21 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   private final int perContextLimit;
   private final int aggregateLimit;
   private final int retryAfterSeconds;
+  private final int observationAggregateLimit;
   private final OperationLeaseService leases;
   private final ReentrantReadWriteLock publication;
   private final Map<UUID, Work> active = new LinkedHashMap<>();
-  private final Map<Bucket, Integer> counts = new HashMap<>();
   private final Map<Bucket, Integer> inferenceCounts = new HashMap<>();
   private int inferenceCount;
   private String preparationId;
   private boolean closing;
+  private final java.util.concurrent.atomic.AtomicReference<StatusAdmission> statusAdmission =
+      new java.util.concurrent.atomic.AtomicReference<>(
+          new StatusAdmission(false, 0, Map.of(), 0, Map.of()));
+  private final io.justsearch.core.scheduling.UserActivity userActivity =
+      new io.justsearch.core.scheduling.UserActivity();
+
+  public io.justsearch.core.scheduling.UserActivity userActivity() { return userActivity; }
 
   /** Explicit standalone-launcher provider; the full Engine root supplies its already-loaded policy. */
   public EngineAdmissionController() {
@@ -57,25 +64,36 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
 
   EngineAdmissionController(EngineResourcePolicy policy, ReentrantReadWriteLock publication) {
     this(policy.execution().get("perContextLimit"), policy.execution().get("aggregateLimit"),
-        policy.execution().get("retryAfterSeconds"), new OperationLeaseServiceImpl(), publication);
+        policy.execution().get("retryAfterSeconds"), observationCapacity(policy),
+        new OperationLeaseServiceImpl(), publication);
   }
 
   /** Explicit policy seam for deterministic admission and transport acceptance tests. */
   public EngineAdmissionController(int perContextLimit, int aggregateLimit, int retryAfterSeconds) {
-    this(perContextLimit, aggregateLimit, retryAfterSeconds, OperationLeaseServiceImpl.processLocal(),
+    this(perContextLimit, aggregateLimit, retryAfterSeconds, aggregateLimit, OperationLeaseServiceImpl.processLocal(),
         new ReentrantReadWriteLock());
   }
 
   private EngineAdmissionController(int perContextLimit, int aggregateLimit, int retryAfterSeconds,
-      OperationLeaseService leases, ReentrantReadWriteLock publication) {
-    if (perContextLimit < 1 || aggregateLimit < 1 || retryAfterSeconds < 1) {
+      int observationAggregateLimit, OperationLeaseService leases, ReentrantReadWriteLock publication) {
+    if (perContextLimit < 1 || aggregateLimit < 1 || retryAfterSeconds < 1
+        || observationAggregateLimit < 1) {
       throw new IllegalArgumentException("Engine admission limits must be positive");
     }
     this.perContextLimit = perContextLimit;
     this.aggregateLimit = aggregateLimit;
     this.retryAfterSeconds = retryAfterSeconds;
+    this.observationAggregateLimit = observationAggregateLimit;
     this.leases = Objects.requireNonNull(leases, "leases");
     this.publication = Objects.requireNonNull(publication, "publication");
+  }
+
+  private static int observationCapacity(EngineResourcePolicy policy) {
+    // Status uses the background call lane, isolated from foreground semantic search.
+    // Match EngineKnowledgeClient's capacity; every admitted read has a worker or queue seat.
+    int backgroundThreads = policy.execution().get("backgroundThreads");
+    return Math.min(policy.execution().get("aggregateLimit"),
+        backgroundThreads + policy.execution().get("backgroundQueue"));
   }
 
   @Override
@@ -131,28 +149,117 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
 
   @Override
   public EngineWorkHandle admit(EngineContext context, boolean allowWhileFrozen) {
+    return admit(context, allowWhileFrozen, false);
+  }
+
+  @Override
+  public EngineWorkHandle admitObservation(EngineContext context) {
+    return admit(context, false, true);
+  }
+
+  private EngineWorkHandle admit(EngineContext context, boolean allowWhileFrozen,
+      boolean observation) {
     Objects.requireNonNull(context, "context");
     if (context.workId().isPresent()) throw new IllegalArgumentException("Work is already attached");
     synchronized (lock) {
       if (closing) refuse(EngineAdmissionException.Reason.FROZEN);
       if (preparationId != null && !allowWhileFrozen) refuse(EngineAdmissionException.Reason.FROZEN);
       Bucket bucket = Bucket.of(context);
-      if (active.size() >= aggregateLimit) refuse(EngineAdmissionException.Reason.ENGINE_LIMIT);
-      if (counts.getOrDefault(bucket, 0) >= perContextLimit) {
-        refuse(EngineAdmissionException.Reason.CONTEXT_LIMIT);
-      }
+      reserveAdmission(bucket, allowWhileFrozen, observation);
       UUID id = UUID.randomUUID();
-      Work work = new Work(context.withWorkId(id), bucket);
+      Work work = new Work(context.withWorkId(id), bucket, observation);
       active.put(id, work);
-      counts.merge(bucket, 1, Integer::sum);
       return new Reference(work, work.initial);
     }
+  }
+
+  /**
+   * Reserves a status read in the bounded observation pool without taking the work owner's lock:
+   * search and generation capacity cannot refuse it, but overlapping observations beyond the
+   * observation limits are refused. Released once, after response serialization.
+   */
+  @Override
+  public StatusReservation reserveStatusAdmission(EngineContext context) {
+    Objects.requireNonNull(context, "context");
+    Bucket bucket = Bucket.of(context);
+    reserveAdmission(bucket, false, true);
+    var released = new java.util.concurrent.atomic.AtomicBoolean();
+    return () -> {
+      if (released.compareAndSet(false, true)) releaseReservation(bucket, true);
+    };
+  }
+
+  private void reserveAdmission(Bucket bucket, boolean allowWhileFrozen, boolean observation) {
+    for (;;) {
+      StatusAdmission observed = statusAdmission.get();
+      if (observed.frozen() && !allowWhileFrozen) refuse(EngineAdmissionException.Reason.FROZEN);
+      Map<Bucket, Integer> selectedCounts =
+          observation ? observed.observationCounts() : observed.counts();
+      int aggregateCount = observation
+          ? observed.observationCount() : observed.activeCount() - observed.observationCount();
+      int selectedLimit = observation ? observationAggregateLimit : aggregateLimit;
+      if (aggregateCount >= selectedLimit) refuse(EngineAdmissionException.Reason.ENGINE_LIMIT);
+      if (selectedCounts.getOrDefault(bucket, 0) >= perContextLimit) {
+        refuse(EngineAdmissionException.Reason.CONTEXT_LIMIT);
+      }
+      var nextCounts = new HashMap<>(selectedCounts);
+      nextCounts.merge(bucket, 1, Integer::sum);
+      StatusAdmission next = observation
+          ? new StatusAdmission(observed.frozen(), observed.activeCount() + 1, observed.counts(),
+              observed.observationCount() + 1, Map.copyOf(nextCounts))
+          : new StatusAdmission(observed.frozen(), observed.activeCount() + 1, Map.copyOf(nextCounts),
+              observed.observationCount(), observed.observationCounts());
+      if (statusAdmission.compareAndSet(observed, next)) return;
+    }
+  }
+
+  private void releaseReservation(Bucket bucket, boolean observation) {
+    statusAdmission.updateAndGet(observed -> {
+      var nextCounts = new HashMap<>(observation ? observed.observationCounts() : observed.counts());
+      nextCounts.compute(bucket, (ignored, count) -> count == 1 ? null : count - 1);
+      return observation
+          ? new StatusAdmission(observed.frozen(), observed.activeCount() - 1, observed.counts(),
+              observed.observationCount() - 1, Map.copyOf(nextCounts))
+          : new StatusAdmission(observed.frozen(), observed.activeCount() - 1, Map.copyOf(nextCounts),
+              observed.observationCount(), observed.observationCounts());
+    });
+  }
+
+  /** Admission writers change the boundary without overwriting concurrent status reservations. */
+  private void publishStatusAdmission() {
+    statusAdmission.updateAndGet(observed -> new StatusAdmission(
+        closing || preparationId != null, observed.activeCount(), observed.counts(),
+        observed.observationCount(), observed.observationCounts()));
+  }
+
+  @Override
+  public EngineWorkHandle admitRequest(
+      EngineContext context, boolean allowWhileFrozen, boolean activeRequest) {
+    return admitRequest(context, allowWhileFrozen, activeRequest, 0);
+  }
+
+  @Override
+  public EngineWorkHandle admitRequest(
+      EngineContext context, boolean allowWhileFrozen, boolean activeRequest, long inputAgeMs) {
+    var work = admit(context, allowWhileFrozen);
+    if (activeRequest) userActivity.record(inputAgeMs);
+    return work;
+  }
+
+  @Override
+  public EngineWorkHandle admitObservationRequest(EngineContext context, boolean activeRequest) {
+    var work = admitObservation(context);
+    if (activeRequest) userActivity.record();
+    return work;
   }
 
   @Override
   public EngineWorkHandle attach(EngineContext context) {
     Objects.requireNonNull(context, "context");
-    if (context.workId().isEmpty()) return admit(context, false);
+    if (context.workId().isEmpty()) return admitRequest(context, false,
+        context.clientKind() != EngineContext.ClientKind.INTERNAL
+            && context.clientKind() != EngineContext.ClientKind.SUPERVISOR
+            && context.urgency() == EngineContext.Urgency.FOREGROUND);
     synchronized (lock) {
       if (closing) refuse(EngineAdmissionException.Reason.FROZEN);
       Work work = active.get(context.workId().orElseThrow());
@@ -195,7 +302,10 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   public void beginClosing() {
     publication.writeLock().lock();
     try {
-      synchronized (lock) { closing = true; }
+      synchronized (lock) {
+        closing = true;
+        publishStatusAdmission();
+      }
     } finally {
       publication.writeLock().unlock();
     }
@@ -216,6 +326,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
     synchronized (lock) {
       if (preparationId == null) preparationId = id;
       else if (!preparationId.equals(id)) throw new IllegalArgumentException("Admission freeze has another owner");
+      publishStatusAdmission();
     }
   }
 
@@ -224,6 +335,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
       if (preparationId == null) return;
       if (!preparationId.equals(id)) throw new IllegalArgumentException("Admission freeze has another owner");
       preparationId = null;
+      publishStatusAdmission();
     }
   }
 
@@ -248,7 +360,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
 
   @Override
   public int activeWorkCount() {
-    synchronized (lock) { return active.size(); }
+    return statusAdmission.get().activeCount();
   }
 
   @Override
@@ -259,11 +371,11 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
     long deadline = System.nanoTime() + budget;
     synchronized (lock) {
       if (!closing) throw new IllegalStateException("Drain requires process closing");
-      while (!active.isEmpty()) {
+      while (statusAdmission.get().activeCount() != 0) {
         long remaining = deadline - System.nanoTime();
         if (remaining <= 0) return false;
         try {
-          java.util.concurrent.TimeUnit.NANOSECONDS.timedWait(lock, remaining);
+          java.util.concurrent.TimeUnit.NANOSECONDS.timedWait(lock, Math.min(remaining, 10_000_000L));
         } catch (InterruptedException interrupted) {
           Thread.currentThread().interrupt();
           return false;
@@ -311,9 +423,18 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
     static Bucket of(EngineContext context) { return new Bucket(context.clientKind(), context.clientId()); }
   }
 
+  /**
+   * Lock-free admission publication. {@code activeCount} holds every live slot (work and
+   * observations); work capacity is {@code activeCount - observationCount}, so observations never
+   * consume search or generation capacity.
+   */
+  private record StatusAdmission(boolean frozen, int activeCount, Map<Bucket, Integer> counts,
+      int observationCount, Map<Bucket, Integer> observationCounts) {}
+
   private static final class Work {
     private final EngineContext initial;
     private final Bucket bucket;
+    private final boolean observation;
     private final Set<Runnable> cancellation = new LinkedHashSet<>();
     private final Set<Runnable> background = new LinkedHashSet<>();
     private final Set<Runnable> completion = new LinkedHashSet<>();
@@ -323,9 +444,10 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
     private boolean completed;
     private boolean inference;
 
-    private Work(EngineContext initial, Bucket bucket) {
+    private Work(EngineContext initial, Bucket bucket, boolean observation) {
       this.initial = initial;
       this.bucket = bucket;
+      this.observation = observation;
     }
   }
 
@@ -414,7 +536,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
         if (--work.references == 0) {
           work.completed = true;
           active.remove(work.initial.workId().orElseThrow());
-          counts.compute(work.bucket, (key, count) -> count == 1 ? null : count - 1);
+          releaseReservation(work.bucket, work.observation);
           if (work.inference) {
             inferenceCount--;
             inferenceCounts.compute(work.bucket, (key, count) -> count == 1 ? null : count - 1);

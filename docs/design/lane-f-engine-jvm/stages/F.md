@@ -9,6 +9,10 @@ updated: 2026-09-09
 
 # Lane F stage F — prose sweep and report: implementation checklist
 
+The completed F-1 residue scanner, its self-test and allowlist were retired on
+2026-10-19. Their tagged links below preserve checkpoint history; use the current
+documentation and regeneration checks for ongoing validation.
+
 Written from 17.3 row F, `verified-facts.md` ("Docs the sweep must correct"), tempdoc 917 §8's
 residue term list, and a code-verified grep at `be47faa40` (2026-09-09, read-only; counts
 exclude `docs/tempdocs/` and `docs/design/lane-f-engine-jvm/`). `design.md` cited by section;
@@ -56,7 +60,7 @@ labelled hits; `docs-validate` and the regen set green.**
    every register path and every build file for no behaviour), and capability names
    (`WORKER` in `requiredCapabilities`) are authorisation tokens clients carry and stay, labelled.
 4. **`00-program-overview.md` does not exist in the repo** (cited by `design.md` 19 and
-   `handoff.md`; the external brief directory is not reachable). The report-back's shape is
+   [archived handoff](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md); the external brief directory is not reachable). The report-back's shape is
    taken from the sibling lanes' de-facto sections (`docs/tempdocs/915-evidence/report-back.md`
    and 917's own report-back): *Cross-lane requests; PRs; Items done, deviated, skipped;
    Evidence; Measurements; Residue routed; What the next lane must know*, plus lane F's two
@@ -134,12 +138,12 @@ Term list: 917 §8's fifteen (`MMF`, `heartbeat`, `suicide`, `breath`, `OFFSET_`
 whose name says legacy. `SupervisionPolicy` and `gRPC` are **not residue terms any more** on
 their own: `EngineSupervisionPolicy`/`BrainSupervisionPolicy` are the live contract, and `gRPC`
 appears in 175 module files as history and in ADR text; the grep for those two counts only
-lines that present them as current. The script `scripts/ci/check-lane-f-residue.mjs` (F-1)
+lines that present them as current. The script [archived check-lane-f-residue.mjs](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/scripts/ci/check-lane-f-residue.mjs) (F-1)
 encodes the term list and the labelling rule and prints unlabelled hits; it is the checkpoint
 proof, run once at F's end and recorded.
 
 2026-10-01 amendment (owner F-1 assignment): reviewed exact-path × term dispositions in
-`governance/lane-f-residue-allowlist.v1.json` also label legitimate vocabulary, guards/fixtures,
+[archived lane-f-residue-allowlist.v1.json](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/governance/lane-f-residue-allowlist.v1.json) also label legitimate vocabulary, guards/fixtures,
 historical comparisons and C2-1 compatibility identities; occurrence counts and trimmed-line
 anchors bind each exemption to reviewed text, and any wildcard, new occurrence or stale anchor fails.
 This central projection avoids hundreds of inline labels while retaining the same review authority.
@@ -150,11 +154,10 @@ This central projection avoids hundreds of inline labels while retaining the sam
 
 ### F-1 — the residue script and the grep
 
-Land `scripts/ci/check-lane-f-residue.mjs` with §2's terms and labelling rule and a self-test
-(a fixture with one unlabelled and one labelled hit); run it; label or delete every unlabelled
-hit that the later items do not own. **Acceptance:** the script exits 0 on the branch at F's
-end; its output is committed to `evidence/F/residue-grep.txt`; the self-test reds on the
-unlabelled fixture.
+The checkpoint required [archived check-lane-f-residue.mjs](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/scripts/ci/check-lane-f-residue.mjs) with §2's terms and labelling rule and the [archived self-test](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/scripts/ci/test-check-lane-f-residue.mjs)
+(a fixture with one unlabelled and one labelled hit), followed by labelling or deletion of
+unlabelled hits. **Historical acceptance:** the script exited 0 at F's end; its output is
+recorded in `evidence/F/residue-grep.txt`; the self-test failed on the unlabelled fixture.
 
 ### F-2 — canonical docs rewritten
 
@@ -274,7 +277,7 @@ re-measured); the checkpoint proof is the grep, `docs-validate` and the regen se
 
 ## 7. Harness
 
-`scripts/ci/check-lane-f-residue.mjs` (F-1) and the existing docs/regen checks. No stack.
+[archived check-lane-f-residue.mjs](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/scripts/ci/check-lane-f-residue.mjs) (F-1) and the existing docs/regen checks. No stack.
 
 ## 8. Governance changes
 

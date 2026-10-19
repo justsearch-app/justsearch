@@ -169,6 +169,9 @@ public class SettingsController {
 
   private void writeRefusal(Context ctx, OperationResult refusal) {
     String code = refusal.errorCode().orElse("SETTINGS_RECOVERY_REQUIRED");
+    // A refusal its owner marks retryable (a transition such as a draining chat server) is never
+    // projected as a permanent server fault: unlisted codes become 503 SERVICE_UNAVAILABLE.
+    boolean retryable = refusal.retryable().orElse(false);
     int status = switch (code) {
       case "BAD_REQUEST", "INVALID_REQUEST", "INVALID_PATH", "OPERATION_KEY_INVALID" -> 400;
       case "SETTINGS_READ_ONLY", "VERSION_CONFLICT", "RECONFIGURE_IN_PROGRESS",
@@ -176,7 +179,7 @@ public class SettingsController {
           "OPERATION_KEY_EXPIRED", "OPERATION_KEY_REUSED", "OPERATION_PREPARATION_UNAVAILABLE" -> 409;
       case "SETTINGS_RECOVERY_REQUIRED", "OPERATIONS_CAPACITY", "ENGINE_CLOSING" -> 503;
       case "COMPONENT_PREPARATION_REQUIRED" -> 503;
-      default -> 500;
+      default -> retryable ? 503 : 500;
     };
     ApiErrorCode classification = switch (code) {
       case "SETTINGS_READ_ONLY" -> ApiErrorCode.SETTINGS_READ_ONLY;
@@ -187,11 +190,11 @@ public class SettingsController {
       case "BAD_REQUEST", "INVALID_REQUEST", "OPERATION_KEY_INVALID", "VERSION_CONFLICT",
           "GENERATION_BOUND_REQUIRES_REINDEX", "RESTART_SOURCE_DRIFT", "OPERATION_KEY_EXPIRED",
           "OPERATION_KEY_REUSED", "OPERATION_PREPARATION_UNAVAILABLE" -> ApiErrorCode.INVALID_REQUEST;
-      default -> ApiErrorCode.INTERNAL_ERROR;
+      default -> retryable ? ApiErrorCode.SERVICE_UNAVAILABLE : ApiErrorCode.INTERNAL_ERROR;
     };
     var payload = ApiErrorHandler.toResponse(classification, refusal.message(), telemetry, ApiErrorHandler.routeOf(ctx));
     payload.put("errorCode", code);
-    payload.put("retryable", refusal.retryable().orElse(false));
+    payload.put("retryable", retryable);
     for (String field : java.util.List.of("operationKey", "operationRecordId", "state")) {
       Object value = refusal.structuredData().get(field);
       if (value != null) payload.put(field, value);

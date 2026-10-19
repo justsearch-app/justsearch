@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ded61fdb174e6400fea5a8756c3e6a494464a6d66d29833eeba193defe0e59b4"
+  },
+  "createdAt": "2026-10-07T07:44:08.592Z",
+  "revision": "4cdbcfe793ef5c7a34ec5c5c74fa6b0be49d7460",
+  "tree": "2cd63320f8efd1d97ae7260624bb2ad97f2d2fc0",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/api/settingsAttempt.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-17724-1791359029113.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3259
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/api/settingsAttempt.test.ts#carries game detection off and auto in settings attempts",
+      "file": "modules/ui-web/src/api/settingsAttempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b7e2801be8f2ae6331a5208de5e5a2850e4bbeaa6dfc6090266db5e983c13ef2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "carries game detection off and auto in settings attempts",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4cdbcfe79",
+    "revision": "4cdbcfe793ef5c7a34ec5c5c74fa6b0be49d7460",
+    "overlays": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/api/settingsAttempt.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-17724-1791359039949.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5483
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/api/settingsAttempt.test.ts#carries game detection off and auto in settings attempts",
+        "classification": "assertion",
+        "detail": "carries game detection off and auto in settings attempts:  AssertionError: expected [Function] to not throw an error but '[\\n  {\\n    \"code\": \"unrecognized_key…' was thrown\n    at Proxy.<anonymous> (file:///F:/justsearch-public/.claude/worktrees/b6d536-bulk-gate-2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1552:16)\n    at Proxy.<anonymous> (fi"
+      }
+    ]
+  },
+  "digest": "sha256:46a4fcc8aa7118860017b6267b71e76680e257a087311cd28fdd4d3ef5b74bf4"
+}

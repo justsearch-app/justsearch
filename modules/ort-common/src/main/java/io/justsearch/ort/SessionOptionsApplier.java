@@ -84,6 +84,11 @@ final class SessionOptionsApplier {
         session.useDeviceAllocatorForInitializers() ? "1" : "0");
     opts.addConfigEntry(
         "session.force_spinning_stop", session.forceSpinningStop() ? "1" : "0");
+    applyProfiling(runtime, opts);
+  }
+
+  /** The requested native kernel profile follows both CPU and GPU session creation. */
+  static void applyProfiling(RuntimePolicy runtime, SessionOptions opts) throws OrtException {
     // 334 Phase 11 / §14.24 FB: profiling directory reads from the typed policy, not
     // System.getenv. Empty Optional = disabled.
     if (runtime.profiling().ortProfilingDir().isPresent()) {

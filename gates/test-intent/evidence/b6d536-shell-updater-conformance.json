@@ -1,0 +1,151 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-07T12:01:20.284Z",
+  "revision": "19c16294db0e008edc6305319d359609f278d003",
+  "tree": "16a0964519bcbb200b78af7680394926a4252107",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::hold_returns_at_once_and_engine_stays_supervised\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 798
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 839
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::exit_while_held_is_unexpected_and_not_restarted\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 764
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::quit_while_held_wins_and_refuses_upgrade\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 871
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::release_after_failed_prepare_resumes_the_same_actor\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 970
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7965
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::hold_returns_at_once_and_engine_stays_supervised",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:8ffaa2992ccf50f4ba0997b48ca0643ecb98bd5d80a463beaecf62ba3c2b64e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::hold_returns_at_once_and_engine_stays_supervised",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:8ffaa2992ccf50f4ba0997b48ca0643ecb98bd5d80a463beaecf62ba3c2b64e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::exit_while_held_is_unexpected_and_not_restarted",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:8ffaa2992ccf50f4ba0997b48ca0643ecb98bd5d80a463beaecf62ba3c2b64e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::exit_while_held_is_unexpected_and_not_restarted",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::quit_while_held_wins_and_refuses_upgrade",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:8ffaa2992ccf50f4ba0997b48ca0643ecb98bd5d80a463beaecf62ba3c2b64e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::quit_while_held_wins_and_refuses_upgrade",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::release_after_failed_prepare_resumes_the_same_actor",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:8ffaa2992ccf50f4ba0997b48ca0643ecb98bd5d80a463beaecf62ba3c2b64e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::release_after_failed_prepare_resumes_the_same_actor",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_handoff_tests.rs#updater::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer",
+      "file": "modules/shell/src-tauri/src/updater_handoff_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9facd1f426f12b545910692c28ade2fb39b005817956cb4bb1292719b66b1148",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:45f696e0386102ea74c6f006152adbf49f7273e599a081b920383fad6d1a684b"
+}

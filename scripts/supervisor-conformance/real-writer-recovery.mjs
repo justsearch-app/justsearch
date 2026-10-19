@@ -75,8 +75,7 @@ const modelLiveABLowMemoryCrash = modelLiveABLowMemoryBeforePointer
 const modelLiveABDecision = modelLiveABGap || modelLiveABCancel || modelLiveABRecomposeFailure;
 const modelLiveAB = scenario === 'model-live-a-b' || modelLiveABDecision
   || modelLiveABAcceptedCancel || modelLiveABIssuedSearch || modelLiveABLowMemoryCrash;
-const generativeRecovery = scenario === 'generative-recovery-success'
-  || scenario === 'generative-recovery-exhaustion';
+const generativeRecovery = scenario === 'generative-recovery-success';
 const acceptedWriteDuringBuild = modelLiveABAcceptedCancel || modelLiveABLowMemoryCrash || (modelLiveAB
   && process.env.JUSTSEARCH_WRITER_RECOVERY_ACCEPTED_WRITE === '1');
 const watcherDeleteDuringBuild = acceptedWriteDuringBuild
@@ -187,7 +186,9 @@ const env = {
     '-e',
     'setInterval(() => {}, 60000)',
   ]),
-  JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: '30000',
+  // Windows-hosted cold job-host compilation has taken 40s before the Engine can run. Root
+  // publication and manifest discovery share the fixture's existing 90s first-start allowance.
+  JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: '90000',
   JUSTSEARCH_DEV_RUNNER_BACKEND_READY_TIMEOUT_MS: '60000',
   JUSTSEARCH_BACKFILL_MAX_DOCS_BEFORE_COMMIT: lockScenario ? '50' : '1',
   JUSTSEARCH_INDEX_COMMIT_TIMER_INTERVAL_MS: lockScenario ? '1000' : '600000',
@@ -245,7 +246,6 @@ delete env.JUSTSEARCH_ISSUED_SEARCH_BARRIER_QUERY;
 delete env.JUSTSEARCH_ISSUED_CITATION_BARRIER_ANSWER;
 delete env.JUSTSEARCH_QUERY_PUBLICATION_BARRIER;
 delete env.JUSTSEARCH_INDEX_START_BARRIERS;
-delete env.JUSTSEARCH_GENERATIVE_RECOVERY_BARRIER;
 if (queryReconfigureMode && !queryCrashPoint) {
   env.JUSTSEARCH_ISSUED_SEARCH_BARRIER_QUERY = 'query reconfigure held lease';
 }

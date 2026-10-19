@@ -15,6 +15,7 @@ import io.justsearch.app.observability.health.Source;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Optional;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +33,7 @@ class OperationRecoveryNoticeTest {
             Path.of("C:", "data", "ui", "operations.db.corrupt-20260912"), 1_789_203_600_001L);
 
     OperationRecoveryNotice.publish(
-        store, new HealthEventChangeRegistry(), recovery, HEAD, Clock.systemUTC());
+        store, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), recovery, HEAD, Clock.systemUTC());
 
     Optional<HealthEvent> found =
         store.find(LifecycleReasonCode.OPERATIONS_HISTORY_RESET.code(), "operations");

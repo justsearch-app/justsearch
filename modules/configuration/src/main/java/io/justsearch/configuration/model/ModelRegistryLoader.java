@@ -136,7 +136,7 @@ public final class ModelRegistryLoader {
         requiresCuda,
         devOnly,
         necessity,
-        dependsOn);
+        dependsOn, rp.nativeTarget);
   }
 
   // Raw deserialization types — match the JSON structure exactly.
@@ -159,7 +159,8 @@ public final class ModelRegistryLoader {
       Boolean requiresCuda,
       Boolean devOnly,
       String necessity,
-      List<String> dependsOn) {}
+      List<String> dependsOn,
+      String nativeTarget) {}
 
   private record RawVariant(
       String filename,

@@ -37,7 +37,6 @@ const { resolveMainRepoRoot, resolveCallerIdentity } = require('./lib/agent-spaw
 const SCRIPT_DIR = __dirname;
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..');
 const REMOVE_WORKTREE = path.join(SCRIPT_DIR, 'remove-worktree.cjs');
-const PREPARE_WORKTREE = path.join(SCRIPT_DIR, 'prepare-worktree.cjs');
 const TAG = '[worktree-lifecycle]';
 
 function log(msg) { console.error(`${TAG} ${msg}`); }
@@ -159,7 +158,7 @@ function resolveWorktreePath(main, given) {
   return entry;
 }
 
-function samePath(a, b) { return path.resolve(a).replace(/\\/g, '/').toLowerCase() === path.resolve(b).replace(/\\/g, '/').toLowerCase(); }
+const { samePath } = require('../lib/path-identity.cjs');
 
 function fetchOrigin(flags) {
   if (flags['no-fetch']) return;
@@ -220,7 +219,7 @@ function cmdCreate(flags) {
     if (!lock.ok) log(`lock not set: ${lock.stderr}`);
   }
   if (flags.prepare) {
-    const args = [PREPARE_WORKTREE, ...(flags['no-dist'] ? ['--no-dist'] : [])];
+    const args = [path.join(dest, 'scripts/dev/prepare-worktree.cjs'), ...(flags['no-dist'] ? ['--no-dist'] : [])];
     const r = spawnSync(process.execPath, args, { cwd: dest, stdio: 'inherit' });
     if (r.status !== 0) log(`prepare-worktree exited ${r.status}; the worktree is registered anyway`);
   }

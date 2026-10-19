@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T18:27:13.035Z",
+  "revision": "a3063df41d7a6948dd38eeb2a9ee5a43030e26da",
+  "tree": "05f38d86071fc4d0685fe58da76de708c7ad912b",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 25466
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time",
+      "file": "modules/shell/src-tauri/src/exit_ledger.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:45c43ed4b6f3dde38dc5e178950a656458b23e26bd360c8e0dee655c07dbbaea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b366c0500",
+    "revision": "b366c050091c9d389bcbf16683706b17cabd36e7",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 32760
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time",
+        "classification": "assertion",
+        "detail": "exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time:  ---- exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time stdout ----\n\nthread 'exit_ledger::tests::compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time' (31424) panicked at src\\exit_ledger.rs:1040:9:\nassertion `left == right` failed: an unknown merged range keeps no stale lower bound: {\"schemaVersion\":1,\"type\":\"ledger-gap\",\"seq\":1,\"at\":\"2026-10-13T18:27:08.639Z"
+      }
+    ]
+  },
+  "digest": "sha256:a601a14cee0b6fde36c16766a3b712c3caba5e359e802d3001904026ae5aeff6"
+}

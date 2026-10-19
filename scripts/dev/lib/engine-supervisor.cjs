@@ -62,6 +62,8 @@ const HARNESS_FLAG = 'JUSTSEARCH_SUPERVISOR_HARNESS';
 
 /** Overridable parameter -> its env var. Only these; the restart BUDGET is never overridable. */
 const OVERRIDE_ENV = Object.freeze({
+  quitDeadlineMs: 'JUSTSEARCH_SUPERVISOR_QUIT_DEADLINE_MS',
+  dataDirLockedWaitMs: 'JUSTSEARCH_SUPERVISOR_DATA_DIR_LOCKED_WAIT_MS',
   stabilityWindowMs: 'JUSTSEARCH_SUPERVISOR_STABILITY_WINDOW_MS',
   maxCooldownMs: 'JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS',
   cooldownIncrementMs: 'JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS',
@@ -92,6 +94,11 @@ function loadPolicy({ env = process.env, repoRoot, reload } = {}) {
     gracefulStopDeadlineMs: declared.gracefulStopDeadlineMs,
     hangPollIntervalMs: declared.hangPollIntervalMs,
     hangUnhealthyThreshold: declared.hangUnhealthyThreshold,
+    // Spec F §4.3: the host quit's deadline and the margin kept for the supervisor's own force. Not
+    // overridable: the Engine budgets its close against the same numbers.
+    quitDeadlineMs: declared.quitDeadlineMs,
+    quitForceMarginMs: declared.quitForceMarginMs,
+    dataDirLockedWaitMs: declared.dataDirLockedWaitMs,
     exitCodes: row.exitCodes,
     unknownExitClass: row.unknownExitClass,
     harnessActive: false,
@@ -143,6 +150,9 @@ const STATES = Object.freeze({
   STOPPING: 'stopping',
   RESTARTING: 'restarting',
   EXHAUSTED: 'exhausted',
+  // Spec F §3.2: terminal after a host quit (stop, takeover, interruption). A STOP decided by the
+  // contract on its own (exit 0, a harness quit or upgrade request) still publishes `stopping`.
+  STOPPED: 'stopped',
 });
 
 function decideOnExit(observation, policy) {
@@ -267,7 +277,689 @@ function exitHandoffReason(manifest, pid, instanceId) {
   return reason === 'quit' || reason === 'upgrade' ? reason : null;
 }
 
+// =============================================================================================
+// The run loop (Spec F §3.3 and §5.2, step 9): T1-T12 over an injected actuator.
+//
+// The loop decides nothing the contract does not: every edge that the contract owns goes through
+// `decide`. What the loop owns is ORDER. It is the only consumer of an Engine exit (`pollExit`), so a
+// death in any phase — before the manifest, between the manifest and HTTP, during readiness, while
+// running or while stopping — takes one path (T4) and leaves one `engine-exit`. Each tick runs, in
+// order: the exit, a host quit, the request deadline, then host requests and health.
+//
+// It touches no process, file or socket itself: the actuator (engine-actuator.cjs) and the `io`
+// functions the caller passes do. That keeps the module's promise above — the decision half is pure —
+// and lets the dev-runner keep its CLI, frontend and reports.
+// =============================================================================================
+
+const TICK_MS = 50;
+const READY_PROBE_GAP_MS = 500;
+const READY_PROBE_TIMEOUT_MS = 1200;
+const HANG_PROBE_TIMEOUT_MS = 1000;
+/** Spec F §3.5: a loop wait that overran by more than this was a suspend, not a slow tick. */
+const SUSPEND_GAP_MS = 2000;
+/** Spec F §3.5: after a resume, health misses are not counted for this long. */
+const RESUME_GRACE_MS = 30000;
+
+/**
+ * The supervisor's clock with suspended time taken out (Spec F §3.5, dev half). Node has no power
+ * API, so the only source is the tick-gap detector: a loop wait of `tickMs` that returns after more
+ * than `suspendGapMs` was a suspend of the observed gap minus one tick. `now()` is the monotonic
+ * clock minus every suspend seen so far, so a deadline armed on it is extended by the suspend; with
+ * no suspend it is the monotonic clock. `inResumeGrace()` is true for `resumeGraceMs` of monotonic
+ * time after the last resume.
+ *
+ * Only the wait is measured, never the loop's own awaits (a POST may take its 2 s timeout): a slow
+ * step must not read as a suspend, which would push the quit's force past the contract deadline.
+ */
+function createSuspendAwareClock({
+  monotonic = () => performance.now(), tickMs = TICK_MS, suspendGapMs = SUSPEND_GAP_MS,
+  resumeGraceMs = RESUME_GRACE_MS,
+} = {}) {
+  let suspendedMs = 0;
+  let resumedAt = null;
+  let openSuspend = null;
+  return {
+    now: () => (openSuspend ?? monotonic()) - suspendedMs,
+    notePower(kind, at = monotonic()) {
+      if (kind === 'suspend' && openSuspend === null) openSuspend = at;
+      if (kind === 'resume' && openSuspend !== null) {
+        suspendedMs += Math.max(0, at - openSuspend); openSuspend = null; resumedAt = at;
+      }
+    },
+    /** Times one wait: `await clock.measureWait(() => waitOrWake(tickMs))`; returns the suspend seen. */
+    async measureWait(wait) {
+      const before = monotonic();
+      await wait();
+      const after = monotonic();
+      const gap = after - before;
+      if (openSuspend !== null || (resumedAt !== null && resumedAt >= before) || gap <= suspendGapMs) return 0;
+      const suspended = gap - tickMs;
+      suspendedMs += suspended;
+      resumedAt = after;
+      return suspended;
+    },
+    inResumeGrace: () => resumedAt !== null && monotonic() - resumedAt < resumeGraceMs,
+    suspendedMs: () => suspendedMs,
+  };
+}
+const HARNESS_REQUEST_DELAY_MS = 500;
+const HARNESS_REQUEST_REASONS = Object.freeze(['quit', 'restart', 'upgrade', 'hang']);
+
+/**
+ * @param {object} options
+ * @param {object} options.actuator see engine-actuator.cjs
+ * @param {object} options.policy from {@link loadPolicy}
+ * @param {object} options.io {readManifest(pid, predecessorInstanceId) -> {apiPort, instanceId}|null,
+ *   readRawManifest() -> object|null, probeHealth(port, ms) -> Promise<bool>, probeAlive(port, ms),
+ *   fetchStatus(port, ms) -> Promise<object|null>, essentialReadyEpoch(status) -> string|null,
+ *   waitForRelease({pid}) -> Promise<{released, waitedMs}>, clearStaleDiscoveryFiles()}
+ * @param {(fields: object) => Promise<void>} options.publish writes the supervisor state record
+ * @param {{initialPortMs: number, initialReadyMs: number}} options.timeouts the first boot's limits
+ * @param {number} options.requestedApiPort the port the first incarnation is asked to bind
+ * @param {{requestReason?: string|null}} [options.harness]
+ * @param {object} [options.hooks] onSpawned, onReady, onIncarnationExit (awaited), onTerminal
+ */
+function createSupervisionLoop({
+  actuator,
+  policy,
+  io,
+  publish,
+  timeouts,
+  requestedApiPort = 0,
+  harness = {},
+  hooks = {},
+  log = () => {},
+  monotonic = () => performance.now(),
+  wallClock = () => Date.now(),
+  quitDeadlineMs = policy.quitDeadlineMs ?? 8000,
+  forceMarginMs = policy.quitForceMarginMs ?? 300,
+  tickMs = TICK_MS,
+}) {
+  // Every deadline and interval below runs on this clock, so suspended time extends them (§3.5).
+  const harnessActive = process.env[HARNESS_FLAG] === '1';
+  const grace = harnessActive ? Number(process.env.JUSTSEARCH_SUPERVISOR_RESUME_GRACE_MS) || RESUME_GRACE_MS : RESUME_GRACE_MS;
+  const suspendClock = createSuspendAwareClock({ monotonic, tickMs, resumeGraceMs: grace });
+  const origin = monotonic(); let injected = [];
+  if (harnessActive && process.env.JUSTSEARCH_SUPERVISOR_HARNESS_SUSPEND_FILE) {
+    try { injected = JSON.parse(fs.readFileSync(process.env.JUSTSEARCH_SUPERVISOR_HARNESS_SUSPEND_FILE, 'utf8')); } catch {}
+  }
+  const applied = new Set();
+  const clockNow = () => {
+    injected.forEach((interval, index) => {
+      for (const [kind, at] of [['suspend', interval.fromMs], ['resume', interval.toMs]]) {
+        const key = `${index}/${kind}`;
+        if (!applied.has(key) && monotonic() - origin >= at) { applied.add(key); suspendClock.notePower(kind, origin + at); }
+      }
+    });
+    return suspendClock.now();
+  };
+  let predecessorExitAt = null; let lockedRetried = false;
+  const s = {
+    state: STATES.STARTING,
+    phase: 'spawned',
+    incarnation: 0,
+    pid: null,
+    restartCount: 0,
+    apiPort: requestedApiPort,
+    instanceId: null,
+    lastExit: null,
+    requestedReason: null,
+    readyAt: null,
+    firstReadyDone: false,
+    // starting
+    portDeadlineAt: null,
+    readyDeadlineAt: null,
+    startTimeout: null,
+    healthInFlight: false,
+    healthResult: null,
+    nextHealthAt: 0,
+    // running
+    runningSince: null,
+    consecutiveMisses: 0,
+    hangInFlight: false,
+    hangResult: null,
+    nextHangAt: 0,
+    essentialReadySince: null,
+    essentialEpoch: null,
+    harnessRequestFired: false,
+    // stopping
+    stopKind: null,
+    stopReasonLabel: null,
+    stopLedgerKey: null,
+    stopDetail: null,
+    requestDeadlineAt: null,
+    requestDeadlineMs: null,
+    forced: false,
+    // restarting
+    release: null,
+    releasePending: false,
+    cooldownMs: 0,
+    cooldownUntil: null,
+    // host quit
+    pendingHostQuit: null,
+    hostQuitActive: false,
+    hostQuitDetail: null,
+    outcome: null,
+  };
+
+  let resolveFirstReady;
+  let rejectFirstReady;
+  const firstReady = new Promise((resolve, reject) => { resolveFirstReady = resolve; rejectFirstReady = reject; });
+  // The caller awaits this; the guard only keeps an early terminal outcome from being reported as an
+  // unhandled rejection before the caller has attached its handler.
+  firstReady.catch(() => {});
+  const quitWaiters = [];
+
+  const snapshot = () => ({
+    state: s.state,
+    phase: s.state === STATES.STARTING ? s.phase : null,
+    incarnation: s.incarnation,
+    pid: s.pid,
+    apiPort: s.apiPort,
+    instanceId: s.instanceId,
+    restartCount: s.restartCount,
+    lastExit: s.lastExit,
+    requestedReason: s.requestedReason,
+    readyAt: s.readyAt,
+  });
+
+  const emit = (state, extra = {}) => {
+    s.state = state;
+    return publish({ ...snapshot(), ...extra }).catch((err) => log(`supervisor state write failed: ${err?.message ?? err}`));
+  };
+
+  const callHook = (name, payload) => {
+    const hook = hooks[name];
+    if (typeof hook !== 'function') return Promise.resolve(null);
+    return Promise.resolve().then(() => hook(payload)).catch((err) => {
+      log(`supervisor hook ${name} failed: ${err?.stack ?? err}`);
+      return null;
+    });
+  };
+
+  const startDeadlines = () => {
+    const now = clockNow();
+    const portMs = s.firstReadyDone ? Math.min(policy.startDeadlineMs, timeouts.initialPortMs) : timeouts.initialPortMs;
+    s.portDeadlineAt = now + portMs;
+    s.portTimeoutMs = portMs;
+    s.readyTimeoutMs = s.firstReadyDone
+      ? Math.min(policy.startDeadlineMs, timeouts.initialReadyMs) : timeouts.initialReadyMs;
+    s.readyDeadlineAt = null;
+  };
+
+  /** T1 and T9: spawn the next incarnation and publish its pid before discovery begins (X09-F4). */
+  const spawnIncarnation = async (cause) => {
+    s.incarnation += 1;
+    s.requestedReason = null;
+    // A manifest left by any earlier incarnation can never be taken for this one's.
+    s.predecessorInstanceId = s.instanceId;
+    s.phase = 'spawned';
+    s.startTimeout = null;
+    s.healthInFlight = false;
+    s.healthResult = null;
+    s.nextHealthAt = 0;
+    s.stopKind = null;
+    s.stopReasonLabel = null;
+    s.stopLedgerKey = null;
+    s.stopDetail = null;
+    s.requestDeadlineAt = null;
+    s.forced = false;
+    s.harnessRequestFired = s.incarnation !== 1;
+    io.clearStaleDiscoveryFiles();
+    const port = s.firstReadyDone ? s.apiPort : requestedApiPort;
+    // Creating the Windows job and publishing its root are part of this same startup budget.
+    // Arm before the synchronous spawn so that a slow host cannot reset the discovery deadline.
+    startDeadlines();
+    const spawned = actuator.spawnEngine({ n: s.incarnation, cause, apiPort: port,
+      startupTimeoutMs: Math.max(0, s.portDeadlineAt - clockNow()) });
+    s.pid = spawned.pid ?? null;
+    await emit(STATES.STARTING);
+    await callHook('onSpawned', { n: s.incarnation, pid: s.pid, cause });
+  };
+
+  /** Ask the Engine to stop through the request file and arm the deadline that covers it not reading it. */
+  const requestShutdown = async (reason, { ledgerKey = reason, detail } = {}) => {
+    if (s.state === STATES.STOPPING && s.requestedReason === reason) return;
+    s.requestedReason = reason;
+    s.state = STATES.STOPPING;
+    const deadlineMs = policy.gracefulStopDeadlineMs;
+    const deadlineEpochMs = wallClock() + deadlineMs;
+    await actuator.recordIntent({ reasonKey: ledgerKey, ...(detail !== undefined ? { detail } : {}),
+      channel: 'REQUEST_FILE', deadlineAt: deadlineEpochMs });
+    actuator.writeShutdownRequest(reason, deadlineEpochMs);
+    // Narrated because the file is transient by design — the Engine deletes it on consumption — so
+    // without a line here the graceful arm leaves no trace at all when it works.
+    log(`wrote a shutdown request: reason=${reason}, deadline in ${deadlineMs}ms, then a forced kill.`);
+    s.stopKind = 'request';
+    s.stopReasonLabel = reason;
+    s.stopLedgerKey = ledgerKey;
+    s.stopDetail = detail;
+    s.requestDeadlineAt = clockNow() + deadlineMs;
+    s.requestDeadlineMs = deadlineMs;
+    await emit(STATES.STOPPING, { reason });
+  };
+
+  /** T5: the start deadline elapsed with the Engine alive and not ready (W09-F2). */
+  const startDeadlineElapsed = async (kind) => {
+    const seconds = Math.max(1, Math.round((kind === 'port' ? s.portTimeoutMs : s.readyTimeoutMs) / 1000));
+    const message = kind === 'port'
+      ? `Backend did not emit JUSTSEARCH_API_PORT=<port> within ${seconds}s (requested=${requestedApiPort}).`
+      : `Backend did not answer at http://127.0.0.1:${s.apiPort}/api/health within ${seconds}s`;
+    s.startTimeout = { kind, message, n: s.incarnation };
+    log(`incarnation ${s.incarnation} did not come up: ${message}`);
+    const action = decide({ event: 'start-deadline-elapsed', restartCount: s.restartCount, state: STATES.STARTING }, policy);
+    if (action.action === ACTIONS.REQUEST_SHUTDOWN) {
+      await requestShutdown(action.reason, { ledgerKey: 'start' });
+    }
+  };
+
+  /** T3. */
+  const enterRunning = async () => {
+    const action = decide({ event: 'ready', state: STATES.STARTING }, policy);
+    if (action.action !== ACTIONS.ENTER_RUNNING) return;
+    s.readyAt = new Date(wallClock()).toISOString();
+    s.runningSince = clockNow();
+    s.consecutiveMisses = 0;
+    s.essentialReadySince = null;
+    s.essentialEpoch = null;
+    s.hangInFlight = false;
+    s.hangResult = null;
+    s.nextHangAt = clockNow() + policy.hangPollIntervalMs;
+    // Published before any caller work (frontend, run record): a reader that waits for `running`
+    // sees it as soon as the Engine answers, whatever the caller does next.
+    await emit(STATES.RUNNING);
+    const first = !s.firstReadyDone;
+    s.firstReadyDone = true;
+    const ready = { n: s.incarnation, pid: s.pid, apiPort: s.apiPort, instanceId: s.instanceId, first };
+    if (first) resolveFirstReady(ready);
+    else void callHook('onReady', ready);
+  };
+
+  const tickStarting = async () => {
+    if (s.phase === 'spawned') {
+      const found = io.readManifest(s.pid, s.predecessorInstanceId);
+      if (found) {
+        // T2: the manifest names this spawn's pid.
+        s.apiPort = found.apiPort;
+        s.instanceId = found.instanceId;
+        s.phase = 'discovered';
+        s.readyDeadlineAt = clockNow() + s.readyTimeoutMs;
+        s.nextHealthAt = 0;
+        await emit(STATES.STARTING);
+      } else if (clockNow() >= s.portDeadlineAt) {
+        await startDeadlineElapsed('port');
+        return;
+      }
+    }
+    if (s.phase !== 'discovered') return;
+    if (s.healthResult && s.healthResult.n === s.incarnation) {
+      const { ok } = s.healthResult;
+      s.healthResult = null;
+      if (ok) {
+        await enterRunning();
+        return;
+      }
+      s.nextHealthAt = clockNow() + READY_PROBE_GAP_MS;
+    }
+    if (clockNow() >= s.readyDeadlineAt) {
+      await startDeadlineElapsed('ready');
+      return;
+    }
+    if (!s.healthInFlight && clockNow() >= s.nextHealthAt) {
+      s.healthInFlight = true;
+      const n = s.incarnation;
+      io.probeHealth(s.apiPort, READY_PROBE_TIMEOUT_MS).then((ok) => ok, () => false).then((ok) => {
+        s.healthInFlight = false;
+        s.healthResult = { n, ok };
+        actuator.wake();
+      });
+    }
+  };
+
+  const tickRunning = async () => {
+    // Harness-only host input exercises the production request path after readiness.
+    const hostRequest = harness.requestReason;
+    if (hostRequest && !s.harnessRequestFired && s.incarnation === 1
+        && clockNow() - s.runningSince >= HARNESS_REQUEST_DELAY_MS && HARNESS_REQUEST_REASONS.includes(hostRequest)) {
+      s.harnessRequestFired = true;
+      await requestShutdown(hostRequest);
+      return;
+    }
+    // Latch the admitted Engine's own close once; later manifest writes cannot extend it.
+    const manifest = io.readRawManifest();
+    const handoff = shutdownHandoffReason(manifest, s.pid, s.instanceId);
+    if (handoff) {
+      // Only terminal operator intents label the coming exit (a failed quit must not be restarted).
+      s.requestedReason = exitHandoffReason(manifest, s.pid, s.instanceId);
+      s.state = STATES.STOPPING;
+      s.stopKind = 'handoff';
+      s.stopReasonLabel = handoff;
+      s.requestDeadlineAt = clockNow() + policy.gracefulStopDeadlineMs;
+      s.requestDeadlineMs = policy.gracefulStopDeadlineMs;
+      await emit(STATES.STOPPING, { reason: handoff });
+      return;
+    }
+    if (s.hangResult && s.hangResult.n === s.incarnation && s.hangResult.instanceId === s.instanceId) {
+      const result = s.hangResult;
+      s.hangResult = null;
+      if (result.alive) {
+        s.consecutiveMisses = 0;
+        const epoch = result.status ? io.essentialReadyEpoch(result.status) : null;
+        if (epoch === null) {
+          s.essentialReadySince = null;
+          s.essentialEpoch = null;
+        } else {
+          if (epoch !== s.essentialEpoch) {
+            s.essentialEpoch = epoch;
+            s.essentialReadySince = result.at;
+          }
+          if (result.at - s.essentialReadySince >= policy.stabilityWindowMs && s.restartCount > 0) {
+            const action = decide({ event: 'stability-elapsed', restartCount: s.restartCount, state: s.state }, policy);
+            if (action.action === ACTIONS.RESET_BUDGET) {
+              s.restartCount = 0;
+              await emit(STATES.RUNNING);
+            }
+          }
+        }
+      } else if (suspendClock.inResumeGrace()) {
+        // A machine waking up answers late; a miss in the grace after a resume is not a hang (§3.5).
+        s.essentialReadySince = null;
+        s.essentialEpoch = null;
+        s.consecutiveMisses = 0;
+      } else {
+        s.essentialReadySince = null;
+        s.essentialEpoch = null;
+        s.consecutiveMisses += 1;
+        const action = decide({ event: 'health-miss', consecutiveMisses: s.consecutiveMisses,
+          restartCount: s.restartCount, state: s.state }, policy);
+        if (action.action === ACTIONS.REQUEST_SHUTDOWN) {
+          log(`Engine missed ${s.consecutiveMisses} liveness polls while alive — treating as a hang and requesting shutdown.`);
+          s.consecutiveMisses = 0;
+          await requestShutdown('hang');
+          return;
+        }
+      }
+    }
+    if (!s.hangInFlight && clockNow() >= s.nextHangAt) {
+      s.hangInFlight = true;
+      s.nextHangAt = clockNow() + policy.hangPollIntervalMs;
+      const tag = { n: s.incarnation, instanceId: s.instanceId, port: s.apiPort };
+      (async () => {
+        const alive = await io.probeAlive(tag.port, HANG_PROBE_TIMEOUT_MS).catch(() => false);
+        const status = alive ? await io.fetchStatus(tag.port, HANG_PROBE_TIMEOUT_MS).catch(() => null) : null;
+        return { ...tag, alive, status, at: clockNow() };
+      })().then((result) => {
+        s.hangInFlight = false;
+        s.hangResult = result;
+        actuator.wake();
+      });
+    }
+  };
+
+  /** T7 / T12b: the request deadline elapsed. */
+  const requestDeadlineElapsed = async () => {
+    s.requestDeadlineAt = null;
+    if (s.forced) return;
+    let ledgerKey;
+    let detail;
+    if (s.stopKind === 'handoff') {
+      // Operator terminal intent remains terminal at the deadline; recovery closes become hangs.
+      s.requestedReason = ['quit', 'upgrade'].includes(s.stopReasonLabel) ? s.stopReasonLabel : 'hang';
+      log(`FORCED KILL: Engine-local ${s.stopReasonLabel} close exceeded its deadline.`);
+      ledgerKey = s.requestedReason;
+    } else if (s.stopKind === 'hostquit') {
+      log(`FORCED KILL: the Engine ignored the quit request for ${s.requestDeadlineMs}ms.`);
+      ledgerKey = 'quit';
+      detail = s.hostQuitDetail;
+    } else {
+      const action = decide({ event: 'request-deadline-elapsed', requestedReason: s.requestedReason,
+        restartCount: s.restartCount, state: s.state }, policy);
+      if (action.action !== ACTIONS.FORCE_KILL) return;
+      // The admission the request file makes: it is a request, never a guarantee.
+      log(`FORCED KILL: the Engine ignored the ${s.stopReasonLabel} request for ${s.requestDeadlineMs}ms.`);
+      ledgerKey = s.stopLedgerKey ?? s.requestedReason;
+      detail = s.stopDetail;
+    }
+    s.forced = true;
+    await actuator.forceKill(ledgerKey, detail !== undefined ? { detail } : {});
+  };
+
+  const finish = async (state, code, reason) => {
+    await emit(state, { reason });
+    s.outcome = { state, code, reason, lastExit: s.lastExit, firstReadyDone: s.firstReadyDone,
+      startTimeout: s.startTimeout, hostQuit: s.hostQuitActive, incarnation: s.incarnation, pid: s.pid };
+    if (!s.firstReadyDone) {
+      const error = s.startTimeout && s.lastExit?.incarnation === s.startTimeout.n
+        ? new Error(s.startTimeout.message)
+        : new Error('Engine exited during discovery');
+      if (!(s.startTimeout && s.lastExit?.incarnation === s.startTimeout.n)) {
+        error.code = 'ENGINE_EXITED_DURING_DISCOVERY';
+        error.details = { pid: s.pid, exitCode: s.lastExit?.code ?? null, signalCode: s.lastSignal ?? null,
+          childReplaced: false, initialDiscovery: true };
+      }
+      error.outcome = s.outcome;
+      rejectFirstReady(error);
+    }
+    for (const waiter of quitWaiters.splice(0)) waiter(s.outcome);
+    await callHook('onTerminal', s.outcome);
+    return s.outcome;
+  };
+
+  /** T4: the one exit path, in every phase. */
+  const onExit = async (exit) => {
+    const phase = s.state === STATES.STARTING ? 'STARTING' : s.state === STATES.RUNNING ? 'RUNNING' : 'STOPPING';
+    s.lastSignal = exit.signal ?? null;
+    // An external stop that asked the Engine itself (the `stop` CLI's graceful POST, tempdoc 819 §D)
+    // leaves a marker: that exit was a host quit, so the loop stops instead of restarting.
+    if (!s.hostQuitActive && typeof io.externalStopRequested === 'function' && io.externalStopRequested()) {
+      s.hostQuitActive = true;
+      s.requestedReason = 'quit';
+    }
+    // A quick failed operator close can exit before the handoff watcher sees it.
+    if (!s.requestedReason) {
+      s.requestedReason = exitHandoffReason(io.readRawManifest(), s.pid, s.instanceId);
+    }
+    const code = exit.code;
+    let decision = decide({ event: 'exit', exitCode: code, requestedReason: s.requestedReason,
+      restartCount: s.restartCount, state: s.state }, policy);
+    if (code === 2 && phase === 'STARTING' && predecessorExitAt !== null &&
+        clockNow() - predecessorExitAt < policy.dataDirLockedWaitMs && !lockedRetried) {
+      lockedRetried = true;
+      decision = { action: ACTIONS.RESTART, reason: 'data_dir_locked', exitClass: 'NON_TRANSIENT',
+        counted: false, cooldownMs: policy.dataDirLockedWaitMs };
+    }
+    predecessorExitAt = clockNow();
+
+    // The record carries the class the BUDGET used, not the class the integer alone implies; `codeClass`
+    // keeps the raw reading beside it.
+    s.lastExit = {
+      code,
+      reason: decision.reason ?? describeExit(code, policy),
+      class: decision.exitClass ?? classifyExit(code, policy),
+      codeReason: describeExit(code, policy),
+      codeClass: classifyExit(code, policy),
+      counted: decision.counted === true,
+      requestedReason: s.requestedReason,
+      incarnation: s.incarnation,
+      at: new Date(wallClock()).toISOString(),
+    };
+    const ledger = await actuator.recordExit({ exit, phase, decision });
+    const terminal = decision.action === ACTIONS.STOP || decision.action === ACTIONS.EXHAUSTED;
+    const reported = await callHook('onIncarnationExit', {
+      n: s.incarnation, pid: s.pid, code, signal: exit.signal ?? null, phase, decision, lastExit: s.lastExit,
+      ledger, terminal, firstReadyDone: s.firstReadyDone, hostQuit: s.hostQuitActive,
+    });
+    log(`Engine incarnation ${s.incarnation} exited ${code} (${s.lastExit.reason}, ${s.lastExit.class}); `
+      + `decision=${decision.action}`
+      + `${decision.counted ? ` counted ${s.restartCount + 1}/${policy.maxRestartAttempts}` : ''}`
+      + `${ledger ? ` ledger=${ledger.exitClass}${ledger.forced ? '/forced' : ''}` : ''}`
+      + `${reported?.engineLog ? ` engineLog=${reported.engineLog}` : ''}`);
+    if (decision.action === ACTIONS.STOP) {
+      return finish(s.hostQuitActive ? STATES.STOPPED : STATES.STOPPING, code, decision.reason);
+    }
+    if (decision.action === ACTIONS.EXHAUSTED) {
+      return finish(STATES.EXHAUSTED, code, `ENGINE_RESTART_EXHAUSTED:${decision.reason}`);
+    }
+    if (s.hostQuitActive) {
+      // Unreachable through `decide` (a quit request always stops), kept so a quit can never restart.
+      return finish(STATES.STOPPED, code, 'quit');
+    }
+    if (decision.counted) s.restartCount += 1;
+    s.cooldownMs = decision.cooldownMs ?? 0;
+    s.release = null;
+    s.releasePending = true;
+    s.cooldownUntil = null;
+    const deadPid = exit.pid;
+    io.waitForRelease({ pid: deadPid }).then((release) => release, () => ({ released: false, waitedMs: 0 }))
+      .then((release) => {
+        s.releasePending = false;
+        s.release = release;
+        actuator.wake();
+      });
+    await emit(STATES.RESTARTING, { reason: decision.reason });
+    return null;
+  };
+
+  /** T8-T9: the floor (handle release), then the cancellable cooldown, then the next spawn. */
+  const tickRestarting = async () => {
+    if (s.releasePending) return;
+    if (s.cooldownUntil === null) {
+      if (s.release && !s.release.released) {
+        log(`proceeding with the restart after ${s.release.waitedMs}ms without a clean handle `
+          + 'release — a boot that finds the data directory still locked will exit non-transient.');
+      }
+      s.cooldownUntil = clockNow() + s.cooldownMs;
+    }
+    if (clockNow() < s.cooldownUntil) return;
+    // The caller may hold a restart back while it is still publishing the run that the last ready
+    // started (its run record must exist before a replacement can be reported running).
+    if (typeof hooks.restartReady === 'function' && !hooks.restartReady()) return;
+    await spawnIncarnation('RESTART');
+  };
+
+  /** T10, T10b, T11. */
+  const takeHostQuit = async () => {
+    const quit = s.pendingHostQuit;
+    s.pendingHostQuit = null;
+    if ([STATES.EXHAUSTED, STATES.STOPPED].includes(s.state) || s.outcome) return null;
+    const already = s.hostQuitActive;
+    s.hostQuitActive = true;
+    if (!already) s.hostQuitDetail = quit.detail ?? null;
+    const deadlineMs = Math.max(0, (quit.deadlineMs ?? quitDeadlineMs) - forceMarginMs);
+    const deadlineEpochMs = wallClock() + (quit.deadlineMs ?? quitDeadlineMs);
+    if (s.state === STATES.RESTARTING) {
+      // T11: no incarnation is alive; cancel the cooldown and spawn nothing.
+      return finish(STATES.STOPPED, s.lastExit?.code ?? null, 'quit');
+    }
+    if (s.state === STATES.STOPPING) {
+      if (s.stopKind === 'hostquit') return null; // one quit, one intent
+      // T10b: the quit supersedes a restart or hang request; no second request is sent.
+      s.requestedReason = 'quit';
+      s.stopKind = 'hostquit';
+      const quitAt = clockNow() + deadlineMs;
+      s.requestDeadlineAt = s.requestDeadlineAt === null ? quitAt : Math.min(s.requestDeadlineAt, quitAt);
+      s.requestDeadlineMs = deadlineMs;
+      await actuator.recordIntent({ reasonKey: 'quit', detail: s.hostQuitDetail, channel: 'REQUEST_FILE',
+        deadlineAt: deadlineEpochMs });
+      await emit(STATES.STOPPING, { reason: 'quit' });
+      return null;
+    }
+    // T10: starting or running.
+    s.requestedReason = 'quit';
+    s.stopKind = 'hostquit';
+    s.stopReasonLabel = 'quit';
+    s.state = STATES.STOPPING;
+    s.requestDeadlineAt = clockNow() + deadlineMs;
+    s.requestDeadlineMs = deadlineMs;
+    const bound = s.firstReadyDone || s.phase === 'discovered';
+    let sent = false;
+    if (bound && Number.isInteger(s.apiPort) && s.apiPort > 0) {
+      await actuator.recordIntent({ reasonKey: 'quit', detail: s.hostQuitDetail, channel: 'HTTP_SHUTDOWN',
+        deadlineAt: deadlineEpochMs });
+      const posted = await actuator.postShutdown(s.apiPort, 'quit', { deadlineAtEpochMs: deadlineEpochMs });
+      sent = posted.ok;
+    }
+    if (!sent) {
+      await actuator.recordIntent({ reasonKey: 'quit', detail: s.hostQuitDetail, channel: 'REQUEST_FILE',
+        deadlineAt: deadlineEpochMs });
+      actuator.writeShutdownRequest('quit', deadlineEpochMs);
+    }
+    log(`asked the Engine to quit${s.hostQuitDetail ? ` (${s.hostQuitDetail})` : ''} through `
+      + `${sent ? 'POST /api/lifecycle/shutdown' : 'the request file'}; forced kill in ${deadlineMs}ms.`);
+    await emit(STATES.STOPPING, { reason: 'quit' });
+    return null;
+  };
+
+  const run = async () => {
+    await actuator.reconcile();
+    await spawnIncarnation('INITIAL');
+    for (;;) {
+      const exit = actuator.pollExit();
+      if (exit) {
+        // eslint-disable-next-line no-await-in-loop
+        const done = await onExit(exit);
+        if (done) return done;
+        continue;
+      }
+      if (s.pendingHostQuit) {
+        // eslint-disable-next-line no-await-in-loop
+        const done = await takeHostQuit();
+        if (done) return done;
+      }
+      if (s.state === STATES.STOPPING && s.requestDeadlineAt !== null && clockNow() >= s.requestDeadlineAt) {
+        // eslint-disable-next-line no-await-in-loop
+        await requestDeadlineElapsed();
+      }
+      if (!actuator.exitObserved()) {
+        // eslint-disable-next-line no-await-in-loop
+        if (s.state === STATES.STARTING) await tickStarting();
+        // eslint-disable-next-line no-await-in-loop
+        else if (s.state === STATES.RUNNING) await tickRunning();
+      }
+      if (s.state === STATES.RESTARTING && !s.pendingHostQuit) {
+        // eslint-disable-next-line no-await-in-loop
+        await tickRestarting();
+      }
+      // eslint-disable-next-line no-await-in-loop
+      const suspended = await suspendClock.measureWait(() => actuator.waitOrWake(tickMs));
+      if (suspended > 0) {
+        s.consecutiveMisses = 0;
+        log(`the machine was suspended for about ${Math.round(suspended)}ms; deadlines are extended by it and `
+          + `health misses are not counted for ${RESUME_GRACE_MS}ms.`);
+      }
+    }
+  };
+
+  let running = null;
+  return {
+    /** Starts the loop once; resolves with the terminal outcome. */
+    run() {
+      if (!running) running = run();
+      return running;
+    },
+    firstReady,
+    /**
+     * Post a host quit (stop, takeover, interruption, reap). Resolves with the loop's terminal
+     * outcome; every caller of a quit waits on the same outcome, and only the loop acts.
+     */
+    hostQuit({ detail = null, deadlineMs = quitDeadlineMs } = {}) {
+      if (s.outcome) return Promise.resolve(s.outcome);
+      const waiter = new Promise((resolve) => quitWaiters.push(resolve));
+      if (!s.pendingHostQuit && !s.hostQuitActive) s.pendingHostQuit = { detail, deadlineMs };
+      actuator.wake();
+      return waiter;
+    },
+    snapshot,
+    outcome: () => s.outcome,
+  };
+}
+
 module.exports = {
+  createSupervisionLoop,
+  createSuspendAwareClock,
+  SUSPEND_GAP_MS,
+  RESUME_GRACE_MS,
+  TICK_MS,
   shutdownHandoffReason,
   exitHandoffReason,
   ACTIONS,

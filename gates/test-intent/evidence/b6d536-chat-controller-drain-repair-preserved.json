@@ -1,0 +1,117 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T11:19:04.694Z",
+  "revision": "d3fe74ef2d998150a1645294115286aff441f4d0",
+  "tree": "a8410dc44caaa9cd44eb13b92b92ea9c897de05b",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.aSearchWithAiOnStillExpands\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.aSearchWithAiOffSkipsExpansionAsToday\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14065
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.aPermanentGenerativeRefusalStaysAPermanentFault\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11023
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java#aSearchWithAiOnStillExpands",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4cdda78c62c18264edaf878083be11e0e37af28aed2b2e296c7f38da51acc390",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSearchWithAiOnStillExpands()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java#aSearchWithAiOffSkipsExpansionAsToday",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4cdda78c62c18264edaf878083be11e0e37af28aed2b2e296c7f38da51acc390",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSearchWithAiOffSkipsExpansionAsToday()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java#aPermanentGenerativeRefusalStaysAPermanentFault",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:49d92652fb1855e456eb382b42942733e47fc14efba42f2a0beb9a11be3efcfe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPermanentGenerativeRefusalStaysAPermanentFault()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d3fe74ef2",
+    "revision": "d3fe74ef2d998150a1645294115286aff441f4d0",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.aSearchWithAiOnStillExpands\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.aSearchWithAiOffSkipsExpansionAsToday\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 83701
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.aPermanentGenerativeRefusalStaysAPermanentFault\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 41054
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java#aSearchWithAiOnStillExpands",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java#aSearchWithAiOffSkipsExpansionAsToday",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java#aPermanentGenerativeRefusalStaysAPermanentFault",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:0f04b62f328162553b9116c45ee79a14265d935ac4a63f60c2b336d9c349aab2"
+}

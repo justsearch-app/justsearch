@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T09:18:01.201Z",
+  "revision": "98fd416d05d602854a605f310c9e176758a39264",
+  "tree": "9aad383782080788ff5497d271c6298da246c179",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.InferenceLifecycleManagerExternalServerTest.startLlamaServerDoesNotAdoptHealthyServerOnConfiguredPortWithoutEndpoint\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerExternalServerTest.healthOnlyUseNeedsTheExplicitEndpointEvenWhenEnabled\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2888
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerExternalServerTest.java#startLlamaServerDoesNotAdoptHealthyServerOnConfiguredPortWithoutEndpoint",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerExternalServerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:14ae59055881b6143d24a4aaa52373d723f1f10ef23f31719e7be942c5215cb9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "startLlamaServerDoesNotAdoptHealthyServerOnConfiguredPortWithoutEndpoint()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerExternalServerTest.java#healthOnlyUseNeedsTheExplicitEndpointEvenWhenEnabled",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerExternalServerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:14ae59055881b6143d24a4aaa52373d723f1f10ef23f31719e7be942c5215cb9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "healthOnlyUseNeedsTheExplicitEndpointEvenWhenEnabled()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2cfd3342e396ea4bf443820e0167519095831b5fc019ffd18c45e3ae359a3295"
+}

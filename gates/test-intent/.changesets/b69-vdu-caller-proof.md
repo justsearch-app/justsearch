@@ -1,0 +1,99 @@
+---
+schema: test-intent.v1
+task: t-20261005-b6d536
+author-role: builder
+author-session: b69-vdu-caller-proof
+---
+
+The observation caller check this changeset added is retired by b72-vdu-presence. The automatic path-label read answers malformed or invalid input like the
+invocation it replaced. Legacy browser-local conversation titles are adopted only when a person
+acts. Proof and live results: F:/agent-sandbox/design-b6d536/codex/b69-vdu-caller-proof/report.md.
+
+```json
+{
+  "entries": [
+    {
+      "items": ["modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java", "modules/ui/src/test/java/io/justsearch/ui/api/PathLabelErrorContractTest.java"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Malformed JSON to POST /api/library/path-label answers 400, as POST /api/operations/{id}/invoke does for the same input. Malformed, empty, non-object, extra-field, non-string and blank pathHash bodies all answer 400 with the invocation's error body fields (success false, message, structuredData, errorClass BAD_REQUEST) and never reach the resolver. VerifierSixHydrationTest is the verifier's class copied unchanged.",
+      "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "the new routes return the same client-error status and body shape as the path they replaced for malformed or invalid input", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b69 builder contract)'; the text does not appear in the owner's turns of session 886833dd"}, {"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "malformed JSON (\"{\") to POST /api/library/path-label returns 500 INTERNAL_ERROR; the operation invocation it replaced returns 400 BAD_REQUEST for the same input", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b69 builder contract)'; the text does not appear in the owner's turns of session 886833dd"}],
+      "evidence": "gates/test-intent/evidence/b69-vdu-repaired.json",
+      "newChecks": ["modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java#pathLabelMalformedJsonPreservesInvocationClientError", "modules/ui/src/test/java/io/justsearch/ui/api/PathLabelErrorContractTest.java#malformedAndInvalidInputMatchTheReplacedInvocationErrorShape"]
+    },
+    {
+      "items": ["modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java", "modules/ui-web/src/shell-v0/state/legacyTitleMount.test.ts"],
+      "class": "New",
+      "behaviour": "Preserved neighbours copied from the verifier unchanged: the facet and path-label reads reject smuggled query, filter, pipeline, document, operation and raw-path fields; facet malformed JSON keeps the search route's error; the invocation route keeps its 400; a fresh automatic list load sends only the observation GET.",
+      "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "the malformed path-label case, and the legacy-title mount case (copy them in, keeping their assertions)", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b69 builder contract)'; the text does not appear in the owner's turns of session 886833dd"}],
+      "evidence": "gates/test-intent/evidence/b69-vdu-preservation.json",
+      "newChecks": ["modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java#collectionCannotSmuggleQueryFiltersPipelineOrDocumentFields", "modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java#pathLabelCannotInvokeAnotherOperationOrResolveByRawPath", "modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java#collectionMalformedJsonPreservesExistingSearchError", "modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java#existingInvocationMalformedJsonRemainsClientError", "modules/ui-web/src/shell-v0/state/legacyTitleMount.test.ts#control: fresh automatic list hydration sends only the observation GET"]
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/state/legacyTitleMount.test.ts", "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "An automatic list load with a retained jf-conversation-titles entry for an untitled backend conversation sends no POST /title (a USER_ACTION route) and keeps the entry; an untrusted synthetic event sends none either. The first trusted input adopts the name once as the reader's (source user) and erases the entry. The verifier's mount case is copied with its assertions.",
+      "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "automatic title adoption must not count as a person acting: choose between a bounded observation route for adoption, deferring adoption until a person acts, or another design", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b69 builder contract)'; the text does not appear in the owner's turns of session 886833dd"}, {"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "a title a person sets stays USER_ACTION", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b69 builder contract)'; the text does not appear in the owner's turns of session 886833dd"}],
+      "evidence": "gates/test-intent/evidence/b69-vdu-legacy-repaired.json",
+      "newChecks": ["modules/ui-web/src/shell-v0/state/legacyTitleMount.test.ts#automatic mount list hydration with retained legacy titles emits no user-action request", "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts#adopts a legacy browser-local title, then ERASES the key — the migration completes"]
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/state/conversationListStore.test.ts"],
+      "class": "New",
+      "behaviour": "The two remaining tempdoc-838 migration cases now reach adoption through a trusted input instead of the list load, and keep their outcomes: a 423 keeps both legacy names and stops re-posting them for the session; a legacy entry the backend has outgrown is dropped with no write.",
+      "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "deferring adoption until a person acts", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b69 builder contract)'; the text does not appear in the owner's turns of session 886833dd"}],
+      "evidence": "gates/test-intent/evidence/b69-vdu-preservation.json",
+      "newChecks": ["modules/ui-web/src/shell-v0/state/conversationListStore.test.ts#does NOT erase a legacy title the locked store refused, and stops re-POSTing it", "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts#drops a legacy entry the backend has already outgrown, without a second write"]
+    }
+  ]
+}
+```
+
+## Acceptance records
+
+Pending independent verifier review. The builder does not provide its own acceptance.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-vdu7-20261012",
+  "verdict": "reject",
+  "digest": "sha256:2fce950d318b76289310f6cb4c32bd48654b2f231784c8bdbc00ad89f1ff298f",
+  "note": "Candidate 3d6c71cfd vs 469d8f10f. Rejected: (1) CALLER-MECHANICS: the observation caller check accepts 12 of 25 independent must-reject adversaries (reassigned target, barrel alias, shadowed const, shorthand and quoted POST method, local fetchFn and cache.fetch, click-fed subscription, two name collisions, click-mounted connectedCallback, route only in a query string); (2) LIVE-LEGACY-TITLE-DISPLAY: after an untouched reload, the person's first input (opening History) posts the adoption while the list reloads; the list answer predates the write and the local copy is already erased, so the row shows the first message instead of the retained title until a later reload (reproduced twice live; own unit L10 fails on the candidate). Passed: full JVM suites, web suite, typecheck, path-label 400/retry preservation, roster/failed-jobs/ledger/preview/chat/typing/rename interrupt with later completion, untouched reload not interrupting, idle Library automatic completion with all-observation traffic, GPU-on replay and raster search, admin GPU-off completing on CPU. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-vdu7/. Owned stacks stopped; no product/test edits, commits or pushes."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-vdu8-20261012",
+  "verdict": "reject",
+  "digest": "sha256:67de5b0ef820d1c8935d3891f567b3e29047ba655d14d39f75407e5741acf0f2",
+  "note": "Independent round 8, candidate 857c3d9cd vs b2684e466: FAIL. (1) LIVE-STREAM-FIRST-ANSWER: after a person's first ask in a new Search v3 conversation, the untouched UI itself sends the auto-title POST /api/chat/dispatch and DELETE /api/chat/conversations/_title_... (both USER_ACTION) while the answer streams; an accepted pass captured after the ask is interrupted with 0 units (reproduced twice; a follow-up ask whose transcript follows the answer completes 2 units). The auto-title code predates the candidate, but the round requires that nothing a person does not do reports activity. (2) LEGACY-RENAME-DURING-ADOPTION: live, with tab B's adoption write delayed 3 s, the person's rename shows, then the row reverts to the legacy title at about 3.1 s and stays through 12 s while the server holds the rename; own unit L13 fails on the candidate and passes on b2684e466. (3) Own unit L17: tab B renames while its adoption is in transit and tab A acts before B confirms; the server ends with the legacy title (rename lost); fails on the candidate, passes on b2684e466. Passed: focused and full JVM suites (architecture failures identical on both arms), web suite, typecheck, builder's new web tests, own presence harness, route roles; live presence for key, click, wheel, typing, key after a failed report (presence within 25 ms, interruption at the next document boundary, about 4 s, 31 s mid-document), rename and title POST, roster, folder failures, ingestion ledger, preview, HTTP and UI chat input interrupt with later completion; presence route rejects other methods; untouched legacy reload sends no presence or title; first input shows the retained title; idle Library automatic completion with only observation traffic; automatic pass interrupted by UI typing; GPU-on replay and raster search; admin GPU-off completing on the CPU (CPU flags and buffers, raster search); MCP and OpenAI-compatible probes. Evidence and limits: F:/agent-sandbox/design-b6d536/codex/verify-vdu8/. No product/test edits, commits or pushes."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-vdu9-20261012",
+  "verdict": "accept",
+  "digest": "sha256:e64c7b1fa8781a80a25dd5da671215e6d411e0bbef2840cdcfeda902b7a5ed72",
+  "note": "Independent round 9, candidate f1a19f754 vs 80f03cb54: PASS. New and own checks fail before by assertion (builder's new Java tests do not compile before) and pass on the candidate; full JVM, web, typecheck, architecture, lane F, regen, API contract and wire results match the before arm. Live on the real UI and dev stack: session roster, folder failures, ingestion ledger, preview, HTTP and UI chat, key, click, wheel, typing and a key 1 s after acceptance each interrupt with 0 units and the document completes later (input to presence 3-581 ms, to interruption 3.3-4.5 s); untouched legacy reload and streaming answers do not interrupt; the new-conversation stream case completes its unit and the title arrives after the VDU hold (auto-title 503 BUSY, then 200); renames during adoption win in every tab and on the server; idle Library start after 329 s with only observation traffic, typing interrupts the automatic pass; GPU-on replay and admin GPU-off CPU pass complete with searchable raster text; MCP and OpenAI-compatible probes pass. Notes: reload within 120 s delays a pending title until a later list load; wall-clock comparison residual; evidence-invalid governance entries need the builder's evidence re-run; automatic start does not happen while the chat model stays loaded (pre-existing). Evidence: F:/agent-sandbox/design-b6d536/codex/verify-vdu9/. No product or test edits, commits or pushes."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS3-20261015",
+  "verdict": "accept",
+  "digest": "sha256:5891dc6b50af4bdcbfd92774b3a0ebe1e718552fb079f29153e55ff945263df6",
+  "note": "Reviewed the title-fixture/evidence correction and source updates; current candidate selectors pass. The exact declared 469d8f10f legacy before run reproduces both assertion failures; earlier verifier notes cover preservation and new-API limits."
+}
+```

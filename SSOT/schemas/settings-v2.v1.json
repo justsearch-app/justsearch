@@ -37,6 +37,9 @@
         "contextWindow" : {
           "type" : [ "integer", "null" ]
         },
+        "gameDetection" : {
+          "type" : [ "string", "null" ]
+        },
         "gpuLayers" : {
           "type" : [ "integer", "null" ]
         },

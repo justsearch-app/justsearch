@@ -458,6 +458,52 @@ public final class IndexCountOps {
   }
 
   /**
+   * Counts whole (non-chunk) documents that are BOTH embedded and sparse-encoded — the S5 unit of
+   * Spec E step E0b (task b6d536): "fully embedded and sparse", one Lucene count with both statuses.
+   *
+   * <p>Embedded is {@code embedding_status = COMPLETED}. Sparse is {@code splade_status} in
+   * {@code COMPLETED} or {@code COMPLETED_EMPTY}, the same two-valued terminal success {@link
+   * #querySpladeFeatureCounts()} counts (BGE-M3 writes the same field). Neither per-stage counter
+   * nor their minimum is this number: a document can be finished in one stage and not the other.
+   *
+   * <p>Does NOT call {@code ensureStarted()} — caller (facade) is responsible for that guard.
+   */
+  public long queryEmbeddedAndSparseCount() {
+    try {
+      return bridge.withSearcher(searcher -> {
+        Query wholeDocs =
+            new BooleanQuery.Builder()
+                .add(new MatchAllDocsQuery(), BooleanClause.Occur.FILTER)
+                .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")),
+                    BooleanClause.Occur.MUST_NOT)
+                .build();
+        Query joint = new BooleanQuery.Builder()
+            .add(wholeDocs, BooleanClause.Occur.FILTER)
+            .add(new TermQuery(new Term(
+                    SchemaFields.EMBEDDING_STATUS,
+                    SchemaFields.EMBEDDING_STATUS_COMPLETED)),
+                BooleanClause.Occur.FILTER)
+            .add(new BooleanQuery.Builder()
+                    .add(new TermQuery(new Term(
+                            SchemaFields.SPLADE_STATUS,
+                            SchemaFields.SPLADE_STATUS_COMPLETED)),
+                        BooleanClause.Occur.SHOULD)
+                    .add(new TermQuery(new Term(
+                            SchemaFields.SPLADE_STATUS,
+                            SchemaFields.SPLADE_STATUS_COMPLETED_EMPTY)),
+                        BooleanClause.Occur.SHOULD)
+                    .build(),
+                BooleanClause.Occur.FILTER)
+            .build();
+        return (long) searcher.count(joint);
+      });
+    } catch (IOException e) {
+      log.debug("Failed to count embedded-and-sparse documents: {}", e.getMessage());
+      return 0L;
+    }
+  }
+
+  /**
    * Queries SPLADE feature extraction status counts for whole (non-chunk) documents.
    *
    * <p>Does NOT call {@code ensureStarted()} — caller (facade) is responsible for that guard.

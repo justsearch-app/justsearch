@@ -14,19 +14,42 @@ MCPB hosts launch bundles over **stdio**, so this bundle is only a **thin
 stdio→Streamable-HTTP bridge** (`server/index.js`):
 
 1. On start it discovers the live API port: `JUSTSEARCH_API_PORT` env var →
-   `head.apiPort` in `%APPDATA%\io.justsearch.shell\runtime\manifest.json` (the
-   app writes its actual port there) → default `8080`; a candidate counts only
-   if `GET /api/health` answers.
-2. If no running JustSearch is found, it exits with an actionable message
-   (install + launch the desktop app).
+   `runtime/manifest.json` in `JUSTSEARCH_DATA_DIR` when set → the same file in the
+   desktop app's data folder (`%APPDATA%\io.justsearch.shell` on Windows;
+   `$XDG_DATA_HOME/io.justsearch.shell`, or `~/.local/share/io.justsearch.shell`, on Linux).
+   A manifest counts only if its pid is alive, the service on its `head.apiPort`, over a
+   connection the operating system reports as that pid's (Linux `/proc`, Windows `netstat -ano`;
+   see 3.), answers `GET /api/runtime/live` with the same pid and instance id, and
+   `GET /api/health` answers 200 (a proven Engine still starting, 503, is re-checked for up to
+   30 s, so starting the host and the app together works); there is no default-port guess. On Windows, when `%APPDATA%`
+   is unset in its environment, it also asks Windows for the Roaming folder. The bridge never
+   looks in a dev checkout: when the installed app and a dev Engine both run, it uses the
+   installed app; set `JUSTSEARCH_DATA_DIR` to the checkout's data folder (for example
+   `<checkout>/modules/ui-web/.dev-data`) or `JUSTSEARCH_API_PORT` to use the dev Engine.
+   (The production stdio server, `scripts/prod/justsearch-mcp.mjs`, tries more: `--port`,
+   `JUSTSEARCH_API_PORT`, the legacy `JUSTSEARCH_HOME` folder, which wins over
+   `JUSTSEARCH_DATA_DIR`, then `JUSTSEARCH_DATA_DIR`, the desktop app's folder, a dev
+   checkout's `.dev-data` folders and the user data folder; the bridge has no `JUSTSEARCH_HOME`
+   step.)
+   The resolver (`server/engine-discovery.cjs`) is shared with the production MCP server and
+   follows the `discovery.desktopAppDataDir` entry of `contracts/platform-paths/spec.v1.json`.
+2. If no running JustSearch is found, it exits with an actionable message that
+   names every location it tried (install + launch the desktop app).
 3. It also fetches the desktop session token (`GET /api/mcp/token`) and sends
    it as `X-JustSearch-Session` on every POST, so the bridge keeps working if
    the packaged app enforces the token on non-GET requests
-   (`ApiSecurityFilters.setupSessionTokenEnforcement`).
+   (`ApiSecurityFilters.setupSessionTokenEnforcement`). Every request to the Engine
+   (probes, token, each message's POST, the GET stream) goes through one function
+   (`engineRequest` in `server/engine-discovery.cjs`) whose keep-alive connections carry
+   nothing until the manifest still names the same Engine and the OS reports that pid as the
+   owner of the server end of that very connection; a reused connection needs no new proof.
+   If a proof fails, nothing is sent: the bridge drops the token and re-runs discovery, so a
+   token never reaches whatever took the port (a `JUSTSEARCH_API_PORT` pin is the operator's
+   choice and is used as given).
 4. Otherwise it forwards newline-delimited JSON-RPC from stdin to
    `http://127.0.0.1:<port>/mcp` (JSON and SSE response bodies both handled)
    and relays server messages back on stdout. If the app restarts on a
-   different port mid-session, the bridge re-reads the port file,
+   different port mid-session, the bridge re-runs that discovery,
    re-initializes the session with the cached `initialize` params, and replays
    the failed call once before giving up.
 
@@ -45,6 +68,7 @@ The bundle does **not** contain JustSearch itself. The desktop app
 |---|---|
 | `manifest.json` | MCPB manifest (schema v0.4) — metadata, the 6 tools, `win32`-only compatibility |
 | `server/index.js` | The stdio→HTTP bridge (zero dependencies) |
+| `server/engine-discovery.cjs` | Desktop data folder + validated manifest selection (shared with `scripts/prod/justsearch-mcp`) |
 | `server.json` | Official MCP Registry metadata (registry schema `2025-12-11`) — **not yet published** |
 | `test/smoke.mjs` | Scripted stdio MCP client: success path (initialize → tools/list → `justsearch_status`) and failure path (`--expect-unreachable`) |
 | `.mcpbignore` | Keeps the packed bundle to `manifest.json` + `server/` |

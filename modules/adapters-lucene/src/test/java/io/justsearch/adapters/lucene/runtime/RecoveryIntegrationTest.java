@@ -167,6 +167,79 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
     recovered.close();
   }
 
+  /**
+   * Task t-20261013-ef3c41, scenario S4: a transient read error on the index folder at startup
+   * never discards the index. A real sharing violation (a backup tool or virus scanner holding the
+   * commit point open without sharing) used to be classified CORRUPT_INDEX, and auto-recovery
+   * answered it by moving the index aside and starting empty. The open must instead fail as
+   * unavailable, leave the index in place, and succeed with every document once the file is free.
+   */
+  @Test
+  void aSharingViolationOnTheIndexAtStartupNeverDiscardsTheIndex() throws Exception {
+    org.junit.jupiter.api.Assumptions.assumeTrue(
+        System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win"),
+        "share modes are a Windows file-system feature");
+    Path dataRoot = dataDir();
+    Path indexPath = dataRoot.resolve("idx-locked");
+    Files.createDirectories(indexPath);
+    IndexSchema schema = buildSchemaWithDim(4);
+    RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
+        .withFallbackIndexPath(dataRoot).open();
+    seed.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+        SchemaFields.DOC_ID, "doc-1",
+        SchemaFields.DOC_UID, "doc-1#0",
+        SchemaFields.CONTENT, "must survive a locked startup")));
+    seed.commitOps().commitAndTrack();
+    seed.close();
+    Path segments;
+    try (Stream<Path> files = Files.list(indexPath)) {
+      segments = files.filter(p -> p.getFileName().toString().startsWith("segments_"))
+          .findFirst().orElseThrow();
+    }
+    ResolvedConfig recoveryCfg = resolvedConfigWith(autoRecoveryYaml(true));
+
+    Throwable openFailure = null;
+    long docsWhileLocked = -1;
+    try (java.nio.channels.FileChannel ignoredHeld = java.nio.channels.FileChannel.open(
+        segments,
+        java.nio.file.StandardOpenOption.READ,
+        com.sun.nio.file.ExtendedOpenOption.NOSHARE_READ,
+        com.sun.nio.file.ExtendedOpenOption.NOSHARE_WRITE,
+        com.sun.nio.file.ExtendedOpenOption.NOSHARE_DELETE)) {
+      try {
+        RunningRuntime whileLocked = schema.atPath(indexPath)
+            .withExecutorRegistrations(testLuceneExecutors())
+            .withFallbackIndexPath(dataRoot).withConfig(recoveryCfg).open();
+        try {
+          docsWhileLocked = whileLocked.indexCountOps().docCount();
+        } finally {
+          whileLocked.close();
+        }
+      } catch (RuntimeException expected) {
+        openFailure = expected;
+      }
+    }
+
+    assertEquals(List.of(), listSiblingBackups(indexPath, "idx-locked.bak-"),
+        "a locked file is not corruption: the index must not be moved aside");
+    assertNotNull(openFailure,
+        "while the commit point cannot be read the open must report the index unavailable, not"
+            + " serve an index holding " + docsWhileLocked + " documents");
+    if (openFailure instanceof IndexRuntimeIOException runtimeFailure) {
+      assertFalse(runtimeFailure.reason() == IndexRuntimeIOException.Reason.CORRUPT_INDEX,
+          "a sharing violation must not be classified as corruption");
+    }
+    RunningRuntime reopened = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
+        .withFallbackIndexPath(dataRoot).withConfig(recoveryCfg).open();
+    try {
+      reopened.commitOps().maybeRefreshBlocking();
+      assertEquals(1, reopened.indexCountOps().docCount(),
+          "once the file is free the retry finds the index with its document");
+    } finally {
+      reopened.close();
+    }
+  }
+
   @Test
   void corruptIndexWithoutAutoRecoveryFailsFast() throws Exception {
     Path dataRoot = dataDir();

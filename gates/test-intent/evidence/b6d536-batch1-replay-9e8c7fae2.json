@@ -1,0 +1,102 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:5b30c505784f7d60b422505dc5d8a1de626d655a6650894cc30850802ab5e7a6"
+  },
+  "createdAt": "2026-10-09T00:07:13.898Z",
+  "revision": "1e333857b664f7db3021324d8080290e1b3db0ad",
+  "tree": "ba2e6ad60b0b1a66dcef31a3727dffcfc09bf4fd",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RecoverableChunkCompletenessTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 81102
+    },
+    {
+      "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7879
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableChunkCompletenessTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableChunkCompletenessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:80ee4c56e3b70809c4596fd8b346ded201127d8d48c372f48568a57b85c66069",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptedWatchedAndRecordedIngestReplaysEveryDeclaredChunk(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:575713ac3c72aa72d44f91b5ca5be5c5e099b4cf26541b445db34242335b267a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missingChunksAreNotCertifiedByTheParentTimestamp()",
+          "status": "passed"
+        },
+        {
+          "name": "equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "9e8c7fae2",
+    "revision": "9e8c7fae2e33db679f535acf083cad0e94460f9a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RecoverableChunkCompletenessTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 68187
+      },
+      {
+        "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 15142
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableChunkCompletenessTest.java",
+        "classification": "assertion",
+        "detail": "interruptedWatchedAndRecordedIngestReplaysEveryDeclaredChunk(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: large replay must persist all chunks, observed 997 ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+        "classification": "assertion",
+        "detail": "missingChunksAreNotCertifiedByTheParentTimestamp(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a matching timestamp must not certify a missing chunk ==> expected: <false> but was: <true> | equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: equal row counts cannot certify duplicate ordinals ==> expected: <false> but was: <true>"
+      }
+    ]
+  },
+  "digest": "sha256:50648f4799b15dd7440b86869d267a2aee29623f4c61548b78c89bb6946b6309"
+}

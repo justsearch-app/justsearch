@@ -20,7 +20,7 @@ fn sleeper() -> PreparedCommand {
         command.args(["-n", "30", "127.0.0.1"]);
         command
     } else {
-        let mut command = std::process::Command::new("sleep");
+        let mut command = crate::containment::engine_command("sleep").unwrap();
         command.arg("30");
         command
     };
@@ -48,13 +48,33 @@ impl HandoffFixture {
     fn spawn_supervised(&self) {
         self.host.admit(sleeper()).unwrap();
         let host = self.host.clone();
+        let spawn_host = host.clone();
+        let dir = self.root.path().to_path_buf();
+        let mut actuator = crate::shell_actuator::ShellActuator::new(
+            host.clone(),
+            dir,
+            move || {
+                if let Some(pid) = spawn_host.child_pid() {
+                    Ok(pid)
+                } else {
+                    spawn_host.admit(sleeper()).map(|c| c.pid)
+                }
+            },
+            |_| {},
+        );
         self.host
             .start_supervisor(move || {
-                while host.should_continue() {
-                    std::thread::sleep(Duration::from_millis(2));
-                }
+                let mut policy = crate::supervisor::load_policy();
+                policy.quit_force_margin_ms = 300;
+                let mut supervisor = crate::supervisor::Supervisor::new(policy);
+                crate::supervisor::run_supervision(&mut supervisor, &mut actuator);
             })
             .unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while self.host.latest_record().is_none() {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(5));
+        }
     }
     async fn run(&self, coordinator: &UpdateCoordinator) -> Result<(), String> {
         let path = self.root.path().join("staged/attempt-1/installer.exe");
@@ -75,9 +95,12 @@ impl HandoffFixture {
             fs::create_dir(self.root.path().join("installer-launch-witness.v1.json")).unwrap();
         }
         if self.failure == "malformed_children" {
-            fs::create_dir(self.root.path().join("runtime")).unwrap();
-            fs::write(self.root.path().join("runtime/manifest.json"),
-                r#"{"schemaVersion":2,"children":{}}"#).unwrap();
+            fs::create_dir_all(self.root.path().join("runtime")).unwrap();
+            fs::write(
+                self.root.path().join("runtime/manifest.json"),
+                r#"{"schemaVersion":2,"children":{}}"#,
+            )
+            .unwrap();
         }
         // Authentication/staging is upstream. This is the exact downstream production call.
         let descriptor = ReleaseDescriptor {
@@ -142,12 +165,19 @@ impl UpgradeHandoff for HandoffFixture {
         self.available
     }
     fn child_pid(&self) -> Option<u32> {
+        if self.failure == "held_crash" && self.host.child_pid().is_some() {
+            self.host.with_child_mut(|child| child.kill().unwrap());
+            assert!(
+                self.host.wait_for_exit(Duration::from_secs(2)),
+                "actor must observe the held crash"
+            );
+        }
         self.host.child_pid()
     }
     fn stop_unrecoverable(&self) -> Result<Option<u32>, String> {
         assert!(self.is_held());
         assert!(
-            !self.available,
+            !self.available || (self.failure == "held_crash" && self.host.child_pid().is_none()),
             "prepared failures must never fall into the dead path"
         );
         let pid = self.host.stop_owned_engine(Duration::from_secs(2))?;
@@ -212,9 +242,23 @@ impl UpgradeHandoff for HandoffFixture {
     fn wait_for_exit(&self, timeout: Duration) -> bool {
         self.host.wait_for_exit(timeout)
     }
+    fn await_contained_exit(
+        &self,
+        timeout: Duration,
+    ) -> Result<crate::containment::JobEmpty, String> {
+        if self.failure == "helpers" {
+            return Ok(crate::containment::JobEmpty::TimedOut { active: 1 });
+        }
+        self.host.await_contained_exit(timeout)
+    }
+    fn terminate_contained(&self) -> Result<(), String> {
+        self.host.force_stop()
+    }
     fn resume(&self) -> Result<(), String> {
         self.host.release_replacement_hold()?;
-        self.spawn_supervised();
+        if !self.host.supervisor_running() {
+            self.spawn_supervised();
+        }
         self.resumes.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
@@ -222,7 +266,10 @@ impl UpgradeHandoff for HandoffFixture {
         assert!(self.is_held());
         assert_eq!(self.host.child_pid(), None);
         if let Some(child) = self.registered_child.lock().unwrap().as_mut() {
-            assert!(child.try_wait().unwrap().is_some(), "registered child survived until launch");
+            assert!(
+                child.try_wait().unwrap().is_some(),
+                "registered child survived until launch"
+            );
         }
         assert!(self.host.admit(sleeper()).is_err());
         assert_eq!(self.intent().phase, UpgradePhase::InstallLaunching);
@@ -233,6 +280,41 @@ impl UpgradeHandoff for HandoffFixture {
             Ok((42, now_epoch_ms()))
         }
     }
+}
+
+#[tokio::test]
+async fn held_crash_before_commit_still_launches_installer() {
+    let fixture = HandoffFixture::new(true, "held_crash");
+    let result = fixture.run(&UpdateCoordinator::default()).await;
+    assert_eq!(
+        fixture.launches.load(Ordering::SeqCst),
+        1,
+        "held crash before commit must proceed to install: {result:?}"
+    );
+    result.unwrap();
+    assert_eq!(fixture.intent().phase, UpgradePhase::InstallLaunched);
+    assert_eq!(
+        fixture.intent().stop_evidence.kind(),
+        "ENGINE_UNRECOVERABLE"
+    );
+    assert!(fixture.host.child_pid().is_none());
+    assert!(fixture.host.predecessor_job_empty());
+    assert!(fixture.is_held());
+    let records = crate::exit_ledger::read_ledger(
+        &crate::exit_ledger::ledger_directory(fixture.root.path()),
+        crate::exit_ledger::Family::Engine,
+    )
+    .unwrap()
+    .records;
+    let exits: Vec<_> = records
+        .iter()
+        .filter(|r| r["type"] == "engine-exit")
+        .collect();
+    assert_eq!(exits.len(), 1);
+    assert_eq!(exits[0]["exitClass"], "UNEXPECTED");
+    assert!(!records
+        .iter()
+        .any(|r| r["type"] == "engine-intent" && r["reason"] == "UPGRADE"));
 }
 
 #[tokio::test]
@@ -268,11 +350,15 @@ async fn coordinator_reconciles_real_registered_child_before_installer_launch() 
     let fixture = HandoffFixture::new(false, "");
     let (child, identity) = crate::tests::owned_sleep_child();
     *fixture.registered_child.lock().unwrap() = Some(child);
-    fs::create_dir(fixture.root.path().join("runtime")).unwrap();
+    fs::create_dir_all(fixture.root.path().join("runtime")).unwrap();
     let manifest = serde_json::json!({"schemaVersion": 2, "children": [{
         "pid": identity.pid, "startedAt": identity.started_at, "executable": identity.executable
     }]});
-    fs::write(fixture.root.path().join("runtime/manifest.json"), serde_json::to_vec(&manifest).unwrap()).unwrap();
+    fs::write(
+        fixture.root.path().join("runtime/manifest.json"),
+        serde_json::to_vec(&manifest).unwrap(),
+    )
+    .unwrap();
     fixture.run(&UpdateCoordinator::default()).await.unwrap();
     assert_eq!(fixture.launches.load(Ordering::SeqCst), 1);
     assert_eq!(fixture.intent().phase, UpgradePhase::InstallLaunched);
@@ -314,12 +400,17 @@ async fn handoff_failures_keep_hold_explicit_and_never_invent_a_dead_engine_fall
         let coordinator = UpdateCoordinator::default();
         let error = fixture.run(&coordinator).await.unwrap_err();
         assert!(
-            error.contains("replacement remains held"),
+            error.contains("replacement remains held") || failure == "prepare",
             "{failure}: {error}"
         );
-        assert!(fixture.is_held());
-        assert_eq!(coordinator.snapshot().state, "repair_required");
-        assert_eq!(fixture.resumes.load(Ordering::SeqCst), 0);
+        assert_eq!(fixture.is_held(), failure != "prepare");
+        if failure != "prepare" {
+            assert_eq!(coordinator.snapshot().state, "repair_required");
+        }
+        assert_eq!(
+            fixture.resumes.load(Ordering::SeqCst),
+            usize::from(failure == "prepare")
+        );
         assert_eq!(
             fixture.launches.load(Ordering::SeqCst),
             usize::from(failure == "witness")
@@ -370,3 +461,28 @@ async fn dead_stop_witness_refuses_mixed_receipts_and_wrong_attempt() {
     )
     .is_err());
 }
+
+#[tokio::test]
+async fn p5_u2_nonempty_job_never_launches_the_installer() {
+    for available in [false, true] {
+        let fixture = HandoffFixture::new(available, "helpers");
+        let result = fixture.run(&UpdateCoordinator::default()).await;
+        assert_eq!(
+            fixture.launches.load(Ordering::SeqCst),
+            0,
+            "installer launched while the job still held a process"
+        );
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert!(
+            error.contains("helpers did not exit: 1 processes"),
+            "{error}"
+        );
+        assert_eq!(fixture.launches.load(Ordering::SeqCst), 0);
+        assert_eq!(fixture.intent().phase, UpgradePhase::RepairRequired);
+        assert_eq!(fixture.resumes.load(Ordering::SeqCst), 1);
+    }
+}
+
+#[path = "updater_p5_oracle.rs"]
+mod p5_original;

@@ -49,13 +49,29 @@ public final class LoopPacingPolicy {
    *
    * Folding energy into the GPU-conflict escape would silently no-op the energy throttle on CPU
    * embeddings, so the two are kept separate here.
+   *
+   * <p>Spec E step E3 adds the third reason, the bulk hold ({@code bulkHeld}: external GPU memory
+   * pressure, later a game). It defers only when <b>any</b> bulk encoder is on the GPU: the
+   * embedding provider, or the sparse (SPLADE / BGE-M3) or NER encoder ({@code
+   * otherBulkEncoderOnGpu}). CPU bulk is never held (P2): no new bulk GPU batch starts, and CPU
+   * work is not GPU work.
+   *
+   * @param otherBulkEncoderOnGpu whether the sparse or NER bulk encoder runs on the GPU
    */
   public static boolean shouldRunBackfill(
-      boolean mainGpuActive, boolean energyReduced, EmbeddingProvider embeddingProvider) {
+      boolean mainGpuActive,
+      boolean energyReduced,
+      boolean bulkHeld,
+      boolean otherBulkEncoderOnGpu,
+      EmbeddingProvider embeddingProvider) {
     if (energyReduced) {
       return false; // power: defer regardless of GPU/CPU
     }
-    return !mainGpuActive || !embeddingProvider.isUsingGpu(); // VRAM conflict: only when on GPU
+    boolean embeddingOnGpu = embeddingProvider.isUsingGpu();
+    if (mainGpuActive && embeddingOnGpu) {
+      return false; // VRAM conflict: only when on GPU
+    }
+    return !(bulkHeld && (embeddingOnGpu || otherBulkEncoderOnGpu)); // hold: GPU bulk only
   }
 
   /**
@@ -67,8 +83,12 @@ public final class LoopPacingPolicy {
       boolean running,
       boolean mainGpuActive,
       boolean energyReduced,
+      boolean bulkHeld,
+      boolean otherBulkEncoderOnGpu,
       EmbeddingProvider embeddingProvider) {
-    boolean backfillBlocked = !shouldRunBackfill(mainGpuActive, energyReduced, embeddingProvider);
+    boolean backfillBlocked =
+        !shouldRunBackfill(
+            mainGpuActive, energyReduced, bulkHeld, otherBulkEncoderOnGpu, embeddingProvider);
     return !running || backfillBlocked;
   }
 

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.mcphost;
 
+import io.justsearch.app.api.runtime.child.OwnedHelper;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -76,7 +78,7 @@ public final class StdioMcpTransport implements McpTransport {
     pb.environment().putAll(extraEnv);
     Process p;
     try {
-      p = pb.start();
+      p = OwnedHelper.start(pb, "MCP stdio transport");
     } catch (IOException e) {
       throw new McpException("Failed to start MCP server: " + command, e);
     }
@@ -135,6 +137,7 @@ public final class StdioMcpTransport implements McpTransport {
     }
     closed = true;
     Process p = process;
+    OwnedHelper.expectInputClose(p, "transport close");
     try {
       if (writer != null) {
         writer.close();

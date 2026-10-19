@@ -12,7 +12,7 @@
  *   - dev-stack use, from a touch record the dev tools write on every call:
  *     `<stateRoot>/owners/<key>.json` `lastDevStackTouchAt`.
  *
- * Grades fed to the unchanged pure verdict (`ownership-verdict.cjs`):
+ * Grades fed to the pure verdict (`ownership-verdict.cjs`):
  *   ended                                   -> abandoned (reclaim without asking)
  *   alive, touch older than the idle bound  -> idle-hold (takeover with a warning)
  *   alive, recent touch                     -> active (ask the user)
@@ -26,7 +26,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { normalizeCreationTime, coerceProcessTable, DEFAULT_MAX_TABLE_AGE_MS } = require('./process-identity.cjs');
+const { normalizeCreationTime, coerceProcessTable, DEFAULT_MAX_TABLE_AGE_MS, linuxIdentity } = require('./process-identity.cjs');
 const { isSafeKey, readFixtureTable } = require('./agent-identity.cjs');
 
 const OWNERS_DIRNAME = 'owners';
@@ -95,6 +95,7 @@ function touchOwner(stateRoot, identity, { now = Date.now() } = {}) {
     harness: identity.harness,
     pid: owner.pid ?? null,
     creationTime: owner.creationTime ?? null,
+    ...(owner.processIdentity ? { processIdentity: owner.processIdentity } : {}),
     sessionId: identity.sessionId ?? null,
     lastDevStackTouchAt: new Date(now).toISOString(),
   });
@@ -113,6 +114,7 @@ function ownerBlockFor(identity) {
     harness: identity.harness,
     pid: o.pid ?? null,
     creationTime: o.creationTime ?? null,
+    ...(o.processIdentity ? { processIdentity: o.processIdentity } : {}),
     key: o.key,
   };
 }
@@ -122,6 +124,11 @@ function ownerBlockFor(identity) {
  * null for an override key, a legacy value or anything else. Pure.
  */
 function parseOwnerKey(key) {
+  const linux = /^(claude|codex)-(\d+)-linux-([0-9a-f-]{36})-([1-9][0-9]*)$/.exec(String(key ?? ''));
+  if (linux) {
+    const processIdentity = linuxIdentity({ kind: 'linux-proc-v1', pid: Number(linux[2]), bootId: linux[3], startTicks: linux[4] });
+    return processIdentity ? { harness: linux[1], pid: processIdentity.pid, creationTime: null, processIdentity, key } : null;
+  }
   const m = /^(claude|codex)-(\d+)-(\d+)$/.exec(String(key ?? ''));
   if (!m) return null;
   return { harness: m[1], pid: Number(m[2]), creationTime: m[3], key: m[0] };
@@ -134,6 +141,18 @@ function parseOwnerKey(key) {
 function ownerLiveness(owner, { table, now = Date.now(), maxTableAgeMs = DEFAULT_MAX_TABLE_AGE_MS } = {}) {
   if (!owner || !owner.key) return { state: 'unknown', reason: 'no owner recorded' };
   const pid = Number(owner.pid);
+  if (owner.processIdentity) {
+    const id = linuxIdentity(owner);
+    if (!id || id.pid !== pid) return { state: 'unknown', reason: 'invalid Linux owner identity' };
+    const coerced = coerceProcessTable(table, { now, maxTableAgeMs });
+    if (!coerced.ok) return { state: 'unknown', reason: coerced.reason };
+    const row = coerced.table.find(r => Number(r.ProcessId) === pid);
+    if (!row) return { state: 'ended', reason: 'owner process ended' };
+    const actual = linuxIdentity(row);
+    if (!actual) return { state: 'unknown', reason: 'owner birth unreadable' };
+    return actual.bootId === id.bootId && actual.startTicks === id.startTicks
+      ? { state: 'alive', reason: 'Linux owner birth matches' } : { state: 'ended', reason: 'owner birth differs' };
+  }
   const ct = normalizeCreationTime(owner.creationTime == null ? null : String(owner.creationTime));
   if (!Number.isInteger(pid) || pid <= 0 || !ct) return { state: 'unknown', reason: 'owner has no process identity (override or legacy)' };
   const coerced = coerceProcessTable(table, { now, maxTableAgeMs });
@@ -229,6 +248,57 @@ function isSelf(active, callerIdentity) {
   return !!(hk && ck && hk === ck);
 }
 
+/** The in-flight operations that block a restart (MUST_COMPLETE, UNSAFE_TO_INTERRUPT). Pure. */
+function restartBlockingOps(opLeases) {
+  const b = opLeases?.byCriticality ?? {};
+  return [...(b.unsafeToInterrupt ?? []), ...(b.mustComplete ?? [])];
+}
+
+/** "indexing.migration (MUST_COMPLETE, opId m1)" per operation, comma-joined. Pure. */
+function describeOps(ops) {
+  const list = (Array.isArray(ops) ? ops : []).map((op) => {
+    const name = op?.opClass || 'an operation';
+    const tags = [op?.criticality, op?.opId ? `opId ${op.opId}` : null].filter(Boolean).join(', ');
+    return tags ? `${name} (${tags})` : name;
+  });
+  return list.length > 0 ? list.join(', ') : 'an operation';
+}
+
+/**
+ * Wording for an owner whose OWN stack has an operation in flight. Pure. It says the stack is the
+ * caller's own and names the operation; it never says another owner holds the stack, never sends
+ * the caller to the user, and never claims the caller started the operation (the backend takes an
+ * operation lease for any HTTP caller and labels it with the stack's owner).
+ * @param {object[]} ops the blocking operations (restartBlockingOps or the gate's criticalOps)
+ * @param {'refused'|'warn'|'confirm'|'advice'} kind refused = a deny restart was refused; warn = a
+ *   warn restart was refused; confirm = a force restart lacks a matching confirm-interrupt;
+ *   advice = the sentence appended to an advisory verdict (quick_health, acquire_when_free)
+ */
+function ownOpInFlightText(ops, kind) {
+  const list = describeOps(ops);
+  const unsafe = (Array.isArray(ops) ? ops : []).some((op) => op?.criticality === 'UNSAFE_TO_INTERRUPT');
+  const force = unsafe
+    // The start tool has no confirm-interrupt input; only the dev-runner CLI takes it.
+    ? 'the dev-runner CLI: --takeover=force --confirm-interrupt=<opId>'
+    : 'takeover "force" (CLI: --takeover=force)';
+  const own = `This stack is your own, and an operation is running in it: ${list}.`;
+  const recorded = 'a forced restart records forcibly_interrupted_critical_op';
+  if (kind === 'advice') {
+    return `An operation is running in it: ${list}. A restart (start) is refused until it finishes: `
+      + `wait, or restart anyway with ${force}.`;
+  }
+  if (kind === 'warn') {
+    return `${own} takeover "warn" does not interrupt it. Wait for it to `
+      + `finish (recommended), or escalate to ${force}; ${recorded}.`;
+  }
+  if (kind === 'confirm') {
+    return `${own} Forcing a restart over an UNSAFE_TO_INTERRUPT operation needs `
+      + '--confirm-interrupt=<opId> (dev-runner CLI) naming that operation; otherwise wait for it to finish.';
+  }
+  return `${own} Restarting it now would interrupt that operation, so the restart was refused. Wait `
+    + `for it to finish, or restart anyway with ${force}; ${recorded}.`;
+}
+
 /**
  * Supervisor tick decision. Pure.
  * @param {object} p
@@ -297,11 +367,12 @@ function pruneOwnerRecords(stateRoot, { table, now = Date.now(), keep = new Set(
  */
 function holderNeedsTable(active, callerIdentity) {
   const o = holderOwner(active);
-  return !!(o && Number.isInteger(Number(o.pid)) && Number(o.pid) > 0 && o.creationTime && !isSelf(active, callerIdentity));
+  return !!(o && Number.isInteger(Number(o.pid)) && Number(o.pid) > 0
+    && (o.creationTime || linuxIdentity(o)) && !isSelf(active, callerIdentity));
 }
 
 /**
- * The ownership verdict for owner-keyed records: gathers presence and delegates to the unchanged
+ * The ownership verdict for owner-keyed records: gathers presence and delegates to the
  * pure `computeOwnershipVerdict`. `table` is a readProcessTable-shaped result (or null = no
  * evidence, which reads as unknown and therefore active-like).
  */
@@ -412,6 +483,9 @@ module.exports = {
   restoreVictim,
   holderOwner,
   isSelf,
+  restartBlockingOps,
+  describeOps,
+  ownOpInFlightText,
   decideSupervisorPresence,
   pruneOwnerRecords,
   activeRunFileCandidates,

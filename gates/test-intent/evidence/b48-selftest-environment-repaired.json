@@ -1,0 +1,71 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T16:35:09.650Z",
+  "revision": "d1c278ba32023c378a667460046ab7aae8ee7134",
+  "tree": "31d8193f4d0bcdee4c695eb5068c4823406d8382",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.SelfTestDeviceEnvironmentTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 31159
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestDeviceEnvironmentTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestDeviceEnvironmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8c689cba60d1e47504a11d2c7eda80f068e4f519d85ea48844f04fc09f97520f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "childControlReceivesTheSameDeviceEnvironmentAndGpuOwnershipAsTheCommand()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f6d579a86",
+    "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b48-selftest-environment-compat.patch",
+        "contentDigest": "sha256:4b795bb707f22f14455e6415ef8290ba21c960099ac4e391de55fcb33bb13e30"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.SelfTestDeviceEnvironmentTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 113320
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestDeviceEnvironmentTest.java",
+        "classification": "assertion",
+        "detail": "childControlReceivesTheSameDeviceEnvironmentAndGpuOwnershipAsTheCommand(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <-1> but was: <null>"
+      }
+    ]
+  },
+  "digest": "sha256:353358e355eb0bb687c092c6929d924a872144536583ce9bc0159835324216b0"
+}

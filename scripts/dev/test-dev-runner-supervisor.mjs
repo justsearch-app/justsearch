@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 /**
  * Lane F stage B item B8 — the dev-runner supervisor's actuator, at unit level.
  *
@@ -168,7 +169,10 @@ try {
 }
 
 async function testWindowsReadHandlePublication() {
-  if (process.platform !== 'win32') return;
+  if (process.platform !== 'win32') {
+    console.log('SKIP Windows FILE_SHARE_DELETE rename refusal; Linux atomic publication is covered by testOverlappingStatePublicationsStayInTransitionOrder');
+    return;
+  }
   const root = tempRoot('reader-rename');
   const target = path.join(root, 'state.json');
   const oldState = { state: 'running', incarnation: 1 };
@@ -321,9 +325,14 @@ async function testHostRequestWriterAndHandoffAdmission() {
   const root = tempRoot('request');
   try {
     const dataDir = path.join(root, 'data');
-    await writeShutdownRequestFile(dataDir, { reason: 'restart', deadlineEpochMs: 1 });
+    await writeShutdownRequestFile(dataDir, { reason: 'restart', deadlineEpochMs: 1, incarnation: 'writer/1' });
     const body = JSON.parse(fs.readFileSync(path.join(dataDir, 'runtime', 'shutdown-request.v1.json'), 'utf8'));
-    assert.deepEqual(body, { schemaVersion: 1, reason: 'restart', deadlineEpochMs: 1, issuedBy: 'dev-runner' });
+    assert.equal(body.incarnation, 'writer/1');
+    assert.match(body.requestNonce, /^[0-9a-f-]{36}$/);
+    assert.deepEqual({ ...body, requestNonce: undefined }, { schemaVersion: 1, reason: 'restart',
+      deadlineEpochMs: 1, issuedBy: 'dev-runner', incarnation: 'writer/1', requestNonce: undefined });
+    await assert.rejects(writeShutdownRequestFile(dataDir, { reason: 'quit', deadlineEpochMs: 1 }),
+      /requires incarnation/);
     const manifest = { schemaVersion: 2, pid: 42, instanceId: 'boot',
       shutdownHandoff: { state: 'pending', reason: 'restart' } };
     assert.equal(engineSupervisor.shutdownHandoffReason(manifest, 42, 'boot'), 'restart');
@@ -485,21 +494,24 @@ async function testTerminalChildCleanupRequiresAllIdentityAxes() {
   try {
     const dataDir = path.join(root, 'data');
     fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
+    const recordedExe = process.platform === 'win32' ? 'C:\\bin\\llama.exe' : '/opt/justsearch/llama-server';
+    const observedExe = process.platform === 'win32' ? 'c:\\bin\\llama.exe' : recordedExe;
+    const foreignExe = process.platform === 'win32' ? 'c:\\other\\java.exe' : '/opt/other/java';
     fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), JSON.stringify({
       schemaVersion: 2,
       children: [
-        { id: 'match', pid: 101, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
-        { id: 'reused', pid: 102, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
-        { id: 'unrelated', pid: 103, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
-        { id: 'near-reuse', pid: 105, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
-        { id: 'unknown', pid: 104, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
+        { id: 'match', pid: 101, startedAt: '2026-09-08T10:00:00.000Z', executable: recordedExe },
+        { id: 'reused', pid: 102, startedAt: '2026-09-08T10:00:00.000Z', executable: recordedExe },
+        { id: 'unrelated', pid: 103, startedAt: '2026-09-08T10:00:00.000Z', executable: recordedExe },
+        { id: 'near-reuse', pid: 105, startedAt: '2026-09-08T10:00:00.000Z', executable: recordedExe },
+        { id: 'unknown', pid: 104, startedAt: '2026-09-08T10:00:00.000Z', executable: recordedExe },
       ],
     }));
     const identities = new Map([
-      [101, { alive: true, startedAt: '2026-09-08T10:00:00.0004567Z', executable: 'c:\\bin\\llama.exe' }],
-      [102, { alive: true, startedAt: '2026-09-08T11:00:00.000Z', executable: 'c:\\bin\\llama.exe' }],
-      [103, { alive: true, startedAt: '2026-09-08T10:00:00.000Z', executable: 'c:\\other\\java.exe' }],
-      [105, { alive: true, startedAt: '2026-09-08T10:00:00.999Z', executable: 'c:\\bin\\llama.exe' }],
+      [101, { alive: true, startedAt: '2026-09-08T10:00:00.0004567Z', executable: observedExe }],
+      [102, { alive: true, startedAt: '2026-09-08T11:00:00.000Z', executable: observedExe }],
+      [103, { alive: true, startedAt: '2026-09-08T10:00:00.000Z', executable: foreignExe }],
+      [105, { alive: true, startedAt: '2026-09-08T10:00:00.999Z', executable: observedExe }],
       [104, { alive: true }],
     ]);
     const killed = [];
@@ -523,6 +535,34 @@ async function testTerminalChildCleanupRequiresAllIdentityAxes() {
     fs.rmSync(root, { recursive: true, force: true });
   }
   console.log('test-dev-runner-supervisor: terminal cleanup is identity-safe — PASS');
+}
+
+// --- the Engine's self-intent beside the owner's -------------------------------------------------
+
+/**
+ * Spec B §6.1-6.2: the Engine records its own intent before every close it runs, including one its
+ * supervisor asked for. When both expect the exit code, the exit is the owner's request: a hang
+ * request answered with a clean 0 is TIMEOUT/hang, not the Engine's ENGINE_RESTART/hang. The
+ * Engine's own intent classifies an exit nobody asked for (an escalated restart), and expects
+ * nothing about a crash.
+ */
+function testTheOwnersIntentOutranksTheEnginesOwn() {
+  const { classifyEngineExit } = require(path.join(__dirname, 'lib', 'engine-actuator.cjs'));
+  const hangRequest = { reason: 'TIMEOUT', detail: 'hang', mode: 'COOPERATIVE', channel: 'REQUEST_FILE' };
+  const selfHang = { reason: 'ENGINE_RESTART', detail: 'hang', expectedCode: 0 };
+  const pick = (c) => [c.exitClass, c.reason, c.detail];
+  assert.deepEqual(pick(classifyEngineExit({ code: 0, intents: [hangRequest], selfIntent: selfHang,
+    policy: PRODUCT_POLICY })), ['REQUESTED', 'TIMEOUT', 'hang'], 'the supervisor asked for this close');
+  const restartRequest = { reason: 'ENGINE_RESTART', detail: null, mode: 'COOPERATIVE', channel: 'REQUEST_FILE' };
+  const selfQuit = { reason: 'QUIT', detail: null, expectedCode: 0 };
+  assert.deepEqual(pick(classifyEngineExit({ code: 4, intents: [restartRequest], selfIntent: selfQuit,
+    policy: PRODUCT_POLICY })), ['REQUESTED', 'ENGINE_RESTART', null], 'the code names the intent it answers');
+  const selfEscalated = { reason: 'ENGINE_RESTART', detail: 'escalated', expectedCode: 5 };
+  assert.deepEqual(pick(classifyEngineExit({ code: 5, intents: [], selfIntent: selfEscalated,
+    policy: PRODUCT_POLICY })), ['REQUESTED', 'ENGINE_RESTART', 'escalated'], 'nobody else asked');
+  assert.deepEqual(pick(classifyEngineExit({ code: 1, intents: [hangRequest], selfIntent: selfHang,
+    policy: PRODUCT_POLICY })), ['UNEXPECTED', 'TIMEOUT', 'hang'], 'a crash during the asked-for close stays a crash');
+  console.log('test-dev-runner-supervisor: the owner\'s intent outranks the Engine\'s own — PASS');
 }
 
 async function main() {
@@ -575,6 +615,7 @@ async function main() {
   testStopReportCarriesTheIncarnationOnlyWhenSupervised();
   testARestartIsNotAnAbandonedStack();
   await testTerminalChildCleanupRequiresAllIdentityAxes();
+  testTheOwnersIntentOutranksTheEnginesOwn();
   console.log('test-dev-runner-supervisor: ALL PASS');
 }
 

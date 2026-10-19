@@ -41,15 +41,23 @@ CONFIGS=(
 )
 
 kill_backend() {
-  # Windows: use PowerShell to find and kill processes on the port
-  powershell -Command "
-    \$conn = Get-NetTCPConnection -LocalPort $PORT -State Listen -ErrorAction SilentlyContinue
-    if (\$conn) {
-      \$conn | ForEach-Object { Stop-Process -Id \$_.OwningProcess -Force -ErrorAction SilentlyContinue }
-    }
-  " 2>/dev/null || true
-  sleep 2
+  [ -s "$OWNED_RECORD" ] || return 0
+  # The run is in its own job: ending its recorded host ends every process the job holds (the java
+  # behind ui.bat included), then each recorded identity is verified. Never a port, name or parent link.
+  powershell -NoProfile -Command '
+    # A separate native host makes Console.Out available in this pipeline as real stdout.
+    $result = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $env:JUSTSEARCH_SWEEP_STOPPER -RecordPath $env:JUSTSEARCH_SWEEP_RECORD -Code 1
+    $status = $LASTEXITCODE
+    $result | Write-Output
+    exit $status
+  ' || { echo "Owned backend stop incomplete; inspect $OWNED_RECORD before retrying" >&2; return 1; }
+  : > "$OWNED_RECORD"
 }
+
+OWNED_RECORD="$(mktemp)"
+export JUSTSEARCH_SWEEP_RECORD="$(cygpath -w "$OWNED_RECORD")"
+export JUSTSEARCH_SWEEP_STOPPER="$(cygpath -w "$REPO_ROOT/scripts/dev/lib/stop-job-run.ps1")"
+trap 'kill_backend; if [ ! -s "$OWNED_RECORD" ]; then rm -f "$OWNED_RECORD"; fi' EXIT
 
 wait_ready() {
   local max_wait=90
@@ -100,7 +108,12 @@ start_backend() {
   export JUSTSEARCH_HYBRID_CC_WEIGHT_DENSE="$dense"
   export JUSTSEARCH_HYBRID_CC_WEIGHT_SPLADE="$splade"
 
-  "$INSTALL_BAT" > /dev/null 2>&1 &
+  # A listener we did not start is a conflict, never a target to kill.
+  if curl -sf "$BASE_URL/api/status" >/dev/null 2>&1; then
+    echo "API port is occupied; stop its owner yourself or choose another port" >&2; return 1
+  fi
+  powershell -NoProfile -File "$REPO_ROOT/scripts/dev/start-recorded-command.ps1" \
+    -CommandFile "$(cygpath -w "$INSTALL_BAT")" -RecordPath "$JUSTSEARCH_SWEEP_RECORD"
 }
 
 # Ensure distribution is built

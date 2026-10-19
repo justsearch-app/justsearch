@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Versioned in-memory replica of currently-asserted health conditions and threshold states.
@@ -92,7 +93,13 @@ public final class ConditionStore {
   }
 
   private final ConcurrentHashMap<ConditionKey, HealthEvent> conditions = new ConcurrentHashMap<>();
+  private volatile ReentrantReadWriteLock publicationLock = new ReentrantReadWriteLock();
   private final AtomicLong version = new AtomicLong();
+
+  /** Binds current-state reads to the component authority's visibility boundary before wiring. */
+  public void bindPublicationBoundary(ReentrantReadWriteLock boundary) {
+    publicationLock = Objects.requireNonNull(boundary, "boundary");
+  }
 
   /**
    * Returns the internal mutation counter. <strong>Not</strong> the SSE wire's
@@ -106,14 +113,20 @@ public final class ConditionStore {
 
   /** Returns the conditions in stable lexicographic order by {@code (id, subject)}. */
   public List<HealthEvent> currentSnapshot() {
-    return conditions.values().stream().sorted(SNAPSHOT_ORDER).toList();
+    var lock = publicationLock.readLock();
+    lock.lock();
+    try { return conditions.values().stream().sorted(SNAPSHOT_ORDER).toList(); }
+    finally { lock.unlock(); }
   }
 
   /** Returns the current condition for the given (id, subject) key, if any. */
   public Optional<HealthEvent> find(String id, String subject) {
     Objects.requireNonNull(id, "id");
     Objects.requireNonNull(subject, "subject");
-    return Optional.ofNullable(conditions.get(new ConditionKey(id, subject)));
+    var lock = publicationLock.readLock();
+    lock.lock();
+    try { return Optional.ofNullable(conditions.get(new ConditionKey(id, subject))); }
+    finally { lock.unlock(); }
   }
 
   /**

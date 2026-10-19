@@ -114,11 +114,6 @@ public record RuntimeStatus(List<Condition> conditions) {
    */
   public static final String REASON_ENGINE_UP_FOR_BACKGROUND =
       LifecycleReasonCode.INFERENCE_UP_FOR_BACKGROUND.code();
-  /**
-   * Anti-flap hold (item 2): the same foreign flip recurred past the cap inside the window, so the
-   * reconciler stopped fighting it and is holding until spec / procedure / policy input changes.
-   */
-  public static final String REASON_CONVERGENCE_HELD_FLAP = "convergence-held-flap-suspected";
   public static final String REASON_PROCEDURE_ACTIVE = "procedure-active";
 
   /**
@@ -164,10 +159,36 @@ public record RuntimeStatus(List<Condition> conditions) {
         : new Condition(Axis.ADOPTION, "own", "own-process", "Using the managed llama-server process", specVersion, now);
   }
 
-  /** Derives the LEASE-axis condition from the current lease holder. */
-  public static Condition deriveLease(RuntimeGpuLease.Holder holder, long specVersion, Instant now) {
-    RuntimeGpuLease.Holder h = holder == null ? RuntimeGpuLease.Holder.NONE : holder;
-    return new Condition(Axis.LEASE, h.name(), "lease-holder", "GPU lease holder: " + h.name(), specVersion, now);
+  /** LEASE-axis value: chat holds the GPU (the engine is ONLINE). */
+  public static final String LEASE_CHAT = "CHAT";
+
+  /** LEASE-axis value: indexing holds the GPU (the engine yielded it, INDEXING). */
+  public static final String LEASE_INDEXING = "INDEXING";
+
+  /** LEASE-axis value: nobody holds the GPU (OFFLINE). */
+  public static final String LEASE_NONE = "NONE";
+
+  /**
+   * The LEASE-axis holder for an observed {@code mode}: {@code ONLINE} is {@link #LEASE_CHAT},
+   * {@code INDEXING} {@link #LEASE_INDEXING}, {@code OFFLINE} {@link #LEASE_NONE}; {@code
+   * TRANSITIONING} (or no observation) keeps {@code previous}, the holder of the last committed
+   * mode, since the swap has not committed yet.
+   */
+  public static String leaseHolderFor(Mode mode, String previous) {
+    String kept = previous == null ? LEASE_NONE : previous;
+    if (mode == null) return kept;
+    return switch (mode) {
+      case ONLINE -> LEASE_CHAT;
+      case INDEXING -> LEASE_INDEXING;
+      case OFFLINE -> LEASE_NONE;
+      case TRANSITIONING -> kept;
+    };
+  }
+
+  /** Derives the LEASE-axis condition from the current lease holder ({@code null} is none). */
+  public static Condition deriveLease(String holder, long specVersion, Instant now) {
+    String h = holder == null ? LEASE_NONE : holder;
+    return new Condition(Axis.LEASE, h, "lease-holder", "GPU lease holder: " + h, specVersion, now);
   }
 
   /** Derives the PROCEDURE-axis condition from the in-flight procedure overlay (nullable). */
@@ -190,7 +211,7 @@ public record RuntimeStatus(List<Condition> conditions) {
 
   /** Three-axis derivation (ENGINE / ADOPTION / LEASE) for the given observation. */
   public static RuntimeStatus derive(
-      Mode mode, boolean external, RuntimeGpuLease.Holder leaseHolder, long specVersion, Instant now) {
+      Mode mode, boolean external, String leaseHolder, long specVersion, Instant now) {
     Instant t = now == null ? Instant.now() : now;
     return new RuntimeStatus(
         List.of(
@@ -207,7 +228,7 @@ public record RuntimeStatus(List<Condition> conditions) {
   public static RuntimeStatus derive(
       Mode mode,
       boolean external,
-      RuntimeGpuLease.Holder leaseHolder,
+      String leaseHolder,
       Procedure procedure,
       long specVersion,
       Instant now) {
@@ -222,6 +243,6 @@ public record RuntimeStatus(List<Condition> conditions) {
 
   /** Initial status before the first observation: engine down, own process, no lease. */
   public static RuntimeStatus initial() {
-    return derive(Mode.OFFLINE, false, RuntimeGpuLease.Holder.NONE, 0L, Instant.now());
+    return derive(Mode.OFFLINE, false, LEASE_NONE, 0L, Instant.now());
   }
 }

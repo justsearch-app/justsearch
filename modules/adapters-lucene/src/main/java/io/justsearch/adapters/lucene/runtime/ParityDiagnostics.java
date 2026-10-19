@@ -120,6 +120,27 @@ public final class ParityDiagnostics {
     return docCount <= 0;
   }
 
+  /**
+   * True when what the index recorded about its shape cannot be read (task t-20261013-ef3c41): a
+   * stored digest that is not a digest this runtime could have written, compared against one it
+   * did compute; or no digest and recorded inputs that are not a readable JSON object. The answer
+   * to "is this index compatible?" is then unknown — never compatible, never "rebuild required" —
+   * and {@link #diff} files no difference for it, so nothing rebuilds automatically.
+   */
+  public static boolean storedShapeUnreadable(
+      Map<String, String> stored, Map<String, Object> expected) {
+    String storedDigest = storedFingerprint(stored);
+    if (!isBlank(storedDigest)) {
+      String expectedDigest = expectedFingerprint(expected);
+      return io.justsearch.adapters.lucene.commit.IndexFingerprint.isWellFormedDigest(expectedDigest)
+          && !io.justsearch.adapters.lucene.commit.IndexFingerprint.isWellFormedDigest(
+              storedDigest);
+    }
+    String storedInputs = storedInputsJson(stored);
+    return !isBlank(storedInputs)
+        && !io.justsearch.adapters.lucene.commit.IndexFingerprint.isReadableInputs(storedInputs);
+  }
+
   public static List<Diff> diff(
       Map<String, String> stored, Map<String, Object> expected, long docCount) {
     return diff(stored, expected, docCount,
@@ -171,6 +192,10 @@ public final class ParityDiagnostics {
       }
       if (!Objects.equals(storedRaw, expectedRaw)) {
         if (REBUILD_REQUIRING_KEYS.contains(key) && holdsNothingToMigrate(docCount)) {
+          continue;
+        }
+        // An unreadable stored digest is an unanswered question, not a shape change: no rebuild.
+        if (REBUILD_REQUIRING_KEYS.contains(key) && storedShapeUnreadable(stored, expected)) {
           continue;
         }
         diffs.add(

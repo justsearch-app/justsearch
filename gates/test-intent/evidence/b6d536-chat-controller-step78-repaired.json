@@ -1,0 +1,242 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:31:35.356Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "c3547acde276826c1505e519e92c525fe2062f42",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatCrashLatchOrderTest.aCrashIsLatchedBeforeItsOfflineLandingIsPublished\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 21350
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.InferenceCapabilityWiringTest.aCrashLatchedAsOutOfMemoryIsPublishedAsOutOfMemory\" --tests \"io.justsearch.app.services.bootstrap.phases.InferenceCapabilityWiringTest.aFailedActivationNamesItsClassifiedFailure\" --tests \"io.justsearch.app.services.bootstrap.phases.InferenceCapabilityWiringTest.aSteppedDownServerIsReadyWithTheContextReducedNotice\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9405
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingStateChatReasonTest.aFailedChatNamesItsClassifiedFailure\" --tests \"io.justsearch.ui.api.OperatingStateChatReasonTest.aStartWaitingWhileTheEngineIsDownIsLoading\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6916
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/state/readinessNotice.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-2\\\\test-intent-vitest-23516-1791995348828.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1473
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashLatchOrderTest.java#aCrashIsLatchedBeforeItsOfflineLandingIsPublished",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashLatchOrderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8bee5ebf5cd10da2bea63185cf961ec6af2db49ff518f3b6dbf5b47af4603c2d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCrashIsLatchedBeforeItsOfflineLandingIsPublished()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceCapabilityWiringTest.java#aCrashLatchedAsOutOfMemoryIsPublishedAsOutOfMemory",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceCapabilityWiringTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1ae47fd4301a3965737bc4ef739199f08594ca0746a3adda6dd0bca351f03e0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCrashLatchedAsOutOfMemoryIsPublishedAsOutOfMemory()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceCapabilityWiringTest.java#aFailedActivationNamesItsClassifiedFailure",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceCapabilityWiringTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1ae47fd4301a3965737bc4ef739199f08594ca0746a3adda6dd0bca351f03e0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedActivationNamesItsClassifiedFailure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceCapabilityWiringTest.java#aSteppedDownServerIsReadyWithTheContextReducedNotice",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceCapabilityWiringTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1ae47fd4301a3965737bc4ef739199f08594ca0746a3adda6dd0bca351f03e0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSteppedDownServerIsReadyWithTheContextReducedNotice()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateChatReasonTest.java#aFailedChatNamesItsClassifiedFailure",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateChatReasonTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcf26c5d4f0e60956e4b5eed1b2dd7591ce1fdeea185c6eacbf1bd90b7f14241",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedChatNamesItsClassifiedFailure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateChatReasonTest.java#aStartWaitingWhileTheEngineIsDownIsLoading",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateChatReasonTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcf26c5d4f0e60956e4b5eed1b2dd7591ce1fdeea185c6eacbf1bd90b7f14241",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStartWaitingWhileTheEngineIsDownIsLoading()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#Spec A step 7: each classified chat failure words its own cause and is a warn",
+      "file": "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4d2b3e76828dc90ccc7438e88461045b573e19f2604b79dd375f1334e9231309",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readinessNotice — index and inference rows Spec A step 7: each classified chat failure words its own cause and is a warn",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#Spec A step 7: context_reduced is a calm notice that stays out of the banner",
+      "file": "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4d2b3e76828dc90ccc7438e88461045b573e19f2604b79dd375f1334e9231309",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readinessNotice — index and inference rows Spec A step 7: context_reduced is a calm notice that stays out of the banner",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "19f7c8a81",
+    "revision": "19f7c8a816e3bf169aa1d572d92a033d03f1d7b0",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatCrashLatchOrderTest.aCrashIsLatchedBeforeItsOfflineLandingIsPublished\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 34032
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.InferenceCapabilityWiringTest.aCrashLatchedAsOutOfMemoryIsPublishedAsOutOfMemory\" --tests \"io.justsearch.app.services.bootstrap.phases.InferenceCapabilityWiringTest.aFailedActivationNamesItsClassifiedFailure\" --tests \"io.justsearch.app.services.bootstrap.phases.InferenceCapabilityWiringTest.aSteppedDownServerIsReadyWithTheContextReducedNotice\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 52808
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingStateChatReasonTest.aFailedChatNamesItsClassifiedFailure\" --tests \"io.justsearch.ui.api.OperatingStateChatReasonTest.aStartWaitingWhileTheEngineIsDownIsLoading\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 51030
+      },
+      {
+        "command": "npx vitest run \"src/shell-v0/state/readinessNotice.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-2\\\\test-intent-vitest-23516-1791995491483.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1014
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashLatchOrderTest.java#aCrashIsLatchedBeforeItsOfflineLandingIsPublished",
+        "classification": "assertion",
+        "detail": "aCrashIsLatchedBeforeItsOfflineLandingIsPublished(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the landing's listeners see the classified failure, not the latch from before it ==> expected: <[CRASH_LOOP]> but was: <[null]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceCapabilityWiringTest.java#aCrashLatchedAsOutOfMemoryIsPublishedAsOutOfMemory",
+        "classification": "assertion",
+        "detail": "aCrashLatchedAsOutOfMemoryIsPublishedAsOutOfMemory(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <inference.out_of_memory> but was: <inference.crashed>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceCapabilityWiringTest.java#aFailedActivationNamesItsClassifiedFailure",
+        "classification": "assertion",
+        "detail": "aFailedActivationNamesItsClassifiedFailure(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <inference.model_load_failed> but was: <inference.activation_failed>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceCapabilityWiringTest.java#aSteppedDownServerIsReadyWithTheContextReducedNotice",
+        "classification": "assertion",
+        "detail": "aSteppedDownServerIsReadyWithTheContextReducedNotice(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <inference.context_reduced> but was: <null>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateChatReasonTest.java#aFailedChatNamesItsClassifiedFailure",
+        "classification": "assertion",
+        "detail": "aFailedChatNamesItsClassifiedFailure(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: inference.out_of_memory ==> expected: <RESOURCE_EXHAUSTED> but was: <null>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingStateChatReasonTest.java#aStartWaitingWhileTheEngineIsDownIsLoading",
+        "classification": "assertion",
+        "detail": "aStartWaitingWhileTheEngineIsDownIsLoading(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <LOADING> but was: <OFF>"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#Spec A step 7: each classified chat failure words its own cause and is a warn",
+        "classification": "assertion",
+        "detail": "readinessNotice — index and inference rows Spec A step 7: each classified chat failure words its own cause and is a warn:  AssertionError: inference.out_of_memory: expected 'Degraded: inference.out_of_memory' to be 'The local AI model ran out of graphic…' // Object.is equality\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-2/test-intent-before-eYaDQF/modules/ui-web/src/shell-v0/state/readinessNotice.test.ts:714:45"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#Spec A step 7: context_reduced is a calm notice that stays out of the banner",
+        "classification": "assertion",
+        "detail": "readinessNotice — index and inference rows Spec A step 7: context_reduced is a calm notice that stays out of the banner:  AssertionError: expected 'Degraded: inference.context_reduced' to be 'The local AI model is running with a …' // Object.is equality\n    at F:/agent-sandbox/design-b6d536/phaseb-tmp-2/test-intent-before-eYaDQF/modules/ui-web/src/shell-v0/state/readinessNotice.test.ts:729:60\n    at file:///F:/justsear"
+      }
+    ]
+  },
+  "digest": "sha256:65d269f2fc36096f16e2f4bcdc4d42bb35158f9918fab467d260340adcc6e82e"
+}

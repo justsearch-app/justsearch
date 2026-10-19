@@ -124,10 +124,8 @@ public final class DevModeVariantProbe {
         ? manifest.capabilities().gpuPrecision() : manifest.capabilities().cpuPrecision();
     ModelPrecision precision = declaredOrGuessedPrecision(
         declaredPrecision, modelFile.getFileName().toString());
-    if (!gpuEnabled && precision == ModelPrecision.FP16) {
-      log.warn("Exact generation model {} requires FP16 but CUDA is unavailable", modelFile);
-      return null;
-    }
+    // Generation identity is immutable. ORT can execute this FP16 artifact on the CPU;
+    // ModelSessionPolicyResolver chooses BASIC_OPT to avoid the expensive Cast rewrite.
     if (gpuEnabled && !selectedGpuFile) {
       return VariantSelection.degraded(modelFile, precision, ExecutionProvider.CUDA,
           "Generation-bound CPU variant selected on CUDA");
@@ -141,10 +139,6 @@ public final class DevModeVariantProbe {
       ExecutionProvider targetEp, boolean gpuEnabled) {
     if (modelFile == null || precision == null || targetEp == null
         || !Files.isRegularFile(modelFile, LinkOption.NOFOLLOW_LINKS)) return null;
-    if (!gpuEnabled && precision == ModelPrecision.FP16) {
-      log.warn("Exact witnessed model {} requires FP16 but CUDA is unavailable", modelFile);
-      return null;
-    }
     if (gpuEnabled && targetEp == ExecutionProvider.CPU) {
       return VariantSelection.degraded(modelFile, precision, ExecutionProvider.CUDA,
           "Witnessed CPU variant selected on CUDA");

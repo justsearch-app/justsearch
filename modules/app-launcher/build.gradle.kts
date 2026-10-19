@@ -169,6 +169,19 @@ tasks.withType<JacocoCoverageVerification>().configureEach {
 tasks.named<Test>("test") {
   inputs.file(rootProject.file("governance/store-recoverability.v1.json"))
     .withPropertyName("cliDataVersionStoreRegister").withPathSensitivity(PathSensitivity.RELATIVE)
+
+  // Tempdoc 966 D6: UnreferencedCodeTest's method rule is a FreezingArchRule whose committed store
+  // is the accepted set of non-public production methods only tests call. Same wiring as
+  // modules/dead-code-audit: ArchUnit resolves a relative store path against the JVM working
+  // directory, so pass the absolute one (system properties prefixed `archunit.` override
+  // src/test/resources/archunit.properties), and declare the store an input so that editing the
+  // accepted set re-runs the test instead of leaving the task up to date.
+  val archunitStore = layout.projectDirectory.dir("archunit_store")
+  systemProperty("archunit.freeze.store.default.path", archunitStore.asFile.absolutePath)
+  inputs
+      .dir(archunitStore)
+      .withPropertyName("unreferencedCodeArchUnitStore")
+      .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 testing {

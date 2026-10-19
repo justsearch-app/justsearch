@@ -169,6 +169,23 @@ public final class ChatController {
             "chat-stream-heartbeat"));
   }
 
+  /** The residency gate every chat run passes before it streams (Spec A step 9). */
+  private volatile ChatResidencyGate residencyGate = ChatResidencyGate.none();
+
+  /** Installs the residency gate; without one every run is admitted. */
+  public void setResidencyGate(ChatResidencyGate gate) {
+    this.residencyGate = java.util.Objects.requireNonNull(gate, "gate");
+  }
+
+  /**
+   * Asks the residency gate about a run with {@code body}; when it refuses, the response is written.
+   *
+   * @return true to go on
+   */
+  boolean admitResidency(Context ctx, Map<String, Object> body) {
+    return residencyGate.admitChat(ctx, body);
+  }
+
   /** Stops the heartbeat scheduler. Call on shutdown (tempdoc 638 PE's asymmetry, not repeated). */
   public void shutdown() {
     heartbeat.shutdown();
@@ -286,6 +303,9 @@ public final class ChatController {
       ctx.status(LOCKED_STATUS).json(locked);
       return;
     }
+    // Spec A step 9: chat unloaded for another GPU user answers a typed refusal, or reloads for a
+    // person, before the stream commits a 200.
+    if (!admitResidency(ctx, parsedBody)) return;
     sseWriter.initSseHeaders(ctx, route);
     // Tempdoc 859 D live-defect D2 — the heartbeat wraps the BLOCKING run, and only it: the pre-run
     // refusals above answer and return without ever opening a stream to beat on.
@@ -640,11 +660,19 @@ public final class ChatController {
    * compact, exclude), so a blank title here is a 400 rather than a second spelling of "clear".
    * A locked store answers 423 through the global {@code KeyLockedException} mapping — the store's
    * own read raises it, so there is no lock arm in this method.
+   *
+   * <p>With {@code If-None-Match: *} (HTTP's "only if there is none yet") the name is stored only
+   * while the conversation has none; otherwise the answer is 412 with the {@code title} and
+   * {@code titleSource} the conversation keeps. The web UI sends a browser's retained legacy name
+   * this way, so a late adoption can never replace a name a person gave the conversation meanwhile,
+   * from that window or any other.
    */
   public void handleSetTitle(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
     String title = null;
     String source = ConversationStore.TITLE_SOURCE_USER;
+    String precondition = ctx.header("If-None-Match");
+    boolean ifUntitled = precondition != null && "*".equals(precondition.trim());
     try {
       @SuppressWarnings("unchecked")
       Map<String, Object> body = ctx.bodyAsClass(Map.class);
@@ -676,7 +704,17 @@ public final class ChatController {
       ctx.status(404).json(err);
       return;
     }
-    conversationStore.setTitle(sessionId, title, source);
+    if (ifUntitled && !conversationStore.setTitleIfUntitled(sessionId, title, source)) {
+      Optional<ConversationStore.SessionSummary> kept = conversationStore.getSessionMeta(sessionId);
+      Map<String, Object> err = new LinkedHashMap<>();
+      err.put("error", "The conversation already has a name");
+      err.put("errorCode", ApiErrorCode.INVALID_STATE.name());
+      kept.map(ConversationStore.SessionSummary::title).ifPresent(t -> err.put("title", t));
+      kept.map(ConversationStore.SessionSummary::titleSource).ifPresent(t -> err.put("titleSource", t));
+      ctx.status(412).json(err);
+      return;
+    }
+    if (!ifUntitled) conversationStore.setTitle(sessionId, title, source);
     // Echo what was actually STORED, not what was sent: the store caps the name at 200 characters,
     // and a response that repeated an over-long input would be telling the client something untrue.
     String stored =
@@ -685,6 +723,140 @@ public final class ChatController {
             .map(ConversationStore.SessionSummary::title)
             .orElse(title.trim());
     ctx.json(Map.of("ok", true, "title", stored, "titleSource", source));
+  }
+
+  /** A model reply this long or longer is not a title. */
+  static final int AUTO_TITLE_MAX_CHARS = 80;
+
+  /** Enough for a 3-5 word title. */
+  static final int AUTO_TITLE_MAX_TOKENS = 32;
+
+  /** When an automatic title the model could not produce now is worth asking for again. */
+  static final long AUTO_TITLE_RETRY_AFTER_MS = 15_000;
+
+  /**
+   * POST /api/chat/conversations/{sessionId}/auto-title: the model names a conversation after its
+   * first answer. This is work the web UI starts on its own once a person's question has been
+   * answered.
+   *
+   * <p>It is declared an observation, so it never counts as a person acting: an untouched window
+   * must not interrupt background picture reading. It is shaped so that it cannot carry a person's
+   * deliberate work: its only input is the conversation id, the prompt is built here from the
+   * conversation's own first question and answer, and its only effect is a name stored while the
+   * conversation has none ({@link ConversationStore#setTitleIfUntitled}).
+   *
+   * <p>It is background inference in the chat lane ({@code DemandKind.BACKGROUND}): it never loads
+   * the chat model, and while picture reading, a self-test or a person's or agent's reply holds the
+   * model it is refused with the typed {@code CHAT_UNAVAILABLE} answer, its {@code reason} and
+   * {@code retryAfterMs}; the caller asks again later. A request refused for longer than the lane's
+   * aging bound is let through once. The answer is {@code {ok, generated, title, titleSource}};
+   * {@code generated} is false when the conversation already had a name, which is returned instead.
+   */
+  public void handleAutoTitle(Context ctx) {
+    String sessionId = ctx.pathParam("sessionId");
+    Optional<ConversationStore.SessionSummary> meta = conversationStore.getSessionMeta(sessionId);
+    if (meta.isEmpty()) {
+      noSuchConversation(ctx, sessionId);
+      return;
+    }
+    if (named(meta.get())) {
+      ctx.json(autoTitleAnswer(false, meta.get()));
+      return;
+    }
+    String question = null;
+    String answer = null;
+    for (Map<String, Object> message : conversationStore.loadHistory(sessionId)) {
+      Object role = message.get("role");
+      if (!(message.get("content") instanceof String text) || text.isBlank()) continue;
+      if (question == null && "user".equals(role)) {
+        question = text;
+      } else if (question != null && answer == null && "assistant".equals(role)) {
+        answer = text;
+      }
+    }
+    if (question == null || answer == null) {
+      Map<String, Object> err = new LinkedHashMap<>();
+      err.put("error", "The conversation has no answered question to name it by");
+      err.put("errorCode", ApiErrorCode.INVALID_STATE.name());
+      ctx.status(409).json(err);
+      return;
+    }
+    if (!residencyGate.admitBackground(ctx)) return;
+    String prompt = "Generate a concise 3-5 word title for this conversation. Reply with only the"
+        + " title, nothing else.\n\nUser: " + clip(question) + "\nAssistant: " + clip(answer);
+    String reply;
+    try {
+      reply = io.justsearch.app.api.chat.DemandScope.call(
+              io.justsearch.app.api.chat.DemandKind.BACKGROUND,
+              () -> onlineAi.get().chatCompletion(
+                  List.of(Map.<String, Object>of("role", "user", "content", prompt)),
+                  AUTO_TITLE_MAX_TOKENS,
+                  io.justsearch.app.api.SamplingParams.DETERMINISTIC,
+                  RequestEngineContext.get(ctx)))
+          .get(60, TimeUnit.SECONDS);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      autoTitleUnavailable(ctx);
+      return;
+    } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, null)) return;
+      LOG.info("Automatic title for {} not generated now: {}", sessionId, e.toString());
+      autoTitleUnavailable(ctx);
+      return;
+    }
+    String title = reply == null ? "" : reply.trim().replaceAll("^[\"']|[\"']$", "").trim();
+    if (title.isEmpty() || title.length() >= AUTO_TITLE_MAX_CHARS) {
+      Map<String, Object> err = new LinkedHashMap<>();
+      err.put("error", "The model's reply was not a title");
+      err.put("errorCode", ApiErrorCode.INVALID_STATE.name());
+      ctx.status(422).json(err);
+      return;
+    }
+    boolean generated = conversationStore.setTitleIfUntitled(
+        sessionId, title, ConversationStore.TITLE_SOURCE_AUTO);
+    Optional<ConversationStore.SessionSummary> after = conversationStore.getSessionMeta(sessionId);
+    if (after.isEmpty()) {
+      noSuchConversation(ctx, sessionId);
+      return;
+    }
+    ctx.json(autoTitleAnswer(generated, after.get()));
+  }
+
+  private static void noSuchConversation(Context ctx, String sessionId) {
+    Map<String, Object> err = new LinkedHashMap<>();
+    err.put("error", "No such conversation: " + sessionId);
+    err.put("errorCode", ApiErrorCode.NOT_FOUND.name());
+    ctx.status(404).json(err);
+  }
+
+  private static boolean named(ConversationStore.SessionSummary meta) {
+    return meta.title() != null && !meta.title().isBlank();
+  }
+
+  private static String clip(String text) {
+    return text.length() > 200 ? text.substring(0, 200) : text;
+  }
+
+  private static Map<String, Object> autoTitleAnswer(
+      boolean generated, ConversationStore.SessionSummary meta) {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("ok", true);
+    body.put("generated", generated);
+    if (named(meta)) {
+      body.put("title", meta.title());
+      if (meta.titleSource() != null) body.put("titleSource", meta.titleSource());
+    }
+    return body;
+  }
+
+  /** The model could not answer now (not running, restarting, timed out): ask again later. */
+  private static void autoTitleUnavailable(Context ctx) {
+    Map<String, Object> err = new LinkedHashMap<>();
+    err.put("error", "The chat model could not name the conversation now; try again later");
+    err.put("errorCode", ApiErrorCode.SERVICE_UNAVAILABLE.name());
+    err.put("retryAfterMs", AUTO_TITLE_RETRY_AFTER_MS);
+    ctx.header("Retry-After", Long.toString(AUTO_TITLE_RETRY_AFTER_MS / 1000));
+    ctx.status(503).json(err);
   }
 
   /**

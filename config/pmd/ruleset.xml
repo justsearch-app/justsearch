@@ -50,7 +50,7 @@
 
   <!--
     Tempdoc 930 chunk F — the Java half of the retired `todo-fixme` kernel gate. A parked marker
-    is a deferred fix nobody scheduled (CLAUDE.md `log-pre-existing-issues`): fix it now or route it.
+    is a deferred fix nobody scheduled: fix it now or route it.
     PMD parses, so unlike the gate's raw-text scanner this cannot score the letters in an
     identifier or a URL. The TypeScript half is ESLint `no-warning-comments` in
     modules/ui-web/eslint.config.js.

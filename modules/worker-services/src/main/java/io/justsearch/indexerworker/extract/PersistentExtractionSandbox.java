@@ -1,6 +1,17 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.extract;
 
+import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.app.api.runtime.child.ChildControl;
+import io.justsearch.app.api.runtime.child.ChildHandle;
+import io.justsearch.app.api.runtime.child.ChildKind;
+import io.justsearch.app.api.runtime.child.ChildSpec;
+import io.justsearch.app.api.runtime.child.DefaultChildControl;
+import io.justsearch.app.api.runtime.child.ExitOutcome;
+import io.justsearch.app.api.runtime.child.StopDetail;
+import io.justsearch.app.api.runtime.child.StopMode;
+import io.justsearch.app.api.runtime.child.StopReason;
+import io.justsearch.app.api.runtime.child.StopRequest;
 import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.telemetry.catalog.EmptyTags;
 import java.io.IOException;
@@ -12,9 +23,16 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -38,9 +56,14 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p><b>The deadline is enforced by killing the child, not by cancelling a thread.</b> That is the
  * property the in-process extractor cannot have: {@code Future.cancel(true)} only sets an interrupt
- * flag, and a wedged PDFBox/POI parse ignores it. {@link Process#destroyForcibly()} closes the
- * child's pipes, which unblocks this sandbox's reader task, so the calling thread returns at the
- * deadline and the next file gets a fresh child.
+ * flag, and a wedged PDFBox/POI parse ignores it. Terminating the child closes its pipes, which
+ * unblocks this sandbox's reader task, so the calling thread returns at the deadline and the next
+ * file gets a fresh child.
+ *
+ * <p><b>Every child is started and stopped through {@link ChildControl}</b> (Spec B §2.7), which
+ * records each stop's reason before it acts and each exit as requested or unexpected. The pool
+ * keeps its own retry and permanence decisions; a child that dies on its own is not stopped, its
+ * recorded exit is read instead.
  *
  * <p><b>Failure classification.</b> A child that dies with {@code OutOfMemoryError} on its stderr
  * is reported as a plain {@link ContentExtractor.ExtractionException}, which
@@ -59,8 +82,14 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   static final int DEFAULT_MAX_STDERR_BYTES = 64 * 1024;
   /** Requests one child handles before it is recycled — the leak guard (design decision 1). */
   static final int DEFAULT_MAX_REQUESTS_PER_CHILD = 500;
-  static final long GRACEFUL_CLOSE_WAIT_MS = 2_000L;
-  static final String TERMINATION_INTENT_PREFIX = "JUSTSEARCH_MANAGED_CHILD_TERMINATION ";
+  /** How long pool close waits for children to exit on EOF before terminating them. */
+  static final Duration GRACEFUL_CLOSE_WAIT = Duration.ofSeconds(2);
+  /** The {@code requestedBy} of every stop this pool asks for. */
+  static final String REQUESTED_BY = "extraction-pool";
+  /** How long a child that broke the protocol on its own gets to exit before it is stopped. */
+  private static final Duration SELF_EXIT_WAIT = Duration.ofSeconds(2);
+  /** Bounds a wait on a stop; the control itself gives up after two terminate attempts. */
+  private static final Duration STOP_WAIT = Duration.ofSeconds(15);
 
   static final String REASON_TIMEOUT = "timeout";
   static final String REASON_CRASH = "crash";
@@ -79,15 +108,13 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   private final int maxStderrBytes;
   private final int maxRequestsPerChild;
   private final ExtractionMetricCatalog catalog;
-  private final io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry;
+  private final ChildControl control;
 
   private final Slot[] allSlots;
   private final BlockingQueue<Slot> freeSlots;
   private final ExecutorService readers;
   private final AtomicLong spawnCount = new AtomicLong();
   private final AtomicLong restartCount = new AtomicLong();
-  private final List<Process> unregisteredChildren =
-      java.util.Collections.synchronizedList(new ArrayList<>());
   private final Thread shutdownHook;
   private volatile boolean closed;
 
@@ -101,7 +128,22 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       int maxRequestsPerChild,
       ExtractionMetricCatalog catalog) {
     this(readerRegistration, command, policy, ocrConfig, timeout, poolSize, maxRequestsPerChild, catalog,
-        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+        ManagedChildRegistry.noop());
+  }
+
+  /** A pool with its own unrecorded control; the Engine passes its {@link ChildControl}. */
+  public PersistentExtractionSandbox(
+      EngineExecutorRegistry.Registration readerRegistration,
+      List<String> command,
+      TikaExtractionPolicy policy,
+      OcrRoutingConfig ocrConfig,
+      Duration timeout,
+      int poolSize,
+      int maxRequestsPerChild,
+      ExtractionMetricCatalog catalog,
+      ManagedChildRegistry childRegistry) {
+    this(readerRegistration, command, policy, ocrConfig, timeout, poolSize, maxRequestsPerChild,
+        catalog, DefaultChildControl.unrecorded(childRegistry));
   }
 
   public PersistentExtractionSandbox(
@@ -113,7 +155,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       int poolSize,
       int maxRequestsPerChild,
       ExtractionMetricCatalog catalog,
-      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+      ChildControl control) {
     this(
         readerRegistration,
         command,
@@ -125,7 +167,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
         catalog,
         responseByteCeiling(policy),
         DEFAULT_MAX_STDERR_BYTES,
-        childRegistry);
+        control);
   }
 
   PersistentExtractionSandbox(
@@ -140,7 +182,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       int maxResponseBytes,
       int maxStderrBytes) {
     this(readerRegistration, command, policy, ocrConfig, timeout, poolSize, maxRequestsPerChild, catalog,
-        maxResponseBytes, maxStderrBytes, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+        maxResponseBytes, maxStderrBytes, DefaultChildControl.unrecorded(ManagedChildRegistry.noop()));
   }
 
   PersistentExtractionSandbox(
@@ -154,7 +196,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       ExtractionMetricCatalog catalog,
       int maxResponseBytes,
       int maxStderrBytes,
-      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+      ChildControl control) {
     if (command == null || command.isEmpty()) {
       throw new IllegalArgumentException("Sandbox command must not be empty");
     }
@@ -167,7 +209,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     this.maxRequestsPerChild =
         maxRequestsPerChild > 0 ? maxRequestsPerChild : DEFAULT_MAX_REQUESTS_PER_CHILD;
     this.catalog = catalog;
-    this.childRegistry = Objects.requireNonNull(childRegistry, "childRegistry");
+    this.control = Objects.requireNonNull(control, "control");
 
     int size = Math.max(1, poolSize);
     this.allSlots = new Slot[size];
@@ -185,7 +227,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
             });
     // Belt to the child's PID-gate braces: a clean JVM exit that skips close() must not leave a
     // child behind either. Removed in close() so a per-test sandbox does not accumulate hooks.
-    this.shutdownHook = new Thread(this::killAll, "extraction-sandbox-shutdown");
+    this.shutdownHook = new Thread(this::stopOnShutdown, "extraction-sandbox-shutdown");
     try {
       Runtime.getRuntime().addShutdownHook(shutdownHook);
     } catch (RuntimeException | Error failure) {
@@ -412,44 +454,43 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     }
   }
 
-  /** Kills the child, records the restart, and turns its exit into the right typed failure. */
+  /**
+   * Retires the child and turns its exit into the right typed failure. A crash is read from the
+   * child's own recorded exit; any other reason stops it first.
+   */
   private ContentExtractor.ExtractionException discardAndClassify(
       Slot slot, Child child, String reason, Exception cause) {
-    child.retirementReason = reason;
-    KillOutcome kill = exitCodeAfterKill(child);
+    ExitOutcome exit;
+    try {
+      exit = REASON_CRASH.equals(reason) ? selfExit(child) : retire(child, reason);
+    } catch (RuntimeException | Error cleanup) {
+      if (cause != null && cause != cleanup) cleanup.addSuppressed(cause);
+      throw cleanup;
+    }
     // The OOM signature only reaches the tail once the drain thread has seen EOF on the dead
     // child's stderr; reading it before that classifies a heap exhaustion as an ordinary crash.
     child.stderr.awaitDrain(2000L);
     String tail = child.stderr.tail();
     boolean oom = tail.contains("OutOfMemoryError");
-    try {
-      finishDiscard(slot, child, oom ? REASON_OOM : reason, kill);
-    } catch (RuntimeException | Error cleanup) {
-      if (cause != null && cause != cleanup) cleanup.addSuppressed(cause);
-      throw cleanup;
-    }
+    if (oom) noteQuietly(child, REASON_OOM);
+    finishDiscard(slot, child, oom ? REASON_OOM : reason);
+    String code = describeCode(exit);
     if (oom) {
       // Permanent: the file does not fit in the child heap, so a retry exhausts it again.
       return new ContentExtractor.ExtractionException(
-          "Sandbox child exhausted its heap (exit=" + kill.exitCode() + "): " + tail, cause);
+          "Sandbox child exhausted its heap (exit=" + code + "): " + tail, cause);
     }
     return new SandboxExtractionException(
-        "Sandbox child exited with code " + kill.exitCode() + ": " + tail, cause);
+        "Sandbox child exited with code " + code + ": " + tail, cause);
   }
 
   private void discardChild(Slot slot, Child child, String reason) {
-    child.retirementReason = reason;
-    KillOutcome kill = exitCodeAfterKill(child);
-    finishDiscard(slot, child, reason, kill);
+    retire(child, reason);
+    finishDiscard(slot, child, reason);
   }
 
-  private void finishDiscard(Slot slot, Child child, String reason, KillOutcome kill) {
-    if (child.process.isAlive()) {
-      throw new IllegalStateException("Extraction child " + child.pid
-          + " survived retirement; retaining its slot for cleanup retry; " + kill);
-    }
+  private void finishDiscard(Slot slot, Child child, String reason) {
     child.close();
-    unregister(child);
     if (slot.child == child) {
       slot.child = null;
     }
@@ -460,36 +501,105 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     log.warn("Extraction sandbox child recycled (reason={}, pid={})", reason, child.pid);
   }
 
-  private static KillOutcome exitCodeAfterKill(Child child) {
-    return killAndConfirm(child.process);
+  /**
+   * Stops the child for {@code reason} and waits for its recorded exit. A child that survives both
+   * terminate attempts keeps its slot (and {@code retirementReason}), so the next request on the
+   * slot retries the stop under the first intent instead of spawning beside a live child.
+   */
+  private ExitOutcome retire(Child child, String reason) {
+    child.retirementReason = reason;
+    if (child.handle.state() == ChildHandle.State.EXITED) return recordedExit(child);
+    return awaitStop(child, control.stop(child.handle, stopRequest(reason)));
   }
 
-  private record KillOutcome(boolean exited, int exitCode, long waitedMs, boolean interrupted) {}
-
-  /** Caller interruption cannot turn an in-flight OS teardown into a false survival verdict. */
-  private static KillOutcome killAndConfirm(Process process) {
-    long started = System.nanoTime();
-    long deadline = started + TimeUnit.SECONDS.toNanos(5);
+  /**
+   * A child that broke the protocol by itself (EOF, broken pipe) normally has exited or is about
+   * to; its exit is recorded as UNEXPECTED by the control. One still running after a short wait is
+   * stopped, since it no longer answers.
+   */
+  private ExitOutcome selfExit(Child child) {
+    child.retirementReason = REASON_CRASH;
+    CompletableFuture<ExitOutcome> exit = child.handle.exit().toCompletableFuture();
     boolean interrupted = Thread.interrupted();
     try {
-      process.destroyForcibly();
-      while (process.isAlive()) {
-        long remaining = deadline - System.nanoTime();
-        if (remaining <= 0) break;
+      long deadline = System.nanoTime() + SELF_EXIT_WAIT.toNanos();
+      while (true) {
         try {
-          // A normal false return means the bounded wait expired. Retry only on interruption.
-          if (!process.waitFor(remaining, TimeUnit.NANOSECONDS)) break;
+          return exit.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
         } catch (InterruptedException e) {
           interrupted = true;
+        } catch (TimeoutException stillRunning) {
+          break;
+        } catch (ExecutionException impossible) {
+          break;
         }
       }
-      boolean exited = !process.isAlive();
-      return new KillOutcome(
-          exited, exited ? process.exitValue() : -1,
-          TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), interrupted);
     } finally {
       if (interrupted) Thread.currentThread().interrupt();
     }
+    return awaitStop(child, control.stop(child.handle,
+        StopRequest.of(StopReason.RECYCLE, StopMode.NOW, REQUESTED_BY)
+            .withDetail(StopDetail.PROTOCOL)));
+  }
+
+  /** The pool's reasons as stop requests (Spec B §2.7). */
+  private static StopRequest stopRequest(String reason) {
+    return switch (reason) {
+      case REASON_TIMEOUT -> StopRequest.of(StopReason.TIMEOUT, StopMode.NOW, REQUESTED_BY);
+      case REASON_INTERRUPTED -> StopRequest.of(StopReason.CANCELLED, StopMode.NOW, REQUESTED_BY);
+      case REASON_REQUEST_BUDGET -> StopRequest.of(StopReason.RECYCLE, StopMode.NOW, REQUESTED_BY)
+          .withDetail(StopDetail.REQUEST_BUDGET);
+      default -> StopRequest.of(StopReason.RECYCLE, StopMode.NOW, REQUESTED_BY)
+          .withDetail(StopDetail.PROTOCOL);
+    };
+  }
+
+  /**
+   * Waits for a stop, keeping the caller's interrupt for after it: an interrupted caller must not
+   * turn an in-flight teardown into a false survival verdict.
+   */
+  private ExitOutcome awaitStop(Child child, CompletionStage<ExitOutcome> stop) {
+    CompletableFuture<ExitOutcome> future = stop.toCompletableFuture();
+    boolean interrupted = Thread.interrupted();
+    Throwable failure = null;
+    try {
+      long deadline = System.nanoTime() + STOP_WAIT.toNanos();
+      while (true) {
+        try {
+          return future.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+          interrupted = true;
+        } catch (ExecutionException e) {
+          failure = e.getCause() != null ? e.getCause() : e;
+          break;
+        } catch (TimeoutException e) {
+          failure = e;
+          break;
+        }
+      }
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
+    }
+    throw new IllegalStateException("Extraction child " + child.pid
+        + " survived retirement; retaining its slot for cleanup retry; state="
+        + child.handle.state(), failure);
+  }
+
+  private static ExitOutcome recordedExit(Child child) {
+    return child.handle.exit().toCompletableFuture().join();
+  }
+
+  private void noteQuietly(Child child, String token) {
+    try {
+      control.note(child.handle, token);
+    } catch (RuntimeException unrecorded) {
+      log.debug("Could not record extraction child note {}", token, unrecorded);
+    }
+  }
+
+  private static String describeCode(ExitOutcome exit) {
+    OptionalInt code = exit.code();
+    return code.isPresent() ? Integer.toString(code.getAsInt()) : "unknown";
   }
 
   private Child acquireChild(Slot slot) throws IOException {
@@ -500,8 +610,10 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     } else if (current != null && current.requests >= maxRequestsPerChild) {
       discardChild(slot, current, REASON_REQUEST_BUDGET);
       current = null;
-    } else if (current != null && !current.process.isAlive()) {
-      discardChild(slot, current, REASON_CRASH);
+    } else if (current != null && current.handle.state() == ChildHandle.State.EXITED) {
+      // It ended on its own; its exit is already recorded (UNEXPECTED), so nothing is stopped.
+      current.retirementReason = REASON_CRASH;
+      finishDiscard(slot, current, REASON_CRASH);
       current = null;
     }
     if (current == null) {
@@ -513,28 +625,27 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
 
   private Child spawn() throws IOException {
     List<String> argv = new ArrayList<>(command);
+    argv.addAll(io.justsearch.app.api.runtime.child.OwnedHelper.childArguments());
     argv.add(ExtractionSandboxChild.PARENT_PID_FLAG + ProcessHandle.current().pid());
-    Process process = new ProcessBuilder(argv).start();
-    io.justsearch.app.api.runtime.ManagedChild registered;
+    ChildSpec spec = new ChildSpec(ChildKind.EXTRACTION, argv, null, Map.of(),
+        new ChildSpec.Stdio.Pipes(), false, OptionalLong.empty(), Optional.empty(),
+        new ChildSpec.CooperativeStop(
+            ChildSpec.CooperativeStop.Action.CLOSE_STDIN, GRACEFUL_CLOSE_WAIT, Set.of(0)),
+        "extraction");
+    ChildHandle handle;
     try {
-      registered =
-          io.justsearch.app.api.runtime.ManagedChild.fromProcess(
-              process,
-              io.justsearch.app.api.runtime.ManagedChild.Kind.EXTRACTION,
-              "stdio",
-              null,
-              hashArgv(command),
-              hashArgv(argv));
-      childRegistry.register(registered);
-    } catch (IOException | RuntimeException failure) {
-      throw rollbackFailedRegistration(process, failure);
+      // A child whose manifest registration fails is stopped (ROLLBACK) by the control and never
+      // returned; one that survives that stays held by the control for its close to retry.
+      handle = control.start(spec, new ChildControl.ManifestEntry("stdio", null, hashArgv(command)));
+    } catch (IllegalStateException closedControl) {
+      throw new IOException("child control is unavailable", closedControl);
     }
     spawnCount.incrementAndGet();
     if (catalog != null) {
       catalog.sandboxSpawnTotal.increment(EmptyTags.INSTANCE);
     }
-    log.info("Extraction sandbox child spawned (pid={})", process.pid());
-    return new Child(process, maxStderrBytes, registered);
+    log.info("Extraction sandbox child spawned (pid={})", handle.pid());
+    return new Child(handle, maxStderrBytes);
   }
 
   @Override
@@ -567,129 +678,81 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     }
   }
 
-  /** Design 7.3 step 4 closes after extraction drain; EOF ends the child's serve loop normally. */
+  /**
+   * Design 7.3 step 4 closes after extraction drain: one cooperative QUIT for every serving child,
+   * so EOF ends each serve loop normally and one pool-wide grace window (not one per child) bounds
+   * it before the control terminates the rest. A child already being retired is stopped at once,
+   * which retries a survivor under its first intent. The host deadline is 15 seconds
+   * (supervision-contract.v1.json).
+   */
   private List<String> stopAllGracefully() {
-    // One pool-wide grace window, not two seconds per child. The host deadline is 15 seconds
-    // (supervision-contract.v1.json); force confirmation and reader drain keep their existing
-    // bounds.
-    long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(GRACEFUL_CLOSE_WAIT_MS);
+    List<Child> serving = new ArrayList<>();
+    List<Child> retiring = new ArrayList<>();
     for (Slot slot : allSlots) {
       Child child = slot.child;
-      if (child != null && child.retirementReason == null) child.requestEof();
+      if (child == null) continue;
+      (child.retirementReason == null ? serving : retiring).add(child);
     }
-    return killAll(deadline);
+    return stopAndCollect(serving, retiring,
+        StopRequest.of(StopReason.QUIT, StopMode.COOPERATIVE, REQUESTED_BY));
   }
 
-  private static KillOutcome exitCodeAfterGracefulClose(Child child, long deadline) {
-    long started = System.nanoTime();
+  /** The JVM is exiting without {@link #close()}: stop every child now. */
+  private void stopOnShutdown() {
+    List<Child> all = new ArrayList<>();
+    for (Slot slot : allSlots) {
+      Child child = slot.child;
+      if (child != null) all.add(child);
+    }
+    List<String> survivors = stopAndCollect(all, List.of(),
+        StopRequest.of(StopReason.QUIT, StopMode.NOW, REQUESTED_BY));
+    if (!survivors.isEmpty()) {
+      log.error("Extraction children survived shutdown: {}", survivors);
+    }
+  }
+
+  private List<String> stopAndCollect(List<Child> serving, List<Child> retiring,
+      StopRequest request) {
+    List<CompletableFuture<?>> stops = new ArrayList<>();
     boolean interrupted = Thread.interrupted();
     try {
-      while (child.process.isAlive()) {
+      if (!serving.isEmpty()) {
+        List<ChildHandle> handles = serving.stream().map(child -> child.handle).toList();
+        stops.add(control.stopAll(handles, request).toCompletableFuture());
+      }
+      for (Child child : retiring) {
+        stops.add(control.stop(child.handle,
+            StopRequest.of(request.reason(), StopMode.NOW, REQUESTED_BY)).toCompletableFuture());
+      }
+      CompletableFuture<Void> all = CompletableFuture.allOf(stops.toArray(CompletableFuture[]::new));
+      long deadline = System.nanoTime() + STOP_WAIT.toNanos();
+      while (!all.isDone()) {
         long remaining = deadline - System.nanoTime();
         if (remaining <= 0) break;
         try {
-          child.process.waitFor(remaining, TimeUnit.NANOSECONDS);
+          all.get(remaining, TimeUnit.NANOSECONDS);
         } catch (InterruptedException e) {
           interrupted = true;
+        } catch (ExecutionException | TimeoutException survivorOrDeadline) {
+          break; // each child's own state says which
         }
       }
-      if (child.process.isAlive()) {
-        recordGracefulTerminationIntent(child);
-        KillOutcome forced = exitCodeAfterKill(child);
-        return new KillOutcome(
-            forced.exited(),
-            forced.exitCode(),
-            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
-            interrupted || forced.interrupted());
-      }
-      return new KillOutcome(
-          true,
-          child.process.exitValue(),
-          TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
-          interrupted);
     } finally {
       if (interrupted) Thread.currentThread().interrupt();
     }
-  }
-
-  // This is a host protocol receipt, emitted synchronously before terminating the OS process.
-  @SuppressWarnings("PMD.SystemPrintln")
-  private static void recordGracefulTerminationIntent(Child child) {
-    ProcessHandle owner = ProcessHandle.current();
-    var ownerStart = owner.info().startInstant();
-    if (ownerStart.isEmpty())
-      return; // Missing ownership evidence never licenses an exit exemption.
-    String intent =
-        MAPPER.writeValueAsString(
-            java.util.Map.of(
-                "enginePid", owner.pid(),
-                "engineStartedAt", ownerStart.get().toString(),
-                "child", child.identity,
-                "requestedAtMs", System.currentTimeMillis(),
-                "reason", "graceful-close-fallback"));
-    // The dev-runner already drains and preserves Engine stderr. Emit before OS termination;
-    // do not depend on the asynchronous file logger (which can discard a full queue).
-    System.err.println(TERMINATION_INTENT_PREFIX + intent);
-  }
-
-  private List<String> killAll() {
-    return killAll(0);
-  }
-
-  private List<String> killAll(long gracefulDeadline) {
     List<String> survivors = new ArrayList<>();
     for (Slot slot : allSlots) {
       Child child = slot.child;
-      if (child != null) {
-        KillOutcome kill =
-            gracefulDeadline != 0 && child.retirementReason == null
-                ? exitCodeAfterGracefulClose(child, gracefulDeadline)
-                : exitCodeAfterKill(child);
-        if (!kill.exited()) {
-          survivors.add("pid=" + child.pid + " " + kill);
-        } else {
-          slot.child = null;
-          child.close();
-          unregister(child);
-        }
+      if (child == null || !(serving.contains(child) || retiring.contains(child))) continue;
+      ChildHandle.State state = child.handle.state();
+      if (state == ChildHandle.State.EXITED) {
+        slot.child = null;
+        child.close();
+      } else {
+        survivors.add("pid=" + child.pid + " state=" + state);
       }
     }
-    synchronized (unregisteredChildren) {
-      for (Process process : unregisteredChildren) {
-        KillOutcome kill = terminateAndWait(process);
-        if (!kill.exited()) survivors.add("unregisteredPid=" + process.pid() + " " + kill);
-      }
-      unregisteredChildren.removeIf(process -> !process.isAlive());
-      return survivors;
-    }
-  }
-
-  IOException rollbackFailedRegistration(Process process, Throwable failure) {
-    KillOutcome kill = terminateAndWait(process);
-    if (!kill.exited()) {
-      unregisteredChildren.add(process);
-      log.error(
-          "Unregistered extraction child PID {} survived registration rollback; retaining handle;"
-              + " {}",
-          process.pid(),
-          kill);
-    }
-    return failure instanceof IOException io
-        ? io
-        : new IOException("could not register extraction child", failure);
-  }
-
-  private static KillOutcome terminateAndWait(Process process) {
-    return killAndConfirm(process);
-  }
-
-  private void unregister(Child child) {
-    if (child.process.isAlive()) return;
-    try {
-      childRegistry.remove(child.identity.id());
-    } catch (IOException e) {
-      log.warn("Could not persist extraction child exit; retaining ownership record", e);
-    }
+    return survivors;
   }
 
   private static String hashArgv(List<String> argv) {
@@ -727,33 +790,24 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   }
 
   private static final class Child {
-    private final Process process;
+    private final ChildHandle handle;
     private final long pid;
     private final OutputStream stdin;
     private final InputStream stdout;
     private final StderrTail stderr;
-    private final io.justsearch.app.api.runtime.ManagedChild identity;
     private final AtomicBoolean inputCloseStarted = new AtomicBoolean();
     private int requests;
     private volatile String retirementReason;
 
-    Child(
-        Process process, int maxStderrBytes, io.justsearch.app.api.runtime.ManagedChild identity) {
-      this.process = process;
-      this.pid = process.pid();
-      this.stdin = process.getOutputStream();
-      this.stdout = process.getInputStream();
-      this.stderr = new StderrTail(process.getErrorStream(), maxStderrBytes);
-      this.identity = identity;
+    Child(ChildHandle handle, int maxStderrBytes) {
+      this.handle = handle;
+      this.pid = handle.pid();
+      this.stdin = handle.stdin();
+      this.stdout = handle.stdout();
+      this.stderr = new StderrTail(handle.stderr(), maxStderrBytes);
     }
 
-    void requestEof() {
-      if (inputCloseStarted.compareAndSet(false, true)) {
-        // Pipe close may wait behind a native write. It must never hold up the kill deadline.
-        Thread.ofPlatform().daemon().name("extraction-sandbox-eof-" + pid).start(this::closeInput);
-      }
-    }
-
+    /** After the recorded exit: the pipes are released. */
     void close() {
       stderr.stop();
       if (inputCloseStarted.compareAndSet(false, true)) closeInput();

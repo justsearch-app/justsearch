@@ -691,6 +691,8 @@ final class PdfOcrEngineTest {
 
   /** A fake tesseract script that writes {@code <outputBase>.txt} the way the real binary would. */
   private static Path writeFakeTesseract(Path directory, String text) throws IOException {
+    if (System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("win"))
+      return NativeTesseractFixture.write(directory, text, true);
     Files.createDirectories(directory);
     boolean windows =
         System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");

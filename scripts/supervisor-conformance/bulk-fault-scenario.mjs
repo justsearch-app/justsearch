@@ -3659,12 +3659,18 @@ async function killOwnedEngineAndObserveCooldown({ engine, data, readJson, waitF
   requireThat(original?.CommandLine?.includes(data),
     'Engine process identity must name this fixture data directory');
   const record = { pid: engine.pid, creationFileTimeUtc: original.CreationFileTimeUtc,
+    ...(original.processIdentity ? { processIdentity: original.processIdentity } : {}),
     cmdlineFingerprint: original.CommandLine };
   const verified = identity.verifyProcessIdentity({ record, table });
   requireThat(identity.isVerifiedMatch(verified),
     `refusing unverified bulk fault: ${verified.reason}`);
 
-  process.kill(engine.pid, 'SIGKILL');
+  if (record.processIdentity?.kind === 'linux-proc-v1') {
+    const result = identity.signalLinuxProcess(record.processIdentity, 'SIGKILL');
+    requireThat(result.ok, `identity-checked bulk fault failed: ${result.reason}`);
+  } else {
+    process.kill(engine.pid, 'SIGKILL');
+  }
   const supervisorFile = path.join(data, 'runtime', 'supervisor.v1.json');
   return waitFor('bulk Engine death and counted restart cooldown', 12000, () => {
     let alive = true;

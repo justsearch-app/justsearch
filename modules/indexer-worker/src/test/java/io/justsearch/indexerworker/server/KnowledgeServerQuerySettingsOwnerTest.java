@@ -505,6 +505,37 @@ final class KnowledgeServerQuerySettingsOwnerTest {
     }
   }
 
+  @Test
+  void automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions(@TempDir Path dir)
+      throws Exception {
+    try (var f = new QueryFixture(dir, 4096L); var ignored = f.composition()) {
+      var builder = new ResolvedConfigBuilder().putDefault("justsearch.data.dir", dir.toString());
+      builder.contributeAutoDetected(java.util.Map.of("justsearch.embed.gpu_mem_mb", "2466",
+          "justsearch.splade.gpu_mem_mb", "2342", "justsearch.ner.gpu_mem_mb", "2125"));
+      var prepared = assertDoesNotThrow(() ->
+          f.server.prepareQueryRoleSettings(new UiSettings(), builder.build(),
+              Set.of("justsearch.rerank.gpu_mem_mb"), f.selection),
+          "a cap change has no bulk session to replace when the physical bulk surface is empty");
+      prepared.abort();
+      f.assertA();
+      assertFalse(f.index.isClosed());
+    }
+  }
+
+  @Test
+  void anExplicitIndexCapStillCannotBeChangedByAQueryOnlyTransaction(@TempDir Path dir)
+      throws Exception {
+    try (var f = new QueryFixture(dir, 4096L)) {
+      var desired = new ResolvedConfigBuilder().putDefault("justsearch.data.dir", dir.toString())
+          .putSettings("justsearch.embed.gpu_mem_mb", "2466").build();
+      var failure = assertThrows(IllegalStateException.class, () ->
+          f.server.prepareQueryRoleSettings(new UiSettings(), desired, Set.of(), f.selection));
+      assertEquals("Query-only settings cannot change index model ownership", failure.getMessage());
+      f.assertA();
+      assertFalse(f.index.isClosed());
+    }
+  }
+
   static final class QueryFixture implements AutoCloseable {
     final TestEngineExecutors executors = new TestEngineExecutors();
     KnowledgeServer server;

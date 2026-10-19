@@ -1,0 +1,137 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T17:31:28.400Z",
+  "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
+  "tree": "2c54440047d7647fceddce8035920be6b5aa851c",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.aFatalExitRecordsNoIntentAndItsHookAddsNone\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.theHookJoiningACooperativeExitAddsNoSecondIntent\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.aFailedIntentRecordDoesNotChangeTheExit\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2219
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.ManagedChildReconcilerTest.withoutContainmentAnIdentityMatchedOrphanLlamaIsStillEndedAtBoot\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3542
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#aFatalExitRecordsNoIntentAndItsHookAddsNone",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFatalExitRecordsNoIntentAndItsHookAddsNone(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#theHookJoiningACooperativeExitAddsNoSecondIntent",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theHookJoiningACooperativeExitAddsNoSecondIntent(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#aFailedIntentRecordDoesNotChangeTheExit",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedIntentRecordDoesNotChangeTheExit(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java#withoutContainmentAnIdentityMatchedOrphanLlamaIsStillEndedAtBoot",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:245b5291cd22b87aae954550d5b357b6c62c3d63f49d2e321f8ad7164bcd1828",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withoutContainmentAnIdentityMatchedOrphanLlamaIsStillEndedAtBoot()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1c6f8da2c",
+    "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.aFatalExitRecordsNoIntentAndItsHookAddsNone\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.theHookJoiningACooperativeExitAddsNoSecondIntent\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.aFailedIntentRecordDoesNotChangeTheExit\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 30731
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.ManagedChildReconcilerTest.withoutContainmentAnIdentityMatchedOrphanLlamaIsStillEndedAtBoot\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 9859
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#aFatalExitRecordsNoIntentAndItsHookAddsNone",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#theHookJoiningACooperativeExitAddsNoSecondIntent",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#aFailedIntentRecordDoesNotChangeTheExit",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java#withoutContainmentAnIdentityMatchedOrphanLlamaIsStillEndedAtBoot",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:168d706344f30758e64521b815adb3644ed59f873bd878a7576c0064747b8a78"
+}

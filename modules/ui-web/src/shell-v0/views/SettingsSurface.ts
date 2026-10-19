@@ -625,6 +625,24 @@ export class SettingsSurface extends JfElement {
       outline: 2px solid var(--accent-tint);
       outline-offset: 2px;
     }
+    /* Forced colors (Windows High Contrast) erase the selected option's tint and edge, so it takes
+       the selection pair ('forced-color-adjust: none' keeps the browser's Canvas backplate from
+       landing behind its text). The selected theme tile keeps its outline (CanvasText there), and the
+       focus ring that outline otherwise hides comes back as Highlight. */
+    @media (forced-colors: active) {
+      .option-btn.selected {
+        forced-color-adjust: none;
+        background: Highlight;
+        border-color: Highlight;
+        color: HighlightText;
+      }
+      .option-btn.selected * {
+        color: HighlightText;
+      }
+      .theme-tile.selected:focus-visible {
+        outline-color: Highlight;
+      }
+    }
     .theme-swatch {
       position: absolute;
       inset: 0;

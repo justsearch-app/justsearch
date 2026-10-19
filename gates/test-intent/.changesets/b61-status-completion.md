@@ -1,0 +1,120 @@
+---
+schema: test-intent.v1
+task: t-20261005-b6d536
+author-role: builder
+author-session: b61-status-approval
+---
+
+Execution receipts and streamed tool completions reach the production canonical status poller. The checks drive the mounted typed authorization host and pending bridge, the host AI reader, direct/resumed/reattached streams, trusted plugin fetch and invocation, virtual commands, consented retry and concurrent approvals. The unchanged operation, settings and after-action preservation checks retain their assertions. Independent acceptance is pending.
+
+Review history (records repair, 2026-10-14). On the previous content (digest sha256:40c11021...),
+verify-status5, -6 and -7 rejected and verify-status8 accepted; the gate reported that as a
+disagreement needing a tie-break. verify-status5 also judged that ea0c311cb replaced the
+operation-classified completion mechanism this entry describes with the server-owned status counter
+(b6d536-b64-status-counter.md), so this entry's evidence cannot stand for that design; verify-status6
+and -7 rejected on counter noise, metadata loss and back-off after refused fresh reads, which
+verify-status8 reports passing on 2fd48e172. This repair changed only the source (orchestrator wording
+no longer cited as owner words), so every earlier record is stale and the disagreement is not decided
+here. At that repair, the evidence file was invalid because statusCompletion.test.ts had changed
+after its run. The next acceptor reviews the current content against the current check.
+
+CI759 round 4 joins the curried `it.each` registration onto one line to satisfy the frontend
+lint gate. This preserves all parameter rows, callbacks and assertions: the file passes all 23
+cases before and after the formatting repair. Its execution evidence is regenerated against the
+current file with the declared before-state `3e64a384b`, no overlay or patch, and ordinary copied
+vitest dependencies (`--copy-node-modules`). This refresh records execution, not acceptance.
+
+```json
+{
+  "entries": [
+    {
+      "items": ["modules/ui-web/src/api/statusCompletion.test.ts"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "A successful server-executed pending approval, state-changing streamed tool completion or raw plugin operation request refreshes the production canonical observation before completion is delivered. Unknown operation identity after reconnect is observed conservatively. Failed, skipped and known read-only completions do not refresh; receipts remain readable and concurrent completions coalesce. Existing invocation, consented retry and virtual-command paths retain canonical completion. CI759 round 4 preserves the curried it.each call while joining its continuation to remove lint ambiguity; every parameter row, callback and assertion remains unchanged.",
+      "sources": [{"kind": "delegated-choice", "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself", "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-05T23:01Z", "delegationScope": "Task t-20261005-b6d536 end to end: the owner handed over checklist item 5 (GPU co-residence) and item 6 (process ownership and exit accounting) for the agent to design, build and verify on its own judgement, and repeated the grant on 2026-10-06T21:10Z (\"proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input\"). It covers choices within those items and the agreed scenarios; it does not authorise changing an established contract outside them. The choice below is agent wording (an orchestrator brief or contract), not the owner's.", "choice": "Every path by which an action that changes status-surface state completes successfully in or through this UI must reach the same completion mechanism", "label": "agent choice", "provenance": "cited before as owner words at 'task t-20261005-b6d536 request (b61 builder role contract, task item 5 / S20)'; the text does not appear in the owner's turns of session 886833dd"}],
+      "evidence": "gates/test-intent/evidence/b61-status-completion.json",
+      "newChecks": ["modules/ui-web/src/api/statusCompletion.test.ts"]
+    }
+  ]
+}
+```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status4-independent",
+  "verdict": "reject",
+  "digest": "sha256:38691478f3c19fc54445850d1b3a70596e86cf3e03fe9b7e4f4c8df901aa5346",
+  "note": "Independent candidate 8fb8c7c4b: FAIL S20/OWN-RAW-SETTINGS on mounted native UI (COMPLETE chat disable, next captured render Online/Shut Down AI, canonical OFF, zero fresh reads); OWN-REATTACH-READONLY passes 3e64a384b and fails 8fb by assertion, reproduced with controlled SSE on built UI. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-status4/report.md. Qualified second E2 window: 239/239 status polls, max full-body 38.7 ms, at most one Gradle invocation; foreign load, no quiet-machine claim."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status5-independent",
+  "verdict": "reject",
+  "digest": "sha256:40c1102172c8c038fd1a6618d3769514d3830e98604aa57440f17c827df878f9",
+  "note": "Current ea0c311cb supersedes this operation-classified completion mechanism. Its historical evidence cannot establish the server-owned counter design; naming this invalidated evidence is necessary to avoid carrying its acceptance forward. Raw plugin settings, approval and exercised ordinary completion paths now pass, but all-path S20 remains rejected by the native encryption-owner omission and mounted missing-metadata rollback. Historical verifier rejections retained. Current independent report: F:/agent-sandbox/design-b6d536/codex/verify-status5/report.md."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status6-independent",
+  "verdict": "reject",
+  "digest": "sha256:40c1102172c8c038fd1a6618d3769514d3830e98604aa57440f17c827df878f9",
+  "note": "Evidence invalid on the candidate (statusCompletion.test.ts changed since its evidence run); completion now also rides the backstop counter, so this record is invalidated. Independent candidate 6377d0030: FAIL. (1) StatusPublicationBackstop counts measurement noise: live idle head advanced the counter 51 times in 10 min (GPU utilisation 0<->1, VRAM, recent* arrays, telemetry window state); the idle mounted UI made 37 fresh reads and a failed 422 action triggered a fresh read and snapshot replacement in 3 of 4 runs. (2) Metadata loss: UI kept 'unlocked' for 12 polls while canonical was locked (live, header-stripping proxy; module case fails, passes on 93479e944). (3) After a real head restart a 1000-request UI burst produced 392 refused fresh reads in 3.6 s, contradicting 'refused fresh reads do not create a loop'. Passing: lock/unlock, raw settings, second tab, approval, agent tool, chat, GPU/index, replay/reattach, restart display, full suites, architecture, regen-all, API contract, lane F. Report: F:/agent-sandbox/design-b6d536/codex/verify-status6/report.md"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status7-independent",
+  "verdict": "reject",
+  "digest": "sha256:40c1102172c8c038fd1a6618d3769514d3830e98604aa57440f17c827df878f9",
+  "note": "Evidence already invalid before this candidate (statusCompletion.test.ts changed since its run). Live on 6f177f241: approval, chat tool, raw plugin settings completions refresh before the next render, but completions after refused fresh reads are not refreshed while back-off lasts. Independent verify-status7 on 6f177f241: FAIL S20 / OWN7-BACKOFF. On the built UI against the running candidate head, after 40 s of refused fresh reads (6 refused, back-off works) and a successful ordinary poll, a lock by another client and, separately, the mounted UI's own successful lock action are not shown at the next render: 0 fresh reads, display unlocked while canonical is locked, caught up only 8-15 s later by ordinary polling. statusInvalidation.ts keeps backoffUntil (up to 30 s, Retry-After up to 300 s) until a successful signal-triggered fresh read; successful ordinary polls do not end it and due() gates every action and receipt signal on it. Unit form fails on 6f177f241 and passes on 823c82104."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status8-independent",
+  "verdict": "accept",
+  "digest": "sha256:40c1102172c8c038fd1a6618d3769514d3830e98604aa57440f17c827df878f9",
+  "note": "Independent verify-status8 on 2fd48e172: PASS. S20 back-off repaired: any successful status read ends the back-off; live, after 40 s of refused fresh reads and a successful poll, another client's lock and the mounted UI's own lock made 2 s later show at the next render (fail on ff5bb2ae9). Builder statusBackoff cases fail on ff5bb2ae9 by assertion (5/10) and pass (10/10). ui suite completes at the 384m default heap (1731 tests, 0 failures; ff5bb2ae9 runs out of heap after 1210); narrowed producer import finds 87/87 counter call sites of a full import. About one refused fresh read per poll interval is bounded (live 7 in 40 s, 3 in 30 s after a restart); the previous bound-of-6 case assumed one clock (3 on a single fake clock); a lagging fresh read gets at most 3 ordinary follow-ups per value (unit and a live 59 s held Worker lane); an own action during back-off shows at the next successful poll; the statusCounterSignal change is justified. Lock/unlock, failed, read-only, replay, reattach, approval, chat, agent tool, GPU, indexing, raw settings, second tab, header stripping, restart, idle 10 min and full-response comparison with f6d579a86 pass; suites, frontend, architecture, lane F, regen, API contract and governance show no new failures. E2 driver window: 239/239 status reads, max 23 ms, 33.8 fresh reads/min, at most 3 per value. Noted, not caused by this candidate: a fresh read missing its 100 ms deadline publishes expired lanes (at-rest UNKNOWN, GPU unavailable) for 100-300 ms, so the UI's fresh reads generate some counter values under load (10 flips per 12 min E2-like; a loop when lanes are slowed). Report: F:/agent-sandbox/design-b6d536/codex/verify-status8/report.md"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS1-20261015",
+  "verdict": "accept",
+  "digest": "sha256:24a78dce0a2f26eaa2af52b1f8fa9b0d8d47f555a1290f1c039250394e4abc17",
+  "note": "Re-reviewed the completion-stream expectations against current frontend checks; candidate and declared before runs reproduce the recorded repair failures."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VS8b-20261016",
+  "verdict": "accept",
+  "digest": "sha256:46b8797ea23d0807bb023d8a54ff1c3344af96c2273ab001fce87bbb8e2ab1c9",
+  "note": "Reran all 23 candidate cases and the original unpatched 3e64a384b before-state, matching its declared completion assertions and controls. The curried registration edit preserves every parameter row, callback and assertion."
+}
+```

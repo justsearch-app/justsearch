@@ -1,0 +1,13 @@
+diff --git a/scripts/dev/lib/stop-exit-census.cjs b/scripts/dev/lib/stop-exit-census.cjs
+index 00933ad..2072003 100644
+--- a/scripts/dev/lib/stop-exit-census.cjs
++++ b/scripts/dev/lib/stop-exit-census.cjs
+@@ -802,3 +802,8 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
+ }
+ module.exports = { CONHOST_EXIT_GRACE_MS, fileTimeFromInstant,
+   engineIdentity, engineIdentityAsync, readRunLedger, ledgerView, observedProcesses, exitTargets, exitResult, startStopExitCensus };
++// Compatibility only (test-intent --before-patch): the adapted census checks call the stop's lookup
++// interfaces, added later. The stop of this state looked up no unproven start and handed the census
++// no lookup observation, so here the stop looks up nothing and observes nothing.
++module.exports.ledgerResolution = () => ({ unproven: [] });
++module.exports.lookupObservation = () => null;

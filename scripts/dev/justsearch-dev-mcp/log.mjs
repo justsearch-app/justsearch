@@ -1,5 +1,6 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import { resolveDevRunnerStateRoot } from './paths.mjs';
 
 function nowIso() {
   return new Date().toISOString();
@@ -39,7 +40,7 @@ function ndjsonEnabled() {
 }
 
 /**
- * Optional. Writes NDJSON only under tmp/dev-runner/** (never elsewhere).
+ * Optional. Writes NDJSON under the same configured state root as the dev-runner.
  *
  * Workflow-telemetry coupling removed 2026-05-12: the original implementation
  * forwarded mapped events to `createWorkflowRunStore` from
@@ -54,7 +55,7 @@ export function maybeAppendNdjson(repoRoot, event) {
   if (!repoRoot) return;
   if (!ndjsonEnabled()) return;
 
-  const filePath = path.join(repoRoot, 'tmp', 'dev-runner', 'justsearch-dev-mcp.ndjson');
+  const filePath = path.join(resolveDevRunnerStateRoot(repoRoot), 'justsearch-dev-mcp.ndjson');
   const line = JSON.stringify({ ts: nowIso(), ...event }) + '\n';
 
   ndjsonChain = ndjsonChain

@@ -1,0 +1,125 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T17:52:50.165Z",
+  "revision": "43564e20fe9e8e1ca1e7a33f1b435c4dd9f7701e",
+  "tree": "e83ba234eae4ccac20c3d3f1c430e450c3a3a0ff",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/readinessNoticeResidency.test.ts\" \"src/shell-v0/views/unifiedChatHumanLoad.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-34124-1791309151271.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1250
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/readinessNoticeResidency.test.ts#words a GPU-pressure unload as paused and reloading on request, at info",
+      "file": "modules/ui-web/src/shell-v0/state/readinessNoticeResidency.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e33b1baa905e8caa90a7c0214d5666fe1e412c3bcca69746d9eec432072f12bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readinessNotice — Spec A step 9 residency unloads words a GPU-pressure unload as paused and reloading on request, at info",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/readinessNoticeResidency.test.ts#words a game-mode unload as paused while a game runs, at info",
+      "file": "modules/ui-web/src/shell-v0/state/readinessNoticeResidency.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e33b1baa905e8caa90a7c0214d5666fe1e412c3bcca69746d9eec432072f12bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readinessNotice — Spec A step 9 residency unloads words a game-mode unload as paused while a game runs, at info",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/unifiedChatHumanLoad.test.ts#withHumanLoad marks the body as a person's chat and keeps the rest",
+      "file": "modules/ui-web/src/shell-v0/views/unifiedChatHumanLoad.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bb0cda4da16ecff64072d63eaf1fcb0224c4aba89df9f290eaf7ba1e6cd698b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unifiedChatRequest — Spec A step 9 allowLoad withHumanLoad marks the body as a person's chat and keeps the rest",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/unifiedChatHumanLoad.test.ts#the chat window marks its /api/chat/dispatch body before it sends it",
+      "file": "modules/ui-web/src/shell-v0/views/unifiedChatHumanLoad.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bb0cda4da16ecff64072d63eaf1fcb0224c4aba89df9f290eaf7ba1e6cd698b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unifiedChatRequest — Spec A step 9 allowLoad the chat window marks its /api/chat/dispatch body before it sends it",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "43564e20f",
+    "revision": "43564e20fe9e8e1ca1e7a33f1b435c4dd9f7701e",
+    "overlays": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/state/readinessNoticeResidency.test.ts\" \"src/shell-v0/views/unifiedChatHumanLoad.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-34124-1791309161054.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1164
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/readinessNoticeResidency.test.ts#words a GPU-pressure unload as paused and reloading on request, at info",
+        "classification": "assertion",
+        "detail": "readinessNotice — Spec A step 9 residency unloads words a GPU-pressure unload as paused and reloading on request, at info:  AssertionError: expected 'Degraded: inference.unloaded_gpu_pres…' to be 'Chat was paused to free graphics memo…' // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-TP8pbQ/modules/ui-web/src/shell-v0/state/readinessNoticeResidency.test.ts:22:37\n    at file:///F:/justsea"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/readinessNoticeResidency.test.ts#words a game-mode unload as paused while a game runs, at info",
+        "classification": "assertion",
+        "detail": "readinessNotice — Spec A step 9 residency unloads words a game-mode unload as paused while a game runs, at info:  AssertionError: expected 'Degraded: inference.unloaded_game_mode' to be 'Chat is paused while a game is runnin…' // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-TP8pbQ/modules/ui-web/src/shell-v0/state/readinessNoticeResidency.test.ts:32:37\n    at file:///F:/justsea"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/unifiedChatHumanLoad.test.ts#withHumanLoad marks the body as a person's chat and keeps the rest",
+        "classification": "assertion",
+        "detail": "unifiedChatRequest — Spec A step 9 allowLoad withHumanLoad marks the body as a person's chat and keeps the rest:  AssertionError: expected 'undefined' to be 'function' // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-TP8pbQ/modules/ui-web/src/shell-v0/views/unifiedChatHumanLoad.test.ts:19:25\n    at file:///F:/justsearch-public/.claude/worktrees/b6d536-chat-controller-6/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/unifiedChatHumanLoad.test.ts#the chat window marks its /api/chat/dispatch body before it sends it",
+        "classification": "assertion",
+        "detail": "unifiedChatRequest — Spec A step 9 allowLoad the chat window marks its /api/chat/dispatch body before it sends it:  AssertionError: expected -1 to be greater than -1\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-TP8pbQ/modules/ui-web/src/shell-v0/views/unifiedChatHumanLoad.test.ts:37:20\n    at file:///F:/justsearch-public/.claude/worktrees/b6d536-chat-controller-6/modules/ui-web/node_modules/@vitest"
+      }
+    ]
+  },
+  "digest": "sha256:b944008b0187cc43e049ac70ecac9693e110ff95bfe31b58fe5f35b2e59461f7"
+}

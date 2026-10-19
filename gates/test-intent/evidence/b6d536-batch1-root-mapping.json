@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T15:52:35.055Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "b346f12228db0ee4c5d235a8e81bcee958b1d67c",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeMappingFailureTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3937
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeMappingFailureTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeMappingFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3b5aac7f6371615a9579a2f1209cf4e66609bf5297f8d59f0b3b1f79f99b55c5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "mappingExceptionRereadsARecoveryThatHappenedInsideTheMapper()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:535a938d45352b1aa7e35534498d6f6f11c66fe612dff8c72bcb0b528b438eab"
+}

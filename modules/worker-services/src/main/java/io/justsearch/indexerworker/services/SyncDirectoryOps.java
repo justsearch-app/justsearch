@@ -67,6 +67,14 @@ final class SyncDirectoryOps {
   private final ConfirmedDeletionMarker deletionMarker;
   private final int pathScanCap;
   private final int pathCharCap;
+  /**
+   * Builds the presence authority for one prune of a root (task t-20261013-ef3c41). The default
+   * knows no registration or recorded volume; the ingest service supplies both.
+   */
+  private volatile java.util.function.Function<Path, PruneOps.PresenceGuard> pruneGuardFactory =
+      root -> RootPresenceGuard.capture(root, null);
+  /** Holds off file publications while the prune applies a batch; the ingest service supplies it. */
+  private volatile PruneOps.WriterFence pruneWriterFence = PruneOps.WriterFence.NONE;
 
   SyncDirectoryOps(
       ReadPathOps readPathOps,
@@ -125,6 +133,23 @@ final class SyncDirectoryOps {
                 io.justsearch.indexerworker.identity.DocumentIdentityStore.UNAVAILABLE);
     this.pathScanCap = pathScanCap;
     this.pathCharCap = pathCharCap;
+  }
+
+  /**
+   * Supplies the presence authority for each prune, so a prune refuses a root that is now a
+   * different folder or volume than the one being watched or first indexed (task
+   * t-20261013-ef3c41).
+   */
+  void setPruneGuardFactory(java.util.function.Function<Path, PruneOps.PresenceGuard> factory) {
+    this.pruneGuardFactory = java.util.Objects.requireNonNull(factory, "factory");
+  }
+
+  /**
+   * Supplies the fence primary ingestion, VDU chunk replacement and renames hold while they write a
+   * file's rows, so the prune never removes part of a file or misses a chunk written meanwhile.
+   */
+  void setPruneWriterFence(PruneOps.WriterFence fence) {
+    this.pruneWriterFence = java.util.Objects.requireNonNull(fence, "fence");
   }
 
   /** A complete, bounded serving-index/disk difference. No queue or Lucene mutation occurs here. */
@@ -290,6 +315,88 @@ final class SyncDirectoryOps {
     return List.copyOf(absent);
   }
 
+  /**
+   * One indexed file document's path, size and modification time, as the index holds them (task
+   * t-20261013-ef3c41, round 8, refined decision 2: the upgrade seeding's evidence). A missing
+   * size or time is {@code -1}.
+   */
+  record IndexedFileStamp(Path path, long sizeBytes, long modifiedAtMs) {
+    /** Whether the file exists at its path now, unlinked, with the indexed size and time. */
+    boolean matchesDisk() {
+      if (sizeBytes < 0 || modifiedAtMs < 0) {
+        return false;
+      }
+      try {
+        BasicFileAttributes attrs = Files.readAttributes(
+            path, BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+        return attrs.isRegularFile()
+            && attrs.size() == sizeBytes
+            && attrs.lastModifiedTime().toMillis() == modifiedAtMs;
+      } catch (IOException | SecurityException notThere) {
+        return false;
+      }
+    }
+  }
+
+  /**
+   * Up to {@code limit} indexed file documents under {@code root} (parent documents only, no
+   * no-file projections), in path order, with their indexed size and modification time.
+   *
+   * @throws IOException when the serving index cannot be read; the caller then cannot tell
+   */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // the search path may throw unchecked
+  List<IndexedFileStamp> sampleIndexedFiles(Path root, int limit) throws IOException {
+    if (readPathOps == null) throw new IOException("Serving index read path is unavailable");
+    try {
+      String normalizedPrefix = PathNormalizer.normalizePathPrefix(root.toString());
+      var query = new org.apache.lucene.search.BooleanQuery.Builder()
+          .add(new org.apache.lucene.search.PrefixQuery(
+                  new org.apache.lucene.index.Term(SchemaFields.PATH, normalizedPrefix)),
+              org.apache.lucene.search.BooleanClause.Occur.MUST)
+          .add(new org.apache.lucene.search.TermQuery(
+                  new org.apache.lucene.index.Term(SchemaFields.IS_CHUNK, "true")),
+              org.apache.lucene.search.BooleanClause.Occur.MUST_NOT)
+          .build();
+      var result = readPathOps.search(query, limit,
+          Set.of(SchemaFields.DOC_ID, SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID,
+              SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT),
+          LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC, null);
+      if (result == null) throw new IOException("Serving index sample returned no result");
+      List<IndexedFileStamp> sample = new ArrayList<>();
+      for (var hit : result.hits()) {
+        if (hit.fields().get(SchemaFields.PROJECTION_SOURCE_ID) != null) {
+          continue;
+        }
+        String path = hit.fields().get(SchemaFields.PATH);
+        if (path == null || path.isBlank()) {
+          path = hit.docId();
+        }
+        if (path == null || path.isBlank()) {
+          continue;
+        }
+        sample.add(new IndexedFileStamp(Path.of(path),
+            longOrMissing(hit.fields().get(SchemaFields.SIZE_BYTES)),
+            longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT))));
+      }
+      return sample;
+    } catch (IOException incomplete) {
+      throw incomplete;
+    } catch (RuntimeException incomplete) {
+      throw new IOException("Serving index sample failed", incomplete);
+    }
+  }
+
+  private static long longOrMissing(String value) {
+    if (value == null || value.isBlank()) {
+      return -1L;
+    }
+    try {
+      return Long.parseLong(value.trim());
+    } catch (NumberFormatException notANumber) {
+      return -1L;
+    }
+  }
+
   private Set<String> getIndexedPathsUnderPrefixStrict(
       String prefix, PathBudget budget,
       java.util.function.BooleanSupplier cancelled) throws IOException {
@@ -437,13 +544,17 @@ final class SyncDirectoryOps {
 
     try {
       // STEP 1: Prune orphans (reuse existing logic with throttle + abort)
-      int pruneResult = pruneOrphansForSync(rootPath, force, cancelled);
+      PruneOps.PruneResult pruneResult = pruneOrphansForSync(root, force, cancelled);
 
       SyncDirectoryResponse pruneAbort = handleSyncPruneAbortIfNeeded(pruneResult, force);
       if (pruneAbort != null) {
         return pruneAbort;
       }
-      filesDeleted = Math.max(0, pruneResult);
+      filesDeleted = pruneResult.pruned();
+      // Task t-20261013-ef3c41: a prune that stopped because the root or a subtree could not be
+      // read removed nothing after that point. Additions below are still safe; the response says
+      // delete detection did not complete, never a silent "in sync".
+      boolean pruneIncomplete = pruneResult.completion() == PruneOps.Completion.INCOMPLETE;
 
       // STEP 2: For force=true (OVERFLOW/burst), we do not attempt to compute the full indexed
       // set (can be large). We enqueue all disk files and rely on IndexingLoop's "unchanged"
@@ -480,6 +591,17 @@ final class SyncDirectoryOps {
         commitOps.commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.SYNC_PRUNE);
       }
 
+      if (pruneIncomplete) {
+        log.warn(
+            "syncDirectory for {}: prune incomplete (root or subtree unreadable); {} deleted,"
+                + " {} kept because their files could not be checked, {} added, delete detection"
+                + " UNVERIFIED",
+            rootPath,
+            filesDeleted,
+            pruneResult.keptUnknown(),
+            filesAdded);
+        return syncDirectoryDeleteUnverifiedResponse(filesDeleted, filesAdded);
+      }
       log.info(
           "syncDirectory complete for {}: {} deleted, {} added",
           rootPath,
@@ -495,8 +617,9 @@ final class SyncDirectoryOps {
 
   // ==================== Phase helpers ====================
 
-  private SyncDirectoryResponse handleSyncPruneAbortIfNeeded(int pruneResult, boolean force) {
-    if (pruneResult < 0 && !force) {
+  private SyncDirectoryResponse handleSyncPruneAbortIfNeeded(
+      PruneOps.PruneResult pruneResult, boolean force) {
+    if (pruneResult.completion() == PruneOps.Completion.ABORTED && !force) {
       log.info("syncDirectory aborted during prune phase (user activity)");
       return syncDirectorySkippedResponse();
     }
@@ -536,33 +659,30 @@ final class SyncDirectoryOps {
     return root;
   }
 
-  private int pruneOrphansForSync(String rootPath, boolean force,
+  private PruneOps.PruneResult pruneOrphansForSync(Path root, boolean force,
       java.util.function.BooleanSupplier cancelled) {
     if (pruneOps == null) {
-      return 0;
+      return new PruneOps.PruneResult(0, PruneOps.Completion.COMPLETE);
     }
-    // Tempdoc 599 §16/A1 (data-loss guard) — if the watched root itself is gone (unmounted /
-    // disconnected drive), DO NOT prune: every file under it would read as "missing" and its whole
-    // index would be silently deleted. Skip; a later sync re-prunes once the root is back. (Worker
-    // background thread, so the existence check's latency on a dead mount is tolerable.)
-    if (!Files.isDirectory(Path.of(rootPath))) {
-      log.warn(
-          "pruneOrphansForSync: root unavailable (likely unmounted), skipping prune to avoid"
-              + " deleting the folder's index: {}",
-          rootPath);
-      return 0;
-    }
+    // Tempdoc 599 §16/A1 (data-loss guard), generalised by task t-20261013-ef3c41: a document is
+    // pruned only when its file is reported not found while this same root (native identity, the
+    // identity captured when the root was registered, and the volume recorded at its first prune)
+    // is present and listable. The guard is
+    // re-checked at every batch boundary, so a drive unplugged mid-prune stops it instead of
+    // reading as "every file is gone".
+    PruneOps.PresenceGuard guard = pruneGuardFactory.apply(root);
     // Tempdoc 885 item 3: the throttle callback the prune already invokes every N documents is now
     // the pacing tick. It always returns false — under a duty cycle the prune is slowed, never
     // abandoned half-done as it was when user activity aborted it.
-    // Tempdoc 931 §C.6 — a confirmed deletion point: the prune removes a document precisely because
-    // its backing file no longer exists on disk (PruneOps' own Files.exists check), and the guard
-    // above has already refused to run at all when the whole root is unavailable.
+    // Tempdoc 931 §C.6 — a confirmed deletion point: the prune reports exactly the paths whose
+    // absence the guard confirmed.
     return pruneOps.pruneByPathPrefix(
-        rootPath,
+        root.toString(),
         () -> cancelled.getAsBoolean() || (!force && indexingPacing.paceAndContinue()),
         SYNC_PRUNE_THROTTLE_BATCH_SIZE,
-        deletionMarker::markIfAbsent);
+        guard,
+        deletionMarker::markIfAbsent,
+        pruneWriterFence);
   }
 
   private Set<String> indexedPathsForSync(String rootPath, boolean force,

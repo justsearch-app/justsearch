@@ -36,16 +36,16 @@ public final class RunRoutes {
       // Registered before the {runId} routes. Nothing today can capture `live` as a run id (the
       // parameterised routes are POST), but a future GET /api/chat/runs/{runId} would make the
       // literal-vs-parameter question live, and declaring the literal first is the cheap side.
-      app.get(LIVE_PATH, session::handleListLiveRuns);
+      app.get(LIVE_PATH, session::handleListLiveRuns, ActivityRole.OBSERVATION);
     }
     if (runs == null) {
       return;
     }
     // Creates the run AND observes it: with the creating call BEING the first stream, execution
     // stays synchronous on the handler thread (§1.7) and no executor move is needed.
-    app.post(PATH_PREFIX, runs::handleCreate);
+    app.post(PATH_PREFIX, runs::handleCreate, ActivityRole.USER_ACTION);
     // An additional / reattaching observer. Unknown or long-retired ⇒ typed 404, never a 200 with
     // an empty stream.
-    app.post(PATH_PREFIX + "/{runId}/observe", runs::handleObserve);
+    app.post(PATH_PREFIX + "/{runId}/observe", runs::handleObserve, ActivityRole.OBSERVATION);
   }
 }

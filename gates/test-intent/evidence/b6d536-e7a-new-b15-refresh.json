@@ -1,0 +1,188 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:12:23.222Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "c7e5e726efa7617eb5cfde00d030f1c30e7787fb",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.reranker.SplitRerankUnderOneLeaseTest.aDeadlineMissOnTheSecondCallReturnsEveryDocumentInItsOriginalOrder\" --tests \"io.justsearch.reranker.SplitRerankUnderOneLeaseTest.aSplitRerankHoldsOneSeatSoAnAgedBulkWaiterIsNotSeatedBetweenItsCalls\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16750
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaPlanTest\" --tests \"io.justsearch.ort.GpuCallPackerTest\" --tests \"io.justsearch.ort.NativeSessionHandleRetiredSessionTest.noGpuSessionForTheRoleUntilItsRetiredSessionCloses\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4528
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/reranker/SplitRerankUnderOneLeaseTest.java#aDeadlineMissOnTheSecondCallReturnsEveryDocumentInItsOriginalOrder",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/reranker/SplitRerankUnderOneLeaseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7a24d8d1380f78e9edfccf416b04971c7b8539848777973167ea25464fa871ef",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aDeadlineMissOnTheSecondCallReturnsEveryDocumentInItsOriginalOrder()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/reranker/SplitRerankUnderOneLeaseTest.java#aSplitRerankHoldsOneSeatSoAnAgedBulkWaiterIsNotSeatedBetweenItsCalls",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/reranker/SplitRerankUnderOneLeaseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7a24d8d1380f78e9edfccf416b04971c7b8539848777973167ea25464fa871ef",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSplitRerankHoldsOneSeatSoAnAgedBulkWaiterIsNotSeatedBetweenItsCalls()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaPlanTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuArenaPlanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c14f69fa75f3ef65972107cef115026c553608ba868d6987f11422333058bb56",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theResolverReadsNoFreeMemoryChatStatePressureOrStartOrder()",
+          "status": "passed"
+        },
+        {
+          "name": "theMinimumActivationsAreTodaysLargestCallAndTheLargestSmallestCall()",
+          "status": "passed"
+        },
+        {
+          "name": "withoutCompactADeviceBelowP12KeepsTodaysConstants()",
+          "status": "passed"
+        },
+        {
+          "name": "chatMemoryIsZeroOnlyWhenNoChatCanRunOnTheDevice()",
+          "status": "passed"
+        },
+        {
+          "name": "anExplicitRoleCapIsKeptAndItsRoleIsPackedAgainstIt()",
+          "status": "passed"
+        },
+        {
+          "name": "theFormulaGivesTheReferenceDevicesTheirBudgetsAndCaps()",
+          "status": "passed"
+        },
+        {
+          "name": "theEmbeddingActivationIsNeverBelowTheMeasuredPoints()",
+          "status": "passed"
+        },
+        {
+          "name": "bgeM3BulkRunsOnTheCpuWithAReasonAndTheOtherRolesKeepThePlan()",
+          "status": "passed"
+        },
+        {
+          "name": "theFirstPlanInOrderThatFitsIsTakenAtTheDerivedBoundaries()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitChatSettingsChangeCAndAPlanTheyBreakIsUserSettingUnmet()",
+          "status": "passed"
+        },
+        {
+          "name": "theVduProjectorFollowsThePlanNeverLiveFreeMemory()",
+          "status": "passed"
+        },
+        {
+          "name": "noGpuWhenTheGpuIsOffOrNoDeviceIsUsable()",
+          "status": "passed"
+        },
+        {
+          "name": "theFinalChatFootprintsAndKvSlopeAreTheMeasuredOnes()",
+          "status": "passed"
+        },
+        {
+          "name": "aChatModelWithoutAMeasuredFootprintIsEstimatedAndMarkedExtrapolated()",
+          "status": "passed"
+        },
+        {
+          "name": "deviceSeatsDivideTheActivationBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuCallPackerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f87f5860cad996ded7693ea7766cd1a40c8aa16a69fe7421e225860c8350554b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "p12ShapesMatchTheProfileTable()",
+          "status": "passed"
+        },
+        {
+          "name": "p16PlusKeepsEveryOneOfTodaysShapes()",
+          "status": "passed"
+        },
+        {
+          "name": "withoutAPlanEveryCallTakesTodaysCount()",
+          "status": "passed"
+        },
+        {
+          "name": "p8ShapesMatchTheProfileTable()",
+          "status": "passed"
+        },
+        {
+          "name": "aCallPadsToItsLongestItemSoAPrefixStopsAtTheFirstItemThatDoesNotFit()",
+          "status": "passed"
+        },
+        {
+          "name": "anInfeasibleSingleItemStillRunsOnCpuAndUnmeasuredRolesAreNotPacked()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleRetiredSessionTest.java#noGpuSessionForTheRoleUntilItsRetiredSessionCloses",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleRetiredSessionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:01069269b35ab363a05799ab0b76177bd1e29b343baa4bc8e8f6e1340328542b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "noGpuSessionForTheRoleUntilItsRetiredSessionCloses()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:d624a673fe340f533efd331ee29a8f260d9a092be27c59356450919a5f96296e"
+}

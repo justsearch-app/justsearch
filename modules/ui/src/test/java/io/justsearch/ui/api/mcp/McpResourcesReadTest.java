@@ -160,6 +160,31 @@ final class McpResourcesReadTest {
     assertTrue(((String) content.get("text")).contains("documents: 42"), content.toString());
   }
 
+  /**
+   * Task t-20261013-ef3c41, S5 — an index the Worker could not count reaches MCP as {@code
+   * docCount} 0 with the {@code docCountUnknown} marker. The agent must be told the count is unknown,
+   * not that the index holds 0 documents (which reads as "nothing indexed, do not search").
+   */
+  @Test
+  void anUncountedIndexIsSummarisedAsUnknownNotZeroDocuments() {
+    KnowledgeStatus base = statusFixture();
+    KnowledgeStatus uncounted = new KnowledgeStatus(
+        base.state(), base.ready(), base.queueDepth(), 0L, 0L, base.buildingDocCount(),
+        base.servingSearchGenerationId(), base.servingIngestGenerationId(), base.switchBufferDepth(),
+        base.pendingJobsCount(), base.processingJobsCount(), base.pendingReadyJobsCount(),
+        base.pendingBackoffJobsCount(), base.migrationSwitchingAgeMs(),
+        base.migrationSwitchingMaxDurationMs(), base.migrationPaused(), base.migrationPauseReason(),
+        base.migrationPausedAtMs(), base.healthy(), base.indexState(),
+        Map.of("docCountUnknown", Boolean.TRUE));
+    KnowledgeSearchController ctrl = controllerWithStatusAndFacets(uncounted, Map.of());
+
+    String text = (String) soleContent(
+        surface(ctrl).readResource("justsearch://index/summary", TestRequestContexts.mcp("s1"))).get("text");
+
+    assertTrue(!text.contains("documents: 0"), "an uncounted index was reported empty: " + text);
+    assertTrue(text.contains("documents: unknown"), text);
+  }
+
   @Test
   @DisplayName("index/roots: contents[0] keys iterate uri, mimeType, text")
   void indexRootsKeyOrder() {

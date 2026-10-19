@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T08:16:27.148Z",
+  "revision": "624dcfc92293a2fef1e6d53a16844642acf8a7a1",
+  "tree": "2fe94e5f0b807aeacdcab5981fb78ec3dd03f448",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerSummaryParityTest.javaReaderGivesTheSharedSummary\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3152
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerSummaryParityTest.java#javaReaderGivesTheSharedSummary",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerSummaryParityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:715400187aadea3e003e3885d8fdd48974ab30a6c8d39d566e05ecb78a5366de",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "javaReaderGivesTheSharedSummary()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:3bba4ab29044044e2d5953b04292ec6fd77fb92948463008437d09c53844765a"
+}

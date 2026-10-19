@@ -32,6 +32,23 @@
  *   honour      — answer health forever; exit 0 when a request arrives
  *   slow-start  — delay publishing the manifest by `slowStartMs` (exceeds the start deadline)
  *
+ * Spec F §7.2's start and discovery modes (one exit path, whatever the phase):
+ *   die-before-manifest            — exit `exitCode` (default 1) after `exitAfterMs`, no manifest
+ *   die-after-manifest-before-http — publish a manifest naming a port nobody listens on, then exit
+ *   die-during-readiness           — publish the manifest, accept health requests and never answer
+ *                                    them, then exit `exitCode` after `exitAfterMs`
+ *   ignore-shutdown                — `honour`, except that it ignores the request file and the
+ *                                    shutdown POST; only a forced kill ends it
+ * and the behaviour flag `ignoreShutdown: true`, which does the same for any other mode.
+ *
+ * Spec B §6.1's self-intent: with `writesSelfIntent: true` the fake records `engine-self-intent` in
+ * `<dataDir>/runtime/exit-ledger/engine.v1.jsonl` (writer role `engine`) before each close it runs
+ * on request, with the reason and code the real Engine records for that request
+ * (`EngineShutdownSequence.selfIntentOf`); `selfIntent: {reason, detail, expectedCode}` records one
+ * before a timed `clean-exit`, as the Engine does before an escalated restart. `crash` and `oom`
+ * record none, as a fatal exit records none. Linux records its real process birth through the shared
+ * reader. Windows retains its unknown FILETIME fixture and the existing owner matching.
+ *
  * Usage:
  *   node fake-engine.mjs --mode crash --exit-after-ms 500
  *   JUSTSEARCH_FAKE_ENGINE_PLAN=<plan.json> node fake-engine.mjs      (per-incarnation behaviour)
@@ -46,6 +63,13 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const ledgerLib = require('../dev/lib/exit-ledger.cjs');
+const { readLinuxProcess } = require('../dev/lib/process-identity.cjs');
+const { spawnBoundChild } = require('../dev/lib/job-run.cjs');
 
 const MODES = new Set([
   'clean-exit',
@@ -56,7 +80,15 @@ const MODES = new Set([
   'hang-hard',
   'honour',
   'slow-start',
+  'spawn-grandchild',
+  'die-before-manifest',
+  'die-after-manifest-before-http',
+  'die-during-readiness',
+  'ignore-shutdown',
 ]);
+
+/** Modes that end on their own before (or instead of) answering HTTP. */
+const DIES_WHILE_STARTING = new Set(['die-before-manifest', 'die-after-manifest-before-http', 'die-during-readiness']);
 
 function parseArgs(argv) {
   const out = {};
@@ -121,10 +153,13 @@ function resolveBehaviour(args, env) {
     process.stderr.write(`fake-engine: unknown mode \`${base.mode}\`\n`);
     process.exit(64);
   }
+  base.exitsAfterGrandchild = base.mode === 'spawn-grandchild' && base.exitCode !== null;
   if (base.exitCode === null) {
-    base.exitCode = base.mode === 'crash' ? 1 : base.mode === 'oom' ? 3 : base.mode === 'boot-fail' ? 2 : 0;
+    base.exitCode = base.mode === 'crash' || DIES_WHILE_STARTING.has(base.mode) ? 1
+      : base.mode === 'oom' ? 3 : base.mode === 'boot-fail' ? 2 : 0;
   }
-  return { ...base, incarnation };
+  if (base.mode === 'ignore-shutdown') base.ignoreShutdown = true;
+  return { ...base, incarnation, planDir: planPath ? path.dirname(path.resolve(planPath)) : null };
 }
 
 const args = parseArgs(process.argv.slice(2));
@@ -169,8 +204,32 @@ log(
 if (behaviour.mode === 'boot-fail') {
   process.stderr.write(`[fake-engine] boot failed (simulated), exiting ${behaviour.exitCode}\n`);
   setTimeout(() => process.exit(behaviour.exitCode), Math.min(behaviour.exitAfterMs, 250));
+} else if (behaviour.mode === 'die-before-manifest') {
+  // The port phase: alive, no manifest yet, then gone.
+  log(`dying before the manifest in ${behaviour.exitAfterMs}ms`);
+  setTimeout(() => process.exit(behaviour.exitCode), behaviour.exitAfterMs);
+} else if (behaviour.mode === 'die-after-manifest-before-http') {
+  dieAfterManifestBeforeHttp();
 } else {
   start();
+}
+
+/**
+ * Discovery without HTTP: the manifest names a port that was bound and released, so the supervisor
+ * has a discovered binding whose health probes are refused, and then the process exits.
+ */
+function dieAfterManifestBeforeHttp() {
+  const probe = http.createServer();
+  probe.listen(requestedPort, '127.0.0.1', () => {
+    const port = probe.address().port;
+    probe.close(() => {
+      publishManifest(port);
+      setTimeout(() => {
+        log(`exiting ${behaviour.exitCode} (died after the manifest, before HTTP)`);
+        process.exit(behaviour.exitCode);
+      }, behaviour.exitAfterMs);
+    });
+  });
 }
 
 function writeJsonAtomic(target, value) {
@@ -192,6 +251,56 @@ function publishManifest(port) {
   log(`manifest published instanceId=${instanceId} port=${port}`);
 }
 
+/** The real Engine's self-intent for a close requested with `reason` (selfIntentOf). */
+const SELF_INTENT_OF = Object.freeze({
+  quit: { reason: 'QUIT', detail: null, expectedCode: 0 },
+  upgrade: { reason: 'UPGRADE', detail: null, expectedCode: 0 },
+  restart: { reason: 'ENGINE_RESTART', detail: null, expectedCode: 4 },
+  hang: { reason: 'ENGINE_RESTART', detail: 'hang', expectedCode: 0 },
+});
+
+/** Records the Engine's own intent before a close it runs; the record is evidence, never a gate. */
+function recordSelfIntent(intent) {
+  if (!intent) return;
+  try {
+    const writer = ledgerLib.createLedgerWriter({
+      ledgerDir: ledgerLib.ledgerDirectory(dataDir),
+      family: 'engine',
+      writer: { role: 'engine', pid: process.pid, startedAt: Date.now() - Math.round(process.uptime() * 1000) },
+    });
+    writer.startSession();
+    const durable = writer.append('engine-self-intent', {
+      engine: { pid: process.pid, creationFileTime: null, instanceId,
+        ...(process.platform === 'linux' ? { processIdentity: readLinuxProcess(process.pid)?.processIdentity } : {}),
+      },
+      reason: intent.reason,
+      detail: intent.detail ?? null,
+      expectedCode: intent.expectedCode,
+    });
+    log(`self-intent ${intent.reason}/${intent.detail ?? '-'} expecting ${intent.expectedCode} (durable=${durable})`);
+  } catch (err) {
+    log(`self-intent not recorded: ${err?.message ?? err}`);
+  }
+}
+
+// Detached avoids libuv's own child job: this models a Java ProcessBuilder helper.
+// Match the production helper seam: the Windows incarnation job or Linux bound-exec.
+function spawnGrandchild() {
+  const [command, argv] = process.platform === 'win32'
+    ? ['ping', ['-n', '600', '127.0.0.1']] : ['sleep', ['600']];
+  const birthMs = Date.now();
+  const helper = (process.platform === 'linux' ? spawnBoundChild : spawn)(
+    command, argv, { detached: true, stdio: 'ignore', windowsHide: true });
+  helper.on('error', (err) => log(`grandchild failed: ${err.message}`));
+  helper.unref();
+  if (!helper.pid) return;
+  writeJsonAtomic(path.join(behaviour.planDir ?? runtimeDir,
+    `grandchild-${behaviour.incarnation}.json`),
+  { pid: helper.pid, birthMs, parentPid: process.pid, incarnation: behaviour.incarnation,
+    ...(process.platform === 'linux' ? { processIdentity: readLinuxProcess(helper.pid)?.processIdentity } : {}),
+  });
+}
+
 function orderlyExit(code, why) {
   log(`exiting ${code} (${why})`);
   try {
@@ -205,14 +314,18 @@ function orderlyExit(code, why) {
 }
 
 function start() {
-  let answering = true;
-  let readingRequests = true;
+  // `die-during-readiness` accepts every request and answers none, like a JVM still constructing
+  // its API, until it exits.
+  let answering = behaviour.mode !== 'die-during-readiness';
+  let readingRequests = behaviour.ignoreShutdown !== true;
 
   let previousEssentialReady = false;
   let previousEpochRequest = null;
   let essentialEpoch = new Date().toISOString();
+  const engineStarted=Date.now();
   const server = http.createServer((req, res) => {
-    if (!answering) {
+    const age=Date.now()-engineStarted;
+    if (!answering || (behaviour.freezeWindow && age>=behaviour.freezeWindow.fromMs && age<behaviour.freezeWindow.toMs)) {
       // A hang is NOT a refusal: the socket is accepted and then nothing happens, which is what a
       // wedged JVM looks like to a poller. Answering 503 here would be a health check that works.
       return;
@@ -221,8 +334,17 @@ function start() {
     if (req.method === 'POST' && url === '/api/lifecycle/shutdown') {
       res.writeHead(202, { 'content-type': 'application/json' });
       res.end('{"accepted":true}');
-      setTimeout(() => orderlyExit(0, 'POST /api/lifecycle/shutdown'), 50);
+      if (behaviour.ignoreShutdown === true) {
+        log('accepted POST /api/lifecycle/shutdown and ignored it (ignoreShutdown)');
+        return;
+      }
+      if (behaviour.writesSelfIntent === true) recordSelfIntent(SELF_INTENT_OF.quit);
+      setTimeout(() => orderlyExit(behaviour.requestExitCode ?? 0, 'POST /api/lifecycle/shutdown'), 50);
       return;
+    }
+    if (url === '/v1/chat/completions') {
+      res.writeHead(200,{'content-type':'text/event-stream'});res.write('data: {"token":"working"}\n\n');
+      const stream=setInterval(()=>res.write('data: {"token":"working"}\n\n'),50);req.on('close',()=>clearInterval(stream));return;
     }
     if (url === '/api/health') {
       res.writeHead(behaviour.healthStatus ?? 200, { 'content-type': 'application/json' });
@@ -265,40 +387,74 @@ function start() {
     log(`JUSTSEARCH_API_PORT=${port}`);
 
     const publishDelay = behaviour.mode === 'slow-start' ? behaviour.slowStartMs : 0;
-    setTimeout(() => publishManifest(port), publishDelay);
-
-    if (behaviour.localHandoffAfterMs !== undefined) {
-      setTimeout(() => {
-        const writeHandoff = (state, stale = false) => {
-          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-          manifest.schemaVersion = 2;
-          manifest.instanceId = stale ? `${instanceId}-stale` : instanceId;
-          manifest.shutdownHandoff = state == null ? null
-            : { state, reason: 'restart', changedAt: new Date().toISOString() };
-          writeJsonAtomic(manifestPath, manifest);
-        };
-        writeHandoff(behaviour.localHandoffState ?? 'pending', behaviour.staleHandoff === true);
-        log('published local shutdown handoff while HTTP remains responsive');
-        if (behaviour.churnHandoff) {
-          // Once admitted: stale replacement, disappearance, then continuously refreshed stamps.
-          // None may cancel or extend the host's already-latched deadline.
-          setTimeout(() => writeHandoff('pending', true), 200);
-          setTimeout(() => writeHandoff(null), 400);
-          setTimeout(() => setInterval(() => writeHandoff('pending'), 100), 600);
-        }
-      }, behaviour.localHandoffAfterMs);
+    setTimeout(() => {
+      publishManifest(port);
+      if (behaviour.mode === 'spawn-grandchild' || behaviour.spawnGrandchild) spawnGrandchild();
+    }, publishDelay);
+    if (behaviour.exitsAfterGrandchild) {
+      setTimeout(() => orderlyExit(behaviour.exitCode, 'spawn-grandchild'), behaviour.exitAfterMs);
     }
 
-    if (behaviour.mode === 'hang-soft' || behaviour.mode === 'hang-hard') {
-      setTimeout(() => {
-        answering = false;
-        readingRequests = behaviour.mode === 'hang-soft';
-        log(`hanging now (mode=${behaviour.mode}, readingRequests=${readingRequests})`);
-      }, behaviour.hangAfterMs);
-    }
+    const armFaults = () => {
+      if (behaviour.localHandoffAfterMs !== undefined) {
+        setTimeout(() => {
+          const writeHandoff = (state, stale = false) => {
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+            manifest.schemaVersion = 2;
+            manifest.instanceId = stale ? `${instanceId}-stale` : instanceId;
+            manifest.shutdownHandoff = state == null ? null
+              : { state, reason: 'restart', changedAt: new Date().toISOString() };
+            writeJsonAtomic(manifestPath, manifest);
+          };
+          writeHandoff(behaviour.localHandoffState ?? 'pending', behaviour.staleHandoff === true);
+          log('published local shutdown handoff while HTTP remains responsive');
+          if (behaviour.churnHandoff) {
+            // Once admitted: stale replacement, disappearance, then continuously refreshed stamps.
+            // None may cancel or extend the host's already-latched deadline.
+            setTimeout(() => writeHandoff('pending', true), 200);
+            setTimeout(() => writeHandoff(null), 400);
+            setTimeout(() => setInterval(() => writeHandoff('pending'), 100), 600);
+          }
+        }, behaviour.localHandoffAfterMs);
+      }
 
-    if (behaviour.mode === 'clean-exit' || behaviour.mode === 'crash' || behaviour.mode === 'oom') {
+      if (behaviour.mode === 'hang-soft' || behaviour.mode === 'hang-hard') {
+        setTimeout(() => {
+          answering = false;
+          readingRequests = behaviour.mode === 'hang-soft';
+          log(`hanging now (mode=${behaviour.mode}, readingRequests=${readingRequests})`);
+        }, behaviour.hangAfterMs);
+      }
+
+      if (behaviour.mode === 'clean-exit' || behaviour.mode === 'crash' || behaviour.mode === 'oom') {
+        setTimeout(() => {
+          // A close the Engine starts itself says so first; a fatal one never does.
+          if (behaviour.mode === 'clean-exit') recordSelfIntent(behaviour.selfIntent);
+          orderlyExit(behaviour.exitCode, behaviour.mode);
+        }, behaviour.exitAfterMs);
+      }
+    };
+
+    // A readiness death cannot wait for RUNNING: it must retain its original startup timing.
+    if (behaviour.mode === 'die-during-readiness') {
       setTimeout(() => orderlyExit(behaviour.exitCode, behaviour.mode), behaviour.exitAfterMs);
+    }
+
+    // An adapter may require a witnessed RUNNING state before injecting the first fault. This is
+    // fixture control only: no subject code reads the gate, and subsequent boot failures keep their
+    // original timing. Identity prevents a stale or unrelated acknowledgment from releasing it.
+    const gatePath = env.JUSTSEARCH_FAKE_ENGINE_FAULT_GATE;
+    if (!gatePath || behaviour.incarnation !== 1) {
+      armFaults();
+    } else {
+      const gateTimer = setInterval(() => {
+        let gate;
+        try { gate = JSON.parse(fs.readFileSync(gatePath, 'utf8')); } catch { return; }
+        if (gate.pid !== process.pid || gate.instanceId !== instanceId || gate.incarnation !== 1) return;
+        clearInterval(gateTimer);
+        log('first-incarnation fault gate released after adapter observed running');
+        armFaults();
+      }, 25);
     }
   });
 
@@ -335,6 +491,8 @@ function start() {
     } catch {
       /* the supervisor rewrites it if it still wants us gone */
     }
+    // `requestExitCode` is a close that crashed: the self-intent still says what was intended.
+    if (behaviour.writesSelfIntent === true) recordSelfIntent(SELF_INTENT_OF[reason]);
     orderlyExit(behaviour.requestExitCode ?? (reason === 'restart' ? 4 : 0), `shutdown request reason=${reason}`);
   }, behaviour.requestPollMs).unref();
   // The interval is unref'd on purpose: the listening server is what holds the event loop open, so

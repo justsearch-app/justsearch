@@ -85,6 +85,7 @@ final class SyncDirectoryCallerProvenanceTest {
               null,
               null,
               0L);
+      addedByThePerson(caseDir.resolve("index-base"), caseDir);
 
       var response =
           service.syncDirectory(
@@ -124,5 +125,22 @@ final class SyncDirectoryCallerProvenanceTest {
             EngineContext.Survival.DURABLE,
             EngineContext.Urgency.BACKGROUND),
         provenance, io.justsearch.core.execution.EngineTaskLifetime.NONE);
+  }
+
+  /**
+   * The person's add of {@code root}: its watch request with the add marker, which records the
+   * root's volume under {@code indexBasePath}. Task t-20261013-ef3c41, round 8 (refined decision
+   * 2): only the add records a root's volume, and every other path refuses a root with none
+   * recorded.
+   */
+  private static void addedByThePerson(Path indexBasePath, Path root) {
+    var adding = new WorkerIngestService(null, null, null,
+        IndexingPacing.unthrottled(), indexBasePath, null,
+        null, null, null, 0L);
+    var added = adding.watchRoot(io.justsearch.ipc.WatchRootRequest.newBuilder()
+            .setRootPath(root.toString()).setRootAdded(true).build(),
+        CallContext.none());
+    assertTrue(added.getWatching(),
+        "precondition: the person adds " + root + ": " + added.getErrorMessage());
   }
 }

@@ -64,7 +64,7 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 - `:modules:app-util` -> `:modules:configuration`
 - `:modules:benchmarks` -> `:modules:adapters-lucene`, `:modules:configuration`, `:modules:indexing`, `:modules:ort-common`, `:modules:reranker`
 - `:modules:configuration` -> `:modules:core-contracts`
-- `:modules:gpu-bridge` -> `:modules:configuration`
+- `:modules:gpu-bridge` -> `:modules:app-api`, `:modules:configuration`
 - `:modules:indexer-worker` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:app-api`, `:modules:configuration`, `:modules:core-contracts`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:reranker`, `:modules:telemetry`, `:modules:worker-core`, `:modules:worker-services`
 - `:modules:indexing` -> `:modules:adapters-lucene`, `:modules:core`
 - `:modules:ipc-common` -> `:modules:app-api`
@@ -72,7 +72,7 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 - `:modules:reranker` -> `:modules:configuration`, `:modules:ort-common`, `:modules:telemetry`
 - `:modules:system-tests` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:ipc-common`
 - `:modules:telemetry` -> `:modules:core`
-- `:modules:ui` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:api-contract-projection-java`, `:modules:app-agent`, `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-engine`, `:modules:app-inference`, `:modules:app-observability`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:core`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:telemetry`, `:modules:worker-services`
+- `:modules:ui` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:api-contract-projection-java`, `:modules:app-agent`, `:modules:app-agent-api`, `:modules:app-api`, `:modules:app-config`, `:modules:app-engine`, `:modules:app-inference`, `:modules:app-observability`, `:modules:app-services`, `:modules:app-util`, `:modules:configuration`, `:modules:core`, `:modules:core-contracts`, `:modules:gpu-bridge`, `:modules:indexer-worker`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:telemetry`, `:modules:worker-services`
 - `:modules:worker-core` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:configuration`, `:modules:indexing`, `:modules:ort-common`, `:modules:telemetry`
 - `:modules:worker-services` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:app-api`, `:modules:configuration`, `:modules:core-contracts`, `:modules:extension-substrate`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:reranker`, `:modules:telemetry`, `:modules:worker-core`
 
@@ -83,6 +83,7 @@ These edges exist only in test suites and should not be treated as production la
 - `:modules:app-agent` uses `testImplementation` on `:modules:app-observability`
 - `:modules:app-engine` uses `testImplementation` on `:modules:app-agent`
 - `:modules:app-launcher` uses `testImplementation` on `:modules:gpu-bridge`
+- `:modules:app-services` uses `testImplementation` on `:modules:app-engine`
 - `:modules:dead-code-audit` uses `testImplementation` on `:modules:$m`
 - `:modules:indexer-worker` uses `testImplementation` on `:modules:app-services`
 - `:modules:system-tests` uses `testImplementation` on `:modules:app-services`, `:modules:indexer-worker`, `:modules:worker-services`
@@ -170,6 +171,7 @@ graph TD
   benchmarks --> ort-common
   benchmarks --> reranker
   configuration --> core-contracts
+  gpu-bridge --> app-api
   gpu-bridge --> configuration
   indexer-worker --> adapters-lucene
   indexer-worker --> ai-backend
@@ -211,6 +213,7 @@ graph TD
   ui --> core
   ui --> core-contracts
   ui --> gpu-bridge
+  ui --> indexer-worker
   ui --> indexing
   ui --> ipc-common
   ui --> ort-common
@@ -242,7 +245,7 @@ graph TD
 
 | Module | Direct deps | Notes |
 |--------|-------------|-------|
-| `ui` | 21 | Head REST API + orchestration bridge |
+| `ui` | 22 | Head REST API + orchestration bridge |
 | `app-services` | 18 | Orchestration + glue across large portions of the stack |
 | `indexer-worker` | 12 | Knowledge-server runtime hosted in the Engine, includes AI bridge + Lucene |
 | `worker-services` | 12 |  |

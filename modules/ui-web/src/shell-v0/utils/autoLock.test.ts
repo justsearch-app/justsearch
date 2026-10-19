@@ -19,7 +19,7 @@ describe('autoLock', () => {
     );
   }
 
-  const LOCK = '/api/conversations/encryption/lock';
+  const LOCK = '/api/conversations/encryption/auto-lock';
 
   it('locks after the idle timeout when unlocked', async () => {
     writeAutoLockMinutes(5);

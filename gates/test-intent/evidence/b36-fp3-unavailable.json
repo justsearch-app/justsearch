@@ -1,0 +1,371 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T15:42:33.926Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "1e6d7a4cfe46af654f7a8b598860f051d851b1e3",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedHybridWithUnavailableProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedAutoWithUnavailableProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedRagWithUnavailableProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedSpladeWithUnavailableEmbeddingProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.timelyHybridWithUnavailableProviderKeepsLoadingCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.timelyAutoWithUnavailableProviderKeepsLoadingCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedReadyProviderKeepsContention\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedUnavailableVectorKeepsTypedDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.permanentlyAbsentProviderKeepsExistingOutcomes\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.unexpiredUnavailableProviderKeepsExistingRouting\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderHybridKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderAutoKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderSpladeKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderRagKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderVectorKeepsTypedDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedPermanentlyMissingModelKeepsCompatibilityOutcome\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 121439
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedHybridWithUnavailableProviderKeepsBudgetOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedHybridWithUnavailableProviderKeepsBudgetOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedAutoWithUnavailableProviderKeepsBudgetOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedAutoWithUnavailableProviderKeepsBudgetOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedRagWithUnavailableProviderKeepsBudgetOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedRagWithUnavailableProviderKeepsBudgetOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedSpladeWithUnavailableEmbeddingProviderKeepsBudgetOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedSpladeWithUnavailableEmbeddingProviderKeepsBudgetOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#timelyHybridWithUnavailableProviderKeepsLoadingCause",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "timelyHybridWithUnavailableProviderKeepsLoadingCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#timelyAutoWithUnavailableProviderKeepsLoadingCause",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "timelyAutoWithUnavailableProviderKeepsLoadingCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedReadyProviderKeepsContention",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedReadyProviderKeepsContention()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedUnavailableVectorKeepsTypedDeadline",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedUnavailableVectorKeepsTypedDeadline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#permanentlyAbsentProviderKeepsExistingOutcomes",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "permanentlyAbsentProviderKeepsExistingOutcomes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#unexpiredUnavailableProviderKeepsExistingRouting",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unexpiredUnavailableProviderKeepsExistingRouting()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderHybridKeepsBudgetOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedColdPlaceholderHybridKeepsBudgetOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderAutoKeepsBudgetOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedColdPlaceholderAutoKeepsBudgetOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderSpladeKeepsBudgetOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedColdPlaceholderSpladeKeepsBudgetOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderRagKeepsBudgetOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedColdPlaceholderRagKeepsBudgetOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderVectorKeepsTypedDeadline",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedColdPlaceholderVectorKeepsTypedDeadline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedPermanentlyMissingModelKeepsCompatibilityOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedPermanentlyMissingModelKeepsCompatibilityOutcome()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c8c7e1c58",
+    "revision": "c8c7e1c5815bbad236664d006bb82ddaf7ec57d9",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b36-fp3-unavailable-compat.patch",
+        "contentDigest": "sha256:4ba52fd15e6bff5a43ffd2a737cd96ed0f9946932bc781d8611541e0a8415a49"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedHybridWithUnavailableProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedAutoWithUnavailableProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedRagWithUnavailableProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedSpladeWithUnavailableEmbeddingProviderKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.timelyHybridWithUnavailableProviderKeepsLoadingCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.timelyAutoWithUnavailableProviderKeepsLoadingCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedReadyProviderKeepsContention\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedUnavailableVectorKeepsTypedDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.permanentlyAbsentProviderKeepsExistingOutcomes\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.unexpiredUnavailableProviderKeepsExistingRouting\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderHybridKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderAutoKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderSpladeKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderRagKeepsBudgetOutcome\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedColdPlaceholderVectorKeepsTypedDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.queuedPermanentlyMissingModelKeepsCompatibilityOutcome\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 122878
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedHybridWithUnavailableProviderKeepsBudgetOutcome",
+        "classification": "assertion",
+        "detail": "queuedHybridWithUnavailableProviderKeepsBudgetOutcome(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <NO_EMBEDDING_SERVICE>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedAutoWithUnavailableProviderKeepsBudgetOutcome",
+        "classification": "assertion",
+        "detail": "queuedAutoWithUnavailableProviderKeepsBudgetOutcome(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedRagWithUnavailableProviderKeepsBudgetOutcome",
+        "classification": "assertion",
+        "detail": "queuedRagWithUnavailableProviderKeepsBudgetOutcome(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <EMBEDDING_UNAVAILABLE>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedSpladeWithUnavailableEmbeddingProviderKeepsBudgetOutcome",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#timelyHybridWithUnavailableProviderKeepsLoadingCause",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#timelyAutoWithUnavailableProviderKeepsLoadingCause",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedReadyProviderKeepsContention",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedUnavailableVectorKeepsTypedDeadline",
+        "classification": "assertion",
+        "detail": "queuedUnavailableVectorKeepsTypedDeadline(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <DEADLINE_EXCEEDED> but was: <INVALID_ARGUMENT>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#permanentlyAbsentProviderKeepsExistingOutcomes",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#unexpiredUnavailableProviderKeepsExistingRouting",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderHybridKeepsBudgetOutcome",
+        "classification": "assertion",
+        "detail": "queuedColdPlaceholderHybridKeepsBudgetOutcome(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <NO_EMBEDDING_SERVICE>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderAutoKeepsBudgetOutcome",
+        "classification": "assertion",
+        "detail": "queuedColdPlaceholderAutoKeepsBudgetOutcome(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderSpladeKeepsBudgetOutcome",
+        "classification": "assertion",
+        "detail": "queuedColdPlaceholderSpladeKeepsBudgetOutcome(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <NO_EMBEDDING_SERVICE>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderRagKeepsBudgetOutcome",
+        "classification": "assertion",
+        "detail": "queuedColdPlaceholderRagKeepsBudgetOutcome(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <NO_EMBEDDING_SERVICE>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedColdPlaceholderVectorKeepsTypedDeadline",
+        "classification": "assertion",
+        "detail": "queuedColdPlaceholderVectorKeepsTypedDeadline(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <DEADLINE_EXCEEDED> but was: <INVALID_ARGUMENT>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#queuedPermanentlyMissingModelKeepsCompatibilityOutcome",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:6fb7906045dd8793b5d792fd44d6d7cb367472a0bebc5d1af9a8f264eb057472"
+}

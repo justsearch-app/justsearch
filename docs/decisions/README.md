@@ -20,12 +20,11 @@ ADRs complement the explanation docs — they capture *why not* and *what else w
 - **`last_reviewed:`** — the date the decision was last re-read against the code, `YYYY-MM-DD`.
 - **`status:` is the *doc-lifecycle* field, not the ADR-vocabulary one.** Write `stable` for a
   live decision; the ADR words (Accepted / Superseded by ADR-XXXX / Rejected) belong in the body's
-  `## Status` section. This matters mechanically: `scripts/docs/llmstxt-generate.mjs:149` includes
-  a doc only when `status` is **exactly** `stable`, `in-progress` or `advisory`, so
-  `status: accepted` silently drops the ADR out of `docs/llms.txt` — the index agents actually
-  read. A retired decision (`superseded`, `rejected - …`) dropping out is intended; a live one
-  dropping out is not. The `adr-coverage` gate is unaffected either way: it prefix-matches
-  `accepted*`/`stable*` as live (`enforcer.mjs:77`), so the gate will not catch this for you.
+  `## Status` section. ADRs that still carry `status: accepted` (or `accepted - …`) count as live
+  too: `scripts/docs/llmstxt-generate.mjs` lists a decision in `docs/llms.txt` — the index agents
+  actually read — when its `status` is `stable`, `in-progress` or `advisory`, or starts with
+  `accepted`, the same live prefix the `adr-coverage` gate matches (`enforcer.mjs:83`). A retired
+  decision (`superseded`, `rejected - …`) dropping out of the index is intended.
 
 ### Frontmatter: `probes:` and `last_reviewed:`
 
@@ -143,8 +142,7 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 5. **Update the register in the same change**: the ADR's `probes:` list, the premise text in
    `governance/adr-probes.v1.json`, `last_reviewed`, and this file's Decision Log row.
 6. **Route what you found and will not fix here.** A defect the re-examination surfaced goes
-   to the owning tempdoc or its domain register at discovery — see the
-   `log-pre-existing-issues` rule in `CLAUDE.md`. A note nobody is scheduled to read is the
+   to the owning tempdoc or its domain register at discovery. A note nobody is scheduled to read is the
    failure this mechanism exists to end.
 
 ## Decision Log
@@ -198,8 +196,11 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 | [0045](0045-public-main-history-publication.md) | Public main history publication (validated agent enqueue, commit-safe PR body, managed review comment) | Accepted, amended 2026-09-05 | 2026-06-28 |
 | [0046](0046-local-api-trust-boundary.md) | Local API trust boundary | Accepted | 2026-09-02 |
 | [0047](0047-context-window-is-a-derived-resource.md) | Context window is a derived resource | Accepted | 2026-09-02 |
-| [0048](0048-extraction-isolation-and-indexing-pacing.md) | Extraction isolation and indexing pacing | Accepted (amended 2026-09-09: explicit urgency and work lifetime) | 2026-09-02 |
+| [0048](0048-extraction-isolation-and-indexing-pacing.md) | Extraction isolation and indexing pacing | Accepted (amended 2026-09-09: explicit urgency and work lifetime; amended 2026-10-05 by [0050](0050-gpu-co-residence-by-prevention.md): chat generation and external GPU pressure) | 2026-09-02 |
 | [0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) | One Engine JVM, and the process boundaries that survive | Accepted | 2026-09-07 |
+| [0050](0050-gpu-co-residence-by-prevention.md) | GPU co-residence by prevention, measured profiles and explicit degradation | Accepted (amends 0004, 0047, 0048) | 2026-10-05 |
+| [0051](0051-held-process-lifetimes-and-owner-exit-records.md) | Held process lifetimes and owner-recorded exits | Accepted (amends 0049) | 2026-10-05 |
+| [0052](0052-weekly-codeql-on-hosted-runners.md) | Weekly CodeQL on hosted runners | Accepted (amends 0044) | 2026-10-19 |
 
 > ADRs 0031–0041 were graduated on 2026-06-09 from the retired `421` frontend-rewrite kernel
 > draft's `50-decisions/` set (authored ~2026-05; the rewrite shipped per tempdoc 563). The

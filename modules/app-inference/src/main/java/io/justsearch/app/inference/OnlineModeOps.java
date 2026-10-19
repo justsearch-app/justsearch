@@ -11,6 +11,8 @@ import io.justsearch.app.api.OnlineAiService.AiUsage;
 import io.justsearch.app.api.OnlineAiService.VisionCompletionResult;
 import io.justsearch.app.api.SamplingParams;
 import io.justsearch.app.api.Mode;
+import io.justsearch.app.api.chat.GenerationLease;
+import io.justsearch.app.inference.chat.GenerationTracker;
 import io.justsearch.app.inference.telemetry.InferenceTelemetryEvents;
 import io.justsearch.app.inference.telemetry.RequestKind;
 import io.justsearch.app.inference.telemetry.RequestOutcome;
@@ -44,6 +46,8 @@ final class OnlineModeOps {
   private static final Logger LOG = LoggerFactory.getLogger(OnlineModeOps.class);
 
   private static final String PATH_CHAT_COMPLETIONS = "/v1/chat/completions";
+  /** llama-server's native completion route; the resume probe asks it for one token. */
+  private static final String PATH_COMPLETION = "/completion";
   private static final Duration HTTP_TIMEOUT = Duration.ofMinutes(2);
 
   /**
@@ -79,9 +83,8 @@ final class OnlineModeOps {
 
   // Priority queue for Online Mode (Chat > VDU)
   private final ReentrantLock onlineRequestLock = new ReentrantLock();
-  private final GenerativeRequestGate requestGate;
-  private final java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable>
-      generationLifetime;
+  /** Spec A §5.2: every exchange below opens its lease here once it holds the request lock. */
+  private final GenerationTracker generation;
   private final ExecutorService foregroundRequests;
   private final ExecutorService backgroundRequests;
 
@@ -131,7 +134,7 @@ final class OnlineModeOps {
       Supplier<String> configModelFileName,
       InferenceTelemetryEvents events) {
     this(executors, httpClient, objectMapper, currentMode, serverPort, lastKnownModelId,
-        configModelFileName, events, new GenerativeRequestGate());
+        configModelFileName, events, new GenerationTracker(ignored -> () -> {}, Runnable::run));
   }
 
   OnlineModeOps(
@@ -143,22 +146,7 @@ final class OnlineModeOps {
       Supplier<String> lastKnownModelId,
       Supplier<String> configModelFileName,
       InferenceTelemetryEvents events,
-      GenerativeRequestGate requestGate) {
-    this(executors, httpClient, objectMapper, currentMode, serverPort, lastKnownModelId,
-        configModelFileName, events, requestGate, ignored -> () -> {});
-  }
-
-  OnlineModeOps(
-      InferenceExecutorRegistrations executors,
-      HttpClient httpClient,
-      ObjectMapper objectMapper,
-      Supplier<Mode> currentMode,
-      Supplier<Integer> serverPort,
-      Supplier<String> lastKnownModelId,
-      Supplier<String> configModelFileName,
-      InferenceTelemetryEvents events,
-      GenerativeRequestGate requestGate,
-      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime) {
+      GenerationTracker generation) {
     this.httpClient = httpClient;
     this.objectMapper = objectMapper;
     this.currentMode = currentMode;
@@ -166,8 +154,7 @@ final class OnlineModeOps {
     this.lastKnownModelId = lastKnownModelId;
     this.configModelFileName = configModelFileName;
     this.events = events == null ? InferenceTelemetryEvents.noop() : events;
-    this.requestGate = Objects.requireNonNull(requestGate, "requestGate");
-    this.generationLifetime = Objects.requireNonNull(generationLifetime, "generationLifetime");
+    this.generation = Objects.requireNonNull(generation, "generation");
     ExecutorService foregroundRequestExecutor = null;
     ExecutorService backgroundRequestExecutor = null;
     ExecutorService foregroundCallbackExecutor = null;
@@ -273,11 +260,26 @@ final class OnlineModeOps {
       int maxTokens,
       SamplingParams sampling,
       io.justsearch.app.api.EngineWorkHandle work) {
+    return chatCompletion(messages, maxTokens, sampling, work, GenerationTracker.Kind.GENERATE);
+  }
+
+  /**
+   * Context-bearing completion under the given lease kind: GENERATE (counted as generating),
+   * ASSIST (Spec E step E2: a short query-assist call) or VDU (bulk work); the last two are not
+   * counted.
+   */
+  CompletableFuture<String> chatCompletion(
+      List<Map<String, Object>> messages,
+      int maxTokens,
+      SamplingParams sampling,
+      io.justsearch.app.api.EngineWorkHandle work,
+      GenerationTracker.Kind kind) {
     Objects.requireNonNull(work, "work");
+    requireCompletionKind(kind);
     var owned = work.retain();
     try {
       return chatCompletionOwned(
-          messages, maxTokens, sampling, owned, requestExecutor(owned));
+          messages, maxTokens, sampling, owned, requestExecutor(owned), kind);
     } catch (RuntimeException | Error failure) {
       owned.close();
       throw failure;
@@ -290,22 +292,37 @@ final class OnlineModeOps {
       SamplingParams sampling,
       io.justsearch.app.api.EngineWorkHandle owned,
       ExecutorService executor) {
+    return chatCompletionOwned(
+        messages, maxTokens, sampling, owned, executor, GenerationTracker.Kind.GENERATE);
+  }
+
+  private CompletableFuture<String> chatCompletionOwned(
+      List<Map<String, Object>> messages,
+      int maxTokens,
+      SamplingParams sampling,
+      io.justsearch.app.api.EngineWorkHandle owned,
+      ExecutorService executor,
+      GenerationTracker.Kind kind) {
     requireOnline("Chat");
-    GenerationTask generation = new GenerationTask();
+    GenerationTask task = new GenerationTask(kind);
+    var abandoned = new java.util.concurrent.atomic.AtomicBoolean();
 
     return io.justsearch.core.execution.EngineFutures.supplyAsync(
         () -> {
           checkCancelled(owned);
-          generation.start(owned);
+          task.queue(owned);
           long enqueueNanos = System.nanoTime();
           emitRequestEnqueued(RequestKind.CHAT);
           RequestOutcome outcome = RequestOutcome.ERROR;
-          onlineRequestLock.lock();
-          GenerativeRequestGate.Lease lease = null;
+          boolean locked = false;
+          GenerationLease lease = null;
           try {
-            lease = requestGate.acquire();
+            awaitCompletionTurn(owned, abandoned);
+            locked = true;
+            requireCompletionWaiting(owned, abandoned);
+            lease = task.admit();
             emitRequestStarted(RequestKind.CHAT, enqueueNanos);
-            String result = sendChatRequest(messages, maxTokens, sampling);
+            String result = sendChatRequest(lease, messages, maxTokens, sampling);
             outcome = RequestOutcome.OK;
             return result;
           } catch (RuntimeException re) {
@@ -313,15 +330,37 @@ final class OnlineModeOps {
             throw re;
           } finally {
             if (lease != null) lease.close();
-            onlineRequestLock.unlock();
+            if (locked) onlineRequestLock.unlock();
             emitRequestCompleted(RequestKind.CHAT, enqueueNanos, outcome);
           }
         },
         executor,
         () -> {
-          try { generation.close(); }
+          try { task.close(); }
           finally { if (owned != null) owned.close(); }
-        });
+        }, () -> abandoned.set(true));
+  }
+
+  /** A timed-out optional completion must leave the queue, even while chat holds the lock. */
+  private void awaitCompletionTurn(io.justsearch.app.api.EngineWorkHandle work,
+      java.util.concurrent.atomic.AtomicBoolean abandoned) {
+    try {
+      while (true) {
+        requireCompletionWaiting(work, abandoned);
+        if (onlineRequestLock.tryLock(VISION_LOCK_POLL_MS, TimeUnit.MILLISECONDS)) return;
+      }
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new java.util.concurrent.CancellationException("Completion interrupted before dispatch");
+    }
+  }
+
+  private static void requireCompletionWaiting(io.justsearch.app.api.EngineWorkHandle work,
+      java.util.concurrent.atomic.AtomicBoolean abandoned) {
+    if (abandoned.get()) {
+      throw new java.util.concurrent.CancellationException("Completion deadline expired before dispatch");
+    }
+    checkCancelled(work);
   }
 
   CompletableFuture<VisionCompletionResult> visionCompletionDetailed(
@@ -347,14 +386,35 @@ final class OnlineModeOps {
       SamplingParams sampling,
       Long seed,
       io.justsearch.app.api.EngineWorkHandle work) {
+    return visionCompletionDetailed(
+        prompt, imageBytes, maxTokens, sampling, seed, work, GenerationTracker.Kind.GENERATE);
+  }
+
+  /** Context-bearing vision completion under the given lease kind (GENERATE, ASSIST or VDU). */
+  CompletableFuture<VisionCompletionResult> visionCompletionDetailed(
+      String prompt,
+      byte[] imageBytes,
+      int maxTokens,
+      SamplingParams sampling,
+      Long seed,
+      io.justsearch.app.api.EngineWorkHandle work,
+      GenerationTracker.Kind kind) {
     Objects.requireNonNull(work, "work");
+    requireCompletionKind(kind);
     var owned = work.retain();
     try {
       return visionCompletionDetailedOwned(
-          prompt, imageBytes, maxTokens, sampling, seed, owned, requestExecutor(owned));
+          prompt, imageBytes, maxTokens, sampling, seed, owned, requestExecutor(owned), kind);
     } catch (RuntimeException | Error failure) {
       owned.close();
       throw failure;
+    }
+  }
+
+  private static void requireCompletionKind(GenerationTracker.Kind kind) {
+    Objects.requireNonNull(kind, "kind");
+    if (kind == GenerationTracker.Kind.AUX) {
+      throw new IllegalArgumentException("a completion is GENERATE, ASSIST or VDU, not AUX");
     }
   }
 
@@ -366,15 +426,28 @@ final class OnlineModeOps {
       Long seed,
       io.justsearch.app.api.EngineWorkHandle owned,
       ExecutorService executor) {
+    return visionCompletionDetailedOwned(prompt, imageBytes, maxTokens, sampling, seed, owned,
+        executor, GenerationTracker.Kind.GENERATE);
+  }
+
+  private CompletableFuture<VisionCompletionResult> visionCompletionDetailedOwned(
+      String prompt,
+      byte[] imageBytes,
+      int maxTokens,
+      SamplingParams sampling,
+      Long seed,
+      io.justsearch.app.api.EngineWorkHandle owned,
+      ExecutorService executor,
+      GenerationTracker.Kind kind) {
     requireOnline("Vision");
 
     String base64Image = Base64.getEncoder().encodeToString(imageBytes);
-    GenerationTask generation = new GenerationTask();
+    GenerationTask task = new GenerationTask(kind);
 
     return io.justsearch.core.execution.EngineFutures.supplyAsync(
         () -> {
           checkCancelled(owned);
-          generation.start(owned);
+          task.queue(owned);
           long enqueueNanos = System.nanoTime();
           emitRequestEnqueued(RequestKind.VISION);
           RequestOutcome outcome = RequestOutcome.ERROR;
@@ -388,11 +461,11 @@ final class OnlineModeOps {
               }
             }
             emitRequestStarted(RequestKind.VISION, enqueueNanos);
-            GenerativeRequestGate.Lease lease = null;
+            GenerationLease lease = null;
             try {
-              lease = requestGate.acquire();
+              lease = task.admit();
               VisionCompletionResult result =
-                  sendVisionRequestDetailed(prompt, base64Image, maxTokens, sampling, seed);
+                  sendVisionRequestDetailed(lease, prompt, base64Image, maxTokens, sampling, seed);
               outcome = RequestOutcome.OK;
               return result;
             } finally {
@@ -412,7 +485,7 @@ final class OnlineModeOps {
         },
         executor,
         () -> {
-          try { generation.close(); }
+          try { task.close(); }
           finally { if (owned != null) owned.close(); }
         });
   }
@@ -571,7 +644,7 @@ final class OnlineModeOps {
       return;
     }
     try {
-      requestGate.requireOpen();
+      generation.requireOpen();
     } catch (IllegalStateException reloading) {
       trackedOnError.accept(reloading);
       return;
@@ -597,10 +670,12 @@ final class OnlineModeOps {
               String[] lastFinishReason = {null};
               Throwable failure = null;
 
+              // No work handle on this path: the lease counts the generation, with no pacing.
+              GenerationTask task = new GenerationTask();
+              task.queue(null);
               onlineRequestLock.lock();
-              GenerativeRequestGate.Lease lease = null;
               try {
-                lease = requestGate.acquire();
+                GenerationLease lease = task.admit();
                 emitRequestStarted(RequestKind.STREAM, enqueueNanos);
                 Map<String, Object> body = new java.util.HashMap<>();
                 body.put("model", resolveModelIdForRequests());
@@ -640,7 +715,7 @@ final class OnlineModeOps {
 
                 HttpRequest request =
                     buildJsonPostRequest(
-                        serverPort.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
+                        lease, serverPort.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
 
                 HttpResponse<java.io.InputStream> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
@@ -670,16 +745,19 @@ final class OnlineModeOps {
                                 if (onUsage != null) {
                                   AiUsage usage = extractUsageFromChatChunk(node);
                                   if (usage != null) {
-                                    pump.dispatch(() -> acceptUsageBestEffort(onUsage, usage));
+                                    pump.dispatchAwaitCapacity(() -> acceptUsageBestEffort(onUsage, usage));
                                   }
                                 }
                                 JsonNode delta = node.path("choices").path(0).path("delta");
+                                if (io.justsearch.app.inference.chat.CompletionTokenProgress.hasToken(node)) {
+                                  task.tokenProduced();
+                                }
 
                                 String content = delta.path("content").asText("");
                                 if (!content.isEmpty()) {
                                   String visible = thinkFilter.accept(content);
                                   if (!visible.isEmpty()) {
-                                    pump.dispatch(() -> onChunk.accept(visible));
+                                    pump.dispatchAwaitCapacity(() -> onChunk.accept(visible));
                                   }
                                 }
 
@@ -704,15 +782,18 @@ final class OnlineModeOps {
                   } else {
                     String tail = thinkFilter.flush();
                     if (!tail.isEmpty()) {
-                      pump.dispatch(() -> onChunk.accept(tail));
+                      pump.dispatchAwaitCapacity(() -> onChunk.accept(tail));
                     }
                   }
                 }
               } catch (Exception e) {
                 failure = e;
               } finally {
-                if (lease != null) lease.close();
-                onlineRequestLock.unlock();
+                try {
+                  task.close();
+                } finally {
+                  onlineRequestLock.unlock();
+                }
               }
 
               // Outside the lock: deliver every queued callback, then exactly one terminal event.
@@ -932,7 +1013,7 @@ final class OnlineModeOps {
         };
 
     StreamWorkOwner owner = new StreamWorkOwner(work, trackedOnComplete, trackedOnError);
-    GenerationTask generation = new GenerationTask();
+    GenerationTask task = new GenerationTask();
     if (currentMode.get() != Mode.ONLINE) {
       try (owner) {
         owner.fail(new IllegalStateException("Not in Online Mode, current mode is " + currentMode.get()));
@@ -940,7 +1021,7 @@ final class OnlineModeOps {
       return;
     }
     try {
-      requestGate.requireOpen();
+      generation.requireOpen();
     } catch (IllegalStateException reloading) {
       try (owner) {
         owner.fail(reloading);
@@ -955,7 +1036,7 @@ final class OnlineModeOps {
             () -> {
               try {
                 owner.start();
-                generation.start(owner.work());
+                task.queue(owner.work());
               // The lock covers the llama-server exchange only; consumer callbacks are pumped off
               // it, and the body read carries an idle deadline so it can never park forever.
               StreamCallbackPump pump =
@@ -972,18 +1053,18 @@ final class OnlineModeOps {
                   new ThinkTagStreamFilter(
                       onReasoningChunk == null
                           ? null
-                          : reasoning -> pump.dispatch(() -> onReasoningChunk.accept(reasoning)));
+                          : reasoning -> pump.dispatchAwaitCapacity(() -> onReasoningChunk.accept(reasoning)));
               boolean[] sawDone = {false};
               String[] lastFinishReason = {null};
               Throwable failure = null;
 
               boolean locked = false;
-              GenerativeRequestGate.Lease lease = null;
+              GenerationLease lease = null;
               try {
                 onlineRequestLock.lockInterruptibly();
                 locked = true;
                 owner.checkCancelled();
-                lease = requestGate.acquire();
+                lease = task.admit();
                 emitRequestStarted(RequestKind.STREAM, enqueueNanos);
                 Map<String, Object> body = new java.util.HashMap<>();
                 body.put("model", resolveModelIdForRequests());
@@ -1038,7 +1119,7 @@ final class OnlineModeOps {
 
                 HttpRequest request =
                     buildJsonPostRequest(
-                        serverPort.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
+                        lease, serverPort.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
 
                 HttpResponse<java.io.InputStream> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
@@ -1071,18 +1152,21 @@ final class OnlineModeOps {
                                 if (onUsage != null) {
                                   AiUsage usage = extractUsageFromChatChunk(node);
                                   if (usage != null) {
-                                    pump.dispatch(() -> acceptUsageBestEffort(onUsage, usage));
+                                    pump.dispatchAwaitCapacity(() -> acceptUsageBestEffort(onUsage, usage));
                                   }
                                 }
 
                                 JsonNode delta = node.path("choices").path(0).path("delta");
+                                if (io.justsearch.app.inference.chat.CompletionTokenProgress.hasToken(node)) {
+                                  task.tokenProduced();
+                                }
 
                                 // Text content
                                 String content = delta.path("content").asText("");
                                 if (!content.isEmpty()) {
                                   String visible = thinkFilter.accept(content);
                                   if (!visible.isEmpty()) {
-                                    pump.dispatch(() -> onChunk.accept(visible));
+                                    pump.dispatchAwaitCapacity(() -> onChunk.accept(visible));
                                   }
                                 }
 
@@ -1090,14 +1174,14 @@ final class OnlineModeOps {
                                 if (onReasoningChunk != null) {
                                   String reasoning = delta.path("reasoning_content").asText("");
                                   if (!reasoning.isEmpty()) {
-                                    pump.dispatch(() -> onReasoningChunk.accept(reasoning));
+                                    pump.dispatchAwaitCapacity(() -> onReasoningChunk.accept(reasoning));
                                   }
                                 }
 
                                 // Tool call deltas
                                 JsonNode toolCalls = delta.path("tool_calls");
                                 if (!toolCalls.isMissingNode() && toolCalls.isArray()) {
-                                  pump.dispatch(() -> onToolCallDelta.accept(node));
+                                  pump.dispatchAwaitCapacity(() -> onToolCallDelta.accept(node));
                                 }
                               } catch (java.util.concurrent.CancellationException cancelled) {
                                 throw cancelled;
@@ -1111,7 +1195,7 @@ final class OnlineModeOps {
                   } else {
                     String tail = thinkFilter.flush();
                     if (!tail.isEmpty()) {
-                      pump.dispatch(() -> onChunk.accept(tail));
+                      pump.dispatchAwaitCapacity(() -> onChunk.accept(tail));
                     }
                   }
                 }
@@ -1147,7 +1231,7 @@ final class OnlineModeOps {
             },
             requestExecutor(owner.work()),
             () -> {
-              try { generation.close(); }
+              try { task.close(); }
               finally { owner.close(); }
             });
       unused.isDone();
@@ -1160,18 +1244,57 @@ final class OnlineModeOps {
 
   // ==================== Unified Streaming (Tempdoc 499) ====================
 
-  /** EngineFutures closes this only on actual producer exit, including cancellation. */
+  /**
+   * One exchange's generation ticket. It queues (entering indexing pacing when there is a work
+   * handle) before the request lock, opens its lease after it, and EngineFutures closes it only on
+   * actual producer exit, including cancellation.
+   */
   private final class GenerationTask implements AutoCloseable {
-    private final java.util.concurrent.atomic.AtomicReference<Runnable> release =
-        new java.util.concurrent.atomic.AtomicReference<>(() -> {});
+    private final GenerationTracker.Kind kind;
+    private final java.util.concurrent.atomic.AtomicReference<GenerationTracker.Ticket> ticket =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    private final java.util.concurrent.atomic.AtomicBoolean closed =
+        new java.util.concurrent.atomic.AtomicBoolean();
 
-    private void start(io.justsearch.app.api.EngineWorkHandle work) {
-      if (work != null) {
-        release.set(Objects.requireNonNull(generationLifetime.apply(work), "generation release"));
-      }
+    private GenerationTask() {
+      this(GenerationTracker.Kind.GENERATE);
     }
 
-    @Override public void close() { release.getAndSet(() -> {}).run(); }
+    /** Spec E step E2: ASSIST and VDU completions keep their lease but are not counted. */
+    private GenerationTask(GenerationTracker.Kind kind) {
+      this.kind = Objects.requireNonNull(kind, "kind");
+    }
+
+    private void queue(io.justsearch.app.api.EngineWorkHandle work) {
+      var queued = generation.queue(kind, work);
+      if (!ticket.compareAndSet(null, queued)) {
+        queued.close();
+        throw new IllegalStateException("generation already queued");
+      }
+      if (closed.get()) close();
+    }
+
+    private void tokenProduced() {
+      var queued = ticket.get();
+      if (queued != null) queued.tokenProduced();
+    }
+
+    private GenerationLease admit() {
+      var queued = ticket.get();
+      if (queued == null) throw new IllegalStateException("generation not queued");
+      return queued.admit();
+    }
+
+    @Override public void close() {
+      closed.set(true);
+      var queued = ticket.getAndSet(null);
+      if (queued != null) queued.close();
+    }
+  }
+
+  /** Where the tracker delivers generation edges: off the lease holder's thread, in order. */
+  java.util.concurrent.Executor edgeExecutor() {
+    return backgroundCallbacks;
   }
 
   /**
@@ -1204,9 +1327,9 @@ final class OnlineModeOps {
   // ==================== Internal Helpers ====================
 
   private void requireOnline(String operation) {
-    requestGate.requireOpen();
+    generation.requireOpen();
     if (currentMode.get() != Mode.ONLINE) {
-      throw new IllegalStateException(
+      throw new io.justsearch.app.api.chat.GenerationUnavailableException(
           operation + " requires ONLINE mode, but current mode is " + currentMode.get());
     }
   }
@@ -1224,8 +1347,9 @@ final class OnlineModeOps {
   }
 
   private String sendChatRequest(
+      GenerationLease lease,
       List<Map<String, Object>> messages, int maxTokens, SamplingParams sampling) {
-    return sendChatRequestDetailed(messages, maxTokens, sampling, false, null).content();
+    return sendChatRequestDetailed(lease, messages, maxTokens, sampling, false, null).content();
   }
 
   /**
@@ -1246,6 +1370,7 @@ final class OnlineModeOps {
    * is likewise behavior-neutral for every existing caller.
    */
   private VisionCompletionResult sendChatRequestDetailed(
+      GenerationLease lease,
       List<Map<String, Object>> messages,
       int maxTokens,
       SamplingParams sampling,
@@ -1300,7 +1425,7 @@ final class OnlineModeOps {
           json.length());
 
       HttpRequest request =
-          buildJsonPostRequest(serverPort.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
+          buildJsonPostRequest(lease, serverPort.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
 
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -1365,6 +1490,7 @@ final class OnlineModeOps {
   }
 
   private VisionCompletionResult sendVisionRequestDetailed(
+      GenerationLease lease,
       String prompt, String base64Image, int maxTokens, SamplingParams sampling, Long seed) {
     try {
       List<Map<String, Object>> content = new ArrayList<>();
@@ -1379,7 +1505,7 @@ final class OnlineModeOps {
       List<Map<String, Object>> messages = List.of(Map.of("role", "user", "content", content));
 
       return sendChatRequestDetailed(
-          messages, maxTokens, sampling != null ? sampling : SamplingParams.VDU, true, seed);
+          lease, messages, maxTokens, sampling != null ? sampling : SamplingParams.VDU, true, seed);
 
     } catch (RuntimeException e) {
       throw e; // avoid double-wrapping RuntimeExceptions from sendChatRequestDetailed
@@ -1534,6 +1660,27 @@ final class OnlineModeOps {
   }
 
   // ==================== Lifecycle ====================
+
+  /**
+   * Spec A §7.4: asks the serving server for one token, inside an AUX lease (so a drain waits for
+   * it but it never counts as chat generating). True only for an HTTP 200 within {@code timeout}.
+   */
+  boolean probeOneToken(Duration timeout) {
+    Objects.requireNonNull(timeout, "timeout");
+    try (GenerationLease lease = generation.admit(GenerationTracker.Kind.AUX, null)) {
+      HttpRequest request = buildJsonPostRequest(lease, serverPort.get(), PATH_COMPLETION,
+          "{\"prompt\":\"ok\",\"n_predict\":1}", timeout);
+      int status = httpClient.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
+      if (status != 200) LOG.warn("Resume probe: one-token completion answered HTTP {}", status);
+      return status == 200;
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return false;
+    } catch (Exception failure) {
+      LOG.warn("Resume probe: one-token completion failed: {}", failure.toString());
+      return false;
+    }
+  }
 
   void shutdown() {
     cancelQueued(foregroundRequests);

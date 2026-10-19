@@ -38,8 +38,9 @@ public interface OrtSessionTelemetryEvents {
   default void onAssemblerEvent(AssemblerEvent event) {}
 
   /**
-   * Records the wait time on the GPU inference semaphore. Fires only on the GPU acquire path
-   * (CPU acquires don't take the semaphore). Microsecond resolution captures the no-contention
+   * Records the wait time for a seat of the GPU device gate (formerly the per-handle inference
+   * semaphore; the metric keeps its name). Fires only on the GPU acquire path (CPU acquires are
+   * not gated). Microsecond resolution captures the no-contention
    * fast path; millisecond would truncate to zero.
    *
    * @param consumer encoder name (matches {@link TransitionReason#consumer()})

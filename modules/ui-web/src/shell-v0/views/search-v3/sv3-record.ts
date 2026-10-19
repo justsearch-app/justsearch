@@ -162,6 +162,7 @@ function groundingDeltaOf(structuredData: Record<string, unknown> | undefined): 
 
 function recordEvidenceOf(item: UnifiedTurnItem): Sv3TurnEvidence | null {
   const a = item.attributes;
+  const retrieval = recordRetrievalMetadata(a);
   // The ACTION plane: an agent run's persisted assistant message. Its `sources` are `AgentSource`s
   // and its `citations` are `AgentSentenceCite`s, projected through the one shared module the live
   // terminal also writes through.
@@ -172,7 +173,7 @@ function recordEvidenceOf(item: UnifiedTurnItem): Sv3TurnEvidence | null {
       Array.isArray(a.citations) ? (a.citations as AgentSentenceCite[]) : [],
       scorer,
     );
-    return { ...evidence, retrievalMode: '' };
+    return { ...evidence, retrievalMode: '', ...retrieval };
   }
   // The ANSWER plane, unchanged.
   const hasSources = Array.isArray(a.citations);
@@ -181,14 +182,25 @@ function recordEvidenceOf(item: UnifiedTurnItem): Sv3TurnEvidence | null {
     claimMatches !== null &&
     typeof claimMatches === 'object' &&
     Array.isArray((claimMatches as { matches?: unknown }).matches);
-  if (!hasSources && !hasMatches) return null;
+  if (!hasSources && !hasMatches && Object.keys(retrieval).length === 0) return null;
   const sources = hasSources ? (a.citations as RetrievalCitation[]) : [];
   return {
     sources,
     matches: matchesFromRecord(claimMatches),
     marks: claimsToCitations(claimsFromRecord(claimMatches), sources),
     retrievalMode: '',
+    ...retrieval,
   };
+}
+
+function recordRetrievalMetadata(attributes: Readonly<Record<string, unknown>>):
+    Partial<Pick<Sv3TurnEvidence, 'retrievalMode' | 'retrievalModeReason' | 'retrievalModeCause'>> {
+  const metadata: Partial<Pick<Sv3TurnEvidence, 'retrievalMode' | 'retrievalModeReason' | 'retrievalModeCause'>> = {};
+  for (const key of ['retrievalMode', 'retrievalModeReason', 'retrievalModeCause'] as const) {
+    const value = attributes[key];
+    if (typeof value === 'string' && value !== '') Object.assign(metadata, { [key]: value });
+  }
+  return metadata;
 }
 
 /** The turn under construction — the same fields as {@link Sv3Turn}, mutable while it accumulates. */
@@ -200,6 +212,7 @@ interface Building {
   activity: Sv3RunFeedItem[];
   tools: number;
   errored: boolean;
+  errorDetail: string;
   /** Tempdoc 848 §2.7 — the turn's persisted thinking, accumulated across all its assistant items. */
   reasoning: ReasoningBlock[];
   /**
@@ -294,6 +307,7 @@ const open = (
   activity: [],
   tools: 0,
   errored: false,
+  errorDetail: '',
   reasoning: [],
   declaredShapeId: null,
   evidence: null,
@@ -412,6 +426,9 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
     }
     if (item.kind === 'error') {
       turn.errored = true;
+      turn.errorDetail = item.content;
+      const evidence = recordEvidenceOf(item);
+      if (evidence !== null) turn.evidence = evidence;
       // Owner decision 2026-08-26, applied to the TIMELINE as well as the receipt. The cancel path
       // logs an error entry on its way down, and drawing it as a note labelled "Error" words the
       // reader's own act as a malfunction — the same thing "failed" did in the receipt, one row
@@ -512,7 +529,7 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
           ? 'failed'
           : 'complete',
       evidence,
-      detail: '',
+      detail: turn.errorDetail,
       toolCalls: turn.tools,
       // An ASK turn's whole response is its answer text, which the transcript already renders through
       // the shared markdown block — handing it a one-item activity list would mean two ways to draw

@@ -14,7 +14,7 @@ function fileContractError(code, message) {
 }
 
 function allowedRunFileRelPosix(runId, kind) {
-  const base = `tmp/dev-runner/runs/${runId}`;
+  const base = `runs/${runId}`;
   switch (kind) {
     case 'backend_stdout':
       return `${base}/logs/backend.stdout.log`;

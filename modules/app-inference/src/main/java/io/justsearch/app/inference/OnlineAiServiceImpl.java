@@ -188,7 +188,8 @@ public final class OnlineAiServiceImpl
         contextLength,
         gpuLayers,
         current.vduMode(),
-        profile.id());
+        profile.id(),
+        current.chatPromptCacheMiB());
   }
 
   private void applyProfileConfig(
@@ -266,11 +267,14 @@ public final class OnlineAiServiceImpl
     if (cfg == null) {
       return null;
     }
+    // The port the running server actually listens on: a managed launch binds a fresh loopback
+    // port, never the configured one (ADR-0051 decision 2).
+    int servingPort = manager.servingPort();
     return new RuntimeInfo(
         cfg.serverExecutable() == null ? null : cfg.serverExecutable().toString(),
         cfg.modelPath() == null ? null : cfg.modelPath().toString(),
         cfg.mmprojPath() == null ? null : cfg.mmprojPath().toString(),
-        cfg.serverPort(),
+        servingPort > 0 ? servingPort : cfg.serverPort(),
         cfg.contextSize(),
         cfg.gpuLayers(),
         manager.isUsingExternalLlamaServer());
@@ -290,7 +294,8 @@ public final class OnlineAiServiceImpl
         d.adoptedAtMs(),
         d.lastHealthOkAtMs(),
         d.lastHealthError(),
-        d.consecutiveHealthFailures());
+        d.consecutiveHealthFailures(),
+        d.note());
   }
 
   @Override
@@ -335,8 +340,10 @@ public final class OnlineAiServiceImpl
       Long seed,
       io.justsearch.core.context.EngineContext engineContext) {
     int resolved = maxTokens <= 0 ? DEFAULT_QA_TOKENS : maxTokens;
+    var kind = declaredLeaseKind();
     try (var work = admission.attach(engineContext)) {
-      return manager.visionCompletionDetailed(prompt, imageBytes, resolved, sampling, seed, work);
+      return manager.visionCompletionDetailed(
+          prompt, imageBytes, resolved, sampling, seed, work, kind);
     }
   }
 
@@ -434,7 +441,8 @@ public final class OnlineAiServiceImpl
         ctx,
         layers,
         base.vduMode(),
-        chatProfileId);
+        chatProfileId,
+        base.chatPromptCacheMiB());
   }
 
   private static Path resolveOptionalPath(String raw, Path fallbackDir) {
@@ -508,9 +516,26 @@ public final class OnlineAiServiceImpl
         resolved,
         sampling,
         messages != null ? messages.size() : 0);
+    var kind = declaredLeaseKind();
     try (var work = admission.attach(engineContext)) {
-      return manager.chatCompletion(messages, resolved, sampling, work);
+      return manager.chatCompletion(messages, resolved, sampling, work, kind);
     }
+  }
+
+  /**
+   * Spec E step E2: the lease kind the caller declared on this thread. VDU bulk work and query
+   * assistance open leases that are not counted as generating; everything else is GENERATE.
+   */
+  private static io.justsearch.app.inference.chat.GenerationTracker.Kind declaredLeaseKind() {
+    if (io.justsearch.app.api.chat.DemandScope.currentBulk()
+        == io.justsearch.app.api.status.operating.BulkWorkKind.VDU) {
+      return io.justsearch.app.inference.chat.GenerationTracker.Kind.VDU;
+    }
+    if (io.justsearch.app.api.chat.DemandScope.current()
+        == io.justsearch.app.api.chat.DemandKind.ASSIST) {
+      return io.justsearch.app.inference.chat.GenerationTracker.Kind.ASSIST;
+    }
+    return io.justsearch.app.inference.chat.GenerationTracker.Kind.GENERATE;
   }
 
   @Override

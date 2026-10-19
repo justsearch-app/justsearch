@@ -10,6 +10,7 @@ import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.inference.InferenceConfig;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.services.bootstrap.phases.InferenceDecision;
+import io.justsearch.app.services.chat.ChatStatusProjection;
 import io.justsearch.app.services.runtimestate.RuntimeSpec;
 import io.justsearch.app.services.settings.FixedSettingsComponentComposer;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -90,7 +91,8 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
       Path mmproj = modelsDir.resolve(profile.mmprojFile());
       inference = new InferenceConfig(inference.serverExecutable(), model,
           Files.isRegularFile(mmproj) ? mmproj : null, inference.serverPort(),
-          inference.contextSize(), inference.gpuLayers(), inference.vduMode(), profile.id());
+          inference.contextSize(), inference.gpuLayers(), inference.vduMode(), profile.id(),
+          inference.chatPromptCacheMiB());
     }
     EngineComponentSnapshot.Component before = observation.snapshot();
     EngineComponentSnapshot.Component nonServingObservation =
@@ -113,16 +115,17 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
         LifecycleReasonCode.INFERENCE_STARTING.code(), "preparing managed generative candidate")) {
       throw refused(PREPARATION_REFUSED,
           "Generative observation changed before candidate preparation",
-          Map.of("changedKeys", Set.copyOf(changedKeys)), null);
+          Map.of("changedKeys", Set.copyOf(changedKeys)), null, true);
     }
     EngineComponentSnapshot.Component staging = observation.snapshot();
     try {
       // The manager resolves RESTART_IF_ONLINE while holding its lifecycle lock. Selecting one
-      // of these prebuilt observations after preparation does not allocate or inspect runtime.
+      // of these prebuilt observations after preparation does not allocate or inspect runtime,
+      // beyond reading the window the candidate was launched with.
       var prepared = manager.prepareResolvedConfig(inference, desired, enabled,
           candidateContext.forceGenerativeRefresh());
       return new ManagedPreparedOwner(prepared,
-          prepared.targetsOnline() ? servingObservation : nonServingObservation,
+          prepared.targetsOnline() ? withWindowNotice(servingObservation) : nonServingObservation,
           observation, before, staging);
     } catch (ModeTransitionException failure) {
       restoreObservation(before, staging);
@@ -132,7 +135,7 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
               "changedKeys", Set.copyOf(changedKeys),
               "reason", failure.reason().name(),
               "inferenceCode", failure.failure().wireCode()),
-          failure);
+          failure, isTransition(failure));
     } catch (RuntimeException failure) {
       restoreObservation(before, staging);
       throw failure;
@@ -145,6 +148,23 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
         before.reasonCode(), before.evidence())) {
       throw new IllegalStateException("Generative observation changed during candidate rollback");
     }
+  }
+
+  /**
+   * Spec A §7.2: a candidate the manager launched one rung lower (a step-down that stays sticky for
+   * an unchanged configuration) serves with the context_reduced notice, like any other READY
+   * landing of that server.
+   */
+  private EngineComponentSnapshot.Component withWindowNotice(
+      EngineComponentSnapshot.Component serving) {
+    var window = manager.launchedContextWindow();
+    String reasonCode = ChatStatusProjection.ready(window == null ? null : window.reason())
+        .reasonCode();
+    if (reasonCode == null) return serving;
+    return new EngineComponentSnapshot.Component(serving.spec(), serving.state(), reasonCode,
+        serving.stateSince(), serving.stateSinceMonotonicNanos(), serving.appliedVersion(),
+        serving.desiredVersion(), serving.lastCompose(), serving.recoveryAttempts(),
+        serving.evidence());
   }
 
   private EngineComponentSnapshot.Component preparedObservation(ResolvedConfig desired,
@@ -175,10 +195,24 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
                 : "settings candidate disables generative serving state");
   }
 
+  /**
+   * True when the chat server refused because it is busy changing state (a reply still draining,
+   * another transition or a superseding intent): the same candidate can succeed once that ends.
+   */
+  private static boolean isTransition(ModeTransitionException failure) {
+    return failure.reason() == ModeTransitionException.Reason.ALREADY_TRANSITIONING
+        || failure.reason() == ModeTransitionException.Reason.INTERRUPTED;
+  }
+
   private static SettingsCommitOwner.Refused refused(String code, String message,
       Map<String, Object> details, Throwable cause) {
+    return refused(code, message, details, cause, false);
+  }
+
+  private static SettingsCommitOwner.Refused refused(String code, String message,
+      Map<String, Object> details, Throwable cause, boolean retryable) {
     var refusal = new SettingsCommitOwner.Refused(
-        OperationResult.failure(message, code, details, false));
+        OperationResult.failure(message, code, details, retryable));
     if (cause != null) refusal.initCause(cause);
     return refusal;
   }

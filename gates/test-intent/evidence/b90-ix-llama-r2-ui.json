@@ -1,0 +1,126 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T22:44:39.860Z",
+  "revision": "7de3976a1b4e429ffa4a7fd0622878132001b7a5",
+  "tree": "04f98fabd676a8166accc8ffa1bee10ab2b0f000",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.EvaluationModeAgreementTest.environmentEvaluationAgreesAcrossBootstrapDebugAndCache\" --tests \"io.justsearch.ui.api.EvaluationModeAgreementTest.booleanAliasAgreesAcrossBootstrapDebugAndCache\" --tests \"io.justsearch.ui.api.ChatRefusalWireTest.externalServerRefusalKeepsItsNamedWireReason\" --tests \"io.justsearch.ui.api.ChatRefusalWireTest.everyRefusalReasonMapsToItsWireCodeAndTheBodyConformsToTheSchema\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 25867
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/EvaluationModeAgreementTest.java#environmentEvaluationAgreesAcrossBootstrapDebugAndCache",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/EvaluationModeAgreementTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55010ee2632a3e5cad28e90a289e580fbbf8c6e130d5fe021e3e428c96dd552c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "environmentEvaluationAgreesAcrossBootstrapDebugAndCache()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/EvaluationModeAgreementTest.java#booleanAliasAgreesAcrossBootstrapDebugAndCache",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/EvaluationModeAgreementTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:55010ee2632a3e5cad28e90a289e580fbbf8c6e130d5fe021e3e428c96dd552c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "booleanAliasAgreesAcrossBootstrapDebugAndCache()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatRefusalWireTest.java#externalServerRefusalKeepsItsNamedWireReason",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatRefusalWireTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8e6ca7290f9923d075b6aa3b67be84877b5e7c7a25b755a0c8a1344be9ec34f0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "externalServerRefusalKeepsItsNamedWireReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatRefusalWireTest.java#everyRefusalReasonMapsToItsWireCodeAndTheBodyConformsToTheSchema",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatRefusalWireTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8e6ca7290f9923d075b6aa3b67be84877b5e7c7a25b755a0c8a1344be9ec34f0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyRefusalReasonMapsToItsWireCodeAndTheBodyConformsToTheSchema()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7de3976a1",
+    "revision": "7de3976a1b4e429ffa4a7fd0622878132001b7a5",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.EvaluationModeAgreementTest.environmentEvaluationAgreesAcrossBootstrapDebugAndCache\" --tests \"io.justsearch.ui.api.EvaluationModeAgreementTest.booleanAliasAgreesAcrossBootstrapDebugAndCache\" --tests \"io.justsearch.ui.api.ChatRefusalWireTest.externalServerRefusalKeepsItsNamedWireReason\" --tests \"io.justsearch.ui.api.ChatRefusalWireTest.everyRefusalReasonMapsToItsWireCodeAndTheBodyConformsToTheSchema\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 27825
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/EvaluationModeAgreementTest.java#environmentEvaluationAgreesAcrossBootstrapDebugAndCache",
+        "classification": "assertion",
+        "detail": "environmentEvaluationAgreesAcrossBootstrapDebugAndCache(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <AGREEMENT=EVAL/0/400/400> but was: <AGREEMENT=PRODUCTION/0/404/404>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/EvaluationModeAgreementTest.java#booleanAliasAgreesAcrossBootstrapDebugAndCache",
+        "classification": "assertion",
+        "detail": "booleanAliasAgreesAcrossBootstrapDebugAndCache(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <AGREEMENT=EVAL/0/400/400> but was: <AGREEMENT=PRODUCTION/0/404/404>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatRefusalWireTest.java#externalServerRefusalKeepsItsNamedWireReason",
+        "classification": "assertion",
+        "detail": "externalServerRefusalKeepsItsNamedWireReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an external owner must have a named refusal ==> Unexpected exception thrown: java.lang.IllegalArgumentException: No enum constant io.justsearch.app.api.chat.RefusalReason.EXTERNAL_SERVER"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatRefusalWireTest.java#everyRefusalReasonMapsToItsWireCodeAndTheBodyConformsToTheSchema",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:a9e64023575a2f510770b41f5e065bbcb1b74d23b947a4750d46c8dc0b81951c"
+}

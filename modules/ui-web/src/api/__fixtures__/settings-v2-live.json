@@ -18,7 +18,8 @@
     "maxTokens" : 2048,
     "gpuLayers" : 35,
     "modelPath" : "C:/models/chat.gguf",
-    "llamaLibPath" : null
+    "llamaLibPath" : null,
+    "gameDetection" : null
   },
   "indexPaths" : [ "C:/docs", "D:/papers" ],
   "settingsMode" : "read_write",

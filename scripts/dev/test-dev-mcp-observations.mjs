@@ -14,9 +14,14 @@ import {
   classifyInferenceOrphan,
   classifyOptionalFileError,
   observeOptionalJsonFile,
+  observeRecordedInference,
   probeLoopbackHttpStatus,
   probeStatusCodeOrThrow,
 } from './justsearch-dev-mcp/observations.mjs';
+import { createRequire } from 'node:module';
+
+const { recordedLlamaServers, probeForeignRuns, httpGetStatusCode } =
+  createRequire(import.meta.url)('./lib/process-record.cjs');
 
 process.exitCode = 1;
 let passed = 0;
@@ -191,6 +196,78 @@ try {
       runState: 'UNKNOWN',
       inferenceObservation: { state: PROBE_OBSERVATION.REFUSED },
     }), false);
+  });
+
+  // ADR-0051 decision 2: llama-server binds a fresh port per launch, so the dev tools find a
+  // left-over one through the port recorded in the runtime manifest, never a fixed port.
+  await check('a recorded llama-server on its own fresh port is found and reported until it stops', async () => {
+    // Connection: close, so no pooled keep-alive socket outlives the server and turns the
+    // after-stop probe into a reset instead of a refusal.
+    const llama = http.createServer((_req, res) => {
+      res.writeHead(200, { Connection: 'close' });
+      res.end('{"status":"ok"}');
+    });
+    const port = await listen(llama);
+    const dataDir = path.join(root, 'recorded-llama');
+    await fsp.mkdir(path.join(dataDir, 'runtime'), { recursive: true });
+    await fsp.writeFile(path.join(dataDir, 'runtime', 'manifest.json'), JSON.stringify({
+      children: [
+        { id: 'llama', kind: 'LLAMA_SERVER', pid: 4242, endpoint: `http://127.0.0.1:${port}` },
+        { id: 'extraction', kind: 'EXTRACTION', pid: 4343, endpoint: 'http://127.0.0.1:1' },
+        { id: 'remote', kind: 'LLAMA_SERVER', pid: 4444, endpoint: 'http://192.0.2.1:9000' },
+      ],
+    }));
+    const missing = path.join(root, 'no-manifest-here');
+    let recorded;
+    try {
+      recorded = await recordedLlamaServers([dataDir, missing, dataDir]);
+      assert.deepEqual(recorded, [{ port, pid: 4242, dataDir }],
+        'only the loopback LLAMA_SERVER record counts; a missing manifest contributes nothing');
+
+      const live = await observeRecordedInference({ recorded });
+      assert.equal(live.state, PROBE_OBSERVATION.REACHABLE);
+      assert.equal(live.port, port);
+      assert.equal(live.pid, 4242);
+
+      const foreign = await probeForeignRuns({
+        enabled: true, hasActiveRun: false, ports: [],
+        inferencePorts: recorded.map((r) => r.port), probe: httpGetStatusCode,
+      });
+      assert.deepEqual(foreign, [{
+        port, kind: 'inference', probePath: '/health', attribution: 'unowned', source: 'observed',
+      }]);
+    } finally {
+      await close(llama);
+    }
+    const gone = await observeRecordedInference({ recorded });
+    assert.equal(gone.state, PROBE_OBSERVATION.REFUSED, JSON.stringify(gone));
+    assert.deepEqual(gone.recordedPorts, [port]);
+  });
+  await check('nothing recorded is a looked-and-found-nothing REFUSED, probing no fixed port', async () => {
+    const probed = [];
+    const observation = await observeRecordedInference({
+      recorded: [],
+      probe: async (url) => { probed.push(url); return { state: PROBE_OBSERVATION.REACHABLE }; },
+    });
+    assert.deepEqual(probed, []);
+    assert.equal(observation.state, PROBE_OBSERVATION.REFUSED);
+    assert.deepEqual(observation.recordedPorts, []);
+    const seen = [];
+    await probeForeignRuns({
+      enabled: true, hasActiveRun: false, ports: [],
+      probe: async (url) => { seen.push(url); return null; },
+    });
+    assert.deepEqual(seen, [], 'no inference port is probed unless one is recorded');
+  });
+  await check('an unknown probe of a recorded port stays unknown, naming the port', async () => {
+    const observation = await observeRecordedInference({
+      recorded: [{ port: 41001, pid: 1 }, { port: 41002, pid: 2 }],
+      probe: async (url) => (new URL(url).port === '41001'
+        ? { state: PROBE_OBSERVATION.TIMED_OUT }
+        : { state: PROBE_OBSERVATION.REFUSED }),
+    });
+    assert.equal(observation.state, PROBE_OBSERVATION.TIMED_OUT);
+    assert.equal(observation.port, 41001);
   });
 
   console.log(`test-dev-mcp-observations: ${passed} passed`);

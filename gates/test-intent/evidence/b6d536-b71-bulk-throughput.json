@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-12T19:07:09.182Z",
+  "revision": "b639e82c5422800b853ddf08e89a37f9fecc1aeb",
+  "tree": "b6a9e9b048f0863f5ad02174c95ffede699cc9d9",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=C:/agent-sandbox-tmp/b77/tmp",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.BulkWriteChunkDeclarationTest.bulkWritesNeedNoPerDocumentRefreshOrParentRewrite\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessReopenCostTest.reopenReadsOnlyNewSegmentsAndDeletionOnlyReopensReadNothing\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15164
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BulkWriteChunkDeclarationTest.java#bulkWritesNeedNoPerDocumentRefreshOrParentRewrite",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BulkWriteChunkDeclarationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6d76e6ea78d389f9f060c16b9a8395b91114288768955481717714d95e5cc8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bulkWritesNeedNoPerDocumentRefreshOrParentRewrite()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessReopenCostTest.java#reopenReadsOnlyNewSegmentsAndDeletionOnlyReopensReadNothing",
+      "file": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessReopenCostTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ae1849022c5ad880c28502e741404b779efb2afa0c063137ae0fb4505b679c0d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reopenReadsOnlyNewSegmentsAndDeletionOnlyReopensReadNothing()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bc2965b52",
+    "revision": "bc2965b52ceb88db6846c0836e364273abf575c0",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-b77-jobbatchwriter-signature.patch",
+        "contentDigest": "sha256:9ab1ad4049effc710d7d8b995f394f1a855de233febe15dbac484e3b3fbb1396"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.BulkWriteChunkDeclarationTest.bulkWritesNeedNoPerDocumentRefreshOrParentRewrite\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessReopenCostTest.reopenReadsOnlyNewSegmentsAndDeletionOnlyReopensReadNothing\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 39847
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BulkWriteChunkDeclarationTest.java#bulkWritesNeedNoPerDocumentRefreshOrParentRewrite",
+        "classification": "assertion",
+        "detail": "bulkWritesNeedNoPerDocumentRefreshOrParentRewrite(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: writing 43 parents must not refresh the searcher per document; observed 43 ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessReopenCostTest.java#reopenReadsOnlyNewSegmentsAndDeletionOnlyReopensReadNothing",
+        "classification": "assertion",
+        "detail": "reopenReadsOnlyNewSegmentsAndDeletionOnlyReopensReadNothing(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a reopen adding one parent must read only that parent's row, not re-read the 630 unchanged rows; observed 629 ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:733ba55775faaf21c7d701c74102961ec355d928dd4d613ecae953c698fd2454"
+}

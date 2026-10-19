@@ -130,7 +130,7 @@ export const unifiedChatBodyStyles = css`
     .degradation-collapse:focus-visible {
       color: var(--text-primary);
       background: var(--surface-hover);
-      outline: none;
+      outline: 2px solid transparent;
     }
     .replay-label { flex: 0 0 auto; color: var(--text-secondary); }
     .replay-slider { flex: 1 1 auto; }
@@ -877,7 +877,7 @@ export const unifiedChatBodyStyles = css`
     .source-disclosure-summary:hover,
     .source-disclosure-summary:focus-visible {
       color: var(--text-primary);
-      outline: none;
+      outline: 2px solid transparent;
     }
     .source-disclosure-summary:focus-visible {
       text-decoration: underline;
@@ -921,7 +921,7 @@ export const unifiedChatBodyStyles = css`
     .source-exclude:focus-visible {
       color: var(--text-primary);
       background: var(--surface-hover);
-      outline: none;
+      outline: 2px solid transparent;
     }
     .source-chip {
       display: inline-flex;
@@ -942,12 +942,19 @@ export const unifiedChatBodyStyles = css`
       background: var(--surface-hover);
       color: var(--text-primary);
       border-color: var(--accent-command);
-      outline: none;
+      outline: 2px solid transparent;
     }
     .source-chip.selected {
       background: var(--surface-hover);
       border-color: var(--accent-command);
       color: var(--text-primary);
+    }
+    /* Forced colors (Windows High Contrast) repaint every chip edge CanvasText and erase the fill, so
+       the selected chip's edge is restated as Highlight, a system colour forced colors keep. */
+    @media (forced-colors: active) {
+      .source-chip.selected {
+        border-color: Highlight;
+      }
     }
     .source-chip-n {
       font-weight: 600;
@@ -1100,7 +1107,7 @@ export const unifiedChatBodyStyles = css`
     .context-meter-trigger:focus-visible {
       color: var(--text-primary);
       text-decoration: underline;
-      outline: none;
+      outline: 2px solid transparent;
     }
     /* Tempdoc 610 §I.2 — the per-phase attribution, revealed on hover/focus (compact by default). */
     .context-meter-breakdown {
@@ -1238,7 +1245,7 @@ export const unifiedChatBodyStyles = css`
     .query-trail-toggle:focus-visible {
       color: var(--text-primary);
       background: var(--surface-hover);
-      outline: none;
+      outline: 2px solid transparent;
     }
     .query-trail-menu {
       position: absolute;
@@ -1273,7 +1280,7 @@ export const unifiedChatBodyStyles = css`
     .query-trail-item:focus-visible {
       color: var(--text-primary);
       background: var(--surface-hover);
-      outline: none;
+      outline: 2px solid transparent;
     }
     /* Search Thread D5 (stage S3) — the pinned scope-chip row, shown above the composer (and above
        .route-row when present) in every affordance — a scope constrains both search and ask. */
@@ -1484,6 +1491,21 @@ export const unifiedChatBodyStyles = css`
       color: var(--accent);
       border-color: var(--accent);
     }
+    /* Spec A step 9 — chat unloaded for another GPU user: calm, not an error. */
+    .chat-residency-notice {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border-subtle);
+      border-radius: 0.375rem;
+      color: var(--text-secondary);
+      font-size: var(--font-size-sm);
+    }
+    .chat-residency-notice p {
+      margin: 0;
+      flex: 1;
+    }
     .error {
       padding: 0.5rem 0.75rem;
       background: var(--accent-danger-08);
@@ -1653,7 +1675,7 @@ export const unifiedChatBodyStyles = css`
       resize: vertical;
     }
     .msg-edit:focus {
-      outline: none;
+      outline: 2px solid transparent;
       border-color: var(--accent-tint);
     }
     .msg-edit-actions {

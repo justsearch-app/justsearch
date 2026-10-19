@@ -1,0 +1,35 @@
+diff --git a/modules/ort-common/src/main/java/io/justsearch/ort/DetachableRun.java b/modules/ort-common/src/main/java/io/justsearch/ort/DetachableRun.java
+--- a/modules/ort-common/src/main/java/io/justsearch/ort/DetachableRun.java
++++ b/modules/ort-common/src/main/java/io/justsearch/ort/DetachableRun.java
+@@ -375,4 +375,31 @@
+       if (tensor != null) tensor.close();
+     }
+   }
++
++  static OrtSession.Result runWithin(
++      SessionHandle.Lease lease, Map<String, OnnxTensor> inputs, long deadlineNanos,
++      ThreadFactory threads) throws OrtException {
++    if (!(lease.release() instanceof Release release)) return lease.runOnCallerThread(inputs);
++    Map<String, OnnxTensor> owned = copyOf(inputs);
++    if (owned == null) return lease.runOnCallerThread(inputs);
++    Device device = release.device;
++    try {
++      device.enter(lease.acquisition(), deadlineNanos);
++    } catch (RuntimeException notStarted) {
++      closeAll(owned);
++      throw notStarted;
++    }
++    Task task = new Task(lease, release, owned);
++    try {
++      threads.newThread(task).start();
++    } catch (RuntimeException | OutOfMemoryError noThread) {
++      device.leave();
++      closeAll(owned);
++      var failure =
++          new SessionAcquireDeadlineExceededException("no run thread for the native run", RUN);
++      failure.initCause(noThread);
++      throw failure;
++    }
++    return task.await(deadlineNanos);
++  }
+ }

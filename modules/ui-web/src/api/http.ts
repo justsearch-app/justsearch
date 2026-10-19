@@ -10,6 +10,7 @@
 
 import { isTauriRuntime as isProbablyTauriRuntime } from '../utils/tauriRuntime';
 import { fetchWithAdmissionWait } from './admissionFetch.js';
+import { observeStatusResponse } from './statusInvalidation.js';
 
 // ==================== Constants ====================
 
@@ -391,6 +392,7 @@ export async function request<T>(
         fetchInit.signal = signal;
       }
       const response = await fetchWithAdmissionWait(fetch, url, fetchInit);
+      await observeStatusResponse(url, response);
 
       if (!response.ok) {
         const text = await response.text().catch(() => '');
@@ -420,7 +422,8 @@ export async function request<T>(
         );
       }
 
-      return (await response.json()) as T;
+      const data = (await response.json()) as T;
+      return data;
     } catch (err: unknown) {
       // Don't retry if aborted
       if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
@@ -431,7 +434,7 @@ export async function request<T>(
 
       // The admission helper already handled every explicitly safe replay. A refusal returned
       // from it must never fall through to the generic server-error retry loop.
-      if (['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT', 'UPGRADE_PREPARING']
+      if (['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT', 'ADMISSION_INFERENCE_BUSY', 'UPGRADE_PREPARING']
         .includes((err as ApiError).code ?? '') || (err as ApiError).retrySafe === false) {
         throw err;
       }

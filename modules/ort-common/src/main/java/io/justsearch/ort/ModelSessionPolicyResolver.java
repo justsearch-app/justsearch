@@ -36,6 +36,8 @@ import java.util.Optional;
  * Stage 1 preserves today's hardcoded per-encoder defaults verbatim.
  */
 public final class ModelSessionPolicyResolver {
+  private static final java.util.Set<java.nio.file.Path> REPORTED_CPU_MODELS =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
 
   /** Default {@code GPU_RETRY_INTERVAL_MS} — moves from {@link NativeSessionHandle} constant. */
   private static final long DEFAULT_GPU_RETRY_INTERVAL_MS = 60_000L;
@@ -65,13 +67,30 @@ public final class ModelSessionPolicyResolver {
     requireNonNull(variant);
 
     return switch (role) {
-      case EMBEDDING -> resolveEmbedding(cfg.ai().embedding(), variant);
-      case SPLADE -> resolveSplade(cfg.ai().splade(), variant);
-      case NER -> resolveNer(cfg.ai().ner(), variant);
-      case BGE_M3 -> resolveBgeM3(cfg.ai().bgeM3(), variant);
-      case RERANKER -> resolveReranker(cfg.ai().reranker(), variant);
+      case EMBEDDING -> resolveEmbedding(cfg.ai().embedding(), variant, planned(cfg, role));
+      case SPLADE -> resolveSplade(cfg.ai().splade(), variant, planned(cfg, role));
+      case NER -> resolveNer(cfg.ai().ner(), variant, planned(cfg, role));
+      case BGE_M3 -> resolveBgeM3(cfg.ai().bgeM3(), variant, planned(cfg, role));
+      case RERANKER -> resolveReranker(cfg.ai().reranker(), variant, planned(cfg, role));
       case CITATION -> resolveCitation(cfg.ai().citationScorer(), variant);
     };
+  }
+
+  /**
+   * Whether the configuration carries an applied device-memory plan (Spec E revision 4 section
+   * 2.2, step E7b): the Engine's own {@code justsearch.gpu.memory_plan} contribution.
+   */
+  private static boolean planned(ResolvedConfig cfg, EncoderRole role) {
+    var resolution = cfg.resolution(
+        io.justsearch.configuration.EnvRegistry.GPU_MEMORY_PLAN_UNPLANNED_ROLES.configKey());
+    boolean outsidePlan = resolution != null && resolution.considered().stream()
+        .filter(source -> source.ordinal()
+            == io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_AUTO_DETECT
+            && source.hasValue())
+        .flatMap(source -> java.util.Arrays.stream(source.rawValue().split(",")))
+        .anyMatch(value -> role.name().equals(value.trim()));
+    return !outsidePlan && !cfg.ai().gpuMemoryPlan().isBlank()
+        && !"no_gpu".equals(cfg.ai().gpuMemoryPlan());
   }
 
   /**
@@ -95,7 +114,7 @@ public final class ModelSessionPolicyResolver {
   // =========================================================================
 
   private static ModelSessionPolicy resolveEmbedding(
-      ResolvedConfig.Ai.Embedding cfg, VariantSelection variant) {
+      ResolvedConfig.Ai.Embedding cfg, VariantSelection variant, boolean planned) {
     // deferCpuSession keys on variant EP, not cfg.gpuEnabled() — matches KnowledgeServer:620
     // (`embedOnGpu = variant.executionProvider() == CUDA`). Diverges in the degraded-hardware
     // case (user configures GPU, hardware lacks CUDA, variant drops to CPU EP).
@@ -104,7 +123,7 @@ public final class ModelSessionPolicyResolver {
     // independently of the preferred provider; keep the selected variant/generation unchanged.
     return new ModelSessionPolicy(
         variant,
-        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
+        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId(), planned),
         new ModelSessionPolicy.Cpu(
             deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
@@ -115,10 +134,10 @@ public final class ModelSessionPolicyResolver {
   }
 
   private static ModelSessionPolicy resolveSplade(
-      ResolvedConfig.Ai.Splade cfg, VariantSelection variant) {
+      ResolvedConfig.Ai.Splade cfg, VariantSelection variant, boolean planned) {
     return new ModelSessionPolicy(
         variant,
-        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
+        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId(), planned),
         new ModelSessionPolicy.Cpu(
             deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
@@ -129,10 +148,10 @@ public final class ModelSessionPolicyResolver {
   }
 
   private static ModelSessionPolicy resolveNer(
-      ResolvedConfig.Ai.Ner cfg, VariantSelection variant) {
+      ResolvedConfig.Ai.Ner cfg, VariantSelection variant, boolean planned) {
     return new ModelSessionPolicy(
         variant,
-        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
+        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId(), planned),
         new ModelSessionPolicy.Cpu(
             deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
@@ -143,10 +162,10 @@ public final class ModelSessionPolicyResolver {
   }
 
   private static ModelSessionPolicy resolveBgeM3(
-      ResolvedConfig.Ai.BgeM3 cfg, VariantSelection variant) {
+      ResolvedConfig.Ai.BgeM3 cfg, VariantSelection variant, boolean planned) {
     return new ModelSessionPolicy(
         variant,
-        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
+        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId(), planned),
         new ModelSessionPolicy.Cpu(
             deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
@@ -157,10 +176,10 @@ public final class ModelSessionPolicyResolver {
   }
 
   private static ModelSessionPolicy resolveReranker(
-      ResolvedConfig.Ai.Reranker cfg, VariantSelection variant) {
+      ResolvedConfig.Ai.Reranker cfg, VariantSelection variant, boolean planned) {
     return new ModelSessionPolicy(
         variant,
-        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
+        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId(), planned),
         new ModelSessionPolicy.Cpu(
             deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
@@ -204,18 +223,26 @@ public final class ModelSessionPolicyResolver {
    * {@code cfg.gpuMemMb} unconditionally, which forced {@link NativeSessionHandle} to inspect
    * {@code policy.variant()} as a second source of truth for the same decision (the §14.28
    * critical-review duality). Zeroing at the resolver collapses the handle's derivation to one
-   * branch.
+   * branch. {@code plannedProfile} is set for a GPU session when the configuration carries an
+   * applied device-memory plan (Spec E step E7b).
    */
   private static ModelSessionPolicy.Gpu buildGpu(
-      VariantSelection variant, int gpuMemMb, int gpuDeviceId) {
-    long arenaCapBytes =
-        variant.executionProvider() == ExecutionProvider.CUDA
-            ? (long) gpuMemMb * BYTES_PER_MB
-            : 0L;
+      VariantSelection variant, int gpuMemMb, int gpuDeviceId, boolean planned) {
+    // The activation coefficients were measured for FP16. A generation's exact FP32/INT8 file
+    // must not inherit its sibling's GPU estimate; preserve that artifact on the CPU instead.
+    boolean unmeasuredPrecision = planned && variant.precision() != ModelPrecision.FP16;
+    boolean onGpu = variant.executionProvider() == ExecutionProvider.CUDA && !unmeasuredPrecision;
+    if (unmeasuredPrecision && variant.executionProvider() == ExecutionProvider.CUDA
+        && REPORTED_CPU_MODELS.add(variant.modelFile().toAbsolutePath().normalize())) {
+      org.slf4j.LoggerFactory.getLogger(ModelSessionPolicyResolver.class).warn(
+          "Encoder uses CPU: planned_profile_precision_unmeasured ({})", variant.precision());
+    }
+    long arenaCapBytes = onGpu ? (long) gpuMemMb * BYTES_PER_MB : 0L;
     return new ModelSessionPolicy.Gpu(
         arenaCapBytes,
         gpuDeviceId,
-        Optional.empty()); // arenaExtendStrategyOverride reserved for per-session experiments
+        Optional.empty(), // arenaExtendStrategyOverride reserved for per-session experiments
+        variant.executionProvider() == ExecutionProvider.CUDA && planned);
   }
 
   /** Today's default RunOptions — shrinkage enabled. */

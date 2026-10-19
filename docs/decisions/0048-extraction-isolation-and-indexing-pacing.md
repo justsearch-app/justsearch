@@ -16,7 +16,7 @@ probes:
   - adr-0048-foreground-gauge-has-a-live-producer
   - adr-0048-retry-exhausted-terminal
   - adr-0048-nrt-mode-defaults-continuous
-last_reviewed: 2026-09-09
+last_reviewed: 2026-10-05
 ---
 
 # ADR-0048: Extraction isolation and indexing pacing
@@ -74,7 +74,7 @@ type survives process merges.
 
 **Engine health is sampled internally.** One scheduled `IndexStatus` unary on the existing health
 monitor's tick feeds the taps; the status handler reads the last snapshot and its age and never
-calls the index half. `?fresh=true` forces a synchronous sample for debug tooling.
+calls the index half. `?fresh=true` requests an asynchronous sample for debug tooling and returns the latest observation without waiting.
 
 **Ingestion failures walk a bounded ladder to a visible terminal state.** Transient outcomes stop
 counting against the attempt cap; the backoff ladder extends to a 7-day bound and then reports
@@ -222,3 +222,11 @@ is introduced. A parent-side descendant snapshot cannot cover late spawns; per-d
 process sets still provide orderly cleanup but cannot survive forced JVM death. See
 [Windows Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)
 for inherited membership and kill-on-close semantics.
+
+## Amendment 2026-10-05: chat generation and external GPU pressure
+
+Amended by [ADR-0050](0050-gpu-co-residence-by-prevention.md).
+
+- Chat generation is foreground contention and keeps this ADR's answer: GPU bulk batches (index encodes, late chunking, NER, BGE-M3, VDU) run at the duty floor through `IndexingPacing`, one batch of about 1 s per duty window. One governor, not two. Query-understanding and expansion calls do not count as generation.
+- A foreground game, or low adapter memory caused by other applications' use, pauses new GPU bulk batches. This is the one pause this ADR allows. It is answered to external conditions that end on their own, not to our own continuous foreground loop, so the starvation argument does not apply. The pause is visible with a reason and is never caused by our own memory use.
+- New probe (added with the implementation): indexing keeps a minimum rate under a continuous agent-search loop with chat generating.

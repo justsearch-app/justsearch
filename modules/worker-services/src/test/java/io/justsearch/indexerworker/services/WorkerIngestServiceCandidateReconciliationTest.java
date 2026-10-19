@@ -303,6 +303,8 @@ final class WorkerIngestServiceCandidateReconciliationTest {
     String collection = "strict-pre-green";
     when(fixture.candidateWriter.deleteByCollection(collection)).thenReturn(1);
 
+    // A watcher delete happens under a root the person added; only the add records its volume.
+    addedAsThePerson(fixture, tempDir);
     InOrder order = inOrder(fixture.queue, fixture.candidateWriter, fixture.servingCommit);
     fixture.service.acceptWatcherDelete(watched, () ->
         fixture.candidateWriter.deleteByIdAndChunks(watched));
@@ -479,11 +481,27 @@ final class WorkerIngestServiceCandidateReconciliationTest {
         "post-mutation state check must see a migration that started during the drain");
   }
 
+  /**
+   * Registers {@code root} as the person's added root. Round 8 of task t-20261013-ef3c41 (refined
+   * decision 2): only the add records a root's volume, so the add's record is taken here too.
+   */
   private static RootWatcherRegistry watch(Fixture fixture, Path root) {
     RootWatcherRegistry registry = new RootWatcherRegistry();
     assertTrue(registry.watch(root.toString(), "research").watching());
     fixture.service.setRootWatcherRegistry(registry);
+    addedAsThePerson(fixture, root);
     return registry;
+  }
+
+  /**
+   * Takes the record the person's add of {@code root} makes. Where the platform exposes no volume
+   * identity (Linux, macOS) nothing is recorded, and nothing needs to be (round 9).
+   */
+  private static void addedAsThePerson(Fixture fixture, Path root) {
+    boolean recorded = ((RootWitness) fixture.service.rootCheck()).recordAdded(root);
+    if (NoVolumeIdentityExtension.volumeIdentityAvailable(root)) {
+      assertTrue(recorded, "precondition: the person's add records the root's volume");
+    }
   }
 
   private Fixture fixture(String... indexedPaths) throws Exception {

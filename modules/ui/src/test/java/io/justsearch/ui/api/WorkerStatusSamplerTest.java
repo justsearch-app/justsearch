@@ -36,6 +36,7 @@ import io.justsearch.core.component.ComponentState;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -72,7 +73,7 @@ final class WorkerStatusSamplerTest {
     ConditionStore conditions = new ConditionStore();
     handler.setLifecycleSnapshotTap(
         new LifecycleSnapshotTap(
-            conditions, new HealthEventChangeRegistry(), HEAD_SRC, Clock.systemUTC()));
+            conditions, new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()), HEAD_SRC, Clock.systemUTC()));
 
     // First tick before client attachment: the tap must ASSERT index.unavailable.
     // Asserting only the cleared end-state would be vacuous — "absent" is also what a tap that
@@ -138,7 +139,7 @@ final class WorkerStatusSamplerTest {
         new io.justsearch.app.services.observability.health.IndexDriftHealthTap(
             new ConditionStore(),
             new io.justsearch.app.observability.health.OccurrenceLog(),
-            new HealthEventChangeRegistry(),
+            new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor()),
             HEAD_SRC,
             Clock.systemUTC(),
             () -> {
@@ -154,18 +155,20 @@ final class WorkerStatusSamplerTest {
   }
 
   @Test
-  @DisplayName("the first read before any sample takes exactly one synchronous sample")
-  void firstReadBeforeAnySampleObservesOnce(@TempDir Path indexBase) {
+  @DisplayName("the first read before any sample returns unknown and schedules one observation")
+  void firstReadBeforeAnySampleSchedulesObservation(@TempDir Path indexBase) {
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
     StatusLifecycleHandler handler = reachableHandler(indexBase, client);
 
-    handler.buildStatusSnapshot();
+    StatusResponse initial = handler.buildStatusSnapshot();
+    assertTrue(initial.meta().workerRpcStale(), "boot status is an honest unknown observation");
+    assertEquals("UNKNOWN", initial.readiness().components().get("ai").state());
     handler.buildStatusSnapshot();
     handler.buildStatusSnapshot();
 
-    // The boot window fallback fires at most once per process: after it, every read is cached.
-    verify(client, times(1)).getWorkerOperationalView(TestRequestContexts.internal());
+    // The boot observation runs independently; later reads reuse its published result.
+    verify(client, org.mockito.Mockito.timeout(10_000).times(1)).getWorkerOperationalView(TestRequestContexts.internal());
   }
 
   @Test
@@ -245,11 +248,13 @@ final class WorkerStatusSamplerTest {
   }
 
   @Test
-  @DisplayName("handleStatus routes ?fresh=true to a sample and anything else to the cache")
+  @DisplayName("handleStatus schedules ?fresh=true and serves the cache immediately")
   void handleStatusRoutesTheFreshParam(@TempDir Path indexBase) {
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
     StatusLifecycleHandler handler = reachableHandler(indexBase, client);
+    long[] now = {1_000_000_000_000L};
+    handler.setClockForTesting(() -> now[0]);
     handler.sampleAndBuildStatusSnapshot();
     verify(client, times(1)).getWorkerOperationalView(TestRequestContexts.internal());
 
@@ -265,13 +270,25 @@ final class WorkerStatusSamplerTest {
     verifyNoMoreInteractions(client);
 
     when(ctx.queryParam("fresh")).thenReturn("true");
+    now[0]++;
     handler.handleStatus(ctx);
-    verify(client, times(2)).getWorkerOperationalView(TestRequestContexts.internal());
+    verify(client, org.mockito.Mockito.timeout(10_000).times(2)).getWorkerOperationalView(TestRequestContexts.internal());
+    awaitObservation(handler, now[0]);
 
     // Case-insensitive, and still exactly one sample per call.
     when(ctx.queryParam("fresh")).thenReturn("TRUE");
+    now[0]++;
     handler.handleStatus(ctx);
-    verify(client, times(3)).getWorkerOperationalView(TestRequestContexts.internal());
+    verify(client, org.mockito.Mockito.timeout(10_000).times(3)).getWorkerOperationalView(TestRequestContexts.internal());
+    awaitObservation(handler, now[0]);
+  }
+
+  private static void awaitObservation(StatusLifecycleHandler handler, long expectedAtMs) {
+    org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(5), () -> {
+      while (handler.buildStatusSnapshot().meta().workerRpcAtMs() != expectedAtMs) {
+        Thread.sleep(1L);
+      }
+    });
   }
 
   @Test

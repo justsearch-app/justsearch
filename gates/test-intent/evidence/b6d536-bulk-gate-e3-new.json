@@ -1,0 +1,373 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T16:07:27.808Z",
+  "revision": "124def8a103222373661d9ef2fc1bb27b7f8e64b",
+  "tree": "e5775ac25f1fed5bfe0b4d999985096c5b64a26a",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineGpuResidencyWitnessTest.enginePressureMakesTheComposedBusYield\" --tests \"io.justsearch.app.engine.EngineGpuResidencyWitnessTest.chatControllerHearsExternalMemoryPressure\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8030
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.ExternalPressureMachineTest.raisesOnTheThirdConsecutiveLowSample\" --tests \"io.justsearch.app.services.gpu.ExternalPressureMachineTest.externalUseAtTheAllowancePlusMarginDoesNotRaise\" --tests \"io.justsearch.app.services.gpu.ExternalPressureMachineTest.freeAtTheMarginDoesNotRaise\" --tests \"io.justsearch.app.services.gpu.ExternalPressureMachineTest.anInBetweenSampleBreaksTheRaiseRun\" --tests \"io.justsearch.app.services.gpu.ExternalPressureMachineTest.clearsOnTheFifthConsecutiveClearSample\" --tests \"io.justsearch.app.services.gpu.ExternalPressureMachineTest.unknownSamplesFreezeTheCounters\" --tests \"io.justsearch.app.services.gpu.ExternalPressureMachineTest.raisedPressureClearsAfterThirtySecondsWithoutAKnownSample\" --tests \"io.justsearch.app.services.gpu.GpuResidencySamplerTest.externalUseRaisesHoldsAndReportsThenClears\" --tests \"io.justsearch.app.services.gpu.GpuResidencySamplerTest.ourOwnUseCannotRaise\" --tests \"io.justsearch.app.services.gpu.GpuResidencySamplerTest.nvmlAtThreeHundredMibFreeDoesNotRaise\" --tests \"io.justsearch.app.services.gpu.GpuResidencySamplerTest.pdhWithoutProcessFiguresDoesNotRaise\" --tests \"io.justsearch.app.services.gpu.GpuResidencySamplerTest.unknownReadingsClearRaisedPressureAfterThirtySeconds\" --tests \"io.justsearch.app.services.gpu.GpuResidencySamplerTest.aLateReceiverHearsRaisedPressure\" --tests \"io.justsearch.app.services.gpu.GpuResidencySamplerTest.statusReadsTheLatestReadingWithoutOwningTheReader\" --tests \"io.justsearch.app.services.gpu.GpuResidencySamplerTest.schedulesEveryTwoSecondsWithAFixedDelay\" --tests \"io.justsearch.app.services.vdu.VduPacingBulkHoldTest.heldGateDefersTrigger\" --tests \"io.justsearch.app.services.vdu.VduPacingBulkHoldTest.heldGateInterruptsBatch\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3002
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.BulkHoldKeepsQueryOnGpuTest.heldBulkWorkKeepsTheQueryEmbedOnGpuAndReleasesNothing\" --tests \"io.justsearch.indexerworker.loop.ops.LoopPacingBulkHoldTest.heldGpuEmbeddingSkipsTheCycle\" --tests \"io.justsearch.indexerworker.loop.ops.LoopPacingBulkHoldTest.heldSparseOrNerOnGpuSkipsTheCycle\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3481
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGpuResidencyWitnessTest.java#enginePressureMakesTheComposedBusYield",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGpuResidencyWitnessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3606c60bb938ec792a02a2a4bd8ff0e0d21c864106277e86c79f556aef88f57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "enginePressureMakesTheComposedBusYield(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGpuResidencyWitnessTest.java#chatControllerHearsExternalMemoryPressure",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGpuResidencyWitnessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3606c60bb938ec792a02a2a4bd8ff0e0d21c864106277e86c79f556aef88f57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatControllerHearsExternalMemoryPressure(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ExternalPressureMachineTest.java#raisesOnTheThirdConsecutiveLowSample",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ExternalPressureMachineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92feef7fe2f3a0acc5fd0871b9de0e63fd9b8bcc1f3c03569004fa12f9aa4126",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "raisesOnTheThirdConsecutiveLowSample()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ExternalPressureMachineTest.java#externalUseAtTheAllowancePlusMarginDoesNotRaise",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ExternalPressureMachineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92feef7fe2f3a0acc5fd0871b9de0e63fd9b8bcc1f3c03569004fa12f9aa4126",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "externalUseAtTheAllowancePlusMarginDoesNotRaise()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ExternalPressureMachineTest.java#freeAtTheMarginDoesNotRaise",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ExternalPressureMachineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92feef7fe2f3a0acc5fd0871b9de0e63fd9b8bcc1f3c03569004fa12f9aa4126",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "freeAtTheMarginDoesNotRaise()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ExternalPressureMachineTest.java#anInBetweenSampleBreaksTheRaiseRun",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ExternalPressureMachineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92feef7fe2f3a0acc5fd0871b9de0e63fd9b8bcc1f3c03569004fa12f9aa4126",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anInBetweenSampleBreaksTheRaiseRun()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ExternalPressureMachineTest.java#clearsOnTheFifthConsecutiveClearSample",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ExternalPressureMachineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92feef7fe2f3a0acc5fd0871b9de0e63fd9b8bcc1f3c03569004fa12f9aa4126",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "clearsOnTheFifthConsecutiveClearSample()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ExternalPressureMachineTest.java#unknownSamplesFreezeTheCounters",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ExternalPressureMachineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92feef7fe2f3a0acc5fd0871b9de0e63fd9b8bcc1f3c03569004fa12f9aa4126",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unknownSamplesFreezeTheCounters()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ExternalPressureMachineTest.java#raisedPressureClearsAfterThirtySecondsWithoutAKnownSample",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/ExternalPressureMachineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:92feef7fe2f3a0acc5fd0871b9de0e63fd9b8bcc1f3c03569004fa12f9aa4126",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "raisedPressureClearsAfterThirtySecondsWithoutAKnownSample()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java#externalUseRaisesHoldsAndReportsThenClears",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f06c3ceabdc12df455cf92c160be7c931e648d21c397bcad7450cee88d57d04e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "externalUseRaisesHoldsAndReportsThenClears()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java#ourOwnUseCannotRaise",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f06c3ceabdc12df455cf92c160be7c931e648d21c397bcad7450cee88d57d04e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ourOwnUseCannotRaise()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java#nvmlAtThreeHundredMibFreeDoesNotRaise",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f06c3ceabdc12df455cf92c160be7c931e648d21c397bcad7450cee88d57d04e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nvmlAtThreeHundredMibFreeDoesNotRaise()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java#pdhWithoutProcessFiguresDoesNotRaise",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f06c3ceabdc12df455cf92c160be7c931e648d21c397bcad7450cee88d57d04e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pdhWithoutProcessFiguresDoesNotRaise()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java#unknownReadingsClearRaisedPressureAfterThirtySeconds",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f06c3ceabdc12df455cf92c160be7c931e648d21c397bcad7450cee88d57d04e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unknownReadingsClearRaisedPressureAfterThirtySeconds()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java#aLateReceiverHearsRaisedPressure",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f06c3ceabdc12df455cf92c160be7c931e648d21c397bcad7450cee88d57d04e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLateReceiverHearsRaisedPressure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java#statusReadsTheLatestReadingWithoutOwningTheReader",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f06c3ceabdc12df455cf92c160be7c931e648d21c397bcad7450cee88d57d04e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "statusReadsTheLatestReadingWithoutOwningTheReader()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java#schedulesEveryTwoSecondsWithAFixedDelay",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f06c3ceabdc12df455cf92c160be7c931e648d21c397bcad7450cee88d57d04e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "schedulesEveryTwoSecondsWithAFixedDelay()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BulkHoldKeepsQueryOnGpuTest.java#heldBulkWorkKeepsTheQueryEmbedOnGpuAndReleasesNothing",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BulkHoldKeepsQueryOnGpuTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9c6ab4f6cd8c1b978eba958e241cb997a3775bc710d7c65d74da2be0332d7c23",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "heldBulkWorkKeepsTheQueryEmbedOnGpuAndReleasesNothing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/LoopPacingBulkHoldTest.java#heldGpuEmbeddingSkipsTheCycle",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/LoopPacingBulkHoldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c71e75d8c71df5f9e982dc2d4afec0ecb559f6cb6219acf7daa5966d6037df82",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "heldGpuEmbeddingSkipsTheCycle()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/LoopPacingBulkHoldTest.java#heldSparseOrNerOnGpuSkipsTheCycle",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/LoopPacingBulkHoldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c71e75d8c71df5f9e982dc2d4afec0ecb559f6cb6219acf7daa5966d6037df82",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "heldSparseOrNerOnGpuSkipsTheCycle()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduPacingBulkHoldTest.java#heldGateDefersTrigger",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduPacingBulkHoldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4f2d52eb3dd7ec12a275c7adee17dce48728fa467be83b89bc127f24ebc9ea5b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "heldGateDefersTrigger()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduPacingBulkHoldTest.java#heldGateInterruptsBatch",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduPacingBulkHoldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4f2d52eb3dd7ec12a275c7adee17dce48728fa467be83b89bc127f24ebc9ea5b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "heldGateInterruptsBatch()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:d1a88cf805110c75bd5321e7d6dbbd2c782823d3664f64cb1134d8ef13231e5d"
+}

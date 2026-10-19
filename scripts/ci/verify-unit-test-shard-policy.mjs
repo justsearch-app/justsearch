@@ -11,6 +11,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import { workflowJobs, aggregateDependencies } from './check-governance-ci-coverage.mjs';
+
 const KIND = 'justsearch-unit-test-shard-policy.v1';
 const ALLOWED_PLATFORM_CLASSES = new Set([
   'windows-required',
@@ -152,6 +154,18 @@ export function parseUnitTestMatrix(workflowText) {
     }
   }
   finishCurrent();
+  // Explicit jobs are used for app-ui so its aggregate waits only on its own parts.
+  for (const job of workflowJobs(workflowText)) {
+    const match = /^Unit tests \(([^$]+)\)$/.exec(job.name ?? '');
+    const tasks = [...job.text.matchAll(/:modules:[\w-]+:test\b/g)].map((m) => m[0]);
+    if (!match || !tasks.length) continue;
+    lanes.push({
+      lane: match[1],
+      artifact: /name: (unit-test-attribution-[\w-]+?)(?:-attempt-|\s*$)/m.exec(job.text)?.[1],
+      runnerLabel: /--runner-label "([^"$]+)"/.exec(job.text)?.[1],
+      gradleTasks: tasks,
+    });
+  }
   lanes.sort((a, b) => a.lane.localeCompare(b.lane));
   return lanes;
 }
@@ -217,6 +231,34 @@ export function validateUnitTestShardPolicy({ policy, workflowText, workflowSign
       issues.push(`${lane.lane}: platformClass is not allowed: ${lane.platformClass}`);
     }
     validateBudget(lane, issues);
+  }
+
+  const jobs = workflowJobs(workflowText);
+  for (const aggregate of policy.aggregates ?? []) {
+    const job = jobs.find((j) => j.id === aggregate.jobId);
+    const actual = job ? aggregateDependencies(job).sort() : [];
+    if (!job || job.name !== aggregate.requiredCheck
+        || !sameList(actual, [...aggregate.parts].sort())) {
+      issues.push(`${aggregate.jobId}: aggregate must unconditionally require success from every expected part`);
+    }
+    for (const part of aggregate.parts) {
+      const partJob = jobs.find((j) => j.id === part);
+      if (!partJob || partJob.if || partJob['continue-on-error']
+          || /^        continue-on-error:/m.test(partJob.text)
+          || partJob.runs.some((run) => run.step?.if && run.step.if !== 'always()')) {
+        issues.push(`${part}: required part is missing, conditional or tolerates job/step failure`);
+      }
+    }
+  }
+  for (const part of policy.windowsParts ?? []) {
+    const job = jobs.find((j) => j.id === part.jobId);
+    const commands = job?.runs.map((r) => r.text).join('\n') ?? '';
+    const commandLines = commands.split('\n').map((line) => line.trim());
+    for (const command of part.commands) {
+      if (commandLines.filter((line) => line === command).length !== 1) issues.push(`${part.jobId}: expected command exactly once: ${command}`);
+    }
+    const actualTasks = [...commands.matchAll(/:modules:[\w-]+:test\b/g)].map((m) => m[0]);
+    if (!sameList(actualTasks, part.gradleTasks)) issues.push(`${part.jobId}: Windows Gradle task ownership differs`);
   }
 
   const workflowLanes = parseUnitTestMatrix(workflowText);

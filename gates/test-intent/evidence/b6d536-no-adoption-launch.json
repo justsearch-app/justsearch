@@ -1,0 +1,154 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T09:27:13.343Z",
+  "revision": "98fd416d05d602854a605f310c9e176758a39264",
+  "tree": "43d12acf2483666659dc6d91d0c1498c98f04ff3",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.healthyServerOnConfiguredPortIsNotAdoptedWithoutExternalEndpoint\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.explicitExternalEndpointIsUsedAndNeverStopped\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.lostBindRetriesOnceOnAFreshPortAtTheSameContextRung\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6171
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#healthyServerOnConfiguredPortIsNotAdoptedWithoutExternalEndpoint",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cbd1a0578bdacfa0eaf98d78412968d1829f88f9f018c64ce7a24a7c120bb46d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "healthyServerOnConfiguredPortIsNotAdoptedWithoutExternalEndpoint(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#explicitExternalEndpointIsUsedAndNeverStopped",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cbd1a0578bdacfa0eaf98d78412968d1829f88f9f018c64ce7a24a7c120bb46d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitExternalEndpointIsUsedAndNeverStopped(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cbd1a0578bdacfa0eaf98d78412968d1829f88f9f018c64ce7a24a7c120bb46d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#lostBindRetriesOnceOnAFreshPortAtTheSameContextRung",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cbd1a0578bdacfa0eaf98d78412968d1829f88f9f018c64ce7a24a7c120bb46d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lostBindRetriesOnceOnAFreshPortAtTheSameContextRung(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cbd1a0578bdacfa0eaf98d78412968d1829f88f9f018c64ce7a24a7c120bb46d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6f7895a79",
+    "revision": "6f7895a7971295288a9a4b93867926a3dd3320e2",
+    "overlays": [
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/RecordingChildControl.java",
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/SurvivingTerminator.java"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-no-adoption-launch-compat.patch",
+        "contentDigest": "sha256:9f8c3ce36be9e250251075249a2df387e4fa45eb3ed72aa3c0a6a11257ac3cd6"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.healthyServerOnConfiguredPortIsNotAdoptedWithoutExternalEndpoint\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.explicitExternalEndpointIsUsedAndNeverStopped\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.lostBindRetriesOnceOnAFreshPortAtTheSameContextRung\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7032
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#healthyServerOnConfiguredPortIsNotAdoptedWithoutExternalEndpoint",
+        "classification": "assertion",
+        "detail": "healthyServerOnConfiguredPortIsNotAdoptedWithoutExternalEndpoint(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a server on the configured port must not be adopted without justsearch.inference.external_endpoint ==> expected: <LAUNCHED_MANAGED> but was: <ADOPTED_EXTERNAL>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#explicitExternalEndpointIsUsedAndNeverStopped",
+        "classification": "assertion",
+        "detail": "explicitExternalEndpointIsUsedAndNeverStopped(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <ADOPTED_EXTERNAL> but was: <LAUNCHED_MANAGED>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash",
+        "classification": "assertion",
+        "detail": "twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a launch never binds the configured port ==> expected: not equal but was: <61209>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#lostBindRetriesOnceOnAFreshPortAtTheSameContextRung",
+        "classification": "assertion",
+        "detail": "lostBindRetriesOnceOnAFreshPortAtTheSameContextRung(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a lost bind must not step the context window down ==> expected: <8192> but was: <4096>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung",
+        "classification": "assertion",
+        "detail": "lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a recovery launch plus exactly one bind retry: [[-m, F:\\agent-sandbox\\design-b6d536\\phaseb-tmp-2\\junit-7055764766868632546\\model.gguf, --jinja, --reasoning-format, deepseek, --reasoning-budget, 512, --host, 127.0.0.1, --metrics, --port, 61229, -c, 8192, -ngl, 0,"
+      }
+    ]
+  },
+  "digest": "sha256:58ad86e64cdfd5e430bf78c37593bacd92b0833d45f925c73264cc7db22a55c2"
+}

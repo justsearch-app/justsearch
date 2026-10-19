@@ -61,7 +61,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -133,6 +133,15 @@ jobs:
       # remembered. That is the exact failure mode 745 documents: a layer nothing
       # invokes is dead regardless of its quality. The runner auto-discovers
       # *.test.mjs so a new test is covered the moment it lands.
+      - name: Stage Linux process helper for Node lifecycle tests
+        # Both the analytics suite here and the dev-runner suite below exercise real pidfd
+        # stops. Compile the production source with its Gradle flags, without configuring JVM
+        # projects or building a distribution in this time-bounded Node/Python lane.
+        run: |
+          helper="modules/ui/build/install/ui/$(node -p 'require("./scripts/lib/native-targets.cjs").nativeTarget().paths["bound-exec"]')"
+          mkdir -p "$(dirname "$helper")"
+          cc -std=c11 -O2 -Wall -Wextra -Werror native/bound-exec/bound-exec.c -o "$helper"
+
       - name: Test agent-analytics instrument (node)
         run: node scripts/agent-analytics/run-all-tests.mjs
 
@@ -262,11 +271,6 @@ jobs:
       # and the floor guard, so a reworded recipe cannot shrink the set to a silent green.
       - name: ui-web gate runner parses the whole recipe
         run: node scripts/ci/run-ui-web-gates.test.mjs
-
-      # Tempdoc 872: the observations inbox is retired; a shard from a session still on the
-      # old brief would otherwise land unread. Fail legibly, with the routing remedy.
-      - name: no observations shards (inbox retired)
-        run: node scripts/ci/check-no-observations-shards.mjs
 
       # Tempdoc 879. Both gates below existed only as manual pre-merge rows, which is the same
       # defect they check for: a mechanism nothing runs cannot contradict anything. The store
@@ -494,6 +498,22 @@ jobs:
       - name: Governance gate self-test fixtures
         run: node scripts/governance/run.mjs --self-test --mode gate
 
+      # Production MCP and the extracted MCPB bundle find the desktop app's Engine through the
+      # platform-paths contract's desktop data folder and validated manifests. Also runs in the
+      # Windows-native lane, where the folder is the Roaming AppData one.
+      - name: Test Engine discovery (desktop data folder, validated manifests)
+        run: node --test scripts/lib/engine-discovery.test.mjs
+
+      # Tempdoc 966 D1: every expected outcome entering, changing or leaving the product test suite
+      # names a source of intent and carries a non-author acceptance record bound to the exact
+      # flagged content. The gate resolves its own base (pull_request merge-base, merge_group
+      # base_sha, push HEAD^1) and needs the full history the checkout above fetches; it fails
+      # closed on a shallow clone. Rules for agents: docs/reference/testing/test-intent.md.
+      # On every run it also appends the rolling four-week test-intent counts (tempdoc 966
+      # Measurement) to the job summary; there is no scheduled workflow (ADR-0026).
+      - name: Test intent gate
+        run: node scripts/governance/run.mjs --gate test-intent --mode gate
+
       - name: ADR premise probes (adr-coverage gate)
         run: node scripts/governance/run.mjs --gate adr-coverage --mode gate
 
@@ -688,7 +708,7 @@ jobs:
 
       - name: Setup Node
         # Only for the lock-drift guard below; no npm install happens in this job.
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -754,7 +774,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -832,7 +852,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: |
@@ -850,7 +870,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -887,7 +907,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: |
@@ -898,7 +918,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -961,7 +981,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Setup runtime client minimum Node version
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 20
 
@@ -972,40 +992,16 @@ jobs:
 
   unit-tests:
     name: Unit tests (${{ matrix.lane }})
-    # Per-lane runner OS (tempdoc 668 option B). app-ui is migrated to Linux (~2.8x
-    # faster, validated); its Windows-specific tests are @Tag("windows") and run on
-    # the separate windows-native-tests lane. search-worker / platform-contracts stay
-    # on Windows pending their own Linux validation.
+    # The other unit lanes keep their existing matrix and task selection.
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: ${{ matrix.timeout_minutes }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - lane: app-ui
-            os: ubuntu-latest
-            artifact: unit-test-attribution-app-ui
-            runner_label: ubuntu-latest/app-ui
-            fetch_depth: 1
-            # This lane runs :modules:app-services:test, which IS RegistrySnapshotExporterTest --
-            # the producer of tmp/consumer-presence/registry-snapshot.json. The three gates that
-            # read that snapshot therefore run here (tempdoc 918 B1), same pattern as
-            # run_snapshot_gates, but for the app-ui lane. None of the three resolves a git
-            # baseline (registry: diffStrategy "none" / no baseline), so depth 1 is enough.
-            run_snapshot_gates: "true"
-            gradle_tasks: >-
-              :modules:app-agent:test
-              :modules:app-agent-api:test
-              :modules:app-api:test
-              :modules:app-api-tck:test
-              :modules:app-config:test
-              :modules:app-launcher:test
-              :modules:app-observability:test
-              :modules:app-services:test
-              :modules:app-util:test
-              :modules:ui:test
           - lane: search-worker
             os: ubuntu-latest
+            timeout_minutes: 25
             artifact: unit-test-attribution-search-worker
             runner_label: ubuntu-latest/search-worker
             fetch_depth: 1
@@ -1021,6 +1017,7 @@ jobs:
               :modules:worker-services:test
           - lane: platform-contracts
             os: ubuntu-latest
+            timeout_minutes: 25
             artifact: unit-test-attribution-platform-contracts
             runner_label: ubuntu-latest/platform-contracts
             # :modules:dead-code-audit:test carries the whole-program dead-class ratchet as an
@@ -1064,7 +1061,7 @@ jobs:
           fetch-depth: ${{ matrix.fetch_depth }}
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: |
@@ -1081,22 +1078,6 @@ jobs:
           chmod +x ./gradlew 2>/dev/null || true
           GW='./gradlew'; [ "$RUNNER_OS" = "Windows" ] && GW='./gradlew.bat'
           "$GW" ${{ matrix.gradle_tasks }} -PskipWebBuild=true --console=plain
-
-      # Tempdoc 918 B1. consumer-presence, host-owns-truth and runtime-witness read the registry
-      # snapshot exported below, and each returns verdict `pass` with a `snapshot-missing` WARNING
-      # when it is absent -- a soft-fail that makes them vacuous anywhere else. The dedicated
-      # exporter must run explicitly because a cached Gradle test task does not replay its
-      # filesystem side effect. The final line is the anti-vacuous assertion: if the snapshot was
-      # not built, the finding is present and this step fails rather than reporting a green that
-      # inspected nothing.
-      - name: Registry-snapshot gates (fresh explicit input)
-        if: matrix.run_snapshot_gates == 'true'
-        run: |
-          chmod +x ./gradlew 2>/dev/null || true
-          GW='./gradlew'; [ "$RUNNER_OS" = "Windows" ] && GW='./gradlew.bat'
-          "$GW" :modules:app-services:exportRegistrySnapshot -PskipWebBuild=true --console=plain
-          node scripts/governance/run.mjs             --gate consumer-presence --gate host-owns-truth --gate runtime-witness             --mode gate --out tmp/snapshot-gates.sarif
-          node -e "if (require('fs').readFileSync('tmp/snapshot-gates.sarif','utf8').includes('snapshot-missing')) { console.error('registry snapshot absent: these three gates inspected nothing'); process.exit(1); }"
 
       - name: Report unit-test attribution
         if: always()
@@ -1119,76 +1100,270 @@ jobs:
             modules/**/build/test-results/test/TEST-*.xml
           if-no-files-found: warn
 
-  # Tempdoc 668 option B — runs ONLY the @Tag("windows") tests (single-instance lock,
-  # job objects, power status) on Windows, preserving coverage of genuinely Windows-
-  # specific product behaviour that the Linux-migrated lanes (app-ui) skip. Small + fast
-  # (a handful of classes via -PwindowsOnly). Covers the modules moved to Linux so far.
-  windows-native-tests:
-    name: Windows-native tests
-    runs-on: windows-latest
-    timeout-minutes: 15
+  app-ui-ui:
+    name: Unit tests (app-ui-ui)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          fetch-depth: 1
 
-      - name: Evidence capture exits cleanly after Windows fetch teardown
-        run: node --test scripts/release/evidence-capture-exit.test.mjs
-
-      # Lane F stage B item B9. These nine files previously ran in CI NOWHERE: `test:dev-runner`
-      # named TWO of them by hand and was invoked from `onramp-smoke.yml` alone, whose trigger is
-      # `workflow_dispatch` only — manual, i.e. only when someone remembered. That is the exact
-      # failure mode tempdoc 745 D6 names for the agent-analytics suite ("a layer nothing invokes is
-      # dead regardless of its quality"), and item B8 has just put a supervisor state machine behind
-      # them. The runner auto-discovers `test-dev-runner-*.mjs`, so a new test is covered the moment
-      # it lands.
-      #
-      # HERE and not in `public-claims`, which is what stages/B.md's B9 proposed: that lane is
-      # ubuntu, and dev-runner.cjs is Windows-first by its own header — the paths these tests
-      # exercise (cuda12 resolution, taskkill, the handle-release cooldown) either do not exist or
-      # do not mean the same thing on Linux. The trigger coverage B9 asked for is unchanged: this
-      # job runs on the same `pull_request` and `push` as that one. Recorded in B.md §0.1.
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: |
             21
             ${{ env.JAVA_VERSION }}
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # The real frontend/HTTP integration probes bundle TypeScript with root esbuild and
+      # resolve UI imports such as zod. skipWebBuild skips the web build, not these dependencies.
+      - name: Setup Node for frontend HTTP probes
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            modules/ui-web/package-lock.json
+
+      - name: Install frontend HTTP probe dependencies
+        run: |
+          npm ci --audit=false
+          npm ci --prefix modules/ui-web --audit=false
+
+      - name: Stage Linux process-lifetime helper
+        shell: bash
+        run: |
+          helper="modules/ui/build/install/ui/$(node -p 'require("./scripts/lib/native-targets.cjs").nativeTarget().paths["bound-exec"]')"
+          mkdir -p "$(dirname "$helper")"
+          cc -std=c11 -O2 -Wall -Wextra -Werror native/bound-exec/bound-exec.c -o "$helper"
+
+      - name: Unit tests with model-dependent tests self-skipping
+        id: gradle-test
+        shell: bash
+        run: |
+          chmod +x ./gradlew 2>/dev/null || true
+          GW='./gradlew'; [ "$RUNNER_OS" = "Windows" ] && GW='./gradlew.bat'
+          "$GW" :modules:ui:test -PskipWebBuild=true --console=plain
+
+      - name: Report unit-test attribution
+        if: always()
+        run: node scripts/ci/report-unit-test-attribution.mjs --lane "app-ui-ui" --runner-label "ubuntu-latest/app-ui-ui" --out-json build/ci/unit-test-attribution.json --out-md build/ci/unit-test-attribution.md --top 20 --allow-empty
+
+      - name: Report unit-test advisory budget
+        if: always()
+        run: node scripts/ci/report-unit-test-budget.mjs --lane "app-ui-ui" --attribution build/ci/unit-test-attribution.json --out-json build/ci/unit-test-budget.json --out-md build/ci/unit-test-budget.md
+
+      - name: Upload unit-test attribution
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-attribution-app-ui-ui-attempt-${{ github.run_attempt }}
+          path: |
+            build/ci/unit-test-attribution.json
+            build/ci/unit-test-attribution.md
+            build/ci/unit-test-budget.json
+            build/ci/unit-test-budget.md
+            modules/**/build/test-results/test/TEST-*.xml
+          if-no-files-found: warn
+
+  app-ui-services:
+    name: Unit tests (app-ui-services)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            ${{ env.JAVA_VERSION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # The real frontend/HTTP integration probes bundle TypeScript with root esbuild and
+      # resolve UI imports such as zod. skipWebBuild skips the web build, not these dependencies.
+      - name: Setup Node for frontend HTTP probes
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            modules/ui-web/package-lock.json
+
+      - name: Install frontend HTTP probe dependencies
+        run: |
+          npm ci --audit=false
+          npm ci --prefix modules/ui-web --audit=false
+
+      - name: Stage Linux process-lifetime helper
+        shell: bash
+        run: |
+          helper="modules/ui/build/install/ui/$(node -p 'require("./scripts/lib/native-targets.cjs").nativeTarget().paths["bound-exec"]')"
+          mkdir -p "$(dirname "$helper")"
+          cc -std=c11 -O2 -Wall -Wextra -Werror native/bound-exec/bound-exec.c -o "$helper"
+
+      - name: Unit tests with model-dependent tests self-skipping
+        id: gradle-test
+        shell: bash
+        run: |
+          chmod +x ./gradlew 2>/dev/null || true
+          GW='./gradlew'; [ "$RUNNER_OS" = "Windows" ] && GW='./gradlew.bat'
+          "$GW" :modules:app-agent:test :modules:app-agent-api:test :modules:app-api:test :modules:app-api-tck:test :modules:app-config:test :modules:app-launcher:test :modules:app-observability:test :modules:app-services:test :modules:app-util:test -PskipWebBuild=true --console=plain
+
+      # Tempdoc 918 B1. consumer-presence, host-owns-truth and runtime-witness read the registry
+      # snapshot exported below, and each returns verdict `pass` with a `snapshot-missing` WARNING
+      # when it is absent -- a soft-fail that makes them vacuous anywhere else. The dedicated
+      # exporter must run explicitly because a cached Gradle test task does not replay its
+      # filesystem side effect. The final line is the anti-vacuous assertion: if the snapshot was
+      # not built, the finding is present and this step fails rather than reporting a green that
+      # inspected nothing.
+      - name: Registry-snapshot gates (fresh explicit input)
+        run: |
+          chmod +x ./gradlew 2>/dev/null || true
+          GW='./gradlew'; [ "$RUNNER_OS" = "Windows" ] && GW='./gradlew.bat'
+          "$GW" :modules:app-services:exportRegistrySnapshot -PskipWebBuild=true --console=plain
+          node scripts/governance/run.mjs             --gate consumer-presence --gate host-owns-truth --gate runtime-witness             --mode gate --out tmp/snapshot-gates.sarif
+          node -e "if (require('fs').readFileSync('tmp/snapshot-gates.sarif','utf8').includes('snapshot-missing')) { console.error('registry snapshot absent: these three gates inspected nothing'); process.exit(1); }"
+
+      - name: Report unit-test attribution
+        if: always()
+        run: node scripts/ci/report-unit-test-attribution.mjs --lane "app-ui-services" --runner-label "ubuntu-latest/app-ui-services" --out-json build/ci/unit-test-attribution.json --out-md build/ci/unit-test-attribution.md --top 20 --allow-empty
+
+      - name: Report unit-test advisory budget
+        if: always()
+        run: node scripts/ci/report-unit-test-budget.mjs --lane "app-ui-services" --attribution build/ci/unit-test-attribution.json --out-json build/ci/unit-test-budget.json --out-md build/ci/unit-test-budget.md
+
+      - name: Upload unit-test attribution
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-attribution-app-ui-services-attempt-${{ github.run_attempt }}
+          path: |
+            build/ci/unit-test-attribution.json
+            build/ci/unit-test-attribution.md
+            build/ci/unit-test-budget.json
+            build/ci/unit-test-budget.md
+            modules/**/build/test-results/test/TEST-*.xml
+          if-no-files-found: warn
+
+  app-ui:
+    name: Unit tests (app-ui)
+    needs: [app-ui-ui, app-ui-services]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require every app-ui part to succeed
+        env:
+          UI_RESULT: ${{ needs.app-ui-ui.result }}
+          SERVICES_RESULT: ${{ needs.app-ui-services.result }}
+        run: test "$UI_RESULT" = success && test "$SERVICES_RESULT" = success
+
+  windows-native-node:
+    name: Windows-native tests (node)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            ${{ env.JAVA_VERSION }}
+
+      # ui-web's install is needed by test-dev-runner-vite-loopback, which starts the real Vite to
+      # prove the dev UI binds 127.0.0.1 on Windows too (localhost may resolve to ::1 first).
       - name: Dev-runner suite (auto-discovered)
-        run: npm ci --audit=false && npm run test:dev-runner
+        run: |
+          npm ci --audit=false
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm ci --prefix modules/ui-web --audit=false
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run test:dev-runner -- --verbose
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  windows-native-contracts:
+    name: Windows-native tests (contracts)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            ${{ env.JAVA_VERSION }}
+
+      - name: Evidence capture exits cleanly after Windows fetch teardown
+        run: |
+          node --test scripts/release/evidence-capture-exit.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Install root dependencies (conformance, production MCP's SDK)
+        run: npm ci --audit=false
+
+      # After the root install: production MCP's token-safety cases need the MCP SDK (a root
+      # devDependency) and fail without it. The extracted bridge still runs without it (it is
+      # unpacked outside the checkout). Run 39228248453 hung here for 24 minutes; the step's own
+      # limit keeps a regression from eating the job's.
+      - name: Engine discovery finds the desktop app's Engine (Roaming AppData)
+        timeout-minutes: 5
+        run: node --test scripts/lib/engine-discovery.test.mjs
 
       # The actuator half of design 7.1's supervisor contract, against the dev-runner. The decision
       # half is proven by `--self-test` in the Public-claims lane; this is the half that needs a real
       # child, and Windows is the only place where the thing §2 re-cut — a cooldown floored on the
       # process handle closing — is a real constraint rather than a no-op.
       - name: Supervisor conformance (dev-runner adapter)
-        run: node scripts/supervisor-conformance/run.mjs --adapter dev-runner
+        run: |
+          node scripts/supervisor-conformance/run.mjs --adapter dev-runner
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/supervisor-conformance/run.mjs --adapter dev-runner --case fileless-clean-local-restart-is-not-counted --repeat 50
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Windows-only tests (@Tag windows) for the Linux-migrated modules
-        run: ./gradlew.bat :modules:app-util:test :modules:app-agent:test :modules:app-services:test :modules:app-observability:test :modules:adapters-lucene:test :modules:app-inference:test :modules:worker-services:test :modules:ort-common:test -PwindowsOnly=true --console=plain
-
-      - name: Preserve Windows-native test results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: windows-native-test-results
-          path: |
-            modules/**/build/test-results/test/TEST-*.xml
-            modules/**/build/reports/tests/test/**
-          retention-days: 30
+      - name: Windows coverage (@Tag windows or cross-platform) for the Linux-migrated modules
+        run: ./gradlew.bat :modules:app-api:test :modules:app-util:test :modules:app-agent:test :modules:app-services:test :modules:app-observability:test :modules:ui:test :modules:adapters-lucene:test :modules:app-inference:test :modules:worker-services:test :modules:ort-common:test -PwindowsOnly=true -PskipWebBuild=true --console=plain
 
       - name: Release compatibility baseline contract tests
         shell: pwsh
-        run: ./scripts/ci/test-release-compatibility-baseline.ps1
+        run: |
+          ./scripts/ci/test-release-compatibility-baseline.ps1
 
       - name: Release signing contract tests
         shell: pwsh
@@ -1199,6 +1374,29 @@ jobs:
           ./scripts/ci/test-sign-windows-diagnostics.ps1
           ./scripts/ci/test-verify-pe-signatures.ps1
           ./scripts/release/test-sign-vendored-payload.ps1
+
+      - name: Preserve Windows-native test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-native-contracts-attempt-${{ github.run_attempt }}
+          path: |
+            modules/**/build/test-results/test/TEST-*.xml
+            modules/**/build/reports/tests/test/**
+          retention-days: 30
+
+  windows-native-tests:
+    name: Windows-native tests
+    needs: [windows-native-node, windows-native-contracts]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require every Windows-native part to succeed
+        env:
+          NODE_RESULT: ${{ needs.windows-native-node.result }}
+          CONTRACTS_RESULT: ${{ needs.windows-native-contracts.result }}
+        run: test "$NODE_RESULT" = success && test "$CONTRACTS_RESULT" = success
 
   # The `shell` crate ran in NO lane until now. The only `cargo` invocation anywhere in CI was
   # `dump-cargo-licenses.mjs` (this file, "License and notices"), which compiles nothing. So
@@ -1224,20 +1422,42 @@ jobs:
   # compile. The directory is gitignored and packaging is unaffected: build-installer.yml stages
   # the real bundle before it packages anything.
   shell-rust-tests:
-    name: Shell crate tests (Rust)
-    runs-on: windows-latest
+    # The Windows leg keeps the exact required-check name; the Linux leg runs the Linux-only cfg tests.
+    name: ${{ matrix.os == 'ubuntu-latest' && 'Shell crate tests (Rust, Linux)' || 'Shell crate tests (Rust)' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Setup Rust (MSVC)
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Linux shell build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
 
       - name: Cache Rust builds
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: modules/shell/src-tauri
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Stage Linux process-lifetime helper
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          helper="modules/ui/build/install/ui/$(node -p 'require("./scripts/lib/native-targets.cjs").nativeTarget().paths["bound-exec"]')"
+          mkdir -p "$(dirname "$helper")"
+          cc -std=c11 -O2 -Wall -Wextra -Werror native/bound-exec/bound-exec.c -o "$helper"
 
       - name: Stage bundle-resource placeholder
         shell: pwsh
@@ -1262,17 +1482,16 @@ jobs:
       # "the shell crate does what it says". A contract with one implementation's actuator never run
       # is not one contract (ci.yml's own 745 lesson, two jobs down: a layer nothing invokes is dead
       # regardless of quality).
-      - name: Setup Node (for the conformance harness)
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
       - name: Build the supervisor conformance driver
+        if: runner.os == 'Windows'
         working-directory: modules/shell/src-tauri
         run: cargo build --bin supervisor-conformance --locked
 
       - name: Supervisor conformance (Tauri adapter)
-        run: node scripts/supervisor-conformance/run.mjs --adapter tauri
+        if: runner.os == 'Windows'
+        run: |
+          node scripts/supervisor-conformance/run.mjs --adapter tauri
+          node scripts/supervisor-conformance/run.mjs --adapter tauri --case fileless-clean-local-restart-is-not-counted --repeat 50
 
   # `:modules:system-tests:integrationTest` ran in NO lane until now: ci.yml ran only
   # `:modules:system-tests:test`, and the module's `check` depends on `test` alone
@@ -1311,7 +1530,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: |
@@ -1322,7 +1541,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Setup Node (for the real Engine supervisor regression)
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -1369,7 +1588,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: |
@@ -1380,7 +1599,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -1430,7 +1649,7 @@ jobs:
           "${RUNNER_TEMP}/gitleaks" version
 
       - name: Set up Node for privacy guards
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -1495,14 +1714,14 @@ jobs:
     # budget: `report-ci-walltime-attribution.mjs` drops any job with no end time, so an
     # attribution taken while the ~6.5-minute suite still runs would omit it entirely and
     # `report-ci-walltime-budget.mjs` would warn `missing-required-lane` on every run.
-    needs: [public-claims, license-and-notices, build, unit-tests, windows-native-tests, shell-rust-tests, integration-tests, secret-scan, jseval-suite]
+    needs: [public-claims, license-and-notices, build, unit-tests, app-ui, windows-native-tests, shell-rust-tests, integration-tests, lifecycle-integration-tests, secret-scan, jseval-suite]
     if: always()
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -1511,14 +1730,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p build/ci
-          gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/jobs" --paginate > build/ci/run-jobs.json
+          gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=latest&per_page=100" --paginate > build/ci/run-jobs.json
 
       # Same-run cross-job download (needs no extra permission; the unit lanes are
       # in `needs`). Lets the attribution split each unit lane's opaque test step
       # into test CPU vs framework overhead. continue-on-error so a cancelled lane
       # (no artifact) degrades to "no breakdown" instead of failing this advisory job.
       - name: Download unit-test attributions (for the test-vs-overhead split)
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         continue-on-error: true
         with:
           pattern: unit-test-attribution-*

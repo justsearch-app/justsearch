@@ -153,7 +153,7 @@ jobs:
           key: tauri-bundler-${{ runner.os }}-v2
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
@@ -162,13 +162,17 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: |
             modules/shell/package-lock.json
             modules/ui-web/package-lock.json
+
+      # This bootstrap path also runs from prepare-worktree before root npm ci exists.
+      - name: Check dependency-free tool invocation before npm install
+        run: node scripts/lib/tool-invoker.test.mjs
 
       - name: Validate release changelog before building
         if: startsWith(github.ref, 'refs/tags/v')
@@ -604,7 +608,7 @@ jobs:
       # imports ajv/ajv-formats from the ROOT package.json, so this job needs a root `npm ci`
       # even though it never touches modules/ui-web or modules/shell directly.
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -614,7 +618,7 @@ jobs:
         run: npm ci --audit=false
 
       - name: Download installer artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: windows-installer
           path: dist/installer

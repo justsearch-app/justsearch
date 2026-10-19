@@ -57,7 +57,10 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
           "EMBEDDING_GENERATION_FAILED",
           "EMBEDDING_EXCEPTION",
           "SKIPPED_SHORT_QUERY",
-          "SKIPPED_NO_DISCRIMINATIVE_TERM");
+          "SKIPPED_NO_DISCRIMINATIVE_TERM",
+          // Spec D §6.2 (ADR-0050 decision 1): a query encoder leg missed the search's semantic
+          // sub-budget; the search answered with the legs it had.
+          "SEMANTIC_BUDGET_EXCEEDED");
 
   private static final Set<String> CHUNK_MERGE_REASON_CODES =
       Set.of(
@@ -90,7 +93,24 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
           "EMBEDDING_UNAVAILABLE",
           "EMBEDDING_EMPTY",
           "EMBEDDING_GENERATION_FAILED",
+          // Spec D §5.1: the RAG query embedding missed its semantic sub-budget; BM25 context.
+          "SEMANTIC_BUDGET_EXCEEDED",
           "CHUNK_VECTOR_COVERAGE_INCOMPLETE"));
+
+  /**
+   * Spec D test C1: the allowlists are the enum's vocabulary in both directions, so a producer code
+   * cannot reach the wire without a contract row, and no contract row is dead.
+   */
+  @Test
+  void allowlistsMatchTheReasonCodeEnum() {
+    Set<String> enumCodes =
+        java.util.Arrays.stream(SearchReasonCode.values())
+            .map(SearchReasonCode::wire)
+            .collect(java.util.stream.Collectors.toSet());
+    Set<String> allowlisted =
+        union(union(EMBEDDING_COMPAT_REASON_CODES, SEARCH_REASON_CODES), CHUNK_MERGE_REASON_CODES);
+    assertEquals(allowlisted, enumCodes);
+  }
 
   @Test
   void searchResponsesOnlyEmitAllowlistedReasonCodes() throws Exception {
@@ -220,6 +240,41 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
     }
   }
 
+  /**
+   * Spec D §5.1: a RAG retrieval whose query embedding misses its semantic sub-budget (here the
+   * models are still loading) reports SEMANTIC_BUDGET_EXCEEDED, and that code is in the RAG
+   * allowlist.
+   */
+  @Test
+  void retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason() throws Exception {
+    String prevConfig = System.getProperty("justsearch.config");
+    String prevMode = System.getProperty("rag.retrieve.mode");
+    var loading = new java.util.concurrent.CountDownLatch(1);
+    try (RunningRuntime lifecycle = newLifecycleWithChunk("doc-1", "Hello world", "Hello chunk")) {
+      System.setProperty("rag.retrieve.mode", "auto");
+      refreshResolvedConfig(lifecycle);
+      var service = new WorkerSearchService(lifecycle, io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.starting());
+      service.setModelReadyLatchSupplier(() -> loading);
+      var request =
+          RetrieveContextRequest.newBuilder()
+              .setQuestion("Hello")
+              .addDocIds("doc-1")
+              .setTopK(5)
+              .build();
+      CallContext call =
+          WorkerSearchServiceSemanticBudgetTest.foreground(java.time.Duration.ofSeconds(3));
+      RetrieveContextResponse response =
+          assertTimeoutPreemptively(
+              java.time.Duration.ofSeconds(5), () -> service.retrieveContext(request, call));
+      assertEquals("SEMANTIC_BUDGET_EXCEEDED", response.getRetrievalModeReason());
+      assertTrue(RAG_RETRIEVAL_MODE_REASONS.contains(response.getRetrievalModeReason()));
+    } finally {
+      loading.countDown();
+      restoreProperty("justsearch.config", prevConfig);
+      restoreProperty("rag.retrieve.mode", prevMode);
+    }
+  }
+
   @Test
   void retrieveContextChunkSearchReasonsAreStable() throws Exception {
     String prevConfig = System.getProperty("justsearch.config");
@@ -263,7 +318,7 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
       {
         System.setProperty("rag.retrieve.mode", "auto");
         refreshResolvedConfig(lifecycle);
-        EmbeddingService embeddingService = new EmbeddingService(Path.of("does-not-exist.gguf"), EmbeddingConfig.DISABLED);
+        var embeddingService = io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.starting();
         var service = new WorkerSearchService(lifecycle, embeddingService);
         RetrieveContextResponse response =
             invokeRetrieveContext(
@@ -275,7 +330,6 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
                     .build());
         assertEquals("EMBEDDING_UNAVAILABLE", response.getRetrievalModeReason());
         assertTrue(RAG_RETRIEVAL_MODE_REASONS.contains(response.getRetrievalModeReason()));
-        embeddingService.close();
       }
 
       // EMBEDDING_EMPTY (embedding service "available" but embed yields empty)

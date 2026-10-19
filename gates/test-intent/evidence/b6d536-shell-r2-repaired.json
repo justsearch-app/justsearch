@@ -1,0 +1,361 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-07T11:42:52.416Z",
+  "revision": "19c16294db0e008edc6305319d359609f278d003",
+  "tree": "072dd064460c54422d98ed869d2b4b2ec915e22f",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::try_reap_called_only_by_poll_exit\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 981
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::quit_during_cooldown_spawns_nothing\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 652
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::quit_during_starting_is_recorded\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 648
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::suspend_aware_clock_excludes_sleep_and_preserves_resume_grace\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 632
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::hold_returns_at_once_and_engine_stays_supervised\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 924
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 884
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::exit_while_held_is_unexpected_and_not_restarted\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 865
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::quit_while_held_wins_and_refuses_upgrade\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 887
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::release_after_failed_prepare_resumes_the_same_actor\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 966
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::exhaustion_cleans_registered_children\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1090
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::try_reap_called_only_by_poll_exit",
+      "file": "modules/shell/src-tauri/src/supervisor.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e7d825aba5fe570e80baf206c2797afce241970c1d08a23d22d5b3c1477e2f57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "supervisor::tests::try_reap_called_only_by_poll_exit",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::quit_during_cooldown_spawns_nothing",
+      "file": "modules/shell/src-tauri/src/supervisor.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e7d825aba5fe570e80baf206c2797afce241970c1d08a23d22d5b3c1477e2f57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "supervisor::tests::quit_during_cooldown_spawns_nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::quit_during_starting_is_recorded",
+      "file": "modules/shell/src-tauri/src/supervisor.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e7d825aba5fe570e80baf206c2797afce241970c1d08a23d22d5b3c1477e2f57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "supervisor::tests::quit_during_starting_is_recorded",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::suspend_aware_clock_excludes_sleep_and_preserves_resume_grace",
+      "file": "modules/shell/src-tauri/src/supervisor.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e7d825aba5fe570e80baf206c2797afce241970c1d08a23d22d5b3c1477e2f57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "supervisor::tests::suspend_aware_clock_excludes_sleep_and_preserves_resume_grace",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::hold_returns_at_once_and_engine_stays_supervised",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:8ffaa2992ccf50f4ba0997b48ca0643ecb98bd5d80a463beaecf62ba3c2b64e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::hold_returns_at_once_and_engine_stays_supervised",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:8ffaa2992ccf50f4ba0997b48ca0643ecb98bd5d80a463beaecf62ba3c2b64e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::exit_while_held_is_unexpected_and_not_restarted",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:8ffaa2992ccf50f4ba0997b48ca0643ecb98bd5d80a463beaecf62ba3c2b64e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::exit_while_held_is_unexpected_and_not_restarted",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::quit_while_held_wins_and_refuses_upgrade",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:8ffaa2992ccf50f4ba0997b48ca0643ecb98bd5d80a463beaecf62ba3c2b64e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::quit_while_held_wins_and_refuses_upgrade",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::release_after_failed_prepare_resumes_the_same_actor",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:8ffaa2992ccf50f4ba0997b48ca0643ecb98bd5d80a463beaecf62ba3c2b64e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::release_after_failed_prepare_resumes_the_same_actor",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#tests::exhaustion_cleans_registered_children",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:65a2b22a7efe47082d8a67d617ca1d916fa3c886c14ca6b59dd43273953638cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tests::exhaustion_cleans_registered_children",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "547b96083",
+    "revision": "547b960835e03b0437052dc744c70c08b3c3ef19",
+    "overlays": [
+      "modules/shell/src-tauri/resources/headless/.placeholder"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/b6d536-shell-r2-before.patch",
+        "contentDigest": "sha256:21b7ace08286a5c354b15b70fd1764d036b95e6a505bd63d27bb93368ddd7c70"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::try_reap_called_only_by_poll_exit\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5999
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::quit_during_cooldown_spawns_nothing\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 3833
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::quit_during_starting_is_recorded\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 3488
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::suspend_aware_clock_excludes_sleep_and_preserves_resume_grace\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 3518
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::hold_returns_at_once_and_engine_stays_supervised\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 3706
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 3376
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::exit_while_held_is_unexpected_and_not_restarted\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 3202
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::quit_while_held_wins_and_refuses_upgrade\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 4204
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::release_after_failed_prepare_resumes_the_same_actor\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5336
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::exhaustion_cleans_registered_children\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 6095
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::try_reap_called_only_by_poll_exit",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::quit_during_cooldown_spawns_nothing",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::quit_during_starting_is_recorded",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::suspend_aware_clock_excludes_sleep_and_preserves_resume_grace",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::hold_returns_at_once_and_engine_stays_supervised",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::exit_while_held_is_unexpected_and_not_restarted",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::quit_while_held_wins_and_refuses_upgrade",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::release_after_failed_prepare_resumes_the_same_actor",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#tests::exhaustion_cleans_registered_children",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      }
+    ]
+  },
+  "digest": "sha256:ab23a94e4afd8aff9d53e3e7173927ab47a6a37775bbe12b0e8ec079a7c04941"
+}

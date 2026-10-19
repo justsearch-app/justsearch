@@ -1,6 +1,6 @@
 # JustSearch
 
-**A private retrieval backend for your AI agents — and a neural search engine with a cited, on-device AI assistant for your own files. Hybrid search (BM25 + dense vectors + learned-sparse + reranking) plus grounded Q&A, summarization, and extraction over your documents — 100% on your machine. Windows-only for now.**
+**A private retrieval backend for your AI agents — and a neural search engine with a cited, on-device AI assistant for your own files. Hybrid search (BM25 + dense vectors + learned-sparse + reranking) plus grounded Q&A, summarization, and extraction over your documents — 100% on your machine. Windows installer; on Linux, runs from source.**
 
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -59,7 +59,7 @@ build-from-source alternative): [`docs/how-to/verify-your-download.md`](docs/how
 
 | | |
 |---|---|
-| **OS** | **Windows 10 or 11, 64-bit (x64) only** — macOS/Linux are not in the current scope ([NON-GOALS](NON-GOALS.md)). Verified on Windows 11; Windows 10 x64 is the expected WebView2 baseline but is not yet explicitly tested. WebView2, the VC++ runtime, and a Java runtime are bundled by the installer; there is nothing to install first. |
+| **OS** | **Windows 10 or 11, 64-bit (x64) only** for the installer. On Linux, JustSearch runs from source ([Quickstart](#quickstart-build-from-source)); there is no Linux installer. macOS is not in the current scope ([NON-GOALS](NON-GOALS.md)). Verified on Windows 11; Windows 10 x64 is the expected WebView2 baseline but is not yet explicitly tested. WebView2, the VC++ runtime, and a Java runtime are bundled by the installer; there is nothing to install first. |
 | **Disk** | 261 MB installer + ~0.7 GB installed + **~9 GB one-time model download** + the search index (grows with your corpus). Plan for **≥ 15 GB free**. |
 | **RAM** | **16 GB recommended.** 8 GB is a conservative floor for keyword/semantic search only (not a benchmarked minimum; chat needs the GPU below regardless of RAM). The on-device chat model (~5.9 GB file) is loaded into memory when answering. |
 | **GPU** | **Required for chat.** Search and semantic ranking run on CPU — no GPU needed for those. Chat requires an NVIDIA GPU with **≥ 8 GB VRAM** (the app needs ~7.5 GB free VRAM to run the chat model). Without a supported NVIDIA GPU, or below that VRAM floor, no install path offers the chat model — chat does **not** fall back to CPU, so the app is search-only. |
@@ -91,9 +91,9 @@ All three need an app build that serves `POST /mcp`, which the v0.1.0 installer 
 client lists no tools, POST a `tools/list` JSON-RPC request at the URL above before debugging the client; a 404
 means that build has no MCP endpoint, so use a newer release or a from-source build.
 
-Six tools: `justsearch_answer` (RAG, primary), `justsearch_search`, `justsearch_browse`, `justsearch_ingest`,
-`justsearch_status`, `justsearch_runtime_manifest`. The server binds to loopback and never uploads anything
-itself, but the passages it returns go to whichever client you connected — a cloud-hosted agent will forward
+Seven tools: `justsearch_answer` (RAG, primary), `justsearch_search`, `justsearch_browse`, `justsearch_ingest`,
+`justsearch_status`, `justsearch_runtime_manifest`, `justsearch_operation_outcome`. The server binds to
+loopback and never uploads anything itself, but the passages it returns go to whichever client you connected — a cloud-hosted agent will forward
 them to its model provider like any other tool result.
 
 Does wiring an agent to these tools measurably improve its answers? We benchmark that under a fail-closed
@@ -157,7 +157,8 @@ then `python -m jseval relevance-gate --dataset beir/scifact`. Slugs: `beir/scif
 `mixed/legal-clerc-200`, `mixed/miracl-de-2k`, `mixed/miracl-fr-2k`.
 Full methodology, comparison-class caveats, and reproduction:
 [`docs/reference/benchmarks/methodology.md`](docs/reference/benchmarks/methodology.md). The table above is
-projected from `scripts/jseval/release.v1.json` (the canonical 2026-08-14 release), not hand-transcribed.
+hand-written from `scripts/jseval/release.v1.json` (the canonical 2026-08-14 release); CI checks every
+number it shows against that file (`scripts/ci/check-readme-benchmark-numbers.mjs`).
 For the broader research angle — open questions, what's deferred, and how to get involved — see
 [`RESEARCH.md`](RESEARCH.md).
 
@@ -176,19 +177,28 @@ Accepted publication `agent-utility-hero-2026-07-28` (record `c5a75457b264`, pol
 
 ## Quickstart (build from source)
 
-> Prereqs to **build + test**: **JDK 25** (the Gradle toolchain auto-resolves it) and **Node.js** (for the
-> `modules/ui-web` frontend) — nothing else. Building/contributing needs **no GPU, no Rust toolchain, and no model
-> download**; the ~9 GB models below are runtime-only (fetched on first *run* of the app).
+> Prereqs to **build + test**: **JDK 25** (the Gradle toolchain auto-resolves it) and **Node.js 24** (for the
+> `modules/ui-web` frontend). Building/contributing needs **no GPU, no Rust toolchain, and no model
+> download**; the ~9 GB models below are runtime-only (the installed app downloads them with your consent).
 
 ```bash
 git clone https://github.com/justsearch-app/justsearch && cd justsearch
-./gradlew.bat build              # build (Windows; use ./gradlew on *nix once cross-platform)
+./gradlew build                  # Linux, or Windows Git Bash
 ```
 
+On Linux, install JDK 25, Node 24, a C compiler (`cc`) and Tesseract. GPU development also
+needs an NVIDIA driver, a CUDA-enabled llama-server built from the project's pinned llama.cpp
+version (`b8571`), and the ORT CUDA 12 libraries. Export the regular executable as
+`JUSTSEARCH_SERVER_EXE`; make it executable and put its required shared libraries on the loader's
+search path. Keep ORT's CUDA 12 dependencies available even if llama-server uses another CUDA
+version.
+
 To **run** the full desktop app, the easy path is the [installer](#install-windows) above; running the
-Engine stack from source is a developer workflow — see [`CONTRIBUTING.md`](CONTRIBUTING.md). First run
-downloads the models once (**~9 GB** — the ~5.9 GB local chat model dominates; fetched from GitHub Releases +
-HuggingFace), then runs fully offline.
+Engine stack from source is a developer workflow — see [`CONTRIBUTING.md`](CONTRIBUTING.md). The installed
+app downloads the models once on first launch, with your consent (**~9 GB** — the ~5.9 GB local chat model
+dominates; fetched from GitHub Releases + HuggingFace), then runs fully offline. Running from source does
+not download them: keyword search works without models, and `node scripts/dev/doctor.mjs` names the step
+to the next tier.
 
 ## Architecture
 
@@ -214,7 +224,7 @@ JustSearch itself sends nothing off your machine, and you can check:
 
 ## Status
 
-**Alpha** (`0.3.0`), **Windows-only** (macOS/Linux are not in the current scope). The installer is
+**Alpha** (`0.3.0`), **Windows installer only** (Linux runs from source; macOS is not in the current scope). The installer is
 **code-signed** (publisher: Elias Justus) as of v0.2.0; SmartScreen reputation for the new certificate
 accrues with downloads, so an early reputation prompt is possible and names the verified publisher. In active
 development since 2025; published 2026. Built in the open with heavy AI-agent assistance — the development

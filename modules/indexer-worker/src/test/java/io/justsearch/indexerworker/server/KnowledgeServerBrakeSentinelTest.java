@@ -26,11 +26,14 @@ final class KnowledgeServerBrakeSentinelTest {
     IndexGenerationManager mgr = new IndexGenerationManager(tempDir.resolve("index"));
     mgr.initializeOrLoad();
 
+    // Task t-20261013-ef3c41, round 3 (delegated decision): an unattributable boot no longer
+    // reports attempt 1 and rebuilds unasked; with no brake it can consult, it is held. What this
+    // test pins is unchanged: it never charges any budget.
     for (int i = 0; i < IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS + 5; i++) {
-      assertEquals(
-          1,
-          KnowledgeServer.recordAutoRebuildAttemptOrSkip(mgr, null),
-          "an unattributable boot always reports attempt 1, so it can never exhaust the budget");
+      org.junit.jupiter.api.Assertions.assertThrows(
+          IndexGenerationManager.AutoRebuildBrakeUnreadableException.class,
+          () -> KnowledgeServer.recordAutoRebuildAttemptOrSkip(mgr, null),
+          "an unattributable boot is held rather than charged");
     }
     assertEquals(
         0,

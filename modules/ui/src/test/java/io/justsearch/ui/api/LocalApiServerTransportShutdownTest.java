@@ -42,7 +42,8 @@ class LocalApiServerTransportShutdownTest {
       assertTrue(executor.isShutdown(), "stop must survive executor closure");
       try {
         long started = System.nanoTime();
-        LocalApiServer.stopHttpTransport(transport);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+            () -> LocalApiServer.stopHttpTransport(transport));
         assertEquals(0L, entered.getCount());
         assertEquals(1L, release.getCount(), "teardown must still be wedged when caller returns");
         assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
@@ -98,8 +99,9 @@ class LocalApiServerTransportShutdownTest {
         var closed = new ArrayList<String>();
         var sequence = new EngineShutdownSequence(data, List.of(
             new EngineShutdownSequence.Step("local-api", reason -> {
-              LocalApiServer.stopHttpTransport(transport);
-              closed.add("http"); return null;
+              try { LocalApiServer.stopHttpTransport(transport); }
+              finally { closed.add("http"); }
+              return null;
             }),
             new EngineShutdownSequence.Step("head-assembly", reason -> {
               closed.add("head"); return null;
@@ -112,6 +114,8 @@ class LocalApiServerTransportShutdownTest {
         assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
             < EngineSupervisionPolicy.GRACEFUL_STOP_DEADLINE_MS);
         assertEquals(List.of("http", "head", "index", "exit"), closed);
+        org.junit.jupiter.api.Assertions.assertFalse(sequence.resultIfRun().clean(),
+            "a genuine drain timeout remains a shutdown failure");
         assertEquals(1L, release.getCount(), "handler must still be wedged at ordered completion");
       } finally {
         release.countDown();

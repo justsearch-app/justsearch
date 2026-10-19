@@ -1,0 +1,105 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T07:09:46.343Z",
+  "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
+  "tree": "fe778744b7c2f2213541b9e3edb411d21c70538b",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.StopDetailVocabularyTest.ownerStopDetailsRoundTrip\" --tests \"io.justsearch.app.api.runtime.child.StopDetailVocabularyTest.unknownTokenReadsUnknownWithRaw\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerFixtureTest.fixturesConformAndRead\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2294
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/StopDetailVocabularyTest.java#ownerStopDetailsRoundTrip",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/StopDetailVocabularyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:80c2ccffa6931f24563d2d09620098b7ec68a27c2ad5753060137a5a12ca33ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ownerStopDetailsRoundTrip()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/StopDetailVocabularyTest.java#unknownTokenReadsUnknownWithRaw",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/StopDetailVocabularyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:80c2ccffa6931f24563d2d09620098b7ec68a27c2ad5753060137a5a12ca33ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unknownTokenReadsUnknownWithRaw()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerFixtureTest.java#fixturesConformAndRead",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerFixtureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:26d8092eeed1060523c516183fa33ef839adff663a073e2c2a37a3763b4bf0d4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fixturesConformAndRead()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f75486245",
+    "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.StopDetailVocabularyTest.ownerStopDetailsRoundTrip\" --tests \"io.justsearch.app.api.runtime.child.StopDetailVocabularyTest.unknownTokenReadsUnknownWithRaw\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerFixtureTest.fixturesConformAndRead\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 14192
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/StopDetailVocabularyTest.java#ownerStopDetailsRoundTrip",
+        "classification": "assertion",
+        "detail": "ownerStopDetailsRoundTrip(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: session_end is a stop detail ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/StopDetailVocabularyTest.java#unknownTokenReadsUnknownWithRaw",
+        "classification": "assertion",
+        "detail": "unknownTokenReadsUnknownWithRaw(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: readers have a tolerant parse ==> Unexpected exception thrown: java.lang.NoSuchMethodException: io.justsearch.app.api.runtime.child.StopDetail.fromWireOrUnknown(java.lang.String)"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerFixtureTest.java#fixturesConformAndRead",
+        "classification": "assertion",
+        "detail": "fixturesConformAndRead(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a fixture line carries session_end ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:245b69cb056bbf9c8232831a485117285087fdf063454fa0fcda69c96483de56"
+}

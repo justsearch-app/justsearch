@@ -1,0 +1,238 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T15:47:37.140Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "8333570be1456f97e0ca3d660979584bdb31c5c4",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.queuedSpladeOnlyWithBoundEncoderReturnsKeywordsAndContendedReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.queuedSpladeOnlyWithStartingEncoderReturnsKeywordsWithoutWaiting\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.queuedDeprecatedSpladeModeReturnsKeywordsAndContendedReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.absentSpladeOnlyReturnsKeywordsWithItsExistingNoServiceReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.queuedPermanentlyAbsentSpladeRetainsNoServiceReasonWithoutFalseBudgetCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.unavailableSpladeEncoderReturnsKeywordsWithItsExistingGenerationFailure\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14250
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.mcp.SpladeOnlyBoundaryFallbackTest.bareHttpSpladeModeReturnsKeywordHitsWithBudgetAndContention\" --tests \"io.justsearch.ui.api.mcp.SpladeOnlyBoundaryFallbackTest.bareMcpSpladeModeReturnsKeywordHitsAndDegradationNote\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 24422
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#queuedSpladeOnlyWithBoundEncoderReturnsKeywordsAndContendedReason",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09afcab3b6fc6a8f3f6651463d7e966fa8f42bd117a8d6032dbda7f1a1cb7fca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedSpladeOnlyWithBoundEncoderReturnsKeywordsAndContendedReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#queuedSpladeOnlyWithStartingEncoderReturnsKeywordsWithoutWaiting",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09afcab3b6fc6a8f3f6651463d7e966fa8f42bd117a8d6032dbda7f1a1cb7fca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedSpladeOnlyWithStartingEncoderReturnsKeywordsWithoutWaiting()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#queuedDeprecatedSpladeModeReturnsKeywordsAndContendedReason",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09afcab3b6fc6a8f3f6651463d7e966fa8f42bd117a8d6032dbda7f1a1cb7fca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedDeprecatedSpladeModeReturnsKeywordsAndContendedReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09afcab3b6fc6a8f3f6651463d7e966fa8f42bd117a8d6032dbda7f1a1cb7fca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#absentSpladeOnlyReturnsKeywordsWithItsExistingNoServiceReason",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09afcab3b6fc6a8f3f6651463d7e966fa8f42bd117a8d6032dbda7f1a1cb7fca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "absentSpladeOnlyReturnsKeywordsWithItsExistingNoServiceReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#queuedPermanentlyAbsentSpladeRetainsNoServiceReasonWithoutFalseBudgetCause",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09afcab3b6fc6a8f3f6651463d7e966fa8f42bd117a8d6032dbda7f1a1cb7fca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedPermanentlyAbsentSpladeRetainsNoServiceReasonWithoutFalseBudgetCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#unavailableSpladeEncoderReturnsKeywordsWithItsExistingGenerationFailure",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09afcab3b6fc6a8f3f6651463d7e966fa8f42bd117a8d6032dbda7f1a1cb7fca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unavailableSpladeEncoderReturnsKeywordsWithItsExistingGenerationFailure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/SpladeOnlyBoundaryFallbackTest.java#bareHttpSpladeModeReturnsKeywordHitsWithBudgetAndContention",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/SpladeOnlyBoundaryFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e3973f7f18d0e7fb17dc1a0a005ff6a910cda77389a29e9a4fb2deb8e2640e41",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bareHttpSpladeModeReturnsKeywordHitsWithBudgetAndContention()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/SpladeOnlyBoundaryFallbackTest.java#bareMcpSpladeModeReturnsKeywordHitsAndDegradationNote",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/SpladeOnlyBoundaryFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e3973f7f18d0e7fb17dc1a0a005ff6a910cda77389a29e9a4fb2deb8e2640e41",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bareMcpSpladeModeReturnsKeywordHitsAndDegradationNote()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "9fde46683",
+    "revision": "9fde4668381dedc0adda8c2b5858d196f74d1e8c",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.queuedSpladeOnlyWithBoundEncoderReturnsKeywordsAndContendedReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.queuedSpladeOnlyWithStartingEncoderReturnsKeywordsWithoutWaiting\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.queuedDeprecatedSpladeModeReturnsKeywordsAndContendedReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.absentSpladeOnlyReturnsKeywordsWithItsExistingNoServiceReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.queuedPermanentlyAbsentSpladeRetainsNoServiceReasonWithoutFalseBudgetCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.unavailableSpladeEncoderReturnsKeywordsWithItsExistingGenerationFailure\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 87809
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.mcp.SpladeOnlyBoundaryFallbackTest.bareHttpSpladeModeReturnsKeywordHitsWithBudgetAndContention\" --tests \"io.justsearch.ui.api.mcp.SpladeOnlyBoundaryFallbackTest.bareMcpSpladeModeReturnsKeywordHitsAndDegradationNote\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 82156
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#queuedSpladeOnlyWithBoundEncoderReturnsKeywordsAndContendedReason",
+        "classification": "assertion",
+        "detail": "queuedSpladeOnlyWithBoundEncoderReturnsKeywordsAndContendedReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: skip reason was lost ==> expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#queuedSpladeOnlyWithStartingEncoderReturnsKeywordsWithoutWaiting",
+        "classification": "assertion",
+        "detail": "queuedSpladeOnlyWithStartingEncoderReturnsKeywordsWithoutWaiting(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: skip reason was lost ==> expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#queuedDeprecatedSpladeModeReturnsKeywordsAndContendedReason",
+        "classification": "assertion",
+        "detail": "queuedDeprecatedSpladeModeReturnsKeywordsAndContendedReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: skip reason was lost ==> expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason",
+        "classification": "assertion",
+        "detail": "timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: skip reason was lost ==> expected: <SEMANTIC_BUDGET_EXCEEDED> but was: <>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#absentSpladeOnlyReturnsKeywordsWithItsExistingNoServiceReason",
+        "classification": "assertion",
+        "detail": "absentSpladeOnlyReturnsKeywordsWithItsExistingNoServiceReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: skip reason was lost ==> expected: <NO_EMBEDDING_SERVICE> but was: <>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#queuedPermanentlyAbsentSpladeRetainsNoServiceReasonWithoutFalseBudgetCause",
+        "classification": "assertion",
+        "detail": "queuedPermanentlyAbsentSpladeRetainsNoServiceReasonWithoutFalseBudgetCause(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: skip reason was lost ==> expected: <NO_EMBEDDING_SERVICE> but was: <>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#unavailableSpladeEncoderReturnsKeywordsWithItsExistingGenerationFailure",
+        "classification": "assertion",
+        "detail": "unavailableSpladeEncoderReturnsKeywordsWithItsExistingGenerationFailure(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: skip reason was lost ==> expected: <EMBEDDING_GENERATION_FAILED> but was: <>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/SpladeOnlyBoundaryFallbackTest.java#bareHttpSpladeModeReturnsKeywordHitsWithBudgetAndContention",
+        "classification": "assertion",
+        "detail": "bareHttpSpladeModeReturnsKeywordHitsWithBudgetAndContention(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: {\"interactionId\":\"c1209330-ee84-4870-8034-5cdbd85a929a\",\"searchTrace\":{\"version\":1,\"effectiveMode\":\"TEXT\",\"decisionKind\":\"empty_query\",\"qpp\":{\"maxIdf\":0.0,\"avgIctf\":0.4054651,\"queryScope\":1.0},\"degradation\":{\"vectorBlocked\":false,\"hybridFallback\":false,\"spladeExe"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/SpladeOnlyBoundaryFallbackTest.java#bareMcpSpladeModeReturnsKeywordHitsAndDegradationNote",
+        "classification": "assertion",
+        "detail": "bareMcpSpladeModeReturnsKeywordHitsAndDegradationNote(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Found 0 results (took 631ms).&#10;Hints:&#10;- No results found. Try broader terms, or use justsearch_status to check what's indexed.&#10;- Enrichment in progress — semantic search and entity filters may be limited. Check justsearch_status.&#10; ==> expected: <tr"
+      }
+    ]
+  },
+  "digest": "sha256:7bc6909eee4d5b357afdad5a1822422849444c7b05e06176daffcde066c134b6"
+}

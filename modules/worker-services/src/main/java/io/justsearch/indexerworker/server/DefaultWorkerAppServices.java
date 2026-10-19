@@ -56,6 +56,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   private static final Logger log = LoggerFactory.getLogger(DefaultWorkerAppServices.class);
 
   private final IndexingLoop indexingLoop;
+  // The force-reindex marks this service set's loop consumes. A read-only (deferred) set has no
+  // loop; its writer upgrade inherits this set, so a force admitted before the upgrade survives it.
+  private final java.util.Set<String> forcedPaths;
   /** Runtime already owned by {@link #indexingLoop}; null for a deferred/read-only bundle. */
   private final RunningRuntime producerRuntime;
   /**
@@ -72,6 +75,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   /** Shared by A and its prepared B; final cutover drains admitted mutation effects. */
   private final WorkerMutationAdmission mutationAdmission;
   private final Object mutationOwnerToken;
+  private final io.justsearch.indexerworker.queue.JobQueue producerQueue;
+  private final Path producerIndexBasePath;
+  private final Path producerActiveIndexPath;
   private final WorkerHealthService healthService;
   private final ResolvedConfig resolvedConfig;
   private final ExtractionConfiguration extractionConfiguration;
@@ -415,7 +421,27 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       WorkerServiceConfiguration configuration,
       WorkerServiceConfiguration candidateConfiguration) {
     this(executors, ctx, migrationActiveSupplier, embeddingTelemetryEvents, indexingPacing,
-        childRegistry, configuration, candidateConfiguration, null);
+        unrecorded(childRegistry), configuration, candidateConfiguration, null);
+  }
+
+  /** The Engine's composition: extraction children start and stop through its control. */
+  public DefaultWorkerAppServices(
+      WorkerExecutorRegistrations executors,
+      InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
+      WorkerServiceConfiguration configuration,
+      WorkerServiceConfiguration candidateConfiguration) {
+    this(executors, ctx, migrationActiveSupplier, embeddingTelemetryEvents, indexingPacing,
+        childControl, configuration, candidateConfiguration, null);
+  }
+
+  private static io.justsearch.app.api.runtime.child.ChildControl unrecorded(
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    return io.justsearch.app.api.runtime.child.DefaultChildControl.unrecorded(
+        java.util.Objects.requireNonNull(childRegistry, "childRegistry"));
   }
 
   /** Constructs a fresh Green loop while retaining the incumbent's physical watcher. */
@@ -429,12 +455,28 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       WorkerServiceConfiguration configuration,
       WorkerServiceConfiguration candidateConfiguration,
       DefaultWorkerAppServices nativeSource) {
+    return prepareNativeGreen(executors, ctx, migrationActiveSupplier, embeddingTelemetryEvents,
+        indexingPacing, unrecorded(childRegistry), configuration, candidateConfiguration,
+        nativeSource);
+  }
+
+  /** {@link #prepareNativeGreen} with the Engine's child control. */
+  public static DefaultWorkerAppServices prepareNativeGreen(
+      WorkerExecutorRegistrations executors,
+      InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
+      WorkerServiceConfiguration configuration,
+      WorkerServiceConfiguration candidateConfiguration,
+      DefaultWorkerAppServices nativeSource) {
     java.util.Objects.requireNonNull(nativeSource, "nativeSource");
     if (!nativeSource.producerOwnership.ownsProducer() || nativeSource.producerRuntime == null) {
       throw new IllegalStateException("Native source does not own a running producer");
     }
     return new DefaultWorkerAppServices(executors, ctx, migrationActiveSupplier,
-        embeddingTelemetryEvents, indexingPacing, childRegistry, configuration,
+        embeddingTelemetryEvents, indexingPacing, childControl, configuration,
         candidateConfiguration, nativeSource);
   }
 
@@ -448,13 +490,28 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       WorkerServiceConfiguration configuration,
       DefaultWorkerAppServices deferredSource) {
+    return prepareDeferredWriterUpgrade(executors, ctx, migrationActiveSupplier,
+        embeddingTelemetryEvents, indexingPacing, unrecorded(childRegistry), configuration,
+        deferredSource);
+  }
+
+  /** {@link #prepareDeferredWriterUpgrade} with the Engine's child control. */
+  public static DefaultWorkerAppServices prepareDeferredWriterUpgrade(
+      WorkerExecutorRegistrations executors,
+      InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
+      WorkerServiceConfiguration configuration,
+      DefaultWorkerAppServices deferredSource) {
     java.util.Objects.requireNonNull(deferredSource, "deferredSource");
     if (deferredSource.producerRuntime != null || deferredSource.indexingLoop != null
         || !deferredSource.producerOwnership.ownsWatcher()) {
       throw new IllegalStateException("Deferred source does not own a watcher-only producer");
     }
     return new DefaultWorkerAppServices(executors, ctx, migrationActiveSupplier,
-        embeddingTelemetryEvents, indexingPacing, childRegistry, configuration, null,
+        embeddingTelemetryEvents, indexingPacing, childControl, configuration, null,
         deferredSource);
   }
 
@@ -464,12 +521,15 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       java.util.function.BooleanSupplier migrationActiveSupplier,
       io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
       IndexingPacing indexingPacing,
-      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
       WorkerServiceConfiguration configuration,
       WorkerServiceConfiguration candidateConfiguration,
       DefaultWorkerAppServices nativeSource) {
     java.util.Objects.requireNonNull(executors, "executors");
-    java.util.Objects.requireNonNull(childRegistry, "childRegistry");
+    java.util.Objects.requireNonNull(childControl, "childControl");
+    this.producerQueue = ctx.jobQueue();
+    this.producerIndexBasePath = ctx.indexBasePath();
+    this.producerActiveIndexPath = ctx.activeIndexPath();
     this.resolvedConfig = configuration.snapshot();
     this.candidateConfiguration = candidateConfiguration;
     this.extractionConfiguration = configuration.extraction();
@@ -514,6 +574,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         ? encoderBindings : new EncoderBindings();
     // Even a deferred bundle owns its watcher; ordinary close semantics remain unchanged.
     this.producerOwnership = new SharedProducerOwnership(true, nativeSource == null);
+    this.forcedPaths = nativeSource != null && nativeSource.indexingLoop == null
+        ? nativeSource.forcedPaths : java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     if (ingestRunning != null) {
       // Extraction owns an executor, a shutdown hook and (after first routed file) child-process
@@ -525,7 +587,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
               ctx,
               extractionCatalog,
               ocrCatalog,
-              childRegistry,
+              childControl,
               extractionConfiguration);
       // Tempdoc 516 P3 / Slice 5 (W7.2 followup): the 5 startup-config setters are now
       // IndexingLoopOptions record fields. Construct the options upfront so the loop is
@@ -537,7 +599,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
               ctx.documentIdentityStore(),                              // documentIdentityStore
               migrationActiveSupplier,                                  // 516 P3 final — pre-wired at ctor
               ingestRunning::latestCommitUserDataBestEffort,            // commitMetadataSupplier
-              embeddingTelemetryEvents);                                // 516 P3 final — pre-wired at ctor
+              embeddingTelemetryEvents,                                 // 516 P3 final — pre-wired at ctor
+              forcedPaths);                                             // inherited across a deferred upgrade
 
       try {
         this.indexingLoop =
@@ -607,6 +670,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     this.ingestService.setPathResolutionStore(ctx.pathResolutionStore());
     this.ingestService.setDocumentIdentityStore(ctx.documentIdentityStore());
     this.ingestService.setMutationAdmission(mutationAdmission, mutationOwnerToken);
+    this.ingestService.setForcedPathSink(forcedPaths::addAll);
 
     // Tempdoc 400 §22 Issue D / LR2-e.4 (Phase 6 / 6.7): wire the
     // active-generation supplier from the ingest service's
@@ -627,6 +691,10 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             null, // embeddingService — not wired post-construction (pre-existing)
             this::indexingLoopState,
             discoveredModels);
+    // Spec D §4.2: readiness reported once stays reported across a service-set swap.
+    if (nativeSource != null) {
+      healthService.shareQueryReadiness(nativeSource.healthService.queryReadiness());
+    }
 
     // 5. Cross-service wiring (previously in the gRPC wiring, deleted at item A9)
     this.chunkRerankerConfig = configuration.chunkReranker();
@@ -659,6 +727,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     });
     healthService.setModelActiveSupplier("citation-scorer",
         searchService::isCitationScorerActive);
+    // Spec D §4.2 item 3: embedding readiness waits until a query would not create a session.
+    healthService.setQueryEncodersWarm(searchService::queryEncodersWarm);
 
     // 7. Tempdoc 418 Phase B — Worker-side filesystem watcher. Constructed after JobQueue is
     // wired (via ctx) so events feed straight into the queue; injected into the ingest
@@ -694,6 +764,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       this.rootWatcherRegistry = nativeSource.rootWatcherRegistry;
     }
     this.ingestService.setRootWatcherRegistry(rootWatcherRegistry);
+    // Task t-20261013-ef3c41, round 4: the indexing loop's admission, freshness, re-hash and
+    // pre-write decisions and the watcher's DELETE confirmation all ask the service's one
+    // root-identity check, the same question the prune asks.
+    if (indexingLoop != null) indexingLoop.useRootCheck(ingestService.rootCheck());
+    this.workerWatcher.useRootCheck(ingestService.rootCheck());
     this.embeddingProviderTarget = new EmbeddingProviderTarget(this);
     if (nativeSource != null) copySourceQueryBindings(nativeSource);
   }
@@ -801,10 +876,18 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         : applied == null
             ? incumbent.citationScorerConfig : applied.citationScorer();
     this.indexingPacing = incumbent.indexingPacing;
+    this.producerQueue = greenContext.jobQueue();
+    this.producerIndexBasePath = greenContext.indexBasePath();
+    this.producerActiveIndexPath = greenContext.activeIndexPath();
     this.indexingLoop = incumbent.indexingLoop;
+    this.forcedPaths = incumbent.forcedPaths;
     this.producerRuntime = greenRuntime;
     this.borrowedFrom = incumbent;
-    this.mutationOwnerToken = new Object();
+    // Query-only recomposition retains the exact writer and generation. Its root walks and
+    // watcher callbacks must retain that producer's admission identity as well. A Green
+    // promotion still receives a distinct identity, installed by the final cutover fence.
+    this.mutationOwnerToken = queryChunkConfig != null
+        ? incumbent.mutationOwnerToken : new Object();
     this.mutationAdmission = incumbent.mutationAdmission;
     this.encoderBindings = incumbent.producerEncoderBindings;
     this.producerEncoderBindings = incumbent.producerEncoderBindings;
@@ -835,6 +918,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     ingestService.setDocumentIdentityStore(greenContext.documentIdentityStore());
     ingestService.setMutationAdmission(mutationAdmission, mutationOwnerToken);
     searchService.setActiveGenerationSupplier(ingestService.activeGenerationSupplier());
+    // Task t-20261013-ef3c41, round 4: the shared loop and watcher ask this service's root check.
+    if (indexingLoop != null) indexingLoop.useRootCheck(ingestService.rootCheck());
+    workerWatcher.useRootCheck(ingestService.rootCheck());
 
     this.healthService =
         new WorkerHealthService(
@@ -858,6 +944,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       return status != null && status.available();
     });
     healthService.setModelActiveSupplier("citation-scorer", searchService::isCitationScorerActive);
+    healthService.setQueryEncodersWarm(searchService::queryEncodersWarm);
+    healthService.shareQueryReadiness(incumbent.healthService.queryReadiness());
     ingestService.setRootWatcherRegistry(rootWatcherRegistry);
 
     var lifecycle = indexingLoop.getEmbeddingLifecycle();
@@ -946,20 +1034,18 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   }
 
   /**
-   * Blocks watcher callbacks across a deferred runtime's last fallible publication step.
+   * Blocks new admission across a deferred runtime's last fallible publication step. Existing
+   * queue-only scans finish on the unchanged durable queue without delaying the first writer.
    * Installation is assignment-only: an uninstalled lease leaves the incumbent as exact owner.
    */
   public WatcherHandoff prepareDeferredWatcherHandoffTo(DefaultWorkerAppServices successor) {
     java.util.Objects.requireNonNull(successor, "successor");
-    WorkerMutationAdmission.FinalFence fence;
+    WorkerMutationAdmission.DeferredQueueHandoff fence;
     try {
-      fence = mutationAdmission.beginFinalFence(mutationOwnerToken, 10_000L);
+      fence = mutationAdmission.beginDeferredQueueHandoff(mutationOwnerToken);
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
-      throw new IllegalStateException("Interrupted while draining deferred watcher callbacks", interrupted);
-    }
-    if (fence == null) {
-      throw new IllegalStateException("Timed out draining deferred watcher callbacks");
+      throw new IllegalStateException("Interrupted while preparing deferred watcher routing", interrupted);
     }
     boolean retained = false;
     try {
@@ -969,6 +1055,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
           || successor.rootWatcherRegistry != rootWatcherRegistry
           || successor.watcherCallbacks != watcherCallbacks
           || successor.mutationAdmission != mutationAdmission
+          || successor.producerQueue != producerQueue
+          || !java.util.Objects.equals(successor.producerIndexBasePath, producerIndexBasePath)
+          || !java.util.Objects.equals(successor.producerActiveIndexPath, producerActiveIndexPath)
           || successor.producerOwnership.ownsWatcher()) {
         throw new IllegalArgumentException("Successor is not this deferred watcher's writer upgrade");
       }
@@ -981,13 +1070,13 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   public final class WatcherHandoff implements AutoCloseable {
     private final DefaultWorkerAppServices successor;
-    private final WorkerMutationAdmission.FinalFence fence;
+    private final WorkerMutationAdmission.DeferredQueueHandoff fence;
     private final Thread ownerThread = Thread.currentThread();
     private boolean installed;
     private boolean closed;
 
     private WatcherHandoff(
-        DefaultWorkerAppServices successor, WorkerMutationAdmission.FinalFence fence) {
+        DefaultWorkerAppServices successor, WorkerMutationAdmission.DeferredQueueHandoff fence) {
       this.successor = successor;
       this.fence = fence;
     }
@@ -997,10 +1086,10 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       requireOwnerThread();
       if (closed) throw new IllegalStateException("Watcher handoff lease is already closed");
       if (installed) return;
-      fence.install(successor.mutationOwnerToken);
-      producerOwnership.transferWatcherTo(successor.producerOwnership);
-      watcherCallbacks.target = successor.preparedWatcherTarget;
-      fence.certifySuccessor();
+      fence.install(successor.mutationOwnerToken, () -> {
+        producerOwnership.transferWatcherTo(successor.producerOwnership);
+        watcherCallbacks.target = successor.preparedWatcherTarget;
+      });
       installed = true;
     }
 
@@ -1596,7 +1685,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       @SuppressWarnings("unused") InfraContext ctx,
       ExtractionMetricCatalog catalog,
       OcrMetricCatalog ocrCatalog,
-      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
       ExtractionConfiguration configuration) {
     OcrRoutingConfig ocrConfig = configuration.ocr();
     logEffectiveOcrConfig(ocrConfig);
@@ -1624,7 +1713,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         ExtractionSandboxFactory.probeChildCommand(
             executors.sandboxReaders(), command, extractionPolicy, ocrConfig,
             ExtractionSandboxFactory.PROBE_TIMEOUT,
-            childRegistry);
+            childControl);
     if (probeFailure.isPresent()) {
       log.warn(
           "Extraction sandbox child failed its startup probe ({}); process-routed extraction "
@@ -1648,7 +1737,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         ocrCatalog,
         command,
         poolSettings,
-        childRegistry);
+        childControl);
   }
 
   /**

@@ -222,7 +222,9 @@ public class IndexingLoop implements Closeable {
   // delivers — dropped enqueue, deleted file, cancelled scan — is retained for the process
   // lifetime. Tempdoc 821 §3-C3 made whole-root force-reindex scans a routine producer here
   // (previously only explicit submitBatch calls were), so the residue now scales with root size.
-  private final Set<String> forcedPaths = java.util.concurrent.ConcurrentHashMap.newKeySet();
+  // Supplied by IndexingLoopOptions: a loop created by a deferred writer upgrade receives the set
+  // its read-only predecessor marked into while no loop existed.
+  private final Set<String> forcedPaths;
 
   // Tempdoc 798: memoization for the pending-ingest probe (see PENDING_INGEST_PROBE_TTL_MS).
   private volatile long pendingIngestProbedAtMs = 0L;
@@ -365,6 +367,7 @@ public class IndexingLoop implements Closeable {
     this.documentIdentityStore = opts.documentIdentityStore();
     this.migrationActiveSupplier = opts.migrationActiveSupplier();
     this.commitMetadataSupplier = opts.commitMetadataSupplier();
+    this.forcedPaths = opts.forcedPaths();
     if (opts.detailedTracing()) {
       log.info("Indexing pipeline tracing: enabled");
     }
@@ -397,6 +400,17 @@ public class IndexingLoop implements Closeable {
     if (commitOps != null) {
       commitOps.setCommitCompletedListener(embeddingLifecycle::refreshStoredFingerprintAfterCommit);
     }
+    // Task t-20261013-ef3c41: lets an unreadable source be reported as "indexed, source
+    // unreadable". Read-only; never part of a deletion decision.
+    if (documentFieldOps != null) {
+      ingestionAuthority.useIndexedSourceProbe(
+          source ->
+              documentFieldOps.getDocumentField(
+                      io.justsearch.indexerworker.util.PathNormalizer.normalizePath(
+                          source.toAbsolutePath().toString()),
+                      SchemaFields.PATH)
+                  != null);
+    }
     // Tempdoc 516 Slice 4a.2 (W5.1): construct the stale resolver + writer. The indexedDelta
     // callback feeds the cross-seam indexedSinceCommit counter on the loop residue.
     this.staleResolver =
@@ -410,7 +424,6 @@ public class IndexingLoop implements Closeable {
     this.writer =
         new JobBatchWriter(
             indexingCoordinator,
-            documentFieldOps,
             signalBus,
             embeddingLifecycle,
             this.encoderBindings::spladeEncoder,
@@ -964,8 +977,10 @@ public class IndexingLoop implements Closeable {
     // inline > 7 docs/sec RMW backfill). precomputedEmbedding in buildDocument() takes priority
     // over allowEmbeddingWrites, so batch-computed vectors are written regardless.
     EmbeddingProvider provider = embeddingLifecycle.embeddingProvider();
+    // Spec E section 1.3 item 4: no migration batch embed starts while bulk GPU work is held; the
+    // documents keep PENDING vectors for backfill.
     boolean canBatchEmbed =
-        migrationActiveSupplier.getAsBoolean() && provider.isAvailable();
+        migrationActiveSupplier.getAsBoolean() && provider.isAvailable() && !signalBus.isBulkHeld();
     float[][] embeddings = null;
 
     if (canBatchEmbed) {
@@ -1036,6 +1051,14 @@ public class IndexingLoop implements Closeable {
    * package-private (test-only) to public after the 4 lifecycle-delegate setters were
    * removed from IndexingLoop's surface.
    */
+  /**
+   * Task t-20261013-ef3c41, round 4: every deletion decision this loop makes (admission, freshness,
+   * re-hash, pre-write) asks {@code check} whether the source's root still vouches for absence.
+   */
+  public void useRootCheck(SourcePresence.RootCheck check) {
+    ingestionAuthority.useRootCheck(check);
+  }
+
   public EmbeddingProviderLifecycle getEmbeddingLifecycle() {
     return embeddingLifecycle;
   }
@@ -1198,6 +1221,15 @@ public class IndexingLoop implements Closeable {
     if (!isRunning()) {
       start();
     }
+  }
+
+  /**
+   * Whether each enrichment stage can drain its backlog right now, by the backfill scheduler's own
+   * checks (Spec E §1.7, step E1). The status surface reads it so that a backlog no stage can drain
+   * does not keep indexing from reading IDLE.
+   */
+  public BackfillScheduler.StageAvailability enrichmentStageAvailability() {
+    return backfillScheduler.stageAvailability();
   }
 
   /**

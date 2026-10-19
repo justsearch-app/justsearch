@@ -86,17 +86,31 @@ const COMPLETION_DETAILS: Readonly<Record<string, string>> = {
   CANCELLED: 'The run was cancelled.',
 };
 
+/** A catalog sentence, or null when the catalog has none (`localizeResourceKey` echoes a miss). */
+function reasonCopy(key: string): string | null {
+  const resolved = localizeResourceKey(key);
+  return resolved.length > 0 && resolved !== key ? resolved : null;
+}
+
 /**
  * Per-variant message extraction. Returns an empty string when the
  * variant carries no human-readable message; the row degrades to
  * showing just the title in that case.
  */
-function bodyToMessage(body: HealthEvent['body']): string {
+function bodyToMessage(id: string | undefined, body: HealthEvent['body']): string {
   if (!body) return '';
   switch (body.kind) {
     case 'condition': {
       const c = body as AssertedCondition;
-      return c.message ?? c.reason ?? (c.status ? `status: ${c.status}` : '');
+      // Spec A step 7 (F1): a condition with no message of its own is worded by the catalog's
+      // per-reason sentence (`health-events.<id>.reason.<Reason>.message`) before its bare reason
+      // token, so a failed chat reads "The local AI model file could not be loaded".
+      return (
+        c.message ??
+        (id && c.reason ? reasonCopy(`health-events.${id}.reason.${c.reason}.message`) : null) ??
+        c.reason ??
+        (c.status ? `status: ${c.status}` : '')
+      );
     }
     case 'lifecycle': {
       const l = body as LifecycleEvent;
@@ -200,7 +214,7 @@ export const healthEventActivityRowStrategy: AggregateStrategy<
   if (!event.id) return nothing;
   const severityClass = severityToClass(event.severity);
   const title = resolveTitle(event);
-  const message = bodyToMessage(event.body);
+  const message = bodyToMessage(event.id, event.body);
   const sourceName = event.source?.serviceName ?? '';
   const timestamp = event.timestamp ?? '';
   const relativeTime = timestamp ? formatRelativeIso(timestamp) : '';

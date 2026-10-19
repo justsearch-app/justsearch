@@ -28,7 +28,7 @@ npm --prefix .\modules\ui-web run dev:all
 
 What it does:
 - Starts the backend (`:modules:ui:runHeadless`) on a free port near `33221`.
-- Starts the frontend at `http://localhost:5173`.
+- Starts the frontend at `http://127.0.0.1:5173`.
 - Sets `VITE_JUSTSEARCH_API_PORT=<port>` (and legacy `VITE_API_PORT=<port>`) so the UI connects immediately (no `?api_port=` needed).
 - If you started the backend separately (and didn’t set the Vite env var), the UI can also auto-discover by probing `33221..33250` on loopback and validating the `/api/status` payload.
 
@@ -52,13 +52,13 @@ cd modules\ui-web
 npm run dev
 ```
 
-Open `http://localhost:5173`. The frontend resolves the backend using `resolveApiEndpoint()` and will typically
+Open `http://127.0.0.1:5173`. The frontend resolves the backend using `resolveApiEndpoint()` and will typically
 connect automatically (via `VITE_JUSTSEARCH_API_PORT` / `VITE_API_PORT`, or by probing `33221..33250` on loopback).
 
 Tip: If you started the backend on a non-default port, you can force the UI to use it via:
 
 ```text
-http://localhost:5173/?api_port=33221
+http://127.0.0.1:5173/?api_port=33221
 ```
 
 You can also set `VITE_JUSTSEARCH_API_PORT` when running `npm run dev`.
@@ -70,7 +70,7 @@ To test the full desktop experience (with native window chrome, drag regions, et
 **Prereq (stage the bundled backend into the Tauri resources folder):**
 
 ```powershell
-.\gradlew.bat --no-daemon -PskipWebBuild=true :modules:ui:bundleSidecar
+node scripts/lib/tool-invoker.cjs gradle --no-daemon -PskipWebBuild=true :modules:ui:bundleSidecar
 ```
 
 Then run:
@@ -84,7 +84,7 @@ Notes:
   (no `?api_port=` required).
 - The shell starts the backend with `-Djustsearch.prod=true`, so the Local API CORS allowlist is in **desktop/prod**
   mode (only `tauri://<loopback-host>` and `http(s)://tauri.localhost` are allowed). A browser UI
-  (`http://localhost:5173`) cannot directly call that backend by design.
+  (`http://127.0.0.1:5173`) cannot directly call that backend by design.
 - The current dev supervisor is **Windows-first** (it expects `runtime/bin/java.exe` and Windows classpath separators).
 
 ### Build the desktop installer (Windows)
@@ -100,7 +100,7 @@ Artifacts are produced under `modules/shell/src-tauri/target/release/bundle/` (p
 ### Sidecar bundle smoke test (no GUI)
 
 ```powershell
-.\gradlew.bat --no-daemon -PskipWebBuild=true :modules:ui:smokeSidecarBundle
+node scripts/lib/tool-invoker.cjs gradle --no-daemon -PskipWebBuild=true :modules:ui:smokeSidecarBundle
 ```
 
 This launches the staged headless bundle and asserts basic readiness (`/api/status` and `/api/health` with Worker READY).
@@ -206,10 +206,10 @@ When using browser automation tools (Playwright, Puppeteer, or MCP browser tools
 **Solution:** Use URL query parameters instead of typing:
 
 ```text
-http://localhost:5173/?q=search_term
+http://127.0.0.1:5173/?q=search_term
 
 # Optional deterministic override (avoid discovery delays in automation):
-http://localhost:5173/?api_port=<port>&q=search_term
+http://127.0.0.1:5173/?api_port=<port>&q=search_term
 ```
 
 The app reads `?q=` from the URL and sets the query state directly, bypassing the input event chain.
@@ -233,7 +233,7 @@ This issue is **fixed**: clicking a checkbox now also activates the row so the I
 
 ### Full-Stack Development Workflow
 
-For AI agents working on this project:
+Start the backend and frontend together:
 
 ```powershell
 # Start backend + frontend together (recommended; cross-platform)
@@ -259,7 +259,7 @@ After modifying Java code:
 1. Stop the dev stack:
    - If you used `npm --prefix modules/ui-web run dev:all`, press **Ctrl+C** in that terminal.
    - If you used `run-headless-api.ps1`, press **Ctrl+C** in that terminal.
-2. Rebuild (Java-only, skips web bundle): `.\gradlew.bat :modules:ui:installDist -PskipWebBuild=true --no-daemon`
+2. Rebuild (Java-only, skips web bundle): `node scripts/lib/tool-invoker.cjs gradle :modules:ui:installDist -PskipWebBuild=true --no-daemon`
 3. Restart: `.\scripts\dev\run-headless-api.ps1 -SkipBuild`
 
 **One distribution:** lane F stage A item A13 deleted the Worker distribution. `:modules:ui:installDist` builds the only tree the backend launches from, and the index half is in its `lib/` — there is no second artifact that can drift out of sync.

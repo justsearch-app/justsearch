@@ -26,7 +26,7 @@ Scope:
 | Env Variable | System Property | Type | Description |
 | :--- | :--- | :--- | :--- |
 | **Paths & Discovery** | | | |
-| `JUSTSEARCH_DATA_DIR` | `justsearch.data.dir` | Path | Root directory for logs, index, and durable state (e.g., `jobs.db`). |
+| `JUSTSEARCH_DATA_DIR` | `justsearch.data.dir` | Path | Headless/dev root directory for logs, index, and durable state (e.g., `jobs.db`). The desktop shell retains its platform app-data directory and passes that path to the Engine; this variable does not move desktop data or its delete-data target. |
 | `JUSTSEARCH_HOME` | `justsearch.home` | Path | JustSearch “home” directory (desktop: AI Home root used for models/packs/runtime restore state). |
 | `JUSTSEARCH_MODE` | `justsearch.mode` | Enum | Install/runtime intent (tempdoc 657): `full-desktop` (default), `headless`, or `mcp-lite`. Set at launch by whichever launcher starts the backend (the desktop shell declares `full-desktop`; the headless launcher declares `headless`/`mcp-lite`). Drives which model tiers "Install AI" fetches (`mcp-lite` skips the LLM + CUDA-runtime tiers) and is reported on the runtime manifest under `mode.intent`. Unrecognized ⇒ `full-desktop`. |
 | `JUSTSEARCH_SSOT_PATH` | `justsearch.ssot.path` | Path | Overrides auto-discovery of the `SSOT/` directory. |
@@ -71,15 +71,20 @@ Scope:
 | `JUSTSEARCH_EMBED_LATE_CHUNKING_CONTEXT_LENGTH` | `justsearch.embed.late_chunking_context_length` | Int | Single-pass whole-doc token limit for the late-chunking VECTOR path (tempdoc 691 Phase 2), independent of `JUSTSEARCH_EMBED_CONTEXT_LENGTH` — the base batch path OOMs at this length, but the late-chunking path is batch-1 by construction (OOM-safe). Default `8192`, clamped to `[JUSTSEARCH_EMBED_CONTEXT_LENGTH, 8192]` — 8192 is gte-multilingual-base's trained context ceiling. |
 | `JUSTSEARCH_MODELS_DIR` | `justsearch.models.dir` | Path | Models directory (used to resolve model filenames in some flows). |
 | `JUSTSEARCH_SERVER_EXE` | `justsearch.server.exe` | Path | Path to `llama-server` executable (BYO runtime override). |
-| `JUSTSEARCH_SERVER_PORT` | `justsearch.server.port` | Int | HTTP port for `llama-server`. |
+| `JUSTSEARCH_SERVER_PORT` | `justsearch.server.port` | Int | Configured `llama-server` port. JustSearch's own `llama-server` never binds it: every managed launch uses a fresh loopback port (ADR-0051 decision 2). A healthy server found here is not adopted; the Engine logs one WARN and `/api/inference/status` shows the note `external_server_ignored`. To use your own server, set `JUSTSEARCH_INFERENCE_EXTERNAL_ENDPOINT`. |
+| `JUSTSEARCH_INFERENCE_EXTERNAL_ENDPOINT` | `justsearch.inference.external_endpoint` | String | Your own `llama-server`, as a loopback URL with a port (`http://127.0.0.1:8080`). The only way JustSearch uses a server it did not start: it is reported and never stopped. Unset (default): JustSearch runs and owns its `llama-server`. Any other host, scheme or a path is refused with a reason. Restart required. |
 | `JUSTSEARCH_CONTEXT_SIZE` | `justsearch.context.size` | Int | LLM context window (`-c`). **Default: auto, derived** — override with `N` (tempdoc 883). Unset means the Head derives the window from the backend and contributes it at ordinal 150 (`auto_detected` / `hardware_probe`): 32768 with GPU layers, 8192 at `-ngl 0`. The GPU rung is a latency and co-residency **budget**, not the largest window that fits - the dev card measurably fits the model's whole 262144 context - so set this variable if you want more; it has no upper clamp below `n_ctx_train`. The ladder steps down through 16384 → 8192 → 4096 if llama-server refuses a rung at launch (JustSearch passes `-fit off` so an unfittable rung aborts detectably instead of being absorbed by llama-server's default memory-fitting pass). Any explicit value (here, `-D`, `settings.json`, or YAML) is a one-rung ladder: honoured or the launch fails loud, never silently reduced. `/props` `n_ctx` remains the authority for what the server actually has. |
 | `JUSTSEARCH_LLM_SLOTS` | `justsearch.llm.slots` | Int | llama-server parallel slots (`-np`). Default `2`, clamped to `[1,8]` — two so a background delegate cannot evict the foreground turn's prompt-cache prefix. Passing `-np` at all disables llama-server's automatic `kv_unified`, so JustSearch also passes `-kvu`; without it every slot divides the window a request actually gets (`n_ctx_seq`) while `/props` keeps reporting the full `n_ctx`. |
 | `JUSTSEARCH_LLM_KV_TYPE` | `justsearch.llm.kv_type` | String | llama-server KV cache type for both `-ctk` and `-ctv`. Default `q8_0`. Restricted to llama.cpp's cache types (`f32`, `f16`, `bf16`, `q8_0`, `q5_1`, `q5_0`, `q4_1`, `q4_0`, `iq4_nl`); anything else is refused with a WARN, because an unknown type aborts llama-server at launch and the context ladder would read that abort as "this rung does not fit". A quantized V-cache requires flash attention, which is why `-fa on` is always passed explicitly. |
-| `JUSTSEARCH_GPU_ENABLED` | `justsearch.gpu.enabled` | Bool | Master ONNX GPU switch. Auto-set to `true` when CUDA DLLs are detected. Per-model overrides (`EMBED_GPU_ENABLED`, `SPLADE_GPU_ENABLED`, etc.) take precedence when explicitly set. Does not affect reranker or chunk reranker (those remain opt-in). |
+| `JUSTSEARCH_LLM_PROMPT_CACHE_MIB` | `justsearch.llm.prompt_cache_mib` | Int | Development override of the llama-server host prompt-cache bound for chat (`--cache-ram`, MiB). Unset: chat uses `1024`; evaluation mode and VDU always use `0`, override or not. Decimal integers `0` to `2147483647`; a blank or malformed value is refused with the source named, never replaced by the default. Captured when the inference configuration is created; restart required. The dev runner sets it with `--prompt-cache-mib`. See [Managed inference host prompt cache](#managed-inference-host-prompt-cache). |
+| `JUSTSEARCH_GPU_ENABLED` | `justsearch.gpu.enabled` | Bool | Master ONNX GPU switch. Auto-set to `true` when CUDA DLLs are detected. Per-model overrides (`EMBED_GPU_ENABLED`, `SPLADE_GPU_ENABLED`, etc.) take precedence when explicitly set. Does not affect reranker or chunk reranker (those remain opt-in). An actual no-device result selects CPU for every encoder, including those exceptions. With a usable GPU, the status GPU profile includes exempt GPU encoders even when chat uses its CPU plan; `/api/inference/encoders` reports each encoder's runtime accelerator. |
 | `JUSTSEARCH_GPU_DEVICE_MEMORY_CEILING_MB` | `justsearch.gpu.device_memory_ceiling_mb` | Long | Optional nonnegative cap, in MB, applied to the reported GPU device total and free memory for encoder composition. Unset leaves the physical report unchanged; explicit `0` is a valid cap that forces the in-place path. Requires restart. |
+| `JUSTSEARCH_GPU_GAME_DETECTION` | `justsearch.gpu.game_detection` | String | Game detection: `auto` (default) or `off`. With `auto`, while a game runs (Windows Game Mode, or a full-screen or busy foreground app that holds at least 1 GiB of graphics memory and is not JustSearch) no new bulk GPU batch starts, the app shows indexing paused (`indexing.paused_game_mode`), and the chat server is told. `off` never detects a game and clears a detected one at once. Any other value is `auto` with a WARN. Applies without restart (read every 2 s). |
+| `JUSTSEARCH_GPU_MEMORY_PLAN` | `justsearch.gpu.memory_plan` | String | Derived, not a preference: the device-memory plan the Engine applies (Spec E), as the planned profile `p16_plus`, `p12` or `p8`, blank when none applies. The Engine contributes it at the auto-detected ordinal together with the plan's encoder caps, chat profile, context rung and projector placement; an explicit value is ignored with a WARN. Encoder sessions on a planned profile pack their calls against the plan and refuse the FP32 fallback on the GPU. |
 | `JUSTSEARCH_GPU_LAYERS` | `justsearch.gpu.layers` | Int | GPU offload layers for `llama-server` (`-ngl`). Does not affect ONNX GPU — use `JUSTSEARCH_GPU_ENABLED` or per-model overrides. |
 | `JUSTSEARCH_VLM_MODEL` | `justsearch.vlm.model` | String | Vision-language model filename (resolved under `JUSTSEARCH_MODELS_DIR`). |
 | `JUSTSEARCH_MMPROJ_MODEL` | `justsearch.mmproj.model` | String | Vision projector filename (resolved under `JUSTSEARCH_MODELS_DIR`). |
+| `JUSTSEARCH_MMPROJ_OFFLOAD` | `justsearch.mmproj.offload` | Bool | Whether llama-server places the vision projector on the GPU. Default `true` (today's launch). On 12 GB and 8 GB cards the device-memory plan (Spec E) sets `false` at the auto-detected ordinal, which launches with `--no-mmproj-offload` for chat and VDU alike. An explicit value wins and changes the chat memory the plan reserves. Applies on the next chat relaunch. |
 | `JUSTSEARCH_USE_THINKING` | `justsearch.llm.use_thinking` | Bool | Enables reasoning stream formatting for llama-server (`--reasoning-format deepseek`) and reasoning-channel extraction. Default `true`. Requires server restart to apply flag change. See `docs/explanation/05-ai-architecture.md` §Reasoning Pipeline. |
 | `JUSTSEARCH_REASONING_BUDGET` | `justsearch.llm.reasoning_budget` | Int | llama-server reasoning token budget (`--reasoning-budget`). Default `512` — bounded reasoning, on. `0` disables reasoning. Unbounded (`-1`) and any value at or above the conversation engine's default completion ceiling (1024) are **refused and clamped back to 512** with a WARN: reasoning and answer tokens share one budget, so those settings return empty answers with no error. Requires server restart to apply flag change. |
 | `JUSTSEARCH_AGENT_CONTEXT_COMPRESSION_ENABLED` | `justsearch.agent.context_compression.enabled` | Bool | Enables deterministic compression of older agent tool outputs in conversation history. Default `true`. |
@@ -202,12 +207,34 @@ Scope:
 | `JUSTSEARCH_INDEX_COMMIT_TIMER_INTERVAL_MS` | `index.commit.timer_interval_ms` | Int | Period (ms) of `CommitOps`' safety-net commit timer, which commits whenever `pendingDocs > 0` regardless of which write path produced them; default `10000` (the constant it replaces, so the default arm is unchanged). This is the ceiling on every other commit-cadence lever: tempdoc 885's live window measured the indexing loop's own commit triggers going to zero while this timer's share rose 16 → 46, because deferring the loop's commits keeps `pendingDocs` above zero longer and hands the timer more work. A non-positive value is refused with a WARN and the default is used. Resolved onto `ResolvedConfig.Index`, which the index half reads in process. |
 | `JUSTSEARCH_INDEX_IDENTITY_DELETION_GRACE_MS` | | | How long (ms) a confirmed-deleted path keeps its document identity; default 2592000000 (30 days). Resolved onto ResolvedConfig.Index, which the index half reads in process. |
 
+### Managed inference host prompt cache
+
+The managed llama-server host prompt cache is bounded to **1024 MiB** for chat. Evaluation mode
+(`-Djustsearch.eval.mode=true`, including scripted-agent runs) and VDU disable it (`--cache-ram 0`).
+The short self-test server that runtime activation launches also runs with `--cache-ram 0`: it
+answers one request and never resumes a conversation.
+
+For development, override the chat bound with the registered key `JUSTSEARCH_LLM_PROMPT_CACHE_MIB` /
+**`-Djustsearch.llm.prompt_cache_mib=<MiB>`** (listed in the table above; the system property wins
+over the environment variable), or use
+**`node scripts/dev/dev-runner.cjs start --prompt-cache-mib <MiB>`**, which sets the system
+property. The CLI option wins over an earlier value in `JAVA_OPTS`.
+The override accepts decimal integers from 0 to 2147483647. An invalid value refuses
+configuration/launch with an explicit error naming the property or variable. The dev runner refuses
+an invalid `--prompt-cache-mib` before any start work: exit code 1, `error.code`
+`INVALID_PROMPT_CACHE_MIB` under `--json`, and a one-line message without a stack trace. Evaluation
+and VDU still use zero when an override is supplied. The bound is captured when inference
+configuration is created; mode changes, profile changes, crash recovery, and VDU exit preserve it.
+Restart the head to change the development override. This is host RAM, separate from the GPU
+KV-cache memory plan.
+
 ## Additional Runtime Keys (Selected)
 
 | Env Variable | System Property | Type | Description |
 | :--- | :--- | :--- | :--- |
 | **JVM & index half** | | | |
 | `JUSTSEARCH_WORKER_DEADLINE_MS` | | | Retained compatibility key for the index-half call deadline. The current index half is composed in the Engine, so this no longer denotes the historical Head-to-Worker process RPC. |
+| `JUSTSEARCH_REQUIRE_CONTAINMENT` | *(n/a — env only)* | Bool | When `1`, an Engine that could not join its Windows kill-on-close job (so its helper processes could outlive it) exits with `FATAL_OR_UNCAUGHT` before taking the instance lock instead of booting with the `engine.containment_unavailable` warning. `JUSTSEARCH_SUPERVISOR_HARNESS=1` implies it. Default unset. The runtime manifest's `containment {status, reason}` reports the boot outcome. |
 | **Dev Hot-Reload** | | | |
 | `JUSTSEARCH_DEV_HOTRELOAD` | `justsearch.dev.hotreload` | Bool | Enables dev hot-reload: JDWP agent on the Engine + `DevReloadManager` for service reconstruction when the request file appears. Use with MCP `start(hotReload: true)` or set env var before starting the dev stack. Default `false`. |
 | `JUSTSEARCH_DEV_DEBUG_PORT` | | | JDWP debug port for the Engine, read by the dev-runner and placed on the Engine launch flags. |
@@ -304,7 +331,7 @@ powershell -ExecutionPolicy Bypass -File scripts/bench/run-claim-b-suite-win.ps1
 ```powershell
 $env:JUSTSEARCH_LLM_MODEL_PATH = "C:\\AI\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf"
 $env:JUSTSEARCH_GPU_LAYERS = "99"
-./gradlew.bat --no-daemon :modules:app-launcher:run
+node scripts/lib/tool-invoker.cjs gradle --no-daemon :modules:app-launcher:run
 ```
 
 Notes:

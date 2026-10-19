@@ -169,7 +169,7 @@ said history should live separately. This is a concrete case where compliance
 can be improved by editing the artifact rather than strengthening the rule.
 
 The retrospective moved8,421 characters of checkpoint chronology verbatim to
-[checkpoint history](../handoff-checkpoint-history-2026-09-22.md). The handoff
+[checkpoint history](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff-checkpoint-history-2026-09-22.md). The handoff
 shrunk from17,299 to9,476 characters before adding its retrospective pointer.
 Current proof limits and remaining D1/D2/E/F obligations were retained. This
 reduces conflicting instructions; it does not establish that future agents will

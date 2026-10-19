@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Locale;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -63,7 +62,7 @@ class OrtCudaSelfCheckTest {
   @Test
   @DisplayName("missingDlls() lists missing files in failure reason")
   void missingDllsListsMissingFiles() {
-    List<String> missing = List.of("cudart64_12.dll", "cublas64_12.dll");
+    List<String> missing = List.of(io.justsearch.configuration.NativeTargets.current().libraryName("cudart"), io.justsearch.configuration.NativeTargets.current().libraryName("cublas"));
     OrtCudaStatus status = OrtCudaStatus.missingDlls("onnxruntime-gpu", tempDir, missing);
 
     assertTrue(status.configured());
@@ -71,8 +70,8 @@ class OrtCudaSelfCheckTest {
     assertFalse(status.available());
     assertEquals(missing, status.missingDlls());
     assertNotNull(status.failureReason());
-    assertTrue(status.failureReason().contains("cudart64_12.dll"));
-    assertTrue(status.failureReason().contains("cublas64_12.dll"));
+    assertTrue(status.failureReason().contains(io.justsearch.configuration.NativeTargets.current().libraryName("cudart")));
+    assertTrue(status.failureReason().contains(io.justsearch.configuration.NativeTargets.current().libraryName("cublas")));
     assertFalse(status.isHealthy());
   }
 
@@ -162,15 +161,12 @@ class OrtCudaSelfCheckTest {
   // ==================== DLL Check Logic Tests (OrtCudaHelper) ====================
 
   @Test
-  @DisplayName("checkMissingCudaDlls returns empty list for non-Windows or empty dir")
-  void checkMissingCudaDllsReturnsEmptyForNonWindowsOrEmpty() {
+  @DisplayName("checkMissingCudaDlls identifies the host libraries missing from an empty directory")
+  void checkMissingCudaDllsIdentifiesMissingHostLibraries() {
     List<String> missing = OrtCudaHelper.checkMissingCudaDlls(tempDir);
 
-    if (System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win")) {
-      assertFalse(missing.isEmpty(), "On Windows, empty dir should have missing DLLs");
-    } else {
-      assertTrue(missing.isEmpty(), "On non-Windows, should skip check and return empty");
-    }
+    assertEquals(5, missing.size());
+    assertTrue(missing.contains(io.justsearch.configuration.NativeTargets.current().libraryName("ort-cuda")));
   }
 
   @Test
@@ -189,24 +185,20 @@ class OrtCudaSelfCheckTest {
   }
 
   @Test
-  @DisplayName("checkMissingCudaDlls detects missing files on Windows")
-  void checkMissingCudaDllsDetectsMissingFilesOnWindows() throws Exception {
-    if (!System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win")) {
-      return;
-    }
-
+  @DisplayName("checkMissingCudaDlls detects missing host libraries")
+  void checkMissingCudaDllsDetectsMissingFiles() throws Exception {
     Path dllDir = tempDir.resolve("dlls");
     Files.createDirectories(dllDir);
-    Files.createFile(dllDir.resolve("onnxruntime_providers_cuda.dll"));
-    Files.createFile(dllDir.resolve("onnxruntime_providers_shared.dll"));
+    Files.createFile(dllDir.resolve(io.justsearch.configuration.NativeTargets.current().libraryName("ort-cuda")));
+    Files.createFile(dllDir.resolve(io.justsearch.configuration.NativeTargets.current().libraryName("ort-shared")));
 
     List<String> missing = OrtCudaHelper.checkMissingCudaDlls(dllDir);
 
     assertFalse(missing.isEmpty());
-    assertTrue(missing.contains("cudart64_12.dll"));
-    assertTrue(missing.contains("cublas64_12.dll"));
-    assertFalse(missing.contains("onnxruntime_providers_cuda.dll"));
-    assertFalse(missing.contains("onnxruntime_providers_shared.dll"));
+    assertTrue(missing.contains(io.justsearch.configuration.NativeTargets.current().libraryName("cudart")));
+    assertTrue(missing.contains(io.justsearch.configuration.NativeTargets.current().libraryName("cublas")));
+    assertFalse(missing.contains(io.justsearch.configuration.NativeTargets.current().libraryName("ort-cuda")));
+    assertFalse(missing.contains(io.justsearch.configuration.NativeTargets.current().libraryName("ort-shared")));
   }
 
   // ==================== Defensive Copy Tests ====================

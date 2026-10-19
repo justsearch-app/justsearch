@@ -126,6 +126,21 @@ const CAUSE_ROWS: ReadonlyArray<{
     wording: 'The embedding model could not be probed',
   },
   {
+    // Spec D §6.3 — a GPU encoder run has been stuck long enough that searches skip their semantic
+    // legs (each search reports cause `stuck`); the standing state, shown after breakerStandingMs.
+    code: 'encoders.health.semantic_stuck',
+    wording: 'The semantic search encoder is stalled',
+  },
+  {
+    // Searches the GPU turned away (no seat in time, or its breaker open) had their query encoded on
+    // the CPU within the last minute: semantic search is answered, more slowly. Beside
+    // `encoders.health.semantic_stuck` it means the stalled GPU holds up background embedding, not
+    // searches (see `answeredOnCpu`).
+    code: 'encoders.health.query_on_cpu',
+    wording: 'Searches are running on the CPU while the GPU is busy',
+    severity: 'info',
+  },
+  {
     code: 'inference.offline',
     wording: 'The local AI model is offline',
     remedy: OPEN_BRAIN,
@@ -207,6 +222,53 @@ const CAUSE_ROWS: ReadonlyArray<{
     remedy: OPEN_BRAIN,
     severity: 'warn',
   },
+  // Spec A step 7 — WHY chat failed, from the failure the chat controller classified (Spec A §7.1),
+  // instead of the one collapsed "stopped unexpectedly". Each is a fault the controller does not
+  // retry on its own, so `warn` with the Brain remedy, like inference.crashed.
+  {
+    code: 'inference.out_of_memory',
+    wording: 'The local AI model ran out of graphics memory',
+    remedy: OPEN_BRAIN,
+    severity: 'warn',
+  },
+  {
+    code: 'inference.startup_timeout',
+    wording: 'The local AI model took too long to start',
+    remedy: OPEN_BRAIN,
+    severity: 'warn',
+  },
+  {
+    code: 'inference.start_failed',
+    wording: 'The local AI model failed to start',
+    remedy: OPEN_BRAIN,
+    severity: 'warn',
+  },
+  {
+    code: 'inference.model_load_failed',
+    wording: 'The local AI model file could not be loaded',
+    remedy: OPEN_BRAIN,
+    severity: 'warn',
+  },
+  // Spec A §7.2 — chat serves, at a smaller context window, after running out of memory. A notice on
+  // a working model, never a fault: `info`.
+  {
+    code: 'inference.context_reduced',
+    wording: 'The local AI model is running with a shorter context to fit in graphics memory',
+    severity: 'info',
+  },
+  // Spec A step 9 — the chat controller unloaded an idle model because another application needs
+  // the graphics memory, or a game is running. Not a fault and not "unavailable": a chat request
+  // loads it again, so `info`, and neither joins AI_MODEL_UNAVAILABLE_CODES.
+  {
+    code: 'inference.unloaded_gpu_pressure',
+    wording: 'Chat was paused to free graphics memory. It reloads when you ask.',
+    severity: 'info',
+  },
+  {
+    code: 'inference.unloaded_game_mode',
+    wording: 'Chat is paused while a game is running.',
+    severity: 'info',
+  },
   {
     code: 'ocr.disabled',
     wording: 'OCR is disabled, so scanned text cannot be indexed yet',
@@ -242,6 +304,18 @@ const CAUSE_ROWS: ReadonlyArray<{
     code: 'vdu.circuit_open',
     wording: 'Visual document understanding is paused after repeated failures',
     severity: 'warn',
+  },
+  {
+    code: 'vdu.breaker_open.refused',
+    wording:
+      'Automatic picture reading is paused because a settings change or settings recovery kept the AI model closed; it tries again later',
+    severity: 'info',
+  },
+  {
+    code: 'vdu.breaker_open.entry_failed',
+    wording:
+      'Automatic picture reading is paused because the vision model could not start; it tries again later',
+    severity: 'info',
   },
   { code: 'index.throughput_stalled', wording: 'Indexing throughput has stalled' },
   {
@@ -417,6 +491,16 @@ const CAUSE_ROWS: ReadonlyArray<{
     remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
     severity: 'warn',
   },
+  // Task t-20261013-ef3c41 — the repeat-rebuild brake itself could not be read. A brake that cannot be
+  // read holds like a spent one: no automatic rebuild starts, ingestion does not resume, and a person's
+  // rebuild is the way forward. Same consequence as the row above, so the same severity and remedy.
+  {
+    code: 'index.rebuild_brake_unreadable',
+    wording:
+      'The index needs rebuilding, but its rebuild record could not be read, so it is not being rebuilt automatically — search still works on what is already indexed, but new files are not being added. Rebuild the index to continue.',
+    remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
+    severity: 'warn',
+  },
   // Tempdoc 837 S6 removed the `index.rebuilding` row that used to sit here. Its code was emitted
   // only inside the window the verdict forces to `transitioning`, where this projection returns null,
   // so the row was unreachable UI. Its wording was not lost — it moved, word for word, into
@@ -472,6 +556,7 @@ const REINDEX_CAUSE_CODES: ReadonlySet<string> = new Set([
   'index.embedding_legacy',
   'index.embedding_mismatch',
   'index.rebuild_brake_exhausted',
+  'index.rebuild_brake_unreadable',
 ]);
 
 /**
@@ -506,6 +591,9 @@ const RETRIEVAL_IMPAIRING_CODES: ReadonlySet<string> = new Set([
   // The embedder could not be probed: we do NOT know both legs are live, and the reassuring wording
   // requires positive knowledge (same doctrine as severityForCodes' unknown ⇒ warn default).
   'encoders.health.embedding_probe_missing',
+  // A GPU encoder run is stuck (Spec D §6.3): query legs on its device skip, so searches answer
+  // with keyword results until the run returns (unless they are answered on the CPU: `answeredOnCpu`).
+  'encoders.health.semantic_stuck',
   // (Tempdoc 837 S6 removed `index.rebuilding` here with its row: a generation rebuild is a
   // TRANSITION, and this set only ever gates the degraded branch, which that state cannot reach.)
   // An in-place embedding rebuild: the Worker refuses dense queries (REBUILD_IN_PROGRESS) until it
@@ -556,6 +644,16 @@ function isRetrievalImpairing(code: string): boolean {
   return !CAUSE_ROWS.some((row) => row.code === code);
 }
 
+/**
+ * True when {@code code} is the stalled-encoder code reported beside `encoders.health.query_on_cpu`:
+ * searches the stalled GPU turned away were answered semantically on the CPU, so the stall holds up
+ * background embedding only. It is then neither retrieval-impairing nor above `info` severity, and it
+ * stays listed as a cause (the stall is still real).
+ */
+function answeredOnCpu(code: string, codes: readonly string[]): boolean {
+  return code === 'encoders.health.semantic_stuck' && codes.includes('encoders.health.query_on_cpu');
+}
+
 /** True when {@code code} is a passage-leg-only reduction (805 §G.2). */
 function isPassageReduced(code: string): boolean {
   return PASSAGE_REDUCED_CODES.has(code);
@@ -585,6 +683,10 @@ function isPassageReduced(code: string): boolean {
  * still fully semantic" about a CRASHED AI model. `inference.deactivated` does not join: it is the
  * policy/user-choice case the exclusion above is written for ("policy-disabled never comes online"),
  * and it ships at `info` where the set is never consulted anyway.
+ *
+ * <p>Spec A step 7's classified failures split `inference.crashed` and join for the same reason:
+ * each is a `warn` code for a chat model that is down. `inference.context_reduced` does not: the
+ * model serves, and it ships at `info`.
  */
 const AI_MODEL_UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   'inference.offline',
@@ -593,6 +695,10 @@ const AI_MODEL_UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   'inference.runtime_not_installed',
   'inference.activation_failed',
   'inference.crashed',
+  'inference.out_of_memory',
+  'inference.startup_timeout',
+  'inference.start_failed',
+  'inference.model_load_failed',
 ]);
 
 /**
@@ -631,6 +737,7 @@ export function classifyConsequence(codes: readonly string[]): ConsequenceClass 
   let sawPassage = false;
   let sawAi = false;
   for (const code of codes) {
+    if (answeredOnCpu(code, codes)) continue;
     if (RETRIEVAL_IMPAIRING_CODES.has(code) || REINDEX_CAUSE_CODES.has(code)) {
       return 'retrieval-impaired';
     }
@@ -702,7 +809,7 @@ export function severityForCodes(codes: readonly string[]): Severity {
   let sawAny = false;
   for (const code of codes) {
     const row = CAUSE_ROWS.find((c) => c.code === code);
-    const sev: ReasonSeverity = row?.severity ?? 'warn';
+    const sev: ReasonSeverity = answeredOnCpu(code, codes) ? 'info' : (row?.severity ?? 'warn');
     if (!sawAny || SEVERITY_RANK[sev] > SEVERITY_RANK[worst]) {
       worst = sev;
       sawAny = true;
@@ -866,7 +973,9 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
   // (impairing + unclassified). A recognized non-retrieval cause at warn severity (e.g. `ocr.*`)
   // reaches here with no such cause to name — it keeps its own causes rather than a claim with an
   // empty cause list, which is the pre-805 behaviour for that set.
-  const impairingCauses = codes.filter(isRetrievalImpairing);
+  const impairingCauses = codes.filter(
+    (code) => isRetrievalImpairing(code) && !answeredOnCpu(code, codes),
+  );
   const listed = impairingCauses.length > 0 ? impairingCauses : codes;
   return {
     headline: 'Semantic search degraded.',

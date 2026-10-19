@@ -1,0 +1,73 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-07T14:35:33.192Z",
+  "revision": "99373ec68a8e1bcadc83ef82ed62c1409098b6af",
+  "tree": "8a8cd1d28078cf51d65d3b31048f3a0b1312fe67",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::commit_delivery_tests::consumed_commit_queue_held_crash_installs_for_every_exit_observation_order\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4351
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater_commit_delivery_tests.rs#updater::commit_delivery_tests::consumed_commit_queue_held_crash_installs_for_every_exit_observation_order",
+      "file": "modules/shell/src-tauri/src/updater_commit_delivery_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:45bb0eb1e1cd00fa1a249711198ed4a59ae27006314ad8f8f81f6d9383cde45c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::commit_delivery_tests::consumed_commit_queue_held_crash_installs_for_every_exit_observation_order",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "99373ec68",
+    "revision": "99373ec68a8e1bcadc83ef82ed62c1409098b6af",
+    "overlays": [
+      "modules/shell/src-tauri/resources/headless/.placeholder"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/b6d536-shell-held-crash-before.patch",
+        "contentDigest": "sha256:37c7e1d2781ac03d9e03c6fb4025b7970619da8d35d46368df31225f26c7bd5b"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::commit_delivery_tests::consumed_commit_queue_held_crash_installs_for_every_exit_observation_order\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 10091
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/updater_commit_delivery_tests.rs#updater::commit_delivery_tests::consumed_commit_queue_held_crash_installs_for_every_exit_observation_order",
+        "classification": "assertion",
+        "detail": "updater::commit_delivery_tests::consumed_commit_queue_held_crash_installs_for_every_exit_observation_order:  ---- updater::commit_delivery_tests::consumed_commit_queue_held_crash_installs_for_every_exit_observation_order stdout ----\n\nthread 'updater::commit_delivery_tests::consumed_commit_queue_held_crash_installs_for_every_exit_observation_order' (35444) panicked at src\\updater_commit_delivery_tests.rs:131:9:\nassertion `left == right` failed: consumed queue and no commit sent must install for b"
+      }
+    ]
+  },
+  "digest": "sha256:b431d277e1350dbaaa76a57ed2a40f8ff87a2dd589a66dde4b3b266aef0e4a03"
+}

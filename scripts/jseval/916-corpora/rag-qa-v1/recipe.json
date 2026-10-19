@@ -68,7 +68,7 @@
     }
   },
   "instrument": {
-    "mechanical": "python -m jseval tier2-eval --queries <out>/<slug>/queries.json --base-url http://127.0.0.1:<api-port> --llm-url http://127.0.0.1:8080 --top-k 10 --max-context-tokens 4096 --output-dir <dir>",
+    "mechanical": "python -m jseval tier2-eval --queries <out>/<slug>/queries.json --base-url http://127.0.0.1:<api-port> --llm-url http://127.0.0.1:<api-port> --top-k 10 --max-context-tokens 4096 --output-dir <dir>",
     "mechanical_entry_point": "scripts/jseval/jseval/commands/eval_cmds.py:154-202 -> scripts/jseval/jseval/agent_retrieval_eval.py:832-885",
     "chat_profile": "standard — tier2-eval refuses a compact model (CompactModelNotAllowedError, agent_retrieval_eval.py:879-885, markers at :57), so `ai_activate {chatProfile:\"standard\"}` is required and --allow-compact-model must NOT be passed for a quality reading.",
     "judge_tier": "Tier 4: AI Judge (Semantic Eval), docs/explanation/09-testing-strategy.md — agent-driven, on demand, not an automated pipeline. The gold span is what the judge grades groundedness against.",

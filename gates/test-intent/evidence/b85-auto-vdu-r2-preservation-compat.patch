@@ -1,0 +1,24 @@
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeReconciler.java b/modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeReconciler.java
+index 621e3ec78..af319dcad 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeReconciler.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeReconciler.java
+@@ -194,6 +194,19 @@ public final class RuntimeReconciler implements AutoCloseable {
+         componentRecoveryPending);
+   }
+ 
++  /** Compat (fail-before only): the later constructor without a GPU lease; a fresh lease here. */
++  public RuntimeReconciler(
++      OnlineAiLifecycleControl control,
++      Supplier<Mode> modeSupplier,
++      BooleanSupplier externalAdoption,
++      EnterprisePolicyService policy,
++      RuntimeSpecStore specStore,
++      ActivationForwarder forwarder,
++      BooleanSupplier componentRecoveryPending) {
++    this(control, modeSupplier, externalAdoption, policy, specStore, new RuntimeGpuLease(),
++        forwarder, componentRecoveryPending);
++  }
++
+   /**
+    * The Engine's reconciler: every boot, spec and procedure request becomes one {@code
+    * setActivation} on the chat controller.

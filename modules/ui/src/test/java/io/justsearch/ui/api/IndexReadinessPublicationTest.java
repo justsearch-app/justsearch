@@ -32,7 +32,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Function;
 import java.util.function.LongSupplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -145,13 +144,12 @@ final class IndexReadinessPublicationTest {
     // The deterministic retention clock is package-private in the monitor's owning module.
     var constructor = KnowledgeServerHealthMonitor.class.getDeclaredConstructor(
         EngineExecutorRegistry.class, KnowledgeServerBootstrap.class, long.class,
-        LongSupplier.class, BootRecoveryPolicy.class, Function.class, LongSupplier.class);
+        LongSupplier.class, BootRecoveryPolicy.class, LongSupplier.class);
     constructor.setAccessible(true);
     LongSupplier wallClock = System::currentTimeMillis;
     LongSupplier ownerClock = nowNanos::get;
-    Function<String, String> environment = ignored -> null;
     var monitor = constructor.newInstance(executors, fixture.server, 10_000L, wallClock,
-        BootRecoveryPolicy.defaults(), environment, ownerClock);
+        BootRecoveryPolicy.defaults(), ownerClock);
     monitor.componentRegistry(fixture.components);
     return monitor;
   }
@@ -390,12 +388,9 @@ final class IndexReadinessPublicationTest {
       var entered = new java.util.concurrent.CountDownLatch(1);
       var release = new java.util.concurrent.CountDownLatch(1);
       var secondStarted = new java.util.concurrent.CountDownLatch(1);
-      var firstThread = new java.util.concurrent.atomic.AtomicReference<Thread>();
-      var secondThread = new java.util.concurrent.atomic.AtomicReference<Thread>();
       var calls = new java.util.concurrent.atomic.AtomicInteger();
       when(fixture.client.getWorkerOperationalView(any())).thenAnswer(invocation -> {
         if (calls.incrementAndGet() == 1) {
-          firstThread.set(Thread.currentThread());
           entered.countDown();
           assertTrue(release.await(5, java.util.concurrent.TimeUnit.SECONDS));
           throw new IllegalStateException("older failed contact");
@@ -406,22 +401,12 @@ final class IndexReadinessPublicationTest {
       try {
         assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS));
         var second = threads.submit(() -> {
-          secondThread.set(Thread.currentThread());
           secondStarted.countDown();
           return fixture.handler.sampleAndBuildStatusSnapshot();
         });
         assertTrue(secondStarted.await(5, java.util.concurrent.TimeUnit.SECONDS));
-        var threadBean = java.lang.management.ManagementFactory.getThreadMXBean();
-        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
-        java.lang.management.ThreadInfo info;
-        do {
-          info = threadBean.getThreadInfo(secondThread.get().threadId());
-          if (info != null && info.getLockOwnerId() == firstThread.get().threadId()) break;
-          if (second.isDone()) break;
-          Thread.yield();
-        } while (System.nanoTime() < deadline);
-        assertTrue(info != null && info.getLockOwnerId() == firstThread.get().threadId(),
-            "the second fresh request must contend on the actual first sampler owner");
+        // Coalescing happens in the Worker observation lane; request threads own no RPC lock.
+        assertEquals(1, calls.get(), "the overlapping request must share the outstanding observation");
         var cached = threads.submit(fixture.handler::buildStatusSnapshot)
             .get(5, java.util.concurrent.TimeUnit.SECONDS);
         assertFalse(cached.meta().workerRpcStale(), "cached reads must not wait for the stalled RPC");
@@ -429,6 +414,10 @@ final class IndexReadinessPublicationTest {
         release.countDown();
         first.get(5, java.util.concurrent.TimeUnit.SECONDS);
         second.get(5, java.util.concurrent.TimeUnit.SECONDS);
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        while ((calls.get() < 2 || fixture.handler.buildStatusSnapshot().meta().workerRpcStale()
+            || fixture.components.handle("index").snapshot().state() != ComponentState.READY)
+            && System.nanoTime() < deadline) Thread.sleep(10);
         assertEquals(2, calls.get());
         assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state());
         assertFalse(fixture.handler.buildStatusSnapshot().meta().workerRpcStale());

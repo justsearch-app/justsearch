@@ -1,3 +1,4 @@
+import './lib/test-fixture-processes.cjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,16 +19,24 @@ function manifest(t) {
   return { dir, child };
 }
 
-test('Windows default PowerShell inspector binds the real current PID (read only)',
-  { skip: process.platform !== 'win32' }, () => {
+test('Native default inspector binds the real current PID (read only)',
+  { skip: !['win32', 'linux'].includes(process.platform) }, () => {
     const result = api.inspectProcessIdentity(process.pid);
     assert.equal(result?.alive, true);
-    assert.equal(path.resolve(result.executable).toLowerCase(), process.execPath.toLowerCase());
-    assert.ok(Number.isFinite(Date.parse(result.startedAt)));
+    if (process.platform === 'win32') {
+      assert.equal(path.resolve(result.executable).toLowerCase(), process.execPath.toLowerCase());
+      assert.ok(Number.isFinite(Date.parse(result.startedAt)));
+    } else {
+      assert.equal(result.executable, fs.realpathSync(process.execPath));
+      const stat = fs.readFileSync('/proc/self/stat', 'utf8');
+      assert.deepEqual(result.processIdentity, { kind: 'linux-proc-v1', pid: process.pid,
+        bootId: fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(), startTicks: stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/)[19] });
+      assert.equal(result.startedAt, undefined, 'no invented wall-clock birth');
+    }
   });
 
-test('Windows default inspector distinguishes a missing PID from a failed query (read only)',
-  { skip: process.platform !== 'win32' }, () => {
+test('Native default inspector distinguishes a missing PID from a failed query (read only)',
+  { skip: !['win32', 'linux'].includes(process.platform) }, () => {
     assert.deepEqual(api.inspectProcessIdentity(2147483647), { alive: false });
     assert.equal(api.inspectProcessIdentity('123;exit 0'), null);
   });
@@ -76,18 +85,30 @@ test('stopRun after failed Engine quit persists verified llama cleanup and retur
   const { dir, child } = manifest(t);
   let alive = true;
   const runPath = path.join(dir, 'run.json');
+  const birth = '134000000000000000';
+  let backendAlive = true;
   const run = { runId: path.basename(dir), dataDir: dir, apiPortActual: 0, uiPortActual: 0,
-    pids: { runnerPid: process.pid, frontendRootPid: null, backendRootPid: 123 } };
+    pids: { runnerPid: process.pid, frontendRootPid: null, backendRootPid: 123 },
+    identities: { backend: { pid: 123, creationFileTimeUtc: birth } } };
+  let censusFinished = false;
   const result = await api.stopRun({}, {
     resolveTarget: async () => ({ run, runPath }),
-    gracefulShutdown: async () => ({ outcome: 'exited', exitCode: 1 }),
-    census: async () => ({ finish: async killed => {
-      assert.deepEqual(killed, [child.pid]); return {};
+    // The backend as it is, and the registered llama child as itself (its manifest start, to the
+    // millisecond) while it runs: a row naming another birth at its PID would say it had ended.
+    lookupIdentities: async pids => new Map(pids.map(pid => [pid, pid === child.pid
+      ? { present: alive, creationFileTime: String(BigInt(Date.parse(child.startedAt)) * 10000n + 116444736000000000n) }
+      : { present: backendAlive, creationFileTime: birth }])),
+    gracefulShutdown: async () => { backendAlive = false; return { outcome: 'exited', exitCode: 1 }; },
+    // Spec B step 9: the census reads the ledger; the stop's own kills are not handed to it.
+    census: async () => ({ finish: async options => {
+      assert.ok(!Array.isArray(options) && !JSON.stringify(options ?? {}).includes(String(child.pid)), JSON.stringify(options));
+      censusFinished = true; return {};
     } }),
     inspectChild: () => alive ? { ...child, alive } : { alive: false },
     terminateChild: pid => { assert.equal(pid, child.pid); alive = false; return true; },
   });
   assert.equal(alive, false);
+  assert.equal(censusFinished, true);
   assert.deepEqual(result.killedPids, [child.pid]);
   assert.equal(result.childCleanup[0].outcome, 'terminated');
   const report = JSON.parse(fs.readFileSync(path.join(dir, 'stop-report.json'), 'utf8'));
@@ -146,4 +167,50 @@ test('discovery restart reports death while preserving registered children', asy
   assert.deepEqual(report.killedPids, []);
   assert.deepEqual(report.childCleanup, []);
   assert.deepEqual(report.errors, []);
+});
+
+test('Linux terminal cleanup terminates an identity-matched child after its binary is deleted; the stranger survives',
+  { skip: process.platform !== 'linux' }, async t => {
+    const { spawn } = await import('node:child_process');
+    const { once } = await import('node:events');
+    const { dir } = manifest(t);
+    const executable = path.join(dir, 'owned-sleep');
+    fs.copyFileSync('/bin/sleep', executable);
+    const child = spawn(executable, ['30'], { stdio: 'ignore' });
+    const stranger = spawn('/bin/sleep', ['30'], { stdio: 'ignore' });
+    const ended = once(child, 'exit'), strangerEnded = once(stranger, 'exit');
+    try {
+      await Promise.all([once(child, 'spawn'), once(stranger, 'spawn')]);
+      const saved = child.recordedIdentity;
+      assert.ok(saved?.processIdentity);
+      fs.unlinkSync(executable);
+      assert.equal(fs.readlinkSync(`/proc/${child.pid}/exe`), executable + ' (deleted)');
+      fs.writeFileSync(path.join(dir, 'runtime/manifest.json'), JSON.stringify({ children: [
+        { id: 'deleted-helper', pid: child.pid, processIdentity: saved.processIdentity, executable }] }));
+      const result = await api.cleanupRegisteredChildrenForTerminal(dir);
+      assert.equal(result[0]?.outcome, 'terminated', JSON.stringify(result));
+      assert.equal(result[0]?.killAccepted, true);
+      await ended;
+      assert.equal(api.inspectProcessIdentity(child.pid)?.alive, false);
+      assert.equal(api.inspectProcessIdentity(stranger.pid)?.alive, true, 'a different process is never a cleanup target');
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill();
+      if (stranger.exitCode === null && stranger.signalCode === null) stranger.kill();
+      await Promise.all([ended, strangerEnded]);
+    }
+  });
+
+test('a malformed saved Linux tuple stays unknown and never authorizes a helper stop', async t => {
+  const { dir, child } = manifest(t);
+  const observed = { kind: 'linux-proc-v1', pid: child.pid,
+    bootId: '333fd9cf-f547-4117-a537-fc8be3c44466', startTicks: '42' };
+  const malformed = { ...observed, startTicks: 'unreadable' };
+  fs.writeFileSync(path.join(dir, 'runtime/manifest.json'), JSON.stringify({ children: [
+    { ...child, processIdentity: malformed }] }));
+  const result = await api.cleanupRegisteredChildrenForTerminal(dir,
+    () => ({ alive: true, executable: child.executable, processIdentity: observed }),
+    () => assert.fail('an unreadable saved birth cannot authorize a signal'));
+  assert.equal(result[0]?.outcome, 'unknown-identity', JSON.stringify(result));
+  assert.equal(api.checkRecordedProcess({ pid: child.pid, processIdentity: malformed },
+    { present: true, processIdentity: observed }), 'unknown');
 });

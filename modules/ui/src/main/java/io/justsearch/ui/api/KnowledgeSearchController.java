@@ -305,12 +305,37 @@ public class KnowledgeSearchController {
             knowledgeServer, perSourceSearch, onlineAi, lambdaMartReranker, configStore);
   }
 
-  /**
-   * Handles search requests.
-   *
-   * POST /api/knowledge/search
-   * Body: { "query": "search text", "limit": 10 }
-   */
+  /** Fixed lexical enumeration for unattended Library hydration; never accepts a user query. */
+  public void handleCollectionFacet(Context ctx) {
+    long startNs = System.nanoTime();
+    try {
+      Map<?, ?> body = ctx.bodyAsClass(Map.class);
+      if (body == null || body.size() != 1 || !(body.get("maxDocsScanned") instanceof Number cap)
+          || cap.doubleValue() != cap.intValue() || cap.intValue() < 1) {
+        ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
+            "Only a positive maxDocsScanned is accepted", telemetry, ApiErrorHandler.routeOf(ctx)));
+        return;
+      }
+      var facets = new KnowledgeSearchRequest.Facets(true, cap.intValue(),
+          List.of(new KnowledgeSearchRequest.FieldSpec("collection", 100)));
+      var lexical = new PipelineConfig(true, false, false, "none", false, false, 0, false, false);
+      var request = new KnowledgeSearchRequest("*:*", 1, null, null, null, List.of("collection"),
+          null, null, facets, "lucene", false, false, lexical);
+      var response = adapter.search(request, RequestEngineContext.get(ctx));
+      ctx.json(Map.of("facets", response.facets() == null ? Map.of() : response.facets(),
+          "facetsTruncated", Boolean.TRUE.equals(response.facetsTruncated())));
+    } catch (KnowledgeClientException e) {
+      ctx.status(ApiErrorHandler.mapClientStatusToHttp(e.status()))
+          .json(ApiErrorHandler.toResponse(ApiErrorHandler.resolve(e), e, telemetry, ApiErrorHandler.routeOf(ctx)));
+    } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
+      ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
+    } finally {
+      recordRequestMetricsBestEffort(ctx, startNs);
+    }
+  }
+
+  /** Handles POST /api/knowledge/search: { "query": "search text", "limit": 10 }. */
   public void handleSearch(Context ctx) {
     var engineContext = RequestEngineContext.get(ctx);
     long startNs = System.nanoTime();
@@ -337,14 +362,6 @@ public class KnowledgeSearchController {
       if (query == null || query.isBlank()) {
         ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, "Query is required", telemetry, ApiErrorHandler.routeOf(ctx)));
         return;
-      }
-
-      // Foreground responsiveness: record UI activity for the Head's idle checks (VDU pacing).
-      // This is intentionally best-effort; it must never make search fail.
-      try {
-        knowledgeServer.recordUserActivity();
-      } catch (Exception ignored) {
-        // best-effort
       }
 
       log.info("Knowledge search: query='{}', limit={}", redact(new SensitiveQuery(query)), limit);
@@ -778,6 +795,8 @@ public class KnowledgeSearchController {
         .indexState("UNKNOWN")
         .statusStale(true)
         .statusStaleMs(snapshot != null ? System.currentTimeMillis() - snapshot.atMs() : 0L)
+        // Task t-20261013-ef3c41: nothing was counted, so the 0 in indexedDocuments is not a count.
+        .indexedDocumentsUnknown(true)
         .build();
   }
 
@@ -815,11 +834,6 @@ public class KnowledgeSearchController {
 
       log.info("Knowledge suggest: query='{}', limit={}", redact(new SensitiveQuery(query)), limit);
 
-      try {
-        knowledgeServer.recordUserActivity();
-      } catch (Exception ignored) {
-        // best-effort
-      }
 
       List<String> suggestions = adapter.suggest(query, limit, engineContext);
       ctx.json(Map.of("suggestions", suggestions));
@@ -855,11 +869,6 @@ public class KnowledgeSearchController {
       }
       Integer maxFolders = body.get("maxFolders") instanceof Number n ? n.intValue() : null;
 
-      try {
-        knowledgeServer.recordUserActivity();
-      } catch (Exception ignored) {
-        // best-effort
-      }
 
       log.info("Knowledge listFolders: parentPath='{}', maxFolders={}",
           redact(new SensitiveQuery(parentPath)), maxFolders);
@@ -901,11 +910,6 @@ public class KnowledgeSearchController {
           ? list.stream().filter(String.class::isInstance).map(String.class::cast).toList()
           : List.of();
 
-      try {
-        knowledgeServer.recordUserActivity();
-      } catch (Exception ignored) {
-        // best-effort
-      }
 
       log.info("Knowledge listFolderFiles: folderPath='{}', limit={}",
           redact(new SensitiveQuery(folderPath)), limit);

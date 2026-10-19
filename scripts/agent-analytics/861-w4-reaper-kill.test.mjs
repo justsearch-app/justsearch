@@ -126,7 +126,7 @@ function eligibleEntry(record = REC()) {
 /** A fake `taskkill` that counts invocations. Reaching it in an adverse test is the failure. */
 function countingExec() {
   const calls = [];
-  const exec = (file, args) => { calls.push([file, ...args].join(' ')); return { status: 0, stdout: '', stderr: '' }; };
+  const exec = (file, args) => { calls.push([file, ...args].join(' ')); return { status: 0, stdout: '{"outcome":"terminated"}', stderr: '' }; };
   return { exec, calls };
 }
 
@@ -270,7 +270,15 @@ await check('TOCTOU control: with a fresh snapshot the SAME entry proceeds — s
   assert.equal(res.refused, false);
   assert.equal(res.killed, true);
   assert.equal(res.confirmed, true, 'the confirmation read must see the pid gone');
-  assert.deepEqual(calls, [`taskkill.exe /PID ${PID} /F`], 'by pid, /F, and never /T');
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].startsWith('powershell.exe '));
+  assert.ok(calls[0].includes(`-Pid ${PID}`));
+  assert.ok(calls[0].includes(`-CreationFileTimeUtc ${record.creationFileTimeUtc}`));
+  assert.ok(calls[0].includes(`-Pid ${PID} -CreationFileTimeUtc ${record.creationFileTimeUtc} -Code 1`),
+    'termination rechecks the recorded birth on its handle');
+  assert.ok(calls[0].includes('terminate-process.ps1'), 'birth check and termination share one native handle');
+  assert.ok(!calls[0].includes('/T'));
+  assert.ok(!calls[0].includes('-Tree'), 'only the registered process, never its tree');
   assert.equal(reads, 2, 'executeReap reads the table twice: re-verify, then confirm');
   assert.equal(res.stamp.by.occasion, SWEEP_OCCASION);
   assert.equal(res.stamp.by.cell, CELLS.SAME_SESSION);
@@ -336,10 +344,10 @@ await check('executeReap refuses a contention entry, a refuse entry, and a repor
   assert.match(res.reason, /accepts only entries whose disposition is "reap"/);
 });
 
-await check('taskkillByPid refuses on a non-win32 platform rather than inventing a POSIX kill', () => {
+await check('taskkillByPid refuses Linux termination without a readable recorded identity', () => {
   const res = taskkillByPid(1234, { exec: () => { throw new Error('must not be called'); }, platform: 'linux' });
   assert.equal(res.ok, false);
-  assert.match(res.reason, /win32 only/);
+  assert.equal(res.outcome, 'unknown-identity');
 });
 
 await check("readDevRunnerActiveRun degrades to an empty claim when the dev-runner's state root is absent", async () => {
@@ -386,8 +394,8 @@ async function findOwnChildRow(pid, marker) {
   return null;
 }
 
-if (process.platform !== 'win32') {
-  skipped.push('REAL KILL: win32-only (the process table and taskkill are win32 surfaces)');
+if (!['win32', 'linux'].includes(process.platform)) {
+  skipped.push('REAL KILL: no native identity/termination backend on this platform');
 } else {
   await check('REAL KILL: a same-session record over a child this test spawned is verified, killed, confirmed, and retired', async () => {
     await withDisposableChild(async (child, marker) => {
@@ -404,6 +412,7 @@ if (process.platform !== 'win32') {
         producer: '861-w4-test-fixture',
         pid: child.pid,
         creationFileTimeUtc: found.row.CreationFileTimeUtc,
+        processIdentity: found.row.processIdentity,
         cmdlineFingerprint: marker,
         port: 65000,
         leaseDurationSec: 60,
@@ -453,6 +462,7 @@ if (process.platform !== 'win32') {
         producer: '861-w4-test-fixture',
         pid: child.pid,
         creationFileTimeUtc: found.row.CreationFileTimeUtc,
+        processIdentity: found.row.processIdentity,
         cmdlineFingerprint: marker,
         port: 65001,
         leaseDurationSec: 60,
@@ -479,7 +489,7 @@ if (process.platform !== 'win32') {
     assert.equal(res.refused, true, 'a record whose process is gone must refuse, not kill whatever now holds the pid');
     assert.equal(res.killed, false);
     assert.equal(res.identity.verdict, IDENTITY.MISMATCH);
-    assert.match(res.identity.reason, /not present in the process table/);
+    assert.match(res.identity.reason, process.platform === 'linux' ? /^process ended$/ : /not present in the process table/);
     const after = await readRecordFile(file);
     assert.equal(after.identityVerify?.verdict, IDENTITY.MISMATCH, 'retained and marked');
   });

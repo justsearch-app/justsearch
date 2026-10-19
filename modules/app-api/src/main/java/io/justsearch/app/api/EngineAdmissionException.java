@@ -4,7 +4,11 @@ package io.justsearch.app.api;
 /** A typed admission refusal, independent from operation dispatch authorization. */
 public final class EngineAdmissionException extends RuntimeException {
   private static final long serialVersionUID = 1L;
-  public enum Reason { CONTEXT_LIMIT, ENGINE_LIMIT, FROZEN, WORK_FINISHED }
+  /**
+   * Why the work was refused. {@link #INFERENCE_BUSY}: the foreground inference threads and their
+   * bounded queue are all occupied, so this inference request cannot even wait for a thread.
+   */
+  public enum Reason { CONTEXT_LIMIT, ENGINE_LIMIT, INFERENCE_BUSY, FROZEN, WORK_FINISHED }
 
   private final Reason reason;
   private final int retryAfterSeconds;

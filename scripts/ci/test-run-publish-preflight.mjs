@@ -14,7 +14,7 @@ const lifecycle = repositoryManifest.contexts.filter((entry) => entry.check === 
 assert.equal(lifecycle.length, 1, 'the required lifecycle check needs exactly one reproduction entry');
 assert.equal(lifecycle[0].mode, 'local-subset');
 assert.deepEqual(lifecycle[0].commands, [
-  './gradlew.bat :modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=false -PskipWebBuild=true --console=plain',
+  'node scripts/lib/tool-invoker.cjs gradle :modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=false -PskipWebBuild=true --console=plain',
 ]);
 
 const signalPolicy = {
@@ -55,6 +55,26 @@ assert.ok(calls.every((call) => call.options.cwd === 'fixture' && call.options.s
 assert.equal(commandForPlatform('./gradlew.bat checkLicense', 'win32'), '.\\gradlew.bat checkLicense');
 assert.equal(commandForPlatform('./gradlew.bat checkLicense', 'linux'), './gradlew.bat checkLicense');
 assert.equal(commandForPlatform('node scripts/ci/check.mjs', 'win32'), 'node scripts/ci/check.mjs');
+
+// --run uses this same executor: every local command must reach the shell in manifest order.
+const manifestCommands = repositoryManifest.contexts
+  .filter((context) => context.mode === 'local-subset')
+  .flatMap((context) => context.commands);
+for (const platform of ['win32', 'linux']) {
+  const executed = [];
+  assert.equal(executeLocalSubsets(repositoryManifest, {
+    checkCandidate() {},
+    cwd: 'fixture',
+    platform,
+    run(command, options) {
+      executed.push(command);
+      assert.deepEqual(options, { cwd: 'fixture', shell: true, stdio: 'inherit' });
+      return { status: 0 };
+    },
+  }), 0);
+  assert.deepEqual(executed, manifestCommands);
+  for (const command of manifestCommands) assert.equal(commandForPlatform(command, platform), command);
+}
 
 const gitStatusCalls = [];
 assert.throws(

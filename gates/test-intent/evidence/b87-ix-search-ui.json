@@ -1,0 +1,126 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T07:16:09.956Z",
+  "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+  "tree": "4ff41b3aeea8d36dd7bc1a67808e4e0476bb46e6",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-ask.test.ts\" \"src/shell-v0/views/AskFallbackReason.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\test-intent-vitest-33036-1791875760426.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2368
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts#keeps the retrieval fallback reason through citations and completion",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ad7f6cf07fb541470d0523b248ff8a31302d987646c8b86f199d358f1ddfe464",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps the retrieval fallback reason through citations and completion",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/AskFallbackReason.test.ts#Unified Chat includes the fallback cause in its retrieval preamble",
+      "file": "modules/ui-web/src/shell-v0/views/AskFallbackReason.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f45a23da4584ebc53e05a8b92f354b348152256d011be9f5fbf98ac7f211fe8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Ask retrieval explanation Unified Chat includes the fallback cause in its retrieval preamble",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/AskFallbackReason.test.ts#Search Ask shows its fallback cause without opening sources",
+      "file": "modules/ui-web/src/shell-v0/views/AskFallbackReason.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f45a23da4584ebc53e05a8b92f354b348152256d011be9f5fbf98ac7f211fe8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Ask retrieval explanation Search Ask shows its fallback cause without opening sources",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/AskFallbackReason.test.ts#Search Ask keeps its fallback cause on an empty terminal error",
+      "file": "modules/ui-web/src/shell-v0/views/AskFallbackReason.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f45a23da4584ebc53e05a8b92f354b348152256d011be9f5fbf98ac7f211fe8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Ask retrieval explanation Search Ask keeps its fallback cause on an empty terminal error",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "61ff9b955",
+    "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-ask.test.ts\" \"src/shell-v0/views/AskFallbackReason.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\test-intent-vitest-33036-1791875765941.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2681
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-ask.test.ts#keeps the retrieval fallback reason through citations and completion",
+        "classification": "assertion",
+        "detail": "keeps the retrieval fallback reason through citations and completion:  AssertionError: expected { sources: [ { …(11) } ], …(3) } to match object { retrievalMode: 'BM25', …(2) }\n(3 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///C:/agent-sandbox-tmp/b87-ix-search/ui-deps/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymou"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/AskFallbackReason.test.ts#Unified Chat includes the fallback cause in its retrieval preamble",
+        "classification": "assertion",
+        "detail": "Ask retrieval explanation Unified Chat includes the fallback cause in its retrieval preamble:  AssertionError: expected '1 passage used · bm25' to contain 'semantic search did not answer in time'\n    at F:/justsearch-public/.claude/worktrees/test-intent-before-vZQMot/modules/ui-web/src/shell-v0/views/AskFallbackReason.test.ts:17:30\n    at file:///C:/agent-sandbox-tmp/b87-ix-search/ui-deps/nod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/AskFallbackReason.test.ts#Search Ask shows its fallback cause without opening sources",
+        "classification": "assertion",
+        "detail": "Ask retrieval explanation Search Ask shows its fallback cause without opening sources:  AssertionError: expected '' to contain 'semantic search did not answer in time'\n    at F:/justsearch-public/.claude/worktrees/test-intent-before-vZQMot/modules/ui-web/src/shell-v0/views/AskFallbackReason.test.ts:35:33\n    at file:///C:/agent-sandbox-tmp/b87-ix-search/ui-deps/node_modules/@vitest/run"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/AskFallbackReason.test.ts#Search Ask keeps its fallback cause on an empty terminal error",
+        "classification": "assertion",
+        "detail": "Ask retrieval explanation Search Ask keeps its fallback cause on an empty terminal error:  AssertionError: expected 'The answer failed. No matching docume…' to contain 'semantic search did not answer in time'\n    at F:/justsearch-public/.claude/worktrees/test-intent-before-vZQMot/modules/ui-web/src/shell-v0/views/AskFallbackReason.test.ts:41:31\n    at file:///C:/agent-sandbox-tmp/b87-ix-s"
+      }
+    ]
+  },
+  "digest": "sha256:49a60bf4ac91f348f44e325c3670c1ce2e6160085dfa4f9236f1b6a0d2b51603"
+}

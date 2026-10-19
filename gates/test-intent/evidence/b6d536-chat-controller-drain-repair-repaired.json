@@ -1,0 +1,338 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:01:29.473Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "0a086e003ba39f811216a9068e2e75986d60f82a",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.aSearchAnswersWithoutExpansionWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.aSearchRecordsTheAiOffReasonWhenTheRefusalArrivesThroughTheFuture\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.queryUnderstandingSkipsLikeAiOffWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.filterNormalizationFallsBackLikeAiOffWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.contextSufficiencyAnswersUnknownLikeAiOffWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.gpl.GplDeferralDuringChatDrainTest.aRefusalAtTheCallDefersTheDocumentAndTheJobCompletesAfterTheDrain\" --tests \"io.justsearch.app.services.gpl.GplDeferralDuringChatDrainTest.aRefusalThroughTheFutureDefersTheDocumentInsteadOfDroppingIt\" --tests \"io.justsearch.app.services.vdu.VduDeferralDuringChatDrainTest.aDrainingGateDefersTheDocumentInsteadOfFailingIt\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15548
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.KnowledgeSearchDuringChatDrainTest.aSearchDuringADeactivateDrainAnswersWithoutExpansionLikeAiOff\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.aBusyChatServerRefusalIsTransientThroughTheSettingsRoute\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.aBusyChatServerRefusalIsTransientThroughTheChatModeRoute\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.anInterruptedTransitionRefusalIsTransient\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.anOccupiedSettingsTransactionIsATransientConflict\" --tests \"io.justsearch.ui.api.OpenAiCompatOfflineWordingTest.aRefusedConnectionSaysChatIsNotRunningWithoutTheStalePort\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10675
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java#aSearchAnswersWithoutExpansionWhenTheDrainingGateRefusesAtTheCall",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4cdda78c62c18264edaf878083be11e0e37af28aed2b2e296c7f38da51acc390",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSearchAnswersWithoutExpansionWhenTheDrainingGateRefusesAtTheCall()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java#aSearchRecordsTheAiOffReasonWhenTheRefusalArrivesThroughTheFuture",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4cdda78c62c18264edaf878083be11e0e37af28aed2b2e296c7f38da51acc390",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSearchRecordsTheAiOffReasonWhenTheRefusalArrivesThroughTheFuture()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java#queryUnderstandingSkipsLikeAiOffWhenTheDrainingGateRefusesAtTheCall",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4cdda78c62c18264edaf878083be11e0e37af28aed2b2e296c7f38da51acc390",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queryUnderstandingSkipsLikeAiOffWhenTheDrainingGateRefusesAtTheCall()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java#filterNormalizationFallsBackLikeAiOffWhenTheDrainingGateRefusesAtTheCall",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4cdda78c62c18264edaf878083be11e0e37af28aed2b2e296c7f38da51acc390",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "filterNormalizationFallsBackLikeAiOffWhenTheDrainingGateRefusesAtTheCall()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java#contextSufficiencyAnswersUnknownLikeAiOffWhenTheDrainingGateRefusesAtTheCall",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4cdda78c62c18264edaf878083be11e0e37af28aed2b2e296c7f38da51acc390",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "contextSufficiencyAnswersUnknownLikeAiOffWhenTheDrainingGateRefusesAtTheCall()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpl/GplDeferralDuringChatDrainTest.java#aRefusalAtTheCallDefersTheDocumentAndTheJobCompletesAfterTheDrain",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpl/GplDeferralDuringChatDrainTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:040a445431960437a33449ae09e68b95c658ebd26fb0330b6a4cbea93d19bbb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRefusalAtTheCallDefersTheDocumentAndTheJobCompletesAfterTheDrain()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpl/GplDeferralDuringChatDrainTest.java#aRefusalThroughTheFutureDefersTheDocumentInsteadOfDroppingIt",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpl/GplDeferralDuringChatDrainTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:040a445431960437a33449ae09e68b95c658ebd26fb0330b6a4cbea93d19bbb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRefusalThroughTheFutureDefersTheDocumentInsteadOfDroppingIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduDeferralDuringChatDrainTest.java#aDrainingGateDefersTheDocumentInsteadOfFailingIt",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduDeferralDuringChatDrainTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4c0f30b21e803d52e4f19c2bfdd7a5653ffa7cf4f692fd073af791b565df5ede",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aDrainingGateDefersTheDocumentInsteadOfFailingIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/KnowledgeSearchDuringChatDrainTest.java#aSearchDuringADeactivateDrainAnswersWithoutExpansionLikeAiOff",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/KnowledgeSearchDuringChatDrainTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5649542d592b825f8575a49c213ad3943cfc9862f7b39d93015ef4a3c03179d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSearchDuringADeactivateDrainAnswersWithoutExpansionLikeAiOff()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java#aBusyChatServerRefusalIsTransientThroughTheSettingsRoute",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:49d92652fb1855e456eb382b42942733e47fc14efba42f2a0beb9a11be3efcfe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aBusyChatServerRefusalIsTransientThroughTheSettingsRoute()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java#aBusyChatServerRefusalIsTransientThroughTheChatModeRoute",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:49d92652fb1855e456eb382b42942733e47fc14efba42f2a0beb9a11be3efcfe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aBusyChatServerRefusalIsTransientThroughTheChatModeRoute()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java#anInterruptedTransitionRefusalIsTransient",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:49d92652fb1855e456eb382b42942733e47fc14efba42f2a0beb9a11be3efcfe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anInterruptedTransitionRefusalIsTransient()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java#anOccupiedSettingsTransactionIsATransientConflict",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:49d92652fb1855e456eb382b42942733e47fc14efba42f2a0beb9a11be3efcfe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anOccupiedSettingsTransactionIsATransientConflict()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatOfflineWordingTest.java#aRefusedConnectionSaysChatIsNotRunningWithoutTheStalePort",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatOfflineWordingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:43c247d85b8ca42987d438160889cf489278339f9ebf650168666233a25b1a1f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRefusedConnectionSaysChatIsNotRunningWithoutTheStalePort()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d3fe74ef2",
+    "revision": "d3fe74ef2d998150a1645294115286aff441f4d0",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.aSearchAnswersWithoutExpansionWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.aSearchRecordsTheAiOffReasonWhenTheRefusalArrivesThroughTheFuture\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.queryUnderstandingSkipsLikeAiOffWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.filterNormalizationFallsBackLikeAiOffWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.worker.OptionalAiStepsDuringChatDrainTest.contextSufficiencyAnswersUnknownLikeAiOffWhenTheDrainingGateRefusesAtTheCall\" --tests \"io.justsearch.app.services.gpl.GplDeferralDuringChatDrainTest.aRefusalAtTheCallDefersTheDocumentAndTheJobCompletesAfterTheDrain\" --tests \"io.justsearch.app.services.gpl.GplDeferralDuringChatDrainTest.aRefusalThroughTheFutureDefersTheDocumentInsteadOfDroppingIt\" --tests \"io.justsearch.app.services.vdu.VduDeferralDuringChatDrainTest.aDrainingGateDefersTheDocumentInsteadOfFailingIt\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 86476
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.KnowledgeSearchDuringChatDrainTest.aSearchDuringADeactivateDrainAnswersWithoutExpansionLikeAiOff\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.aBusyChatServerRefusalIsTransientThroughTheSettingsRoute\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.aBusyChatServerRefusalIsTransientThroughTheChatModeRoute\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.anInterruptedTransitionRefusalIsTransient\" --tests \"io.justsearch.ui.api.TransitionRefusalProjectionTest.anOccupiedSettingsTransactionIsATransientConflict\" --tests \"io.justsearch.ui.api.OpenAiCompatOfflineWordingTest.aRefusedConnectionSaysChatIsNotRunningWithoutTheStalePort\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 92112
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java#aSearchAnswersWithoutExpansionWhenTheDrainingGateRefusesAtTheCall",
+        "classification": "assertion",
+        "detail": "aSearchAnswersWithoutExpansionWhenTheDrainingGateRefusesAtTheCall(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the search answers while chat drains ==> Unexpected exception thrown: java.lang.IllegalStateException: Generative component is unavailable"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java#aSearchRecordsTheAiOffReasonWhenTheRefusalArrivesThroughTheFuture",
+        "classification": "assertion",
+        "detail": "aSearchRecordsTheAiOffReasonWhenTheRefusalArrivesThroughTheFuture(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the same skip reason as when AI is off ==> expected: <AI_UNAVAILABLE> but was: <FAILED>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java#queryUnderstandingSkipsLikeAiOffWhenTheDrainingGateRefusesAtTheCall",
+        "classification": "assertion",
+        "detail": "queryUnderstandingSkipsLikeAiOffWhenTheDrainingGateRefusesAtTheCall(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: java.lang.IllegalStateException: Generative component is unavailable"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java#filterNormalizationFallsBackLikeAiOffWhenTheDrainingGateRefusesAtTheCall",
+        "classification": "assertion",
+        "detail": "filterNormalizationFallsBackLikeAiOffWhenTheDrainingGateRefusesAtTheCall(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: java.lang.IllegalStateException: Generative component is unavailable"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/OptionalAiStepsDuringChatDrainTest.java#contextSufficiencyAnswersUnknownLikeAiOffWhenTheDrainingGateRefusesAtTheCall",
+        "classification": "assertion",
+        "detail": "contextSufficiencyAnswersUnknownLikeAiOffWhenTheDrainingGateRefusesAtTheCall(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: java.lang.IllegalStateException: Generative component is unavailable"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpl/GplDeferralDuringChatDrainTest.java#aRefusalAtTheCallDefersTheDocumentAndTheJobCompletesAfterTheDrain",
+        "classification": "assertion",
+        "detail": "aRefusalAtTheCallDefersTheDocumentAndTheJobCompletesAfterTheDrain(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the job is not aborted by a transient refusal: GPL job aborted at offset 0 ==> expected: <COMPLETED> but was: <FAILED>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpl/GplDeferralDuringChatDrainTest.java#aRefusalThroughTheFutureDefersTheDocumentInsteadOfDroppingIt",
+        "classification": "assertion",
+        "detail": "aRefusalThroughTheFutureDefersTheDocumentInsteadOfDroppingIt(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the deferred document still yields its triples ==> expected: <2> but was: <0>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduDeferralDuringChatDrainTest.java#aDrainingGateDefersTheDocumentInsteadOfFailingIt",
+        "classification": "assertion",
+        "detail": "aDrainingGateDefersTheDocumentInsteadOfFailingIt(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a refused admission is not the document's failure ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/KnowledgeSearchDuringChatDrainTest.java#aSearchDuringADeactivateDrainAnswersWithoutExpansionLikeAiOff",
+        "classification": "assertion",
+        "detail": "aSearchDuringADeactivateDrainAnswersWithoutExpansionLikeAiOff(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the search answers (no error status) while chat drains: [{error=Generative component is unavailable, errorCode=INVALID_STATE, errorClass=PERMANENT, retryable=false, i18nKey=errors.INVALID_STATE}] ==> expected: <[]> but was: <[500]>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java#aBusyChatServerRefusalIsTransientThroughTheSettingsRoute",
+        "classification": "assertion",
+        "detail": "aBusyChatServerRefusalIsTransientThroughTheSettingsRoute(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a transition is not a server fault: Projected[status=500, body={error=Managed generative candidate was refused before settings commit, errorCode=GENERATIVE_PREPARATION_REFUSED, errorClass=PERMANENT, retryable=false, i18nKey=errors.INTERNAL_ERROR}] ==> expected: <"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java#aBusyChatServerRefusalIsTransientThroughTheChatModeRoute",
+        "classification": "assertion",
+        "detail": "aBusyChatServerRefusalIsTransientThroughTheChatModeRoute(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a transition is not a server fault: Projected[status=500, body={error=Managed generative candidate was refused before settings commit, errorCode=GENERATIVE_PREPARATION_REFUSED, errorClass=PERMANENT, retryable=false, i18nKey=errors.INVALID_STATE}] ==> expected: <5"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java#anInterruptedTransitionRefusalIsTransient",
+        "classification": "assertion",
+        "detail": "anInterruptedTransitionRefusalIsTransient(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a transition is not a server fault: Projected[status=500, body={error=Managed generative candidate was refused before settings commit, errorCode=GENERATIVE_PREPARATION_REFUSED, errorClass=PERMANENT, retryable=false, i18nKey=errors.INTERNAL_ERROR}] ==> expected: <"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/TransitionRefusalProjectionTest.java#anOccupiedSettingsTransactionIsATransientConflict",
+        "classification": "assertion",
+        "detail": "anOccupiedSettingsTransactionIsATransientConflict(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the contender may retry: Projected[status=409, body={error=Another settings transaction is active, errorCode=RECONFIGURE_IN_PROGRESS, errorClass=TRANSIENT, retryable=false, i18nKey=errors.SERVICE_UNAVAILABLE}] ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatOfflineWordingTest.java#aRefusedConnectionSaysChatIsNotRunningWithoutTheStalePort",
+        "classification": "assertion",
+        "detail": "aRefusedConnectionSaysChatIsNotRunningWithoutTheStalePort(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the message names no internal port: llama-server connect refused on port 8081 ==> expected: <false> but was: <true>"
+      }
+    ]
+  },
+  "digest": "sha256:3262433be40995f5a964582a04b1177ef3d3282af6794779fff7575d830451a6"
+}

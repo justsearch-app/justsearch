@@ -19,6 +19,8 @@ import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
 import io.justsearch.configuration.resolved.ConfigStore;
 
+import io.justsearch.ort.EncoderRole;
+import io.justsearch.ort.GpuCallPacker;
 import io.justsearch.ort.NativeSessionHandle;
 import io.justsearch.ort.OrtCudaStatus;
 import io.justsearch.ort.SessionAcquisitionRequest;
@@ -410,8 +412,19 @@ public final class SpladeEncoder implements Closeable {
     while (pos < n) {
       int batchStart = pos;
       int batchTokens = 0;
+      // Spec E §2.2: the plan read for this call may take fewer items than the count cap (items are
+      // in ascending length, so each prefix pads to its last item). Without a plan: the count cap.
+      int callItems =
+          GpuCallPacker.itemsPerCall(
+              sessions.arenaPlan(),
+              EncoderRole.SPLADE,
+              maxBatch,
+              n - pos,
+              i -> tokenCounts[sortedIndices[batchStart + i]],
+              this::inferenceSeqLen,
+              count -> count);
       while (pos < n
-          && (pos - batchStart) < maxBatch
+          && (pos - batchStart) < callItems
           && batchTokens + tokenCounts[sortedIndices[pos]] <= tokenBudget) {
         batchTokens += tokenCounts[sortedIndices[pos]];
         pos++;
@@ -491,6 +504,12 @@ public final class SpladeEncoder implements Closeable {
     return seqLen; // beyond largest bucket — use exact size
   }
 
+  /** The length a batch call whose longest item has {@code seqLen} tokens is padded to. */
+  private int inferenceSeqLen(int seqLen) {
+    return outputFormat != OutputFormat.PRESPARSE && pinnedOutputsSupported
+        ? bucketSeqLen(seqLen) : seqLen;
+  }
+
   /**
    * Ensures the pinned output tensor matches the required shape. Only reallocates when the bucketed
    * shape changes — with 4 buckets this means at most 4 allocations per session lifetime instead of
@@ -543,12 +562,13 @@ public final class SpladeEncoder implements Closeable {
       long[][] allInputIds, long[][] allAttentionMask, long[][] allTokenTypeIds, int batch, int len)
       throws OrtException {
     var acquisition = LocalSessionAcquisition.background();
-    try (var lease = sessions.acquire(acquisition)) {
+    try (var lease = GpuCallPacker.acquireForCall(
+        sessions, acquisition, EncoderRole.SPLADE, batch, inferenceSeqLen(len))) {
       if (!firstEncodeLogged) {
         firstEncodeLogged = true;
         log.info(
             "SPLADE first encode: using {} session (gpuConfigured={}, gpuAvailable={}, outputFormat={})",
-            sessions.isGpuAvailable() ? "GPU" : "CPU",
+            lease.isCpu() ? "CPU" : "GPU",
             sessions.status().configured(),
             sessions.isGpuAvailable(),
             outputFormat);
@@ -616,6 +636,8 @@ public final class SpladeEncoder implements Closeable {
               // Tempdoc 400 LR2-c: emit cpu_fallback.triggered event on the
               // active encoder.ort_run span.
               EncoderOrtRunSpans.emitCpuFallbackEvent("gpu_bfc_arena", "splade");
+              // Spec E invariant 1: the CPU step runs outside the device seat.
+              lease.close();
               try (var cpuLease = sessions.acquireCpu(acquisition)) {
                 buf = runHeapFallback(cpuLease, inputs, batch, inferLen);
               }
@@ -638,6 +660,8 @@ public final class SpladeEncoder implements Closeable {
               // Tempdoc 400 LR2-c: emit cpu_fallback.triggered event on the
               // active encoder.ort_run span.
               EncoderOrtRunSpans.emitCpuFallbackEvent("gpu_bfc_arena", "splade");
+              // Spec E invariant 1: the CPU step runs outside the device seat.
+              lease.close();
               try (var cpuLease = sessions.acquireCpu(acquisition)) {
                 buf = runHeapFallback(cpuLease, inputs, batch, inferLen);
               }
@@ -698,12 +722,13 @@ public final class SpladeEncoder implements Closeable {
   private Map<String, Float> runOnnxInferenceSingle(
       long[] inputIds, long[] attentionMask, long[] tokenTypeIds,
       SessionAcquisitionRequest acquisition) throws OrtException {
-    try (var lease = sessions.acquire(acquisition)) {
+    try (var lease = GpuCallPacker.acquireForCall(
+        sessions, acquisition, EncoderRole.SPLADE, 1, inputIds.length)) {
       if (!firstEncodeLogged) {
         firstEncodeLogged = true;
         log.info(
             "SPLADE first encode: using {} session (gpuConfigured={}, gpuAvailable={}, outputFormat={})",
-            sessions.isGpuAvailable() ? "GPU" : "CPU",
+            lease.isCpu() ? "CPU" : "GPU",
             sessions.status().configured(),
             sessions.isGpuAvailable(),
             outputFormat);
@@ -741,6 +766,8 @@ public final class SpladeEncoder implements Closeable {
                 seqLen);
             // Tempdoc 400 LR2-c.
             EncoderOrtRunSpans.emitCpuFallbackEvent("gpu_bfc_arena", "splade");
+            // Spec E invariant 1: the CPU step runs outside the device seat.
+            lease.close();
             try (var cpuLease = sessions.acquireCpu(acquisition)) {
               buf = runHeapFallback(cpuLease, inputs, 1, seqLen);
             }
@@ -910,6 +937,8 @@ public final class SpladeEncoder implements Closeable {
             batch, maxLen, e.getMessage());
         // Tempdoc 400 LR2-c.
         EncoderOrtRunSpans.emitCpuFallbackEvent("gpu_bfc_arena", "splade");
+        // Spec E invariant 1: the CPU step runs outside the device seat.
+        lease.close();
         try (var cpuLease = sessions.acquireCpu(acquisition)) {
           return runSparseOutputInference(
               cpuLease, allInputIds, allAttentionMask, allTokenTypeIds, batch, acquisition);
@@ -1206,6 +1235,30 @@ public final class SpladeEncoder implements Closeable {
   /** Returns true if GPU is currently available for inference. */
   public boolean isGpuAvailable() {
     return sessions.isGpuAvailable();
+  }
+
+  /** The device a query encode would select now (Spec D §1.1). */
+  public io.justsearch.ort.QueryDevice queryDevice() {
+    return sessions.queryDevice();
+  }
+
+  /** Whether a query encode would run now without creating a session (Spec D §4.2). */
+  public boolean isQueryWarm() {
+    return sessions.isQueryWarm();
+  }
+
+  public boolean isGpuRetryDue() {
+    return sessions.isGpuRetryDue();
+  }
+
+  /** Runs {@code listener} after a session of this encoder is created or released. */
+  public void addSessionGenerationListener(Runnable listener) {
+    sessions.addGenerationListener(listener);
+  }
+
+  /** Warms the CPU session a query the device turns away runs on (see SessionHandle). */
+  public boolean prewarmCpuForQueries(InferenceRequest request) {
+    return sessions.prewarmCpuForQueries(SessionAcquisitionRequest.from(request));
   }
 
   private static long[] copyLongBuffer(LongBuffer buffer) {

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.ai.install;
 
+import io.justsearch.configuration.NativeTargets;
 import io.justsearch.configuration.resolved.ConfigStore;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -32,8 +33,17 @@ public final class RuntimeRestoreUtil {
    * @return true if the runtime exe exists and is non-empty after restore
    */
   public static boolean ensureRuntimePresent(Path homeDir) {
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) {
+      ConfigStore store = ConfigStore.globalOrNull();
+      Path external = store == null ? null : store.get().ai().serverExe();
+      if (external == null) return false;
+      if (!Files.isRegularFile(external) || !Files.isExecutable(external)) {
+        throw new IllegalStateException("JUSTSEARCH_SERVER_EXE must name a regular executable file: " + external);
+      }
+      return true;
+    }
     Path targetDir = homeDir.resolve("native-bin").resolve("llama-server");
-    Path targetExe = targetDir.resolve("llama-server.exe");
+    Path targetExe = targetDir.resolve(NativeTargets.current().executableName("llama-server"));
 
     try {
       Files.createDirectories(targetDir);

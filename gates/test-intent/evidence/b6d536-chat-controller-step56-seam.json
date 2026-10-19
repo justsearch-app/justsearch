@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T17:35:01.134Z",
+  "revision": "228c9da66221dd21e9ded4debbd9efc4a2c20584",
+  "tree": "4a2354163bf6d721f4dc0931fdad20d6005dc6fa",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationSelfTestSeamTest.theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter\" --tests \"io.justsearch.app.services.vdu.OfflinePassChatSeamTest.aPassWithEmbeddingsPendingLeavesChatRunning\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11938
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestSeamTest.java#theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6effa64492e3b2d6659d1211e55c562bfeca0c99ed50f8f0c71b1d4aaad1836f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflinePassChatSeamTest.java#aPassWithEmbeddingsPendingLeavesChatRunning",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflinePassChatSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:90b95b0694e01156a158aaf8a3505e48b841e207ed34c8851381a050313ac172",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPassWithEmbeddingsPendingLeavesChatRunning()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d3fe74ef2",
+    "revision": "d3fe74ef2d998150a1645294115286aff441f4d0",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-chat-controller-step56-seam-compat.patch",
+        "contentDigest": "sha256:be36287b29e997a6a6a7bc80a818366fbe86d966a4704602ea538ff6558571bc"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationSelfTestSeamTest.theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter\" --tests \"io.justsearch.app.services.vdu.OfflinePassChatSeamTest.aPassWithEmbeddingsPendingLeavesChatRunning\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 49092
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestSeamTest.java#theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter",
+        "classification": "assertion",
+        "detail": "theMainServerIsStoppedBeforeTheCandidateLaunchesAndLoadsOnceAfter(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: U11: the main server is stopped before the candidate launches ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflinePassChatSeamTest.java#aPassWithEmbeddingsPendingLeavesChatRunning",
+        "classification": "assertion",
+        "detail": "aPassWithEmbeddingsPendingLeavesChatRunning(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: chat stays up through the pass ==> expected: <0> but was: <1775>"
+      }
+    ]
+  },
+  "digest": "sha256:15e56e001d9e85afdd9cbbfd63c73996a2b9d52a433085ce4053ccbbc938baaa"
+}

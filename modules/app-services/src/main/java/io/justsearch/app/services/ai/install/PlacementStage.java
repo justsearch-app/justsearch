@@ -96,6 +96,15 @@ final class PlacementStage {
       return "Failed to finalize: " + e.getMessage();
     }
 
+    if (io.justsearch.app.inference.ChatArtifactIdentity.isChatModel(targetFile)) {
+      try {
+        io.justsearch.app.inference.ChatArtifactIdentity.promoted(
+            partialFile, targetFile, dl.sizeBytes(), dl.sha256());
+      } catch (IOException unavailable) {
+        log.debug("Chat verification receipt could not follow promotion", unavailable);
+      }
+    }
+
     // Tempdoc 374 alpha.15 fix B: archive extraction. The cuda-runtime package ships its DLLs in a
     // single zip (too large for the NSIS installer payload). After download + SHA verification the
     // zip is expanded into the same directory; the archive itself stays on disk so the planner's
@@ -175,7 +184,11 @@ final class PlacementStage {
    * models by guesswork.
    */
   void writeContract(InstallContract contract, Path homeDir) {
+    var before = InstallContractIO.read(homeDir);
     InstallContractIO.write(contract, homeDir);
+    io.justsearch.core.status.StatusChangeCounter.process().changed(
+        before == null ? null : java.util.Arrays.asList(before.downloadProfile(), before.models()),
+        java.util.Arrays.asList(contract.downloadProfile(), contract.models()));
     log.info("Install contract written to {}", homeDir.resolve(InstallContract.CONTRACT_FILENAME));
   }
 }

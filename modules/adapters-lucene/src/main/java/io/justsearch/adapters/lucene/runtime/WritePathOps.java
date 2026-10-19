@@ -11,6 +11,9 @@ import net.jcip.annotations.ThreadSafe;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -19,6 +22,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.document.SortedNumericDocValuesField;
 import org.apache.lucene.index.DocValues;
+import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FloatVectorValues;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexableField;
@@ -330,6 +334,100 @@ public final class WritePathOps {
     return readModifyWrite(searcher, docId, updates, new ParentSliceCache());
   }
 
+  boolean backfillChunkDeclarations(
+      IndexSearcher searcher, int parent, String docId, ChunkSetCompleteness.Declaration declaration)
+      throws IOException {
+    LifecycleSnapshot snap = session.snapshot;
+    if (snap == null || snap.writer() == null) return false;
+    // The coordinator holds its mutation lock. Re-read the current writer snapshot rather than
+    // overwriting a parent/status change made since the admission searcher was acquired.
+    try (var reader = DirectoryReader.open(snap.writer())) {
+      var current = new IndexSearcher(reader);
+      var hits = current.search(new TermQuery(new Term(idField, docId)), 1);
+      if (hits.scoreDocs.length == 0) return false;
+      int currentParent = hits.scoreDocs[0].doc;
+      long verifiedModified = session.readPathOps.readLongDocValueOrStoredLong(searcher, parent, SchemaFields.MODIFIED_AT);
+      long currentModified = session.readPathOps.readLongDocValueOrStoredLong(current, currentParent, SchemaFields.MODIFIED_AT);
+      String content = current.storedFields().document(currentParent).get(SchemaFields.CONTENT);
+      if (verifiedModified != currentModified
+          || !declaration.revision().equals(ChunkParentRevision.sha256Hex(content == null ? "" : content))) return false;
+      // Recheck children under the same lock: no partial/delete-only mutation can be certified
+      // using the older admission snapshot. This does not invoke the splitter again.
+      if (!session.chunkCompleteness.matchesDeclaration(current, docId, declaration.total(), declaration.revision())) return false;
+      // This immutable snapshot is protected by the coordinator's mutation lock. Every
+      // complete legacy parent shares its child summaries and the one subsequent refresh.
+      // A partial set remains undeclared and therefore follows normal repair admission.
+      var complete = new LinkedHashMap<String, ChunkSetCompleteness.Declaration>();
+      var docNumbers = new HashMap<String, Integer>();
+      for (var entry : session.chunkCompleteness.legacyParents(current, idField).entrySet()) {
+        var assessment = session.chunkCompleteness.assess(current, entry.getValue(), entry.getKey());
+        if (assessment.complete() && assessment.backfill() != null) {
+          complete.put(entry.getKey(), assessment.backfill());
+          docNumbers.put(entry.getKey(), entry.getValue());
+        }
+      }
+      var sparse = legacySparseFeatures(current, new HashSet<>(docNumbers.values()));
+      for (var entry : complete.entrySet())
+        installChunkDeclaration(current, docNumbers.get(entry.getKey()), entry.getKey(), entry.getValue(), sparse.get(docNumbers.get(entry.getKey())));
+      return true;
+    }
+  }
+
+  private boolean installChunkDeclaration(IndexSearcher searcher, int parent, String docId,
+      ChunkSetCompleteness.Declaration declaration, Map<String, Float> sparse) throws IOException {
+    var updates = new HashMap<String, Object>();
+    updates.put(SchemaFields.CHUNK_TOTAL, declaration.total());
+    updates.put(SchemaFields.CHUNK_PARENT_CONTENT_SHA256, declaration.revision());
+    updates.put(SchemaFields.CONTENT_SHA256, declaration.revision());
+    // A declaration migration must retain completed sparse artifacts. Supplying the existing
+    // features bypasses the ordinary RMW reset-status lane, which would schedule re-encoding.
+    if (session.fieldMapper.fieldDef(SchemaFields.SPLADE) != null) {
+      updates.put(SchemaFields.SPLADE, sparse == null ? Map.of() : sparse);
+      // These companions are doc-values-only in the production catalog. Reconstructing stored
+      // fields cannot retain them once the ordinary reset-status policy has been bypassed.
+      String status = readKeywordDocValue(searcher, parent, SchemaFields.SPLADE_STATUS);
+      if (status != null) updates.put(SchemaFields.SPLADE_STATUS, status);
+      Long retry = readNumericDocValue(searcher, parent, SchemaFields.SPLADE_RETRY_COUNT);
+      if (retry != null) updates.put(SchemaFields.SPLADE_RETRY_COUNT, retry);
+    }
+    return readModifyWrite(searcher, docId, updates);
+  }
+
+  /** One sparse term pass for the whole migration, using Lucene's public feature decoder. */
+  private Map<Integer, Map<String, Float>> legacySparseFeatures(IndexSearcher searcher,
+      Set<Integer> parents) throws IOException {
+    var result = new HashMap<Integer, Map<String, Float>>();
+    if (parents.isEmpty()) return result;
+    long started = System.nanoTime();
+    long termsVisited = 0;
+    long featuresRead = 0;
+    for (var context : searcher.getIndexReader().leaves()) {
+      var localParents = parents.stream().mapToInt(doc -> doc - context.docBase)
+          .filter(doc -> doc >= 0 && doc < context.reader().maxDoc()).sorted().toArray();
+      if (localParents.length == 0) continue;
+      var terms = context.reader().terms(SchemaFields.SPLADE);
+      if (terms == null) continue;
+      var iterator = terms.iterator();
+      for (var term = iterator.next(); term != null; term = iterator.next()) {
+        termsVisited++;
+        String feature = term.utf8ToString();
+        var values = org.apache.lucene.document.FeatureField.newDoubleValues(SchemaFields.SPLADE, feature)
+            .getValues(context, null);
+        for (int parent : localParents) {
+          if (values.advanceExact(parent)) {
+            result.computeIfAbsent(context.docBase + parent, ignored -> new HashMap<>())
+                .put(feature, (float) values.doubleValue());
+            featuresRead++;
+          }
+        }
+      }
+    }
+    if (termsVisited > 0) log.debug(
+        "Prepared legacy sparse preservation: parents={}, termsVisited={}, featuresRead={}, elapsedMs={}",
+        parents.size(), termsVisited, featuresRead, (System.nanoTime() - started) / 1_000_000.0);
+    return result;
+  }
+
   /**
    * Per-batch memo of the parent documents a chunk RMW re-slices from: the stored content, and the
    * SHA-256 revision identity {@link #preserveChunkContent} compares against the chunk's own
@@ -372,6 +470,16 @@ public final class WritePathOps {
       Map<String, Object> updates,
       ParentSliceCache parentCache)
       throws IOException {
+    return readModifyWrite(searcher, docId, updates, parentCache, Map.of());
+  }
+
+  private boolean readModifyWrite(
+      IndexSearcher searcher,
+      String docId,
+      Map<String, Object> updates,
+      ParentSliceCache parentCache,
+      Map<String, Object> expectedFields)
+      throws IOException {
     var topDocs = searcher.search(new TermQuery(new Term(idField, docId)), 1);
     if (topDocs.scoreDocs.length == 0) {
       log.debug("readModifyWrite: document not found: {}", docId);
@@ -404,6 +512,12 @@ public final class WritePathOps {
       }
     }
 
+    for (var expected : expectedFields.entrySet()) {
+      if (!java.util.Objects.equals(fields.get(expected.getKey()), expected.getValue())) {
+        return false;
+      }
+    }
+
     // A parent read here can serve every sibling chunk in batch/path RMW. More importantly, a
     // rename rewrites the parent first while this searcher still exposes the old identity; caching
     // its content lets all old-parent chunk slices survive that rewrite exactly.
@@ -423,6 +537,11 @@ public final class WritePathOps {
 
     // Apply updates (overwrites existing values, including anything the engine restored)
     fields.putAll(updates);
+    if (updates.containsKey(SchemaFields.CONTENT)) {
+      String content = asString(fields.get(SchemaFields.CONTENT));
+      fields.put(SchemaFields.CONTENT_SHA256,
+          ChunkParentRevision.sha256Hex(content == null ? "" : content));
+    }
 
     // Write-time status/artifact contract (tempdoc 798). The merged map — existing stored fields
     // union rmwPolicy-preserved fields union the caller's updates — is exactly what will be
@@ -829,6 +948,12 @@ public final class WritePathOps {
    * preserved per their catalog {@code rmwPolicy} (tempdoc 711).
    */
   boolean updateDocument(String docId, Map<String, Object> updates) {
+    return updateDocumentIf(docId, Map.of(), updates);
+  }
+
+  /** Caller holds IndexingCoordinator's dispatch lock through the comparison and write. */
+  boolean updateDocumentIf(
+      String docId, Map<String, Object> expectedFields, Map<String, Object> updates) {
     guardWritable();
     if (docId == null || docId.isBlank() || updates == null || updates.isEmpty()) {
       return false;
@@ -838,7 +963,8 @@ public final class WritePathOps {
       if (refreshSnap != null && refreshSnap.searcherManager() != null) {
         refreshSnap.searcherManager().maybeRefreshBlocking();
       }
-      return bridge.withSearcherNoRefresh(searcher -> readModifyWrite(searcher, docId, updates));
+      return bridge.withSearcherNoRefresh(searcher ->
+          readModifyWrite(searcher, docId, updates, new ParentSliceCache(), expectedFields));
     } catch (IOException e) {
       log.error("Failed to update document {}", docId, e);
       throw new IndexRuntimeIOException(classifyIOException(e), "Failed to update document", e);

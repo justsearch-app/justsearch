@@ -52,6 +52,15 @@ testing {
               // Enable ByteBuddy experimental mode for JDK 25 support (until ByteBuddy 1.17.5+)
               "-Dnet.bytebuddy.experimental=true"
             )
+            // Spec A U14 (LlamaExchangeLeaseScanTest) reads these sources outside this module.
+            // Declared so a cached result is not replayed after they change.
+            inputs
+              .files(
+                fileTree(rootDir.resolve("modules")) { include("*/src/main/java/**/*.java") },
+                fileTree(rootDir.resolve("scripts/jseval/jseval")) { include("**/*.py") },
+              )
+              .withPropertyName("llamaExchangeScanSources")
+              .withPathSensitivity(PathSensitivity.RELATIVE)
           }
         }
       }

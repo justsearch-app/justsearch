@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T16:06:27.263Z",
+  "revision": "124def8a103222373661d9ef2fc1bb27b7f8e64b",
+  "tree": "0bd6e2823715316357109ba51142afa099f11d30",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.InlineEmbeddingBulkHoldTest.energySaverStillEmbedsInline\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3718
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/InlineEmbeddingBulkHoldTest.java#energySaverStillEmbedsInline",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/InlineEmbeddingBulkHoldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:99561087d70a9caf70ada346babc27ffb55bb32667d77b95d92135e8a8a083aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "energySaverStillEmbedsInline(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "124def8a1",
+    "revision": "124def8a103222373661d9ef2fc1bb27b7f8e64b",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.InlineEmbeddingBulkHoldTest.energySaverStillEmbedsInline\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 28176
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/InlineEmbeddingBulkHoldTest.java#energySaverStillEmbedsInline",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:9015a1418cc30212cd331b76304203d6e4d423ee643d2969da2e68dce117a1f5"
+}

@@ -7,12 +7,9 @@ import static org.mockito.Mockito.*;
 import io.justsearch.app.api.OfflineProcessingOutcome;
 import io.justsearch.app.api.OfflineProcessingOutcome.BlockReason;
 import io.justsearch.app.api.OfflineProcessingOutcome.EmbeddingHandoff;
-import io.justsearch.app.api.OnlineAiLifecycleControl;
 import io.justsearch.app.engine.DefaultEngineExecutorRegistry;
 import io.justsearch.app.engine.EngineAdmissionController;
 import io.justsearch.app.services.intent.EngineProvenance;
-import io.justsearch.app.services.runtimestate.RuntimeReconciler;
-import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.app.services.vdu.OfflineCoordinator;
 import io.justsearch.app.services.vdu.VduBatchProcessor;
 import io.justsearch.app.services.vdu.VduCapabilityState;
@@ -30,7 +27,8 @@ class VduProcedureExecutorLifetimeTest {
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
     var admission = new EngineAdmissionController(1, 1, 1);
-    var reconciler = mock(RuntimeReconciler.class);
+    // The procedure's own work blocks, ignoring interrupts, until released.
+    var client = mock(KnowledgeClient.class);
     doAnswer(invocation -> {
       entered.countDown();
       boolean interrupted = false;
@@ -39,13 +37,11 @@ class VduProcedureExecutorLifetimeTest {
         catch (InterruptedException expected) { interrupted = true; }
       }
       if (interrupted) Thread.currentThread().interrupt();
-      return null;
-    }).when(reconciler).endProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH);
-    var client = mock(KnowledgeClient.class);
+      return 0;
+    }).when(client).recoverVduProcessing(any());
     try (var registry = new DefaultEngineExecutorRegistry();
         var coordinator = new OfflineCoordinator(registry, admission,
-            mock(OnlineAiLifecycleControl.class), reconciler, mock(VduBatchProcessor.class),
-            () -> client, new VduCapabilityState())) {
+            mock(VduBatchProcessor.class), () -> client, new VduCapabilityState())) {
       try {
         var context = EngineProvenance.internal("timeout-enrichment",
             EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
@@ -77,14 +73,10 @@ class VduProcedureExecutorLifetimeTest {
     var stopped = new CountDownLatch(1);
     var closeFailure = new AtomicReference<Throwable>();
     var admission = new EngineAdmissionController(2, 4, 1);
-    var inference = mock(OnlineAiLifecycleControl.class);
-    when(inference.isOnline()).thenReturn(true);
     var client = mock(KnowledgeClient.class);
     when(client.countPendingVdu(any())).thenReturn(1);
+    // The batch (and the VDU hold it closes on the way out) blocks, ignoring interrupts.
     var batch = mock(VduBatchProcessor.class);
-    when(batch.processPendingFiles(any(), any())).thenReturn(new OfflineProcessingOutcome(
-        1, 1, 0, BlockReason.NONE, EmbeddingHandoff.NOT_EVALUATED));
-    var reconciler = mock(RuntimeReconciler.class);
     doAnswer(invocation -> {
       entered.countDown();
       boolean wasInterrupted = false;
@@ -96,12 +88,12 @@ class VduProcedureExecutorLifetimeTest {
         }
       }
       if (wasInterrupted) Thread.currentThread().interrupt();
-      return null;
-    }).when(reconciler).endProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH);
+      return new OfflineProcessingOutcome(1, 1, 0, BlockReason.NONE, EmbeddingHandoff.NOT_EVALUATED);
+    }).when(batch).processPendingFiles(any(), any());
     try (var registry = new DefaultEngineExecutorRegistry();
-        var coordinator = new OfflineCoordinator(registry, admission, inference, reconciler,
+        var coordinator = new OfflineCoordinator(registry, admission,
             batch, () -> client, new VduCapabilityState())) {
-      var sampler = new VduOfflineTriggerSampler(registry, () -> coordinator, () -> null, () -> false);
+      var sampler = expiredStartupSampler(registry, coordinator);
       Thread closer = null;
       try {
         var check = VduOfflineTriggerSampler.class.getDeclaredMethod("checkOnce");
@@ -138,6 +130,24 @@ class VduProcedureExecutorLifetimeTest {
         if (closer != null) closer.join(5_000);
         sampler.stop();
       }
+    }
+  }
+  private static VduOfflineTriggerSampler expiredStartupSampler(
+      io.justsearch.core.execution.EngineExecutorRegistry registry, OfflineCoordinator coordinator)
+      throws Exception {
+    try {
+      var constructor = VduOfflineTriggerSampler.class.getDeclaredConstructor(
+          io.justsearch.core.execution.EngineExecutorRegistry.class, java.util.function.Supplier.class,
+          java.util.function.Supplier.class, java.util.function.BooleanSupplier.class,
+          java.util.function.Supplier.class, java.util.function.LongSupplier.class);
+      constructor.setAccessible(true);
+      return constructor.newInstance(registry, (java.util.function.Supplier<OfflineCoordinator>) () -> coordinator,
+          (java.util.function.Supplier<io.justsearch.app.services.worker.KnowledgeServerBootstrap>) () -> null,
+          (java.util.function.BooleanSupplier) () -> false,
+          (java.util.function.Supplier<io.justsearch.app.inference.chat.ChatHolds>) () -> null,
+          (java.util.function.LongSupplier) () -> Long.MAX_VALUE);
+    } catch (NoSuchMethodException beforeStartupRepair) {
+      return new VduOfflineTriggerSampler(registry, () -> coordinator, () -> null, () -> false);
     }
   }
 }

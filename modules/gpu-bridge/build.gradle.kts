@@ -5,6 +5,8 @@ plugins {
 }
 
 dependencies {
+  // GpuMemoryReader and its sample types (ADR-0050); app-api does not depend on gpu-bridge.
+  api(project(":modules:app-api"))
   implementation(project(":modules:configuration"))
   implementation(libs.slf4j.api)
 }
@@ -18,6 +20,7 @@ testing {
         implementation(testFixtures(project(":modules:configuration")))
         implementation(platform(libs.junit.bom))
         implementation(libs.junit.jupiter.api)
+        implementation(libs.mockito.core)
         implementation("org.junit.jupiter:junit-jupiter-params:5.14.3")
         runtimeOnly(libs.junit.jupiter.engine)
         runtimeOnly(libs.junit.platform.launcher)
@@ -29,4 +32,8 @@ testing {
 tasks.withType<Test>().configureEach {
   jvmArgs("--enable-native-access=ALL-UNNAMED")
   workingDir = rootProject.projectDir
+}
+
+tasks.named<Test>("test") {
+  inputs.property("linuxGpuCheck", providers.environmentVariable("JUSTSEARCH_LINUX_GPU_CHECK").orElse(""))
 }

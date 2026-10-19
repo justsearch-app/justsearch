@@ -1,0 +1,97 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T17:20:20.597Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "c3547acde276826c1505e519e92c525fe2062f42",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeChatCauseTest.aFailureWithoutAClassifiedCauseKeepsItsMessage\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13885
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/state/chatFailureCause.test.ts\" \"src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts\" \"src/shell-v0/views/HealthSurface.render.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-3\\\\test-intent-vitest-23536-1791998418639.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1956
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java#aFailureWithoutAClassifiedCauseKeepsItsMessage",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeChatCauseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:15273c990c23102a9ec716b6d2bf0e41ed05aaad429cd37a5e477cdf26b2d381",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailureWithoutAClassifiedCauseKeepsItsMessage()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts#a chat model that is merely offline still says offline",
+      "file": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:93eda6dad18cd2a2c5c4ce2c497c5cb34d9c796e0e0c0ebdb0a025aab3feca8f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chat failure cause — Spec A step 7 (F1) a chat model that is merely offline still says offline",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts#a condition's own message still wins over the catalog's per-reason sentence",
+      "file": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1247241fb91b7f2779ca51686d29e574e71e86c358032c94bddd8a50ca53a343",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "(HealthEvent, activity-row) canonical strategy — Pass-8 mirror a condition's own message still wins over the catalog's per-reason sentence",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts#F1: an AI Engine that is merely offline still says Offline",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a90929cb3d78a28bb2dd2481c28f3254af0b79e0f4050d7a84734fa89ffb86af",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HealthSurface — recommendedActions panel F1: an AI Engine that is merely offline still says Offline",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:4fca049e632057cb749462c80b3959494e02598a0edc35010d4640f52518a67a"
+}

@@ -1,0 +1,234 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:d6365732a21827c41b0aed4b763fad01ff0383a5f7bddf14e2973868ad16dff8"
+  },
+  "createdAt": "2026-10-13T22:40:11.685Z",
+  "revision": "ce7685a1c7be8d40170f185f3b0e96b5fcadea72",
+  "tree": "386c82a8b1069b0f1725d723d87584b88c913de3",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VerifierStatus5Test.realEncryptionOwnerPublishesItsCanonicalStateChange\" --tests \"io.justsearch.ui.api.VerifierStatus5Test.samplerFailureAndRecoveryPublishCanonicalFreshnessChanges\" --tests \"io.justsearch.ui.api.StatusPublicationCompletenessTest.everyStatusBearingFieldAndFutureProducerHasAPublicationPath\" --tests \"io.justsearch.ui.api.StatusPublicationCompletenessTest.producerWithoutOwnerPublicationStillSignalsCanonicalChange\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 23842
+    },
+    {
+      "command": "npx vitest run \"src/api/statusBoundary.test.ts\" \"src/api/statusBoundaryPoll.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b82g-status-records\\\\fe\\\\t\\\\test-intent-vitest-22244-1791931107477.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3326
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java#realEncryptionOwnerPublishesItsCanonicalStateChange",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4c252c1f897d2e46c88e87acaf8212b100bd64b58151b9a867942d715a2df76a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realEncryptionOwnerPublishesItsCanonicalStateChange(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java#samplerFailureAndRecoveryPublishCanonicalFreshnessChanges",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4c252c1f897d2e46c88e87acaf8212b100bd64b58151b9a867942d715a2df76a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "samplerFailureAndRecoveryPublishCanonicalFreshnessChanges()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java#everyStatusBearingFieldAndFutureProducerHasAPublicationPath",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f333fcc82cdf8e8573de7be9dccf49ea493565e1c5d06b3a60649789466b6363",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyStatusBearingFieldAndFutureProducerHasAPublicationPath()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java#producerWithoutOwnerPublicationStillSignalsCanonicalChange",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f333fcc82cdf8e8573de7be9dccf49ea493565e1c5d06b3a60649789466b6363",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "producerWithoutOwnerPublicationStillSignalsCanonicalChange()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/statusBoundary.test.ts",
+      "file": "modules/ui-web/src/api/statusBoundary.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f81ca25277ad1e07ec301bff0e8d8c043fa983a2b2717eb715756991ea184905",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "independent server publication boundary a refused read-only request still observes a foreign completed publication",
+          "status": "passed"
+        },
+        {
+          "name": "independent server publication boundary a newer foreign publication on a read-only response refreshes once and leaves the body readable",
+          "status": "passed"
+        },
+        {
+          "name": "independent server publication boundary a retired head response cannot replace a snapshot after a refused new-head read",
+          "status": "passed"
+        },
+        {
+          "name": "independent server publication boundary missing metadata cannot certify an older response as current after a restart signal",
+          "status": "passed"
+        },
+        {
+          "name": "independent server publication boundary an ordinary canonical poll with newer change metadata initiates a bounded fresh read",
+          "status": "passed"
+        },
+        {
+          "name": "independent server publication boundary many read-only unchanged responses do not refresh",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/statusBoundaryPoll.test.ts",
+      "file": "modules/ui-web/src/api/statusBoundaryPoll.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3e726a49698ee97eac5dbaf411793def02e8a950ff711e7349d6ae453005109b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a restarted head with a refused read clears subscribers and cannot replay the old body to a new subscriber",
+          "status": "passed"
+        },
+        {
+          "name": "an ordinary cached poll schedules one fresh read and a failed read never schedules itself",
+          "status": "passed"
+        },
+        {
+          "name": "the mounted Security view discards the prior epoch while preserving transient same-epoch failures (metadata=true)",
+          "status": "passed"
+        },
+        {
+          "name": "the mounted Security view discards the prior epoch while preserving transient same-epoch failures (metadata=false)",
+          "status": "passed"
+        },
+        {
+          "name": "restarting the store cannot retain the previous head body when the next head refuses its first read",
+          "status": "passed"
+        },
+        {
+          "name": "headerlessStatusConvergesAfterSseEpoch (SSE before the first body=false)",
+          "status": "passed"
+        },
+        {
+          "name": "headerlessStatusConvergesAfterSseEpoch (SSE before the first body=true)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "93479e944",
+    "revision": "93479e944a42f6e64fdbf3d3e34b4a24c6ffcb21",
+    "overlays": [
+      "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java",
+      "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus2Test.java",
+      "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus3Test.java",
+      "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java",
+      "modules/ui/src/test/java/io/justsearch/ui/api/StatusLaneAging.java",
+      "modules/ui-web/node_modules/.before-run-private-install"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b67-status-backstop-compat.patch",
+        "contentDigest": "sha256:1c1392f24a3feea1596d9adbd7a5305c0d0a4eef5ebf292e98f1657670d2c14e"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VerifierStatus5Test.realEncryptionOwnerPublishesItsCanonicalStateChange\" --tests \"io.justsearch.ui.api.VerifierStatus5Test.samplerFailureAndRecoveryPublishCanonicalFreshnessChanges\" --tests \"io.justsearch.ui.api.StatusPublicationCompletenessTest.everyStatusBearingFieldAndFutureProducerHasAPublicationPath\" --tests \"io.justsearch.ui.api.StatusPublicationCompletenessTest.producerWithoutOwnerPublicationStillSignalsCanonicalChange\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 81868
+      },
+      {
+        "command": "npx vitest run \"src/api/statusBoundary.test.ts\" \"src/api/statusBoundaryPoll.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b82g-status-records\\\\fe\\\\t\\\\test-intent-vitest-22244-1791931203411.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3219
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java#realEncryptionOwnerPublishesItsCanonicalStateChange",
+        "classification": "assertion",
+        "detail": "realEncryptionOwnerPublishesItsCanonicalStateChange(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the real owner changed canonical status but the next read-only response carries no change signal ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java#samplerFailureAndRecoveryPublishCanonicalFreshnessChanges",
+        "classification": "assertion",
+        "detail": "samplerFailureAndRecoveryPublishCanonicalFreshnessChanges(): org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (2 failures)&#13;&#10;&#9;org.opentest4j.AssertionFailedError: canonical freshness changed to stale but a read-only response carries no publication ==> expected: <true> but was: <false>&#13;&#10;&#9;org.opentest4j.AssertionFailedError: canonica"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java#everyStatusBearingFieldAndFutureProducerHasAPublicationPath",
+        "classification": "assertion",
+        "detail": "everyStatusBearingFieldAndFutureProducerHasAPublicationPath(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Canonical status has no completeness publication path for unregistered fields/producers"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java#producerWithoutOwnerPublicationStillSignalsCanonicalChange",
+        "classification": "assertion",
+        "detail": "producerWithoutOwnerPublicationStillSignalsCanonicalChange(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Canonical status has no completeness publication path for unregistered fields/producers"
+      },
+      {
+        "id": "modules/ui-web/src/api/statusBoundary.test.ts",
+        "classification": "assertion",
+        "detail": "independent server publication boundary a refused read-only request still observes a foreign completed publication:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at C:/agent-sandbox-tmp/b82g-status-records/fe/t/test-intent-before-HWnXXB/modules/ui-web/src/api/statusBoundary.test.ts:13:19\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///C:/age | independent server publication boundary missing metadata cannot certify an older"
+      },
+      {
+        "id": "modules/ui-web/src/api/statusBoundaryPoll.test.ts",
+        "classification": "assertion",
+        "detail": "a restarted head with a refused read clears subscribers and cannot replay the old body to a new subscriber:  AssertionError: expected { …(31) } to be null\n    at C:/agent-sandbox-tmp/b82g-status-records/fe/t/test-intent-before-HWnXXB/modules/ui-web/src/api/statusBoundaryPoll.test.ts:37:18\n    at file:///C:/agent-sandbox-tmp/b82g-status-records/fe/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20 | an ordinary cached poll schedules one fresh read and a failed read never schedules itself:"
+      }
+    ]
+  },
+  "digest": "sha256:79c328da4d42f14c0d062c70c013adf908cf0298e279b677477bd67974b49fe5"
+}

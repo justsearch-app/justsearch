@@ -134,6 +134,9 @@ public final class RunStreamController {
       ctx.status(423).json(locked);
       return;
     }
+    // Spec A step 9: the residency gate answers before the stream commits (reconciliation F8: a
+    // request without allowLoad is an agent's and never loads chat under pressure).
+    if (!chat.admitResidency(ctx, body)) return;
     createHandler.handle(ctx);
   }
 

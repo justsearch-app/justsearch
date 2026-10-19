@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "windows-x86_64": {
+      "executables": {
+        "llama-server": "llama-server.exe",
+        "curl": "curl.exe",
+        "tesseract": "tesseract.exe",
+        "nvidia-smi": "nvidia-smi.exe",
+        "java-gui": "javaw.exe"
+      },
+      "libraries": {
+        "cuda": "nvcuda.dll",
+        "nvml": "nvml.dll",
+        "ort": "onnxruntime.dll",
+        "ort-jni": "onnxruntime4j_jni.dll",
+        "ort-shared": "onnxruntime_providers_shared.dll",
+        "ort-cuda": "onnxruntime_providers_cuda.dll",
+        "cudart": "cudart64_12.dll",
+        "cublasLt": "cublasLt64_12.dll",
+        "cublas": "cublas64_12.dll",
+        "cufft": "cufft64_11.dll",
+        "curand": "curand64_10.dll",
+        "cusparse": "cusparse64_12.dll",
+        "cusolver": "cusolver64_11.dll",
+        "nvJitLink": "nvJitLink_120_0.dll",
+        "cudnn": "cudnn64_9.dll",
+        "cudnn_graph": "cudnn_graph64_9.dll",
+        "cudnn_heuristic": "cudnn_heuristic64_9.dll",
+        "cudnn_ops": "cudnn_ops64_9.dll",
+        "cudnn_cnn": "cudnn_cnn64_9.dll",
+        "cudnn_adv": "cudnn_adv64_9.dll",
+        "cudnn_engines_runtime_compiled": "cudnn_engines_runtime_compiled64_9.dll",
+        "cudnn_engines_precompiled": "cudnn_engines_precompiled64_9.dll",
+        "ggml-cuda": "ggml-cuda.dll"
+      },
+      "ortResources": {
+        "ort": "ai/onnxruntime/native/win-x64/onnxruntime.dll",
+        "ort-jni": "ai/onnxruntime/native/win-x64/onnxruntime4j_jni.dll",
+        "ort-shared": "ai/onnxruntime/native/win-x64/onnxruntime_providers_shared.dll",
+        "ort-cuda": "ai/onnxruntime/native/win-x64/onnxruntime_providers_cuda.dll"
+      },
+      "capabilities": {
+        "runtimePacks": true,
+        "cpuBaselineRuntime": true
+      },
+      "paths": {}
+    },
+    "linux-x86_64": {
+      "executables": {
+        "llama-server": "llama-server",
+        "curl": "curl",
+        "tesseract": "tesseract",
+        "nvidia-smi": "nvidia-smi",
+        "java-gui": "java"
+      },
+      "libraries": {
+        "cuda": "libcuda.so.1",
+        "nvml": "libnvidia-ml.so.1",
+        "ort": "libonnxruntime.so",
+        "ort-jni": "libonnxruntime4j_jni.so",
+        "ort-shared": "libonnxruntime_providers_shared.so",
+        "ort-cuda": "libonnxruntime_providers_cuda.so",
+        "cudart": "libcudart.so.12",
+        "cublasLt": "libcublasLt.so.12",
+        "cublas": "libcublas.so.12",
+        "cufft": "libcufft.so.11",
+        "curand": "libcurand.so.10",
+        "cusparse": "libcusparse.so.12",
+        "cusolver": "libcusolver.so.11",
+        "nvJitLink": "libnvJitLink.so.12",
+        "cudnn": "libcudnn.so.9",
+        "cudnn_graph": "libcudnn_graph.so.9",
+        "cudnn_heuristic": "libcudnn_heuristic.so.9",
+        "cudnn_ops": "libcudnn_ops.so.9",
+        "cudnn_cnn": "libcudnn_cnn.so.9",
+        "cudnn_adv": "libcudnn_adv.so.9",
+        "cudnn_engines_runtime_compiled": "libcudnn_engines_runtime_compiled.so.9",
+        "cudnn_engines_precompiled": "libcudnn_engines_precompiled.so.9",
+        "ggml-cuda": "libggml-cuda.so"
+      },
+      "ortResources": {
+        "ort": "ai/onnxruntime/native/linux-x64/libonnxruntime.so",
+        "ort-jni": "ai/onnxruntime/native/linux-x64/libonnxruntime4j_jni.so",
+        "ort-shared": "ai/onnxruntime/native/linux-x64/libonnxruntime_providers_shared.so",
+        "ort-cuda": "ai/onnxruntime/native/linux-x64/libonnxruntime_providers_cuda.so"
+      },
+      "capabilities": {
+        "runtimePacks": false,
+        "cpuBaselineRuntime": false
+      },
+      "paths": {
+        "bound-exec": "native/linux-x86_64/justsearch-bound-exec"
+      }
+    }
+  }
+}

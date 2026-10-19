@@ -1,0 +1,585 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T09:12:57.208Z",
+  "revision": "947a6a72fa6b67b09e526242f0914ccf39cd3c09",
+  "tree": "8fc883fbbb6ca88dec449a3a58ee7f1d57a773d6",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::a_dropped_timed_out_job_is_not_an_empty_updater_witness\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8658
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::tests::windows::failed_spawn_reports_the_start_error\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 706
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::tests::windows::ending_an_incarnation_leaves_no_helper\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 666
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::t11_unknown_times_and_java_calendar_edges\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 612
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::forced_shell_stop_observes_supervisor_forced\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 655
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::t15_every_shared_fixture_has_the_java_and_node_summary\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 578
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::t12_rotation_replaces_old_generation_and_respects_hard_cap\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 589
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::tests::windows::shell_never_joins_an_incarnation_job\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 637
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::tests::windows::closing_the_job_kills_what_is_left_in_it\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 569
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::write_failure_is_nonfatal_and_gap_precedes_next_success\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 454
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::torn_tail_is_closed_and_rotation_failure_records_a_gap\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 482
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::uncontained_incarnation_is_published_as_shell_unavailable\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 589
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::tests::windows::contained_spawn_runs_the_program_inside_the_job\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 724
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::t15_every_shared_record_writes_the_same_bytes_as_node_and_java\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 676
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::tests::windows::terminate_ends_the_engine_and_its_helpers_with_the_engine_stop_code\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 619
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::observed_engine_exit_ends_the_helpers_it_left_running\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 632
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::appender_follows_rotations_and_rejects_caller_bugs\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 805
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::a_dropped_timed_out_job_is_not_an_empty_updater_witness",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::a_dropped_timed_out_job_is_not_an_empty_updater_witness",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/containment.rs#containment::tests::windows::failed_spawn_reports_the_start_error",
+      "file": "modules/shell/src-tauri/src/containment.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d3f25554e94cb41c5c2f49f9bb5796dc7d225bc04fa3aec83598316fd68a06f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containment::tests::windows::failed_spawn_reports_the_start_error",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/containment.rs#containment::tests::windows::ending_an_incarnation_leaves_no_helper",
+      "file": "modules/shell/src-tauri/src/containment.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d3f25554e94cb41c5c2f49f9bb5796dc7d225bc04fa3aec83598316fd68a06f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containment::tests::windows::ending_an_incarnation_leaves_no_helper",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::t11_unknown_times_and_java_calendar_edges",
+      "file": "modules/shell/src-tauri/src/exit_ledger.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:45c43ed4b6f3dde38dc5e178950a656458b23e26bd360c8e0dee655c07dbbaea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit_ledger::tests::t11_unknown_times_and_java_calendar_edges",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::forced_shell_stop_observes_supervisor_forced",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::forced_shell_stop_observes_supervisor_forced",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::t15_every_shared_fixture_has_the_java_and_node_summary",
+      "file": "modules/shell/src-tauri/src/exit_ledger.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:45c43ed4b6f3dde38dc5e178950a656458b23e26bd360c8e0dee655c07dbbaea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit_ledger::tests::t15_every_shared_fixture_has_the_java_and_node_summary",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::t12_rotation_replaces_old_generation_and_respects_hard_cap",
+      "file": "modules/shell/src-tauri/src/exit_ledger.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:45c43ed4b6f3dde38dc5e178950a656458b23e26bd360c8e0dee655c07dbbaea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit_ledger::tests::t12_rotation_replaces_old_generation_and_respects_hard_cap",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/containment.rs#containment::tests::windows::shell_never_joins_an_incarnation_job",
+      "file": "modules/shell/src-tauri/src/containment.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d3f25554e94cb41c5c2f49f9bb5796dc7d225bc04fa3aec83598316fd68a06f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containment::tests::windows::shell_never_joins_an_incarnation_job",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/containment.rs#containment::tests::windows::closing_the_job_kills_what_is_left_in_it",
+      "file": "modules/shell/src-tauri/src/containment.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d3f25554e94cb41c5c2f49f9bb5796dc7d225bc04fa3aec83598316fd68a06f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containment::tests::windows::closing_the_job_kills_what_is_left_in_it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::write_failure_is_nonfatal_and_gap_precedes_next_success",
+      "file": "modules/shell/src-tauri/src/exit_ledger.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:45c43ed4b6f3dde38dc5e178950a656458b23e26bd360c8e0dee655c07dbbaea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit_ledger::tests::write_failure_is_nonfatal_and_gap_precedes_next_success",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::torn_tail_is_closed_and_rotation_failure_records_a_gap",
+      "file": "modules/shell/src-tauri/src/exit_ledger.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:45c43ed4b6f3dde38dc5e178950a656458b23e26bd360c8e0dee655c07dbbaea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit_ledger::tests::torn_tail_is_closed_and_rotation_failure_records_a_gap",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::uncontained_incarnation_is_published_as_shell_unavailable",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::uncontained_incarnation_is_published_as_shell_unavailable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/containment.rs#containment::tests::windows::contained_spawn_runs_the_program_inside_the_job",
+      "file": "modules/shell/src-tauri/src/containment.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d3f25554e94cb41c5c2f49f9bb5796dc7d225bc04fa3aec83598316fd68a06f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containment::tests::windows::contained_spawn_runs_the_program_inside_the_job",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::t15_every_shared_record_writes_the_same_bytes_as_node_and_java",
+      "file": "modules/shell/src-tauri/src/exit_ledger.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:45c43ed4b6f3dde38dc5e178950a656458b23e26bd360c8e0dee655c07dbbaea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit_ledger::tests::t15_every_shared_record_writes_the_same_bytes_as_node_and_java",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/containment.rs#containment::tests::windows::terminate_ends_the_engine_and_its_helpers_with_the_engine_stop_code",
+      "file": "modules/shell/src-tauri/src/containment.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d3f25554e94cb41c5c2f49f9bb5796dc7d225bc04fa3aec83598316fd68a06f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containment::tests::windows::terminate_ends_the_engine_and_its_helpers_with_the_engine_stop_code",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::observed_engine_exit_ends_the_helpers_it_left_running",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:bff6a5206f91021d645fb1fa7f57364186ef00ca49f7d3c581829903c85a856b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::observed_engine_exit_ends_the_helpers_it_left_running",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::appender_follows_rotations_and_rejects_caller_bugs",
+      "file": "modules/shell/src-tauri/src/exit_ledger.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:45c43ed4b6f3dde38dc5e178950a656458b23e26bd360c8e0dee655c07dbbaea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit_ledger::tests::appender_follows_rotations_and_rejects_caller_bugs",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f7cd27765",
+    "revision": "f7cd2776599bae5cb21d7b9157052c7a8d15ffcf",
+    "overlays": [
+      "modules/shell/src-tauri/resources/headless/.placeholder"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-shell-r1-before-api.patch",
+        "contentDigest": "sha256:cf64af760ba771a714c31d00f50be3acf39c81f13243c4a1d08621e640fe843c"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::a_dropped_timed_out_job_is_not_an_empty_updater_witness\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 36584
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::tests::windows::failed_spawn_reports_the_start_error\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 4532
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::tests::windows::ending_an_incarnation_leaves_no_helper\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5390
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::t11_unknown_times_and_java_calendar_edges\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5474
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::forced_shell_stop_observes_supervisor_forced\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 4050
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::t15_every_shared_fixture_has_the_java_and_node_summary\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 4367
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::t12_rotation_replaces_old_generation_and_respects_hard_cap\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5201
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::tests::windows::shell_never_joins_an_incarnation_job\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 6265
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::tests::windows::closing_the_job_kills_what_is_left_in_it\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 6801
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::write_failure_is_nonfatal_and_gap_precedes_next_success\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5353
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::torn_tail_is_closed_and_rotation_failure_records_a_gap\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 6289
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::uncontained_incarnation_is_published_as_shell_unavailable\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5833
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::tests::windows::contained_spawn_runs_the_program_inside_the_job\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 7557
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::t15_every_shared_record_writes_the_same_bytes_as_node_and_java\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5919
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"containment::tests::windows::terminate_ends_the_engine_and_its_helpers_with_the_engine_stop_code\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5506
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::observed_engine_exit_ends_the_helpers_it_left_running\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 4747
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::appender_follows_rotations_and_rejects_caller_bugs\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 3687
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::a_dropped_timed_out_job_is_not_an_empty_updater_witness",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/containment.rs#containment::tests::windows::failed_spawn_reports_the_start_error",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/containment.rs#containment::tests::windows::ending_an_incarnation_leaves_no_helper",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::t11_unknown_times_and_java_calendar_edges",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::forced_shell_stop_observes_supervisor_forced",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::t15_every_shared_fixture_has_the_java_and_node_summary",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::t12_rotation_replaces_old_generation_and_respects_hard_cap",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/containment.rs#containment::tests::windows::shell_never_joins_an_incarnation_job",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/containment.rs#containment::tests::windows::closing_the_job_kills_what_is_left_in_it",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::write_failure_is_nonfatal_and_gap_precedes_next_success",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::torn_tail_is_closed_and_rotation_failure_records_a_gap",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::uncontained_incarnation_is_published_as_shell_unavailable",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/containment.rs#containment::tests::windows::contained_spawn_runs_the_program_inside_the_job",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::t15_every_shared_record_writes_the_same_bytes_as_node_and_java",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/containment.rs#containment::tests::windows::terminate_ends_the_engine_and_its_helpers_with_the_engine_stop_code",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::observed_engine_exit_ends_the_helpers_it_left_running",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::appender_follows_rotations_and_rejects_caller_bugs",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      }
+    ]
+  },
+  "digest": "sha256:1c7b94ea20c37cc512692b2762d96f0a0e48913d6fb998ec59b81c5bbd461cc0"
+}

@@ -16,6 +16,10 @@
       "why": "NewerDataNotice publishes a non-blocking Health condition with the recorded newer versions and preserved filenames in its Java message. It never enters the readiness envelope or wordCauses, like settings.reset_from_corrupt."
     },
     {
+      "code": "engine.containment_unavailable",
+      "why": "Spec F §1.3: EngineContainmentNotice publishes a non-blocking Health condition at boot when the Engine could not join its own Windows job, with the failed call and Windows error in its Java message. It never enters the readiness envelope or wordCauses, like data.newer_build."
+    },
+    {
       "code": "local_api.session_token_missing",
       "why": "Fail-closed boot refusal (tempdoc 884 item 23): the Head throws at LocalApiServer construction before the loopback bind, so no readiness envelope, ConditionStore or SSE stream exists to carry it. The operator sees it in the fatal log line and the process exit; there is no UI to word it in."
     },
@@ -50,6 +54,38 @@
     {
       "code": "operations.history_reset",
       "why": "Head-owned ConditionStore condition (OperationRecoveryNotice); the Health surface renders its Java message, including preserved bytes and the bounded retry fence. It is not a readiness-envelope cause."
+    },
+    {
+      "code": "indexing.paused_energy_saver",
+      "why": "Spec E step E1: the reasonCode of the operating status block's indexing projection (operating.indexing), set by OperatingStateAssembler when indexing is PAUSED for energy saver. It never enters the readiness envelope or wordCauses; the operating surface words it from its reasons."
+    },
+    {
+      "code": "indexing.slowed_chat_generating",
+      "why": "Spec E step E2: the reasonCode of the operating status block's indexing projection (operating.indexing), set by OperatingStateAssembler when indexing is SLOWED to the duty floor while chat is answering. It never enters the readiness envelope or wordCauses; the operating surface words it from its reasons."
+    },
+    {
+      "code": "indexing.paused_gpu_busy",
+      "why": "Spec E step E3: the reasonCode of the operating status block's indexing projection (operating.indexing), set by OperatingStateAssembler when indexing is PAUSED because another application needs the graphics card's memory (the Engine's GPU residency sampler raised external pressure on the bulk work gate). It never enters the readiness envelope or wordCauses; the operating surface words it from its reasons."
+    },
+    {
+      "code": "indexing.paused_game_mode",
+      "why": "Spec E step E4: the reasonCode of the operating status block's indexing projection (operating.indexing), set by OperatingStateAssembler when indexing is PAUSED because a game runs (the Engine's GPU residency sampler detected one and set the bulk work gate's game input). It never enters the readiness envelope or wordCauses; the operating surface words it from its reasons."
+    },
+    {
+      "code": "inference.setting_unmet",
+      "why": "Spec E step E7b (P4): the reasonCode of the operating status block's user_setting_unmet degradation (operating.degradations), set by OperatingStateAssembler while an explicit user setting outranks the device-memory plan and cannot be honoured on this machine; its cause lists the unmet settings. It never enters the readiness envelope or wordCauses; the operating surface words it from its code."
+    },
+    {
+      "code": "inference.device_below_p8",
+      "why": "Spec E step E7b: the reasonCode of the operating status block's device_below_p8 degradation (operating.degradations), set by OperatingStateAssembler while the pinned GPU's total memory is below the P8 boundary, so no device-memory plan applies and today's constants stay (Spec E revision 3 section 2.2, the below-P8 row). The status profile reads P8 because the profile enum has no smaller class. It never enters the readiness envelope or wordCauses."
+    },
+    {
+      "code": "inference.device_memory_overcommit",
+      "why": "Spec E r4 other rows and revision 3 Q7: operating.degradations explains that P8 without COMPACT retains the 9B and today's encoder constants beyond the safe memory plan. This is an operating notice, not a readiness refusal."
+    },
+    {
+      "code": "indexing.bge_m3_unmeasured",
+      "why": "Spec E decision 9(a) and M2c ruling: operating.degradations explains that BGE-M3 bulk runs on CPU because its GPU activation footprint is unmeasured, while other roles keep the plan. It never enters readiness wordCauses."
     },
     {
       "code": "operations.persistence_failed",

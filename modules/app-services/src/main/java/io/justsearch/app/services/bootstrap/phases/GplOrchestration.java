@@ -120,6 +120,12 @@ public final class GplOrchestration {
           prevDocCount = -1L;
         }
         prevUptimeMs = uptimeMs;
+        if (status.getCore().getDocCountUnknown()) {
+          // Task t-20261013-ef3c41: the Worker could not count the index, so there is no corpus
+          // size to stabilize on or compare; the 0 it carries is not one. Start over next poll.
+          prevDocCount = -1L;
+          continue;
+        }
         if ("IDLE".equals(state) && docCount > 0 && docCount == prevDocCount && aiService.isAvailable()) {
           Map<String, Long> mimeCounts = fetchMimeFacets(client);
           if (mimeCounts == null) {
@@ -182,6 +188,12 @@ public final class GplOrchestration {
       KnowledgeClient client, GplJobCoordinator coordinator, Path snapshotFile) {
     try {
       io.justsearch.ipc.StatusResponse status = client.getStatus(ENGINE_CONTEXT);
+      if (status.getCore().getDocCountUnknown()) {
+        // Task t-20261013-ef3c41: a snapshot records the corpus size the next evaluation compares
+        // against; a 0 that is not a count would disable the growth trigger until the next one.
+        log.warn("GPL eval snapshot not saved: the Worker could not count the index");
+        return;
+      }
       Map<String, Long> mimeCounts = fetchMimeFacets(client);
       long triples = coordinator.getStatus().tripleCount();
       GplEvalSnapshot.capture(status, mimeCounts, triples).save(snapshotFile);

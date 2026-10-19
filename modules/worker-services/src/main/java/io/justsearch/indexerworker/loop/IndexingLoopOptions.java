@@ -5,7 +5,9 @@ import io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents;
 import io.justsearch.indexerworker.identity.DocumentIdentityStore;
 import io.justsearch.indexerworker.path.PathResolutionStore;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BooleanSupplier;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -33,6 +35,10 @@ import java.util.function.Supplier;
  *       span attrs (tempdoc 400 LR2-d.2). Defaults to {@link Map#of()}.
  *   <li>{@code embeddingTelemetryEvents} — sink for {@code embedding.runtime.*} metric emissions
  *       (tempdoc 413). May be null; the embedding lifecycle keeps its own no-op default.
+ *   <li>{@code forcedPaths} — the paths marked for force reindex, which the loop consumes when it
+ *       reaches each one. Defaults to a fresh set. A writer upgraded from a read-only (deferred)
+ *       boot is given the set its read-only services marked into, so a force submitted before the
+ *       loop existed still reaches it.
  * </ul>
  */
 public record IndexingLoopOptions(
@@ -41,7 +47,8 @@ public record IndexingLoopOptions(
     DocumentIdentityStore documentIdentityStore,
     BooleanSupplier migrationActiveSupplier,
     Supplier<Map<String, String>> commitMetadataSupplier,
-    EmbeddingTelemetryEvents embeddingTelemetryEvents) {
+    EmbeddingTelemetryEvents embeddingTelemetryEvents,
+    Set<String> forcedPaths) {
 
   public IndexingLoopOptions {
     pathResolutionStore = pathResolutionStore != null ? pathResolutionStore : PathResolutionStore.NOOP;
@@ -51,6 +58,19 @@ public record IndexingLoopOptions(
     commitMetadataSupplier = commitMetadataSupplier != null ? commitMetadataSupplier : Map::of;
     // embeddingTelemetryEvents may be null — EmbeddingProviderLifecycle keeps a no-op default
     // when this slot isn't wired.
+    forcedPaths = forcedPaths != null ? forcedPaths : ConcurrentHashMap.newKeySet();
+  }
+
+  /** The production shape before a forced-path set could be handed over: a fresh set. */
+  public IndexingLoopOptions(
+      boolean detailedTracing,
+      PathResolutionStore pathResolutionStore,
+      DocumentIdentityStore documentIdentityStore,
+      BooleanSupplier migrationActiveSupplier,
+      Supplier<Map<String, String>> commitMetadataSupplier,
+      EmbeddingTelemetryEvents embeddingTelemetryEvents) {
+    this(detailedTracing, pathResolutionStore, documentIdentityStore, migrationActiveSupplier,
+        commitMetadataSupplier, embeddingTelemetryEvents, null);
   }
 
   /** Back-compatible shape for callers that do not perform production indexing. */
@@ -66,7 +86,8 @@ public record IndexingLoopOptions(
         DocumentIdentityStore.UNAVAILABLE,
         migrationActiveSupplier,
         commitMetadataSupplier,
-        embeddingTelemetryEvents);
+        embeddingTelemetryEvents,
+        null);
   }
 
   /** Defaults for callers that don't need any of the optional slots (typically tests). */

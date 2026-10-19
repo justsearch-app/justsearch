@@ -10,9 +10,11 @@
   "allowed": [
     "modules/ui-web/src/shell-v0/state/aiVerdict.ts",
     "modules/ui-web/src/shell-v0/state/aiStateStore.ts",
+    "modules/ui-web/src/shell-v0/state/chatResidency.ts",
     "modules/ui-web/src/shell-v0/views/BrainSurface.ts"
   ],
   "allowedNotes": {
+    "modules/ui-web/src/shell-v0/state/chatResidency.ts": "Spec A F1/F8: pure reason-code selectors called only by aiStateStore.buildSnapshot to project chatFailureReason/chatUnloadedReason. chatEnabledSpec === false suppresses these notices when the person switched chat off; these helpers do not derive an engine lifecycle kind, read install/onnx state, or open a second status source. Surfaces consume the store's reason fields and AiState.aiEngine remains derived by computeAiEngineVerdict.",
     "modules/ui-web/src/shell-v0/state/aiStateStore.ts": "Tempdoc 737 §12c: the store authority reads the raw runtime-authority fields (status.inference.engineState/chatEnabledSpec/procedure/engineReason) in exactly two places — computeRuntime (resolves the engine mode, preferring the authority) and buildSnapshot (feeds them into computeAiEngineVerdict) — plus the soft-off chat-capability guard in computeCapabilities. This is the store-level single authority (like 594/595/596), not a re-fork; every OTHER surface consumes AiState.aiEngine / AiState.capabilities, not these raw fields.",
     "modules/ui-web/src/shell-v0/views/BrainSurface.ts": "installStalled() reads installStatus.state === 'running' to detect a STALE in-progress install (paired with isAiInstallLive's staleness window) — a distinct question from the lifecycle KIND computeAiEngineVerdict answers, not a re-derivation of it. Every OTHER read of installStatus.state/onnxFeatures in this file was fixed to consume computeAiEngineVerdict instead (tempdoc 663) before this allow-list entry was added — re-check with a fresh grep before assuming new occurrences are equally legitimate."
   }

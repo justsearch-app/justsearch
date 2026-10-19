@@ -369,3 +369,57 @@ withTempRoot((root) => {
 });
 
 console.log('test-report-ci-evidence-digest: PASS');
+
+// Independently rerun parts retain their own attempt's evidence; an old attempt
+// cannot fill a hole left by a failed or cancelled current attempt.
+{
+  const ui = { ...job('Unit tests (app-ui-ui)', 'success', 1, 3), run_attempt: 2 };
+  const services = { ...job('Unit tests (app-ui-services)', 'success', 1, 4), run_attempt: 1 };
+  const aggregate = job('Unit tests (app-ui)', 'success', 5, 6, [step('Require every app-ui part to succeed', 'success', 5, 6)]);
+  const windows = { ...job('Windows-native tests (contracts)', 'failure', 1, 2), run_attempt: 2 };
+  const report = buildDigest({ policy, run: greenRun, jobsDoc: { jobs: [ui, services, aggregate, windows] }, artifactsDoc: artifacts([
+    'unit-test-attribution-app-ui-ui-attempt-1',
+    'unit-test-attribution-app-ui-services-attempt-1',
+    'windows-native-contracts-attempt-1',
+  ]) });
+  assert.equal(report.unitAttribution.length, 2, 'aggregate owns no JUnit payload');
+  assert.equal(report.unitAttribution[0].artifactPresent, false, 'old attempt cannot mask missing UI evidence');
+  assert.equal(report.unitAttribution[1].artifactPresent, true, 'unchanged services part retains attempt 1');
+  assert.equal(report.partEvidence.find((p) => p.job === windows.name).artifactPresent, false);
+  assert.ok(report.warnings.some((w) => w.includes('windows-native-contracts-attempt-2')));
+  assert.ok(report.jobs.find((j) => j.name === ui.name).factLane.required);
+  assert.match(report.jobs.find((j) => j.name === ui.name).localReproduction[0], /:modules:ui:test/);
+}
+
+// Hosted CP5: GitHub gives unchanged parts the current workflow attempt number
+// while retaining their original execution timestamps and artifacts.
+{
+  const unchanged = { ...job('Unit tests (app-ui-services)', 'success', 1, 4), run_attempt: 3 };
+  const old = { name: 'unit-test-attribution-app-ui-services-attempt-1', created_at: unchanged.completed_at };
+  const report = buildDigest({ policy, run: greenRun, jobsDoc: { jobs: [unchanged] }, artifactsDoc: { artifacts: [old] } });
+  assert.equal(report.unitAttribution[0].artifactPresent, true);
+  assert.equal(report.partEvidence[0].attempt, 1);
+  const rerun = { ...unchanged, started_at: '2026-07-01T01:00:00Z', completed_at: '2026-07-01T01:04:00Z' };
+  const missing = buildDigest({ policy, run: greenRun, jobsDoc: { jobs: [rerun] }, artifactsDoc: { artifacts: [old] } });
+  assert.equal(missing.unitAttribution[0].artifactPresent, false);
+}
+
+// Cancellation can leave a new aggregate with no step metadata. It still owns
+// no historical app-ui test artifact when the run contains split part jobs.
+{
+  const aggregate = job('Unit tests (app-ui)', 'cancelled', 1, 2, []);
+  const part = job('Unit tests (app-ui-ui)', 'cancelled', 1, 2, []);
+  const report = buildDigest({ policy, run: greenRun, jobsDoc: { jobs: [part, aggregate] } });
+  assert.equal(report.jobs.find((j) => j.name === aggregate.name).unitAttributionArtifact, null);
+}
+
+// Node's evidence lives in the Actions job log; there is no transcript artifact.
+{
+  const windows = { ...job('Windows-native tests (node)', 'success', 1, 2), run_attempt: 1 };
+  const windowsPolicy = { workflows: [{ ...policy.workflows[0], requiredStatusChecks: ['Windows-native tests'] }] };
+  const report = buildDigest({ policy: windowsPolicy, run: greenRun, jobsDoc: { jobs: [windows] }, artifactsDoc: artifacts([]) });
+  assert.equal(report.jobs[0].partArtifact, null);
+  assert.equal(report.partEvidence.length, 0);
+  assert.ok(report.jobs[0].factLane.required, 'removing an empty artifact does not change required status');
+  assert.ok(!report.warnings.some((w) => /windows-native-node|undefined-attempt/.test(w)));
+}

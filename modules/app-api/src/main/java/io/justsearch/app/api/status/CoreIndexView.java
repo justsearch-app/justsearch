@@ -45,6 +45,17 @@ package io.justsearch.app.api.status;
  * reclaimed yet — the signal that separates "the corpus shrank" from "the index has not merged yet".
  * {@code indexedDocuments} is not a substitute: it subtracts chunk documents and can be counted on
  * the ingest reader during a rebuild.
+ *
+ * <p>Spec E step E1 (task b6d536, §1.7) added {@code vduAvailable}: whether a VDU backlog
+ * ({@code pendingVduCount}) can drain right now. The Head sets it (VDU is wired, a vision-capable
+ * chat model is configured and no capability block is standing); the Worker cannot know it. Null
+ * (not reported) normalizes to true, so a reported backlog is read as being worked on, never as
+ * idle. Operating status skips a backlog in an unavailable stage when deciding IDLE.
+ *
+ * <p>Task t-20261013-ef3c41 added {@code indexedDocumentsUnknown}: true when {@code
+ * indexedDocuments} and {@code searchableDocuments} are not counts — the index could not be counted
+ * and no earlier count exists. Both then carry 0 for older readers; a surface that knows this field
+ * shows the count as checking or unknown, never as an empty index. False means the counts are known.
  */
 @SuppressWarnings("ArrayRecordComponent") // 419 C3 V1/V2: intentional for API time-series payload
 public record CoreIndexView(
@@ -64,11 +75,42 @@ public record CoreIndexView(
     long pendingUnknownSizeJobs,
     long searchableDocuments,
     long indexMaxDoc,
-    long indexNumDocs) {
+    long indexNumDocs,
+    boolean indexedDocumentsUnknown,
+    Boolean vduAvailable) {
   public CoreIndexView {
     indexState = indexState == null ? "" : indexState;
+    vduAvailable = vduAvailable == null ? Boolean.TRUE : vduAvailable;
     recentJobQueueDepth = recentJobQueueDepth == null ? new long[0] : recentJobQueueDepth;
     recentDocsPerSec = recentDocsPerSec == null ? new double[0] : recentDocsPerSec;
+  }
+
+  /**
+   * Count-aware ctor from task t-20261013-ef3c41; {@code vduAvailable} is not reported.
+   */
+  public CoreIndexView(
+      boolean indexHealthy,
+      long indexedDocuments,
+      long pendingJobs,
+      String indexState,
+      long indexSizeBytes,
+      int pendingVduCount,
+      long writerQueueDepth,
+      long writerPendingDocs,
+      long commitCount,
+      long refreshLagMs,
+      long[] recentJobQueueDepth,
+      double[] recentDocsPerSec,
+      long pendingBytes,
+      long pendingUnknownSizeJobs,
+      long searchableDocuments,
+      long indexMaxDoc,
+      long indexNumDocs,
+      boolean indexedDocumentsUnknown) {
+    this(indexHealthy, indexedDocuments, pendingJobs, indexState, indexSizeBytes, pendingVduCount,
+        writerQueueDepth, writerPendingDocs, commitCount, refreshLagMs, recentJobQueueDepth,
+        recentDocsPerSec, pendingBytes, pendingUnknownSizeJobs, searchableDocuments, indexMaxDoc,
+        indexNumDocs, indexedDocumentsUnknown, null);
   }
 
   /**
@@ -86,7 +128,7 @@ public record CoreIndexView(
       long indexSizeBytes,
       int pendingVduCount) {
     this(indexHealthy, indexedDocuments, pendingJobs, indexState, indexSizeBytes, pendingVduCount,
-        0L, 0L, 0L, 0L, new long[0], new double[0], 0L, 0L, indexedDocuments, 0L, 0L);
+        0L, 0L, 0L, 0L, new long[0], new double[0], 0L, 0L, indexedDocuments, 0L, 0L, false, null);
   }
 
   /** Backward-compatible 10-arg ctor; defaults the 419 V1/V2 trends to empty. */
@@ -103,7 +145,7 @@ public record CoreIndexView(
       long refreshLagMs) {
     this(indexHealthy, indexedDocuments, pendingJobs, indexState, indexSizeBytes, pendingVduCount,
         writerQueueDepth, writerPendingDocs, commitCount, refreshLagMs,
-        new long[0], new double[0], 0L, 0L, indexedDocuments, 0L, 0L);
+        new long[0], new double[0], 0L, 0L, indexedDocuments, 0L, 0L, false, null);
   }
 
   /** Backward-compatible 11-arg ctor; defaults the 419 V2 P2 docs/sec trend to empty. */
@@ -121,7 +163,7 @@ public record CoreIndexView(
       long[] recentJobQueueDepth) {
     this(indexHealthy, indexedDocuments, pendingJobs, indexState, indexSizeBytes, pendingVduCount,
         writerQueueDepth, writerPendingDocs, commitCount, refreshLagMs,
-        recentJobQueueDepth, new double[0], 0L, 0L, indexedDocuments, 0L, 0L);
+        recentJobQueueDepth, new double[0], 0L, 0L, indexedDocuments, 0L, 0L, false, null);
   }
 
   /** Backward-compatible 12-arg ctor; defaults the 813 Slice B pending-byte weights to zero. */
@@ -140,12 +182,47 @@ public record CoreIndexView(
       double[] recentDocsPerSec) {
     this(indexHealthy, indexedDocuments, pendingJobs, indexState, indexSizeBytes, pendingVduCount,
         writerQueueDepth, writerPendingDocs, commitCount, refreshLagMs,
-        recentJobQueueDepth, recentDocsPerSec, 0L, 0L, indexedDocuments, 0L, 0L);
+        recentJobQueueDepth, recentDocsPerSec, 0L, 0L, indexedDocuments, 0L, 0L, false, null);
   }
 
   public static CoreIndexView fallback(String indexState) {
     return new CoreIndexView(
         false, 0, 0, indexState, 0, 0, 0L, 0L, 0L, 0L, new long[0], new double[0], 0L, 0L, 0L, 0L,
-        0L);
+        0L, false, null);
+  }
+
+  /**
+   * Backward-compatible 17-arg ctor (before Spec E step E1); {@code vduAvailable} is not reported.
+   */
+  public CoreIndexView(
+      boolean indexHealthy,
+      long indexedDocuments,
+      long pendingJobs,
+      String indexState,
+      long indexSizeBytes,
+      int pendingVduCount,
+      long writerQueueDepth,
+      long writerPendingDocs,
+      long commitCount,
+      long refreshLagMs,
+      long[] recentJobQueueDepth,
+      double[] recentDocsPerSec,
+      long pendingBytes,
+      long pendingUnknownSizeJobs,
+      long searchableDocuments,
+      long indexMaxDoc,
+      long indexNumDocs) {
+    this(indexHealthy, indexedDocuments, pendingJobs, indexState, indexSizeBytes, pendingVduCount,
+        writerQueueDepth, writerPendingDocs, commitCount, refreshLagMs, recentJobQueueDepth,
+        recentDocsPerSec, pendingBytes, pendingUnknownSizeJobs, searchableDocuments, indexMaxDoc,
+        indexNumDocs, false, null);
+  }
+
+  /** The same view with {@code vduAvailable} set (the Head knows it; the Worker does not). */
+  public CoreIndexView withVduAvailable(boolean available) {
+    return new CoreIndexView(indexHealthy, indexedDocuments, pendingJobs, indexState,
+        indexSizeBytes, pendingVduCount, writerQueueDepth, writerPendingDocs, commitCount,
+        refreshLagMs, recentJobQueueDepth, recentDocsPerSec, pendingBytes, pendingUnknownSizeJobs,
+        searchableDocuments, indexMaxDoc, indexNumDocs, indexedDocumentsUnknown, available);
   }
 }

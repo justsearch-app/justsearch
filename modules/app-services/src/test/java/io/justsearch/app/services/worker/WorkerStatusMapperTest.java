@@ -33,6 +33,32 @@ final class WorkerStatusMapperTest {
     assertEquals(0.0, out.searchConfig().entityBoost(), 0.0);
   }
 
+  /**
+   * Task t-20261013-ef3c41, S5 — the Worker's "could not count" marker reaches /api/status as
+   * {@code indexedDocumentsUnknown}, so the 0 kept in {@code indexedDocuments} for older readers is
+   * never shown as an empty index. Built and read through descriptors and record components so the
+   * check compiles against a revision without the field and fails there by assertion.
+   */
+  @Test
+  void anUncountedIndexReachesStatusAsUnknown() throws Exception {
+    com.google.protobuf.Descriptors.FieldDescriptor unknownField =
+        CoreStatus.getDescriptor().findFieldByName("doc_count_unknown");
+    org.junit.jupiter.api.Assertions.assertNotNull(unknownField, "the Worker cannot say a count is unknown");
+    StatusResponse status =
+        StatusResponse.newBuilder()
+            .setCore(CoreStatus.newBuilder().setDocCount(0).setField(unknownField, Boolean.TRUE).build())
+            .build();
+
+    Object core = WorkerStatusMapper.toUiStatusMap(status, null).core();
+
+    java.lang.reflect.RecordComponent component = java.util.Arrays.stream(core.getClass().getRecordComponents())
+        .filter(c -> c.getName().equals("indexedDocumentsUnknown"))
+        .findFirst()
+        .orElse(null);
+    org.junit.jupiter.api.Assertions.assertNotNull(component, "/api/status cannot say a count is unknown");
+    assertEquals(Boolean.TRUE, component.getAccessor().invoke(core));
+  }
+
   @Test
   void toUiStatusMapIncludesReadinessFieldsWhenHealthProvided() {
     StatusResponse status =
@@ -49,6 +75,24 @@ final class WorkerStatusMapperTest {
     assertEquals(1L, out.core().pendingJobs());
     assertTrue(out.aiReady());
     assertFalse(out.embeddingReady());
+  }
+
+  @Test
+  // Spec D §4.2: cold query encoders after readiness reach the Head apart from embeddingReady
+  void toUiStatusMapCarriesColdQueryEncodersApartFromEmbeddingReadiness() throws Exception {
+    StatusResponse status = StatusResponse.newBuilder().setCore(CoreStatus.newBuilder()).build();
+    var coldField = HealthCheckResponse.getDescriptor().findFieldByName("query_encoders_cold");
+    org.junit.jupiter.api.Assertions.assertNotNull(coldField);
+    HealthCheckResponse cold = HealthCheckResponse.newBuilder()
+        .setAiReady(true).setEmbeddingReady(true).setField(coldField, true).build();
+
+    WorkerOperationalView out = WorkerStatusMapper.toUiStatusMap(status, cold);
+
+    assertTrue(out.embeddingReady());
+    var queryCold = WorkerOperationalView.class.getMethod("queryEncodersCold");
+    assertEquals(true, queryCold.invoke(out));
+    assertEquals(false, queryCold.invoke(WorkerStatusMapper.toUiStatusMap(status,
+        HealthCheckResponse.newBuilder().setEmbeddingReady(true).build())));
   }
 
   @Test

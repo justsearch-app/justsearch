@@ -1,8 +1,12 @@
+import { runLifecycle } from '../lifecycle.mjs';
+import { engineRecords } from './dev-runner.mjs';
+import { signalLinuxProcess } from '../../dev/lib/process-identity.cjs';
+import { runUpdaterHold } from '../updater-hold.mjs';
 /**
  * Conformance adapter: the production supervisor (the Tauri shell), lane F stage B item B10.
  *
  * It drives `modules/shell/src-tauri`'s `supervisor-conformance` binary, which runs the SAME
- * `run_supervision` loop `lib.rs` runs, over the same `decide` the register's decision table pins —
+ * `run_supervision` loop `lib.rs` runs, over the same `decide` the register's decision table pins â€”
  * against a real child with a controlled fake workload. B17 binds the driver to the production
  * EngineHost child ownership, manifest admission, exit, state publication and handoff methods.
  * This proves those lifecycle bindings; AppHandle setup and graphical events remain outside
@@ -10,28 +14,29 @@
  *
  * The binary is built by the CI step that precedes this one (`cargo build --bin
  * supervisor-conformance --locked`); locally, run that first. If it is missing this adapter reports
- * itself UNAVAILABLE with the command — it does not build on demand, because a harness that
+ * itself UNAVAILABLE with the command â€” it does not build on demand, because a harness that
  * silently compiles a several-minute dependency graph in the middle of a case list is a harness
  * whose timings mean nothing.
  */
 
 import fs from 'node:fs';
+import assert from 'node:assert/strict';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 
-import { enginePlanFor } from '../contract.mjs';
+import { enginePlanFor, engineRow } from '../contract.mjs';
 import { proveEssentialStability } from '../essential-stability.mjs';
 
 export const name = 'tauri';
+export const phases = Object.freeze(['start','discovery','quit','kill']);
 
 const CRATE = ['modules', 'shell', 'src-tauri'];
 
-function binaryPath(repoRoot) {
+export function binaryPath(repoRoot) {
+  const suffix = process.platform === 'win32' ? '.exe' : '';
   for (const profile of ['debug', 'release']) {
-    for (const suffix of ['.exe', '']) {
-      const candidate = path.join(repoRoot, ...CRATE, 'target', profile, `supervisor-conformance${suffix}`);
-      if (fs.existsSync(candidate)) return candidate;
-    }
+    const candidate = path.join(repoRoot, ...CRATE, 'target', profile, `supervisor-conformance${suffix}`);
+    if (fs.existsSync(candidate)) return candidate;
   }
   return null;
 }
@@ -61,7 +66,7 @@ const RESTART_CASES = new Set([
   'requested-restart-completion-failure-is-counted',
 ]);
 
-function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncarnation, requestReason }) {
+export function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncarnation, requestReason }) {
   const child = spawn(
     binary,
     [
@@ -88,6 +93,8 @@ function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncar
 }
 
 export async function runCase({ testCase, policy, io }) {
+  if (String(testCase.probe).startsWith('updater-')) return runUpdaterHold({ testCase, policy, io });
+  if (testCase.probe || (name === "tauri" && testCase.expect?.ledger)) return runLifecycle({ name, testCase, policy, io });
   const problems = [];
   const binary = binaryPath(io.repoRoot);
   if (!binary) return { problems: ['the supervisor-conformance binary vanished between checks'] };
@@ -109,6 +116,56 @@ export async function runCase({ testCase, policy, io }) {
   });
 
   try {
+    if (testCase.id === 'engine-exit-ends-its-helpers'
+        || testCase.id === 'supervisor-killed-ends-engine-and-helpers') {
+      const helper = await io.waitFor(() => io.readJsonIfPresent(path.join(workDir, 'grandchild-1.json')),
+        { what: 'detached helper pid', timeoutMs: 10000 });
+      const alive = io.isAlive;
+      try {
+        assert.equal(alive(helper.pid), true, 'positive control: helper ran before the fault');
+        assert.equal(alive(helper.parentPid), true, 'positive control: Engine ran before the fault');
+        if (testCase.id === 'supervisor-killed-ends-engine-and-helpers') {
+          run.child.kill(); // TerminateProcess on Windows: no cleanup code gets to run.
+          await run.exited;
+        } else {
+          await io.waitFor(() => !alive(helper.parentPid),
+            { what: 'Engine exit', timeoutMs: 10000, intervalMs: 10 });
+        }
+        const started = Date.now();
+        while ((alive(helper.pid) || alive(helper.parentPid))
+            && Date.now() - started < testCase.expect.helperGoneWithinMs) {
+          await io.sleep(10);
+        }
+        assert.equal(alive(helper.pid), false,
+          `helper survives ${testCase.expect.helperGoneWithinMs} ms after the fault`);
+        assert.equal(alive(helper.parentPid), false, 'Engine survives supervisor death');
+        return { problems };
+      } finally {
+        // Stop the supervisor before cleanup so the negative control cannot spawn another Engine.
+        // The before-state has no job: its restarted successor must be cleaned up explicitly too.
+        try { run.child.kill(); } catch { /* already gone */ }
+        await Promise.race([run.exited, io.sleep(2000)]);
+        const manifest = io.readJsonIfPresent(path.join(dataDir, 'runtime', 'manifest.json'));
+        const state = io.readJsonIfPresent(path.join(dataDir, 'runtime', 'supervisor.v1.json'));
+        // These pids came only from this run's fixture/state; no tree or port sweep.
+        if (process.platform === 'linux') {
+          const owned = [helper, ...engineRecords(io, dataDir).filter(row => row.type === 'engine-start')];
+          for (const record of owned) {
+            if (!alive(record.pid)) continue;
+            const result = signalLinuxProcess(record.processIdentity, 'SIGKILL');
+            assert(result.ok || result.outcome === 'mismatch',
+              `fixture identity-bound stop failed: ${result.reason}`);
+          }
+        } else {
+          const owned = new Set([helper.pid, helper.parentPid, manifest?.pid, manifest?.head?.pid, state?.pid]);
+          for (const pid of owned) {
+            if (Number.isInteger(pid) && pid > 0 && alive(pid)) {
+              try { process.kill(pid); } catch { /* exited concurrently */ }
+            }
+          }
+        }
+      }
+    }
     if (testCase.id === 'live-503-and-continuous-essential-stability') {
       problems.push(...await proveEssentialStability({
         dataDir, statePath: path.join(dataDir, 'runtime', 'supervisor.v1.json'), policy, io,
@@ -149,14 +206,37 @@ export async function runCase({ testCase, policy, io }) {
     // on the same fields in the dev-runner adapter is what makes "one file" a checked claim.
     const state = io.readJsonIfPresent(path.join(dataDir, 'runtime', 'supervisor.v1.json'));
     if (!state) {
-      problems.push('no supervisor.v1.json was written — the state a dead Engine cannot report is missing');
+      problems.push('no supervisor.v1.json was written â€” the state a dead Engine cannot report is missing');
     } else {
       if (state.kind !== 'engine-supervisor-state.v1') problems.push(`state kind ${state.kind}`);
       if (state.supervisor !== 'tauri') problems.push(`state supervisor ${state.supervisor}`);
       if (state.schemaVersion !== 1) problems.push(`state schemaVersion ${state.schemaVersion}`);
     }
 
+    if (summary.forcedKill) {
+      const code = engineRow().exitCodes.find((row) => row.name === 'SUPERVISOR_FORCED').code;
+      if (process.platform === 'linux') {
+        // SIGKILL has no Windows program exit code. The owner ledger records the
+        // actual signal and the successful force following a cooperative intent.
+        assert.equal(summary.lastExit?.code, -9, 'forced shell stop observes SIGKILL');
+        assert.equal((summary.checkpoint ?? state)?.lastExit?.code, -9,
+          'the disk state must retain the forced signal observation');
+        const exit = engineRecords(io, dataDir).find(row => row.type === 'engine-exit' && row.forced);
+        assert(exit, 'forced shell stop must have a durable exit receipt');
+        assert.equal(exit.code, null);
+        assert.equal(exit.signal, 9);
+        assert.equal(exit.codeDistinctive, false);
+        assert.equal(exit.ownerIntentBeforeSignal, true);
+        assert.equal(exit.exitClass, 'REQUESTED');
+      } else {
+        assert.equal(summary.lastExit?.code, code, 'forced shell stop must record SUPERVISOR_FORCED');
+        assert.equal((summary.checkpoint ?? state)?.lastExit?.code, code, 'the disk state must retain the distinctive forced code');
+      }
+    }
+
     if (RESTART_CASES.has(testCase.id)) {
+      const checkpoint = summary.checkpoint;
+      if (checkpoint) { summary.state = checkpoint.state; summary.restartCount = checkpoint.restartCount; }
       if (summary.incarnation < 2) {
         problems.push(`no second incarnation (incarnation ${summary.incarnation}, state ${summary.state})`);
       } else if (summary.state !== 'running') {
@@ -168,7 +248,7 @@ export async function runCase({ testCase, policy, io }) {
       }
       if (!counted && summary.restartCount !== 0) {
         problems.push(
-          `restartCount ${summary.restartCount}, expected 0 — a REQUESTED restart must not spend the crash budget`,
+          `restartCount ${summary.restartCount}, expected 0 â€” a REQUESTED restart must not spend the crash budget`,
         );
       }
       if (testCase.id === 'fileless-clean-local-restart-is-not-counted'
@@ -210,7 +290,7 @@ export async function runCase({ testCase, policy, io }) {
       }
       if (testCase.id === 'hang-hard-recovered-by-forced-kill' && summary.forcedKill !== true) {
         problems.push(
-          'the hang-hard incarnation was not force-killed — the request file alone ended it, so the'
+          'the hang-hard incarnation was not force-killed â€” the request file alone ended it, so the'
           + ' forced branch was never exercised',
         );
       }
@@ -241,7 +321,7 @@ export async function runCase({ testCase, policy, io }) {
         }
         if ((summary.restartCount ?? 99) >= policy.maxRestartAttempts) {
           problems.push(
-            `restartCount ${summary.restartCount} reached the budget — a non-transient exit must give`
+            `restartCount ${summary.restartCount} reached the budget â€” a non-transient exit must give`
             + ' up AT ONCE, not after spending the remaining attempts',
           );
         }
@@ -250,7 +330,7 @@ export async function runCase({ testCase, policy, io }) {
         && summary.restartCount !== policy.maxRestartAttempts) {
         problems.push(
           `restartCount ${summary.restartCount}, expected exactly ${policy.maxRestartAttempts}`
-          + ' — the budget must be spent, not short-changed',
+          + ' â€” the budget must be spent, not short-changed',
         );
       }
       return { problems };

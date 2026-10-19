@@ -88,6 +88,9 @@ public final class RAGContext implements ContextInjector {
   /** Default fetch timeout for retrieval and batch-fetch fallback. */
   static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(20);
 
+  /** The worker's retrieval mode reason for a query embedding that missed its semantic budget. */
+  private static final String SEMANTIC_BUDGET_EXCEEDED = "SEMANTIC_BUDGET_EXCEEDED";
+
   /** Attribute keys for cross-SPI handoff. */
   public static final String ATTR_CITATIONS = "rag.citations";
   public static final String ATTR_CHUNKS_USED = "rag.chunksUsed";
@@ -98,9 +101,10 @@ public final class RAGContext implements ContextInjector {
 
   /**
    * The sources a citation matcher should verify against, WITH the literal text that was actually
-   * put in front of the model (tempdoc 836 §1.4). Set by injectors that hold that text; the
-   * retrieval path leaves it unset, because its citations carry true chunk ordinals and the
-   * Worker's lookup resolves the right text for them.
+   * put in front of the model (tempdoc 836 §1.4). Set by injectors that hold that text — this one
+   * included (WP4.4): a chunk ordinal is not enough, because a chunkless document's passage was
+   * synthesized at retrieval and has no stored chunk for the Worker's lookup to find, and the
+   * stored chunk of any document can differ from what the budget let the model see.
    *
    * <p>Holds {@code List<DocumentService.VerificationSource>}. It is not a second copy of {@link
    * #ATTR_CITATIONS}: each entry CONTAINS its citation, so the two can never disagree about which
@@ -397,6 +401,12 @@ public final class RAGContext implements ContextInjector {
       ragMeta = new LinkedHashMap<>();
       ragMeta.put("retrieval_mode", retrievalMode);
       ragMeta.put("retrieval_mode_reason", retrievalModeReason);
+      // Spec D §5.1: why the query embedding missed its semantic sub-budget; present only with
+      // SEMANTIC_BUDGET_EXCEEDED, which is a BM25 fallback and never a planner skip.
+      if (SEMANTIC_BUDGET_EXCEEDED.equals(retrievalModeReason)
+          && !retrieval.retrievalModeCause().isEmpty()) {
+        ragMeta.put("retrieval_mode_cause", retrieval.retrievalModeCause());
+      }
       ragMeta.put("chunks_used", chunksUsed);
       ragMeta.put("chunks_found", chunksFound);
       DocumentService.QualitySignals qs = retrieval.quality();
@@ -446,7 +456,7 @@ public final class RAGContext implements ContextInjector {
         }
         Map<String, Object> err =
             errorPayload("No matching documents found in the index", "NO_CONTENT");
-        return InjectorResult.terminalError(new SseEvent("error", err));
+        return terminalRetrievalError(err, ragMeta);
       }
       // Tempdoc 610 §J.3 — mirror the worker fallback: never re-inject (via whole-doc fetch) a parent
       // doc whose chunks the user hid. If every selected doc is hidden, this empties to NO_CONTENT.
@@ -455,7 +465,7 @@ public final class RAGContext implements ContextInjector {
       if (fallback == null || fallback.isBlank()) {
         Map<String, Object> err = errorPayload("No content in selected files", "NO_CONTENT");
         err.put("docIds", docIds);
-        return InjectorResult.terminalError(new SseEvent("error", err));
+        return terminalRetrievalError(err, ragMeta);
       }
       context = fallback;
       wholeDocumentFallback = true;
@@ -487,6 +497,13 @@ public final class RAGContext implements ContextInjector {
 
     // Stash for downstream consumers (StreamingCitationMatcher, RAGDoneEnricher).
     ctx.attributes().put(ATTR_CITATIONS, kept);
+    List<DocumentService.VerificationSource> verification =
+        verificationSources(kept, cut.passages());
+    if (verification.isEmpty()) {
+      ctx.attributes().remove(ATTR_VERIFICATION_SOURCES);
+    } else {
+      ctx.attributes().put(ATTR_VERIFICATION_SOURCES, verification);
+    }
     ctx.attributes().put(ATTR_CHUNKS_USED, usedRag ? keptCount : 0);
     ctx.attributes().put(ATTR_CHUNKS_FOUND, chunksFound);
     ctx.attributes().put(ATTR_USED_RAG, usedRag);
@@ -534,9 +551,15 @@ public final class RAGContext implements ContextInjector {
    * @param truncated true when anything was left out
    * @param inclusions per-section inclusion states, index-aligned with the retrieval's sections;
    *     EMPTY when the cut could not produce a per-passage record (the structure-blind branches)
+   * @param passages per section, the text of it that {@code context} carries ({@code ""} when none
+   *     of it is known to be there), index-aligned with the retrieval's sections; EMPTY when there
+   *     were no sections to align with
    */
   private record SectionCut(
-      String context, boolean truncated, List<ContextInclusion> inclusions) {}
+      String context,
+      boolean truncated,
+      List<ContextInclusion> inclusions,
+      List<String> passages) {}
 
   /**
    * Tempdoc 849 §5.2 — the cut, branched on what it is cutting.
@@ -571,7 +594,7 @@ public final class RAGContext implements ContextInjector {
       String context, List<ContextSection> sections, int budgetTokens, boolean wholeDocumentFallback) {
     if (wholeDocumentFallback || sections.isEmpty()) {
       TruncationResult truncation = TokenEstimation.truncateIfNeeded(context, budgetTokens);
-      return new SectionCut(truncation.content(), truncation.truncated(), List.of());
+      return new SectionCut(truncation.content(), truncation.truncated(), List.of(), List.of());
     }
     SectionCut sectioned = cutSections(sections, budgetTokens);
     int cap = TokenEstimation.effectiveContextCap(budgetTokens);
@@ -585,7 +608,14 @@ public final class RAGContext implements ContextInjector {
         cap);
     TruncationResult truncation =
         TokenEstimation.truncateIfNeeded(sectioned.context(), budgetTokens);
-    return new SectionCut(fitToTokenBudget(truncation.content(), cap), true, List.of());
+    String trimmed = fitToTokenBudget(truncation.content(), cap);
+    // WP4.4 — the blind trim keeps no per-section record, but whether a section's text survived it
+    // whole is still checkable. A section that did not is claimed as nothing rather than as a guess.
+    List<String> survived = new ArrayList<>(sectioned.passages().size());
+    for (String passage : sectioned.passages()) {
+      survived.add(!passage.isEmpty() && trimmed.contains(passage) ? passage : "");
+    }
+    return new SectionCut(trimmed, true, List.of(), List.copyOf(survived));
   }
 
   /**
@@ -607,6 +637,7 @@ public final class RAGContext implements ContextInjector {
     int cap = TokenEstimation.effectiveContextCap(budgetTokens);
     StringBuilder sb = new StringBuilder();
     List<ContextInclusion> inclusions = new ArrayList<>(sections.size());
+    List<String> passages = new ArrayList<>(sections.size());
     int usedTokens = 0;
     boolean truncated = false;
 
@@ -615,6 +646,7 @@ public final class RAGContext implements ContextInjector {
       String content = section.content();
       if (truncated || content.isEmpty()) {
         inclusions.add(ContextInclusion.dropped());
+        passages.add("");
         continue;
       }
       String separator = sb.isEmpty() ? "" : ContextBudgeter.SECTION_SEPARATOR;
@@ -624,6 +656,7 @@ public final class RAGContext implements ContextInjector {
       if (overheadTokens >= remaining) {
         truncated = true;
         inclusions.add(ContextInclusion.dropped());
+        passages.add("");
         continue;
       }
       int contentBudget = remaining - overheadTokens;
@@ -637,19 +670,23 @@ public final class RAGContext implements ContextInjector {
             section.truncated()
                 ? ContextInclusion.partial(content.length())
                 : ContextInclusion.included(content.length()));
+        passages.add(content);
         continue;
       }
       String fitted = fitToTokenBudget(content, contentBudget);
       truncated = true;
       if (fitted.isEmpty()) {
         inclusions.add(ContextInclusion.dropped());
+        passages.add("");
         continue;
       }
       sb.append(separator).append(header).append(fitted);
       usedTokens += overheadTokens + TokenEstimation.estimateTokens(fitted);
       inclusions.add(ContextInclusion.partial(fitted.length()));
+      passages.add(fitted);
     }
-    return new SectionCut(sb.toString(), truncated, List.copyOf(inclusions));
+    return new SectionCut(
+        sb.toString(), truncated, List.copyOf(inclusions), List.copyOf(passages));
   }
 
   /**
@@ -710,6 +747,44 @@ public final class RAGContext implements ContextInjector {
       resolved.add(citations.get(i).withInclusion(inclusions.get(i)));
     }
     return List.copyOf(resolved);
+  }
+
+  /**
+   * WP4.4 — the sources this turn's answer is verified against: each citation paired with the text
+   * of its passage that the prompt actually carried.
+   *
+   * <p>Supplying the text is what lets a chunkless document verify at all — its passage was
+   * synthesized at retrieval, so the Worker's lookup by {@code (parentDocId, chunkIndex)} finds no
+   * stored chunk — and it pins the evidence to what the model saw: not the stored chunk of a
+   * document edited since, nor the tail of a passage the budget cut. A passage that reached the
+   * model as nothing carries the {@link ContextCitation#CHUNK_INDEX_ABSENT} ordinal, the one way a
+   * blank source says "do not look me up" (tempdoc 836 §8.4); it keeps its position so every other
+   * source keeps its own.
+   *
+   * <p>The pairing is positional, like {@link #resolveInclusion}, and is refused on the same
+   * grounds: when the lists disagree in length nothing is published and the matcher falls back to
+   * the chunk lookup, as before.
+   */
+  private static List<DocumentService.VerificationSource> verificationSources(
+      List<ContextCitation> citations, List<String> passages) {
+    if (citations.isEmpty() || passages.size() != citations.size()) {
+      return List.of();
+    }
+    List<DocumentService.VerificationSource> sources = new ArrayList<>(citations.size());
+    for (int i = 0; i < citations.size(); i++) {
+      ContextCitation c = citations.get(i);
+      String passage = passages.get(i);
+      sources.add(
+          passage.isBlank()
+              ? new DocumentService.VerificationSource(
+                  new ContextCitation(
+                      c.parentDocId(), ContextCitation.CHUNK_INDEX_ABSENT, c.chunkTotal(),
+                      c.startChar(), c.endChar(), c.score(), c.excerpt(), c.startLine(),
+                      c.endLine(), c.headingText(), c.headingLevel(), c.inclusion()),
+                  "")
+              : new DocumentService.VerificationSource(c, passage));
+    }
+    return List.copyOf(sources);
   }
 
   /**
@@ -922,4 +997,10 @@ public final class RAGContext implements ContextInjector {
     p.put("i18nKey", "errors." + code);
     return p;
   }
+  private static InjectorResult terminalRetrievalError(
+      Map<String, Object> error, Map<String, Object> metadata) {
+    List<SseEvent> events = metadata == null ? List.of() : List.of(new SseEvent("rag.meta", metadata));
+    return new InjectorResult(List.of(), events, java.util.Optional.of(new SseEvent("error", error)));
+  }
+
 }

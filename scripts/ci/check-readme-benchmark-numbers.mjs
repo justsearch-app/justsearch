@@ -97,6 +97,7 @@ function main() {
     { token: "MIRACL-de", values: [nd(measured["mixed/miracl-de-2k"])] },
     { token: "MIRACL-fr", values: [nd(measured["mixed/miracl-fr-2k"])] },
     { token: "CourtListener", values: [nd(courtFull), nd(measured["mixed/courtlistener-200"])] },
+    { token: "CLERC", values: [nd(measured["mixed/legal-clerc-200"])] },
   ];
 
   const failures = [];

@@ -1,3 +1,4 @@
+import conventions.HostPlatform
 import com.fasterxml.jackson.databind.ObjectMapper
 import java.io.File
 import java.net.URI
@@ -136,6 +137,7 @@ testing {
         runtimeOnly(libs.junit.platform.launcher)
         // DAP: integrationTest transitive dep declared directly.
         implementation(project(":modules:indexing"))
+        implementation(project(":modules:indexer-worker"))
       }
       targets { all { testTask.configure { shouldRunAfter(tasks.named("test")) } } }
     }
@@ -335,16 +337,23 @@ val headlessDistDir = layout.buildDirectory.dir("headless-dist")
 // older version often won — alpha.18's binary-incompatible
 // VariantSelector.select signature change surfaced this as
 // `NoSuchMethodError` on `/api/status` (round-9 sandbox finding).
+abstract class DistributionFileOperations {
+    @get:javax.inject.Inject
+    abstract val fileSystem: org.gradle.api.file.FileSystemOperations
+}
+
 val headlessDist by tasks.registering(Copy::class) {
     group = "distribution"
     description = "Assemble the headless application distribution"
+    val fileSystem = objects.newInstance<DistributionFileOperations>().fileSystem
+    val libJars = fileTree(headlessDistDir.map { it.dir("lib") }) {
+        include("**/*.jar")
+    }
     doFirst {
         // Tempdoc 374 alpha.19 Bug K: purge stale module jars from previous
         // version bumps. Only lib/*.jar — `normalizeHeadlessJar`'s stable-name
         // output at the destination root is preserved.
-        delete(fileTree(headlessDistDir.get().asFile.resolve("lib")) {
-            include("**/*.jar")
-        })
+        fileSystem.delete { delete(libJars) }
     }
     from(headlessJar)
     from(configurations.runtimeClasspath) {
@@ -374,9 +383,25 @@ val tauriHeadlessResourcesDir =
 // ============================================================================
 // v1 Simple Mode: bundle llama-server.exe (CPU-only) into the sidecar payload
 // ============================================================================
-val isWindowsHost = System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")
+val isWindowsHost = HostPlatform.isWindows
+val isLinuxHost = HostPlatform.isLinux
+val nativeTargetsSpec = ObjectMapper().readTree(providers.fileContents(
+    rootProject.layout.projectDirectory.file("contracts/native-targets/spec.v1.json")).asText.get())
+val nativeTarget = nativeTargetsSpec["targets"][HostPlatform.targetId]
+    ?: throw GradleException("Unsupported native target: ${HostPlatform.targetId}")
+val boundExecRelative = nativeTargetsSpec["targets"]["linux-x86_64"]["paths"]["bound-exec"].asText()
+val llamaServerName = nativeTarget["executables"]["llama-server"].asText()
+val windowsNativeTarget = nativeTargetsSpec["targets"]["windows-x86_64"]
+val windowsLlamaServerName = windowsNativeTarget["executables"]["llama-server"].asText()
+val windowsTesseractName = windowsNativeTarget["executables"]["tesseract"].asText()
+val windowsOrtCudaName = windowsNativeTarget["libraries"]["ort-cuda"].asText()
+val windowsOrtRequiredNames = listOf("ort-cuda", "ort-shared", "cudart", "cublas", "cublasLt")
+    .map { windowsNativeTarget["libraries"][it].asText() }
+val linuxOrtResourceDir = nativeTargetsSpec["targets"]["linux-x86_64"]["ortResources"]["ort"].asText().substringBeforeLast('/')
+val windowsOrtCudaResource = nativeTargetsSpec["targets"]["windows-x86_64"]["ortResources"]["ort-cuda"].asText()
+
 val llamaStageDir = layout.buildDirectory.dir("llama-server/stage")
-val stagedLlamaServerExe = llamaStageDir.map { it.file(if (isWindowsHost) "llama-server.exe" else "llama-server") }
+val stagedLlamaServerExe = llamaStageDir.map { it.file(llamaServerName) }
 
 // Runtime source: the pinned upstream llama.cpp Windows build is downloaded at build time. The vendored
 // third_party/llama.cpp source tree and its `-PllamaRuntime=source` developer override were removed
@@ -733,7 +758,7 @@ val stageLlamaCudaVariant by tasks.registering(Sync::class) {
 
   // Runtime files (llama-server.exe + ggml-cuda.dll + backends)
   from(zipTree(cudaZipFile)) {
-    include("**/llama-server.exe")
+    include("**/$windowsLlamaServerName")
     include("**/*.dll")
     include("**/LICENSE*")
     // See stageLlamaServerFromPrebuilt: ggml-rpc.dll is the unused, unsigned distributed-inference
@@ -752,7 +777,7 @@ val stageLlamaCudaVariant by tasks.registering(Sync::class) {
   }
   onlyIf { cudaZipFile.exists() && cudartZipFile.exists() }
   doLast {
-    val serverExe = variantDir.resolve("llama-server.exe")
+    val serverExe = variantDir.resolve(windowsLlamaServerName)
     if (!serverExe.exists()) {
       logger.warn("CUDA variant staging failed - llama-server.exe not found")
       return@doLast
@@ -816,18 +841,17 @@ val stageOrtCudaVariant by tasks.registering(Sync::class) {
   description = "Stage ORT CUDA DLLs for GPU-accelerated ONNX inference"
   enabled = includeOrtCuda
   val srcDir = ortCudaConventionalDir.asFile
+  val stageDir = ortCudaStageDir
+  val cudaName = windowsOrtCudaName
+  val requiredNames = windowsOrtRequiredNames
   into(ortCudaStageDir)
   from(srcDir) {
     include("*.dll")
   }
-  onlyIf { srcDir.exists() && srcDir.resolve("onnxruntime_providers_cuda.dll").exists() }
+  onlyIf { srcDir.exists() && srcDir.resolve(cudaName).exists() }
   doLast {
-    val stageRoot = ortCudaStageDir.get().asFile
-    val requiredDlls = listOf(
-      "onnxruntime_providers_cuda.dll", "onnxruntime_providers_shared.dll",
-      "cudart64_12.dll", "cublas64_12.dll", "cublasLt64_12.dll"
-    )
-    val missing = requiredDlls.filter { !stageRoot.resolve(it).exists() }
+    val stageRoot = stageDir.get().asFile
+    val missing = requiredNames.filter { !stageRoot.resolve(it).exists() }
     if (missing.isNotEmpty()) {
       logger.warn("ORT CUDA variant incomplete — missing: $missing")
       return@doLast
@@ -849,7 +873,7 @@ val stageOrtCudaVariant by tasks.registering(Sync::class) {
         """.trimMargin()
       )
     }
-    logger.lifecycle("ORT CUDA variant staged at: ${stageRoot.absolutePath} (${requiredDlls.size} required DLLs present)")
+    logger.lifecycle("ORT CUDA variant staged at: ${stageRoot.absolutePath} (${requiredNames.size} required DLLs present)")
   }
 }
 
@@ -861,6 +885,7 @@ val stageLlamaServerFromPrebuilt by tasks.registering(Sync::class) {
   val zipFile = llamaPrebuiltZip.get().asFile
   val stageRoot = llamaStageDir.get().asFile
   val runtimeStamp = "llama.cpp $llamaPrebuiltVersion prebuilt\n"
+  val serverName = windowsLlamaServerName
   outputs.dir(stageRoot)
   // This task is cheap and must be correct. Don't allow stale staged payloads to persist.
   outputs.upToDateWhen { false }
@@ -871,7 +896,7 @@ val stageLlamaServerFromPrebuilt by tasks.registering(Sync::class) {
     include("variants/**")
   }
   from(zipTree(zipFile)) {
-    include("**/llama-server.exe")
+    include("**/$windowsLlamaServerName")
     include("**/*.dll")
     include("**/LICENSE*")
     // ggml-rpc.dll is llama.cpp's distributed/multi-machine inference backend. JustSearch only ever
@@ -886,7 +911,7 @@ val stageLlamaServerFromPrebuilt by tasks.registering(Sync::class) {
     relativePath = org.gradle.api.file.RelativePath(true, name)
   }
   doLast {
-    val serverExe = stageRoot.resolve("llama-server.exe")
+    val serverExe = stageRoot.resolve(serverName)
     if (!serverExe.exists()) {
       throw GradleException("Staged llama-server.exe not found after prebuilt extract: ${serverExe.absolutePath}")
     }
@@ -954,7 +979,7 @@ val createHeadlessRuntime by tasks.registering(Exec::class) {
   val jlinkExecutable =
       javaHome.resolve("bin")
           .resolve(
-              if (System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows"))
+              if (HostPlatform.isWindows)
                   "jlink.exe"
               else "jlink")
   val outDir = headlessRuntimeImageDir.get().asFile
@@ -983,6 +1008,8 @@ val createHeadlessRuntime by tasks.registering(Exec::class) {
       // - java.xml: XML parsing (config files, Tika metadata)
       // - java.desktop: AWT/Swing (image handling, clipboard in UI scenarios)
       // - jdk.httpserver: Lightweight HTTP server for local API
+      // - jdk.unsupported: Methvin recursive file watching and native-buffer cleanup
+      // - jdk.zipfs: Read rules and metadata packaged inside application jars
       listOf(
               "java.base",
               "java.logging",
@@ -994,7 +1021,9 @@ val createHeadlessRuntime by tasks.registering(Exec::class) {
               "java.security.sasl",
               "java.xml",
               "java.desktop",
-              "jdk.httpserver")
+              "jdk.httpserver",
+              "jdk.unsupported",
+              "jdk.zipfs")
           .joinToString(","),
       "--output",
       outDir.absolutePath)
@@ -1007,7 +1036,7 @@ val createHeadlessRuntime by tasks.registering(Exec::class) {
 val copyJavawToRuntime by tasks.registering {
   group = "distribution"
   description = "Copy javaw.exe to the jlink runtime (Windows only)"
-  val isWindows = System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")
+  val isWindows = HostPlatform.isWindows
   onlyIf { isWindows }
   dependsOn(createHeadlessRuntime)
 
@@ -1053,15 +1082,16 @@ val aotTrainingJvmFlags = listOf("-XX:+UseG1GC", "-XX:+UseCompactObjectHeaders")
 val generateHeadAotCache by tasks.registering {
   group = "distribution"
   description = "Generate JDK 25 AOT cache for the Head process"
-  notCompatibleWithConfigurationCache("Spawns external JVM processes for AOT training")
   dependsOn(headlessDist, createHeadlessRuntime, copyJavawToRuntime)
+  val trainingJvmFlags = aotTrainingJvmFlags
   val runtimeDir = headlessRuntimeImageDir.map { it.asFile }
   val headDistDirProp = headlessDistDir.map { it.asFile }
   val aotDir = aotCacheDir.map { it.dir("head").asFile }
   outputs.dir(aotDir)
 
   doLast {
-    val isWindows = System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")
+    val aotTrainingJvmFlags = trainingJvmFlags
+    val isWindows = HostPlatform.isWindows
     val java = runtimeDir.get().resolve("bin").resolve(if (isWindows) "java.exe" else "java").absolutePath
     val headDist = headDistDirProp.get()
     val aot = aotDir.get()
@@ -1126,7 +1156,7 @@ val generateDevHeadAotCache by tasks.registering {
   outputs.dir(aotDir.map { it.resolve("head") })
 
   doLast {
-    val isWindows = System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")
+    val isWindows = HostPlatform.isWindows
     val java = org.gradle.internal.jvm.Jvm.current().javaHome
         .resolve("bin").resolve(if (isWindows) "java.exe" else "java").absolutePath
     val dist = installDir.get().asFile
@@ -1392,6 +1422,7 @@ val verifyTesseractRuntime by tasks.registering {
       rootProject.layout.projectDirectory.file("packaging/runtime/tesseract-windows.v1.json").asFile
   val runtimeDir = layout.buildDirectory.dir("runtime/tesseract-windows").get().asFile
   val isWindowsForTask = isWindowsHost
+  val executableName = windowsTesseractName
   val overrideActive = tesseractOverrideActive
   inputs.file(manifestFile)
   inputs.property("overrideActive", overrideActive)
@@ -1449,7 +1480,7 @@ val verifyTesseractRuntime by tasks.registering {
       }
     }
 
-    val tesseract = runtimeDir.resolve("tesseract.exe")
+    val tesseract = runtimeDir.resolve(executableName)
     val tessdata = runtimeDir.resolve("tessdata")
     val process =
         ProcessBuilder(tesseract.absolutePath, "--list-langs")
@@ -1476,8 +1507,8 @@ val verifyTesseractRuntime by tasks.registering {
 //   1. §G — `ai/onnxruntime/native/linux-x64/**` (~201 MB, incl. a ~316 MB-uncompressed
 //      `libonnxruntime_providers_cuda.so`). ONNX Runtime's Java loader
 //      (`OnnxRuntime.initOsArch()` / `extractFromResources()`) only ever reads
-//      `/ai/onnxruntime/native/<current-JVM-OS_ARCH>/…`, so on this Windows-only product the
-//      Linux natives are provably dead weight.
+//      `/ai/onnxruntime/native/<current-JVM-OS_ARCH>/…`, so Linux natives are excluded only
+//      from the Windows payload. Linux sidecars retain the upstream jar unchanged.
 //   2. §J item 2 — `ai/onnxruntime/native/win-x64/onnxruntime_providers_cuda.dll` (the ~164 MB
 //      Windows CUDA execution-provider DLL). This DLL is strictly useless without the CUDA
 //      dependency DLLs, which only ever arrive via the consent-gated `cuda-runtime` Install-AI
@@ -1511,6 +1542,7 @@ val stageTrimmedOnnxRuntimeGpu by tasks.registering(Jar::class) {
   group = "distribution"
   description = "Repackage the onnxruntime_gpu jar without its Linux natives or win-x64 CUDA EP DLL (Windows-only installer). Tempdoc 772 §G + §J item 2."
   dependsOn(headlessDist)
+  enabled = isWindowsHost
   // headlessDist copies the runtimeClasspath jars into lib/ under their original Maven names, so
   // the untrimmed jar lands at a path we can derive statically from the single source of truth for
   // the version — the version catalog (libs.versions.onnxruntime), NOT a hardcoded string — so a
@@ -1521,9 +1553,9 @@ val stageTrimmedOnnxRuntimeGpu by tasks.registering(Jar::class) {
   val originalJar =
       headlessDistDir.get().asFile.resolve("lib").resolve(onnxGpuJarName)
   from(zipTree(originalJar)) {
-    exclude("ai/onnxruntime/native/linux-x64/**")
+    exclude("$linuxOrtResourceDir/**")
     // §J item 2: the win-x64 CUDA EP DLL moves to the cuda-runtime pack (see comment above).
-    exclude("ai/onnxruntime/native/win-x64/onnxruntime_providers_cuda.dll")
+    exclude(windowsOrtCudaResource)
   }
   destinationDirectory.set(trimmedOnnxRuntimeGpuDir)
   // Fixed output name (not the version-stamped original): the Engine loads it via `-cp lib/*`, so
@@ -1544,12 +1576,14 @@ val bundleSidecarResources by tasks.registering(Sync::class) {
   // the deleted WorkerSpawner launched. Since item A6 the index half is composed in this JVM and
   // `ui`'s own runtimeClasspath already contains indexer-worker, Lucene, Tika, SQLite and
   // onnxruntime_gpu, so `lib/worker/` was a duplicate the shipped installer paid for twice.
-  // The untrimmed onnxruntime_gpu jar is excluded here and replaced (below) by the
-  // Linux-natives-stripped variant from stageTrimmedOnnxRuntimeGpu — Tempdoc 772 §G.
+  // Windows replaces the upstream ORT jar with its existing trimmed variant (Tempdoc 772 §G).
+  // Linux retains the upstream jar, including its JNI and provider shared libraries.
   from(headlessDistDir) {
     include("ui-headless.jar")
     include("lib/**")
-    exclude("lib/onnxruntime_gpu-*.jar")
+    if (isWindowsHost) {
+      exclude("lib/onnxruntime_gpu-*.jar")
+    }
   }
   // Tempdoc 657 — the Headless Runtime launcher: runs the co-located ui-headless.jar as a local,
   // loopback-only service (no desktop shell) in a chosen mode. See docs/how-to/headless-runtime.md.
@@ -1558,8 +1592,23 @@ val bundleSidecarResources by tasks.registering(Sync::class) {
   }
   // Tempdoc 772 §G — the trimmed onnxruntime_gpu jar (Linux natives + CUDA EP DLL removed) lands
   // in lib/ where the untrimmed original was excluded above.
-  from(stageTrimmedOnnxRuntimeGpu.map { it.archiveFile }) {
-    into("lib")
+  if (isWindowsHost) {
+    from(stageTrimmedOnnxRuntimeGpu.map { it.archiveFile }) {
+      into("lib")
+    }
+  } else if (isLinuxHost) {
+    // installDist owns compilation/staging of the shared lifetime helper (also used by Java).
+    val installed = tasks.named<Sync>("installDist")
+    dependsOn(installed)
+    from(installed.map { it.destinationDir.resolve("native") }) {
+      into("native")
+    }
+    val boundExec = boundExecRelative
+    doLast {
+      check(destinationDir.resolve(boundExec).canExecute()) {
+        "Linux sidecar is missing its executable bound-exec helper from installDist"
+      }
+    }
   }
   // AOT cache file for the Engine (JEP 514). Item A13: one JVM, one cache — `worker/worker.aot`
   // was deleted with the task that produced it.
@@ -1579,6 +1628,12 @@ val bundleSidecarResources by tasks.registering(Sync::class) {
   }
   from(headlessRuntimeImageDir) {
     into("runtime")
+    if (!isWindowsHost) {
+      // jlink emits read-only legal files. Keep staged copies replaceable on later builds.
+      filesMatching("legal/**") {
+        permissions { unix("rw-r--r--") }
+      }
+    }
   }
 
   // Bundle the llama-server runtime (CPU-only) into the sidecar payload.
@@ -1642,7 +1697,7 @@ tasks.register("smokeSidecarBundle") {
   dependsOn(bundleSidecarResources)
 
   doLast {
-    val isWindows = System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")
+    val isWindows = HostPlatform.isWindows
     val headlessDir = project.layout.projectDirectory.dir("../shell/src-tauri/resources/headless").asFile
     val javaBin = headlessDir.resolve("runtime").resolve("bin").resolve(if (isWindows) "java.exe" else "java")
     val uiJar = headlessDir.resolve("ui-headless.jar")
@@ -1656,7 +1711,7 @@ tasks.register("smokeSidecarBundle") {
       // Tauri shell uses javaw.exe to spawn backend without console window
       val javawBin = headlessDir.resolve("runtime").resolve("bin").resolve("javaw.exe")
       if (!javawBin.exists()) throw GradleException("Missing javaw.exe in bundled runtime: ${javawBin.absolutePath}")
-      val serverExe = headlessDir.resolve("native-bin").resolve("llama-server").resolve("llama-server.exe")
+      val serverExe = headlessDir.resolve("native-bin").resolve("llama-server").resolve(windowsLlamaServerName)
       if (!serverExe.exists()) {
         throw GradleException("Missing bundled llama-server.exe: ${serverExe.absolutePath}")
       }
@@ -1977,12 +2032,6 @@ tasks.withType<CreateStartScripts>().configureEach {
               Regex("(?m)^set CLASSPATH=.*$", RegexOption.MULTILINE),
               "set CLASSPATH=%APP_HOME%\\\\lib\\\\*")
       windowsScript.writeText(collapsed)
-    } else {
-      val unixText = unixScript.readText()
-      // Lambda form: the string-replacement overload treats '$' as a group reference, so
-      // "$APP_HOME" -> "$A" throws "Illegal group reference" when building on Linux (tempdoc 668).
-      val collapsed = Regex("(?m)^CLASSPATH=.*$").replace(unixText) { "CLASSPATH=\"\$APP_HOME/lib/*\"" }
-      unixScript.writeText(collapsed)
     }
   }
 }
@@ -1994,9 +2043,10 @@ tasks.withType<CreateStartScripts>().configureEach {
  * If the project root is a git worktree, also checks the main repo root. Returns the absolute
  * path to the detected directory, or null if not found.
  */
-fun detectOrtCudaPath(projectRoot: File): String? {
+fun detectOrtCudaPath(projectRoot: File, cudaDllName: String): String? {
+  // This directory contains the Windows backend; Linux uses the shared driver probe.
+  if (!isWindowsHost) return null
   val cudaDirName = "tmp/ort-variant-test/cuda-12.4-v1.24.3"
-  val cudaDllName = "onnxruntime_providers_cuda.dll"
   val candidates = mutableListOf(projectRoot)
   // In a git worktree, .git is a file (not a directory) containing "gitdir: <path>".
   // Resolve the main repo root from it so we can find shared tmp/ resources.
@@ -2095,157 +2145,16 @@ val HEADLESS_GPU_ENV_VARS = listOf(
 )
 
 fun JavaExec.applyHeadlessEvalContract() {
-  workingDir = rootProject.layout.projectDirectory.asFile
-  val repoRootProvider =
-    providers.environmentVariable("JUSTSEARCH_REPO_ROOT")
-      .orElse(rootProject.layout.projectDirectory.asFile.absolutePath)
-  val dataDirProvider =
-    providers.environmentVariable("JUSTSEARCH_DATA_DIR")
-      .orElse(rootProject.layout.projectDirectory.dir("tmp/headless-eval-data").asFile.absolutePath)
-  val indexBasePathProvider =
-    providers.environmentVariable("JUSTSEARCH_INDEX_BASE_PATH")
-      .orElse(dataDirProvider.map { dataDir ->
-        File(dataDir).toPath().resolve("index").resolve("default").toString()
-      })
-  val ssotPathProvider =
-    providers.environmentVariable("JUSTSEARCH_SSOT_PATH")
-      .orElse(repoRootProvider.map { repoRoot -> File(repoRoot, "SSOT").absolutePath })
-  val pluginsManifestProvider =
-    providers.environmentVariable("JUSTSEARCH_STAGE_PLUGIN_MANIFEST")
-      .orElse(
-        repoRootProvider.map { repoRoot ->
-          File(repoRoot, "SSOT/manifests/plugins/pipeline-stage-plugins.v1.json").absolutePath
-        }
-      )
-  val configPathProvider =
-    providers.environmentVariable("JUSTSEARCH_CONFIG")
-      .orElse(
-        project.layout.projectDirectory.file("src/main/resources/headless-config/application.yaml")
-          .asFile.absolutePath
-      )
-  val modelsDirProvider =
-    providers.environmentVariable("JUSTSEARCH_MODELS_DIR")
-      .orElse(repoRootProvider.map { repoRoot -> File(repoRoot, "models").absolutePath })
-  val serverExeProvider = providers.environmentVariable("JUSTSEARCH_SERVER_EXE")
-  val ortNativePathProvider = providers.environmentVariable("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH")
-  val apiPortProvider = providers.environmentVariable("JUSTSEARCH_API_PORT").orElse("33221")
-
-  val repoRoot = repoRootProvider.get()
-  val dataDir = dataDirProvider.get()
-  val indexBasePath = indexBasePathProvider.get()
-  val ssotPath = ssotPathProvider.get()
-  val pluginsManifest = pluginsManifestProvider.get()
-  val configPath = configPathProvider.get()
-  val modelsDir = modelsDirProvider.get()
-  val serverExe = serverExeProvider.orNull
-  var ortNativePath = ortNativePathProvider.orNull
-  // Auto-detect ORT CUDA DLLs when not explicitly set (ORT 1.24.3 + CUDA 12.4).
-  // Without this, all ONNX GPU sessions fall back to CPU silently.
-  if (ortNativePath.isNullOrBlank()) {
-    ortNativePath = detectOrtCudaPath(rootProject.layout.projectDirectory.asFile)
-  }
-  val apiPort = apiPortProvider.get()
-
-  val envValues =
-    linkedMapOf(
-      "JUSTSEARCH_API_PORT" to apiPort,
-      "JUSTSEARCH_DATA_DIR" to dataDir,
-      "JUSTSEARCH_HOME" to dataDir,
-      "JUSTSEARCH_UI_SETTINGS_MODE" to "IN_MEMORY",
-      "JUSTSEARCH_INDEX_BASE_PATH" to indexBasePath,
-      "JUSTSEARCH_REPO_ROOT" to repoRoot,
-      "JUSTSEARCH_SSOT_PATH" to ssotPath,
-      "JUSTSEARCH_STAGE_PLUGIN_MANIFEST" to pluginsManifest,
-      "JUSTSEARCH_CONFIG" to configPath,
-      "JUSTSEARCH_MODELS_DIR" to modelsDir,
-    )
-  if (!serverExe.isNullOrBlank()) {
-    envValues["JUSTSEARCH_SERVER_EXE"] = serverExe
-  }
-  if (!ortNativePath.isNullOrBlank()) {
-    envValues["JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH"] = ortNativePath
-  }
-  // GPU eval profile: forward GPU-related env vars when set by the caller.
-  for (gpuVar in HEADLESS_GPU_ENV_VARS) {
-    val value = providers.environmentVariable(gpuVar).orNull
-    if (!value.isNullOrBlank()) {
-      envValues[gpuVar] = value
-    }
-  }
-  // AI env vars declared in HEADLESS_AI_ENV_VARS but not hardcoded above.
-  // Mirrors the runHeadless task (line 1828) so keys like
-  // JUSTSEARCH_INDEX_TRACING_LEVEL (400 Layer 2) and JUSTSEARCH_LLM_* reach
-  // the Engine JVM in eval mode. Hardcoded keys in envValues take precedence
-  // via LinkedHashMap insertion semantics (first write wins only when using
-  // putIfAbsent — Map.set overwrites, so only forward missing keys).
-  for (aiVar in HEADLESS_AI_ENV_VARS) {
-    if (envValues.containsKey(aiVar)) continue
-    val value = providers.environmentVariable(aiVar).orNull
-    if (!value.isNullOrBlank()) {
-      envValues[aiVar] = value
-    }
-  }
-  // Auto-enable GPU inference via master switch when CUDA DLLs are detected (tempdoc 337).
-  // Per-model overrides (EMBED_GPU_ENABLED, SPLADE_GPU_ENABLED, etc.) take precedence when set.
-  if (!ortNativePath.isNullOrBlank()) {
-    if (!envValues.containsKey("JUSTSEARCH_GPU_ENABLED")) {
-      envValues["JUSTSEARCH_GPU_ENABLED"] = "true"
-    }
-  }
-  envValues.forEach { (key, value) -> environment(key, value) }
-
-  // Logback config is shipped on the ui-headless.jar classpath via
-  // src/main/resources/logback.xml; no -Dlogback.configurationFile needed.
-  // Tempdoc 374 alpha.23 follow-up — closes Jetty DEBUG noise + dev/prod drift.
-
-  systemProperty("justsearch.api.port", apiPort)
-  systemProperty("justsearch.data.dir", dataDir)
-  systemProperty("justsearch.home", dataDir)
-  systemProperty("justsearch.ui.settings.mode", "IN_MEMORY")
-  systemProperty("justsearch.index.base_path", indexBasePath)
-  systemProperty("justsearch.config", configPath)
-  systemProperty("justsearch.repo.root", repoRoot)
-  systemProperty("justsearch.ssot.path", ssotPath)
-  systemProperty("justsearch.plugins.manifest", pluginsManifest)
-  systemProperty("justsearch.models.dir", modelsDir)
-  // 355: Enable eval-only endpoints (e.g. POST /api/debug/reset-index)
-  systemProperty("justsearch.eval.mode", "true")
-  if (!serverExe.isNullOrBlank()) {
-    systemProperty("justsearch.server.exe", serverExe)
-  }
-  if (!ortNativePath.isNullOrBlank()) {
-    systemProperty("justsearch.onnxruntime.native_path", ortNativePath)
-  }
-  // 363: Forward LLM config from env to system properties for QU eval
-  val llmEnabled = providers.environmentVariable("JUSTSEARCH_LLM_ENABLED").orNull
-  if (!llmEnabled.isNullOrBlank()) {
-    systemProperty("justsearch.llm.enabled", llmEnabled)
-  }
-  val llmModelPath = providers.environmentVariable("JUSTSEARCH_LLM_MODEL_PATH").orNull
-  if (!llmModelPath.isNullOrBlank()) {
-    systemProperty("justsearch.llm.model_path", llmModelPath)
-  }
-  // 334 Phase 11: Profiling support. Enable via env vars:
-  // JUSTSEARCH_JFR_ENABLED=true — starts Java Flight Recorder (writes to tmp/eval-profile.jfr)
-  // JUSTSEARCH_ORT_PROFILING=true — enables ORT per-node profiling (writes Chrome trace to tmp/)
-  val jfrEnabled = providers.environmentVariable("JUSTSEARCH_JFR_ENABLED").orNull
-  if (jfrEnabled == "true") {
-    val jfrPath = rootProject.layout.projectDirectory.dir("tmp").file("eval-profile.jfr").asFile.absolutePath
-    jvmArgs("-XX:+FlightRecorder", "-XX:StartFlightRecording=filename=$jfrPath,duration=300s,settings=profile")
-  }
-  val ortProfiling = providers.environmentVariable("JUSTSEARCH_ORT_PROFILING").orNull
-  if (ortProfiling == "true") {
-    val profileDir = rootProject.layout.projectDirectory.dir("tmp").asFile.absolutePath
-    environment("JUSTSEARCH_ORT_PROFILING_DIR", profileDir)
-  }
-  // 347: Removed env→sysprop bridges for EMBED_ONNX_MODEL_PATH and INDEX_SCHEMA_MISMATCH_POLICY.
-  // These are forwarded as env vars via HEADLESS_GPU_ENV_VARS, and EnvRegistry.get() + contributeEnvRegistry()
-  // both read env vars, so sysprop bridges are redundant.
-
-  // 369: -Pllm=true enables LLM autostart with a generous health check timeout.
-  // Usage: ./gradlew.bat :modules:ui:runHeadlessEval -Pllm=true
-  // Server exe auto-detection is handled by InferenceConfig.findServerExecutable()
-  // which searches dev-layout paths when justsearch.repo.root is set.
+  val root = rootProject.layout.projectDirectory.asFile
+  workingDir = root
+  val definition = providers.exec {
+    workingDir(root)
+    commandLine("node", File(root, "scripts/dev/lib/eval-launch.cjs").absolutePath)
+    environment(providers.environmentVariablesPrefixedBy("JUSTSEARCH_").get())
+  }.standardOutput.asText.get()
+  val launch = ObjectMapper().readTree(definition)
+  launch.get("environment").fields().forEachRemaining { (key, value) -> environment(key, value.asText()) }
+  jvmArgs(launch.get("jvmArgs").map { it.asText() })
   val llmFlag = project.findProperty("llm")?.toString()?.lowercase() == "true"
   if (llmFlag) {
     environment("JUSTSEARCH_AI_AUTOSTART_ENABLED", "true")
@@ -2295,7 +2204,7 @@ tasks.register<JavaExec>("runHeadless") {
   var cudaDetected = false
   val ortEnv = providers.environmentVariable("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH").orNull
   if (ortEnv == null) {
-    val detected = detectOrtCudaPath(rootProject.layout.projectDirectory.asFile)
+    val detected = detectOrtCudaPath(rootProject.layout.projectDirectory.asFile, windowsOrtCudaName)
     if (detected != null) {
       environment("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", detected)
       cudaDetected = true
@@ -2348,7 +2257,7 @@ tasks.register<JavaExec>("runHeadlessWithProfiling") {
   // Auto-detect ORT CUDA DLLs when not explicitly set
   var cudaDetected = false
   if (System.getenv("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH") == null) {
-    val detected = detectOrtCudaPath(rootProject.layout.projectDirectory.asFile)
+    val detected = detectOrtCudaPath(rootProject.layout.projectDirectory.asFile, windowsOrtCudaName)
     if (detected != null) {
       environment("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", detected)
       cudaDetected = true

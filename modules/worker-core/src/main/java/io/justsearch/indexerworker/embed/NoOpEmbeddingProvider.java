@@ -4,15 +4,32 @@ package io.justsearch.indexerworker.embed;
 import java.util.List;
 
 /**
- * Null Object implementation of {@link EmbeddingProvider}. Always reports unavailable, returns empty
- * results. Used as the initial value for embedding fields before a real model is loaded, eliminating
- * null checks across all consumers.
+ * Placeholder implementation of {@link EmbeddingProvider}. Returns empty results and explicitly
+ * reports absent, starting or failed. Startup selects the state before publishing a real model.
  */
 public final class NoOpEmbeddingProvider implements EmbeddingProvider {
 
   public static final NoOpEmbeddingProvider INSTANCE = new NoOpEmbeddingProvider();
 
-  private NoOpEmbeddingProvider() {}
+  private final Availability availability;
+
+  private NoOpEmbeddingProvider() {
+    this(Availability.ABSENT);
+  }
+
+  private NoOpEmbeddingProvider(Availability availability) {
+    this.availability = availability;
+  }
+
+  /** Installed model selected, before asynchronous encoder publication. */
+  public static EmbeddingProvider starting() {
+    return new NoOpEmbeddingProvider(Availability.STARTING);
+  }
+
+  /** Failed model publication, preserving the actual cause. */
+  public static EmbeddingProvider failed(Throwable cause) {
+    return new NoOpEmbeddingProvider(new Availability(Availability.State.FAILED, cause));
+  }
 
   @Override
   public float[] embedDocument(String text) {
@@ -40,8 +57,8 @@ public final class NoOpEmbeddingProvider implements EmbeddingProvider {
   }
 
   @Override
-  public boolean isAvailable() {
-    return false;
+  public Availability availability() {
+    return availability;
   }
 
   @Override

@@ -1,0 +1,26 @@
+diff --git a/modules/shell/src-tauri/src/engine_host.rs b/modules/shell/src-tauri/src/engine_host.rs
+index b388da7..09024e7 100644
+--- a/modules/shell/src-tauri/src/engine_host.rs
++++ b/modules/shell/src-tauri/src/engine_host.rs
+@@ -95,6 +95,13 @@ pub(crate) struct EngineHost {
+     inner: Mutex<HostInner>,
+     watcher: Arc<(Mutex<WatcherState>, Condvar)>,
+     supervisor: Mutex<Option<JoinHandle<()>>>,
++    // Compat declaration for fail-before runs only; nothing in this state reads it.
++    control: Mutex<Control>,
++}
++
++#[derive(Default)]
++struct Control {
++    pending: Option<supervisor::HostQuit>,
+ }
+ 
+ impl Default for EngineHost {
+@@ -103,6 +110,7 @@ impl Default for EngineHost {
+             inner: Mutex::new(HostInner::default()),
+             watcher: Arc::new((Mutex::new(WatcherState::default()), Condvar::new())),
+             supervisor: Mutex::new(None),
++            control: Mutex::new(Control::default()),
+         }
+     }
+ }

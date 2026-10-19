@@ -1,0 +1,232 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:25:14.160Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "cdef079496a6f12235c7c5546233f4f806d75efc",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorTest.pendingEmbeddingsNeverStopChatAndThePassCompletes\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorFailureCleanupTest.bodyFailureIsPrimaryAndReleasesTheGuardForTheNextPass\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorFailureCleanupTest.fatalBodyFailureIsPreservedAndReleasesTheGuard\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorOwnershipTest.queuedCancellationRunsNoBodyAndReleasesOwnershipExactlyOnce\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorOwnershipTest.runningCancellationRetainsStageGuardAndAdmissionThroughBlockedCleanup\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorOwnershipTest.admittedContextWithWorkIdFlowsToEveryProcedurePort\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorOwnershipTest.vduModeFailureIsVisibleAfterOwnershipRelease\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5372
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OfflineProcessingOperationLifecycleIntegrationTest.completedOutcomePublishesOnlyAfterCleanupReleasesAdmission\" --tests \"io.justsearch.ui.api.OfflineProcessingOperationLifecycleIntegrationTest.acknowledgedFailureAndBlockedRemainderProduceRecordedIncompleteOutcomeAfterCleanup\" --tests \"io.justsearch.ui.api.OfflineProcessingOperationLifecycleIntegrationTest.cancellationDuringCleanupCannotPublishOrDetachEarly\" --tests \"io.justsearch.ui.api.OfflineProcessingOperationLifecycleIntegrationTest.postselectionModeEntryFailureRecordsCapturedRemainderAndPreservesCause\" --tests \"io.justsearch.ui.api.VduProcedureExecutorLifetimeTest.aRealRegistryTimeoutRefusesCloseAndRetainsTheOwnerUntilRetry\" --tests \"io.justsearch.ui.api.VduProcedureExecutorLifetimeTest.stopWaitsForTheActualProcedureAndRetainsItsAccountingUntilExit\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10149
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorTest.java#pendingEmbeddingsNeverStopChatAndThePassCompletes",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:37d30c2a05f64dd9b8e6dd275344cb19efad12221839a3bd0ad76ae34497183a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingEmbeddingsNeverStopChatAndThePassCompletes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorFailureCleanupTest.java#bodyFailureIsPrimaryAndReleasesTheGuardForTheNextPass",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorFailureCleanupTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:685cd7316e5b0f94687682232a6dcdb52ec609ec26a594d6a89494710f23933e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bodyFailureIsPrimaryAndReleasesTheGuardForTheNextPass()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorFailureCleanupTest.java#fatalBodyFailureIsPreservedAndReleasesTheGuard",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorFailureCleanupTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:685cd7316e5b0f94687682232a6dcdb52ec609ec26a594d6a89494710f23933e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fatalBodyFailureIsPreservedAndReleasesTheGuard()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorOwnershipTest.java#queuedCancellationRunsNoBodyAndReleasesOwnershipExactlyOnce",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5028f5bb5b877c08d433040886e1b1b2523943930f37d3d938a3cd458939f6c8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedCancellationRunsNoBodyAndReleasesOwnershipExactlyOnce()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorOwnershipTest.java#runningCancellationRetainsStageGuardAndAdmissionThroughBlockedCleanup",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5028f5bb5b877c08d433040886e1b1b2523943930f37d3d938a3cd458939f6c8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "runningCancellationRetainsStageGuardAndAdmissionThroughBlockedCleanup()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorOwnershipTest.java#admittedContextWithWorkIdFlowsToEveryProcedurePort",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5028f5bb5b877c08d433040886e1b1b2523943930f37d3d938a3cd458939f6c8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "admittedContextWithWorkIdFlowsToEveryProcedurePort()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorOwnershipTest.java#vduModeFailureIsVisibleAfterOwnershipRelease",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5028f5bb5b877c08d433040886e1b1b2523943930f37d3d938a3cd458939f6c8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "vduModeFailureIsVisibleAfterOwnershipRelease()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java#completedOutcomePublishesOnlyAfterCleanupReleasesAdmission",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe716f2e669031c073b59762ed8dc69b955166cec70dc47fc7a8f4c65f1f9be6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedOutcomePublishesOnlyAfterCleanupReleasesAdmission()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java#acknowledgedFailureAndBlockedRemainderProduceRecordedIncompleteOutcomeAfterCleanup",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe716f2e669031c073b59762ed8dc69b955166cec70dc47fc7a8f4c65f1f9be6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "acknowledgedFailureAndBlockedRemainderProduceRecordedIncompleteOutcomeAfterCleanup()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java#cancellationDuringCleanupCannotPublishOrDetachEarly",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe716f2e669031c073b59762ed8dc69b955166cec70dc47fc7a8f4c65f1f9be6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancellationDuringCleanupCannotPublishOrDetachEarly()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java#postselectionModeEntryFailureRecordsCapturedRemainderAndPreservesCause",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe716f2e669031c073b59762ed8dc69b955166cec70dc47fc7a8f4c65f1f9be6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "postselectionModeEntryFailureRecordsCapturedRemainderAndPreservesCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VduProcedureExecutorLifetimeTest.java#aRealRegistryTimeoutRefusesCloseAndRetainsTheOwnerUntilRetry",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VduProcedureExecutorLifetimeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:780462b0dcc542fa8b4bdf40102ce2d8d93ca76f9c009f1ac1daf1030fe0c64d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRealRegistryTimeoutRefusesCloseAndRetainsTheOwnerUntilRetry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VduProcedureExecutorLifetimeTest.java#stopWaitsForTheActualProcedureAndRetainsItsAccountingUntilExit",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VduProcedureExecutorLifetimeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:780462b0dcc542fa8b4bdf40102ce2d8d93ca76f9c009f1ac1daf1030fe0c64d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "stopWaitsForTheActualProcedureAndRetainsItsAccountingUntilExit()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:7100e1ecdf5c71f81bff58830e89eaab870cbc291aa69587057e342a4f214ed0"
+}

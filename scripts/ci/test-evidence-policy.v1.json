@@ -69,6 +69,13 @@
       "cadence": "local targeted runs when changing the measured or proven behavior"
     },
     {
+      "tag": "heap-measurement",
+      "tier": "unit-heap-measurement",
+      "owner": "adapters-lucene / chunk admission retention",
+      "reason": "ChunkAdmissionRefreshRetentionTest measures retained heap across reader refreshes with a settled 100,000-chunk corpus. The tag describes this measurement and does not exclude it from the default unit-test task.",
+      "cadence": "runs every CI in the adapters-lucene unit-test lane; run locally before changing chunk admission or reader refresh retention"
+    },
+    {
       "tag": "vdu",
       "tier": "vdu-integration-evidence",
       "owner": "VDU processing",
@@ -81,6 +88,13 @@
       "owner": "app-util / Windows OS integration (single-instance lock, power status)",
       "reason": "Windows-specific product behavior. Excluded from the Linux-migrated lanes (tempdoc 668 option B) and run on the dedicated windows-native-tests lane so the coverage is preserved. Job-object containment was in this set until lane F stage A item A11 deleted WindowsJobObject with the child process it contained.",
       "cadence": "runs every CI on the windows-native lane; touch when changing Windows OS-integration behavior"
+    },
+    {
+      "tag": "cross-platform",
+      "tier": "cross-platform-unit-evidence",
+      "owner": "portable OS integration / Windows-native and Linux unit coverage",
+      "reason": "Ported test classes retain Windows OS-branch coverage in the dedicated windows-native-tests lane (selected alongside windows by -PwindowsOnly=true) and run in the default Linux unit lanes. Genuinely Windows-only methods retain their windows tag and OS prerequisites. The tag adds host coverage; it does not exclude or defer unit tests.",
+      "cadence": "runs every CI in the default Linux unit lanes and the windows-native lane; touch when changing portable OS-integration behavior"
     },
     {
       "tag": "load-sensitive",

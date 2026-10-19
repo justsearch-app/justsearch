@@ -52,3 +52,7 @@ testing {
     }
   }
 }
+
+tasks.named<Test>("test") {
+  inputs.property("linuxGpuCheck", providers.environmentVariable("JUSTSEARCH_LINUX_GPU_CHECK").orElse(""))
+}

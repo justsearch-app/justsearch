@@ -1,0 +1,77 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T11:08:04.042Z",
+  "revision": "27f19c3ac0f57d46a8c4c633cddd236ef12614b7",
+  "tree": "5952ddaf641a514eb44bd4aa2562d93e4ed955bf",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.PersistentExtractionSandboxStopCodeTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16045
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxStopCodeTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxStopCodeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:53af213ca0bec42162c174849995904c078d97ba7ccee75b3d0fcc8a60b776ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "timeoutKillEndsTheChildWithTheChildStopCode()",
+          "status": "passed"
+        },
+        {
+          "name": "protocolRecycleEndsTheChildWithTheChildStopCode()",
+          "status": "passed"
+        },
+        {
+          "name": "closeForcingAChildThatIgnoresEofEndsItWithTheChildStopCode()",
+          "status": "passed"
+        },
+        {
+          "name": "requestBudgetRecycleEndsTheChildWithTheChildStopCode()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "27f19c3ac",
+    "revision": "27f19c3ac0f57d46a8c4c633cddd236ef12614b7",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.PersistentExtractionSandboxStopCodeTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 58098
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxStopCodeTest.java",
+        "classification": "assertion",
+        "detail": "timeoutKillEndsTheChildWithTheChildStopCode(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the child ends with the control's code ==> expected: <1246953473> but was: <1> | protocolRecycleEndsTheChildWithTheChildStopCode(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the child ends with the control's code ==> expected: <1246953473> but was: <1> | closeForcingAChildThatIgnoresEofEndsItWithTheChildStopCode(): org.opentest4j.AssertionFailedEr"
+      }
+    ]
+  },
+  "digest": "sha256:68f17ea527d87a4add3dece43582d28a4fa200c8b43437b6c78b53a5ecb56867"
+}

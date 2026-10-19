@@ -14,6 +14,7 @@
  */
 
 import { authorizedFetch } from '../api/authorizedFetch.js';
+import { observeStatusResponse } from '../../api/statusInvalidation.js';
 
 /** Risk policy axes per `OperationPolicy.RiskTier` on the Java side. */
 export type Risk = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -181,7 +182,14 @@ export class OperationClient {
    * {@link authorizedFetch}, which itself resolves the CURRENT global fetch per call
    * (so runtime fetch mocks and a shared cached client both work). */
   private get fetchImpl(): typeof fetch {
-    return this.explicitFetch ?? authorizedFetch;
+    const send = this.explicitFetch ?? authorizedFetch;
+    // Every result passes the same receipt owner, including custom transports. The
+    // owner deduplicates the Response already observed by authorizedFetch.
+    return async (input, init) => {
+      const response = await send(input, init);
+      await observeStatusResponse(input, response);
+      return response;
+    };
   }
 
   /**

@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:83d8dd3cdaf29665ab7d4d5208d8f1950aa0fdbf948556d275c256efabd8b9b7"
+  },
+  "createdAt": "2026-10-16T04:06:29.412Z",
+  "revision": "31bbdf349527234907d0378966df178e66ef3e0e",
+  "tree": "d2002bcf341bd6bc29c7e0af1a0504c9b4cc7e49",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ops.VduRecoveryLostComparisonTest.selectedDocumentAlreadyCompletedIsNotResetAndDoesNotKeepTheRow\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 21872
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduRecoveryLostComparisonTest.java#selectedDocumentAlreadyCompletedIsNotResetAndDoesNotKeepTheRow",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduRecoveryLostComparisonTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cc491216a8ccba09fda5c70587330613dcdba3f6e84d522e66eef5c0f6e3edc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "selectedDocumentAlreadyCompletedIsNotResetAndDoesNotKeepTheRow()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1d23c9d95",
+    "revision": "1d23c9d9540eadd4cc798693c0f750a0840844e8",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ops.VduRecoveryLostComparisonTest.selectedDocumentAlreadyCompletedIsNotResetAndDoesNotKeepTheRow\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 22114
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/VduRecoveryLostComparisonTest.java#selectedDocumentAlreadyCompletedIsNotResetAndDoesNotKeepTheRow",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:af9b1449c5b4858612e3da2011ba7f8d6003665179db2701eb69916b644a0e8a"
+}

@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.ai.install;
 
+import io.justsearch.configuration.NativeTargets;
+import io.justsearch.app.api.runtime.child.OwnedHelper;
+
 import io.justsearch.configuration.EnvRegistry;
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -108,7 +111,7 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
    * just reset the connection is the cheapest thing to avoid, so a retry escalates instead.
    */
   private boolean download(String url, Path destPartial, ProgressCallback callback, int tier) {
-    if (usesBits(tier) && isWindows()) {
+    if (usesBits(tier) && io.justsearch.configuration.PlatformPaths.isWindows()) {
       try {
         boolean ok = downloadWithBits(url, destPartial, callback);
         if (ok) {
@@ -243,6 +246,8 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
    * future re-verification of already-present files.
    */
   public static void verify(Path file, long expectedSize, String expectedSha256) throws Exception {
+    var observed = io.justsearch.app.inference.ChatArtifactIdentity.isChatModel(file)
+        ? io.justsearch.app.inference.ChatArtifactIdentity.observe(file) : null;
     if (expectedSize > 0) {
       long size = Files.size(file);
       if (size != expectedSize) {
@@ -252,6 +257,14 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
     String got = sha256(file);
     if (!got.equalsIgnoreCase(expectedSha256)) {
       throw new IllegalStateException("SHA-256 mismatch");
+    }
+    if (observed != null) {
+      try {
+        io.justsearch.app.inference.ChatArtifactIdentity.rememberVerified(
+            file, observed.size(), got, observed);
+      } catch (IOException unavailable) {
+        log.debug("Verified chat receipt unavailable; background verification will retry", unavailable);
+      }
     }
   }
 
@@ -294,7 +307,7 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
    */
   private boolean resumeBitsJob(String jobId, ProgressCallback callback) throws Exception {
     if (jobId == null || jobId.isBlank()) return false;
-    if (!isWindows()) return false;
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) return false;
     String script =
         "$ErrorActionPreference='Stop'; "
             + "Get-BitsTransfer -JobId '"
@@ -499,7 +512,7 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
    */
   static List<String> curlCommand(String url, Path destPartial, boolean forceHttp11) {
     List<String> cmd = new ArrayList<>();
-    cmd.add("curl.exe");
+    cmd.add(NativeTargets.current().executableName("curl"));
     cmd.add("--fail");
     cmd.add("--location");
     cmd.add("--silent");
@@ -545,7 +558,7 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
     try {
       ProcessBuilder pb = new ProcessBuilder(curlCommand(url, destPartial, forceHttp11));
       pb.redirectErrorStream(true);
-      curlProcess = pb.start();
+      curlProcess = OwnedHelper.start(pb, "curl download");
       try {
         InputStream stream = curlProcess.getInputStream();
         Thread.ofVirtual()
@@ -778,7 +791,7 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
    * Windows is a no-op.
    */
   static int sweepOrphanedBitsJobs(Collection<String> claimedJobIds) {
-    if (!isWindows()) return 0;
+    if (!io.justsearch.configuration.PlatformPaths.isWindows()) return 0;
     List<String> enumerated;
     try {
       enumerated = enumerateBitsJobIdsByDisplayName();
@@ -895,10 +908,10 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
         new ProcessBuilder(
             "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script);
     pb.redirectErrorStream(true);
-    Process p = pb.start();
+    Process p = OwnedHelper.start(pb, "BITS download control");
     boolean ok = p.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS);
     if (!ok) {
-      p.destroyForcibly();
+      OwnedHelper.terminate(p, "timeout");
       throw new IllegalStateException("PowerShell timed out");
     }
     byte[] bytes = p.getInputStream().readAllBytes();
@@ -912,9 +925,6 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
 
   // -- Utilities --------------------------------------------------------------
 
-  private static boolean isWindows() {
-    return System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows");
-  }
 
   private static String psEscape(String raw) {
     if (raw == null) return "";

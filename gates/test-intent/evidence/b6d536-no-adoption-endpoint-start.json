@@ -1,0 +1,71 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T11:29:29.423Z",
+  "revision": "75917a07325f85c402b837e5a17eba4cb4b2bd5c",
+  "tree": "c6af787e9443f46d4dbd058c914c11ce1a82c011",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ExternalInferenceEndpointTest.refusedEndpointFailsTheStartAsInvalidConfiguration\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15990
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#refusedEndpointFailsTheStartAsInvalidConfiguration",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f894a1c8dfc5de04fcbf81d041b23e67387b3afe12c249c792bef4e1d68bde49",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusedEndpointFailsTheStartAsInvalidConfiguration(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "68547f75a",
+    "revision": "68547f75a4a123d796da3b31a414a1cc18bfc309",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-no-adoption-endpoint-compat.patch",
+        "contentDigest": "sha256:4faf7dca1eff835197ef74036c9b6a8163c596475734a528db4505d8893d2d70"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ExternalInferenceEndpointTest.refusedEndpointFailsTheStartAsInvalidConfiguration\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7999
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ExternalInferenceEndpointTest.java#refusedEndpointFailsTheStartAsInvalidConfiguration",
+        "classification": "assertion",
+        "detail": "refusedEndpointFailsTheStartAsInvalidConfiguration(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <INVALID_CONFIG> but was: <EXECUTABLE_NOT_FOUND>"
+      }
+    ]
+  },
+  "digest": "sha256:5b36823ec819b9152ad6d4c55b2b3cd7eafe20a0de16c738669e4bb9a9bf50f8"
+}

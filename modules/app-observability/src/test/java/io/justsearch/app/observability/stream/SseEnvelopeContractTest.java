@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -46,7 +47,7 @@ final class SseEnvelopeContractTest {
   @Test
   @DisplayName("HealthEventChangeRegistry emits envelopes on streamId surface:health-events")
   void healthEvent() {
-    HealthEventChangeRegistry registry = new HealthEventChangeRegistry();
+    HealthEventChangeRegistry registry = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     List<SseEnvelope> seen = new ArrayList<>();
     registry.subscribe(seen::add);
 
@@ -141,7 +142,7 @@ final class SseEnvelopeContractTest {
   @DisplayName(
       "Fix D: cross-stream sequence isolation — broadcasts on one channel don't bump another")
   void crossStreamSequenceIsolation() {
-    HealthEventChangeRegistry health = new HealthEventChangeRegistry();
+    HealthEventChangeRegistry health = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     RuntimeContextChangeRegistry runtime =
         new RuntimeContextChangeRegistry();
 

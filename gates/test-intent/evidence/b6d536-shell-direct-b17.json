@@ -1,0 +1,169 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-07T13:20:04.202Z",
+  "revision": "f6b5b019a963b098365b3f3365fcc5a27d7d0e2f",
+  "tree": "d6c82e1f9fe8b9e937992f46b5d95340421e5451",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::try_reap_called_only_by_poll_exit\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3158
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::quit_during_cooldown_spawns_nothing\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 458
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::quit_during_starting_is_recorded\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 535
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::exhaustion_cleans_registered_children\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1299
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::try_reap_called_only_by_poll_exit",
+      "file": "modules/shell/src-tauri/src/supervisor.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e7d825aba5fe570e80baf206c2797afce241970c1d08a23d22d5b3c1477e2f57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "supervisor::tests::try_reap_called_only_by_poll_exit",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::quit_during_cooldown_spawns_nothing",
+      "file": "modules/shell/src-tauri/src/supervisor.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e7d825aba5fe570e80baf206c2797afce241970c1d08a23d22d5b3c1477e2f57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "supervisor::tests::quit_during_cooldown_spawns_nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::quit_during_starting_is_recorded",
+      "file": "modules/shell/src-tauri/src/supervisor.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e7d825aba5fe570e80baf206c2797afce241970c1d08a23d22d5b3c1477e2f57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "supervisor::tests::quit_during_starting_is_recorded",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#tests::exhaustion_cleans_registered_children",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:a17137582bed2ee14032851ce8c45a8cb5d4b37174242eda543709b02e45894f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tests::exhaustion_cleans_registered_children",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "547b96083",
+    "revision": "547b960835e03b0437052dc744c70c08b3c3ef19",
+    "overlays": [
+      "modules/shell/src-tauri/resources/headless/.placeholder"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/b6d536-shell-r2-before.patch",
+        "contentDigest": "sha256:21b7ace08286a5c354b15b70fd1764d036b95e6a505bd63d27bb93368ddd7c70"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::try_reap_called_only_by_poll_exit\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 12860
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::quit_during_cooldown_spawns_nothing\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 499
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::quit_during_starting_is_recorded\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 429
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::exhaustion_cleans_registered_children\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 984
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::try_reap_called_only_by_poll_exit",
+        "classification": "assertion",
+        "detail": "supervisor::tests::try_reap_called_only_by_poll_exit:  ---- supervisor::tests::try_reap_called_only_by_poll_exit stdout ----\n\nthread 'supervisor::tests::try_reap_called_only_by_poll_exit' (19024) panicked at src\\supervisor.rs:1606:9:\nassertion `left == right` failed: the exit wins over concurrent quit and is observed once\n  left: 0\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    supervisor::tests::try_reap_called_only_by_poll_exit\n\ntest res"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::quit_during_cooldown_spawns_nothing",
+        "classification": "assertion",
+        "detail": "supervisor::tests::quit_during_cooldown_spawns_nothing:  ---- supervisor::tests::quit_during_cooldown_spawns_nothing stdout ----\n\nthread 'supervisor::tests::quit_during_cooldown_spawns_nothing' (41952) panicked at src\\supervisor.rs:1620:9:\nassertion `left == right` failed: cooldown quit is terminal without exhaustion\n  left: false\n right: true\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    supervisor::tests::quit_during_cooldown_spawns_nothing\n\ntest"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::quit_during_starting_is_recorded",
+        "classification": "assertion",
+        "detail": "supervisor::tests::quit_during_starting_is_recorded:  ---- supervisor::tests::quit_during_starting_is_recorded stdout ----\n\nthread 'supervisor::tests::quit_during_starting_is_recorded' (19880) panicked at src\\supervisor.rs:1635:9:\nassertion `left == right` failed: startup quit reaches the actor's exit path\n  left: false\n right: true\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    supervisor::tests::quit_during_starting_is_recorded\n\ntest result: FAILE"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#tests::exhaustion_cleans_registered_children",
+        "classification": "assertion",
+        "detail": "tests::exhaustion_cleans_registered_children:  ---- tests::exhaustion_cleans_registered_children stdout ----\n\nthread 'tests::exhaustion_cleans_registered_children' (11800) panicked at src\\lib.rs:1931:9:\nassertion failed: child.try_wait().unwrap().is_none()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    tests::exhaustion_cleans_registered_children\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out; finished in 0.49s\n\n\nw"
+      }
+    ]
+  },
+  "digest": "sha256:47f6c8cd36a7ae23393322cc39ff0a90167fafde7502d4108c1bc85ec01944f5"
+}

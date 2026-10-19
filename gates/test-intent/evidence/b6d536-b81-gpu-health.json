@@ -1,0 +1,183 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T22:03:13.190Z",
+  "revision": "41d9f3bf6c14c3bb60dcd41f81880102ec725610",
+  "tree": "01b99bb921986c4f2c706a19d6bf4ededd224e35",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-observability:test --tests \"io.justsearch.app.observability.health.HealthStalledObserverTest.slowAdvancingObserverIsNotWaitedForUntilBacklogDrains\" --tests \"io.justsearch.app.observability.health.HealthStalledObserverTest.observerErrorAfterTheBoundedWaitReachesTheChannelOwnersLog\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8983
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.gameDoesNotMaskMemoryPressureOnP16Plus\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.gameDoesNotMaskMemoryPressureWhileTheProfileIsUnresolved\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.stablePressureRetriesUnloadAfterAuxCompletes\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.stablePressureRetriesUnloadAfterAssistCompletes\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8982
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthStalledObserverTest.java#slowAdvancingObserverIsNotWaitedForUntilBacklogDrains",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthStalledObserverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4db420756fc9408ef404565e23e08ef73a0ebdcb78cc49f48fe79f32f0841d24",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "slowAdvancingObserverIsNotWaitedForUntilBacklogDrains()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthStalledObserverTest.java#observerErrorAfterTheBoundedWaitReachesTheChannelOwnersLog",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthStalledObserverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4db420756fc9408ef404565e23e08ef73a0ebdcb78cc49f48fe79f32f0841d24",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "observerErrorAfterTheBoundedWaitReachesTheChannelOwnersLog()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#gameDoesNotMaskMemoryPressureOnP16Plus",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gameDoesNotMaskMemoryPressureOnP16Plus()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#gameDoesNotMaskMemoryPressureWhileTheProfileIsUnresolved",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gameDoesNotMaskMemoryPressureWhileTheProfileIsUnresolved()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#stablePressureRetriesUnloadAfterAuxCompletes",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "stablePressureRetriesUnloadAfterAuxCompletes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#stablePressureRetriesUnloadAfterAssistCompletes",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "stablePressureRetriesUnloadAfterAssistCompletes()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "44a9e8aa2",
+    "revision": "44a9e8aa26fb28655eb031a816f23606402c6216",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-b81-gpu-health-compat.patch",
+        "contentDigest": "sha256:852a378197e79535df4f623719d407ea5c686038af78ad264c121794692aab67"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-observability:test --tests \"io.justsearch.app.observability.health.HealthStalledObserverTest.slowAdvancingObserverIsNotWaitedForUntilBacklogDrains\" --tests \"io.justsearch.app.observability.health.HealthStalledObserverTest.observerErrorAfterTheBoundedWaitReachesTheChannelOwnersLog\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 99294
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.gameDoesNotMaskMemoryPressureOnP16Plus\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.gameDoesNotMaskMemoryPressureWhileTheProfileIsUnresolved\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.stablePressureRetriesUnloadAfterAuxCompletes\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.stablePressureRetriesUnloadAfterAssistCompletes\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 47214
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthStalledObserverTest.java#slowAdvancingObserverIsNotWaitedForUntilBacklogDrains",
+        "classification": "assertion",
+        "detail": "slowAdvancingObserverIsNotWaitedForUntilBacklogDrains(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: frame 3 held the publisher 1001 ms although the observer's backlog never drained ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/health/HealthStalledObserverTest.java#observerErrorAfterTheBoundedWaitReachesTheChannelOwnersLog",
+        "classification": "assertion",
+        "detail": "observerErrorAfterTheBoundedWaitReachesTheChannelOwnersLog(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an observer Error after the publisher's bounded wait must reach the channel owner's log ==> expected: not <null>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#gameDoesNotMaskMemoryPressureOnP16Plus",
+        "classification": "assertion",
+        "detail": "gameDoesNotMaskMemoryPressureOnP16Plus(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: another application's memory need unloads idle chat even while a game runs ==> expected: <[unload:gpu_busy]> but was: <[]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#gameDoesNotMaskMemoryPressureWhileTheProfileIsUnresolved",
+        "classification": "assertion",
+        "detail": "gameDoesNotMaskMemoryPressureWhileTheProfileIsUnresolved(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: another application's memory need unloads idle chat even while a game runs ==> expected: <[unload:gpu_busy]> but was: <[]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#stablePressureRetriesUnloadAfterAuxCompletes",
+        "classification": "assertion",
+        "detail": "stablePressureRetriesUnloadAfterAuxCompletes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: once the AUX lease closes the deferred unload runs with the pressure unchanged ==> expected: <[unload:gpu_busy]> but was: <[]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#stablePressureRetriesUnloadAfterAssistCompletes",
+        "classification": "assertion",
+        "detail": "stablePressureRetriesUnloadAfterAssistCompletes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: once the ASSIST lease closes the deferred unload runs with the pressure unchanged ==> expected: <[unload:gpu_busy]> but was: <[]>"
+      }
+    ]
+  },
+  "digest": "sha256:ae2ddeb04bdac77286ad746d16c9a56a4907fa29d2644523ca0e0832f2e88853"
+}

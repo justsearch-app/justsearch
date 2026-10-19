@@ -1,0 +1,123 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T17:02:39.388Z",
+  "revision": "99b515eeae0a6caa0b9e93a6ee1c372718c66aa7",
+  "tree": "a426c0b7b40d23057c802d44180bd4cd84c965d9",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.splade.DeviceSeatDuringCpuStepTest.aSpladeBatchsCpuStepRunsOutsideTheDeviceSeat\" --tests \"io.justsearch.indexerworker.splade.DeviceSeatDuringCpuStepTest.anEmbeddingSubBatchsCpuStepRunsOutsideTheDeviceSeat\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 32440
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.aFailedFp16CreationOnAPlannedProfileDoesNotLoadTheFp32FileOnTheGpu\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10755
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/DeviceSeatDuringCpuStepTest.java#aSpladeBatchsCpuStepRunsOutsideTheDeviceSeat",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/DeviceSeatDuringCpuStepTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd611f184f886fc788fff8ed6b4e38385bebc37e8b21033d64a3629620529de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSpladeBatchsCpuStepRunsOutsideTheDeviceSeat()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/DeviceSeatDuringCpuStepTest.java#anEmbeddingSubBatchsCpuStepRunsOutsideTheDeviceSeat",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/DeviceSeatDuringCpuStepTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd611f184f886fc788fff8ed6b4e38385bebc37e8b21033d64a3629620529de1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anEmbeddingSubBatchsCpuStepRunsOutsideTheDeviceSeat()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#aFailedFp16CreationOnAPlannedProfileDoesNotLoadTheFp32FileOnTheGpu",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5ea6719c0b0454bce7c00607697218ba87b3cf940c2c23fa09eeb4e30671610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedFp16CreationOnAPlannedProfileDoesNotLoadTheFp32FileOnTheGpu()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f648453b5",
+    "revision": "f648453b5063af0bd852979e22a246b3d86d9726",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-e7a-repaired-compat.patch",
+        "contentDigest": "sha256:5a358dcf95e4369c7372fa7a2699f26ba9809cf51389120338fec9fd2a0f14fc"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.splade.DeviceSeatDuringCpuStepTest.aSpladeBatchsCpuStepRunsOutsideTheDeviceSeat\" --tests \"io.justsearch.indexerworker.splade.DeviceSeatDuringCpuStepTest.anEmbeddingSubBatchsCpuStepRunsOutsideTheDeviceSeat\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 82672
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.aFailedFp16CreationOnAPlannedProfileDoesNotLoadTheFp32FileOnTheGpu\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8748
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/DeviceSeatDuringCpuStepTest.java#aSpladeBatchsCpuStepRunsOutsideTheDeviceSeat",
+        "classification": "assertion",
+        "detail": "aSpladeBatchsCpuStepRunsOutsideTheDeviceSeat(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the query waited for the device seat while the bulk encoder ran on its CPU ==> Unexpected exception thrown: io.justsearch.ort.SessionAcquireDeadlineExceededException: native session acquisition deadline exceeded"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/DeviceSeatDuringCpuStepTest.java#anEmbeddingSubBatchsCpuStepRunsOutsideTheDeviceSeat",
+        "classification": "assertion",
+        "detail": "anEmbeddingSubBatchsCpuStepRunsOutsideTheDeviceSeat(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the query waited for the device seat while the bulk encoder ran on its CPU ==> Unexpected exception thrown: io.justsearch.ort.SessionAcquireDeadlineExceededException: native session acquisition deadline exceeded"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#aFailedFp16CreationOnAPlannedProfileDoesNotLoadTheFp32FileOnTheGpu",
+        "classification": "assertion",
+        "detail": "aFailedFp16CreationOnAPlannedProfileDoesNotLoadTheFp32FileOnTheGpu(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the FP32 file was loaded on the GPU after FP16 failed ==> expected: <[missing\\model_fp16.onnx]> but was: <[missing\\model_fp16.onnx, missing\\model.onnx]>"
+      }
+    ]
+  },
+  "digest": "sha256:d49125e21ffa8c3412ce61ebb2b249aa9adeddffb991fedde1080eed64649a03"
+}

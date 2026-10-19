@@ -1,0 +1,103 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:79980b9d786249111daa45082da1dbf41f82b0e58ebec63b4028b6442edb9960"
+  },
+  "createdAt": "2026-10-15T21:21:47.644Z",
+  "revision": "087fb01ccca5e4594ef738aaebde0d417b6f01e4",
+  "tree": "40886f2f6aaf3e6ab82d4274fa914478be747ce0",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryReadinessTest.aPrewarmThatAlwaysFailsReachesReadyWithinTheBoundWithTheReason\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryReadinessTest.aGpuReleaseAfterReadyChangesOnlyTheComponentStateNotTheReadiness\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 30424
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleHandlerTest.coldQueryEncodersAfterReadinessDegradeOnlyTheEmbeddingComponent\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15780
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.WorkerStatusMapperTest.toUiStatusMapCarriesColdQueryEncodersApartFromEmbeddingReadiness\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14070
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryReadinessTest.java#aPrewarmThatAlwaysFailsReachesReadyWithinTheBoundWithTheReason",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryReadinessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:374b59861e99aba1b1daf7f596da38aaae1dbd05226d2096fd1548cb11de81db",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPrewarmThatAlwaysFailsReachesReadyWithinTheBoundWithTheReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryReadinessTest.java#aGpuReleaseAfterReadyChangesOnlyTheComponentStateNotTheReadiness",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryReadinessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:374b59861e99aba1b1daf7f596da38aaae1dbd05226d2096fd1548cb11de81db",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aGpuReleaseAfterReadyChangesOnlyTheComponentStateNotTheReadiness()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java#coldQueryEncodersAfterReadinessDegradeOnlyTheEmbeddingComponent",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleHandlerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9a92a96e94e2929c641f35014990c5b3f9aaec0d16bb948664f08b09d40a866a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "coldQueryEncodersAfterReadinessDegradeOnlyTheEmbeddingComponent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerStatusMapperTest.java#toUiStatusMapCarriesColdQueryEncodersApartFromEmbeddingReadiness",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerStatusMapperTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5d35930d3e1eb48a48bf4c1599dbe32f9ec81bb74bc58b714317bb1de53b68d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "toUiStatusMapCarriesColdQueryEncodersApartFromEmbeddingReadiness()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:77267cd9cd38578eb1880e7dea9656e046c3ced21df2cba85282b4923aae9157"
+}

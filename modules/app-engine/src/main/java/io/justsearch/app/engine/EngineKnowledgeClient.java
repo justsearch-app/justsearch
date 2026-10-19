@@ -227,7 +227,11 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       int inferenceThreads = Math.max(1, foreground.maxThreads() / 2);
       var textLimits = new EngineExecutorRegistry.Limits(
           Math.max(1, foreground.maxThreads() - inferenceThreads), foreground.maxQueue());
-      var inferenceLimits = new EngineExecutorRegistry.Limits(inferenceThreads, 0);
+      // An inference request that finds every inference thread busy waits for one, within its own
+      // deadline, instead of being refused at once. The wait queue holds as many requests as there
+      // are threads, inside the policy's foreground queue bound; only a full queue refuses.
+      var inferenceLimits = new EngineExecutorRegistry.Limits(
+          inferenceThreads, Math.min(inferenceThreads, foreground.maxQueue()));
       var foregroundCall =
           platform(executors, "engine-knowledge-call-foreground", Kind.FOREGROUND, textLimits);
       registrations.add(foregroundCall);
@@ -249,7 +253,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       ExecutorService foregroundCallExecutor =
           foregroundCall.open(daemonFactory("engine-call-foreground"));
       ExecutorService foregroundInferenceExecutor =
-          foregroundInference.open(daemonFactory("engine-inference-foreground"));
+          foregroundInference.openWithReservedSeats(daemonFactory("engine-inference-foreground"));
       ExecutorService backgroundCallExecutor =
           backgroundCall.open(daemonFactory("engine-call-background"));
       ExecutorService foregroundStreamExecutor =
@@ -393,10 +397,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     private final ScheduledFuture<?> alarm;
     private final long deadlineNanos;
 
+    /** When the call began, before any wait for a thread; the worker's budgets count from here. */
+    private final long startNanos;
+
     Budget(long budgetMs, io.justsearch.app.api.EngineWorkHandle work, Consumer<Throwable> fail) {
       this.work = work;
       this.fail = fail;
-      this.deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(budgetMs);
+      this.startNanos = System.nanoTime();
+      this.deadlineNanos = startNanos + TimeUnit.MILLISECONDS.toNanos(budgetMs);
       this.alarm = scheduleDeadline(this::expire, budgetMs);
       try {
         this.cancellation = work.onCancel(this::cancel);
@@ -409,18 +417,26 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     /** Flips the budget to EXPIRED and signals the worker to unwind. Idempotent. */
     void expire() {
       if (outcome.compareAndSet(Outcome.RUNNING, Outcome.EXPIRED)) {
-        fail.accept(new KnowledgeClientException(KnowledgeClientException.Status.DEADLINE_EXCEEDED,
-            "Engine call exceeded its deadline"));
-        signalCancellation();
-        cancelQueuedSubmission();
+        // A call still waiting for a thread gives up its admission slot and serving view before
+        // its caller sees the outcome, so a caller that retries at once finds them free.
+        try {
+          cancelQueuedSubmission();
+        } finally {
+          fail.accept(new KnowledgeClientException(
+              KnowledgeClientException.Status.DEADLINE_EXCEEDED, "Engine call exceeded its deadline"));
+          signalCancellation();
+        }
       }
     }
 
     boolean cancel(String reason) {
       if (outcome.compareAndSet(Outcome.RUNNING, Outcome.CANCELLED)) {
-        fail.accept(new io.justsearch.app.api.EngineWorkCancelledException(reason));
-        signalCancellation();
-        cancelQueuedSubmission();
+        try {
+          cancelQueuedSubmission();
+        } finally {
+          fail.accept(new io.justsearch.app.api.EngineWorkCancelledException(reason));
+          signalCancellation();
+        }
         return true;
       }
       return false;
@@ -462,7 +478,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           traceId,
           requestId,
           signal, engineContext, enqueueProvenance(engineContext),
-          Objects.requireNonNull(childLifetime, "unary childLifetime"), deadlineNanos);
+          Objects.requireNonNull(childLifetime, "unary childLifetime"), deadlineNanos, startNanos);
     }
 
     @Override
@@ -742,6 +758,29 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   }
 
   /**
+   * The answer for a unary call whose call pool refused it. A closed pool is the Engine going away
+   * and is reported as such (service unavailable), never as a capacity refusal. A full foreground
+   * inference lane (its threads and its wait queue) has its own code. Every other capacity refusal
+   * stays the Engine limit.
+   */
+  private RuntimeException unaryRefusal(java.util.concurrent.RejectedExecutionException failure,
+      ExecutorService executor) {
+    if (failure instanceof io.justsearch.core.execution.EngineExecutorRejectedException refused) {
+      if (refused.reason()
+          == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED) {
+        return refused;
+      }
+      if (executor == foregroundInferenceThreads && refused.reason()
+          == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT) {
+        return new io.justsearch.app.api.EngineAdmissionException(
+            io.justsearch.app.api.EngineAdmissionException.Reason.INFERENCE_BUSY,
+            admission.retryAfterSeconds());
+      }
+    }
+    return engineLimit();
+  }
+
+  /**
    * Runs one unary call under its budget, and <b>returns at the budget</b> (review B3).
    *
    * <p>The first cut armed a cancel and then checked, after the fact, whether the budget had
@@ -763,6 +802,12 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private <T> T withBudget(String operation, long budgetMs, EngineContext engineContext,
       boolean inference, Function<Budget, T> body) {
     var work = inference ? admission.attachInference(engineContext) : admission.attach(engineContext);
+    return withOwnedBudget(operation, budgetMs, work, inference, body);
+  }
+
+  /** Own an already-retained reference, so orderly cleanup need not reopen admission. */
+  private <T> T withOwnedBudget(String operation, long budgetMs,
+      io.justsearch.app.api.EngineWorkHandle work, boolean inference, Function<Budget, T> body) {
     CallView view;
     try {
       view = captureCallView();
@@ -783,6 +828,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       work.close();
       throw failure;
     }
+    ExecutorService submittedTo = null;
     try {
       OwnedCallTask task = new OwnedCallTask(budget, work, () -> {
         WorkerAppServices prior = taskServices.get();
@@ -837,6 +883,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         if (failure instanceof Error error) throw error;
       }, releaseView);
       ExecutorService executor = callThreads(work.context(), inference);
+      submittedTo = executor;
       budget.submitted(task);
       task.executeOn(executor);
     } catch (java.util.concurrent.RejectedExecutionException e) {
@@ -848,7 +895,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           finally { view.release(); }
         }
         else task.cancelBeforeStart();
-        throw engineLimit();
+        throw unaryRefusal(e, submittedTo);
       }
     }
     try {
@@ -909,9 +956,23 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   @Override
   protected <T> T executeInferenceRpc(String operation, RpcDeadlineCategory category,
       Function<SearchServiceCalls, T> rpc, EngineContext engineContext) {
-    return withBudget(operation, deadline(category), engineContext, true,
+    return withBudget(operation, headBounded(deadline(category)), engineContext, true,
         budget -> rpc.apply(new WorkerSearchCalls(
             requireService(WorkerAppServices::searchService), budget.context())));
+  }
+
+  /**
+   * A search call's budget: its category budget, narrowed to what is left of the deadline the head
+   * fixed for the request when the call runs inside one (Spec D §1.2). The worker reads the result
+   * as the call's deadline, so its semantic sub-budget and lexical reserve are taken from the
+   * request's remaining time rather than from a fresh category budget per call.
+   */
+  static long headBounded(long categoryBudgetMs) {
+    var head = io.justsearch.app.services.worker.HeadSearchDeadline.current();
+    if (head.isEmpty()) return categoryBudgetMs;
+    long remainingNanos = head.getAsLong() - System.nanoTime();
+    long remainingMs = Math.max(1L, (remainingNanos + 999_999L) / 1_000_000L);
+    return Math.min(categoryBudgetMs, remainingMs);
   }
 
   @Override
@@ -925,7 +986,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     // Search that internally reranks counts once.
     return withBudget(
         operation,
-        deadline(category),
+        headBounded(deadline(category)),
         engineContext,
         budget -> rpc.apply(new WorkerSearchCalls(requireService(WorkerAppServices::searchService), budget.context())));
   }
@@ -939,6 +1000,16 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         deadline(category),
         engineContext,
         budget -> rpc.apply(new WorkerIngestCalls(requireService(WorkerAppServices::ingestService), budget.context())));
+  }
+
+  @Override
+  public int recoverVduProcessingForRetainedOwner(io.justsearch.app.api.EngineWorkHandle owner) {
+    var request = io.justsearch.ipc.RecoverVduProcessingRequest.newBuilder()
+        .setProcedureOwner(owner.context().workId().orElseThrow().toString()).build();
+    return withOwnedBudget("recoverVduProcessing", deadline(RpcDeadlineCategory.VDU_OPERATION),
+        owner.retain(), false,
+        budget -> new WorkerIngestCalls(requireService(WorkerAppServices::ingestService),
+            budget.context()).recoverVduProcessing(request).getRecoveredCount());
   }
 
   @Override
@@ -1239,13 +1310,36 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     }
   }
 
-  /** One accepted child on the existing bounded walker; completion means both owned tasks exited. */
+  /**
+   * One accepted child on the existing bounded walker; completion means both owned tasks exited.
+   * The request was just made by a person or an agent: an explicit ingest is a deliberate add, so
+   * it carries the add marker and records its folder's volume (task t-20261013-ef3c41, round 8b,
+   * decision 1).
+   */
   CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecordedRoot(RecordedRootPlan plan,
       String childKey, long epoch, EngineContext context, CancelToken cancellation) {
+    return enumerateExplicitRoot(plan, childKey, epoch, context, cancellation, true);
+  }
+
+  /**
+   * {@link #enumerateRecordedRoot} for an explicit ingest resumed after a restart or a stopped
+   * attachment: it is no fresh add, so it carries no add marker and records nothing (round 8b,
+   * decision 2); a folder with no recorded volume is then refused and nothing is deleted.
+   */
+  CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecoveredRecordedRoot(
+      RecordedRootPlan plan, String childKey, long epoch, EngineContext context,
+      CancelToken cancellation) {
+    return enumerateExplicitRoot(plan, childKey, epoch, context, cancellation, false);
+  }
+
+  private CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateExplicitRoot(
+      RecordedRootPlan plan, String childKey, long epoch, EngineContext context,
+      CancelToken cancellation, boolean rootAdded) {
     CallView view = captureCallView();
     try {
       return enumerateRecordedRoot(plan, childKey, epoch, context, cancellation,
-          WorkerIngestService.RecordedScanMode.STREAMING, view, capturedRootFence(plan, false));
+          WorkerIngestService.RecordedScanMode.STREAMING, view, capturedRootFence(plan, false),
+          rootAdded);
     } catch (RuntimeException | Error failure) {
       view.release();
       throw failure;
@@ -1258,7 +1352,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     CallView view = captureCallView();
     try {
       return enumerateRecordedRoot(plan, childKey, epoch, context, cancellation,
-          WorkerIngestService.RecordedScanMode.STREAMING, view, capturedRootFence(plan, true));
+          WorkerIngestService.RecordedScanMode.STREAMING, view, capturedRootFence(plan, true),
+          false);
     } catch (RuntimeException | Error failure) {
       view.release();
       throw failure;
@@ -1303,7 +1398,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           if (outcome != JobQueue.WalkEnumerationOutcome.COMPLETE) return CompletableFuture.completedFuture(outcome);
           if (cancellation.isCancelled()) return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.CANCELLED);
           return enumerateRecordedRoot(singleRoot, operationKey, epoch, owner.context(), cancellation,
-              WorkerIngestService.RecordedScanMode.CAPTURED, parentView.fork(), fence);
+              WorkerIngestService.RecordedScanMode.CAPTURED, parentView.fork(), fence, false);
         });
       }
       return result.whenComplete((ignored, failure) -> {
@@ -1324,7 +1419,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecordedRoot(RecordedRootPlan plan,
       String childKey, long epoch, EngineContext context, CancelToken cancellation,
       WorkerIngestService.RecordedScanMode mode, CallView view,
-      io.justsearch.app.services.worker.WatchedRootsState.RootProducerFence fence) {
+      io.justsearch.app.services.worker.WatchedRootsState.RootProducerFence fence,
+      boolean rootAdded) {
     try {
     Objects.requireNonNull(plan, "plan");
     Objects.requireNonNull(cancellation, "cancellation");
@@ -1335,7 +1431,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     var root = plan.roots().getFirst();
     var builder = ScanRootRequest.newBuilder().setRootPath(root.path().toString())
         .setMode(root.force() ? ScanMode.SCAN_MODE_FORCE_REINDEX : ScanMode.SCAN_MODE_INITIAL)
-        .addAllExcludeGlobs(root.excludePatterns());
+        .addAllExcludeGlobs(root.excludePatterns())
+        .setRootAdded(rootAdded);
     if (root.collection() != null) builder.setCollection(root.collection());
     var request = builder.build();
     var recorded = new WorkerIngestService.RecordedRootScan(request, childKey, epoch,
@@ -1351,6 +1448,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
               ? JobQueue.WalkEnumerationOutcome.CANCELLED
               : terminal.getComplete() && terminal.getTerminalReasonCode().isEmpty()
                   ? JobQueue.WalkEnumerationOutcome.COMPLETE : JobQueue.WalkEnumerationOutcome.FAILED);
+          if (!root.singleFile()) {
+            // Task t-20261013-ef3c41, round 6 (S8): the reindex walk records a root-level refusal
+            // as the root's state at once, as the boot walk does, instead of leaving it to read
+            // indexed until the periodic sync asks.
+            roots.recordRecordedWalk(root.path(),
+                outcome.get() == JobQueue.WalkEnumerationOutcome.COMPLETE,
+                terminal.getTerminalReasonCode());
+          }
         }
         return null;
       }, () -> {

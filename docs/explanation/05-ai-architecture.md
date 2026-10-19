@@ -246,7 +246,7 @@ Entries are `<root>/<ortVersion>/<cpu|cuda>-<optLevel>/<sha256>/model.onnx` plus
 
 Hits update `lastUsed`; after publication, the store counts committed graph and metadata bytes across providers in the current ORT version and evicts least-recently-used entries to the cap (path order breaks ties). Cleanup/eviction failures are logged and non-fatal, so this is a best-effort bound, not a reservation before optimization. First initialization per root/version in a JVM removes other root children (old version namespaces), refusing linked paths. Any `*.onnx_data` sibling or tensor external-data declaration, including nested tensor-bearing fields, excludes a model from disk caching; failed inspection/store preparation falls back to in-memory optimization. Each session load attempts deletion of exactly the four legacy regular-file siblings `.optimized`, `.opt-meta`, `.cuda.optimized`, `.cuda.opt-meta`, refusing symlinks/junctions and directories. These graphs are registered as derived, regenerable storage in `governance/store-recoverability.v1.json` (`ort-optimized-models`); see [D-012](../reference/inference-runtime-register.md#d-012-ort-optimized-graphs-one-content-keyed-per-machine-store--shipped).
 
-Model file verification: `./gradlew.bat :modules:worker-core:verifyModel -Pmodel=<path> -Pgpu=true`
+Model file verification: `node scripts/lib/tool-invoker.cjs gradle :modules:worker-core:verifyModel -Pmodel=<path> -Pgpu=true`
 
 ### 4. Reranker GPU Coordination (index-half, default enabled)
 

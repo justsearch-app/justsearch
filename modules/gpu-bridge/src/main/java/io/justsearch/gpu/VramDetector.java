@@ -1,17 +1,14 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.gpu;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Detects actual available VRAM from the GPU using nvidia-smi.
  *
- * <p>This class queries the GPU for actual VRAM availability via nvidia-smi.
+ * <p>This class reads the GPU's VRAM through {@link NvidiaSmiReadings}: one shared nvidia-smi
+ * reading per process, at most one probe at a time and at most once per five seconds.
  *
  * <h2>Usage</h2>
  * <pre>
@@ -38,17 +35,21 @@ public final class VramDetector {
    */
   private static final long COMFORTABLE_VRAM = VramRequirements.COMFORTABLE_VRAM_BYTES;
 
-  /** Timeout for nvidia-smi commands in seconds. */
-  private static final int NVIDIA_SMI_TIMEOUT_SECONDS = 5;
+  /** The process-wide nvidia-smi reading every detector shares (task b6d536 b101). */
+  private final NvidiaSmiReadings readings;
 
-  // Cached values to avoid repeated nvidia-smi calls
-  private Long cachedTotalVram = null;
-  private long cacheTimestamp = 0;
-  private static final long CACHE_TTL_MS = 60_000; // 1 minute cache
+  public VramDetector() {
+    this(NvidiaSmiReadings.shared());
+  }
 
-  // Sticky failure flag: once nvidia-smi fails (not found / non-zero exit),
-  // all subsequent calls short-circuit without spawning a process.
-  private volatile boolean nvidiaSmiUnavailable = false;
+  VramDetector(NvidiaSmiReadings readings) {
+    this.readings = readings;
+  }
+
+  /** The shared reading, probing at most once per {@link NvidiaSmiReadings#MIN_INTERVAL}. */
+  NvidiaSmiReadings.Reading reading() {
+    return readings.read();
+  }
 
   /**
    * Detects total VRAM in bytes using nvidia-smi.
@@ -56,65 +57,8 @@ public final class VramDetector {
    * @return total VRAM in bytes, or -1 if detection fails
    */
   public long getTotalVramBytes() {
-    if (nvidiaSmiUnavailable) {
-      return -1;
-    }
-    // Check cache
-    if (cachedTotalVram != null && (System.currentTimeMillis() - cacheTimestamp) < CACHE_TTL_MS) {
-      return cachedTotalVram;
-    }
-
-    try {
-      ProcessBuilder pb = new ProcessBuilder(
-          "nvidia-smi",
-          "--query-gpu=memory.total",
-          "--format=csv,noheader,nounits");
-      pb.redirectErrorStream(true);
-      Process proc = pb.start();
-
-      // Wait BEFORE reading: the timeout must bound the call. nvidia-smi emits a single
-      // short line, so its output fits the OS pipe buffer and it never blocks on write —
-      // reading after the process has exited (or been killed) cannot deadlock, but reading
-      // first would let readLine() block indefinitely on a hung child, defeating the timeout.
-      boolean exited = proc.waitFor(NVIDIA_SMI_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-      if (!exited) {
-        proc.destroyForcibly();
-        LOG.warn("nvidia-smi timed out");
-        return -1;
-      }
-
-      String output;
-      try (BufferedReader reader = new BufferedReader(
-          new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
-        output = reader.readLine();
-      }
-
-      if (proc.exitValue() != 0 || output == null || output.isBlank()) {
-        LOG.debug("nvidia-smi failed or returned empty output — disabling future polls");
-        nvidiaSmiUnavailable = true;
-        return -1;
-      }
-
-      long vramBytes = parseNvidiaSmiFirstGpuBytes(output);
-      if (vramBytes < 0) {
-        // Unparseable output is a transient glitch, not a missing tool — do not set the
-        // sticky flag (matches the legacy NumberFormatException path).
-        LOG.debug("Failed to parse nvidia-smi total-memory output: {}", output);
-        return -1;
-      }
-
-      // Cache the result
-      cachedTotalVram = vramBytes;
-      cacheTimestamp = System.currentTimeMillis();
-
-      LOG.debug("Detected total VRAM: {} bytes", vramBytes);
-      return vramBytes;
-
-    } catch (Exception e) {
-      LOG.debug("nvidia-smi not available — disabling future polls: {}", e.getMessage());
-      nvidiaSmiUnavailable = true;
-      return -1;
-    }
+    NvidiaSmiReadings.Reading reading = reading();
+    return reading == null || reading.totalBytes() == null ? -1 : reading.totalBytes();
   }
 
   /**
@@ -123,49 +67,8 @@ public final class VramDetector {
    * @return available VRAM in bytes, or -1 if detection fails
    */
   public long getAvailableVramBytes() {
-    if (nvidiaSmiUnavailable) {
-      return -1;
-    }
-    try {
-      ProcessBuilder pb = new ProcessBuilder(
-          "nvidia-smi",
-          "--query-gpu=memory.free",
-          "--format=csv,noheader,nounits");
-      pb.redirectErrorStream(true);
-      Process proc = pb.start();
-
-      // Wait before reading — see getTotalVramBytes() for why the timeout must precede the read.
-      boolean exited = proc.waitFor(NVIDIA_SMI_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-      if (!exited) {
-        proc.destroyForcibly();
-        LOG.warn("nvidia-smi timed out");
-        return -1;
-      }
-
-      String output;
-      try (BufferedReader reader = new BufferedReader(
-          new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
-        output = reader.readLine();
-      }
-
-      if (proc.exitValue() != 0 || output == null || output.isBlank()) {
-        LOG.debug("nvidia-smi failed or returned empty output");
-        return -1;
-      }
-
-      long vramBytes = parseNvidiaSmiFirstGpuBytes(output);
-      if (vramBytes < 0) {
-        LOG.debug("Failed to parse nvidia-smi free-memory output: {}", output);
-        return -1;
-      }
-
-      LOG.debug("Detected available VRAM: {} bytes", vramBytes);
-      return vramBytes;
-
-    } catch (Exception e) {
-      LOG.debug("nvidia-smi free memory detection failed: {}", e.getMessage());
-      return -1;
-    }
+    NvidiaSmiReadings.Reading reading = reading();
+    return reading == null || reading.freeBytes() == null ? -1 : reading.freeBytes();
   }
 
   /**
@@ -263,47 +166,26 @@ public final class VramDetector {
    * @return driver version like {@code "591.59"}, or null if unavailable
    */
   public String getDriverVersion() {
-    if (nvidiaSmiUnavailable) {
-      return null;
-    }
-    try {
-      ProcessBuilder pb =
-          new ProcessBuilder(
-              "nvidia-smi",
-              "--query-gpu=driver_version",
-              "--format=csv,noheader");
-      pb.redirectErrorStream(true);
-      Process proc = pb.start();
-
-      // Wait before reading — see getTotalVramBytes() for why the timeout must precede the read.
-      boolean exited = proc.waitFor(NVIDIA_SMI_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-      if (!exited) {
-        proc.destroyForcibly();
-        return null;
-      }
-
-      String output;
-      try (BufferedReader reader =
-          new BufferedReader(new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
-        output = reader.readLine();
-      }
-
-      if (proc.exitValue() != 0 || output == null || output.isBlank()) {
-        return null;
-      }
-      return output.trim().lines().findFirst().orElse("").trim();
-    } catch (Exception e) {
-      return null;
-    }
+    NvidiaSmiReadings.Reading reading = reading();
+    return reading == null ? null : reading.driverVersion();
   }
 
   /**
-   * Invalidates the cached VRAM value, forcing a fresh query on next call.
+   * Whether the nvidia-smi tool is available, without starting it: the last shared reading's
+   * answer when one was taken, otherwise whether nvidia-smi is installed where a launch finds it.
+   * Independent of where the GPU memory figures come from (NVML reads them in process).
+   */
+  public boolean isToolAvailable() {
+    return readings.toolAvailable();
+  }
+
+  /**
+   * Marks the shared reading stale and asks for a fresh one: the next probe the five-second
+   * interval allows takes it, retrying a sticky failure. Never starts nvidia-smi sooner than
+   * that; a read inside the interval returns the last reading, marked stale.
    */
   public void invalidateCache() {
-    cachedTotalVram = null;
-    cacheTimestamp = 0;
-    nvidiaSmiUnavailable = false;
+    readings.invalidate();
   }
 
   private static String formatGb(long bytes) {

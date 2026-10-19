@@ -43,10 +43,24 @@ public record EnrichmentProgressView(
     // "combined" | "individual" | "idle". Previously unobservable: batchTiming/
     // enrichmentCompleted counters froze in individual mode with no signal explaining why
     // (710 S-B3 finding).
-    String backfillMode) {
+    String backfillMode,
+    // Spec E step E0b (task b6d536): whole documents BOTH embedded and sparse-encoded, one joint
+    // Lucene count. The S5 throughput unit; not derivable from the per-stage counters above.
+    long embeddedAndSparseCount,
+    // Spec E step E1 (§1.7): whether each stage can drain its backlog right now, by the same
+    // provider checks the backfill loop uses. The *Enabled flags above are wire-time provider
+    // presence. Operating status skips a backlog in a disabled or unavailable stage when deciding
+    // IDLE. Null (not reported) normalizes to true: a producer that reports a backlog without
+    // saying the stage is stuck is read as working on it, never as idle.
+    Boolean embeddingAvailable,
+    Boolean spladeAvailable,
+    Boolean nerAvailable) {
   public EnrichmentProgressView {
     backfillMode = backfillMode == null ? "idle" : backfillMode;
     completeness = completeness == null ? List.of() : List.copyOf(completeness);
+    embeddingAvailable = embeddingAvailable == null ? Boolean.TRUE : embeddingAvailable;
+    spladeAvailable = spladeAvailable == null ? Boolean.TRUE : spladeAvailable;
+    nerAvailable = nerAvailable == null ? Boolean.TRUE : nerAvailable;
   }
 
   public static EnrichmentProgressView empty() {

@@ -1,0 +1,85 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T07:40:49.601Z",
+  "revision": "4cfcc60125bc63891913ba8b993cd60be15a6134",
+  "tree": "745b17ba74ab9de5f50c6fa988f83f62757daee2",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.HeadRerankDeadlineInProcessTest.hybridSearchWithAStalledRerankerAnswersWithinTheDeadlineWithFusedResults\" --tests \"io.justsearch.app.engine.HeadRerankDeadlineInProcessTest.hybridSearchWhoseRerankWaitsForLoadingModelsAnswersWithinTheDeadline\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 23950
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankDeadlineInProcessTest.java#hybridSearchWithAStalledRerankerAnswersWithinTheDeadlineWithFusedResults",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankDeadlineInProcessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:10c1db1480aa7b460200c197a3d89aa54d3699446225e6a52ab85342d38c06f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "hybridSearchWithAStalledRerankerAnswersWithinTheDeadlineWithFusedResults(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankDeadlineInProcessTest.java#hybridSearchWhoseRerankWaitsForLoadingModelsAnswersWithinTheDeadline",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankDeadlineInProcessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:10c1db1480aa7b460200c197a3d89aa54d3699446225e6a52ab85342d38c06f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "hybridSearchWhoseRerankWaitsForLoadingModelsAnswersWithinTheDeadline(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "68547f75a",
+    "revision": "68547f75a4a123d796da3b31a414a1cc18bfc309",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.HeadRerankDeadlineInProcessTest.hybridSearchWithAStalledRerankerAnswersWithinTheDeadlineWithFusedResults\" --tests \"io.justsearch.app.engine.HeadRerankDeadlineInProcessTest.hybridSearchWhoseRerankWaitsForLoadingModelsAnswersWithinTheDeadline\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 174273
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankDeadlineInProcessTest.java#hybridSearchWithAStalledRerankerAnswersWithinTheDeadlineWithFusedResults",
+        "classification": "assertion",
+        "detail": "hybridSearchWithAStalledRerankerAnswersWithinTheDeadlineWithFusedResults(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a search whose rerank does not return must answer within D = 5000 ms; took 60007 ms ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankDeadlineInProcessTest.java#hybridSearchWhoseRerankWaitsForLoadingModelsAnswersWithinTheDeadline",
+        "classification": "assertion",
+        "detail": "hybridSearchWhoseRerankWaitsForLoadingModelsAnswersWithinTheDeadline(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a search whose rerank does not return must answer within D = 5000 ms; took 60027 ms ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:9e7eda9c8a626aad10743bdbf0e495367b535550efd310950567b85666ebac11"
+}

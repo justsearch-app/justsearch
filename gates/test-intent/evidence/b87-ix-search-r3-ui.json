@@ -1,0 +1,146 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T19:36:24.364Z",
+  "revision": "8bde08e9a6d9f5d4d40c4315ad825efeecceb46b",
+  "tree": "87549204842f6aedd36265ff69f514e2c2cb1f30",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/AskTerminalReload.test.ts\" \"src/shell-v0/aggregate-substrate/strategies/RerankLoadingReason.test.ts\" \"src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\test-intent-vitest-31076-1791920166101.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6962
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts#reloaded Search Ask keeps the terminal error and its retrieval explanation",
+      "file": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f73010a5f6bf8243b8b10e50072cba17931ebbc401d34790cafe73002fecbf4e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reloaded Search Ask keeps the terminal error and its retrieval explanation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts#reloaded Unified Chat keeps the terminal error and its retrieval explanation",
+      "file": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f73010a5f6bf8243b8b10e50072cba17931ebbc401d34790cafe73002fecbf4e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reloaded Unified Chat keeps the terminal error and its retrieval explanation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts#document fallback still explains why chunk retrieval was unavailable",
+      "file": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f73010a5f6bf8243b8b10e50072cba17931ebbc401d34790cafe73002fecbf4e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "document fallback still explains why chunk retrieval was unavailable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/RerankLoadingReason.test.ts#a loading reranker is explained without a raw reason code",
+      "file": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/RerankLoadingReason.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:20bda95f34b6037d9f59442591b30b83aa625cab9024d463135ee7d48f46154c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a loading reranker is explained without a raw reason code",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts#F-052 — CROSS_ENCODER_SKIP_WORDING covers the drop-class vocabulary exactly",
+      "file": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7f669cb7ba9a6fb9f7105ad2737d2599d165413945d00597c0db4694af0cce5f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) F-052 — CROSS_ENCODER_SKIP_WORDING covers the drop-class vocabulary exactly",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "8bde08e9a",
+    "revision": "8bde08e9a6d9f5d4d40c4315ad825efeecceb46b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/AskTerminalReload.test.ts\" \"src/shell-v0/aggregate-substrate/strategies/RerankLoadingReason.test.ts\" \"src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\test-intent-vitest-31076-1791920177038.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5868
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts#reloaded Search Ask keeps the terminal error and its retrieval explanation",
+        "classification": "assertion",
+        "detail": "reloaded Search Ask keeps the terminal error and its retrieval explanation:  AssertionError: expected '' to be 'No matching documents found in the in…' // Object.is equality\n    at F:/justsearch-public/.claude/worktrees/test-intent-before-ltxvMi/modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts:24:24\n    at file:///C:/agent-sandbox-tmp/b87-ix-search/ui-deps/node_mo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts#reloaded Unified Chat keeps the terminal error and its retrieval explanation",
+        "classification": "assertion",
+        "detail": "reloaded Unified Chat keeps the terminal error and its retrieval explanation:  AssertionError: expected '\\n      \\n        \\n          Search …' to contain 'semantic search did not answer in time'\n    at F:/justsearch-public/.claude/worktrees/test-intent-before-ltxvMi/modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts:40:28\n    at file:///C:/agent-sandbox-tmp/b87-ix-s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts#document fallback still explains why chunk retrieval was unavailable",
+        "classification": "assertion",
+        "detail": "document fallback still explains why chunk retrieval was unavailable:  AssertionError: expected '\\n        Full-document retrieval\\n  …' to contain '(document too small for chunking)'\n    at F:/justsearch-public/.claude/worktrees/test-intent-before-ltxvMi/modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts:50:28\n    at file:///C:/agent-sandbox-tmp/b87-ix-search"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/RerankLoadingReason.test.ts#a loading reranker is explained without a raw reason code",
+        "classification": "assertion",
+        "detail": "a loading reranker is explained without a raw reason code:  AssertionError: expected 'Hybrid search' to contain 'Relevance re-ranking model is still l…'\n    at F:/justsearch-public/.claude/worktrees/test-intent-before-ltxvMi/modules/ui-web/src/shell-v0/aggregate-substrate/strategies/RerankLoadingReason.test.ts:9:16\n    at file:///C:/agent-sandbox-tmp/b87-ix-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts#F-052 — CROSS_ENCODER_SKIP_WORDING covers the drop-class vocabulary exactly",
+        "classification": "assertion",
+        "detail": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) F-052 — CROSS_ENCODER_SKIP_WORDING covers the drop-class vocabulary exactly:  AssertionError: expected [ 'DEADLINE_EXCEEDED', …(5) ] to deeply equal [ 'DEADLINE_EXCEEDED', …(6) ]\n    at F:/justsearch-public/.claude/worktrees/test-intent-before-ltxvMi/modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts:357:60\n    at file:///C:/agent-sandbox-tm"
+      }
+    ]
+  },
+  "digest": "sha256:289ebab205615fa01663f5e12a1c5239765e885d4edfdcac3d9bc92cd38426b7"
+}

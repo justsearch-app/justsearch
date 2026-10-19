@@ -1,0 +1,69 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:83d8dd3cdaf29665ab7d4d5208d8f1950aa0fdbf948556d275c256efabd8b9b7"
+  },
+  "createdAt": "2026-10-16T04:32:35.305Z",
+  "revision": "31bbdf349527234907d0378966df178e66ef3e0e",
+  "tree": "f6552fc637c6d66a47b95eca260ad953d4e25f63",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::upgrade_stop_waits_for_actor_accounting_after_the_job_cleanup_floor\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2884
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::upgrade_stop_waits_for_actor_accounting_after_the_job_cleanup_floor",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:63db5e00119af43e58f6174cb8928d1758ce564c31274c25da1e81171897e428",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::upgrade_stop_waits_for_actor_accounting_after_the_job_cleanup_floor",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "31bbdf349",
+    "revision": "31bbdf349527234907d0378966df178e66ef3e0e",
+    "overlays": [
+      "modules/shell/src-tauri/resources/headless/.placeholder"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::upgrade_stop_waits_for_actor_accounting_after_the_job_cleanup_floor\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 16161,
+        "output": "\nrunning 1 test\ntest engine_host::tests::upgrade_stop_waits_for_actor_accounting_after_the_job_cleanup_floor ... FAILED\n\nfailures:\n\n---- engine_host::tests::upgrade_stop_waits_for_actor_accounting_after_the_job_cleanup_floor stdout ----\n\nthread 'engine_host::tests::upgrade_stop_waits_for_actor_accounting_after_the_job_cleanup_floor' (12472) panicked at src\\engine_host.rs:2018:9:\nassertion `left == right` failed: the accounted upgrade must permit handoff\n  left: Err(\"Engine stop did not finish as upgrade; installer refused\")\n right: Ok(Some(2972))\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::upgrade_stop_waits_for_actor_accounting_after_the_job_cleanup_floor\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 148 filtered out; finished in 2.09s\n\n\n   Compiling shell v0.3.0 (F:\\justsearch-public\\.claude\\worktrees\\b6d536-ci-other\\build\\ci759\\before\\test-intent-before-o9eyOD\\modules\\shell\\src-tauri)\nwarning: function `request_head_shutdown` is never used\n   --> src\\lib.rs:203:4\n    |\n203 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src\\lib.rs:944:15\n    |\n944 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variant `Unsupported` is never constructed\n  --> src\\containment.rs:39:5\n   |\n37 | pub(crate) enum ContainmentError {\n   |                 ---------------- variant in this enum\n38 |     /// Not Windows: there is no job to create.\n39 |     Unsupported,\n   |     ^^^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: function `resolve_manifest_path` is never used\n  --> src\\platform_paths.rs:92:8\n   |\n92 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src\\quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src\\quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src\\supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src\\updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src\\updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 9 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.97s\n     Running unittests src\\lib.rs (F:\\justsearch-public\\.claude\\worktrees\\b6d536-ci-other\\build\\cargo-target\\debug\\deps\\shell_lib-ab4a4d612243eb27.exe)\nerror: test failed, to rerun pass `--lib`\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::upgrade_stop_waits_for_actor_accounting_after_the_job_cleanup_floor",
+        "classification": "assertion",
+        "detail": "engine_host::tests::upgrade_stop_waits_for_actor_accounting_after_the_job_cleanup_floor:  ---- engine_host::tests::upgrade_stop_waits_for_actor_accounting_after_the_job_cleanup_floor stdout ----\n\nthread 'engine_host::tests::upgrade_stop_waits_for_actor_accounting_after_the_job_cleanup_floor' (12472) panicked at src\\engine_host.rs:2018:9:\nassertion `left == right` failed: the accounted upgrade must permit handoff\n  left: Err(\"Engine stop did not finish as upgrade; installer refused\")\n right: Ok(S"
+      }
+    ]
+  },
+  "digest": "sha256:7bf50ce0d04cd703d7f3d170fb3a26533528ac986d738a03908816b1dd1eb641"
+}

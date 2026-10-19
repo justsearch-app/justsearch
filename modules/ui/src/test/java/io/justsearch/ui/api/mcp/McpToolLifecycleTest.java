@@ -177,7 +177,7 @@ class McpToolLifecycleTest {
         name,
         "Original description for " + name + ".",
         Map.of("type", "object", "properties", Map.of()),
-        annotations);
+        annotations, false);
   }
 
   @SuppressWarnings("unchecked")

@@ -1,0 +1,118 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:06:23.136Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "4fc67997894ce6e1ec7ca784fe6f6f291220253c",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatFailureScopeTest.aRefusedActivationDoesNotShowAnEarlierFailureAsItsOwn\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6200
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.GenerativeSettingsComponentOwnerTest.aSettingsApplyKeepsTheContextReducedNoticeOfASteppedDownServer\" --tests \"io.justsearch.app.services.supervision.ChatFailedReasonCodesContractTest.everyFailedCodeTheBrainRowsNameCarriesItsReasonCode\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6944
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatFailureScopeTest.java#aRefusedActivationDoesNotShowAnEarlierFailureAsItsOwn",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatFailureScopeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e82954ecdd1379aab49ba10e498dcb4902d5ec79c3fa9c4873dc6a4c032c5473",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRefusedActivationDoesNotShowAnEarlierFailureAsItsOwn()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/GenerativeSettingsComponentOwnerTest.java#aSettingsApplyKeepsTheContextReducedNoticeOfASteppedDownServer",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/GenerativeSettingsComponentOwnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:91503a756378dd0aa84201e71f064c86651d1037653e7cfacc993cd13ca89d60",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSettingsApplyKeepsTheContextReducedNoticeOfASteppedDownServer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/supervision/ChatFailedReasonCodesContractTest.java#everyFailedCodeTheBrainRowsNameCarriesItsReasonCode",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/supervision/ChatFailedReasonCodesContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6116674a7dc90649a3fe4f19651ab90afd064b5cdb312990e4fbebb3ea2fd1b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyFailedCodeTheBrainRowsNameCarriesItsReasonCode()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "99809b8a2",
+    "revision": "99809b8a27169d4b6a9965947a5e281e68edb9c7",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatFailureScopeTest.aRefusedActivationDoesNotShowAnEarlierFailureAsItsOwn\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 31992
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.GenerativeSettingsComponentOwnerTest.aSettingsApplyKeepsTheContextReducedNoticeOfASteppedDownServer\" --tests \"io.justsearch.app.services.supervision.ChatFailedReasonCodesContractTest.everyFailedCodeTheBrainRowsNameCarriesItsReasonCode\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 63697
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatFailureScopeTest.java#aRefusedActivationDoesNotShowAnEarlierFailureAsItsOwn",
+        "classification": "assertion",
+        "detail": "aRefusedActivationDoesNotShowAnEarlierFailureAsItsOwn(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the refused activation's landing does not show the crash loop as its failure ==> expected: <[null]> but was: <[CRASH_LOOP]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/GenerativeSettingsComponentOwnerTest.java#aSettingsApplyKeepsTheContextReducedNoticeOfASteppedDownServer",
+        "classification": "assertion",
+        "detail": "aSettingsApplyKeepsTheContextReducedNoticeOfASteppedDownServer(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the relaunched candidate serves on the reduced window, so the notice stays ==> expected: <inference.context_reduced> but was: <null>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/supervision/ChatFailedReasonCodesContractTest.java#everyFailedCodeTheBrainRowsNameCarriesItsReasonCode",
+        "classification": "assertion",
+        "detail": "everyFailedCodeTheBrainRowsNameCarriesItsReasonCode(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: brain FAILED rows out of step with ChatReasonCodes:&#10;  clean-exit: names resource_exhausted but not the reason code it is published as (inference.out_of_memory)&#10;  clean-exit: names crash_loop but not the reason code it is published as (inference.crashed)&#"
+      }
+    ]
+  },
+  "digest": "sha256:3d99e97404569b5a35954cb5e22406ba0089fbe2c8609490a1ba2c774eed36a7"
+}

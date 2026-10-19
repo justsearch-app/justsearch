@@ -1,0 +1,143 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T15:55:36.031Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "0911d7c6476b1ef3a38fe787c13b9769259c220a",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeSubscriberRecoveryTest.subscriberAttachingInsideSuccessfulRecoveryNeverSeesAStaleFailure\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2998
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.repeatedUnchangedAdmissionReadsNoChildren\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.firstLegacyScanDoesNotSplitOrOpenAWriterReaderPerParent\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.legacyMigrationPreservesCompletedSparseFeatures\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5522
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeSubscriberRecoveryTest.java#subscriberAttachingInsideSuccessfulRecoveryNeverSeesAStaleFailure",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeSubscriberRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:380e33a8473074c3e001148f936945bf0b776958aa671f8ed2ca42ba16ff2d05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "subscriberAttachingInsideSuccessfulRecoveryNeverSeesAStaleFailure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java#repeatedUnchangedAdmissionReadsNoChildren",
+      "file": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:53b77b292360d38f2f33131e911d502612dcf590ff76c591fdbbf0718e37c4ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "repeatedUnchangedAdmissionReadsNoChildren()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java#firstLegacyScanDoesNotSplitOrOpenAWriterReaderPerParent",
+      "file": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:53b77b292360d38f2f33131e911d502612dcf590ff76c591fdbbf0718e37c4ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "firstLegacyScanDoesNotSplitOrOpenAWriterReaderPerParent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java#legacyMigrationPreservesCompletedSparseFeatures",
+      "file": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:53b77b292360d38f2f33131e911d502612dcf590ff76c591fdbbf0718e37c4ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacyMigrationPreservesCompletedSparseFeatures()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2f42b4d50",
+    "revision": "2f42b4d504ae7ef9f55a6eb1baa4bbd423245a9b",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-b55-batch-repair-compat.patch",
+        "contentDigest": "sha256:79b99e95e6496f6f972d86fff175441d6f3fcff2d173941d09f6f3105dec82f2"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeSubscriberRecoveryTest.subscriberAttachingInsideSuccessfulRecoveryNeverSeesAStaleFailure\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 30490
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.repeatedUnchangedAdmissionReadsNoChildren\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.firstLegacyScanDoesNotSplitOrOpenAWriterReaderPerParent\" --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.legacyMigrationPreservesCompletedSparseFeatures\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 15336
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeSubscriberRecoveryTest.java#subscriberAttachingInsideSuccessfulRecoveryNeverSeesAStaleFailure",
+        "classification": "assertion",
+        "detail": "subscriberAttachingInsideSuccessfulRecoveryNeverSeesAStaleFailure(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: neither the attachment snapshot nor a delta may expose failure while READY: [READY:true, READY:true, READY:false] ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java#repeatedUnchangedAdmissionReadsNoChildren",
+        "classification": "assertion",
+        "detail": "repeatedUnchangedAdmissionReadsNoChildren(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: unchanged admission must not revisit child rows ==> expected: <0> but was: <50000>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java#firstLegacyScanDoesNotSplitOrOpenAWriterReaderPerParent",
+        "classification": "assertion",
+        "detail": "firstLegacyScanDoesNotSplitOrOpenAWriterReaderPerParent(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: complete legacy children already declare their intended total ==> expected: <0> but was: <32>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java#legacyMigrationPreservesCompletedSparseFeatures",
+        "classification": "assertion",
+        "detail": "legacyMigrationPreservesCompletedSparseFeatures(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: migration must preserve the existing sparse weights ==> expected: <2.0078125> but was: <0.0>"
+      }
+    ]
+  },
+  "digest": "sha256:ed27751d9c2ff70b00bf8a57d3f97209728a15accfd615ebb6aa50f090ae8687"
+}

@@ -30,6 +30,7 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
   private final Object monitor = new Object();
   private final Map<String, DefaultComponentHandle> components = new LinkedHashMap<>();
   private final List<ListenerSubscription> listeners = new ArrayList<>();
+  private final List<ListenerSubscription> projections = new ArrayList<>();
   private final ReentrantLock applyLock = new ReentrantLock();
   private final ReentrantReadWriteLock publicationLock;
   private final RetainedStateBudget retainedState;
@@ -55,6 +56,34 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
   }
 
   @Override
+  public Optional<ReentrantReadWriteLock> publicationBoundary() {
+    return Optional.of(publicationLock);
+  }
+
+  @Override
+  public Subscription subscribePublication(Consumer<EngineComponentSnapshot> projection) {
+    Objects.requireNonNull(projection, "projection");
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (monitor) {
+        ensureOpen();
+        projection.accept(snapshotLocked());
+        var subscription = new ListenerSubscription(projection);
+        projections.add(subscription);
+        return subscription;
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
+    }
+  }
+
+  private void projectLocked(EngineComponentSnapshot snapshot) {
+    for (var projection : projections) {
+      if (!projection.closed) projection.listener.accept(snapshot);
+    }
+  }
+
+  @Override
   public ComponentHandle register(ComponentSpec spec) {
     Objects.requireNonNull(spec, "spec");
     EngineComponentSnapshot published;
@@ -71,7 +100,9 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
         handle = new DefaultComponentHandle(spec, Instant.now(), System.nanoTime());
         components.put(spec.name(), handle);
         revision++;
+        io.justsearch.core.status.StatusChangeCounter.process().changed();
         published = snapshotLocked();
+        projectLocked(published);
         observers = listenersLocked();
       }
     } finally {
@@ -202,6 +233,8 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
         closed = true;
         listeners.forEach(ListenerSubscription::closeLocked);
         listeners.clear();
+        projections.forEach(ListenerSubscription::closeLocked);
+        projections.clear();
       }
     } finally {
       publicationLock.writeLock().unlock();
@@ -248,7 +281,9 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
           return Optional.of(handle.snapshotLocked());
         }
         revision++;
+        io.justsearch.core.status.StatusChangeCounter.process().changed();
         published = snapshotLocked();
+        projectLocked(published);
         observers = listenersLocked();
         exact = handle.snapshotLocked();
       }
@@ -346,7 +381,8 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
     public void install() {
       requireWriteLock();
       // The coordinator must call validate while the same write lock is held before its durable
-      // commit point. Keep this post-commit operation assignment-only.
+      // commit point. Install the bounded current-state projections before releasing visibility;
+      // projections enqueue state only, and cannot deliver arbitrary observers here.
       synchronized (monitor) {
         if (changed) {
           for (int i = 0; i < updates.size(); i++) {
@@ -354,7 +390,9 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
             update.handle.installPrepared(update.desired);
           }
           revision = preparedSnapshot.revision();
+          io.justsearch.core.status.StatusChangeCounter.process().changed();
         }
+        if (changed) projectLocked(preparedSnapshot);
         installed = true;
       }
     }
@@ -598,6 +636,7 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
         if (closed) return;
         closeLocked();
         listeners.remove(this);
+        projections.remove(this);
       }
     }
 

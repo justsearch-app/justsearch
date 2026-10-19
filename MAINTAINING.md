@@ -17,14 +17,26 @@ the apparatus is visible and documented, never forced on a contributor.
 - **`scripts/agent-analytics/`**: maintainer telemetry and analytics tooling, session-to-merge
   links, the `world-state.mjs` orientation command, and the dev-tool tests (see its README).
 
+## Linux development prerequisites
+
+Use JDK 25, Node 24, a C compiler (`cc`) and Tesseract. For the GPU development stack, install
+an NVIDIA driver, build CUDA llama-server from the pinned llama.cpp version `b8571`, and export
+its executable path as `JUSTSEARCH_SERVER_EXE`. The file must be regular and executable; keep its
+shared libraries discoverable by the system loader. ONNX Runtime additionally needs its CUDA 12
+libraries, independently of llama-server's CUDA version. Development inference uses the GPU.
+
+Run `node scripts/dev/prepare-worktree.cjs` in each worktree, then
+`node scripts/dev/doctor.mjs`. Use `./gradlew` in Linux shells and Windows Git Bash, or
+`node scripts/lib/tool-invoker.cjs gradle <args...>` from either OS. The same invoker accepts
+`npm` for commands that need npm's portable entry point.
+
 ## Maintainer-only operational setup (contributors can skip)
 
 - **Agent work** — JustSearch uses agent-system: the projected `AGENTS.md` entry in this repository,
   plus private project knowledge, task records and role contracts in the maintainer's agent-system
   private root. The former agent layer (`CLAUDE.md`, `.claude/rules`, skills, Codex agent roles and
-  the hook manifest) was retired at adoption on 2026-10-05; its history is in
-  [`docs/reference/contributing/agent-guide.md`](docs/reference/contributing/agent-guide.md) and the
-  superseded contributor pages.
+  the hook manifest) was retired at adoption on 2026-10-05, and the remaining agent pages on
+  2026-10-19; their history is in git, at tag `agent-docs-pre-reset`.
 - **Shared local dev stack** — one local backend at a time, with an ownership/lease handshake through
   the `justsearch-dev` MCP server. `.mcp.json` registers it for Claude Code (seed it with
   `cp .mcp.json.example .mcp.json`; no secret required) and `.codex/config.toml` registers it for

@@ -132,9 +132,17 @@ implicitly `0`.
 Phase-1 attribution keeps `workflowRunId` canonical and treats `session_id` as an optional
 contextual join key.
 
-- maintained workflow entrypoints may resolve `session_id` from `JUSTSEARCH_AGENT_SESSION_ID`
-- maintained workflow entrypoints may also accept explicit `--session-id <id>` overrides
-- precedence is explicit `--session-id`, then `JUSTSEARCH_AGENT_SESSION_ID`, then `null`
+- `session_id` is the calling agent session's readable label, resolved by the repository's one
+  identity rule (`scripts/dev/lib/agent-identity.cjs`; Python producers call it through
+  `scripts/dev/agent-identity.mjs`, see `scripts/jseval/jseval/agent_identity.py`)
+- precedence is an explicit override (`--session-id <id>`, then `JUSTSEARCH_AGENT_IDENTITY`),
+  then the caller's harness process (the nearest Claude Code or Codex ancestor, which a dev-runner
+  started by the dev MCP server receives from that server as a validated hand-off; the label is
+  that harness's own session variable, `null` when it is absent), then `ci` (when `CI` is set) or
+  `unknown`, both with `session_id` = `null`
+- `JUSTSEARCH_AGENT_SESSION_ID` is not a source of `session_id`: it is only the dev-runner's
+  hand-off to the backend it launches, so the backend's operation leases name the session that
+  owns the stack
 - agent-driven workflow runs are expected to carry `session_id`
 - manual shell runs and CI runs may legitimately remain unattributed
 

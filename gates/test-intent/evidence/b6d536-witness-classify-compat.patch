@@ -1,0 +1,39 @@
+diff --git a/modules/worker-services/build.gradle.kts b/modules/worker-services/build.gradle.kts
+index 4286aa8db..9dbfc6139 100644
+--- a/modules/worker-services/build.gradle.kts
++++ b/modules/worker-services/build.gradle.kts
+@@ -233,3 +233,11 @@ testing {
+     }
+   }
+ }
++
++// Compat (fail-before only): compile-time-only stubs for later API that test code names directly.
++// They are never on a runtime classpath.
++val beforeCompatStubs by sourceSets.creating {
++  java.srcDir("src/beforeCompatStubs/java")
++  compileClasspath += sourceSets["main"].compileClasspath
++}
++dependencies { "testCompileOnly"(beforeCompatStubs.output) }
+diff --git a/modules/worker-services/src/beforeCompatStubs/java/io/justsearch/app/api/runtime/child/OwnedHelper.java b/modules/worker-services/src/beforeCompatStubs/java/io/justsearch/app/api/runtime/child/OwnedHelper.java
+new file mode 100644
+index 000000000..398919dab
+--- /dev/null
++++ b/modules/worker-services/src/beforeCompatStubs/java/io/justsearch/app/api/runtime/child/OwnedHelper.java
+@@ -0,0 +1,17 @@
++package io.justsearch.app.api.runtime.child;
++
++import io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter.EngineIdentity;
++
++/**
++ * Compat (fail-before only), compile-time only: the later owned-helper recorder that a probe in
++ * TikaProbeOwnerIntentTest names directly. It is on the test compile classpath and never on any
++ * runtime classpath, so the checks that look the class up reflectively still find no owned
++ * helpers in this before-state, and no production code here can call it.
++ */
++public final class OwnedHelper {
++  private OwnedHelper() {}
++
++  public static void recordTo(LedgerSink sink, EngineIdentity owner) {
++    throw new UnsupportedOperationException("compile-time stub");
++  }
++}

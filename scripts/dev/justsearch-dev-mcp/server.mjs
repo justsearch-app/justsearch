@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const execFileP = promisify(execFile);
+const gradleLauncher = process.platform === 'win32' ? './gradlew.bat' : './gradlew';
 
 // Tempdoc 637 §H.1 — MCP-server self-freshness. The dev MCP server is a long-lived stdio process; after
 // server.mjs (or a sibling loaded module) is edited it keeps serving OLD code until the harness reconnects
@@ -96,6 +97,7 @@ import {
   PROBE_OBSERVATION,
   classifyInferenceOrphan,
   observeDirectoryEntries,
+  observeRecordedInference,
   observeOptionalJsonFile,
   observePath,
   probeLoopbackHttpStatus,
@@ -152,10 +154,14 @@ function devRunnerEnvFor(identity) {
 }
 
 /**
- * Holder liveness for an advisory read (quick_health, staleness): a cheap pid-exists check. A
- * reused pid can read as alive here; decisions (start, stop, reload, acquire) use 'full'.
+ * Holder liveness for an advisory read (quick_health, staleness). Linux uses birth evidence so a
+ * reused pid or previous boot cannot keep an ended owner alive. Windows retains its cheap
+ * pid-exists check; decisions (start, stop, reload, acquire) always use 'full'.
  */
-function cheapLiveness(owner) {
+async function cheapLiveness(owner) {
+  if (owner?.processIdentity) {
+    return ownerPresence.ownerLiveness(owner, { table: await agentIdentity.readTableAsync() });
+  }
   const p = ownerPresence.ownerPidPresence(owner);
   if (!owner?.creationTime) return { state: 'unknown', reason: 'owner has no process identity' };
   if (p === 'absent') return { state: 'ended', reason: 'owner pid is gone' };
@@ -177,12 +183,13 @@ const {
   resolveForeignRegisterDir,
   readForeignRegister,
   probeForeignRuns,
+  recordedLlamaServers,
 } = _ownReq('../lib/process-record.cjs');
 
 /** Read non-expired op-leases (mirrors the dev-runner filter) and bucket by criticality. */
 async function readOwnershipOpLeases(mainRepoRoot) {
   try {
-    const raw = await fsp.readFile(path.join(mainRepoRoot, 'tmp', 'dev-runner', 'op-leases.json'), 'utf8').catch(() => null);
+    const raw = await fsp.readFile(path.join(resolveDevRunnerStateRoot(mainRepoRoot), 'op-leases.json'), 'utf8').catch(() => null);
     if (!raw) return { byCriticality: { mustComplete: [], unsafeToInterrupt: [], interruptibleWithLoss: [] }, entries: [], active: [] };
     const doc = JSON.parse(raw);
     const now = Date.now();
@@ -226,20 +233,30 @@ export async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, c
   // `distFrom` launch is not reported as a mismatch against the caller it was launched from.
   const leaseProv = active.provenance || null;
   const provenanceMismatch = computeProvenanceMismatch(leaseProv, callerRepoRoot);
-  // Presence of the holder: full pid + creation-time evidence for decisions, a cheap pid check for
-  // advisory reads. A holder with no owner block (every pre-change record) is an unknown owner.
+  // Presence of the holder: full birth evidence for decisions and Linux advisory reads, a cheap
+  // Windows pid check for advisory reads. A holder with no owner block is an unknown owner.
   const holderOwner = ownerPresence.holderOwner(active);
   let table = null;
   let liveness = null;
   if (ownerPresence.holderNeedsTable(active, callerIdentity)) {
     if (evidence === 'full') table = await agentIdentity.readTableAsync();
-    else liveness = cheapLiveness(holderOwner);
+    else liveness = await cheapLiveness(holderOwner);
   }
-  const { decision } = ownerPresence.computeOwnerVerdict({
+  let { decision } = ownerPresence.computeOwnerVerdict({
     active, callerIdentity, selfCheck: true, supervisorAlive, leaseExpired,
     stateRoot: ownersRoot, table, liveness, opLeases, takeover,
     provenance: { mismatch: provenanceMismatch }, now: Date.now(),
   });
+  // The owner's own stack with an operation in flight: the verdict stays USE (the owner may use it,
+  // and reload / the read tools proceed), but a restart is refused until the operation finishes.
+  // Say so here, where the owner orients, instead of only in the refusal.
+  const restartBlockers = decision.verdict === 'USE' ? ownerPresence.restartBlockingOps(opLeases) : [];
+  if (restartBlockers.length > 0) {
+    decision = {
+      ...decision,
+      recommendedAction: `${decision.recommendedAction} ${ownerPresence.ownOpInFlightText(restartBlockers, 'advice')}`,
+    };
+  }
   const ownership = {
     holder: active.holder,
     takeoverPolicy: active.takeoverPolicy ?? null,
@@ -289,7 +306,7 @@ export async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, c
         // unmissable while preserving any ownership/contention guidance the verdict already set.
         const staleRemedy =
           'STALE BACKEND: the running Head is serving an OLDER build than your source — behaviour may ' +
-          'reflect old code. Run `./gradlew.bat :modules:ui:installDist` then restart/reload before ' +
+          `reflect old code. Run \`${gradleLauncher} :modules:ui:installDist\` then restart/reload before ` +
           'trusting results. (Lane F stage A item A13: the head dist is the ONLY distribution now, ' +
           'so this stamp covers everything the Engine loads.)';
         ownership.recommendedAction = ownership.recommendedAction
@@ -317,8 +334,8 @@ export async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, c
 export async function withStaleness(structured, { mainRepoRoot, callerRepoRoot, callerIdentity }) {
   try {
     const active = await readJsonFileNoSymlinks({
-      repoRoot: mainRepoRoot,
-      relPosix: 'tmp/dev-runner/active.json',
+      repoRoot: resolveDevRunnerStateRoot(mainRepoRoot),
+      relPosix: 'active.json',
       maxBytes: 200_000,
     });
     if (!active?.holder) return structured; // no running stack → nothing to declare
@@ -551,8 +568,8 @@ async function resolveRunId(sharedRoot, runId) {
   if (runId) return runId;
   try {
     const active = await readJsonFileNoSymlinks({
-      repoRoot: sharedRoot,
-      relPosix: 'tmp/dev-runner/active.json',
+      repoRoot: resolveDevRunnerStateRoot(sharedRoot),
+      relPosix: 'active.json',
       maxBytes: 200_000,
     });
     return active?.runId ?? null;
@@ -616,8 +633,19 @@ async function resolveApiBaseUrl({ runId, apiPort, mainRepoRoot }) {
   return { ok: true, apiBaseUrl, runId: result.runId, chatProfile };
 }
 
-/** Default inference server port (llama-server). Read once at module load. */
-const INFERENCE_PORT = parseInt(process.env.JUSTSEARCH_SERVER_PORT, 10) || 8080;
+/**
+ * Data dirs whose runtime manifest may record a llama-server child: the run's own (when a run
+ * record names one), then the dev-runner default (`modules/ui-web/.dev-data`) of this checkout and
+ * of the main checkout. llama-server has no fixed port (ADR-0051 decision 2); its record does.
+ */
+export function inferenceRecordDataDirs({ runJson, repoRoot, mainRepoRoot }) {
+  const dirs = [];
+  if (typeof runJson?.dataDir === 'string' && runJson.dataDir) dirs.push(path.resolve(runJson.dataDir));
+  for (const root of [repoRoot, mainRepoRoot]) {
+    if (root) dirs.push(path.resolve(root, 'modules', 'ui-web', '.dev-data'));
+  }
+  return [...new Set(dirs)];
+}
 
 /* ── Tempdoc 844 B4a — honest JSON projection ──────────────────────────────────────────────── */
 
@@ -1081,7 +1109,10 @@ export async function checkRunMutationOwnership({
   const { ownership, decision } = await buildOwnershipProjection({
     mainRepoRoot, callerRepoRoot, callerIdentity, takeover, active, runJson, evidence: 'full', stateRoot,
   });
-  if (decision && decision.action === 'conflict') {
+  // `takeover_denied` refuses a start that would stop another owner's stale stack. A call that
+  // mutates the run (stop, reload) is not a takeover, so it keeps its earlier disposition, as
+  // dev-runner's assertMayMutateRun does.
+  if (decision && decision.action === 'conflict' && decision.reason !== 'takeover_denied') {
     const idle = decision.verdict === 'IDLE_HOLD';
     return {
       allowed: false,
@@ -1194,7 +1225,7 @@ export function classifyHotSwapOutcome({ exitCode, stdout = '', stderr = '', ide
         + 'record names, but WITHOUT the hot-reload classes dir on its classpath, so nothing was '
         + 'pushed. That means the process was launched from a stale distribution predating the '
         + 'hot-reload classpath. Remedy: rebuild the dist in that tree '
-        + '(./gradlew.bat :modules:ui:installDist) and restart the stack.',
+        + `(${gradleLauncher} :modules:ui:installDist) and restart the stack.`,
     } };
   }
   if (exitCode === 3) {
@@ -1263,13 +1294,17 @@ export async function main() {
         'renewals — avoids a mid-campaign takeover when the agent is busy (jseval/gradle) for minutes',
         'with no session activity. quick_health reports remaining hold via ownership.lease.remainingSec.',
         '',
-        'Prerequisites: ./gradlew.bat build must succeed before start.',
+        `Prerequisites: ${gradleLauncher} build must succeed before start.`,
         'After compaction: call quick_health to re-orient.',
         '',
         'Common errors:',
         '- NO_ACTIVE_RUN: call start, then retry.',
         '- OWNER_CONFLICT: another agent owns the stack. Call quick_health to see the owner,',
-        '  then ask the user before retrying with takeover: "warn".',
+        '  then ask the user before retrying with takeover: "warn". An idle, dead or abandoned owner',
+        '  needs no approval: its actionRequired says to retry with takeover: "warn" directly.',
+        '  If the message says the stack is your own, an operation is running in it (named in the',
+        '  message and criticalOps): wait for it to finish, or restart with takeover: "force"',
+        '  (an UNSAFE_TO_INTERRUPT operation also needs --confirm-interrupt=<opId>, a dev-runner CLI flag).',
         '- RUN_NOT_FOUND: omit runId to auto-resolve the active run.',
         '- Preflight fails: fix the reported issue (build, stop stale run, check models).',
       ].join('\n'),
@@ -1290,7 +1325,7 @@ export async function main() {
   mcpServer.registerTool(
     'justsearch.dev.start',
     {
-      description: 'Launch the dev stack. Returns OWNER_CONFLICT if another agent owns it (use takeover param to override with user approval). Cold start: ~1 min; warm: ~15s (HTTP ready) / ~40s (worker ready). Blocks until readiness level reached.',
+      description: 'Launch the dev stack. Returns OWNER_CONFLICT if another agent owns it (use takeover param to override with user approval), or if an operation is running in your own stack (wait, or takeover "force"). Cold start: ~1 min; warm: ~15s (HTTP ready) / ~40s (worker ready). Blocks until readiness level reached.',
       inputSchema: StartInputSchema,
       annotations: { destructiveHint: false, openWorldHint: false },
     },
@@ -1323,10 +1358,11 @@ export async function main() {
       const callerIdentity = await callerIdentityFor(input);
       if (!takeover || takeover === 'deny') {
         try {
-          const active = await readJsonFileNoSymlinks({ repoRoot: mainRepoRoot, relPosix: 'tmp/dev-runner/active.json', maxBytes: 200_000 });
+          const active = await readJsonFileNoSymlinks({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), relPosix: 'active.json', maxBytes: 200_000 });
           const { ownership, decision } = await buildOwnershipProjection({ mainRepoRoot, callerRepoRoot: repoRoot, callerIdentity, takeover: 'deny', active, evidence: 'full', stateRoot: devRunnerStateRoot });
           if (decision && decision.action === 'conflict') {
             const idle = decision.verdict === 'IDLE_HOLD';
+            const stale = decision.reason === 'takeover_denied';
             return toToolResult({
               ok: false,
               error: {
@@ -1336,10 +1372,13 @@ export async function main() {
               ownership,
               actionRequired: idle
                 ? 'Owner is idle — retry with takeover: "warn" (no user approval needed).'
-                : 'Ask the user before retrying with takeover: "warn".',
+                : stale
+                  ? 'Previous ownership is dead or abandoned — retry with takeover: "warn" to reclaim it (no user approval needed).'
+                  : 'Ask the user before retrying with takeover: "warn".',
             });
           }
-          // decision.action === 'proceed' (abandoned / dead / no-owner / self) → fall through to start.
+          // decision.action === 'proceed' (no-owner / self) → fall through to start. A dead or
+          // abandoned foreign stack needs an explicit takeover: deny never stops another's processes.
         } catch (_) { /* active.json missing or unreadable — proceed to start */ }
       }
 
@@ -1398,7 +1437,7 @@ export async function main() {
         maybeAppendNdjson(mainRepoRoot, { event: 'tool_start_result', tool: 'justsearch.dev.start', ok: false, timedOut: true });
         const observed = { activeRunId: null, apiBaseUrl: null, uiUrl: null, apiPort: null, uiPort: null, dataDir: null, apiStatusCode: null };
         try {
-          const active = await readJsonFileNoSymlinks({ repoRoot: mainRepoRoot, relPosix: 'tmp/dev-runner/active.json', maxBytes: 200_000 });
+          const active = await readJsonFileNoSymlinks({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), relPosix: 'active.json', maxBytes: 200_000 });
           if (active?.runId) {
             observed.activeRunId = active.runId;
             const runJson = await readRunJson({ repoRoot: mainRepoRoot, runId: active.runId });
@@ -1451,6 +1490,19 @@ export async function main() {
         return toToolResult(parsed);
       }
 
+      // Spec F §5.3 (X09-F5): the takeover's stop of the previous stack did not end it; nothing
+      // was started and the previous stack may still be (partly) running.
+      if (!parsed.ok && parsed.error?.code === 'TAKEOVER_STOP_FAILED') {
+        maybeAppendNdjson(mainRepoRoot, {
+          event: 'tool_start_result', tool: 'justsearch.dev.start',
+          ok: false, takeoverStopFailed: true,
+        });
+        return toToolResult({
+          ...parsed,
+          actionRequired: 'Call quick_health (detail: "full") to see what is still running, then stop it before retrying.',
+        });
+      }
+
       // After successful start, wait for readiness if requested
       if (parsed.ok) {
         const apiBaseUrl = parsed.apiBaseUrl;
@@ -1487,8 +1539,8 @@ export async function main() {
       const maxBytes = input.maxBytes ?? 65_536;
       const maxLines = input.maxLines ?? 200;
 
-      const { relPosix } = resolveAllowedRunFile({ repoRoot: mainRepoRoot, runId: input.runId, kind: input.kind });
-      const tailRes = await tailTextFileNoSymlinks({ repoRoot: mainRepoRoot, relPosix, maxBytes, maxLines });
+      const { relPosix, abs } = resolveAllowedRunFile({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), runId: input.runId, kind: input.kind });
+      const tailRes = await tailTextFileNoSymlinks({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), relPosix, maxBytes, maxLines });
 
       if (input.grepPattern && tailRes.ok) {
         try {
@@ -1508,7 +1560,7 @@ export async function main() {
               ok: true,
               runId: input.runId,
               kind: input.kind,
-              path: relPosix,
+              path: path.relative(mainRepoRoot, abs).split(path.sep).join('/'),
               truncated: !!tailRes.truncated,
               bytesRead: tailRes.bytesRead,
               text: tailRes.text,
@@ -2083,7 +2135,7 @@ export async function main() {
         setCheck(
           'headDist',
           'FAIL',
-          `Missing: ${headBin}. Run: ./gradlew.bat :modules:ui:installDist`
+          `Missing: ${headBin}. Run: ${gradleLauncher} :modules:ui:installDist`
             + ' (or, for a fresh worktree: node scripts/dev/prepare-worktree.cjs)',
         );
       } else {
@@ -2095,9 +2147,10 @@ export async function main() {
       }
 
       // 2. No stale or active run
+      let recordedRunJson = null;
       const activeObservation = await observeOptionalJsonFile({
-        repoRoot: mainRepoRoot,
-        relPosix: 'tmp/dev-runner/active.json',
+        repoRoot: resolveDevRunnerStateRoot(mainRepoRoot),
+        relPosix: 'active.json',
         maxBytes: 200_000,
       });
       if (activeObservation.state === FILE_OBSERVATION.ABSENT) {
@@ -2115,9 +2168,9 @@ export async function main() {
         } else {
           let runObservation;
           try {
-            const runFile = resolveAllowedRunFile({ repoRoot: mainRepoRoot, runId: activeRunId, kind: 'run_json' });
+            const runFile = resolveAllowedRunFile({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), runId: activeRunId, kind: 'run_json' });
             runObservation = await observeOptionalJsonFile({
-              repoRoot: mainRepoRoot,
+              repoRoot: resolveDevRunnerStateRoot(mainRepoRoot),
               relPosix: runFile.relPosix,
               maxBytes: 2_000_000,
             });
@@ -2135,6 +2188,7 @@ export async function main() {
                 + `${runObservation.error?.message || 'no readable run record'}`,
             );
           } else {
+            recordedRunJson = runObservation.value;
             const pids = runObservation.value?.pids || {};
             const anyAlive = Object.values(pids).some((pid) => {
               if (typeof pid !== 'number' || pid <= 0) return false;
@@ -2182,72 +2236,53 @@ export async function main() {
         );
       }
 
-      // 4. Inference port available. A response proves occupancy, not listener identity.
-      const inferenceObservation = await probeLoopbackHttpStatus(
-        `http://127.0.0.1:${INFERENCE_PORT}/health`,
-        { timeoutMs: 2_000 },
-      );
+      // 4. No recorded llama-server still answers. llama-server binds a fresh port per launch
+      // (ADR-0051 decision 2), so each one recorded in a runtime manifest is probed on its own
+      // port. A response proves occupancy, not listener identity.
+      const inferenceObservation = await observeRecordedInference({
+        recorded: await recordedLlamaServers(
+          inferenceRecordDataDirs({ runJson: recordedRunJson, repoRoot, mainRepoRoot })),
+      });
       if (inferenceObservation.state === PROBE_OBSERVATION.REFUSED) {
-        setCheck('noInferenceOrphan', 'PASS', `OK (connection refused on port ${INFERENCE_PORT})`);
+        const looked = inferenceObservation.recordedPorts;
+        setCheck(
+          'noInferenceOrphan',
+          'PASS',
+          looked.length > 0
+            ? `OK (connection refused on recorded llama-server port(s) ${looked.join(', ')})`
+            : 'OK (no llama-server recorded in a runtime manifest)',
+        );
       } else if (inferenceObservation.state === PROBE_OBSERVATION.REACHABLE) {
         setCheck(
           'noInferenceOrphan',
           'FAIL',
-          `A listener answered on inference port ${INFERENCE_PORT} (HTTP ${inferenceObservation.statusCode ?? '?'}). `
+          `A recorded llama-server (pid ${inferenceObservation.pid ?? '?'}) still answers on port `
+            + `${inferenceObservation.port} (HTTP ${inferenceObservation.statusCode ?? '?'}). `
             + 'Do not assume the port/GPU is free; identify its owning process before cleanup.',
         );
       } else {
         setCheck(
           'noInferenceOrphan',
           'UNKNOWN',
-          `Could not determine whether port ${INFERENCE_PORT} is free (${inferenceObservation.state}): `
-            + `${inferenceObservation.error?.message || 'probe failed'}`,
+          `Could not determine whether recorded llama-server port ${inferenceObservation.port} is free `
+            + `(${inferenceObservation.state}): ${inferenceObservation.error?.message || 'probe failed'}`,
         );
       }
 
       // 5. Shared cuda12 GPU llama-server resolvable (tempdoc 656). REPORT-ONLY: the stack starts
       // fine without it (inference fails closed), so this does NOT gate `ready`. GPU-only by design:
       // there is deliberately no CPU baseline in dev (a CPU 9B fallback DOSes concurrent worktrees).
-      const exe = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server';
-      const cuda12 = ['native-bin', 'llama-server', 'variants', 'cuda12', exe];
-      const resolvedMainRepoRoot = resolveMainRepoRoot(repoRoot);
-      const worktreeCuda12 = path.join(repoRoot, 'modules', 'ui', ...cuda12);
-      const sharedCuda12 = path.join(resolvedMainRepoRoot, 'modules', 'ui', ...cuda12);
-      const worktreeCudaObservation = await observePath(worktreeCuda12);
-      const sharedCudaObservation = sharedCuda12 === worktreeCuda12
-        ? worktreeCudaObservation
-        : await observePath(sharedCuda12);
-      if (worktreeCudaObservation.state === FILE_OBSERVATION.PRESENT) {
-        setCheck('llamaVariantResolvable', 'PASS', 'OK (cuda12 GPU runtime resolvable — worktree)');
-      } else if (sharedCudaObservation.state === FILE_OBSERVATION.PRESENT) {
-        setCheck('llamaVariantResolvable', 'PASS', 'OK (cuda12 GPU runtime resolvable — shared main-checkout)');
-      } else if (
-        worktreeCudaObservation.state === FILE_OBSERVATION.ABSENT
-        && sharedCudaObservation.state === FILE_OBSERVATION.ABSENT
-      ) {
-        setCheck(
-          'llamaVariantResolvable',
-          'FAIL',
-          'No cuda12 GPU runtime resolvable. Provision the shared runtime ONCE at the main checkout: '
-            + '`./gradlew :modules:ui:stageLlamaCudaVariant` (~600 MB), then the dev-runner auto-populates '
-            + 'the shared native-bin and every worktree references it. Dev is GPU-only (no CPU baseline); '
-            + 'until then inference is unavailable (fails closed) but search works.',
-        );
-      } else {
-        const uncertain = worktreeCudaObservation.state !== FILE_OBSERVATION.ABSENT
-          ? worktreeCudaObservation
-          : sharedCudaObservation;
-        setCheck(
-          'llamaVariantResolvable',
-          'UNKNOWN',
-          `Could not verify cuda12 runtime (${uncertain.state}): ${uncertain.error?.message}`,
-        );
-      }
+      const runtime = _ownReq('../lib/dev-runtime.cjs').resolveDevRuntime(repoRoot, resolveMainRepoRoot(repoRoot));
+      setCheck('llamaVariantResolvable', runtime.valid ? 'PASS' : 'FAIL', runtime.valid
+        ? `OK (GPU runtime: ${runtime.path})` : runtime.source === 'override'
+          ? 'JUSTSEARCH_SERVER_EXE must name a regular executable file'
+          : 'GPU runtime unavailable. Export JUSTSEARCH_SERVER_EXE to the pinned CUDA llama-server build.');
 
       const checks = Object.fromEntries(
         Object.entries(checkStates).map(([name, state]) => [name, state === 'PASS']),
       );
-      const ready = ['headDist', 'noStaleRun', 'modelsDir', 'noInferenceOrphan']
+      const ready = ['headDist', 'noStaleRun', 'modelsDir', 'noInferenceOrphan',
+        ...(process.env.JUSTSEARCH_SERVER_EXE ? ['llamaVariantResolvable'] : [])]
         .every((name) => checkStates[name] === 'PASS');
       return toToolResult(PreflightOutputSchema.parse({
         ready,
@@ -2291,8 +2326,8 @@ export async function main() {
       let activeRecord = null;
       let activeRunJson = null;
       const activeObservation = await observeOptionalJsonFile({
-        repoRoot: mainRepoRoot,
-        relPosix: 'tmp/dev-runner/active.json',
+        repoRoot: resolveDevRunnerStateRoot(mainRepoRoot),
+        relPosix: 'active.json',
         maxBytes: 200_000,
       });
       if (activeObservation.state === FILE_OBSERVATION.ABSENT) {
@@ -2313,9 +2348,9 @@ export async function main() {
           runId = activeRecord.runId;
           let runObservation;
           try {
-            const runFile = resolveAllowedRunFile({ repoRoot: mainRepoRoot, runId, kind: 'run_json' });
+            const runFile = resolveAllowedRunFile({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), runId, kind: 'run_json' });
             runObservation = await observeOptionalJsonFile({
-              repoRoot: mainRepoRoot,
+              repoRoot: resolveDevRunnerStateRoot(mainRepoRoot),
               relPosix: runFile.relPosix,
               maxBytes: 2_000_000,
             });
@@ -2399,12 +2434,15 @@ export async function main() {
         }
       }
 
-      // Observe inference-port availability when no active run is proven or its backend is dead.
+      // Recorded llama-servers, each on its own recorded port (ADR-0051 decision 2: no fixed port).
+      const recordedInference = probe
+        ? await recordedLlamaServers(
+          inferenceRecordDataDirs({ runJson: activeRunJson, repoRoot, mainRepoRoot }))
+        : [];
+
+      // Observe them when no active run is proven or its backend is dead.
       if (probe && (runState !== 'ACTIVE' || httpReady === false)) {
-        const inferenceObservation = await probeLoopbackHttpStatus(
-          `http://127.0.0.1:${INFERENCE_PORT}/health`,
-          { timeoutMs: 2_000 },
-        );
+        const inferenceObservation = await observeRecordedInference({ recorded: recordedInference });
         probes.inference = inferenceObservation;
         inferenceOrphan = classifyInferenceOrphan({
           inferenceObservation,
@@ -2459,6 +2497,7 @@ export async function main() {
         ownedRunState: runState,
         ownedApiPort: apiPort,
         aiActive,
+        inferencePorts: recordedInference.map((r) => r.port),
         registerDir: resolveForeignRegisterDir(mainRepoRoot),
         probe: probeStatusCodeOrThrow,
       });
@@ -2484,7 +2523,7 @@ export async function main() {
       let freshness;
       if (runState === 'ACTIVE') {
         const buildArtifact = ownership?.backendStale
-          ? { state: 'STALE', reason: 'running an older build than source', remedy: 'gradlew :modules:ui:installDist then restart/reload' }
+          ? { state: 'STALE', reason: 'running an older build than source', remedy: `${gradleLauncher} :modules:ui:installDist then restart/reload` }
           : ownership
             ? { state: 'FRESH' }
             : { state: 'UNKNOWN', reason: 'ownership/build provenance could not be read' };
@@ -2598,8 +2637,8 @@ export async function main() {
         'Tempdoc 606: wait until the shared dev stack becomes acquirable (the current owner releases, '
         + 'goes abandoned, or a critical op clears), then return HOW to take it — replacing the '
         + 'conflict→ask-user→manual-retry round-trip with one waited call. Polls the single ownership '
-        + 'verdict. acquirable:true returns recommendedTakeover ("deny" = just start; "warn" = idle owner, '
-        + 'self-authorize). acquirable:false on timeout (owner stayed active → ask the user or takeover:"force").',
+        + 'verdict. acquirable:true returns recommendedTakeover ("deny" = just start; "warn" = idle, dead or '
+        + 'abandoned owner, self-authorize). acquirable:false on timeout (owner stayed active → ask the user or takeover:"force").',
       inputSchema: AcquireWhenFreeInputSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -2612,7 +2651,7 @@ export async function main() {
       let last = null;
       for (;;) {
         let active = null;
-        try { active = await readJsonFileNoSymlinks({ repoRoot: mainRepoRoot, relPosix: 'tmp/dev-runner/active.json', maxBytes: 200_000 }); } catch { /* none */ }
+        try { active = await readJsonFileNoSymlinks({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), relPosix: 'active.json', maxBytes: 200_000 }); } catch { /* none */ }
         const { ownership, decision } = await buildOwnershipProjection({ mainRepoRoot, callerRepoRoot: repoRoot, callerIdentity, takeover: 'deny', active, evidence: 'full', stateRoot: devRunnerStateRoot });
         const rt = recommendedTakeoverFor(decision);
         if (rt !== null) {
@@ -2688,6 +2727,13 @@ export async function main() {
 
       const parsed = DevRunnerStopJsonSchema.parse(json);
       const out = coerceExitAwareOk(parsed, exitCode);
+      // Spec F §5.3: the stack was not verified gone (or a port is held outside it, never killed).
+      // active.json is kept with stopFailed; the caller must not treat the stack as stopped.
+      if (json?.error?.code === 'STOP_INCOMPLETE') {
+        out.actionRequired = 'The stop could not verify the stack is gone; call quick_health (detail: "full") '
+          + 'and inspect foreignPortOwner / errors before starting again. '
+          + 'Forgetting leaves processes running; a person decides. Only the recorded owner may forget after an incomplete stop; processes left behind must be ended or inspected first.';
+      }
 
       // Merge cleanup if requested
       if (clean !== 'none') {
@@ -2823,7 +2869,7 @@ export async function main() {
       const input = AiActivateInputSchema.parse(rawArgs);
       const timeoutMs = input.timeoutMs ?? 60_000;
       const pollIntervalMs = input.pollIntervalMs ?? 2_000;
-      const variantId = input.variantId ?? 'cuda12';
+      const variantId = input.variantId ?? (process.env.JUSTSEARCH_SERVER_EXE ? 'default' : 'cuda12');
 
       const resolved = await resolveApiBaseUrl({ runId: input.runId, apiPort: input.apiPort, mainRepoRoot });
       if (!resolved.ok) {
@@ -2893,7 +2939,7 @@ export async function main() {
       let active = null;
       let runJson = null;
       try {
-        active = await readJsonFileNoSymlinks({ repoRoot: mainRepoRoot, relPosix: 'tmp/dev-runner/active.json', maxBytes: 200_000 });
+        active = await readJsonFileNoSymlinks({ repoRoot: resolveDevRunnerStateRoot(mainRepoRoot), relPosix: 'active.json', maxBytes: 200_000 });
         if (!active?.runId) throw new Error('no runId');
         runJson = await readRunJson({ repoRoot: mainRepoRoot, runId: active.runId });
         if (!runJson) throw new Error('no run.json');
@@ -2961,7 +3007,7 @@ export async function main() {
       // hold: an older copy would silently skip the identity check it does not have. The bytecode
       // and the Gradle wrapper come from the run's tree; only the pusher binary is ours.
       const hotSwapScript = path.join(repoRoot, 'scripts', 'dev', 'HotSwapPush.java');
-      const gradleCmd = path.join(runRoot, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
+      const invoker = path.join(runRoot, 'scripts/lib/tool-invoker.cjs');
       result.compiledFrom = runRoot;
       result.debugPort = debugPort;
 
@@ -2970,9 +3016,9 @@ export async function main() {
         const compileStart = Date.now();
         try {
           const compileResult = await execFileP(
-            gradleCmd,
-            [`:modules:${module}:compileJava`],
-            { cwd: runRoot, timeout: 60_000, windowsHide: true, shell: process.platform === 'win32', env: jdkEnv },
+            process.execPath,
+            [invoker, 'gradle', `:modules:${module}:compileJava`],
+            { cwd: runRoot, timeout: 60_000, windowsHide: true, env: jdkEnv },
           );
           result.compileMs = Date.now() - compileStart;
           // Check for compilation errors in output

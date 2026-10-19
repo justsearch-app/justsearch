@@ -1,0 +1,140 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:23:37.689Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "85217f183c3eff2492b0301c5a9fef23f3751b98",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryPrewarmTest.aWarmCpuQuerySessionIsNotWaitedOn\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryPrewarmTest.semanticSearchDisabledDoesNotWaitOnPrewarm\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11548
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleQueryLegCreationTest.aCpuOnlyQueryLegRunsOnTheCpuSession\" --tests \"io.justsearch.ort.NativeSessionHandleQueryLegCreationTest.aQueryLegAfterAFailedGpuRunsOnTheCpuSession\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3808
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java#aWarmCpuQuerySessionIsNotWaitedOn",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f3de5778771ff8e8bf4b6454b384f020fb7056906d8b0c6f4bc43bda9a3d8139",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aWarmCpuQuerySessionIsNotWaitedOn()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java#semanticSearchDisabledDoesNotWaitOnPrewarm",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f3de5778771ff8e8bf4b6454b384f020fb7056906d8b0c6f4bc43bda9a3d8139",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "semanticSearchDisabledDoesNotWaitOnPrewarm()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryLegCreationTest.java#aCpuOnlyQueryLegRunsOnTheCpuSession",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryLegCreationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:71e6a2eff38f345a886c038e8938b62379d3b48894ddaf32ab4c75bfab7c8506",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCpuOnlyQueryLegRunsOnTheCpuSession()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryLegCreationTest.java#aQueryLegAfterAFailedGpuRunsOnTheCpuSession",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryLegCreationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:71e6a2eff38f345a886c038e8938b62379d3b48894ddaf32ab4c75bfab7c8506",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aQueryLegAfterAFailedGpuRunsOnTheCpuSession()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "88cbf13c3",
+    "revision": "88cbf13c3c3d3441138be8257a74500d859b7d3e",
+    "overlays": [
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/QueryPrewarmFixture.java"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryPrewarmTest.aWarmCpuQuerySessionIsNotWaitedOn\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQueryPrewarmTest.semanticSearchDisabledDoesNotWaitOnPrewarm\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 103397
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleQueryLegCreationTest.aCpuOnlyQueryLegRunsOnTheCpuSession\" --tests \"io.justsearch.ort.NativeSessionHandleQueryLegCreationTest.aQueryLegAfterAFailedGpuRunsOnTheCpuSession\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 6582
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java#aWarmCpuQuerySessionIsNotWaitedOn",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPrewarmTest.java#semanticSearchDisabledDoesNotWaitOnPrewarm",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryLegCreationTest.java#aCpuOnlyQueryLegRunsOnTheCpuSession",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryLegCreationTest.java#aQueryLegAfterAFailedGpuRunsOnTheCpuSession",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:be5628d9f6d7866396fbe2f28ec5cc5ecdaee5deefd57928ca7e5104a0fe61f5"
+}

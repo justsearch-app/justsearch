@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:16:58.770Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "2023dffb3e793b3c65cf9815f7d8a322dc2d7b98",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerProcessOwnershipTest.terminalFenceRefusesLaunchAndOwnershipHasNoAdoptionPath\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7935
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerProcessOwnershipTest.java#terminalFenceRefusesLaunchAndOwnershipHasNoAdoptionPath",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerProcessOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2103e38442a01c5a14f0df482175ddc418ad0fa16fa0d36e4e48ebfa8fd935f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "terminalFenceRefusesLaunchAndOwnershipHasNoAdoptionPath()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:7817190d66ddb855fb09df3c1b5c42b4fc5c041e092a18e8bd55c69217d69466"
+}

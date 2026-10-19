@@ -53,7 +53,7 @@ export function startAutoLock(fetchFn: FetchFn, now: () => number = () => Date.n
       const res = await fetchFn('/api/conversations/encryption');
       const state = ((await res.json()) as { state?: string }).state;
       if (state === 'unlocked') {
-        await fetchFn('/api/conversations/encryption/lock', { method: 'POST' });
+        await fetchFn('/api/conversations/encryption/auto-lock', { method: 'POST' });
         lastActivity = now(); // avoid re-firing immediately
       }
     } catch {

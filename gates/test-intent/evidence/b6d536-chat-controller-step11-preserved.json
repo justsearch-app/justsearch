@@ -1,0 +1,1057 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-07T01:51:41.561Z",
+  "revision": "64e04b891904dccff1442547b97dbb969f617fd4",
+  "tree": "41307d6d8d1dc016434df098b2d4d03ddf8c7258",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerChildApiTest.everyStopAStepMakesCarriesTheStepsReasonAfterItsIntentAndEndsRequested\" --tests \"io.justsearch.app.services.chat.ChatControllerChildApiTest.anExitNobodyAskedForIsUnexpectedAndHasNoIntent\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4191
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.candidatePublishesOnlyAfterStartAndHealthComplete\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.preparedCandidateStaysPrivateUntilAssignmentOnlyInstallAndFencesRecovery\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.preparedModelSwitchPublishesCandidateIdentityInsteadOfIncumbentProps\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.preparedCandidateDeathRefusesCommitAndRestoresIncumbent\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.precommitCrashCallbackInvalidatesCandidateWithoutRecoveringIt\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.coldEnablePublishesModeAtCommitBeforeRetirement\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.restartIfOnlineRefreshRetainsOfflineConfigurationWithoutStartingServer\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.disableRetainsIncumbentUntilCommitThenRetiresIt\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.lifecycleCallbackFencesRecoveryBeforePublicationLockAcquisition\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.abortPreparedCandidateStopsBAndRestoresCapturedA\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.recoveryQueuedDuringPreparationCannotOvertakeTheStagedCandidate\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedPrecommitCandidateRestoresABeforeReturningFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.candidateFailureRollsBackUsingActualAContextDespiteGlobalC\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.rollbackReplacesApplyOnlyDesiredConfigWithServingAAndRetainsStrictPolicy\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedCandidateAndFailedRollbackPreserveBothCausesAndLeaveOffline\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.insufficientVramRefusesBeforeStopOrCacheClearAndEmitsOneFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.unknownVramStillAllowsExplicitGpuCandidate\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedIncumbentStopNeverStartsCandidate\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedCandidateCleanupDoesNotAttemptIncumbentRestart\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.wrongManagedCandidateHashIsRefusedAndIncumbentRestored\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.applyOnlyRejectsInvalidWithoutChangeAndRetainsValidResolvedSnapshotForLaterStart\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.vduEnterAndExitPreserveCapturedResolvedContextAndStrictPolicy\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.rollbackRetriesFormerGpuIncumbentWithoutSecondAdmissionGate\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.queuedFailureSignalWaitsForApplyThenRejectsItsReplacedPhysicalOwner\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedColdStartupCleansItsUnhealthyChildBeforeReturning\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedColdStartupCleanupRetainsOwnershipAndReportsBothFailuresOffline\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedStopForIndexingCannotRepublishOnlineWithoutHealth\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.managedFailureOnlyDemotesAndLeavesPhysicalCleanupToAdmittedRecovery\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.admittedRecoveryRestartsServingAButNeverNewDesiredB\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.admittedRecoveryDrainsARealRequestBeforeOnePhysicalReplacement\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.cancelledRecoveryWaitingForARealRequestNeverStopsOrLaunches\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.explicitIndexingStopDuringDrainSupersedesTheSameRetainedStartRequest\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.interruptedRequestDrainCountsFailureWithoutPhysicalReplacement\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.explicitIndexingDuringFailedPrelaunchDrainSupersedesRetainedInitialRequest\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.timeoutPublicationDoesNotCancelLateSameOwnerReady\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedRetryKeepsClosedLifecycleCauseAndAddsTypedFailureEvidence\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.retainedFailedInitialAIsPreferredAfterDesiredChangesToB\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.foreignExternalOwnerRefusesBeforeAdmission\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.appliedVersionMismatchRefusesWithoutSpendingAttemptOrStoppingOwner\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.cancellationAfterPhysicalClosePreventsLaunchButKeepsSpentAttempt\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.autonomousActivationCannotStealRetainedFailureButExplicitUserActivationCan\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.queuedVduEnterCannotLaunchAfterAutonomousOwnerFails\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal\" --tests \"io.justsearch.app.inference.ChatResidencyUnloadStepTest.anIdleServerStopsAndChatReadsUnloadedUntilItsNextStart\" --tests \"io.justsearch.app.inference.ChatResidencyUnloadStepTest.aReplyInProgressRefusesTheUnloadAndNothingChanges\" --tests \"io.justsearch.app.inference.ChatResidencyUnloadStepTest.pressureThatClearedBeforeTheStopLeavesTheServerRunning\" --tests \"io.justsearch.app.inference.ChatResidencyUnloadStepTest.aStartRefusedUnderPressureReadsUnloadedWithoutAServer\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7808
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerChildApiTest.java#everyStopAStepMakesCarriesTheStepsReasonAfterItsIntentAndEndsRequested",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerChildApiTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7d13c31359ea58bc867408a7a85d618f8b33f5bf8f0d672e8430ac2c7ea3bb93",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyStopAStepMakesCarriesTheStepsReasonAfterItsIntentAndEndsRequested()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerChildApiTest.java#anExitNobodyAskedForIsUnexpectedAndHasNoIntent",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerChildApiTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7d13c31359ea58bc867408a7a85d618f8b33f5bf8f0d672e8430ac2c7ea3bb93",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExitNobodyAskedForIsUnexpectedAndHasNoIntent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#candidatePublishesOnlyAfterStartAndHealthComplete",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "candidatePublishesOnlyAfterStartAndHealthComplete()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#preparedCandidateStaysPrivateUntilAssignmentOnlyInstallAndFencesRecovery",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preparedCandidateStaysPrivateUntilAssignmentOnlyInstallAndFencesRecovery()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#preparedModelSwitchPublishesCandidateIdentityInsteadOfIncumbentProps",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preparedModelSwitchPublishesCandidateIdentityInsteadOfIncumbentProps()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#preparedCandidateDeathRefusesCommitAndRestoresIncumbent",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preparedCandidateDeathRefusesCommitAndRestoresIncumbent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#precommitCrashCallbackInvalidatesCandidateWithoutRecoveringIt",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "precommitCrashCallbackInvalidatesCandidateWithoutRecoveringIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#coldEnablePublishesModeAtCommitBeforeRetirement",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "coldEnablePublishesModeAtCommitBeforeRetirement()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#restartIfOnlineRefreshRetainsOfflineConfigurationWithoutStartingServer",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "restartIfOnlineRefreshRetainsOfflineConfigurationWithoutStartingServer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#disableRetainsIncumbentUntilCommitThenRetiresIt",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "disableRetainsIncumbentUntilCommitThenRetiresIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#lifecycleCallbackFencesRecoveryBeforePublicationLockAcquisition",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lifecycleCallbackFencesRecoveryBeforePublicationLockAcquisition()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#abortPreparedCandidateStopsBAndRestoresCapturedA",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "abortPreparedCandidateStopsBAndRestoresCapturedA()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#recoveryQueuedDuringPreparationCannotOvertakeTheStagedCandidate",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recoveryQueuedDuringPreparationCannotOvertakeTheStagedCandidate()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedPrecommitCandidateRestoresABeforeReturningFailure",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedPrecommitCandidateRestoresABeforeReturningFailure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#candidateFailureRollsBackUsingActualAContextDespiteGlobalC",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "candidateFailureRollsBackUsingActualAContextDespiteGlobalC()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#rollbackReplacesApplyOnlyDesiredConfigWithServingAAndRetainsStrictPolicy",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rollbackReplacesApplyOnlyDesiredConfigWithServingAAndRetainsStrictPolicy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedCandidateAndFailedRollbackPreserveBothCausesAndLeaveOffline",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedCandidateAndFailedRollbackPreserveBothCausesAndLeaveOffline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#insufficientVramRefusesBeforeStopOrCacheClearAndEmitsOneFailure",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "insufficientVramRefusesBeforeStopOrCacheClearAndEmitsOneFailure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#unknownVramStillAllowsExplicitGpuCandidate",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unknownVramStillAllowsExplicitGpuCandidate()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedIncumbentStopNeverStartsCandidate",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedIncumbentStopNeverStartsCandidate()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedCandidateCleanupDoesNotAttemptIncumbentRestart",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedCandidateCleanupDoesNotAttemptIncumbentRestart()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#wrongManagedCandidateHashIsRefusedAndIncumbentRestored",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "wrongManagedCandidateHashIsRefusedAndIncumbentRestored()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#applyOnlyRejectsInvalidWithoutChangeAndRetainsValidResolvedSnapshotForLaterStart",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "applyOnlyRejectsInvalidWithoutChangeAndRetainsValidResolvedSnapshotForLaterStart()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#vduEnterAndExitPreserveCapturedResolvedContextAndStrictPolicy",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "vduEnterAndExitPreserveCapturedResolvedContextAndStrictPolicy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#rollbackRetriesFormerGpuIncumbentWithoutSecondAdmissionGate",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rollbackRetriesFormerGpuIncumbentWithoutSecondAdmissionGate()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#queuedFailureSignalWaitsForApplyThenRejectsItsReplacedPhysicalOwner",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedFailureSignalWaitsForApplyThenRejectsItsReplacedPhysicalOwner()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedColdStartupCleansItsUnhealthyChildBeforeReturning",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedColdStartupCleansItsUnhealthyChildBeforeReturning()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedColdStartupCleanupRetainsOwnershipAndReportsBothFailuresOffline",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedColdStartupCleanupRetainsOwnershipAndReportsBothFailuresOffline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedStopForIndexingCannotRepublishOnlineWithoutHealth",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedStopForIndexingCannotRepublishOnlineWithoutHealth()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#managedFailureOnlyDemotesAndLeavesPhysicalCleanupToAdmittedRecovery",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "managedFailureOnlyDemotesAndLeavesPhysicalCleanupToAdmittedRecovery()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#admittedRecoveryRestartsServingAButNeverNewDesiredB",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "admittedRecoveryRestartsServingAButNeverNewDesiredB()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#admittedRecoveryDrainsARealRequestBeforeOnePhysicalReplacement",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "admittedRecoveryDrainsARealRequestBeforeOnePhysicalReplacement()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#cancelledRecoveryWaitingForARealRequestNeverStopsOrLaunches",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancelledRecoveryWaitingForARealRequestNeverStopsOrLaunches()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#explicitIndexingStopDuringDrainSupersedesTheSameRetainedStartRequest",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitIndexingStopDuringDrainSupersedesTheSameRetainedStartRequest()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#interruptedRequestDrainCountsFailureWithoutPhysicalReplacement",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptedRequestDrainCountsFailureWithoutPhysicalReplacement()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#explicitIndexingDuringFailedPrelaunchDrainSupersedesRetainedInitialRequest",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitIndexingDuringFailedPrelaunchDrainSupersedesRetainedInitialRequest()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#timeoutPublicationDoesNotCancelLateSameOwnerReady",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "timeoutPublicationDoesNotCancelLateSameOwnerReady()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedRetryKeepsClosedLifecycleCauseAndAddsTypedFailureEvidence",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedRetryKeepsClosedLifecycleCauseAndAddsTypedFailureEvidence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#retainedFailedInitialAIsPreferredAfterDesiredChangesToB",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retainedFailedInitialAIsPreferredAfterDesiredChangesToB()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#foreignExternalOwnerRefusesBeforeAdmission",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "foreignExternalOwnerRefusesBeforeAdmission()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#appliedVersionMismatchRefusesWithoutSpendingAttemptOrStoppingOwner",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "appliedVersionMismatchRefusesWithoutSpendingAttemptOrStoppingOwner()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#cancellationAfterPhysicalClosePreventsLaunchButKeepsSpentAttempt",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancellationAfterPhysicalClosePreventsLaunchButKeepsSpentAttempt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#autonomousActivationCannotStealRetainedFailureButExplicitUserActivationCan",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "autonomousActivationCannotStealRetainedFailureButExplicitUserActivationCan()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#queuedVduEnterCannotLaunchAfterAutonomousOwnerFails",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedVduEnterCannotLaunchAfterAutonomousOwnerFails()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:85a38ddd4dffdcb2708aa88400565d3427d691a0ceeefbf11fd28129f78247ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java#anIdleServerStopsAndChatReadsUnloadedUntilItsNextStart",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1c17efd2553f3566be6704083759e28591d4d05ab14e81172674234467d79ac9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anIdleServerStopsAndChatReadsUnloadedUntilItsNextStart()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java#aReplyInProgressRefusesTheUnloadAndNothingChanges",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1c17efd2553f3566be6704083759e28591d4d05ab14e81172674234467d79ac9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReplyInProgressRefusesTheUnloadAndNothingChanges()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java#pressureThatClearedBeforeTheStopLeavesTheServerRunning",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1c17efd2553f3566be6704083759e28591d4d05ab14e81172674234467d79ac9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pressureThatClearedBeforeTheStopLeavesTheServerRunning()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java#aStartRefusedUnderPressureReadsUnloadedWithoutAServer",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1c17efd2553f3566be6704083759e28591d4d05ab14e81172674234467d79ac9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStartRefusedUnderPressureReadsUnloadedWithoutAServer()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "64e04b891",
+    "revision": "64e04b891904dccff1442547b97dbb969f617fd4",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerChildApiTest.everyStopAStepMakesCarriesTheStepsReasonAfterItsIntentAndEndsRequested\" --tests \"io.justsearch.app.services.chat.ChatControllerChildApiTest.anExitNobodyAskedForIsUnexpectedAndHasNoIntent\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 49381
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.candidatePublishesOnlyAfterStartAndHealthComplete\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.preparedCandidateStaysPrivateUntilAssignmentOnlyInstallAndFencesRecovery\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.preparedModelSwitchPublishesCandidateIdentityInsteadOfIncumbentProps\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.preparedCandidateDeathRefusesCommitAndRestoresIncumbent\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.precommitCrashCallbackInvalidatesCandidateWithoutRecoveringIt\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.coldEnablePublishesModeAtCommitBeforeRetirement\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.restartIfOnlineRefreshRetainsOfflineConfigurationWithoutStartingServer\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.disableRetainsIncumbentUntilCommitThenRetiresIt\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.lifecycleCallbackFencesRecoveryBeforePublicationLockAcquisition\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.abortPreparedCandidateStopsBAndRestoresCapturedA\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.recoveryQueuedDuringPreparationCannotOvertakeTheStagedCandidate\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedPrecommitCandidateRestoresABeforeReturningFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.candidateFailureRollsBackUsingActualAContextDespiteGlobalC\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.rollbackReplacesApplyOnlyDesiredConfigWithServingAAndRetainsStrictPolicy\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedCandidateAndFailedRollbackPreserveBothCausesAndLeaveOffline\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.insufficientVramRefusesBeforeStopOrCacheClearAndEmitsOneFailure\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.unknownVramStillAllowsExplicitGpuCandidate\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedIncumbentStopNeverStartsCandidate\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedCandidateCleanupDoesNotAttemptIncumbentRestart\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.wrongManagedCandidateHashIsRefusedAndIncumbentRestored\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.applyOnlyRejectsInvalidWithoutChangeAndRetainsValidResolvedSnapshotForLaterStart\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.vduEnterAndExitPreserveCapturedResolvedContextAndStrictPolicy\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.rollbackRetriesFormerGpuIncumbentWithoutSecondAdmissionGate\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.queuedFailureSignalWaitsForApplyThenRejectsItsReplacedPhysicalOwner\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedColdStartupCleansItsUnhealthyChildBeforeReturning\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedColdStartupCleanupRetainsOwnershipAndReportsBothFailuresOffline\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedStopForIndexingCannotRepublishOnlineWithoutHealth\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.managedFailureOnlyDemotesAndLeavesPhysicalCleanupToAdmittedRecovery\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.admittedRecoveryRestartsServingAButNeverNewDesiredB\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.admittedRecoveryDrainsARealRequestBeforeOnePhysicalReplacement\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.cancelledRecoveryWaitingForARealRequestNeverStopsOrLaunches\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.explicitIndexingStopDuringDrainSupersedesTheSameRetainedStartRequest\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.interruptedRequestDrainCountsFailureWithoutPhysicalReplacement\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.explicitIndexingDuringFailedPrelaunchDrainSupersedesRetainedInitialRequest\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.timeoutPublicationDoesNotCancelLateSameOwnerReady\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedRetryKeepsClosedLifecycleCauseAndAddsTypedFailureEvidence\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.retainedFailedInitialAIsPreferredAfterDesiredChangesToB\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.foreignExternalOwnerRefusesBeforeAdmission\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.appliedVersionMismatchRefusesWithoutSpendingAttemptOrStoppingOwner\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.cancellationAfterPhysicalClosePreventsLaunchButKeepsSpentAttempt\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.autonomousActivationCannotStealRetainedFailureButExplicitUserActivationCan\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.queuedVduEnterCannotLaunchAfterAutonomousOwnerFails\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal\" --tests \"io.justsearch.app.inference.ChatResidencyUnloadStepTest.anIdleServerStopsAndChatReadsUnloadedUntilItsNextStart\" --tests \"io.justsearch.app.inference.ChatResidencyUnloadStepTest.aReplyInProgressRefusesTheUnloadAndNothingChanges\" --tests \"io.justsearch.app.inference.ChatResidencyUnloadStepTest.pressureThatClearedBeforeTheStopLeavesTheServerRunning\" --tests \"io.justsearch.app.inference.ChatResidencyUnloadStepTest.aStartRefusedUnderPressureReadsUnloadedWithoutAServer\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 16292
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerChildApiTest.java#everyStopAStepMakesCarriesTheStepsReasonAfterItsIntentAndEndsRequested",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerChildApiTest.java#anExitNobodyAskedForIsUnexpectedAndHasNoIntent",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#candidatePublishesOnlyAfterStartAndHealthComplete",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#preparedCandidateStaysPrivateUntilAssignmentOnlyInstallAndFencesRecovery",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#preparedModelSwitchPublishesCandidateIdentityInsteadOfIncumbentProps",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#preparedCandidateDeathRefusesCommitAndRestoresIncumbent",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#precommitCrashCallbackInvalidatesCandidateWithoutRecoveringIt",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#coldEnablePublishesModeAtCommitBeforeRetirement",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#restartIfOnlineRefreshRetainsOfflineConfigurationWithoutStartingServer",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#disableRetainsIncumbentUntilCommitThenRetiresIt",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#lifecycleCallbackFencesRecoveryBeforePublicationLockAcquisition",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#abortPreparedCandidateStopsBAndRestoresCapturedA",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#recoveryQueuedDuringPreparationCannotOvertakeTheStagedCandidate",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedPrecommitCandidateRestoresABeforeReturningFailure",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#candidateFailureRollsBackUsingActualAContextDespiteGlobalC",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#rollbackReplacesApplyOnlyDesiredConfigWithServingAAndRetainsStrictPolicy",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedCandidateAndFailedRollbackPreserveBothCausesAndLeaveOffline",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#insufficientVramRefusesBeforeStopOrCacheClearAndEmitsOneFailure",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#unknownVramStillAllowsExplicitGpuCandidate",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedIncumbentStopNeverStartsCandidate",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedCandidateCleanupDoesNotAttemptIncumbentRestart",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#wrongManagedCandidateHashIsRefusedAndIncumbentRestored",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#applyOnlyRejectsInvalidWithoutChangeAndRetainsValidResolvedSnapshotForLaterStart",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#vduEnterAndExitPreserveCapturedResolvedContextAndStrictPolicy",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#rollbackRetriesFormerGpuIncumbentWithoutSecondAdmissionGate",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#queuedFailureSignalWaitsForApplyThenRejectsItsReplacedPhysicalOwner",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedColdStartupCleansItsUnhealthyChildBeforeReturning",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedColdStartupCleanupRetainsOwnershipAndReportsBothFailuresOffline",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedStopForIndexingCannotRepublishOnlineWithoutHealth",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#managedFailureOnlyDemotesAndLeavesPhysicalCleanupToAdmittedRecovery",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#admittedRecoveryRestartsServingAButNeverNewDesiredB",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#admittedRecoveryDrainsARealRequestBeforeOnePhysicalReplacement",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#cancelledRecoveryWaitingForARealRequestNeverStopsOrLaunches",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#explicitIndexingStopDuringDrainSupersedesTheSameRetainedStartRequest",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#interruptedRequestDrainCountsFailureWithoutPhysicalReplacement",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#explicitIndexingDuringFailedPrelaunchDrainSupersedesRetainedInitialRequest",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#timeoutPublicationDoesNotCancelLateSameOwnerReady",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedRetryKeepsClosedLifecycleCauseAndAddsTypedFailureEvidence",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#retainedFailedInitialAIsPreferredAfterDesiredChangesToB",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#foreignExternalOwnerRefusesBeforeAdmission",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#appliedVersionMismatchRefusesWithoutSpendingAttemptOrStoppingOwner",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#cancellationAfterPhysicalClosePreventsLaunchButKeepsSpentAttempt",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#autonomousActivationCannotStealRetainedFailureButExplicitUserActivationCan",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#queuedVduEnterCannotLaunchAfterAutonomousOwnerFails",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java#anIdleServerStopsAndChatReadsUnloadedUntilItsNextStart",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java#aReplyInProgressRefusesTheUnloadAndNothingChanges",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java#pressureThatClearedBeforeTheStopLeavesTheServerRunning",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java#aStartRefusedUnderPressureReadsUnloadedWithoutAServer",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:e5c9533c54e22a92d5470e8f428fe5482dc161fdd5d080d1c563a42544ed8abc"
+}

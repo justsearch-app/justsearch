@@ -23,6 +23,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { readLinuxProcess } from '../dev/lib/process-identity.cjs';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -31,7 +32,9 @@ import {
   OVERRIDE_ENV,
   FAKE_ENGINE,
   actuatorCases,
+  casesForAdapter,
   checkExitTableAgreement,
+  lifecycleCases,
   decisionCases,
   engineRow,
   loadPolicy,
@@ -134,7 +137,18 @@ function writeEnginePlan(workDir, incarnations) {
   return target;
 }
 
+function isAlive(pid) {
+  if (process.platform === 'linux') {
+    const observed = readLinuxProcess(pid);
+    if (observed == null) throw new Error(`cannot establish fixture liveness for ${pid}`);
+    return observed.present;
+  }
+  try { process.kill(pid, 0); return true; }
+  catch (err) { if (err.code === 'ESRCH') return false; throw err; }
+}
+
 export const io = {
+  isAlive,
   sleep,
   waitFor,
   readJsonIfPresent,
@@ -367,11 +381,39 @@ function selfTestExitTable() {
 function selfTestCaseListShape() {
   const problems = [];
   const seen = new Set();
-  for (const testCase of [...decisionCases(), ...actuatorCases()]) {
+  const updaterProbes = new Set([
+    'updater-hold', 'updater-upgrade', 'updater-held-exit',
+    'updater-quit', 'updater-release', 'updater-nonempty',
+  ]);
+  const foundUpdaterProbes = new Set();
+  for (const testCase of [...decisionCases(), ...actuatorCases(), ...lifecycleCases()]) {
     if (!testCase.id) problems.push('a case has no id');
     if (!testCase.why) problems.push(`${testCase.id}: no \`why\` — a case nobody can read is a case nobody maintains`);
     if (!testCase.faultMode) problems.push(`${testCase.id}: no faultMode`);
+    if (testCase.adapters && (!testCase.adapters.length
+        || (testCase.adapters.length < 2 && !testCase.adapterWhy?.trim())
+        || testCase.adapters.some(name => !['tauri', 'dev-runner'].includes(name)))) {
+      problems.push(`${testCase.id}: adapter restriction requires known adapters and adapterWhy`);
+    }
+    if (String(testCase.probe).startsWith('updater-')) {
+      if (!updaterProbes.has(testCase.probe)) problems.push(`${testCase.id}: unknown updater probe`);
+      if (foundUpdaterProbes.has(testCase.probe)) problems.push(`${testCase.id}: repeated updater probe`);
+      foundUpdaterProbes.add(testCase.probe);
+      if (JSON.stringify(testCase.adapters) !== '["tauri"]'
+          || JSON.stringify(testCase.drives) !== '["quit"]'
+          || !testCase.expect || !Array.isArray(testCase.enginePlan) || !testCase.enginePlan.length) {
+        problems.push(`${testCase.id}: updater probe requires Tauri quit drive, engine plan and expectations`);
+      }
+      if (testCase.probe === 'updater-hold'
+          && !(Number.isFinite(testCase.expect.holdWithinMs) && testCase.expect.holdWithinMs > 0
+            && testCase.expect.holdWithinMs <= 100)) {
+        problems.push(`${testCase.id}: admission hold bound must be at most 100 ms`);
+      }
+    }
     seen.add(testCase.id);
+  }
+  for (const probe of updaterProbes) {
+    if (!foundUpdaterProbes.has(probe)) problems.push(`missing updater probe ${probe}`);
   }
   const modes = new Set(actuatorCases().map((c) => c.faultMode));
   for (const required of ['clean-exit', 'hang', 'oom']) {
@@ -429,7 +471,17 @@ async function runAdapter(name) {
   // filter is applied here and a filtered run reports how many cases it left out, so a green from a
   // narrowed run cannot be mistaken for a green from the contract.
   const only = process.argv.includes('--case') ? process.argv[process.argv.indexOf('--case') + 1] : null;
-  const declared = actuatorCases();
+  const phases = Array.isArray(adapter.phases) ? adapter.phases : [];
+  const declared = casesForAdapter(phases, engineRow(), name);
+  const undriven = lifecycleCases().filter((c) => (!c.adapters || c.adapters.includes(name)) && !declared.includes(c));
+  if (undriven.length > 0) {
+    process.exitCode = 1;
+    process.stdout.write(
+      `supervisor-conformance: adapter \`${name}\` does not drive ${undriven.length} lifecycle case(s): `
+      + `${undriven.map((c) => c.id).join(', ')}\n`,
+    );
+  }
+  if (undriven.length) return;
   const cases = only ? declared.filter((c) => c.id === only) : declared;
   if (only) {
     process.stdout.write(
@@ -450,7 +502,9 @@ async function runAdapter(name) {
     return;
   }
 
-  for (const testCase of cases) {
+  const repeat = Number(process.argv[process.argv.indexOf('--repeat') + 1]) || 1;
+  if (process.argv.includes('--repeat') && (!only || repeat < 1 || repeat > 50)) throw new Error('--repeat requires --case and 1..50');
+  for (const testCase of cases.flatMap(c => Array.from({ length: repeat }, () => c))) {
     let problems;
     try {
       // eslint-disable-next-line no-await-in-loop

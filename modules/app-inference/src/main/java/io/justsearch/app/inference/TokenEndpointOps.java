@@ -6,6 +6,7 @@ import static io.justsearch.app.inference.InferenceHttpHelpers.*;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.app.api.Mode;
+import io.justsearch.app.api.chat.GenerationLease;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -37,6 +38,12 @@ final class TokenEndpointOps {
   private final Supplier<Mode> currentMode;
   private final Supplier<Integer> serverPort;
 
+  /**
+   * Spec A §5.2: the AUX lease every exchange holds, from the lifecycle manager's generation
+   * tracker. Throws {@link IllegalStateException} while admission is closed.
+   */
+  private final Supplier<GenerationLease> auxAdmission;
+
   // Cached result of tokenize endpoint availability probe
   private volatile Boolean tokenizeEndpointAvailable;
 
@@ -47,11 +54,18 @@ final class TokenEndpointOps {
       HttpClient httpClient,
       ObjectMapper objectMapper,
       Supplier<Mode> currentMode,
-      Supplier<Integer> serverPort) {
+      Supplier<Integer> serverPort,
+      Supplier<GenerationLease> auxAdmission) {
     this.httpClient = httpClient;
     this.objectMapper = objectMapper;
     this.currentMode = currentMode;
     this.serverPort = serverPort;
+    this.auxAdmission = java.util.Objects.requireNonNull(auxAdmission, "auxAdmission");
+  }
+
+  /** One AUX lease for a whole operation, taken before any check, as the gate it replaces was. */
+  private GenerationLease admit() {
+    return java.util.Objects.requireNonNull(auxAdmission.get(), "aux lease");
   }
 
   // ==================== Token Counting ====================
@@ -63,13 +77,19 @@ final class TokenEndpointOps {
    * method is best-effort and should not be used for critical control flow.
    */
   Optional<Integer> countTokens(String text) {
+    try (GenerationLease lease = admit()) {
+      return countTokens(lease, text);
+    }
+  }
+
+  private Optional<Integer> countTokens(GenerationLease lease, String text) {
     if (text == null || text.isEmpty()) {
       return Optional.of(0);
     }
     if (currentMode.get() != Mode.ONLINE) {
       return Optional.empty();
     }
-    if (!supportsTokenize()) {
+    if (!supportsTokenize(lease)) {
       return Optional.empty();
     }
 
@@ -78,7 +98,7 @@ final class TokenEndpointOps {
       String json = objectMapper.writeValueAsString(body);
 
       HttpRequest request =
-          buildJsonPostRequest(serverPort.get(), PATH_TOKENIZE, json, ENDPOINT_TIMEOUT);
+          buildJsonPostRequest(lease, serverPort.get(), PATH_TOKENIZE, json, ENDPOINT_TIMEOUT);
 
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -118,21 +138,28 @@ final class TokenEndpointOps {
    */
   Optional<String> applyTemplate(
       List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
+    try (GenerationLease lease = admit()) {
+      return applyTemplate(lease, messages, tools);
+    }
+  }
+
+  private Optional<String> applyTemplate(
+      GenerationLease lease, List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
     if (messages == null || messages.isEmpty()) {
       return Optional.of("");
     }
     if (currentMode.get() != Mode.ONLINE) {
       return Optional.empty();
     }
-    if (!supportsApplyTemplate()) {
+    if (!supportsApplyTemplate(lease)) {
       return Optional.empty();
     }
 
     try {
       String json = objectMapper.writeValueAsString(buildApplyTemplateBody(messages, tools));
 
-      HttpRequest request =
-          buildJsonPostRequest(serverPort.get(), PATH_APPLY_TEMPLATE, json, ENDPOINT_TIMEOUT);
+      HttpRequest request = buildJsonPostRequest(
+          lease, serverPort.get(), PATH_APPLY_TEMPLATE, json, ENDPOINT_TIMEOUT);
 
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -188,11 +215,13 @@ final class TokenEndpointOps {
    */
   Optional<Integer> countPromptTokens(
       List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
-    var prompt = applyTemplate(messages, tools);
-    if (prompt.isEmpty()) {
-      return Optional.empty();
+    try (GenerationLease lease = admit()) {
+      var prompt = applyTemplate(lease, messages, tools);
+      if (prompt.isEmpty()) {
+        return Optional.empty();
+      }
+      return countTokens(lease, prompt.get());
     }
-    return countTokens(prompt.get());
   }
 
   // ==================== Endpoint Probes ====================
@@ -204,6 +233,12 @@ final class TokenEndpointOps {
    * ONLINE mode.
    */
   boolean supportsTokenize() {
+    try (GenerationLease lease = admit()) {
+      return supportsTokenize(lease);
+    }
+  }
+
+  private boolean supportsTokenize(GenerationLease lease) {
     if (currentMode.get() != Mode.ONLINE) {
       return false;
     }
@@ -216,7 +251,7 @@ final class TokenEndpointOps {
     try {
       HttpRequest request =
           buildJsonPostRequest(
-              serverPort.get(), PATH_TOKENIZE, "{\"content\":\"test\"}", PROBE_TIMEOUT);
+              lease, serverPort.get(), PATH_TOKENIZE, "{\"content\":\"test\"}", PROBE_TIMEOUT);
 
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -239,6 +274,12 @@ final class TokenEndpointOps {
    * ONLINE mode.
    */
   boolean supportsApplyTemplate() {
+    try (GenerationLease lease = admit()) {
+      return supportsApplyTemplate(lease);
+    }
+  }
+
+  private boolean supportsApplyTemplate(GenerationLease lease) {
     if (currentMode.get() != Mode.ONLINE) {
       return false;
     }
@@ -258,7 +299,7 @@ final class TokenEndpointOps {
       String json = objectMapper.writeValueAsString(body);
 
       HttpRequest request =
-          buildJsonPostRequest(serverPort.get(), PATH_APPLY_TEMPLATE, json, PROBE_TIMEOUT);
+          buildJsonPostRequest(lease, serverPort.get(), PATH_APPLY_TEMPLATE, json, PROBE_TIMEOUT);
 
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());

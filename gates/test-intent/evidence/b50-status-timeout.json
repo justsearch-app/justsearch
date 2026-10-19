@@ -1,0 +1,303 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T15:41:05.637Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "ad6338aa9a9430b2ca2396b79cb1b00610a14ff2",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusNonBlockingHttpTest\" --tests \"io.justsearch.ui.api.WorkerStatusSamplerTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 66534
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusNonBlockingHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusNonBlockingHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bb60d70b374f840766774801a778cba280e46de34f791b8fe6913e8af0239eb3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "boot status does not join disk-pressure ()",
+          "status": "passed"
+        },
+        {
+          "name": "boot status does not join disk-pressure (?fresh=true)",
+          "status": "passed"
+        },
+        {
+          "name": "boot status does not join worker ()",
+          "status": "passed"
+        },
+        {
+          "name": "boot status does not join worker (?fresh=true)",
+          "status": "passed"
+        },
+        {
+          "name": "failedObservationRetainsTheLastResponseAsStale()",
+          "status": "passed"
+        },
+        {
+          "name": "failure of disk-pressure stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of inference stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of gpl stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of conversation stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of telemetry stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of vdu stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of vdu-processing stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of device-plan stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of bulk-gate stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of gpu-capabilities stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of at-rest stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of agent stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of online-ai stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of gpu-saturation stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of power stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of resume stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of vision stays local",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for disk-pressure",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for inference",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for gpu-capabilities",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for gpl",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for conversation",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for telemetry",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for vdu",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for vdu-processing",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for device-plan",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for bulk-gate",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for registry",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for assembly-lock",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for gpu-memory",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for at-rest",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for worker",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for rrd",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for admission-lock",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for agent",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for online-ai",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for gpu-saturation",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for model-file-path",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for power",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for resume",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for vision",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/WorkerStatusSamplerTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/WorkerStatusSamplerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee504361a4197876529b33fa420b42d187fe7b89ff12a44678d992c283c462d0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the sampling period is 2 s while index work is in flight and 10 s when idle",
+          "status": "passed"
+        },
+        {
+          "name": "the first read before any sample returns unknown and schedules one observation",
+          "status": "passed"
+        },
+        {
+          "name": "handleStatus schedules ?fresh=true and serves the cache immediately",
+          "status": "passed"
+        },
+        {
+          "name": "the taps do not reconcile on the read path",
+          "status": "passed"
+        },
+        {
+          "name": "a status read after a sample performs zero Worker RPCs",
+          "status": "passed"
+        },
+        {
+          "name": "a sample older than SAMPLE_STALE_PERIODS periods reads stale; one within does not",
+          "status": "passed"
+        },
+        {
+          "name": "a sampler tick feeds the health taps with no status request anywhere",
+          "status": "passed"
+        },
+        {
+          "name": "a failed sample is still a sample, and reads report it stale without re-calling",
+          "status": "passed"
+        },
+        {
+          "name": "an aged-out sample recovers to fresh when the sampler ticks again",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f6d579a86",
+    "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b50-status-timeout-compat.patch",
+        "contentDigest": "sha256:3bbbee766497635af8f5895d446c6f96e510e311d00d82ed2cb7eea00b73e268"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusNonBlockingHttpTest\" --tests \"io.justsearch.ui.api.WorkerStatusSamplerTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 289597
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusNonBlockingHttpTest.java",
+        "classification": "assertion",
+        "detail": "boot status does not join disk-pressure (): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a boot request must return without waiting for its first observation ==> Unexpected exception thrown: java.net.http.HttpTimeoutException: request timed out | boot status does not join disk-pressure (?fresh=true): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a boot request must return without waiting for its first observation ==> Unexpected exception thr"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/WorkerStatusSamplerTest.java",
+        "classification": "assertion",
+        "detail": "the first read before any sample returns unknown and schedules one observation: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: boot status is an honest unknown observation ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:fa82ff59c2e49cc5754507eee741ad79f38a333c4bf6d0d4d135a5d29fcc26b0"
+}

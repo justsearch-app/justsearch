@@ -70,6 +70,7 @@ final class EngineVduMigrationReplayTest {
     writeWatchedRoots(dataDir, watchedRoot);
 
     engine = EngineTestHarness.start(dataDir);
+    engine.addRootAsThePerson(watchedRoot);
     assertEquals(
         1,
         engine

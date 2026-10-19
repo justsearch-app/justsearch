@@ -112,7 +112,7 @@ This amendment retires the carve-out and extends the manual-only policy to every
 **Additional consequences (beyond the original "Negative"):**
 
 - **Nightly observability / agent-eval / resilience soft-gate cadence is gone.** Drift signals (Phase 3 σ(nDCG@10), agent live eval scorecards, RR-219 G0 advisory) are produced only when an agent manually dispatches the relevant workflow. Subject-touching changes are the trigger point.
-- **`docs-lint` no longer auto-runs on docs PRs.** Run the regeneration scripts locally before pushing: `node scripts/docs/llmstxt-generate.mjs`, `node scripts/docs/skills-sync.mjs`, `node scripts/architecture/module-deps.mjs --check-canonical`. Load `/docs-maintenance` for the full checklist.
+- **`docs-lint` no longer auto-runs on docs PRs.** Run the regeneration scripts locally before pushing: `node scripts/docs/llmstxt-generate.mjs`, `node scripts/architecture/module-deps.mjs --check-canonical`.
 - **Auto-issue-opening on Phase 3 drift is gone.** The schedule-conditional `Open issue on drift` step was removed because `github.event_name` can no longer equal `'schedule'`. Manual dispatchers read the gate report directly from the run.
 
 **Workflow signal health script** (`scripts/ci/workflow-signal-health.mjs`) remains useful for diagnosing failures of manually-dispatched runs; only the "scheduled GitHub Actions failure" framing in the docs becomes obsolete.

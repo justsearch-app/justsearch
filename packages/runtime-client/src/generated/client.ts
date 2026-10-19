@@ -6,12 +6,42 @@
  * OpenAPI spec version: 0.1.0
  */
 import { runtimeFetch } from '../transport.js';
+/**
+ * A chat refusal's reason (Spec A step 9): why this one request was not admitted. Present only on chat refusals.
+ */
+export type ApiErrorResponseReason = typeof ApiErrorResponseReason[keyof typeof ApiErrorResponseReason];
+
+
+export const ApiErrorResponseReason = {
+  GPU_BUSY: 'GPU_BUSY',
+  GAME_MODE: 'GAME_MODE',
+  RELOAD_BACKOFF: 'RELOAD_BACKOFF',
+  LOADING: 'LOADING',
+  BUSY: 'BUSY',
+  OFF: 'OFF',
+  FAILED: 'FAILED',
+  REFUSED: 'REFUSED',
+  ENGINE_STOPPING: 'ENGINE_STOPPING',
+  DEVICE_RECOVERING: 'DEVICE_RECOVERING',
+  SELF_TEST: 'SELF_TEST',
+  EXTERNAL_SERVER: 'EXTERNAL_SERVER',
+} as const;
+
 export interface ApiErrorResponse {
   error: string;
   errorClass?: string;
   errorCode: string;
+  /** On a chat refusal: true when the app may offer the person a load in spite of it (POST /api/chat/load-anyway). Never true for an agent. */
+  forceAllowed?: boolean;
   i18nKey?: string;
+  /** A chat refusal's reason (Spec A step 9): why this one request was not admitted. Present only on chat refusals. */
+  reason?: ApiErrorResponseReason;
   requestId?: string;
+  /**
+     * When present, the earliest useful retry in milliseconds (a TRANSIENT refusal such as CHAT_UNAVAILABLE). Absent when the Engine does not know.
+     * @minimum 0
+     */
+  retryAfterMs?: number;
   retrySafe?: boolean;
   retryable?: boolean;
 }
@@ -272,8 +302,17 @@ export type RuntimeReadyUnavailableResponse = {
   error: string;
   errorClass?: string;
   errorCode: string;
+  /** On a chat refusal: true when the app may offer the person a load in spite of it (POST /api/chat/load-anyway). Never true for an agent. */
+  forceAllowed?: boolean;
   i18nKey?: string;
+  /** A chat refusal's reason (Spec A step 9): why this one request was not admitted. Present only on chat refusals. */
+  reason?: 'GPU_BUSY' | 'GAME_MODE' | 'RELOAD_BACKOFF' | 'LOADING' | 'BUSY' | 'OFF' | 'FAILED' | 'REFUSED' | 'ENGINE_STOPPING' | 'DEVICE_RECOVERING' | 'SELF_TEST' | 'EXTERNAL_SERVER';
   requestId?: string;
+  /**
+     * When present, the earliest useful retry in milliseconds (a TRANSIENT refusal such as CHAT_UNAVAILABLE). Absent when the Engine does not know.
+     * @minimum 0
+     */
+  retryAfterMs?: number;
   retrySafe?: boolean;
   retryable?: boolean;
 };

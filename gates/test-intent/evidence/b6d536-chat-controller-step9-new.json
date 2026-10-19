@@ -1,0 +1,769 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:47:33.369Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "c3547acde276826c1505e519e92c525fe2062f42",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResidencyTest.u19NoPressureNeverUnloadsAnIdleServer\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.t21AnIdleGpuServerUnloadsUnderPressureWithAVisibleReason\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.aCpuServerIsNeverUnloadedForGpuPressure\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.p3OnSixteenGigabytesAGameAloneDoesNotUnloadButAnotherAppDoes\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.untilTheProfileIsKnownAGameAloneLeavesChatLoadedButAnotherAppUnloadsIt\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.aGameUnloadsChatBelowSixteenGigabytesWithTheGameModeDetail\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.t22AReplyInProgressDefersTheUnloadToTheNextIdleEdge\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.aLeaseThatOpensBeforeTheUnloadDrainsMakesItWaitForTheNextIdleEdge\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.pressureThatClearsBeforeTheStopLeavesChatLoaded\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.f6AnUnloadedChatStaysUnloadedOverTenMinutesOfForwardedActivations\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.u18NoDemandReloadsWithinTwoMinutesOfAPressureUnload\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.anAgentDemandReloadsOnceThePressureIsGoneAndTheDwellIsOver\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.u17UnderPressureEveryDemandKindIsRefusedOrWaitsAndNoneLoads\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.u17WithinTheDwellAnAgentUnderPressureIsToldToWaitForTheDwell\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.u17AssistAndAuxNeverLoadEvenWithThePressureGone\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.aWaitingBackgroundDemandEndsWithTheReloadAPersonStarts\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.switchingChatOffEndsWaitingBackgroundDemandsAsOff\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.aDemandWhileChatRunsGoesStraightThrough\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.t26APersonLoadsAnywayAndOnlyANewPressureEdgeUnloadsAgain\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.f8OnlyAPersonMayLoadAnyway\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.ch7AGpuStartUnderPressureIsRefusedIntoUnloadedWithoutADwell\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.t40AnOpenVduHoldIsAskedToFinishUnderPressureAndTheIdleServerThenUnloads\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.u13NoVduPassStartsUnderPressure\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.u13NoVduPassStartsWhileChatIsUnloadedForAnotherGpuUser\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.aRunningHoldStartsAnUnloadedServerAndClearsTheLatch\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.afterShutdownADemandIsRefusedAsStopping\" --tests \"io.justsearch.app.services.bootstrap.phases.InferenceResidencyStatusTest.aPressureUnloadPublishesTheGpuPressureReason\" --tests \"io.justsearch.app.services.bootstrap.phases.InferenceResidencyStatusTest.aGameModeUnloadPublishesTheGameModeReason\" --tests \"io.justsearch.app.services.bootstrap.phases.InferenceResidencyStatusTest.theIndexingYieldKeepsItsOwnReason\" --tests \"io.justsearch.app.services.bootstrap.phases.InferenceResidencyStatusTest.theReloadAfterAnUnloadIsReadyAgain\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5360
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatResidencyUnloadStepTest.anIdleServerStopsAndChatReadsUnloadedUntilItsNextStart\" --tests \"io.justsearch.app.inference.ChatResidencyUnloadStepTest.aReplyInProgressRefusesTheUnloadAndNothingChanges\" --tests \"io.justsearch.app.inference.ChatResidencyUnloadStepTest.pressureThatClearedBeforeTheStopLeavesTheServerRunning\" --tests \"io.justsearch.app.inference.ChatResidencyUnloadStepTest.aStartRefusedUnderPressureReadsUnloadedWithoutAServer\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5934
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.i7ChatCompletionsWhileUnloadedUnderPressureIs503ChatUnavailableWithReasonGpuBusy\" --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.aHeaderLessRunWithoutAllowLoadIsAnAgentsAndIsRefusedWithoutARun\" --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.aPersonsChatUnderPressureMayBeLoadedAnywayButAnAgentClaimingAllowLoadMayNot\" --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.aPersonsChatReloadsAnUnloadedModelAndGoesOnOnceItIsReady\" --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.t26LoadAnywayFromTheAppLoadsUnderPressure\" --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.f8LoadAnywayWithoutThePersonsEvidenceIsRefused\" --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.theDevPressureTriggerIsAbsentOutsideEvalMode\" --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.theDevPressureTriggerReportsPressureAndChatUnloads\" --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.theDevTriggerTriesTheGameRuleOnANamedProfile\" --tests \"io.justsearch.ui.api.ChatRefusalWireTest.everyRefusalReasonMapsToItsWireCodeAndTheBodyConformsToTheSchema\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5459
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/state/chatResidency.test.ts\" --reporter=json --outputFile=\"F:\\\\agent-sandbox\\\\design-b6d536\\\\phaseb-tmp-1\\\\test-intent-vitest-36116-1791996452072.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1291
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#u19NoPressureNeverUnloadsAnIdleServer",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "u19NoPressureNeverUnloadsAnIdleServer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#t21AnIdleGpuServerUnloadsUnderPressureWithAVisibleReason",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "t21AnIdleGpuServerUnloadsUnderPressureWithAVisibleReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#aCpuServerIsNeverUnloadedForGpuPressure",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCpuServerIsNeverUnloadedForGpuPressure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#p3OnSixteenGigabytesAGameAloneDoesNotUnloadButAnotherAppDoes",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "p3OnSixteenGigabytesAGameAloneDoesNotUnloadButAnotherAppDoes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#untilTheProfileIsKnownAGameAloneLeavesChatLoadedButAnotherAppUnloadsIt",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "untilTheProfileIsKnownAGameAloneLeavesChatLoadedButAnotherAppUnloadsIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#aGameUnloadsChatBelowSixteenGigabytesWithTheGameModeDetail",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aGameUnloadsChatBelowSixteenGigabytesWithTheGameModeDetail()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#t22AReplyInProgressDefersTheUnloadToTheNextIdleEdge",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "t22AReplyInProgressDefersTheUnloadToTheNextIdleEdge()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#aLeaseThatOpensBeforeTheUnloadDrainsMakesItWaitForTheNextIdleEdge",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLeaseThatOpensBeforeTheUnloadDrainsMakesItWaitForTheNextIdleEdge()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#pressureThatClearsBeforeTheStopLeavesChatLoaded",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pressureThatClearsBeforeTheStopLeavesChatLoaded()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#f6AnUnloadedChatStaysUnloadedOverTenMinutesOfForwardedActivations",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "f6AnUnloadedChatStaysUnloadedOverTenMinutesOfForwardedActivations()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#u18NoDemandReloadsWithinTwoMinutesOfAPressureUnload",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "u18NoDemandReloadsWithinTwoMinutesOfAPressureUnload()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#anAgentDemandReloadsOnceThePressureIsGoneAndTheDwellIsOver",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anAgentDemandReloadsOnceThePressureIsGoneAndTheDwellIsOver()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#u17UnderPressureEveryDemandKindIsRefusedOrWaitsAndNoneLoads",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "u17UnderPressureEveryDemandKindIsRefusedOrWaitsAndNoneLoads()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#u17WithinTheDwellAnAgentUnderPressureIsToldToWaitForTheDwell",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "u17WithinTheDwellAnAgentUnderPressureIsToldToWaitForTheDwell()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#u17AssistAndAuxNeverLoadEvenWithThePressureGone",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "u17AssistAndAuxNeverLoadEvenWithThePressureGone()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#aWaitingBackgroundDemandEndsWithTheReloadAPersonStarts",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aWaitingBackgroundDemandEndsWithTheReloadAPersonStarts()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#switchingChatOffEndsWaitingBackgroundDemandsAsOff",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "switchingChatOffEndsWaitingBackgroundDemandsAsOff()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#aDemandWhileChatRunsGoesStraightThrough",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aDemandWhileChatRunsGoesStraightThrough()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#t26APersonLoadsAnywayAndOnlyANewPressureEdgeUnloadsAgain",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "t26APersonLoadsAnywayAndOnlyANewPressureEdgeUnloadsAgain()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#f8OnlyAPersonMayLoadAnyway",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "f8OnlyAPersonMayLoadAnyway()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#ch7AGpuStartUnderPressureIsRefusedIntoUnloadedWithoutADwell",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ch7AGpuStartUnderPressureIsRefusedIntoUnloadedWithoutADwell()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#t40AnOpenVduHoldIsAskedToFinishUnderPressureAndTheIdleServerThenUnloads",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "t40AnOpenVduHoldIsAskedToFinishUnderPressureAndTheIdleServerThenUnloads()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#u13NoVduPassStartsUnderPressure",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "u13NoVduPassStartsUnderPressure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#u13NoVduPassStartsWhileChatIsUnloadedForAnotherGpuUser",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "u13NoVduPassStartsWhileChatIsUnloadedForAnotherGpuUser()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#aRunningHoldStartsAnUnloadedServerAndClearsTheLatch",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRunningHoldStartsAnUnloadedServerAndClearsTheLatch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#afterShutdownADemandIsRefusedAsStopping",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "afterShutdownADemandIsRefusedAsStopping()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceResidencyStatusTest.java#aPressureUnloadPublishesTheGpuPressureReason",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceResidencyStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4a7cbe4495ac91cc701e077581aba4df1898f358bd6e0c662f31d4ad687d1fda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPressureUnloadPublishesTheGpuPressureReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceResidencyStatusTest.java#aGameModeUnloadPublishesTheGameModeReason",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceResidencyStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4a7cbe4495ac91cc701e077581aba4df1898f358bd6e0c662f31d4ad687d1fda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aGameModeUnloadPublishesTheGameModeReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceResidencyStatusTest.java#theIndexingYieldKeepsItsOwnReason",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceResidencyStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4a7cbe4495ac91cc701e077581aba4df1898f358bd6e0c662f31d4ad687d1fda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theIndexingYieldKeepsItsOwnReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceResidencyStatusTest.java#theReloadAfterAnUnloadIsReadyAgain",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/InferenceResidencyStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4a7cbe4495ac91cc701e077581aba4df1898f358bd6e0c662f31d4ad687d1fda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theReloadAfterAnUnloadIsReadyAgain()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java#anIdleServerStopsAndChatReadsUnloadedUntilItsNextStart",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1171ed232f1034959c03081b06c8445cb6f680f710a6d2f9f57891d24e1d938b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anIdleServerStopsAndChatReadsUnloadedUntilItsNextStart()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java#aReplyInProgressRefusesTheUnloadAndNothingChanges",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1171ed232f1034959c03081b06c8445cb6f680f710a6d2f9f57891d24e1d938b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReplyInProgressRefusesTheUnloadAndNothingChanges()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java#pressureThatClearedBeforeTheStopLeavesTheServerRunning",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1171ed232f1034959c03081b06c8445cb6f680f710a6d2f9f57891d24e1d938b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pressureThatClearedBeforeTheStopLeavesTheServerRunning()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java#aStartRefusedUnderPressureReadsUnloadedWithoutAServer",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResidencyUnloadStepTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1171ed232f1034959c03081b06c8445cb6f680f710a6d2f9f57891d24e1d938b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStartRefusedUnderPressureReadsUnloadedWithoutAServer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#i7ChatCompletionsWhileUnloadedUnderPressureIs503ChatUnavailableWithReasonGpuBusy",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "i7ChatCompletionsWhileUnloadedUnderPressureIs503ChatUnavailableWithReasonGpuBusy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#aHeaderLessRunWithoutAllowLoadIsAnAgentsAndIsRefusedWithoutARun",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aHeaderLessRunWithoutAllowLoadIsAnAgentsAndIsRefusedWithoutARun()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#aPersonsChatUnderPressureMayBeLoadedAnywayButAnAgentClaimingAllowLoadMayNot",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPersonsChatUnderPressureMayBeLoadedAnywayButAnAgentClaimingAllowLoadMayNot()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#aPersonsChatReloadsAnUnloadedModelAndGoesOnOnceItIsReady",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPersonsChatReloadsAnUnloadedModelAndGoesOnOnceItIsReady()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#t26LoadAnywayFromTheAppLoadsUnderPressure",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "t26LoadAnywayFromTheAppLoadsUnderPressure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#f8LoadAnywayWithoutThePersonsEvidenceIsRefused",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "f8LoadAnywayWithoutThePersonsEvidenceIsRefused()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#theDevPressureTriggerIsAbsentOutsideEvalMode",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theDevPressureTriggerIsAbsentOutsideEvalMode()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#theDevPressureTriggerReportsPressureAndChatUnloads",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theDevPressureTriggerReportsPressureAndChatUnloads()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#theDevTriggerTriesTheGameRuleOnANamedProfile",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fb348a9101bf04481a3053be12144e41535410156859e641c723643b67bd937e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theDevTriggerTriesTheGameRuleOnANamedProfile()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatRefusalWireTest.java#everyRefusalReasonMapsToItsWireCodeAndTheBodyConformsToTheSchema",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatRefusalWireTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8e6ca7290f9923d075b6aa3b67be84877b5e7c7a25b755a0c8a1344be9ec34f0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyRefusalReasonMapsToItsWireCodeAndTheBodyConformsToTheSchema()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/chatResidency.test.ts#the AI state names a GPU-pressure or game unload, and nothing else",
+      "file": "modules/ui-web/src/shell-v0/state/chatResidency.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e3c20cbd48b6b19c74b8f212e20d8fdc1ae4ce12bb21dbd9901f2e2a58bf88fa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatResidency — Spec A step 9 the AI state names a GPU-pressure or game unload, and nothing else",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/chatResidency.test.ts#a chat the user switched off is off, not unloaded",
+      "file": "modules/ui-web/src/shell-v0/state/chatResidency.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e3c20cbd48b6b19c74b8f212e20d8fdc1ae4ce12bb21dbd9901f2e2a58bf88fa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatResidency — Spec A step 9 a chat the user switched off is off, not unloaded",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/chatResidency.test.ts#reads the refusal body and ignores other bodies",
+      "file": "modules/ui-web/src/shell-v0/state/chatResidency.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e3c20cbd48b6b19c74b8f212e20d8fdc1ae4ce12bb21dbd9901f2e2a58bf88fa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatResidency — Spec A step 9 reads the refusal body and ignores other bodies",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/chatResidency.test.ts#Load anyway posts allowLoad to the route and reads loading or the refusal",
+      "file": "modules/ui-web/src/shell-v0/state/chatResidency.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e3c20cbd48b6b19c74b8f212e20d8fdc1ae4ce12bb21dbd9901f2e2a58bf88fa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatResidency — Spec A step 9 Load anyway posts allowLoad to the route and reads loading or the refusal",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:f15be1f5634a1de1215cd9fbd053e2972011bbdec872ceb90d5da30e83d9894d"
+}

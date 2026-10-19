@@ -56,6 +56,15 @@ export const ambientStyles = css`
     outline: 2px solid var(--focus-ring-color);
     outline-offset: 2px;
   }
+  /* Forced colors (Windows High Contrast): the ring is the system Highlight, stated here rather than
+     through the token, so a theme that writes --focus-ring-color inline on the root cannot take it.
+     A component rule that hides its ring behind an 'outline: 2px solid transparent' gets CanvasText
+     instead (forced colors repaint the transparent outline), which is still a visible ring. */
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline-color: Highlight;
+    }
+  }
 
   /* Input placeholder — ::placeholder is shadow-scoped (§16 S3), so a document rule never reached
      shadow inputs and each one re-authored the muted colour. The ONE token-coloured placeholder, in

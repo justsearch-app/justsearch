@@ -1,0 +1,13 @@
+diff --git a/modules/ui/src/main/java/io/justsearch/ui/api/StatusLifecycleHandler.java b/modules/ui/src/main/java/io/justsearch/ui/api/StatusLifecycleHandler.java
+--- a/modules/ui/src/main/java/io/justsearch/ui/api/StatusLifecycleHandler.java
++++ b/modules/ui/src/main/java/io/justsearch/ui/api/StatusLifecycleHandler.java
+@@ -202,6 +202,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
+   /** How many sampling periods a sample may age before it is reported stale. */
+   static final int SAMPLE_STALE_PERIODS = 3;
+ 
++  // Compatibility only: lets later checks compile; no production code in this state reads it.
++  static final int PROBE_ALLOWANCE_PERIODS = 3;
++
+   /** The sampler's last observation; {@code null} until the first one. */
+   private volatile WorkerViewSample lastWorkerSample;
+   private final java.util.concurrent.atomic.AtomicReference<EngineComponentSnapshot> lastComponentSnapshot =

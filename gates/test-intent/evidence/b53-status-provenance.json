@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T11:26:46.913Z",
+  "revision": "75917a07325f85c402b837e5a17eba4cb4b2bd5c",
+  "tree": "f1b2b986fdd9239736f7cf1a960857f4bdaddd59",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusReadinessStalenessTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5288
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadinessStalenessTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadinessStalenessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:16d7d2284700603de335d5076b1d20c85482ade7ad0a79c4b54075c0eaea7010",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "composites aggregate member staleness: any-stale, max-age, head-local stays fresh",
+          "status": "passed"
+        },
+        {
+          "name": "every readiness dimension is classified worker-observed or head-local",
+          "status": "passed"
+        },
+        {
+          "name": "worker RPC failure marks worker-observed dimensions stale and leaves head-local fresh",
+          "status": "passed"
+        },
+        {
+          "name": "a reachable Worker leaves every dimension fresh",
+          "status": "passed"
+        },
+        {
+          "name": "a reachable Worker leaves every composite fresh",
+          "status": "passed"
+        },
+        {
+          "name": "after contact is lost, staleness is measured from the last successful observation",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "ff0c00f5e",
+    "revision": "ff0c00f5e7358b6e0876cfee1dfeb09f41899d62",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b53-status-provenance-compat.patch",
+        "contentDigest": "sha256:8dab5098f57b50d11c103c563798cd75aac7306c4d256a2bbd3540fe79a7dcaa"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusReadinessStalenessTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 34951
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadinessStalenessTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:eabc5871fa7de28c8fbc785f2e634c6a9c128b8edcc9d18dc5bfe8917481cc37"
+}

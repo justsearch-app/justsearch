@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/test-fixture-processes.cjs';
 /**
  * Soft-clean must not delete an AUTHORED durable store.
  *

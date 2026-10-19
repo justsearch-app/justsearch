@@ -1,0 +1,257 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T08:30:01.160Z",
+  "revision": "1f8ce3e01cc75a8527c0b5987a9c3d49c534bedc",
+  "tree": "0a2dc90143cf87fd7b297d4badb878bd8e68ebbb",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.installedProfilePathKeepsItsMeasuredPlan\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.customChatDisablesEveryAutomaticGpuRoleThroughPrepare\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aDeviceOverrideLeavesTheOtherRolesAndChatPlanned\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aForeignRoleWithoutAWeightObservationKeepsItsUnplannedPolicy\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aChatOnlyPlannerFailureDoesNotAbortConfigurationPreparation\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.unchangedPlanningDoesNotRepeatInfoLogs\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.anOperatorLockedProfileIsBudgetedAsTheActualLaunch\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.anInstallerStandardPathFollowsTheCompactDevicePlan\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aChangedArtifactAtTheShippedPathIsStillCustom\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 22583
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#installedProfilePathKeepsItsMeasuredPlan",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "installedProfilePathKeepsItsMeasuredPlan(24564)",
+          "status": "passed"
+        },
+        {
+          "name": "installedProfilePathKeepsItsMeasuredPlan(16376)",
+          "status": "passed"
+        },
+        {
+          "name": "installedProfilePathKeepsItsMeasuredPlan(12282)",
+          "status": "passed"
+        },
+        {
+          "name": "installedProfilePathKeepsItsMeasuredPlan(8178)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#customChatDisablesEveryAutomaticGpuRoleThroughPrepare",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "customChatDisablesEveryAutomaticGpuRoleThroughPrepare()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aDeviceOverrideLeavesTheOtherRolesAndChatPlanned",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aDeviceOverrideLeavesTheOtherRolesAndChatPlanned(EMBEDDING)",
+          "status": "passed"
+        },
+        {
+          "name": "aDeviceOverrideLeavesTheOtherRolesAndChatPlanned(SPLADE)",
+          "status": "passed"
+        },
+        {
+          "name": "aDeviceOverrideLeavesTheOtherRolesAndChatPlanned(NER)",
+          "status": "passed"
+        },
+        {
+          "name": "aDeviceOverrideLeavesTheOtherRolesAndChatPlanned(RERANKER)",
+          "status": "passed"
+        },
+        {
+          "name": "aDeviceOverrideLeavesTheOtherRolesAndChatPlanned(BGE_M3)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aForeignRoleWithoutAWeightObservationKeepsItsUnplannedPolicy",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aForeignRoleWithoutAWeightObservationKeepsItsUnplannedPolicy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aChatOnlyPlannerFailureDoesNotAbortConfigurationPreparation",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aChatOnlyPlannerFailureDoesNotAbortConfigurationPreparation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#unchangedPlanningDoesNotRepeatInfoLogs",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unchangedPlanningDoesNotRepeatInfoLogs()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anOperatorLockedProfileIsBudgetedAsTheActualLaunch",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anOperatorLockedProfileIsBudgetedAsTheActualLaunch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anInstallerStandardPathFollowsTheCompactDevicePlan",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anInstallerStandardPathFollowsTheCompactDevicePlan()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aChangedArtifactAtTheShippedPathIsStillCustom",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:19f4f5b1d86138ddf6e14c6ccca7a301e9f0458123913a14a3e14fd0b38999ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aChangedArtifactAtTheShippedPathIsStillCustom()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7de3976a1",
+    "revision": "7de3976a1b4e429ffa4a7fd0622878132001b7a5",
+    "overlays": [
+      "modules/app-services/build.gradle.kts",
+      "modules/app-services/gradle.lockfile"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.installedProfilePathKeepsItsMeasuredPlan\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.customChatDisablesEveryAutomaticGpuRoleThroughPrepare\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aDeviceOverrideLeavesTheOtherRolesAndChatPlanned\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aForeignRoleWithoutAWeightObservationKeepsItsUnplannedPolicy\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aChatOnlyPlannerFailureDoesNotAbortConfigurationPreparation\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.unchangedPlanningDoesNotRepeatInfoLogs\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.anOperatorLockedProfileIsBudgetedAsTheActualLaunch\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.anInstallerStandardPathFollowsTheCompactDevicePlan\" --tests \"io.justsearch.app.services.gpu.GpuPrepareRegressionTest.aChangedArtifactAtTheShippedPathIsStillCustom\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 53848
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#installedProfilePathKeepsItsMeasuredPlan",
+        "classification": "assertion",
+        "detail": "installedProfilePathKeepsItsMeasuredPlan(24564): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the installer's absolute path identifies the shipped profile file ==> expected: <true> but was: <false> | installedProfilePathKeepsItsMeasuredPlan(16376): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the installer's absolute path identifies the shipped profile file ==> expected: <true> but was: <false> | installedProfilePathKeepsItsMeasuredPlan(122"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#customChatDisablesEveryAutomaticGpuRoleThroughPrepare",
+        "classification": "assertion",
+        "detail": "customChatDisablesEveryAutomaticGpuRoleThroughPrepare(): org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: every GPU-enabled key must resolve through the registry (2 failures)&#13;&#10;&#9;org.opentest4j.AssertionFailedError: expected: <false> but was: <true>&#13;&#10;&#9;org.opentest4j.AssertionFailedError: expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aDeviceOverrideLeavesTheOtherRolesAndChatPlanned",
+        "classification": "assertion",
+        "detail": "aDeviceOverrideLeavesTheOtherRolesAndChatPlanned(EMBEDDING): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a role on another adapter must not remove the shared plan ==> expected: <true> but was: <false> | aDeviceOverrideLeavesTheOtherRolesAndChatPlanned(SPLADE): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a role on another adapter must not remove the shared plan ==> expected: <true> but was: <false> | aDeviceOverrideLeavesTheOtherRolesAndCh"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aForeignRoleWithoutAWeightObservationKeepsItsUnplannedPolicy",
+        "classification": "assertion",
+        "detail": "aForeignRoleWithoutAWeightObservationKeepsItsUnplannedPolicy(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aChatOnlyPlannerFailureDoesNotAbortConfigurationPreparation",
+        "classification": "assertion",
+        "detail": "aChatOnlyPlannerFailureDoesNotAbortConfigurationPreparation(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a chat-cache error must degrade planning, not reject the entire configuration ==> Unexpected exception thrown: java.lang.IllegalArgumentException: justsearch.llm.prompt_cache_mib must be a non-negative integer MiB (0..2147483647): invalid"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#unchangedPlanningDoesNotRepeatInfoLogs",
+        "classification": "assertion",
+        "detail": "unchangedPlanningDoesNotRepeatInfoLogs(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: identical planning must publish one INFO result, without repeated launch messages ==> expected: <1> but was: <2>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anOperatorLockedProfileIsBudgetedAsTheActualLaunch",
+        "classification": "assertion",
+        "detail": "anOperatorLockedProfileIsBudgetedAsTheActualLaunch(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the locked path identifies its actual artifact ==> expected: <standard> but was: <null>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#anInstallerStandardPathFollowsTheCompactDevicePlan",
+        "classification": "assertion",
+        "detail": "anInstallerStandardPathFollowsTheCompactDevicePlan(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuPrepareRegressionTest.java#aChangedArtifactAtTheShippedPathIsStillCustom",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:c6c328c3934bf49b7ef38a3be2ea5141245027de55982dc6bba84f56f0e6bf37"
+}

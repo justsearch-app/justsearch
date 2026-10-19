@@ -1,0 +1,84 @@
+Method io.justsearch.adapters.lucene.runtime.DeferredRuntime.session() is never referenced
+Method io.justsearch.adapters.lucene.runtime.LuceneRuntimeBuilder.withPrebuiltComponentsForTests(io.justsearch.adapters.lucene.runtime.Components) is never referenced
+Method io.justsearch.adapters.lucene.runtime.ReadOnlyRuntime.session() is never referenced
+Method io.justsearch.adapters.lucene.runtime.RunningRuntime.session() is never referenced
+Method io.justsearch.agent.AgentLoopService.forTesting(io.justsearch.app.api.OnlineAiService, io.justsearch.agent.api.registry.OperationCatalog, io.justsearch.agent.api.registry.OperationDispatcher, io.justsearch.agent.api.registry.AgentToolEmitter, io.justsearch.agent.tools.FileOperationLog, java.util.function.Function, io.justsearch.agent.AgentRunStore, io.justsearch.agent.AgentTelemetry) is never referenced
+Method io.justsearch.agent.AgentRetryPolicy$RetryDecision.action() is never referenced
+Method io.justsearch.app.engine.EngineRoot.liveMigrationStartCompletionForTests(java.lang.String) is never referenced
+Method io.justsearch.app.inference.InferenceLifecycleManager.asIntOrNull(tools.jackson.databind.JsonNode) is never referenced
+Method io.justsearch.app.inference.InferenceLifecycleManager.asPositiveInt(tools.jackson.databind.JsonNode) is never referenced
+Method io.justsearch.app.inference.InferenceLifecycleManager.extractContextTokensFromProps(tools.jackson.databind.JsonNode) is never referenced
+Method io.justsearch.app.inference.InferenceLifecycleManager.extractUsageFromChatChunk(tools.jackson.databind.JsonNode) is never referenced
+Method io.justsearch.app.inference.InferenceLifecycleManager.handlePeriodicHealthFailure(java.lang.String, boolean) is never referenced
+Method io.justsearch.app.inference.InferenceLifecycleManager.isUsingExternalServer() is never referenced
+Method io.justsearch.app.inference.InferenceLifecycleManager.setUsingExternalServerForTest(boolean) is never referenced
+Method io.justsearch.app.inference.InferenceLifecycleManager.startLlamaServer() is never referenced
+Method io.justsearch.app.inference.InferenceLifecycleManager.updateFromPropsBestEffort(tools.jackson.databind.JsonNode) is never referenced
+Method io.justsearch.app.inference.TransitionRunner.installViewForTest(io.justsearch.app.inference.InferenceRuntimeView) is never referenced
+Method io.justsearch.app.services.HeadAssembly.chooseFirstNonBlank([Ljava.lang.String;) is never referenced
+Method io.justsearch.app.services.ai.install.AiInstallService.knowledgeServerForTest() is never referenced
+Method io.justsearch.app.services.ai.install.AiInstallService.setFreeSpaceProbeForTest(io.justsearch.app.services.ai.install.FreeSpaceCheck$Probe) is never referenced
+Method io.justsearch.app.services.ai.install.AiInstallService.setNanoClockForTest(java.util.function.LongSupplier) is never referenced
+Method io.justsearch.app.services.ai.install.TransportFaultInjector.resetWarningState() is never referenced
+Method io.justsearch.app.services.ai.runtime.RuntimeActivationService.setSelfTestOverrideForTest(java.util.function.BiFunction) is never referenced
+Method io.justsearch.app.services.feedback.NdjsonAppendStore.storeFile() is never referenced
+Method io.justsearch.app.services.intent.ConsentCapsuleService.liveGrantCount() is never referenced
+Method io.justsearch.app.services.observability.rules.DwellTimeScheduler.reset(java.lang.String) is never referenced
+Method io.justsearch.app.services.worker.KnowledgeSearchEngine.isLambdaMartEligible(io.justsearch.app.api.knowledge.PipelineConfig, io.justsearch.app.api.gpl.RerankerService, int) is never referenced
+Method io.justsearch.app.services.worker.KnowledgeServerHealthMonitor.recoveryAttemptRunningForTest() is never referenced
+Method io.justsearch.app.services.worker.SearchPipelinePresets.toProtoPipelineConfig(io.justsearch.app.api.knowledge.PipelineConfig) is never referenced
+Method io.justsearch.applauncher.Launcher.installFactories(io.justsearch.applauncher.Launcher$EnvironmentFactory, io.justsearch.applauncher.Launcher$CommandRunnerFactory, io.justsearch.applauncher.Launcher$SmokeDriverFactory) is never referenced
+Method io.justsearch.applauncher.Launcher.resetFactories() is never referenced
+Method io.justsearch.applauncher.LauncherEnvironment.configManager() is never referenced
+Method io.justsearch.applauncher.LauncherEnvironment.installFactories(io.justsearch.applauncher.LauncherEnvironment$ConfigManagerFactory, io.justsearch.applauncher.LauncherEnvironment$ProcessResourcesFactory, io.justsearch.applauncher.LauncherEnvironment$TelemetryFactory, io.justsearch.applauncher.LauncherEnvironment$AppFacadeFactory) is never referenced
+Method io.justsearch.applauncher.LauncherEnvironment.resetFactories() is never referenced
+Method io.justsearch.applauncher.LauncherEnvironment.telemetry() is never referenced
+Method io.justsearch.applauncher.SmokeDriver.installCommandRunnerFactory(io.justsearch.applauncher.Launcher$CommandRunnerFactory) is never referenced
+Method io.justsearch.applauncher.SmokeDriver.resetFactories() is never referenced
+Method io.justsearch.configuration.resolved.ConfigStore.clearGlobal() is never referenced
+Method io.justsearch.contracts.BootContractRegistry.reset() is never referenced
+Method io.justsearch.contracts.ContractSampler.reset() is never referenced
+Method io.justsearch.indexerworker.embed.EmbeddingService.getCacheSizeForTesting() is never referenced
+Method io.justsearch.indexerworker.embed.EmbeddingService.putCacheEntryForTesting(java.lang.String, io.justsearch.indexerworker.embed.EmbeddingService$ChunkedEmbedding, long) is never referenced
+Method io.justsearch.indexerworker.embed.EmbeddingService.setLastEvictionTimeForTesting(long) is never referenced
+Method io.justsearch.indexerworker.extract.PersistentExtractionSandbox.firstChildPid() is never referenced
+Method io.justsearch.indexerworker.extract.PersistentExtractionSandbox.restartCount() is never referenced
+Method io.justsearch.indexerworker.extract.PersistentExtractionSandbox.spawnCount() is never referenced
+Method io.justsearch.indexerworker.extract.PolicyDrivenTikaExtractor.evaluateOcrAttemptForTesting(java.nio.file.Path, java.lang.String, java.lang.String, io.justsearch.indexerworker.extract.StructuredDocumentSummary, long) is never referenced
+Method io.justsearch.indexerworker.extract.PolicyDrivenTikaExtractor.shouldAttemptOcrForTesting(java.nio.file.Path, java.lang.String, java.lang.String, io.justsearch.indexerworker.extract.StructuredDocumentSummary) is never referenced
+Method io.justsearch.indexerworker.extract.TikaOcrRuntime.resetLanguageCacheForTests() is never referenced
+Method io.justsearch.indexerworker.extract.VisualExtractionEvidence.from(java.lang.String, io.justsearch.indexerworker.extract.StructuredDocumentSummary, java.lang.String, io.justsearch.indexerworker.extract.OcrRoutingConfig, boolean) is never referenced
+Method io.justsearch.indexerworker.loop.EmbeddingProviderLifecycle.unloadEmbeddingService() is never referenced
+Method io.justsearch.indexerworker.loop.IndexingLoop.getExtractor() is never referenced
+Method io.justsearch.indexerworker.loop.IndexingLoop.getJournal() is never referenced
+Method io.justsearch.indexerworker.loop.IndexingLoop.getWriter() is never referenced
+Method io.justsearch.indexerworker.loop.IngestionOutcomeJournal.pendingTransitionsForTest() is never referenced
+Method io.justsearch.indexerworker.metrics.OperationalMetrics.deregisterEncoder(java.lang.String) is never referenced
+Method io.justsearch.indexerworker.server.KnowledgeServer.awaitMigrationCutoverExitForTests(long, java.util.concurrent.TimeUnit) is never referenced
+Method io.justsearch.indexerworker.server.KnowledgeServer.indexGenerationManagerForTests() is never referenced
+Method io.justsearch.indexerworker.server.KnowledgeServer.installMigrationBarrierForTests(io.justsearch.indexerworker.server.MigrationTransitionBarrier$Hook) is never referenced
+Method io.justsearch.indexerworker.server.KnowledgeServer.jobQueueForTests() is never referenced
+Method io.justsearch.indexerworker.server.KnowledgeServer.lifecycleManagerForTests() is never referenced
+Method io.justsearch.indexerworker.server.KnowledgeServer.readOnlyOpensForTest() is never referenced
+Method io.justsearch.indexerworker.server.KnowledgeServer.rebuildBrakeExhaustedForTest() is never referenced
+Method io.justsearch.indexerworker.server.KnowledgeServer.releaseModelReadyLatchForTests() is never referenced
+Method io.justsearch.indexerworker.server.KnowledgeServer.signalBusForTests() is never referenced
+Method io.justsearch.indexerworker.services.RagContextOps$ChunkRerankResult.wasReranked() is never referenced
+Method io.justsearch.indexerworker.services.RagContextOps.searchChunksWithMeta(java.lang.String, java.util.Set, int, int, boolean, java.lang.String, io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes$RuntimeSearchFilters, java.util.List, io.justsearch.core.context.EngineContext$Urgency, io.justsearch.core.execution.EngineTaskLifetime) is never referenced
+Method io.justsearch.indexerworker.services.RootWatcherRegistry.watchedRoots() is never referenced
+Method io.justsearch.indexerworker.services.SearchOrchestrator.deriveActualMode(boolean, boolean, boolean) is never referenced
+Method io.justsearch.indexerworker.services.SearchOrchestrator.deriveEffectiveMode(io.justsearch.ipc.PipelineConfig) is never referenced
+Method io.justsearch.indexerworker.services.SearchOrchestrator.modeToDefaultPipeline(io.justsearch.ipc.SearchMode) is never referenced
+Method io.justsearch.indexerworker.services.respond.SearchTraceProjector.project(io.justsearch.indexerworker.services.plan.SearchDecision, io.justsearch.indexerworker.services.SearchOutcome, io.justsearch.indexerworker.services.input.SearchInputs) is never referenced
+Method io.justsearch.indexerworker.splade.SpladeEncoder.postProcess([[[F, [[J) is never referenced
+Method io.justsearch.ort.NativeSessionHandle.peekCpuSession() is never referenced
+Method io.justsearch.telemetry.JvmRuntimeGauges.getJvmGaugeErrorCount() is never referenced
+Method io.justsearch.telemetry.RrdMetricStore.curatedMetricsForTest() is never referenced
+Method io.justsearch.ui.api.AgentController.isHeartbeatSchedulerShutdown() is never referenced
+Method io.justsearch.ui.api.ApiErrorHandler.clearCachesForTest() is never referenced
+Method io.justsearch.ui.api.ApiSecurityFilters.install(io.javalin.Javalin) is never referenced
+Method io.justsearch.ui.api.ChatController.isHeartbeatSchedulerShutdown() is never referenced
+Method io.justsearch.ui.api.LocalApiServer$Builder.operationLeaseService(io.justsearch.app.api.OperationLeaseService) is never referenced
+Method io.justsearch.ui.api.RouteContractPolicy.declaredSchemaFiles() is never referenced
+Method io.justsearch.ui.api.RouteContractPolicy.validateSdkRoutes(java.util.Collection, java.util.Collection) is never referenced
+Method io.justsearch.ui.api.StatusLifecycleHandler.setClockForTesting(java.util.function.LongSupplier) is never referenced

@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-08T13:39:50.035Z",
+  "revision": "11a13af1c48ce03729af1df3c7de1f5eda5afda1",
+  "tree": "0e5b7e370db8adee4bb0b16713d30ca4cfe68147",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.resolved.ConfigApplyScopesTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7203
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cfd9e0925ba67a8dcf5556c286b09a472cf4ccf4a8154349cddf36408f5b8832",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "classifiesEffectiveValueChangesAndLeavesSourceOnlyChangesAsNoOp()",
+          "status": "passed"
+        },
+        {
+          "name": "indexPathRetentionKeepsServingValueAndTraceWhilePublishingOtherValues()",
+          "status": "passed"
+        },
+        {
+          "name": "sharedGpuPolicyRequiresRestartInsteadOfQueryOwnerComposition()",
+          "status": "passed"
+        },
+        {
+          "name": "changingSnapshotBoundQueryThresholdRequiresRestart()",
+          "status": "passed"
+        },
+        {
+          "name": "packagedRegisterIsTheRepositoryRegister()",
+          "status": "passed"
+        },
+        {
+          "name": "sourceOrdinalDoesNotChangeClassificationWhenEffectiveValueIsEqual()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:c875ed32d2739e0de0af9ba7b102755d57774ee9f6e48a1a502eb62d4d2839a5"
+}

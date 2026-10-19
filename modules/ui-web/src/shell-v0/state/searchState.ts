@@ -419,49 +419,10 @@ export function buildSearchIntent(
 }
 
 // ---------------------------------------------------------------------------
-// Tempdoc 811 C-2a — the collection ENUMERATION probe.
-//
-// The Library's "Other sources" section needs the set of collections present in the index, which no
-// endpoint exposes (`IndexingRoutes` has only the DELETE; `IndexStatusOps#countDefaultScopeDocs`
-// defers the per-collection breakdown). The `facet` role `collection` carries in `fields.v1.json`
-// is that mechanism: `FacetingEngine` tallies a keyword/docValues field over the whole matched set.
-//
-// It lives HERE, beside `runSearch`, because this module is the ONE `/api/knowledge/search`
-// issuance site (the `search-issuance` gate / 577 Ext II): the probe is an aggregation, not a user
-// query, so it deliberately does NOT go through `buildSearchIntent` — but it must not open a second
-// POST site either. `searchState` owns "how this app talks to the search endpoint"; the meaning of
-// the answer belongs to `otherSources.ts`.
-// ---------------------------------------------------------------------------
+// Collection enumeration is unattended Library hydration on a dedicated observation route.
 
 /** The facet field that names a document's corpus (`fields.v1.json` `roles: [filter, facet]`). */
 export const COLLECTION_FACET_FIELD = 'collection';
-
-/**
- * The one query that reaches `MatchAllDocsQuery`. A BLANK query cannot be used: `SearchPlanner.plan`
- * short-circuits it to `EmptyQueryDecision` before any facet is planned, so the wire has no
- * match-everything shape and this is what the classic QueryParser resolves under `lucene` syntax.
- */
-const COLLECTION_FACET_QUERY = '*:*';
-
-/** `SearchPlanner.buildFacetFields` clamps a facet's `size` to 100. */
-const COLLECTION_FACET_VALUE_LIMIT = 100;
-
-/** The enumeration request body — a facet request that returns nothing else. */
-export function buildCollectionFacetProbe(maxDocsScanned: number): Record<string, unknown> {
-  return {
-    query: COLLECTION_FACET_QUERY,
-    querySyntax: 'lucene',
-    // One hit is one too many, but the wire has no facets-only mode; the smallest legal page.
-    limit: 1,
-    // The same BM25-only pipeline the quick pass uses: no expansion, no rerankers, no dense leg.
-    pipeline: QUICK_PIPELINE,
-    facets: {
-      include: true,
-      maxDocsScanned,
-      fields: [{ field: COLLECTION_FACET_FIELD, size: COLLECTION_FACET_VALUE_LIMIT }],
-    },
-  };
-}
 
 /**
  * Issues the enumeration probe and returns the raw response body for `deriveOtherSources`.
@@ -475,10 +436,10 @@ export async function fetchCollectionFacet(
   baseUrl?: string,
   signal?: AbortSignal,
 ): Promise<unknown> {
-  const res = await authorizedFetch(((baseUrl ?? apiBase) || '') + '/api/knowledge/search', {
+  const res = await authorizedFetch(((baseUrl ?? apiBase) || '') + '/api/knowledge/collection-facet', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildCollectionFacetProbe(maxDocsScanned)),
+    body: JSON.stringify({ maxDocsScanned }),
     ...(signal ? { signal } : {}),
   });
   if (!res.ok) {

@@ -17,6 +17,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
@@ -71,7 +72,7 @@ final class ReadinessReconciledWithoutRequestTest {
   void workerReadyTransitionClearsIndexUnavailableWithoutStatusRequest()
       throws InterruptedException {
     ConditionStore conditions = new ConditionStore();
-    HealthEventChangeRegistry changes = new HealthEventChangeRegistry();
+    HealthEventChangeRegistry changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
     LifecycleSnapshotTap tap =
         new LifecycleSnapshotTap(conditions, changes, HEAD_SRC, Clock.systemUTC());
 

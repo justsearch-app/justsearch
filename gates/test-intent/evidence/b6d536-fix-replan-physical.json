@@ -1,0 +1,154 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T17:38:41.865Z",
+  "revision": "2c499df0da395f14c011ef2dd48655c71fe0d09e",
+  "tree": "640bd937adb6163fd8d4a4b79280c81f970c41e3",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest\" --tests \"io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest.compactToStandardActivationReplacesPhysicalBulkAndQueryCaps\" --tests \"io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest.standardToCompactActivationReplacesPhysicalBulkAndQueryCaps\" --tests \"io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest.precommitRefusalRestoresSourcePhysicalCapsAndWarmQuery\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14712
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b8a2298e029e1742dff2212173420bddf51a48ce89e24af8d714a982ebe3106d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "standardToCompactActivationReplacesPhysicalBulkAndQueryCaps(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "precommitRefusalRestoresSourcePhysicalCapsAndWarmQuery(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "compactToStandardActivationReplacesPhysicalBulkAndQueryCaps(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java#compactToStandardActivationReplacesPhysicalBulkAndQueryCaps",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b8a2298e029e1742dff2212173420bddf51a48ce89e24af8d714a982ebe3106d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "compactToStandardActivationReplacesPhysicalBulkAndQueryCaps(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java#standardToCompactActivationReplacesPhysicalBulkAndQueryCaps",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b8a2298e029e1742dff2212173420bddf51a48ce89e24af8d714a982ebe3106d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "standardToCompactActivationReplacesPhysicalBulkAndQueryCaps(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java#precommitRefusalRestoresSourcePhysicalCapsAndWarmQuery",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b8a2298e029e1742dff2212173420bddf51a48ce89e24af8d714a982ebe3106d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "precommitRefusalRestoresSourcePhysicalCapsAndWarmQuery(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java#automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1947bf61a7d94b5d9828f69cd48c3c235201fd9b45a4272e354482146fedfeb0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2c499df0d",
+    "revision": "2c499df0da395f14c011ef2dd48655c71fe0d09e",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest\" --tests \"io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest.compactToStandardActivationReplacesPhysicalBulkAndQueryCaps\" --tests \"io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest.standardToCompactActivationReplacesPhysicalBulkAndQueryCaps\" --tests \"io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest.precommitRefusalRestoresSourcePhysicalCapsAndWarmQuery\" --tests \"io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 33329
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java",
+        "classification": "assertion",
+        "detail": "standardToCompactActivationReplacesPhysicalBulkAndQueryCaps(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: standard to compact physical EMBEDDING session must carry target cap ==> expected: <5483003904> but was: <2855272448> | compactToStandardActivationReplacesPhysicalBulkAndQueryCaps(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: compact to standard physical EMBEDDING session must carry target cap ==> expected: <2855272448> but "
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java#compactToStandardActivationReplacesPhysicalBulkAndQueryCaps",
+        "classification": "assertion",
+        "detail": "compactToStandardActivationReplacesPhysicalBulkAndQueryCaps(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: compact to standard physical EMBEDDING session must carry target cap ==> expected: <2855272448> but was: <5483003904>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java#standardToCompactActivationReplacesPhysicalBulkAndQueryCaps",
+        "classification": "assertion",
+        "detail": "standardToCompactActivationReplacesPhysicalBulkAndQueryCaps(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: standard to compact physical EMBEDDING session must carry target cap ==> expected: <5483003904> but was: <2855272448>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java#precommitRefusalRestoresSourcePhysicalCapsAndWarmQuery",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java#automaticMemoryCapsDoNotRebuildAnIndexOwnerWithoutPhysicalSessions",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:34dbc56f8036952ce8713d57359b83394a61fe3647023da14015ad90260896a5"
+}

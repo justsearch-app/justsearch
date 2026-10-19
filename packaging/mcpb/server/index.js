@@ -10,13 +10,16 @@
  *   stdin  (newline-delimited JSON-RPC)  --->  POST http://127.0.0.1:<port>/mcp
  *   stdout (newline-delimited JSON-RPC)  <---  JSON or SSE response bodies
  *
- * Port discovery (in order): JUSTSEARCH_API_PORT env var, the `head.apiPort`
- * field of the runtime manifest the app writes
- * (%APPDATA%\io.justsearch.shell\runtime\manifest.json), then the default 8080.
- * A candidate counts only if GET /api/health answers. The manifest is the one
- * filesystem discovery transport (tempdoc 501 section 6 closure rule); the
- * `api-port.txt` sibling this bridge used to read stopped being written in 501
- * Phase 18, so reading it could only ever fall through to the 8080 guess.
+ * Port discovery (in order): the JUSTSEARCH_API_PORT env pin, then the runtime manifest
+ * (runtime/manifest.json) in JUSTSEARCH_DATA_DIR when set, then in the desktop app's data folder
+ * (Windows: %APPDATA%\io.justsearch.shell; Linux: $XDG_DATA_HOME or ~/.local/share, then
+ * io.justsearch.shell — see engine-discovery.cjs). A manifest counts only if its pid is alive, the
+ * service on its port, over a connection the OS says is that pid's, reports the same pid and
+ * instance (GET /api/runtime/live) and /api/health answers 200; there is no default-port
+ * guess, so an unrelated service is never picked up. Every request to the Engine goes through
+ * engine-discovery.cjs engineRequest(), which writes nothing on a new connection until the OS
+ * says its server end is the manifest pid's; when that fails, the bridge selects again (fetching
+ * that Engine's own token) and retries once.
  *
  * Fully offline by design: zero dependencies, Node builtins only, and no
  * network access beyond 127.0.0.1 — this bridge never downloads anything.
@@ -24,17 +27,11 @@
 
 'use strict';
 
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+const { describeTried, engineRequest, selectEngine, standardCandidates } = require('./engine-discovery.cjs');
 
-const DEFAULT_PORT = 8080;
 const HEALTH_TIMEOUT_MS = 2500;
 const REQUEST_TIMEOUT_MS = 300000; // long: answer/ingest calls can be slow on CPU
 const LOG_PREFIX = '[justsearch-mcpb]';
-
-const APPDATA = process.env.APPDATA || '';
-const MANIFEST_FILE = path.join(APPDATA, 'io.justsearch.shell', 'runtime', 'manifest.json');
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -46,10 +43,11 @@ function log(...args) {
 
 function actionableUnreachableMessage(tried) {
   return [
-    `${LOG_PREFIX} Could not reach a running JustSearch instance on 127.0.0.1 (tried port${tried.length === 1 ? '' : 's'}: ${tried.join(', ')}).`,
+    `${LOG_PREFIX} Could not reach a running JustSearch instance on 127.0.0.1. Tried:`,
+    ...(tried.length > 0 ? tried.map((t) => `  - ${t}`) : ['  - (no candidate location)']),
     '',
     'This connector is only a bridge: the actual MCP server runs inside the',
-    'JustSearch desktop app (Windows). To fix this:',
+    'JustSearch desktop app. To fix this:',
     '',
     '  1. Install JustSearch if you have not: download the installer from',
     '     https://github.com/justsearch-app/justsearch/releases and follow the',
@@ -58,38 +56,27 @@ function actionableUnreachableMessage(tried) {
     '  2. Launch JustSearch and wait for the window to load.',
     '  3. Retry from your MCP client (e.g. toggle the connector in Claude Desktop).',
     '',
-    `If JustSearch IS running, check which port it bound: ${MANIFEST_FILE}`,
+    'If JustSearch IS running, its runtime/manifest.json in the desktop data folder above',
     'should carry the live API port at head.apiPort, and',
     'http://127.0.0.1:<port>/api/health should answer in a browser.',
   ].join('\n');
 }
 
-function readManifestPort() {
-  try {
-    const port = JSON.parse(fs.readFileSync(MANIFEST_FILE, 'utf8'))?.head?.apiPort;
-    if (Number.isInteger(port) && port > 0 && port < 65536) return port;
-  } catch {
-    /* missing/unreadable/malformed manifest — fall through */
-  }
-  return null;
+/** The Engine the bridge talks to (engineRequest target). */
+function target() {
+  return { port: state.port, engine: state.engine };
 }
 
-function httpGet(port, urlPath, timeoutMs) {
+function healthy(port) {
   return new Promise((resolve) => {
-    const req = http.get(
-      { host: '127.0.0.1', port, path: urlPath, timeout: timeoutMs },
-      (res) => {
-        res.resume(); // drain
-        resolve(res.statusCode || 0);
-      }
-    );
+    const req = engineRequest({ port, engine: null }, { path: '/api/health', timeoutMs: HEALTH_TIMEOUT_MS }, (res) => {
+      res.resume(); // drain
+      resolve(res.statusCode === 200);
+    });
     req.on('timeout', () => req.destroy(new Error('timeout')));
-    req.on('error', () => resolve(0));
+    req.on('error', () => resolve(false));
+    req.end();
   });
-}
-
-async function healthy(port) {
-  return (await httpGet(port, '/api/health', HEALTH_TIMEOUT_MS)) === 200;
 }
 
 /**
@@ -98,10 +85,11 @@ async function healthy(port) {
  * allowed, which is exactly what lets a local MCP client bootstrap. Returns
  * null when absent/empty (dev mode / enforcement disabled).
  */
-function fetchSessionToken(port) {
+function fetchSessionToken() {
   return new Promise((resolve) => {
-    const req = http.get(
-      { host: '127.0.0.1', port, path: '/api/mcp/token', timeout: HEALTH_TIMEOUT_MS },
+    const req = engineRequest(
+      target(),
+      { path: '/api/mcp/token', timeoutMs: HEALTH_TIMEOUT_MS },
       (res) => {
         let raw = '';
         res.setEncoding('utf8');
@@ -118,21 +106,27 @@ function fetchSessionToken(port) {
     );
     req.on('timeout', () => req.destroy(new Error('timeout')));
     req.on('error', () => resolve(null));
+    req.end();
   });
 }
 
-/** Returns a live port or null. Order: env pin, runtime manifest, default 8080. */
-async function discoverPort(triedOut) {
-  const candidates = [];
+/**
+ * Returns { port, engine } or null; appends one line per location tried to triedOut.
+ * Order: JUSTSEARCH_API_PORT pin (engine null: the operator named the port), then validated
+ * runtime manifests (engine-discovery.cjs; engine is the selected candidate).
+ */
+async function discoverEngine(triedOut) {
+  const tried = triedOut || [];
   const envPort = Number.parseInt(process.env.JUSTSEARCH_API_PORT || '', 10);
-  if (Number.isInteger(envPort) && envPort > 0) candidates.push(envPort);
-  const manifestPort = readManifestPort();
-  if (manifestPort !== null) candidates.push(manifestPort);
-  candidates.push(DEFAULT_PORT);
-  const unique = [...new Set(candidates)];
-  for (const port of unique) {
-    if (triedOut && !triedOut.includes(port)) triedOut.push(port);
-    if (await healthy(port)) return port;
+  if (Number.isInteger(envPort) && envPort > 0) {
+    if (await healthy(envPort)) return { port: envPort, engine: null };
+    tried.push(`JUSTSEARCH_API_PORT=${envPort} (not responding)`);
+  }
+  const { selected, tried: folders } = await selectEngine(standardCandidates());
+  tried.push(...describeTried(folders.filter((f) => !f.ok)));
+  if (selected) {
+    log(`using the Engine in ${selected.dataDir} (${selected.source}, pid ${selected.pid}, port ${selected.port})`);
+    return { port: selected.port, engine: selected };
   }
   return null;
 }
@@ -143,6 +137,7 @@ async function discoverPort(triedOut) {
 
 const state = {
   port: null,
+  engine: null, // the validated manifest candidate behind port (null for a JUSTSEARCH_API_PORT pin)
   apiToken: null, // desktop session token (X-JustSearch-Session), if enforced
   sessionId: null, // Mcp-Session-Id from the server, if it assigns one
   protocolVersion: null, // negotiated during initialize
@@ -202,15 +197,9 @@ function postToServer(message, intercept) {
     if (state.protocolVersion) headers['mcp-protocol-version'] = state.protocolVersion;
     if (state.apiToken) headers['x-justsearch-session'] = state.apiToken;
 
-    const req = http.request(
-      {
-        host: '127.0.0.1',
-        port: state.port,
-        path: '/mcp',
-        method: 'POST',
-        headers,
-        timeout: REQUEST_TIMEOUT_MS,
-      },
+    const req = engineRequest(
+      target(),
+      { method: 'POST', path: '/mcp', headers, timeoutMs: REQUEST_TIMEOUT_MS },
       (res) => {
         const status = res.statusCode || 0;
         const newSession = res.headers['mcp-session-id'];
@@ -269,7 +258,8 @@ function postToServer(message, intercept) {
     req.on('timeout', () => req.destroy(new Error('request timeout')));
     req.on('error', (e) => {
       const err = new Error(`connection failed: ${e.message}`);
-      err.retryable = true; // ECONNREFUSED etc: app restarted / port moved
+      // ECONNREFUSED etc: app restarted / port moved; ENGINE_NOT_PROVEN: nothing was sent
+      err.retryable = true;
       reject(err);
     });
     req.write(body);
@@ -278,8 +268,8 @@ function postToServer(message, intercept) {
 }
 
 /**
- * Best-effort server->client stream (GET /mcp). Optional per spec; if the
- * server answers 405 or the stream drops, we simply go without it.
+ * Best-effort server->client stream (GET /mcp). Optional per spec; if the server answers 405,
+ * the stream drops or its connection is not proven, we simply go without it.
  */
 function openGetStream() {
   if (state.getStream) {
@@ -289,8 +279,9 @@ function openGetStream() {
   const headers = { accept: 'text/event-stream' };
   if (state.sessionId) headers['mcp-session-id'] = state.sessionId;
   if (state.protocolVersion) headers['mcp-protocol-version'] = state.protocolVersion;
-  const req = http.request(
-    { host: '127.0.0.1', port: state.port, path: '/mcp', method: 'GET', headers },
+  const req = engineRequest(
+    target(),
+    { path: '/mcp', headers },
     (res) => {
       if (res.statusCode !== 200) {
         res.resume();
@@ -314,16 +305,20 @@ function openGetStream() {
  * Throws if JustSearch is unreachable.
  */
 async function recoverConnection() {
+  state.apiToken = null; // the old token never goes to whatever is found next
+  state.engine = null;
   const tried = [];
-  const port = await discoverPort(tried);
-  if (port === null) {
+  const found = await discoverEngine(tried);
+  if (found === null) {
     const err = new Error('JustSearch unreachable');
     err.tried = tried;
     throw err;
   }
+  const { port } = found;
   state.port = port;
+  state.engine = found.engine;
   state.sessionId = null;
-  state.apiToken = await fetchSessionToken(port); // token rotates per app start
+  state.apiToken = await fetchSessionToken(); // token rotates per app start
   if (!state.initializeParams) return; // nothing to re-establish yet
 
   state.reinitCounter += 1;
@@ -393,13 +388,15 @@ function failRequest(message, text) {
 
 async function main() {
   const tried = [];
-  const port = await discoverPort(tried);
-  if (port === null) {
+  const found = await discoverEngine(tried);
+  if (found === null) {
     process.stderr.write(`${actionableUnreachableMessage(tried)}\n`);
     process.exit(1);
   }
+  const { port } = found;
   state.port = port;
-  state.apiToken = await fetchSessionToken(port);
+  state.engine = found.engine;
+  state.apiToken = await fetchSessionToken();
   log(`bridging stdio <-> http://127.0.0.1:${port}/mcp${state.apiToken ? ' (session token attached)' : ''}`);
 
   let stdinBuffer = '';

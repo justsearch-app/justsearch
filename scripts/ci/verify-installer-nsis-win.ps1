@@ -56,6 +56,7 @@ param(
   # until that field exists.
   [switch]$IncludeUpgradeArrival
 )
+. (Join-Path $PSScriptRoot "../testing/owned-process.ps1")
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -306,7 +307,7 @@ function Wait-ForBackendReady {
       continue
     }
     $workerStatus = ""
-    try { 
+    try {
       # Check components.worker.state (new API format) first, fallback to worker.status (legacy)
       if ($lastHealthJson.components -and $lastHealthJson.components.worker) {
         $workerStatus = [string]$lastHealthJson.components.worker.state
@@ -367,6 +368,7 @@ function Start-HeadlessBackend {
     -NoNewWindow `
     -RedirectStandardOutput $stdout `
     -RedirectStandardError $stderr
+  Register-FixtureProcess $proc
 
   $deadline = [DateTime]::UtcNow.AddSeconds($PortTimeoutSec)
   $port = 0
@@ -404,8 +406,8 @@ function Start-HeadlessBackend {
     # (which never gets assigned when this function throws before returning) cannot reach it.
     # Losing that cleanup would leak a java.exe on the runner every time this path fires.
     if ($proc -and -not $proc.HasExited) {
-      try { & taskkill /PID $proc.Id /T /F | Out-Null } catch {}
-      try { $proc.Kill() } catch {}
+      try { Stop-FixtureProcess $proc } catch {}
+
     }
     throw "Headless backend did not emit JUSTSEARCH_API_PORT within ${PortTimeoutSec}s. Evidence=$EvidenceFile"
   }
@@ -429,8 +431,8 @@ function Stop-HeadlessBackendAndWait {
     [int]$TimeoutSec = 30
   )
   if ($Process -and -not $Process.HasExited) {
-    try { & taskkill /PID $Process.Id /T /F | Out-Null } catch {}
-    try { $Process.Kill() } catch {}
+    try { Stop-FixtureProcess $Process } catch {}
+
   }
   $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSec)
   while ($Process -and -not $Process.HasExited -and [DateTime]::UtcNow -lt $deadline) {
@@ -528,6 +530,7 @@ try {
   # ---------------------------------------------------------------------------
   $installArgs = @("/S", "/D=$InstallDir")
   $installProc = Start-Process -FilePath $SetupExePath -ArgumentList $installArgs -Wait -PassThru
+  Register-FixtureProcess $installProc
   Assert ($installProc.ExitCode -eq 0) "NSIS installer failed (exit=$($installProc.ExitCode)). Evidence=$evidenceFile"
 
   # ---------------------------------------------------------------------------
@@ -893,8 +896,8 @@ try {
       Write-Host "PASS: Upgrade-arrival leg -- settings persisted, install-status shape present, activation did not regress to MODEL_PATH_REQUIRED."
     } finally {
       if ($upgradeProc -and -not $upgradeProc.HasExited) {
-        try { & taskkill /PID $upgradeProc.Id /T /F | Out-Null } catch {}
-        try { $upgradeProc.Kill() } catch {}
+        try { Stop-FixtureProcess $upgradeProc } catch {}
+
       }
       try { Remove-Item -LiteralPath $upgradeDataDir -Recurse -Force -ErrorAction SilentlyContinue } catch {}
     }
@@ -1003,6 +1006,7 @@ try {
     if ($installedUninstaller) {
       try {
         $u = Start-Process -FilePath $installedUninstaller.FullName -ArgumentList @("/S") -Wait -PassThru
+        Register-FixtureProcess $u
         if ($u.ExitCode -ne 0) {
           throw "Uninstaller exited with code $($u.ExitCode)"
         }
@@ -1029,7 +1033,7 @@ try {
         }
         # Cleanup so we don't strand processes on the build host.
         foreach ($p in $leaked) {
-          try { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue } catch {}
+          # Observed leak: no held start identity; never terminate it by PID.
         }
         throw "Uninstaller leaked running processes from install dir. Evidence=$evidenceFile"
       }
@@ -1062,8 +1066,8 @@ try {
 
   # Teardown headless backend (kill process tree on Windows). This is a cleanup fallback.
   if ($headlessProc -and -not $headlessProc.HasExited) {
-    try { & taskkill /PID $headlessProc.Id /T /F | Out-Null } catch {}
-    try { $headlessProc.Kill() } catch {}
+    try { Stop-FixtureProcess $headlessProc } catch {}
+
   }
 
   try { Remove-Item -LiteralPath $dataDir -Recurse -Force -ErrorAction SilentlyContinue } catch {}

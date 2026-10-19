@@ -1,0 +1,249 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-15T09:11:43.366Z",
+  "revision": "947a6a72fa6b67b09e526242f0914ccf39cd3c09",
+  "tree": "52e65a353f63904850b5b06271ff479161e6bdd5",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest\" --tests \"io.justsearch.app.api.runtime.child.LedgerReconcilerTest\" --tests \"io.justsearch.app.api.runtime.child.EngineWrittenChildrenFixtureTest\" --tests \"io.justsearch.app.api.runtime.RuntimeManifestIncarnationTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 31118
+    },
+    {
+      "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.memory.NvmlVramProbeTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6303
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeManifestIncarnationPublishTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 25435
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:90103aea1a2743a5f73f257d9fc979b0f45c0b9096a2da9afaf1e6b99776e9d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Manifest adapter: a child is registered while it runs and removed at its exit",
+          "status": "passed"
+        },
+        {
+          "name": "T7: a terminator that never kills gives SURVIVED after 10 s; the retry succeeds",
+          "status": "passed"
+        },
+        {
+          "name": "aSelfTestThatSurvivedItsStopBlocksTheMainServer()",
+          "status": "passed"
+        },
+        {
+          "name": "T9: a throwing ledger never blocks the stop; the outcome says the record was lost",
+          "status": "passed"
+        },
+        {
+          "name": "pathPrefixGoesInFrontOfTheInheritedPath()",
+          "status": "passed"
+        },
+        {
+          "name": "childStartRecordsWhetherTheChildIsInTheEngineJob()",
+          "status": "passed"
+        },
+        {
+          "name": "T13: with no probe the release is UNMEASURED",
+          "status": "passed"
+        },
+        {
+          "name": "T8: the stop-intent is on disk before terminate() is called",
+          "status": "passed"
+        },
+        {
+          "name": "T13: QUIT, UPGRADE and ENGINE_RESTART skip the GPU poll",
+          "status": "passed"
+        },
+        {
+          "name": "T2: a child that exits by itself between the intent and the terminate is UNEXPECTED",
+          "status": "passed"
+        },
+        {
+          "name": "aChatServerStartWaitsForAStopStillRunning()",
+          "status": "passed"
+        },
+        {
+          "name": "T13: no release within 5 s is TIMEOUT, and fails nothing",
+          "status": "passed"
+        },
+        {
+          "name": "T4: eight concurrent stops write one intent and share one outcome; the first wins",
+          "status": "passed"
+        },
+        {
+          "name": "T6: stopAll of three children shares one 2 s grace (under 3 s in total)",
+          "status": "passed"
+        },
+        {
+          "name": "Manifest adapter: a refused registration stops the child (ROLLBACK) and throws",
+          "status": "passed"
+        },
+        {
+          "name": "T3: stopping an exited child returns its recorded UNEXPECTED exit and writes nothing",
+          "status": "passed"
+        },
+        {
+          "name": "T5: COOPERATIVE stops: eof:0 is REQUESTED unforced, ignore-eof forced, eof:3 UNEXPECTED",
+          "status": "passed"
+        },
+        {
+          "name": "T9: a failed intent write is a ledger-gap on the next write; the stop proceeds",
+          "status": "passed"
+        },
+        {
+          "name": "T4: NOW escalates a pending COOPERATIVE stop at once, with stop-escalate",
+          "status": "passed"
+        },
+        {
+          "name": "T13: without an expected size, two stable samples after a drop are a recovery",
+          "status": "passed"
+        },
+        {
+          "name": "T13: the GPU poll recovers at sample 3 (75% of the expected release)",
+          "status": "passed"
+        },
+        {
+          "name": "aChatServerRollbackSurvivorBlocksEveryChatServerStart()",
+          "status": "passed"
+        },
+        {
+          "name": "T14: start(gpu) and awaitGpuRelease wait for a pending poll",
+          "status": "passed"
+        },
+        {
+          "name": "exitWhileRegisteringRemovesTheEntry()",
+          "status": "passed"
+        },
+        {
+          "name": "T1: stop(NOW) is REQUESTED with our code, one intent before the terminate, one exit",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LedgerReconcilerTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/LedgerReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:759c19c2c1b6db2610e4bd9b946a9f97eced127b4d969e99d34df362eaba5301",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "T10: a reused PID (same pid, other start) is GONE, not the recorded child",
+          "status": "passed"
+        },
+        {
+          "name": "T10: gone → OWNER_DIED; alive and matching → child-survived, untouched; start unreadable → UNKNOWN; a second boot writes nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/EngineWrittenChildrenFixtureTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/EngineWrittenChildrenFixtureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1df3dbf940616725d460256d0e2a73c476d393fc50a49ab6917e2735211e1e24",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "openForEngine writes the extraction outcomes the committed fixture records",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/RuntimeManifestIncarnationTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/RuntimeManifestIncarnationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9242cae17def2a5fd82548d4e8fae7c1094c04cc62a099ea3fa280a4e3212fb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the supervisor's <session>/<n> parses; anything else is no incarnation",
+          "status": "passed"
+        },
+        {
+          "name": "the incarnation round-trips, is public, and is omitted when absent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/memory/NvmlVramProbeTest.java",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/memory/NvmlVramProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:78929ce72f1e56aaec859ce975fe47e4be23f76d1cea47dac86ed26215789cc8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readsAdapterUsedBytesOfTheOneDevice()",
+          "status": "passed"
+        },
+        {
+          "name": "anythingNvmlCannotMapIsNoReading()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestIncarnationPublishTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestIncarnationPublishTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ad84d5af51f40a021f8357f5fd26d2f82296d31699785ce63861d4a248517c17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "manifestCarriesTheIncarnationFromTheFirstWrite()",
+          "status": "passed"
+        },
+        {
+          "name": "unsupervisedEngineWritesNoIncarnation()",
+          "status": "passed"
+        },
+        {
+          "name": "theEngineReadsItsIncarnationThroughTheConfigurationRegistry()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:10e3706fab65498a8e751bb2bf07d23a79faae22ccee1718d40db5af3f03f9b9"
+}

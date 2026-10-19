@@ -158,6 +158,27 @@ export function actuatorCases(row = engineRow()) {
 }
 
 /**
+ * Spec F §7.2: the lifecycle phases a case can drive besides `actuator`. Each adapter declares the
+ * phases it implements (`export const phases`); until Spec F step 12 makes a missing phase fail the
+ * harness, `run.mjs` names the cases an adapter does not drive on every run instead of passing over
+ * them in silence.
+ */
+export const LIFECYCLE_PHASES = Object.freeze(['start', 'discovery', 'quit', 'kill']);
+
+/** Cases that drive one of the lifecycle phases. */
+export function lifecycleCases(row = engineRow()) {
+  return allCases(row).filter((c) => (c.drives ?? []).some((d) => LIFECYCLE_PHASES.includes(d)));
+}
+
+/** The cases an adapter that implements `phases` runs: every actuator case, plus its lifecycle phases. */
+export function casesForAdapter(phases = [], row = engineRow(), adapterName = null) {
+  return allCases(row).filter((c) => (!c.adapters || c.adapters.includes(adapterName))
+    && ((c.drives ?? []).includes('actuator')
+      || (c.drives ?? []).some((d) => LIFECYCLE_PHASES.includes(d) && phases.includes(d))
+));
+}
+
+/**
  * The fake engine's per-incarnation plan for a case — shared by BOTH adapters.
  *
  * Shared, and not copied into each adapter, for the same reason the case list is: two adapters with
@@ -165,9 +186,9 @@ export function actuatorCases(row = engineRow()) {
  * how its implementation is started and observed; what the case means is the register's, and this
  * is the last piece of that meaning that could not be expressed as data.
  *
- * `exitAfterMs` on the faulting incarnation is generous (1500 ms) because of a real constraint
- * rather than padding: both supervisors have to reach `running` before the fault, or the case is
- * exercising the START path and not the supervisor.
+ * Both supervisors must reach `running` before the first fault. The dev-runner adapter acknowledges
+ * that observation to the fixture before its timers start; a delay from socket publication alone
+ * cannot guarantee this on Windows. The configured delays still apply after that acknowledgment.
  */
 export function enginePlanFor(testCase) {
   if (testCase.enginePlan) return testCase.enginePlan;

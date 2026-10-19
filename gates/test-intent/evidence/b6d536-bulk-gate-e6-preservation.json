@@ -1,0 +1,177 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T17:45:52.305Z",
+  "revision": "79b5e2e253bb03add7ced0b0774b69b819aa1717",
+  "tree": "0d3207b25ed3fb1e7e4a7bba38e9405c31c717c3",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:core:test --tests \"io.justsearch.core.component.DeviceMemoryLineTest.choosesBesideOnlyFromMeasuredFreeMemoryAndAppliesBothCeilingAxes\" --tests \"io.justsearch.core.component.DeviceMemoryLineTest.unknownOrZeroFreeMemoryDoesNotAuthorizeCoResidentComposition\" --tests \"io.justsearch.core.component.DeviceMemoryLineTest.retiresTheSourceOnlyWhenItsReleaseCanMakeTheCandidateFit\" --tests \"io.justsearch.core.component.DeviceMemoryLineTest.unknownMemoryEvidenceNeverAuthorizesSourceRetirement\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3102
+    },
+    {
+      "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.GpuCapabilitiesServiceTest.nvmlWithGpu_winsWithHighConfidence\" --tests \"io.justsearch.gpu.GpuCapabilitiesServiceTest.nvmlDeviceCountDrivesPrecedence_notTotalVram\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5388
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/core/src/test/java/io/justsearch/core/component/DeviceMemoryLineTest.java#choosesBesideOnlyFromMeasuredFreeMemoryAndAppliesBothCeilingAxes",
+      "file": "modules/core/src/test/java/io/justsearch/core/component/DeviceMemoryLineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e5e76841cc2e663d55879739389ec53026a6eeee9c0570b7908335d3fe05798",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "choosesBesideOnlyFromMeasuredFreeMemoryAndAppliesBothCeilingAxes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/core/src/test/java/io/justsearch/core/component/DeviceMemoryLineTest.java#unknownOrZeroFreeMemoryDoesNotAuthorizeCoResidentComposition",
+      "file": "modules/core/src/test/java/io/justsearch/core/component/DeviceMemoryLineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e5e76841cc2e663d55879739389ec53026a6eeee9c0570b7908335d3fe05798",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unknownOrZeroFreeMemoryDoesNotAuthorizeCoResidentComposition()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/core/src/test/java/io/justsearch/core/component/DeviceMemoryLineTest.java#retiresTheSourceOnlyWhenItsReleaseCanMakeTheCandidateFit",
+      "file": "modules/core/src/test/java/io/justsearch/core/component/DeviceMemoryLineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e5e76841cc2e663d55879739389ec53026a6eeee9c0570b7908335d3fe05798",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retiresTheSourceOnlyWhenItsReleaseCanMakeTheCandidateFit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/core/src/test/java/io/justsearch/core/component/DeviceMemoryLineTest.java#unknownMemoryEvidenceNeverAuthorizesSourceRetirement",
+      "file": "modules/core/src/test/java/io/justsearch/core/component/DeviceMemoryLineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5e5e76841cc2e663d55879739389ec53026a6eeee9c0570b7908335d3fe05798",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unknownMemoryEvidenceNeverAuthorizesSourceRetirement()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/GpuCapabilitiesServiceTest.java#nvmlWithGpu_winsWithHighConfidence",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/GpuCapabilitiesServiceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c26e23a5d8090e2ef83e81e188af689c888f0d9dde5ad631ca83fa6960140ec3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nvmlWithGpu_winsWithHighConfidence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/GpuCapabilitiesServiceTest.java#nvmlDeviceCountDrivesPrecedence_notTotalVram",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/GpuCapabilitiesServiceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c26e23a5d8090e2ef83e81e188af689c888f0d9dde5ad631ca83fa6960140ec3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nvmlDeviceCountDrivesPrecedence_notTotalVram()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "79b5e2e25",
+    "revision": "79b5e2e253bb03add7ced0b0774b69b819aa1717",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:core:test --tests \"io.justsearch.core.component.DeviceMemoryLineTest.choosesBesideOnlyFromMeasuredFreeMemoryAndAppliesBothCeilingAxes\" --tests \"io.justsearch.core.component.DeviceMemoryLineTest.unknownOrZeroFreeMemoryDoesNotAuthorizeCoResidentComposition\" --tests \"io.justsearch.core.component.DeviceMemoryLineTest.retiresTheSourceOnlyWhenItsReleaseCanMakeTheCandidateFit\" --tests \"io.justsearch.core.component.DeviceMemoryLineTest.unknownMemoryEvidenceNeverAuthorizesSourceRetirement\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 5867
+      },
+      {
+        "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.GpuCapabilitiesServiceTest.nvmlWithGpu_winsWithHighConfidence\" --tests \"io.justsearch.gpu.GpuCapabilitiesServiceTest.nvmlDeviceCountDrivesPrecedence_notTotalVram\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 13007
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/core/src/test/java/io/justsearch/core/component/DeviceMemoryLineTest.java#choosesBesideOnlyFromMeasuredFreeMemoryAndAppliesBothCeilingAxes",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/core/src/test/java/io/justsearch/core/component/DeviceMemoryLineTest.java#unknownOrZeroFreeMemoryDoesNotAuthorizeCoResidentComposition",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/core/src/test/java/io/justsearch/core/component/DeviceMemoryLineTest.java#retiresTheSourceOnlyWhenItsReleaseCanMakeTheCandidateFit",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/core/src/test/java/io/justsearch/core/component/DeviceMemoryLineTest.java#unknownMemoryEvidenceNeverAuthorizesSourceRetirement",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/GpuCapabilitiesServiceTest.java#nvmlWithGpu_winsWithHighConfidence",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/GpuCapabilitiesServiceTest.java#nvmlDeviceCountDrivesPrecedence_notTotalVram",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:a3feacc698fa235b03da515f14151ad14393aefc425a1c8aa33f2725fadc7b8d"
+}

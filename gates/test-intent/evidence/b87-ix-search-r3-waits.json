@@ -1,0 +1,126 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T22:14:15.849Z",
+  "revision": "8bde08e9a6d9f5d4d40c4315ad825efeecceb46b",
+  "tree": "bd0ade78a1e78bce5a71111e53f00e153579e7ae",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.timelyHybridWithUnavailableProviderKeepsLoadingCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.timelyAutoWithUnavailableProviderKeepsLoadingCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.seatedHybridWithModelsLoadingKeepsLoadingCause\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 30446
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#timelyHybridWithUnavailableProviderKeepsLoadingCause",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "timelyHybridWithUnavailableProviderKeepsLoadingCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#timelyAutoWithUnavailableProviderKeepsLoadingCause",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d9ba7f61c3f029008729b922749c08ff15a201edcb3dea375d6d66a343c768bd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "timelyAutoWithUnavailableProviderKeepsLoadingCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09afcab3b6fc6a8f3f6651463d7e966fa8f42bd117a8d6032dbda7f1a1cb7fca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#seatedHybridWithModelsLoadingKeepsLoadingCause",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8757e9b803eaac36c63149db1da10c9fbf4a86dc2f47bea91127cf8ae86d4a13",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "seatedHybridWithModelsLoadingKeepsLoadingCause()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "61ff9b955",
+    "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.timelyHybridWithUnavailableProviderKeepsLoadingCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedUnavailableTest.timelyAutoWithUnavailableProviderKeepsLoadingCause\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceQueuedLoadingTest.seatedHybridWithModelsLoadingKeepsLoadingCause\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 39881
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#timelyHybridWithUnavailableProviderKeepsLoadingCause",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#timelyAutoWithUnavailableProviderKeepsLoadingCause",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#seatedHybridWithModelsLoadingKeepsLoadingCause",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:87cb87cffe8a87c83247d61a557cca95cf681bbf3cdfb1bf89121df7c95a5df8"
+}

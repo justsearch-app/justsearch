@@ -64,7 +64,24 @@ public record SearchTrace(
       boolean hybridFallback,
       String hybridFallbackReason,
       boolean spladeExecuted,
-      String spladeSkipReason) {}
+      String spladeSkipReason,
+      // Spec D §6.1: why a leg missed its semantic sub-budget ("contended", "loading" or
+      // "stuck"); present only with the reason SEMANTIC_BUDGET_EXCEEDED.
+      String hybridFallbackCause,
+      String spladeSkipCause) {
+
+    /** A degradation without semantic budget causes. */
+    public Degradation(
+        boolean vectorBlocked,
+        String vectorBlockedReason,
+        boolean hybridFallback,
+        String hybridFallbackReason,
+        boolean spladeExecuted,
+        String spladeSkipReason) {
+      this(vectorBlocked, vectorBlockedReason, hybridFallback, hybridFallbackReason,
+          spladeExecuted, spladeSkipReason, null, null);
+    }
+  }
 
   /**
    * The closed, core-owned vocabulary of pipeline stages (tempdoc 549 principle 2; closed per

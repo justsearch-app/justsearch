@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ort;
 
+import io.justsearch.configuration.NativeTargets;
 import io.justsearch.configuration.EnvRegistry;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -30,8 +31,7 @@ public final class GpuAutoDetection {
   /** Relative path under the repo root where ORT CUDA DLLs are conventionally placed. */
   private static final String CUDA_DIR_RELATIVE = "tmp/ort-variant-test/cuda-12.4-v1.24.3";
 
-  /** Sentinel DLL — if this exists, the CUDA runtime is present. */
-  private static final String SENTINEL_DLL = "onnxruntime_providers_cuda.dll";
+
 
   private GpuAutoDetection() {}
 
@@ -51,12 +51,8 @@ public final class GpuAutoDetection {
    * @return map of config keys to auto-detected values, or empty map if no CUDA capability found
    */
   public static Map<String, String> probe(Path repoRoot) {
-    if (!isWindows()) {
-      // CUDA DLL detection is Windows-specific. On Linux/macOS, ORT uses .so/.dylib with
-      // different discovery mechanisms. Return empty — let explicit config handle it.
-      return Map.of();
-    }
-
+    if (!io.justsearch.configuration.PlatformPaths.isWindows() && !io.justsearch.configuration.PlatformPaths.isLinux()) return Map.of();
+    if (NativeTargets.currentIfSupported().isEmpty()) return Map.of();
     Map<String, String> result = new LinkedHashMap<>();
 
     // Check if ORT native path is already explicitly configured.
@@ -76,8 +72,9 @@ public final class GpuAutoDetection {
             nativePath,
             missing);
       }
-      // Explicit path set but no CUDA DLLs found — don't auto-enable, respect explicit config.
-      return Map.of();
+      // Windows preserves its self-contained-directory check. Linux operator paths may hold
+      // only CUDA dependencies; ORT's JNI/providers still come from the bundled jar.
+      if (io.justsearch.configuration.PlatformPaths.isWindows()) return Map.of();
     }
 
     // Search conventional locations.
@@ -132,7 +129,7 @@ public final class GpuAutoDetection {
    * </ol>
    */
   private static Path searchConventionalPaths(Path repoRoot) {
-    if (repoRoot == null) return null;
+    if (!io.justsearch.configuration.PlatformPaths.isWindows() || repoRoot == null) return null;
 
     // Direct check under provided repo root.
     Path candidate = repoRoot.resolve(CUDA_DIR_RELATIVE);
@@ -177,10 +174,7 @@ public final class GpuAutoDetection {
   }
 
   private static boolean hasSentinelDll(Path dir) {
-    return dir != null && Files.isDirectory(dir) && Files.exists(dir.resolve(SENTINEL_DLL));
+    return dir != null && Files.isDirectory(dir) && Files.exists(dir.resolve(NativeTargets.current().libraryName("ort-cuda")));
   }
 
-  private static boolean isWindows() {
-    return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
-  }
 }

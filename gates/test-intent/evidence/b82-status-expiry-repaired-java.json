@@ -1,0 +1,197 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-13T15:16:08.445Z",
+  "revision": "98cad099f27ce769f501104885c05883b272b666",
+  "tree": "75d3c079e892d43c665eb905e498e70c09ba388a",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.settings.SettingsResetCoordinatorTest.confirmedRecoveryResetCompletesAndAdvancesTheStatusCounterOnce\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10770
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusReadDeadlineHttpTest.heldSlowLanesKeepTheirLastRealValueAcrossReadDeadlinesAndAgeOnlyByTheirOwnPeriod\" --tests \"io.justsearch.ui.api.StatusReadDeadlineHttpTest.cachedProbeAnswersKeepTheirRealProbeTime\" --tests \"io.justsearch.ui.api.StatusReadDeadlineHttpTest.freshDeadlineDetachesOutstandingObservationWaiters\" --tests \"io.justsearch.ui.api.StatusReadDeadlineHttpTest.samplerPassesLeaveNoWaitersOnAHeldLane\" --tests \"io.justsearch.ui.api.StatusProbeCadenceTest.aLaneWhoseProbeTakesAboutOnePeriodStaysFreshWhileItKeepsSamplingOnItsCadence\" --tests \"io.justsearch.ui.api.StatusGpuReadingAgeTest.aPublishedGpuReadingAgedByTheThreeStackedTwoSecondDelaysIsNotStale\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 70705
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsResetCoordinatorTest.java#confirmedRecoveryResetCompletesAndAdvancesTheStatusCounterOnce",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsResetCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:41d2ad089989ac761062f8577d73a748bc6527be44246efa110eb597a6ea4228",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "confirmedRecoveryResetCompletesAndAdvancesTheStatusCounterOnce()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadDeadlineHttpTest.java#heldSlowLanesKeepTheirLastRealValueAcrossReadDeadlinesAndAgeOnlyByTheirOwnPeriod",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadDeadlineHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a2d3b634f36ee051c9b86315a8e2ca7a9ceb2cd8960bf50352fcae2b5abe398e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "heldSlowLanesKeepTheirLastRealValueAcrossReadDeadlinesAndAgeOnlyByTheirOwnPeriod()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadDeadlineHttpTest.java#cachedProbeAnswersKeepTheirRealProbeTime",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadDeadlineHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a2d3b634f36ee051c9b86315a8e2ca7a9ceb2cd8960bf50352fcae2b5abe398e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cachedProbeAnswersKeepTheirRealProbeTime()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadDeadlineHttpTest.java#freshDeadlineDetachesOutstandingObservationWaiters",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadDeadlineHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a2d3b634f36ee051c9b86315a8e2ca7a9ceb2cd8960bf50352fcae2b5abe398e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "freshDeadlineDetachesOutstandingObservationWaiters()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadDeadlineHttpTest.java#samplerPassesLeaveNoWaitersOnAHeldLane",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadDeadlineHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a2d3b634f36ee051c9b86315a8e2ca7a9ceb2cd8960bf50352fcae2b5abe398e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "samplerPassesLeaveNoWaitersOnAHeldLane()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusProbeCadenceTest.java#aLaneWhoseProbeTakesAboutOnePeriodStaysFreshWhileItKeepsSamplingOnItsCadence",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusProbeCadenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9b66bc10015d0b8f442842af09422cd68bff2b01273e157f805629af513ad602",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLaneWhoseProbeTakesAboutOnePeriodStaysFreshWhileItKeepsSamplingOnItsCadence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusGpuReadingAgeTest.java#aPublishedGpuReadingAgedByTheThreeStackedTwoSecondDelaysIsNotStale",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusGpuReadingAgeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5f54b1435f9becbed051dfd51ab12ea16bbf7d28d627e7d5050fc69b81d0ec5e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPublishedGpuReadingAgedByTheThreeStackedTwoSecondDelaysIsNotStale()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "98cad099f",
+    "revision": "98cad099f27ce769f501104885c05883b272b666",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.settings.SettingsResetCoordinatorTest.confirmedRecoveryResetCompletesAndAdvancesTheStatusCounterOnce\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 65487
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusReadDeadlineHttpTest.heldSlowLanesKeepTheirLastRealValueAcrossReadDeadlinesAndAgeOnlyByTheirOwnPeriod\" --tests \"io.justsearch.ui.api.StatusReadDeadlineHttpTest.cachedProbeAnswersKeepTheirRealProbeTime\" --tests \"io.justsearch.ui.api.StatusReadDeadlineHttpTest.freshDeadlineDetachesOutstandingObservationWaiters\" --tests \"io.justsearch.ui.api.StatusReadDeadlineHttpTest.samplerPassesLeaveNoWaitersOnAHeldLane\" --tests \"io.justsearch.ui.api.StatusProbeCadenceTest.aLaneWhoseProbeTakesAboutOnePeriodStaysFreshWhileItKeepsSamplingOnItsCadence\" --tests \"io.justsearch.ui.api.StatusGpuReadingAgeTest.aPublishedGpuReadingAgedByTheThreeStackedTwoSecondDelaysIsNotStale\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 42750
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsResetCoordinatorTest.java#confirmedRecoveryResetCompletesAndAdvancesTheStatusCounterOnce",
+        "classification": "assertion",
+        "detail": "confirmedRecoveryResetCompletesAndAdvancesTheStatusCounterOnce(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a committed recovery reset must not fail after replacing the durable settings ==> Unexpected exception thrown: java.lang.NullPointerException: Cannot invoke \"io.justsearch.app.api.UiSettings.getChatEnabled()\" because \"active.priorSettings\" is null"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadDeadlineHttpTest.java#heldSlowLanesKeepTheirLastRealValueAcrossReadDeadlinesAndAgeOnlyByTheirOwnPeriod",
+        "classification": "assertion",
+        "detail": "heldSlowLanesKeepTheirLastRealValueAcrossReadDeadlinesAndAgeOnlyByTheirOwnPeriod(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a read deadline must not replace the last real disk-encryption value ==> expected: <NOT_ENCRYPTED> but was: <UNKNOWN>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadDeadlineHttpTest.java#cachedProbeAnswersKeepTheirRealProbeTime",
+        "classification": "assertion",
+        "detail": "cachedProbeAnswersKeepTheirRealProbeTime(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a cached answer keeps its probe time, not the refresh time: age 9 ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadDeadlineHttpTest.java#freshDeadlineDetachesOutstandingObservationWaiters",
+        "classification": "assertion",
+        "detail": "freshDeadlineDetachesOutstandingObservationWaiters(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: fresh reads answered at their deadline must not stay attached to the held lane: 21 waiters after 20 reads ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadDeadlineHttpTest.java#samplerPassesLeaveNoWaitersOnAHeldLane",
+        "classification": "assertion",
+        "detail": "samplerPassesLeaveNoWaitersOnAHeldLane(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: sampler passes must not stay attached to the held lane: 2 waiters after 2 passes ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusProbeCadenceTest.java#aLaneWhoseProbeTakesAboutOnePeriodStaysFreshWhileItKeepsSamplingOnItsCadence",
+        "classification": "assertion",
+        "detail": "aLaneWhoseProbeTakesAboutOnePeriodStaysFreshWhileItKeepsSamplingOnItsCadence(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a lane whose probe takes about one period and samples every 4000 ms must not read stale: age 5050 ms at 5050 ms ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusGpuReadingAgeTest.java#aPublishedGpuReadingAgedByTheThreeStackedTwoSecondDelaysIsNotStale",
+        "classification": "assertion",
+        "detail": "aPublishedGpuReadingAgedByTheThreeStackedTwoSecondDelaysIsNotStale(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a GPU reading aged only by the three stacked 2 s delays (6100 ms) is current while it keeps arriving on that cadence ==> expected: <false> but was: <true>"
+      }
+    ]
+  },
+  "digest": "sha256:97de979bbf3c10c5723051a12ea6c50c462b9e313fa9ff4a23cb15f27ad19364"
+}

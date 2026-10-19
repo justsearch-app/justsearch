@@ -1,0 +1,142 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-14T16:11:43.961Z",
+  "revision": "b599d4d7e0c07e00d1ebdff61cad6bd9a3c3a79d",
+  "tree": "11dc83fb852a2c63dc44d3ea723daf4ed827a253",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.splade.SeatForEveryGpuRunTest.atMostOneNativeRunIsInFlightOnTheDevice\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13459
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleDeviceMemoryGuardTest.everyGpuRolesPolicyHasShrinkageOnForItsDevice\" --tests \"io.justsearch.ort.NativeSessionHandleDeviceMemoryGuardTest.plainPinnedAndDeadlineGpuRunsPassTheHandlesRunOptions\" --tests \"io.justsearch.ort.NativeSessionHandleDeviceMemoryGuardTest.cpuSessionsAreCreatedWithoutTheCudaProviderAndAreNeverSeated\" --tests \"io.justsearch.ort.NativeSessionHandleDeviceMemoryGuardTest.withTheBreakerHeldOpenQueryLegsRunOnTheWarmCpuWithCauseStuckOrAreTurnedAway\" --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.resolvedGpuPoliciesKeepWeightsInTheArenaWithSameAsRequestedAndNoPatternOptimisation\" --tests \"io.justsearch.ort.NativeSessionHandlePlannedFp32Test.outsidePlannedProfilesTheFp32FallbackOnTheGpuIsUnchanged\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4843
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/SeatForEveryGpuRunTest.java#atMostOneNativeRunIsInFlightOnTheDevice",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/splade/SeatForEveryGpuRunTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:05413491b9366eb24f69812f583b97b5952f05637119d1987f77ab538f627f57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "atMostOneNativeRunIsInFlightOnTheDevice()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceMemoryGuardTest.java#everyGpuRolesPolicyHasShrinkageOnForItsDevice",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceMemoryGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c107b65e9e464d8b9d554cf5248290e7a51a52012d3fb96d741ae4d31328d481",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyGpuRolesPolicyHasShrinkageOnForItsDevice()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceMemoryGuardTest.java#plainPinnedAndDeadlineGpuRunsPassTheHandlesRunOptions",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceMemoryGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c107b65e9e464d8b9d554cf5248290e7a51a52012d3fb96d741ae4d31328d481",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "plainPinnedAndDeadlineGpuRunsPassTheHandlesRunOptions()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceMemoryGuardTest.java#cpuSessionsAreCreatedWithoutTheCudaProviderAndAreNeverSeated",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceMemoryGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c107b65e9e464d8b9d554cf5248290e7a51a52012d3fb96d741ae4d31328d481",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cpuSessionsAreCreatedWithoutTheCudaProviderAndAreNeverSeated()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceMemoryGuardTest.java#withTheBreakerHeldOpenQueryLegsRunOnTheWarmCpuWithCauseStuckOrAreTurnedAway",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceMemoryGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c107b65e9e464d8b9d554cf5248290e7a51a52012d3fb96d741ae4d31328d481",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withTheBreakerHeldOpenQueryLegsRunOnTheWarmCpuWithCauseStuckOrAreTurnedAway()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#resolvedGpuPoliciesKeepWeightsInTheArenaWithSameAsRequestedAndNoPatternOptimisation",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5ea6719c0b0454bce7c00607697218ba87b3cf940c2c23fa09eeb4e30671610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "resolvedGpuPoliciesKeepWeightsInTheArenaWithSameAsRequestedAndNoPatternOptimisation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java#outsidePlannedProfilesTheFp32FallbackOnTheGpuIsUnchanged",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandlePlannedFp32Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5ea6719c0b0454bce7c00607697218ba87b3cf940c2c23fa09eeb4e30671610",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "outsidePlannedProfilesTheFp32FallbackOnTheGpuIsUnchanged()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:eec1bd5afe3677e7b19f62cc639f9ae7d898ade1e627933cd8f6af9f5901e1b5"
+}

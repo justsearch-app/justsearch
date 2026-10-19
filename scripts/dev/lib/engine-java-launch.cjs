@@ -26,20 +26,32 @@ function splitJvmOptions(text = '') {
   return args;
 }
 
-function engineJavaLaunch({ startScript, javaHome, javaOpts = '', uiOpts = '', platform = process.platform }) {
-  // POSIX launchers exec the JVM, preserving PID and their ulimit setup.
-  if (platform !== 'win32') return { command: startScript, args: [], shell: false, windowsHide: true };
+function engineJavaLaunch({ startScript, javaHome, javaOpts = '', uiOpts = '', hotReload = null, platform = process.platform }) {
   const bin = path.dirname(startScript);
+  // Gradle generates both launchers on both OSes; the batch defaults are already argv quoted.
   const script = fs.readFileSync(path.join(bin, 'ui.bat'), 'utf8');
   const defaults = script.match(/^set DEFAULT_JVM_OPTS=(.*)$/m);
   const entry = script.match(/-classpath "%CLASSPATH%" ([\w.$]+) %\*/);
   if (!defaults || !entry) throw new Error('Installed Engine launch script has an unsupported shape');
-  return {
-    command: path.join(javaHome, 'bin', platform === 'win32' ? 'java.exe' : 'java'),
-    args: [...splitJvmOptions(defaults[1]), ...splitJvmOptions(javaOpts),
-      ...splitJvmOptions(uiOpts), '-classpath', path.resolve(bin, '..', 'lib', '*'), entry[1]],
-    shell: false,
-    windowsHide: true,
+  const jars = path.resolve(bin, '..', 'lib', '*');
+  const classpath = hotReload?.enabled && hotReload.classesDir
+    ? `${hotReload.classesDir}${platform === 'win32' ? ';' : ':'}${jars}` : jars;
+  const unix = platform === 'win32' ? null : fs.readFileSync(startScript, 'utf8');
+  const unixDefaults = unix?.match(/^DEFAULT_JVM_OPTS=(.*)$/m);
+  if (unix && !unixDefaults) throw new Error('Installed Engine launch script has an unsupported shape');
+  const defaultArgs = unix ? splitJvmOptions(splitJvmOptions(unixDefaults[1])[0] ?? '') : splitJvmOptions(defaults[1]);
+  const args = [...defaultArgs, ...splitJvmOptions(javaOpts),
+    ...splitJvmOptions(uiOpts), '-classpath', classpath, entry[1]];
+  if (platform === 'win32') return {
+    command: path.join(javaHome, 'bin', 'java.exe'), args, shell: false, windowsHide: true,
   };
+  // Run the installed launcher's unchanged setup, including its ulimit policy, with $0 set to
+  // its real path. Replace only Gradle's argv assembly: shell expansion never sees our JVM argv.
+  const assembly = unix.search(/^set -- /m);
+  if (assembly < 0 || !unix.slice(0, assembly).includes('JAVACMD=')) {
+    throw new Error('Installed Engine launch script has an unsupported shape');
+  }
+  return { command: '/bin/sh', args: ['-c', `${unix.slice(0, assembly)}\nexec "$JAVACMD" "$@"\n`, startScript, ...args],
+    shell: false, windowsHide: true };
 }
 module.exports = { engineJavaLaunch, splitJvmOptions };
