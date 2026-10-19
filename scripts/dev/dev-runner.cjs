@@ -708,7 +708,7 @@ function createPresenceMonitor({
   const full = async (owner) => ownerPresence.ownerLiveness(owner, { table: await readTable(), now: now() }).state;
   return async function evaluate(current, declaredHoldMs) {
     const owner = current?.holder?.owner ?? null;
-    if (!owner?.key || !owner.pid || !owner.creationTime) {
+    if (!owner?.key || !owner.pid || (!owner.creationTime && !processIdentity.linuxIdentity(owner))) {
       return { action: 'renew', reason: 'owner unknown; never reaped on that basis' };
     }
     ticks += 1;

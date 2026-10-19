@@ -367,7 +367,8 @@ function pruneOwnerRecords(stateRoot, { table, now = Date.now(), keep = new Set(
  */
 function holderNeedsTable(active, callerIdentity) {
   const o = holderOwner(active);
-  return !!(o && Number.isInteger(Number(o.pid)) && Number(o.pid) > 0 && o.creationTime && !isSelf(active, callerIdentity));
+  return !!(o && Number.isInteger(Number(o.pid)) && Number(o.pid) > 0
+    && (o.creationTime || linuxIdentity(o)) && !isSelf(active, callerIdentity));
 }
 
 /**

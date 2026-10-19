@@ -153,10 +153,14 @@ function devRunnerEnvFor(identity) {
 }
 
 /**
- * Holder liveness for an advisory read (quick_health, staleness): a cheap pid-exists check. A
- * reused pid can read as alive here; decisions (start, stop, reload, acquire) use 'full'.
+ * Holder liveness for an advisory read (quick_health, staleness). Linux uses birth evidence so a
+ * reused pid or previous boot cannot keep an ended owner alive. Windows retains its cheap
+ * pid-exists check; decisions (start, stop, reload, acquire) always use 'full'.
  */
-function cheapLiveness(owner) {
+async function cheapLiveness(owner) {
+  if (owner?.processIdentity) {
+    return ownerPresence.ownerLiveness(owner, { table: await agentIdentity.readTableAsync() });
+  }
   const p = ownerPresence.ownerPidPresence(owner);
   if (!owner?.creationTime) return { state: 'unknown', reason: 'owner has no process identity' };
   if (p === 'absent') return { state: 'ended', reason: 'owner pid is gone' };
@@ -228,14 +232,14 @@ export async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, c
   // `distFrom` launch is not reported as a mismatch against the caller it was launched from.
   const leaseProv = active.provenance || null;
   const provenanceMismatch = computeProvenanceMismatch(leaseProv, callerRepoRoot);
-  // Presence of the holder: full pid + creation-time evidence for decisions, a cheap pid check for
-  // advisory reads. A holder with no owner block (every pre-change record) is an unknown owner.
+  // Presence of the holder: full birth evidence for decisions and Linux advisory reads, a cheap
+  // Windows pid check for advisory reads. A holder with no owner block is an unknown owner.
   const holderOwner = ownerPresence.holderOwner(active);
   let table = null;
   let liveness = null;
   if (ownerPresence.holderNeedsTable(active, callerIdentity)) {
     if (evidence === 'full') table = await agentIdentity.readTableAsync();
-    else liveness = cheapLiveness(holderOwner);
+    else liveness = await cheapLiveness(holderOwner);
   }
   let { decision } = ownerPresence.computeOwnerVerdict({
     active, callerIdentity, selfCheck: true, supervisorAlive, leaseExpired,
