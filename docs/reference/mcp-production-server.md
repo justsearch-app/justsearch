@@ -65,8 +65,12 @@ MCP server on?" is exactly "which port is the API on?":
   session setup (`initialize`, notifications) on a newly proven Engine, and sends another
   request again only if it never had a connection or the Engine answered 400/404 for its
   session; otherwise the call fails with an error saying its outcome is unknown. The bridge
-  sends an `Mcp-Session-Id` only on connections with the token it was opened under, and drops
-  it when its target changes. Closing stdin stops either client, also during discovery. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
+  sends an `Mcp-Session-Id` only on connections to the Engine that opened it (its manifest
+  identity, or for a pin no manifest names the pid and instance each new connection reads from
+  `GET /api/runtime/live` on itself); a connection to any other Engine gets nothing, and the
+  bridge initializes a new session there first. Idle pooled connections are closed after 25 s,
+  before the Engine's 30 s idle expiry can cross a request. Closing stdin stops either client,
+  also during discovery. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
   the Roaming folder (so a redirected folder is still found).
 - **Order `scripts/prod/justsearch-mcp.mjs` tries:** `--port`, then `JUSTSEARCH_API_PORT`, then
   the manifest in the legacy `JUSTSEARCH_HOME` folder when set (it wins over

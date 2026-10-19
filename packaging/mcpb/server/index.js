@@ -162,8 +162,8 @@ const state = {
   // (X-JustSearch-Session) if enforced. Replaced as a whole once the next one is complete, so a
   // request never pairs one Engine's token with another target.
   target: null,
-  // { id, token }: the Mcp-Session-Id the server assigned and the connection token it was opened
-  // under; engineRequest sends it only on a connection with that same token.
+  // { id, identity }: the Mcp-Session-Id the server assigned and the Engine identity of the
+  // connection it was opened on; engineRequest sends it only on connections to that Engine.
   session: null,
   pinnedByManifest: false, // the JUSTSEARCH_API_PORT pin was accepted through a manifest
   protocolVersion: null, // negotiated during initialize
@@ -230,7 +230,7 @@ function postToServer(message, intercept) {
         const status = res.statusCode || 0;
         const newSession = res.headers['mcp-session-id'];
         if (typeof newSession === 'string' && newSession.length > 0 && state.target === sentTo) {
-          state.session = { id: newSession, token: req.connectionToken };
+          state.session = { id: newSession, identity: req.connectionIdentity };
         }
 
         if (status === 404 || status === 400) {
@@ -289,8 +289,10 @@ function postToServer(message, intercept) {
       const err = new Error(`connection failed: ${e.message}`);
       err.transport = true;
       // Only a request that never had a connection (ECONNREFUSED: app restarted or port moved;
-      // ENGINE_NOT_PROVEN: refused before writing) is surely unsent and may be sent elsewhere.
-      err.retryable = !written;
+      // ENGINE_NOT_PROVEN: refused before writing), or was stopped on its connection before
+      // writing because the session belongs to another Engine, is surely unsent and may be
+      // sent after recovery.
+      err.retryable = !written || e.code === 'SESSION_TARGET_CHANGED';
       reject(err);
     });
   });

@@ -27,7 +27,11 @@
  *     GET /api/mcp/token on itself before it is handed to a request, and a request's credential
  *     is the token of the connection it is written on. A token fetched on one connection is
  *     never sent on another, so a process that takes the port gets request content (that is
- *     what a pin trusts) but never a token it did not hand out itself.
+ *     what a pin trusts) but never a token it did not hand out itself. The connection also
+ *     asks GET /api/runtime/live for the Engine's identity, so an MCP session opened on one
+ *     Engine is never sent to the next one on the port (engineRequest's session).
+ *  5. Idle pooled connections are retired after IDLE_RETIRE_MS (http.Agent timeout), before the
+ *     Engine's own idle expiry (Jetty: 30 s) can close one just as a request is written on it.
  *
  * Why the socket owner: whatever answers on the port can claim any pid and instanceId, so only
  * the OS's record of who holds the connection ties the endpoint to the manifest's process.
@@ -70,6 +74,8 @@ function startupWaitMs(env = process.env) {
   return /^\d+$/.test(raw) ? Number(raw) : STARTUP_WAIT_MS;
 }
 const PROBE_MAX_BYTES = 64 * 1024;
+/** A pooled connection idle this long is closed by the agent (the Engine closes idle ones at 30 s). */
+const IDLE_RETIRE_MS = 25000;
 const OS_QUERY_TIMEOUT_MS = 10000;
 /** The server may not have accepted a fresh connection yet; it is looked up again this often. */
 const PROOF_RETRY_MS = 10;
@@ -302,13 +308,56 @@ function provenConnection(engine, options, done) {
 
 /** The token a token-bound connection fetched on itself: a string ('' in dev mode) or null. */
 const SOCKET_TOKEN = Symbol('justsearch.connectionToken');
+/** The Engine identity a token-bound connection was told (pid/instanceId), or one of its own. */
+const SOCKET_IDENTITY = Symbol('justsearch.connectionIdentity');
 const SESSION_HEADER = 'x-justsearch-session';
+let anonymousConnections = 0;
+
+/**
+ * One GET written on socket alone (no agent, so no pool can lend the socket to anyone else);
+ * keep-alive, so that once it is answered the socket is 'free' again. done(err) or
+ * done(null, status, parsed JSON body or null).
+ */
+function bootstrapGet(socket, port, urlPath, done) {
+  let answer = null;
+  socket.once('free', () => {
+    if (!socket.destroyed) done(null, answer.status, answer.body);
+  });
+  const req = send(
+    undefined,
+    port,
+    { path: urlPath, headers: { accept: 'application/json', connection: 'keep-alive' }, createConnection: () => socket },
+    (res) => {
+      const chunks = [];
+      let size = 0;
+      res.on('data', (chunk) => {
+        size += chunk.length;
+        if (size > PROBE_MAX_BYTES) req.destroy(new Error(`${urlPath} response too large`));
+        else chunks.push(chunk);
+      });
+      res.on('end', () => {
+        let body = null;
+        try {
+          body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        } catch {
+          /* not JSON */
+        }
+        answer = { status: res.statusCode, body };
+      });
+    },
+  );
+  req.on('error', done);
+  req.end();
+}
 
 /**
  * http.Agent createConnection for a pinned port no manifest names: connect, fetch
- * GET /api/mcp/token on this very connection, and only then hand it to the agent, carrying the
- * token it answered (null when it answered none). A connection that fails or closes before that
- * is never handed out: the request fails with 'ENGINE_NOT_PROVEN' (status 'no-token').
+ * GET /api/mcp/token and then GET /api/runtime/live on this very connection, and only then hand
+ * it to the agent, carrying the token it answered (null when it answered none) and the identity
+ * it reported (pid/instanceId; a connection that reports none gets one of its own, so nothing
+ * bound to an identity follows it elsewhere). A connection that fails or closes before that, or
+ * takes longer than PROBE_TIMEOUT_MS, is never handed out: the request fails with
+ * 'ENGINE_NOT_PROVEN' (status 'no-token').
  */
 function tokenBoundConnection(options, done) {
   const socket = connect(options);
@@ -328,47 +377,25 @@ function tokenBoundConnection(options, done) {
     }
   };
   const closed = () => settle(notProven('no-token', `the connection to port ${options.port} closed before it answered a token`));
+  const failed = (e) => settle(notProven('no-token', `port ${options.port}: ${e.message}`));
   socket.once('error', settle);
   socket.once('close', closed);
-  // One bound for connecting and the token answer; past it the connection is never handed out.
+  // One bound for connecting and both answers; past it the connection is never handed out.
   timer = setTimeout(
     () => settle(notProven('no-token', `port ${options.port} did not answer GET /api/mcp/token within ${PROBE_TIMEOUT_MS} ms`)),
     PROBE_TIMEOUT_MS,
   );
   socket.once('connect', () => {
-    // The token request is written on this socket alone (no agent, so no pool can lend the
-    // socket to anyone else); keep-alive, so that once it is answered the socket is 'free' and
-    // goes to the pin's agent with the token it answered.
-    let token = null;
-    socket.once('free', () => {
-      if (socket.destroyed) return;
-      socket[SOCKET_TOKEN] = token;
-      settle(null);
+    bootstrapGet(socket, options.port, '/api/mcp/token', (err, status, body) => {
+      if (err) return failed(err);
+      socket[SOCKET_TOKEN] = status === 200 && body && typeof body.token === 'string' ? body.token : null;
+      bootstrapGet(socket, options.port, '/api/runtime/live', (err2, status2, live) => {
+        if (err2) return failed(err2);
+        const known = status2 === 200 && live && Number.isInteger(live.pid) && typeof live.instanceId === 'string' && live.instanceId;
+        socket[SOCKET_IDENTITY] = known ? `${live.pid}/${live.instanceId}` : `connection-${++anonymousConnections}`;
+        settle(null);
+      });
     });
-    const req = send(
-      undefined,
-      options.port,
-      { path: '/api/mcp/token', headers: { accept: 'application/json', connection: 'keep-alive' }, createConnection: () => socket },
-      (res) => {
-        const chunks = [];
-        let size = 0;
-        res.on('data', (chunk) => {
-          size += chunk.length;
-          if (size > PROBE_MAX_BYTES) req.destroy(new Error('token response too large'));
-          else chunks.push(chunk);
-        });
-        res.on('end', () => {
-          try {
-            const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-            if (res.statusCode === 200 && body && typeof body.token === 'string') token = body.token;
-          } catch {
-            /* no token */
-          }
-        });
-      },
-    );
-    req.on('error', (e) => settle(notProven('no-token', `port ${options.port}: ${e.message}`)));
-    req.end();
   });
   return undefined;
 }
@@ -390,7 +417,7 @@ function agentFor(target) {
   const key = engine ? engineKey(engine) : String(target.port);
   let agent = map.get(key);
   if (!agent) {
-    agent = new http.Agent({ keepAlive: true });
+    agent = new http.Agent({ keepAlive: true, timeout: IDLE_RETIRE_MS });
     agent.createConnection = engine ? (options, done) => provenConnection(engine, options, done) : tokenBoundConnection;
     map.set(key, agent);
   }
@@ -417,26 +444,33 @@ function send(agent, port, { method = 'GET', path: urlPath, headers = {}, timeou
  * The only way the clients send a request to an Engine: send() through agentFor(target), and the
  * request is ended here with body. target is { port, engine, token }: engine is the manifest
  * candidate ({ dataDir, pid, instanceId, port }), or null for a pinned port no manifest names.
- * The request's connection token is target.token for a manifest Engine (fetched over its proven
- * connections), and for a pin the token the connection it is written on fetched itself, read
- * once the request has its connection; it is left on the request as req.connectionToken.
- * credential: true adds that token (X-JustSearch-Session). session ({ id, token }) adds
- * Mcp-Session-Id only when the session was opened under that same connection token, so a
- * session never goes to an endpoint other than the one that opened it. Returns the
- * http.ClientRequest; a failed proof surfaces as its 'error' with err.code 'ENGINE_NOT_PROVEN'
- * (and err.status, err.detail).
+ * Each request's connection has a token and an identity: for a manifest Engine, target.token
+ * (fetched over its proven connections) and the Engine itself; for a pin, what the connection
+ * it is written on fetched itself, read once the request has its connection. Both are left on
+ * the request (req.connectionToken, req.connectionIdentity). credential: true adds that token
+ * (X-JustSearch-Session). session ({ id, identity }) adds Mcp-Session-Id; on a connection to
+ * any other identity the request is destroyed before anything is written, with err.code
+ * 'SESSION_TARGET_CHANGED', so a session never reaches an endpoint other than the one that
+ * opened it. Returns the http.ClientRequest; a failed proof surfaces as its 'error' with
+ * err.code 'ENGINE_NOT_PROVEN' (and err.status, err.detail).
  */
 function engineRequest(target, { method = 'GET', path: urlPath, headers = {}, timeoutMs, body, credential = false, session = null }, onResponse) {
   const engine = target.engine || null;
   const req = send(agentFor(target), engine ? engine.port : target.port, { method, path: urlPath, headers, timeoutMs }, onResponse);
-  const finish = (token) => {
+  const finish = (token, identity) => {
     req.connectionToken = token;
+    req.connectionIdentity = identity;
+    if (session && session.identity !== identity) {
+      const err = new Error('the MCP session was opened on another Engine than this connection reaches; nothing was sent');
+      req.destroy(Object.assign(err, { code: 'SESSION_TARGET_CHANGED' }));
+      return;
+    }
     if (credential && token) req.setHeader(SESSION_HEADER, token);
-    if (session && session.token === token) req.setHeader('mcp-session-id', session.id);
+    if (session) req.setHeader('mcp-session-id', session.id);
     req.end(body);
   };
-  if ((credential || session) && !engine) req.once('socket', (socket) => finish(socket[SOCKET_TOKEN]));
-  else finish(target.token);
+  if ((credential || session) && !engine) req.once('socket', (socket) => finish(socket[SOCKET_TOKEN], socket[SOCKET_IDENTITY]));
+  else finish(target.token, engine ? `${engine.pid}/${engine.instanceId}` : null);
   return req;
 }
 
@@ -665,6 +699,7 @@ function describeTried(tried) {
 module.exports = {
   DESKTOP_APP_IDENTIFIER,
   STARTUP_WAIT_MS,
+  IDLE_RETIRE_MS,
   startupWaitMs,
   desktopAppDataDir,
   validateCandidate,

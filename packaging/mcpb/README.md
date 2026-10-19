@@ -55,12 +55,14 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
 4. Otherwise it forwards newline-delimited JSON-RPC from stdin to
    `http://127.0.0.1:<port>/mcp` (JSON and SSE response bodies both handled)
    and relays server messages back on stdout. If the app restarts on a
-   different port mid-session, the bridge re-runs that discovery, drops the old
-   `Mcp-Session-Id`, and re-initializes the session with the cached `initialize`
-   params. The failed call is sent again once only if it surely did not reach the
+   different port mid-session, or another Engine answers the pinned port, the
+   bridge re-runs that discovery, drops the old `Mcp-Session-Id` (it is only ever
+   sent to the Engine that issued it), and re-initializes the session with the
+   cached `initialize` params. The failed call is sent again once only if it surely did not reach the
    app (it never had a connection, or the app answered 400/404 for its session);
    otherwise it fails with an error saying its outcome is unknown, so a mutating
-   call never runs twice. Closing stdin stops the bridge, also during discovery.
+   call never runs twice. Idle connections are closed after 25 s, before the
+   app's 30 s idle expiry. Closing stdin stops the bridge, also during discovery.
 
 The bridge is **dependency-free** (Node builtins only) and never touches the
 network beyond `127.0.0.1` — no npx fetches, no downloads, ever. That is

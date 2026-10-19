@@ -200,8 +200,13 @@ let instanceCounter = 0;
  * packaged app's session filter does); mcpSessions, initialize assigns an Mcp-Session-Id and a
  * call (POST /mcp with an id) with another one is answered 404 (as after an Engine restart); stream, GET /mcp is a
  * long-lived event stream; keepAliveMs, idle connections are closed after that long.
+ * tokenPerConnection: each connection is answered its own token (`${token}-${conn}`), and
+ * requireToken checks that one; closeAfterPost: every POST answer closes its connection;
+ * rejectNext(status): the next POST /mcp with an id is answered status; expireIdleMs: a request
+ * that arrives on a connection idle at least that long is dropped unanswered with its connection
+ * (the server's idle expiry crossing it on the wire), and no Keep-Alive hint is sent.
  */
-async function startService(t, { kind = 'engine', pid = process.pid, instanceId, token = 'token-abc', port = 0, healthStatus = 200, holdUrl = null, requireToken = false, mcpSessions = false, stream = false, keepAliveMs } = {}) {
+async function startService(t, { kind = 'engine', pid = process.pid, instanceId, token = 'token-abc', port = 0, healthStatus = 200, holdUrl = null, requireToken = false, mcpSessions = false, stream = false, keepAliveMs, tokenPerConnection = false, closeAfterPost = false, expireIdleMs } = {}) {
   const id = instanceId || `instance-${process.pid}-${++instanceCounter}`;
   const requests = [];
   // hold(url, { rpc }): the next request to url (with rpc: a POST /mcp of that JSON-RPC method) is
@@ -220,13 +225,26 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
   // lastAnswers(): from then on every answer closes its connection, as a stopping Engine's does,
   // so the client keeps no idle connection to reuse once the Engine is gone.
   let closing = false;
+  let rejectStatus = null;
   const server = http.createServer((req, res) => {
+    const idleSince = req.socket.idleSince;
+    req.socket.idleSince = undefined;
+    res.once('finish', () => {
+      req.socket.idleSince = Date.now();
+    });
+    if (expireIdleMs !== undefined && idleSince !== undefined && Date.now() - idleSince >= expireIdleMs) {
+      requests.push({ method: req.method, url: req.url, headers: req.headers, body: '', health: healthStatus, conn: req.socket.conn, expired: true });
+      req.socket.destroy();
+      return;
+    }
     let body = '';
     req.on('data', (c) => (body += c));
     req.on('end', () => {
       requests.push({ method: req.method, url: req.url, headers: req.headers, body, health: healthStatus, conn: req.socket.conn });
+      const ownToken = tokenPerConnection ? `${token}-${req.socket.conn}` : token;
       const json = (status, obj, headers = {}) => {
-        res.writeHead(status, { 'content-type': 'application/json', ...headers, ...(closing ? { connection: 'close' } : {}) });
+        const close = closing || (closeAfterPost && req.method === 'POST');
+        res.writeHead(status, { 'content-type': 'application/json', ...headers, ...(close ? { connection: 'close' } : {}) });
         res.end(JSON.stringify(obj));
       };
       const rpcOf = () => {
@@ -253,8 +271,8 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
       if (req.url === '/api/status') return json(200, { status: 'ok' });
       if (kind === 'foreign') return json(404, { error: 'not found' });
       if (req.url === '/api/runtime/live') return json(200, { alive: true, pid, instanceId: id });
-      if (req.url === '/api/mcp/token') return json(200, { token });
-      if (requireToken && req.method !== 'GET' && req.headers['x-justsearch-session'] !== token) return json(401, { error: 'session token required' });
+      if (req.url === '/api/mcp/token') return json(200, { token: ownToken });
+      if (requireToken && req.method !== 'GET' && req.headers['x-justsearch-session'] !== ownToken) return json(401, { error: 'session token required' });
       if (req.url === '/mcp' && req.method === 'GET' && stream) {
         res.writeHead(200, { 'content-type': 'text/event-stream' });
         return res.write(': open\n\n');
@@ -262,6 +280,11 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
       const session = `session-${id}`;
       if (req.url === '/mcp' && req.method === 'POST') {
         const msg = JSON.parse(body);
+        if (rejectStatus && msg.id !== undefined) {
+          const status = rejectStatus;
+          rejectStatus = null;
+          return json(status, { error: 'stale session' });
+        }
         if (mcpSessions && msg.id !== undefined && msg.method !== 'initialize' && req.headers['mcp-session-id'] !== session) return json(404, { error: 'unknown session' });
         if (msg.id === undefined) return res.writeHead(202).end();
         if (msg.method === 'initialize') {
@@ -299,6 +322,7 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
     });
   });
   if (keepAliveMs !== undefined) server.keepAliveTimeout = keepAliveMs;
+  if (expireIdleMs !== undefined) server.keepAliveTimeout = 0; // the expiry above is the only one
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, '127.0.0.1', resolve);
@@ -333,7 +357,10 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
   const lastAnswers = () => {
     closing = true;
   };
-  return { kind, pid, instanceId: id, port: server.address().port, requests, token, close, closeIdle, reset, setHealth, arrived: first.arrived, release: first.release, hold, stopListening, lastAnswers, stats };
+  const rejectNext = (status) => {
+    rejectStatus = status;
+  };
+  return { kind, pid, instanceId: id, port: server.address().port, requests, token, rejectNext, close, closeIdle, reset, setHealth, arrived: first.arrived, release: first.release, hold, stopListening, lastAnswers, stats };
 }
 
 /** Resolve once the service has received the client's notifications/initialized (its handshake is done). */
@@ -1169,10 +1196,12 @@ test('D9: no code path reaches the Engine except engineRequest (one http.request
   assert.equal(shared.match(/\bhttp\.(request|get)\s*\(/g)?.length, 1, 'one http.request, in send');
   assert.match(shared, /function send\([\s\S]*?\{\s*return http\.request\(/, 'the one http.request is send()');
   // send() is called twice: by engineRequest through the target's agent (proven or token-bound
-  // connections), and by tokenBoundConnection for the token request on the connection it opened.
+  // connections), and by bootstrapGet for the token and identity requests a token-bound
+  // connection makes on itself (tokenBoundConnection) before it is handed out.
   assert.equal(shared.match(/(?<!function )\bsend\((?!\))/g)?.length, 2, 'send() called twice');
   assert.match(shared, /function engineRequest[\s\S]*?send\(agentFor\(target\)/, 'engineRequest always uses the target agent');
-  assert.match(shared, /function tokenBoundConnection[\s\S]*?send\(\s*undefined,[\s\S]*?createConnection: \(\) => socket/, 'the token request goes only on the connection being opened');
+  assert.match(shared, /function bootstrapGet\(socket[\s\S]*?send\(\s*undefined,[\s\S]*?createConnection: \(\) => socket/, 'the bootstrap requests go only on the connection being opened');
+  assert.match(shared, /function tokenBoundConnection[\s\S]*?bootstrapGet\(socket, options\.port, '\/api\/mcp\/token'/, 'the token-bound connection fetches its own token');
   assert.equal(shared.match(/\bnet\.connect\s*\(/g)?.length, 1, 'one net.connect, in connect');
   assert.equal(shared.match(/\bconnect\(options\)/g)?.length, 3, 'connect() defined once, called by provenConnection and tokenBoundConnection');
   assert.doesNotMatch(shared, /\bfetch\s*\(/);
@@ -1515,7 +1544,7 @@ test('P5: bridge pinned to a port no manifest names — the long-lived GET strea
   assert.equal(streamOpen, 1, 'the GET stream was still open on its own connection when the call was made');
 });
 
-test('P5/P7: bridge pinned to a port no manifest names — the Engine restarts there with a new token and session: the 404 leads to re-initialize, initialized and one replay, each on a connection that fetched the new token', async (t) => {
+test('P5/P7: bridge pinned to a port no manifest names — the Engine restarts there with a new token and session: the new identity leads to re-initialize, initialized and the call, sent once, each on a connection that fetched the new token', async (t) => {
   const root = tempRoot(t);
   const m = machine(root);
   const first = await startService(t, { token: 'token-first', requireToken: true, mcpSessions: true });
@@ -1532,7 +1561,7 @@ test('P5/P7: bridge pinned to a port no manifest names — the Engine restarts t
   assert.equal(call.result.session, 'token-second');
   assertOwnTokens(second.requests, 'token-second', 'restarted Engine');
   const posts = second.requests.filter((r) => r.url === '/mcp' && r.method === 'POST').map((r) => JSON.parse(r.body).method);
-  assert.deepEqual(posts, ['tools/call', 'initialize', 'notifications/initialized', 'tools/call'], 'refused in the old session, re-initialized, replayed once');
+  assert.deepEqual(posts, ['initialize', 'notifications/initialized', 'tools/call'], 'the old session is never used there: re-initialized, then the call, once');
   assert.match(session.stderr, /reconnected to/);
 });
 
@@ -1699,6 +1728,83 @@ for (const kind of Object.keys(PINS)) {
     assert.equal(second.requests.filter((r) => r.url === '/api/knowledge/ingest').length, 1, 'the call is sent once');
   });
 }
+
+for (const tokens of ['empty', 'repeated']) {
+  test(`P5 (bundle, ${tokens} token): a pin no manifest names — the Engine stops and another one binds the port with the ${tokens === 'empty' ? 'same empty (dev mode)' : 'same'} token; the old Mcp-Session-Id never reaches it, and the bridge re-initializes there before the call`, async (t) => {
+    const root = tempRoot(t);
+    const m = machine(root);
+    const token = tokens === 'empty' ? '' : 'token-same';
+    const first = await startService(t, { token, mcpSessions: true, stream: true });
+    let second = null;
+    const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(first.port) } }, bundle(root), async () => {
+      await handshakeDone(first, { stream: true });
+      await first.close();
+      await until(() => first.stats.open === 0, 10000, 'the first Engine\'s connections closing');
+      await pause(300); // the idle bridge handles the close: a call written on a dropped connection is not sent again
+      second = await startService(t, { port: first.port, token, mcpSessions: true, stream: true });
+    });
+    const oldSession = `session-${first.instanceId}`;
+    const carried = second.requests.filter((r) => r.headers['mcp-session-id'] === oldSession).map((r) => `${r.method} ${r.url}`);
+    assert.deepEqual(carried, [], `the old session stays with the Engine that opened it\n${session.stderr}`);
+    const posts = second.requests.filter((r) => r.url === '/mcp' && r.method === 'POST').map((r) => JSON.parse(r.body).method);
+    assert.deepEqual(posts, ['initialize', 'notifications/initialized', 'tools/call'], 're-initialized there, then the call, once');
+    const call = session.messages.find((x) => x.id === 2);
+    assert.equal(call?.result?.content?.[0]?.text, `tools/call by ${second.instanceId}`, `${JSON.stringify(call)}\n${session.stderr}`);
+  });
+}
+
+for (const status of [400, 404]) {
+  test(`P5 (bundle): an Engine that answers each connection its own token and closes after each POST rejects a call with ${status} — the bridge re-initializes and the call succeeds in the new session on the same Engine`, async (t) => {
+    const root = tempRoot(t);
+    const m = machine(root);
+    const engine = await startService(t, { token: 'token-conn', tokenPerConnection: true, requireToken: true, mcpSessions: true, closeAfterPost: true });
+    const session = await bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(engine.port) } }, bundle(root), async () => {
+      await handshakeDone(engine);
+      engine.rejectNext(status);
+    });
+    const call = session.messages.find((x) => x.id === 2);
+    assert.equal(call?.result?.content?.[0]?.text, `tools/call by ${engine.instanceId}`, `${JSON.stringify(call)}\n${session.stderr}`);
+    const posts = engine.requests.filter((r) => r.url === '/mcp' && r.method === 'POST').map((r) => JSON.parse(r.body).method);
+    assert.deepEqual(posts, ['initialize', 'notifications/initialized', 'tools/call', 'initialize', 'notifications/initialized', 'tools/call'], `rejected (${status}), re-initialized, sent again once`);
+    for (const r of engine.requests.filter((x) => x.headers['x-justsearch-session'])) {
+      assert.equal(r.headers['x-justsearch-session'], `token-conn-${r.conn}`, `${r.method} ${r.url} carries its own connection's token`);
+    }
+  });
+}
+
+test('P3/P7: a connection idle past the agent\'s retirement (25 s) is not reused — the Engine\'s idle expiry crossing a request never costs a call (production MCP and bundle)', async (t) => {
+  // The fixture drops (unanswered) any request arriving on a connection idle 25.75 s or more;
+  // the second call comes 26.5 s after the first.
+  const expireIdleMs = 25750;
+  const idleMs = 26500;
+  const root = tempRoot(t);
+  const m = machine(root);
+  const prodEngine = await startService(t, { expireIdleMs });
+  const bridgeEngine = await startService(t, { expireIdleMs });
+  const ingest = { paths: [path.join(root, 'doc.txt')] };
+  const prodRun = (async () => {
+    const prod = await startProdMcp(t, m, PINS['--port'](prodEngine.port));
+    assert.match(await prod.call('justsearch_ingest', ingest), new RegExp(`ingest by ${prodEngine.instanceId}`), prod.stderr);
+    await pause(idleMs);
+    return { result: await prod.call('justsearch_ingest', ingest), stderr: prod.stderr };
+  })();
+  const bridgeRun = bridgeInteractive({ ...m, env: { ...m.env, JUSTSEARCH_API_PORT: String(bridgeEngine.port) } }, bundle(root), async () => {
+    await handshakeDone(bridgeEngine);
+    await pause(idleMs);
+  });
+  const [prod, session] = await Promise.all([prodRun, bridgeRun]);
+  const call = session.messages.find((x) => x.id === 2);
+  const outcomes = {
+    'production MCP': prod.result.includes(`ingest by ${prodEngine.instanceId}`) ? 'answered' : prod.result,
+    bundle: call?.result?.content?.[0]?.text === `tools/call by ${bridgeEngine.instanceId}` ? 'answered' : JSON.stringify(call),
+  };
+  assert.deepEqual(outcomes, { 'production MCP': 'answered', bundle: 'answered' }, `the call after the idle gap\n${prod.stderr}\n${session.stderr}`);
+  for (const [client, engine] of [['production MCP', prodEngine], ['bundle', bridgeEngine]]) {
+    assert.deepEqual(engine.requests.filter((r) => r.expired).map((r) => `${r.method} ${r.url}`), [], `${client}: nothing was written on a connection past its idle retirement`);
+  }
+  const { IDLE_RETIRE_MS } = require(ENGINE_DISCOVERY);
+  assert.equal(IDLE_RETIRE_MS, 25000, 'retired 5 s before the Engine\'s 30 s idle expiry');
+});
 
 test('D1: a Windows-style lazily resolved folder (the OS-reported Roaming folder) is tried after the home-folder guess', async (t) => {
   const root = tempRoot(t);
