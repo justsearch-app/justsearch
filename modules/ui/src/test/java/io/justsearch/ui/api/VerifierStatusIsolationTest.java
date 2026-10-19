@@ -133,7 +133,12 @@ class VerifierStatusIsolationTest {
       var primed=client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+f.app.port()+"/api/status")).timeout(Duration.ofSeconds(2)).GET().build(),HttpResponse.BodyHandlers.ofString()); assertEquals(200,primed.statusCode());
       f.block.set(true); get(f,"?fresh=true"); assertTrue(f.entered.await(2,TimeUnit.SECONDS));
       int calls=f.calls.get();
-      for(int i=0;i<60;i++){get(f,"?fresh=true");Thread.sleep(1000);}
+      for(int i=0;i<30;i++){get(f,"?fresh=true");}
+      // Exercise coalescing both before and after the held worker observation becomes stale.
+      StatusLaneAging.ageHeldLanes(f.handler);
+      assertTrue(get(f,"").path("meta").path("workerRpcStale").asBoolean(),
+          "the held worker lane must be stale before the second burst of fresh reads");
+      for(int i=0;i<30;i++){get(f,"?fresh=true");}
       assertEquals(calls,f.calls.get(),"fresh requests must coalesce while producer is hung");
       long count=Thread.getAllStackTraces().keySet().stream().filter(t->t.getName().equals("status-observation")).count();
       assertTrue(count<=1,"one bounded sampler, found "+count);
