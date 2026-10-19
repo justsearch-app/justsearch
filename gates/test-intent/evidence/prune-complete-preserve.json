@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-19T06:57:37.402Z",
-  "revision": "abe1aff3af934b4cd2de096bd2ff235f35361599",
-  "tree": "737d44cebed86b918b9706b85e2e8da94f66881b",
+  "createdAt": "2026-10-19T11:37:23.333Z",
+  "revision": "822db4cab60ba421151245f3c0f7ef252d9b3594",
+  "tree": "3a2c4fee74e01a7ce7c0af882a2a0c9bcef61098",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.PruneRemovesWholeFileTest.aRuntimeClosedDuringThePruneEndsItWithoutSuccessOrHang\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4704
+      "durationMs": 2418
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneRemovesWholeFileTest.java#aRuntimeClosedDuringThePruneEndsItWithoutSuccessOrHang",
       "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneRemovesWholeFileTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e18912d3e4a6ed115b7f3c94cca48b4c26e0379368dd415a77859289ce6e27d1",
+      "contentDigest": "sha256:42a22f159f3af955aef787df587744bd01412bb561e63e197598a356e53c91e2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:63788889a12547039c38e1ddcbe37634a28b21372a5142fff8ff475f854053ae"
+  "digest": "sha256:dfa49aed438b1f410af072cbacfdd37fe59dc02ed6a181feae8660d90c6b86fb"
 }

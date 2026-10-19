@@ -508,8 +508,10 @@ public final class PruneOps {
 
     /**
      * Removes the files of the batch's candidates if the root still vouches for their absence,
-     * asking it right before they are applied. A batch without candidates asks nothing: nothing is
-     * removed on its strength. The whole application runs inside the writer fence.
+     * asking it before the files are checked again and once more after, right before the rows are
+     * removed. A batch without candidates asks nothing: nothing is removed on its strength. The
+     * whole application runs inside the writer fence, and its removals are visible to the next
+     * holder of the fence.
      *
      * @return false when the root check failed; the candidates are discarded, nothing is removed
      */
@@ -572,25 +574,41 @@ public final class PruneOps {
           log.debug("pruneByPathPrefix: kept a file that is present again: {}", file.getKey());
         }
       }
-      if (confirmed.isEmpty()) {
-        return true;
-      }
       // Rows are taken from a view refreshed inside the fence, so a file's rows are all there,
       // including chunks written since the scan; nothing of it can be published until we leave.
-      mgr.maybeRefreshBlocking();
-      IndexSearcher current = mgr.acquire();
-      try {
-        StoredFields storedFields = current.storedFields();
-        for (String filePath : confirmed) {
-          for (String docId : rowsOf(current, storedFields, filePath)) {
-            indexingCoordinator.deleteById(docId);
-            pruned++;
-            sink.accept(filePath);
-            log.debug("pruneByPathPrefix: deleted orphan document: {}", docId);
+      Map<String, List<String>> rows = new LinkedHashMap<>();
+      if (!confirmed.isEmpty()) {
+        mgr.maybeRefreshBlocking();
+        IndexSearcher current = mgr.acquire();
+        try {
+          StoredFields storedFields = current.storedFields();
+          for (String filePath : confirmed) {
+            rows.put(filePath, rowsOf(current, storedFields, filePath));
           }
+        } finally {
+          mgr.release(current);
         }
-      } finally {
-        mgr.release(current);
+      }
+      // The absences above vouch for nothing if the root changed while they were observed: ask
+      // again after the last observation, right before anything is removed on their strength.
+      if (!guard.rootCurrent()) {
+        log.warn(
+            "pruneByPathPrefix: root changed while the batch was checked; {} files kept",
+            confirmed.size());
+        return false;
+      }
+      for (var file : rows.entrySet()) {
+        for (String docId : file.getValue()) {
+          indexingCoordinator.deleteById(docId);
+          pruned++;
+          sink.accept(file.getKey());
+          log.debug("pruneByPathPrefix: deleted orphan document: {}", docId);
+        }
+      }
+      if (!rows.isEmpty()) {
+        // Publish the removals before leaving the fence: the next writer reads its parent from
+        // this view, and must not rebuild children of a parent that is already gone.
+        mgr.maybeRefreshBlocking();
       }
       return true;
     }

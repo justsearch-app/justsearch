@@ -39,7 +39,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import org.apache.lucene.index.DirectoryReader;
@@ -316,6 +318,67 @@ final class PruneWriterFenceTest extends LuceneExecutorTestBase {
         "no chunk of a VDU result written while the sync ran may survive the file's removal");
     assertEquals(1 + chunksWritten.get(), deleted, "the parent and every new chunk are removed");
     assertTrue(waited, "the sync applies its deletions only once the VDU result is complete");
+  }
+
+  @Test
+  void aVduResultThatGetsTheFenceRightAfterTheBatchLeavesNoChunk() throws Exception {
+    Path file = Files.writeString(root.resolve("late.pdf"), "late");
+    String path = key(file);
+    writeParent(path, "scanned page");
+    for (int i = 0; i < 3; i++) {
+      writeChunk(path, i);
+    }
+    runtime.commitOps().commitAndTrack();
+    runtime.commitOps().maybeRefreshBlocking();
+    Files.delete(file);
+    String content = "Recognised text with enough words for several chunks. ".repeat(400);
+    Thread[] syncThread = new Thread[1];
+    Thread[] vduThread = new Thread[1];
+    AtomicReference<WorkerIngestService> service = new AtomicReference<>();
+    AtomicReference<FutureTask<String>> vdu = new AtomicReference<>();
+    AtomicBoolean vduWaited = new AtomicBoolean();
+    // The VDU result arrives while the prune applies its batch and is next to get the fence; the
+    // prune goes on to its commit only once the VDU result is done.
+    IndexingLoop loop = loopWithFence();
+    doAnswer(call -> {
+      Supplier<?> mutation = call.getArgument(0);
+      boolean firstBatch = Thread.currentThread() == syncThread[0] && vdu.get() == null;
+      fence.lock();
+      try {
+        if (firstBatch) {
+          vdu.set(start("late-vdu-result", () -> {
+            var response = service.get().updateVduResult(
+                UpdateVduResultRequest.newBuilder().setDocId(path)
+                    .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
+                    .setExtractedContent(content).build(), CallContext.none());
+            return response.getSuccess() + " " + response.getError();
+          }, vduThread));
+          vduWaited.set(waitsForFence(vduThread[0], vdu.get()));
+        }
+        return mutation.get();
+      } finally {
+        fence.unlock();
+        if (firstBatch) {
+          vdu.get().get(10, TimeUnit.SECONDS);
+        }
+      }
+    }).when(loop).withFileMutationFence(any());
+    service.set(service(loop, runtime));
+    addRoot(service.get());
+
+    FutureTask<Integer> sync = start("sync-under-test", () -> {
+      var response = service.get().syncDirectory(SyncDirectoryRequest.newBuilder()
+          .setRootPath(root.toString()).build(), CallContext.none());
+      assertEquals("", response.getError());
+      return response.getFilesDeleted();
+    }, syncThread);
+    int deleted = sync.get(20, TimeUnit.SECONDS);
+
+    assertTrue(vduWaited.get(), "precondition: the VDU result waited for the prune's batch");
+    assertEquals(4, deleted, "precondition: the file's parent and three chunks were removed");
+    assertEquals(0, committedRows(path),
+        "no chunk a VDU result writes after the file's removal may survive it; VDU said: "
+            + vdu.get().get());
   }
 
   @Test
