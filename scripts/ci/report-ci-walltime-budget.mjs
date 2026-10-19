@@ -80,7 +80,7 @@ export function buildWalltimeBudgetReport({ attribution, policy, now = new Date(
     if (lane.job) laneByJob.set(lane.job, lane);
   }
   const jobs = Array.isArray(attribution.jobs) ? attribution.jobs : [];
-  const warnings = [];
+  const warnings = (attribution.requiredCompletion?.missingChecks || []).map((job) => warn('missing-required-check', `${job} is missing or incomplete.`, { job }));
 
   const reviewByMs = Date.parse(policy.reviewBy || '');
   if (!Number.isFinite(reviewByMs)) {
@@ -138,6 +138,7 @@ export function buildWalltimeBudgetReport({ attribution, policy, now = new Date(
     advisory: true,
     run: attribution.run || {},
     criticalPath: attribution.criticalPath || null,
+    requiredCompletion: attribution.requiredCompletion || null,
     lanes: evaluated,
     warningCount: warnings.length,
     warnings,

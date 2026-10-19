@@ -369,3 +369,23 @@ withTempRoot((root) => {
 });
 
 console.log('test-report-ci-evidence-digest: PASS');
+
+// Independently rerun parts retain their own attempt's evidence; an old attempt
+// cannot fill a hole left by a failed or cancelled current attempt.
+{
+  const ui = { ...job('Unit tests (app-ui-ui)', 'success', 1, 3), run_attempt: 2 };
+  const services = { ...job('Unit tests (app-ui-services)', 'success', 1, 4), run_attempt: 1 };
+  const aggregate = job('Unit tests (app-ui)', 'success', 5, 6, [step('Require every app-ui part to succeed', 'success', 5, 6)]);
+  const windows = { ...job('Windows-native tests (node)', 'failure', 1, 2), run_attempt: 2 };
+  const report = buildDigest({ policy, run: greenRun, jobsDoc: { jobs: [ui, services, aggregate, windows] }, artifactsDoc: artifacts([
+    'unit-test-attribution-app-ui-ui-attempt-1',
+    'unit-test-attribution-app-ui-services-attempt-1',
+    'windows-native-node-attempt-1',
+  ]) });
+  assert.equal(report.unitAttribution.length, 2, 'aggregate owns no JUnit payload');
+  assert.equal(report.unitAttribution[0].artifactPresent, false, 'old attempt cannot mask missing UI evidence');
+  assert.equal(report.unitAttribution[1].artifactPresent, true, 'unchanged services part retains attempt 1');
+  assert.equal(report.partEvidence.find((p) => p.job === windows.name).artifactPresent, false);
+  assert.ok(report.warnings.some((w) => w.includes('windows-native-node-attempt-2')));
+  assert.ok(report.jobs.find((j) => j.name === ui.name).factLane.required);
+}

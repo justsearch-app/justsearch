@@ -79,3 +79,25 @@ test('the checked-in workflow enforces engine-port on production', () => {
   assert.equal(r.rows.find((row) => row.id === 'engine-port').production, true);
   assert.deepEqual(r.issues, []);
 });
+
+test('snapshot production gates remain enforced through a fail-closed required aggregate', () => {
+  const read = (p) => fs.readFileSync(new URL('../../' + p, import.meta.url), 'utf8');
+  const workflowText = read('.github/workflows/ci.yml');
+  const options = {
+    registry: JSON.parse(read('governance/registry.v1.json')),
+    requiredChecks: JSON.parse(read('scripts/ci/workflow-signal-policy.v1.json')).workflows.find((w) => w.name === 'CI').requiredStatusChecks,
+    consultRegister: JSON.parse(read('governance/consult-register.v1.json')),
+    exemptions: JSON.parse(read('scripts/ci/governance-ci-coverage-policy.v1.json')).exemptions,
+  };
+  assert.deepEqual(checkCoverage({ ...options, workflowText }).issues, []);
+  for (const altered of [
+    workflowText.replace('needs: [app-ui-ui, app-ui-services]', 'needs: [app-ui-ui]'),
+    workflowText.replace('  app-ui-services:\n', '  app-ui-services:\n    continue-on-error: true\n'),
+    workflowText.replace('test "$SERVICES_RESULT" = success', 'true'),
+    workflowText.replace(':modules:app-services:exportRegistrySnapshot', ':modules:app-services:classes'),
+    workflowText.replace("includes('snapshot-missing')", "includes('ignored')"),
+  ]) {
+    const issues = checkCoverage({ ...options, workflowText: altered }).issues;
+    assert.ok(issues.some((i) => i.startsWith('consumer-presence:')), issues.join('\n'));
+  }
+});

@@ -152,6 +152,9 @@ export function buildLaneArtifactMap(repoRoot) {
   for (const laneEntry of policy.lanes) {
     map[laneEntry.lane] = { artifact: laneEntry.artifact, file: 'unit-test-attribution.json' };
   }
+  for (const [lane, artifact] of Object.entries(policy.historicalArtifacts || {})) {
+    map[lane] = { artifact, file: 'unit-test-attribution.json' };
+  }
   map['integration-tests'] = { artifact: 'integration-test-results', file: 'integration-test-attribution.json' };
   return map;
 }
@@ -191,7 +194,7 @@ function downloadAndReadJson(ghBin, repo, runId, artifactName, filename, scratch
 /** Build (or read from cache) the compact per-run record: which lanes had attribution data,
  * and their flakyTests. Cached per run-id so repeat invocations skip re-downloading. */
 export function ensureRunRecord(ghBin, repo, run, laneMap, cacheDir) {
-  const cacheFile = path.join(cacheDir, `${run.id}.json`);
+  const cacheFile = path.join(cacheDir, `${run.id}-attempt-${run.run_attempt || 1}.json`);
   if (fs.existsSync(cacheFile)) {
     try {
       return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
@@ -200,10 +203,27 @@ export function ensureRunRecord(ghBin, repo, run, laneMap, cacheDir) {
     }
   }
 
+  // Artifact names include attempts for independently rerunnable parts. Select
+  // the latest available attempt for each part; unchanged parts retain their evidence.
+  const listing = spawnSync(ghBin, ['api', `repos/${repo}/actions/runs/${run.id}/artifacts?per_page=100`], { encoding: 'utf8' });
+  let artifacts = [];
+  if (listing.status === 0) {
+    try { artifacts = JSON.parse(listing.stdout).artifacts || []; } catch { /* missing evidence remains no data */ }
+  }
+  const jobListing = spawnSync(ghBin, ['api', `repos/${repo}/actions/runs/${run.id}/jobs?filter=latest&per_page=100`], { encoding: 'utf8' });
+  let jobs = [];
+  if (jobListing.status === 0) {
+    try { jobs = JSON.parse(jobListing.stdout).jobs || []; } catch { /* no data */ }
+  }
   const lanes = {};
   for (const [laneName, { artifact, file }] of Object.entries(laneMap)) {
     const scratchDir = path.join(cacheDir, '_scratch', String(run.id), laneName);
-    const json = downloadAndReadJson(ghBin, repo, run.id, artifact, file, scratchDir);
+    const job = jobs.find((j) => j.name === `Unit tests (${laneName})`);
+    const candidates = artifacts.filter((a) => !a.expired && (a.name === artifact
+      || (a.name.startsWith(`${artifact}-attempt-`) && (!job?.run_attempt || a.name === `${artifact}-attempt-${job.run_attempt}`))));
+    candidates.sort((a, b) => Number(b.name.split('-attempt-')[1] || 0) - Number(a.name.split('-attempt-')[1] || 0));
+    const selected = candidates[0]?.name || artifact;
+    const json = downloadAndReadJson(ghBin, repo, run.id, selected, file, scratchDir);
     fs.rmSync(scratchDir, { recursive: true, force: true });
     if (json && Array.isArray(json.flakyTests)) {
       lanes[laneName] = { hasData: true, flakyTests: json.flakyTests };
