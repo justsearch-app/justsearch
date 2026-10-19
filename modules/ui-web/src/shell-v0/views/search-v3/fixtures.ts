@@ -52,6 +52,8 @@ export const HERO_HEADLINE = 'What are you looking for?';
 export interface Sv3EmptyCopy {
   readonly title: string;
   readonly description: string;
+  /** The same outcome while filters restrict the list — the remedy is then theirs to remove. */
+  readonly filteredDescription?: string;
 }
 
 export const SIDEBAR_EMPTY: Sv3EmptyCopy = {
@@ -60,9 +62,13 @@ export const SIDEBAR_EMPTY: Sv3EmptyCopy = {
 };
 
 export const MAIN_EMPTY: Sv3EmptyCopy = {
-  title: 'Nothing matched',
-  description: 'Try fewer words, or widen the scope to all sources.',
+  title: 'No documents matched',
+  description: 'Try fewer or different words.',
+  filteredDescription: 'Try fewer words, or remove a filter above.',
 };
+
+/** WP1.1 — a hit with no document path can be neither opened nor asked about; said, not dropped. */
+export const SV3_RESULT_NO_DOCUMENT = 'This result has no file to open or ask about.';
 
 /**
  * A failed search establishes no match count. This includes a backend rejection as well as
@@ -138,8 +144,11 @@ export interface Sv3Command {
   readonly selected?: boolean;
 }
 
-/** Named rather than inlined, because the window matches on it and a typo would silently do nothing. */
-export const SV3_COMMAND_SEARCH_TEXT = 'cmd-search-text';
+/**
+ * Named rather than inlined, because the window matches on it and a typo would silently do nothing.
+ * WP1.1 — "Search everything" is live: it puts the composer in Search mode and searches the draft.
+ */
+export const SV3_COMMAND_SEARCH = 'cmd-everything';
 
 /** The palette's export command (tempdoc 822 Phase F7; inventory A10). Named for the same reason. */
 export const SV3_COMMAND_EXPORT_MARKDOWN = 'cmd-export-markdown';
@@ -160,17 +169,11 @@ export const COMMAND_GROUPS: readonly Sv3CommandGroup[] = [
     id: 'cg-search',
     label: 'Search',
     commands: [
-      { id: 'cmd-everything', label: 'Search everything', shortcut: 'Ctrl L' },
+      { id: SV3_COMMAND_SEARCH, label: 'Search everything' },
       { id: 'cmd-scope-sources', label: 'Scope to all sources', selected: true },
       { id: 'cmd-scope-recent', label: 'Scope to the last 7 days' },
       { id: 'cmd-similar', label: 'Find documents like this one' },
       { id: 'cmd-explain', label: 'Explain why this result ranked' },
-      /* The ONE live command among the placeholders, and a deliberately TEMPORARY one (tempdoc 822
-         Phase F1): plain submit now goes to the ask tier, so this is what keeps Phase A1's search
-         seam reachable and therefore demonstrable until the deferred search-integration
-         conversation decides where search belongs in this window. Handled in
-         `SearchV3View.onPaletteRun`. */
-      { id: SV3_COMMAND_SEARCH_TEXT, label: 'Search this text' },
     ],
   },
   {

@@ -213,6 +213,82 @@ describe('ResultsCard — multi-select event model (ports SearchSurface.multiSel
   });
 });
 
+describe('ResultsCard — selection-mode="explicit": opening a hit never discards the choice (WP1.1 S1.5)', () => {
+  const HITS = [hit('a'), hit('b'), hit('c'), hit('d')];
+  const snapshotWith = (results: CardHit[]): CardSnapshot => ({
+    ...BASE,
+    matchCount: results.length,
+    totalHits: results.length,
+    results,
+  });
+
+  async function mountExplicit(): Promise<{ el: ResultsCard; selections: CardSelectionDetail[]; opens: string[] }> {
+    const el = await mount(snapshotWith(HITS));
+    el.selectionMode = 'explicit';
+    await el.updateComplete;
+    const selections = collectSelections(el);
+    // The host round-trip, as in the default-mode cases above.
+    el.addEventListener('card-selection', (e) => {
+      el.selectedIds = new Set((e as CustomEvent<CardSelectionDetail>).detail.ids);
+    });
+    const opens: string[] = [];
+    el.addEventListener('card-open', (e) => opens.push((e as CustomEvent<{ id: string }>).detail.id));
+    return { el, selections, opens };
+  }
+
+  afterEach(() => {
+    for (const menu of [...document.querySelectorAll('jf-context-menu')]) menu.remove();
+  });
+
+  it('a plain click opens and leaves the selection alone', async () => {
+    const { el, selections, opens } = await mountExplicit();
+    clickRow(el, 'a', { ctrlKey: true });
+    clickRow(el, 'b', { ctrlKey: true });
+    await el.updateComplete;
+    clickRow(el, 'c');
+    expect(opens).toEqual(['c']);
+    expect(selections.at(-1)?.ids).toEqual(['a', 'b']);
+    expect(selections).toHaveLength(2);
+  });
+
+  it('Ctrl and Shift choose without opening, and Shift ranges from the row read last', async () => {
+    const { el, selections, opens } = await mountExplicit();
+    clickRow(el, 'b');
+    clickRow(el, 'd', { shiftKey: true });
+    expect(opens).toEqual(['b']);
+    expect([...selections.at(-1)!.ids].sort()).toEqual(['b', 'c', 'd']);
+  });
+
+  it('the row menu opens without choosing, and offers choosing to the keyboard', async () => {
+    const { el, selections, opens } = await mountExplicit();
+    const menuEntry = async (id: string, label: string): Promise<HTMLButtonElement> => {
+      row(el, id).querySelector<HTMLButtonElement>('[data-testid="row-actions"]')?.click();
+      await new Promise((r) => setTimeout(r, 0));
+      const menu = document.querySelector('jf-context-menu') as (HTMLElement & { updateComplete: Promise<unknown> }) | null;
+      await menu?.updateComplete;
+      const item = [...(menu?.shadowRoot?.querySelectorAll<HTMLButtonElement>('button.item') ?? [])].find((b) =>
+        (b.textContent ?? '').includes(label),
+      );
+      if (!item) throw new Error(`no menu entry ${label}`);
+      return item;
+    };
+    (await menuEntry('a', 'Add to chosen files')).click();
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    expect(selections.at(-1)?.ids).toEqual(['a']);
+    expect(opens).toEqual([]);
+
+    (await menuEntry('b', 'Open document')).click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(opens).toEqual(['b']);
+    expect(selections).toHaveLength(1);
+
+    (await menuEntry('a', 'Remove from chosen files')).click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(selections.at(-1)?.ids).toEqual([]);
+  });
+});
+
 describe('ResultsCard — facet chips (ports SearchSurface.facets.test.ts, tempdoc 577 Phase 6 Move E)', () => {
   const FACET_SNAPSHOT: CardSnapshot = {
     ...BASE,

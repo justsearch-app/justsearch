@@ -113,6 +113,22 @@ export interface Sv3ComposerSubmit {
 }
 
 /**
+ * WP1.1 — raised on every settled edit of the draft: each keystroke, and the end of an IME
+ * composition (never a half-composed string). Search mode searches as the reader types, so the
+ * window has to hear the draft before it is sent; it ignores the event in the other modes.
+ * `previous` is the draft before this edit — what a place the reader is LEAVING should keep.
+ */
+export const SV3_COMPOSER_DRAFT = 'sv3-composer-draft';
+
+export interface Sv3ComposerDraft {
+  readonly text: string;
+  readonly previous: string;
+}
+
+/** WP1.1 — the reader dropped the chosen files from the prepared Ask, which then asks all files. */
+export const SV3_COMPOSER_SCOPE_CLEAR = 'sv3-composer-scope-clear';
+
+/**
  * Raised when the reader halts a streaming response (tempdoc 822 Phase F1). The window holds the
  * AbortController, so the composer announces the intent and nothing else.
  */
@@ -850,6 +866,32 @@ export class Sv3Composer extends JfElement {
         font-size: var(--font-size-sv3-xs);
         line-height: 1.334;
       }
+      .menu-item-reason {
+        display: block;
+        color: var(--foreground);
+        font-size: var(--font-size-sv3-xs);
+        line-height: 1.334;
+      }
+      .scope {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
+      .scope-clear {
+        margin-inline-start: auto;
+        min-width: 24px;
+        min-height: 24px;
+        border: 0;
+        border-radius: var(--radius-md);
+        background: transparent;
+        color: var(--foreground);
+        font: inherit;
+        cursor: pointer;
+      }
+      .scope-clear:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+      }
 
       /* §5.9's compaction, in two elements: the outer carries the WIDTH (which collapses in one
          frame, so the footer reflows immediately) and the inner carries the MOTION. Docking is
@@ -1037,6 +1079,7 @@ export class Sv3Composer extends JfElement {
     corpus: { attribute: false },
     effort: { type: String, reflect: true },
     tier: { type: String, reflect: true },
+    scopeLabel: { type: String, attribute: 'scope-label' },
     modelLabel: { type: String, reflect: true, attribute: 'model-label' },
     draft: { state: true },
     effortMenuOpen: { state: true },
@@ -1118,6 +1161,11 @@ export class Sv3Composer extends JfElement {
    */
   declare tier: Sv3ComposerTier;
   /**
+   * WP1.1 — the files the next Ask is limited to, in the reader's words, or `''` for none. Shown
+   * in Ask mode only, because only an Ask carries it, with the one control that drops it.
+   */
+  declare scopeLabel: string;
+  /**
    * Which model would answer the next question, VERBATIM from the runtime authority (tempdoc 822
    * Phase F11; the same expression `SearchV3View` stamps on a turn). The window authors no model
    * name: no shortening, no re-casing, no vendor-stripping.
@@ -1166,6 +1214,7 @@ export class Sv3Composer extends JfElement {
     this.corpus = SV3_CORPUS_UNKNOWN;
     this.effort = SV3_EFFORT_DEFAULT;
     this.tier = SV3_TIER_DEFAULT;
+    this.scopeLabel = '';
     this.modelLabel = '';
     this.draft = '';
     this.effortMenuOpen = false;
@@ -1184,7 +1233,25 @@ export class Sv3Composer extends JfElement {
   }
 
   private onInput(event: Event): void {
-    this.draft = (event.target as HTMLTextAreaElement).value;
+    this.setDraft((event.target as HTMLTextAreaElement).value, (event as InputEvent).isComposing === true);
+  }
+
+  /** The IME committed: the composed text is the draft now, and only now is it announced. */
+  private onCompositionEnd(event: Event): void {
+    this.setDraft((event.target as HTMLTextAreaElement).value, false);
+  }
+
+  private setDraft(text: string, composing: boolean): void {
+    const previous = this.draft;
+    this.draft = text;
+    if (composing) return;
+    this.dispatchEvent(
+      new CustomEvent<Sv3ComposerDraft>(SV3_COMPOSER_DRAFT, {
+        detail: { text, previous },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   private onKeydown(event: KeyboardEvent): void {
@@ -1286,6 +1353,19 @@ export class Sv3Composer extends JfElement {
   private submit(tier: Sv3ComposerTier): void {
     const query = this.draft.trim();
     if (query.length === 0) return;
+    // WP1.1 — a SEARCH is none of the three. It joins no run, resolves no decision and needs no
+    // model, so no rung and no availability gate applies to it. (A chord pressed in Search mode is
+    // not a search: the window applies the run rules to it, because only the window sees the run.)
+    if (tier === 'search') {
+      this.dispatchEvent(
+        new CustomEvent<Sv3ComposerSubmit>(SV3_COMPOSER_SUBMIT, {
+          detail: { query, tier },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+      return;
+    }
     if (this.slotKind === 'answer') return;
     if (this.slotKind === 'stop' && !this.steerable) return;
     // A STEER is not a new commitment against the tier's gate — it joins a run that is already
@@ -1335,6 +1415,7 @@ export class Sv3Composer extends JfElement {
           : html`<p class="notice" id="sv3-composer-notice" role="status" data-testid="sv3-composer-notice">
               ${reason}
             </p>`}
+        ${this.scopeNote()}
         <div
           class="glass"
           data-testid="sv3-composer-shell"
@@ -1349,6 +1430,7 @@ export class Sv3Composer extends JfElement {
                 aria-label=${COMPOSER_PLACEHOLDER}
                 data-testid="sv3-composer-input"
                 @input=${this.onInput}
+                @compositionend=${this.onCompositionEnd}
                 @keydown=${this.onKeydown}
               ></textarea>
               ${empty
@@ -1556,11 +1638,47 @@ export class Sv3Composer extends JfElement {
                   : nothing}
               </span>
               <span class="menu-item-description">${option.description}</span>
+              ${this.tierReason(option.id) === ''
+                ? nothing
+                : html`<span class="menu-item-reason" data-testid="sv3-composer-tier-reason"
+                    >${this.tierReason(option.id)}</span
+                  >`}
             </button>
           `,
         )}
       </div>
     `;
+  }
+
+  /** Why a mode cannot run right now, from the same reasons the window hands down; `''` if it can. */
+  private tierReason(tier: Sv3ComposerTier): string {
+    if (tier === 'delegate') return this.delegateUnavailableReason;
+    if (tier === 'ask') return this.unavailableReason;
+    return '';
+  }
+
+  /**
+   * WP1.1 — the chosen files the next Ask is limited to, said where the Ask is typed, with the one
+   * control that drops them (the Ask then searches all files, and the hint says so).
+   */
+  private scopeNote(): TemplateResult | typeof nothing {
+    if (this.tier !== 'ask' || this.scopeLabel === '') return nothing;
+    return html`<p class="notice scope" data-testid="sv3-composer-scope">
+      <span>Limited to ${this.scopeLabel}</span>
+      <button
+        type="button"
+        class="scope-clear"
+        data-testid="sv3-composer-scope-clear"
+        aria-label="Ask about all files instead"
+        title="Ask about all files instead"
+        @click=${() =>
+          this.dispatchEvent(
+            new CustomEvent(SV3_COMPOSER_SCOPE_CLEAR, { bubbles: true, composed: true }),
+          )}
+      >
+        ×
+      </button>
+    </p>`;
   }
 
   /**
@@ -1729,7 +1847,7 @@ export class Sv3Composer extends JfElement {
    * that is about to run rather than the one that used to be the only answer.
    */
   private get activeUnavailableReason(): string {
-    return this.tier === 'delegate' ? this.delegateUnavailableReason : this.unavailableReason;
+    return this.tierReason(this.tier);
   }
 
   /**

@@ -51,13 +51,8 @@ import { FrameLatch } from '../../primitives/frameLatch.js';
 import { sv3Tokens } from './sv3-tokens.css.js';
 import { sv3Shared } from './sv3-shared-styles.js';
 import { COMPOSER_STATE_DEFAULT, WINDOW_TITLE, type Sv3ComposerState } from './fixtures.js';
-import {
-  setQuery,
-  setSearchApiBase,
-  submitSearch,
-  subscribeSearch,
-  type SearchState,
-} from '../../state/searchState.js';
+import { removeScopeChip, setSearchApiBase } from '../../state/searchState.js';
+import { clearFilters, toggleFacetValue } from '../../state/searchFiltersState.js';
 import {
   adoptSv3MorphSheet,
   releaseSv3MorphSheet,
@@ -65,12 +60,21 @@ import {
 } from './sv3-composer-morph.js';
 import {
   type Sv3Composer,
+  type Sv3ComposerDraft,
   type Sv3ComposerStateRequest,
   type Sv3ComposerSubmit,
   type Sv3EffortChange,
   type Sv3TierChange,
 } from './Sv3Composer.js';
-import { projectSv3Results, type Sv3ResultsView } from './sv3-results.js';
+import {
+  Sv3SearchController,
+  sv3ResendScopeNote,
+  sv3ScopeFromPath,
+  sv3ScopeLabel,
+  type Sv3AskScope,
+} from './sv3-search.js';
+import type { Sv3ResultsFilterRemove } from './Sv3Results.js';
+import type { CardSelectionDetail } from '../../components/searchResults/ResultsCard.js';
 import {
   type Sv3SessionPin,
   type Sv3SessionRemove,
@@ -313,8 +317,9 @@ import {
   deleteCascadeTitle,
   PANE_LABEL,
   SV3_COMMAND_EXPORT_MARKDOWN,
-  SV3_COMMAND_SEARCH_TEXT,
+  SV3_COMMAND_SEARCH,
   SV3_DRAFT_KEY,
+  SV3_RESULT_NO_DOCUMENT,
   SV3_RENAME_FAILED,
   SV3_SURFACE_KEY,
 } from './fixtures.js';
@@ -353,6 +358,9 @@ const SIDEBAR_GRIP_LABEL =
  */
 const isPaletteChord = (event: KeyboardEvent): boolean =>
   (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'k';
+
+/** WP1.1 — the result list's key among the places whose unsent drafts are kept (conversation ids). */
+const RESULTS_PLACE = '\u0000results';
 
 const isComposerState = (value: string | null): value is Sv3ComposerState =>
   value === 'hero' || value === 'docked';
@@ -644,8 +652,6 @@ export class SearchV3View extends JfElement {
     composerState: { type: String, reflect: true, attribute: COMPOSER_STATE_ATTR },
     theme: { type: String, reflect: true },
     apiBase: { type: String, attribute: 'api-base' },
-    searchSnapshot: { state: true },
-    asked: { state: true },
     sessions: { state: true },
     aiSnapshot: { state: true },
     streaming: { state: true },
@@ -683,13 +689,6 @@ export class SearchV3View extends JfElement {
   declare theme: AppearanceMode;
   /** Set by the shell on every render of a mounted surface (`chrome/Shell.ts:2945-2949`). */
   declare apiBase: string;
-  /** The latest store emission. Null only until the subscription's first (immediate) call. */
-  declare searchSnapshot: SearchState | null;
-  /**
-   * Whether THIS window has sent anything. The store is a process-wide singleton, so without this
-   * the window would render another surface's results as its own the moment it docked.
-   */
-  declare asked: boolean;
   /**
    * The window's session list — a PROJECTION and a per-render cache of the app-wide conversation
    * store plus the canonical thread record, not an authority of its own (Phase F6; the exact split
@@ -802,7 +801,6 @@ export class SearchV3View extends JfElement {
   /** 859 §B — the dock's own box watcher, and the node it is currently bound to. */
   private dockObserver: ResizeObserver | null = null;
   private observedDock: HTMLElement | null = null;
-  private searchUnsubscribe: (() => void) | null = null;
   private aiUnsubscribe: (() => void) | null = null;
   private uiModeUnsubscribe: (() => void) | null = null;
   private appearanceUnsubscribe: (() => void) | null = null;
@@ -863,6 +861,21 @@ export class SearchV3View extends JfElement {
    * `streaming` status alone is per-turn and reachable for two turns at once.
    */
   private askReasoningTurnId: string | null = null;
+  /**
+   * WP1.1 — Search mode: the shared search store's reader, the result list's chosen rows, and the
+   * files a prepared Ask is limited to (`sv3-search.ts`). The window keeps only the navigation.
+   */
+  private readonly search = new Sv3SearchController(this);
+  /**
+   * WP1.1 S1.13 — each place's own unsent draft: a conversation's follow-up, or the result list's
+   * query. Window-local, like the result list itself; the one persisted draft is still the composer's.
+   */
+  private readonly placeDrafts = new Map<string, string>();
+  /**
+   * WP1.1 — the mode is Ask only because a conversation was opened from Search, not because the
+   * reader chose it. A New session undoes exactly that switch and keeps a mode the reader chose.
+   */
+  private tierFollowsPlace = false;
 
   constructor() {
     super();
@@ -872,8 +885,6 @@ export class SearchV3View extends JfElement {
     // pre-paint script exists to avoid.
     this.theme = getAppearanceMode();
     this.apiBase = '';
-    this.searchSnapshot = null;
-    this.asked = false;
     this.sessions = SV3_SESSIONS_EMPTY;
     this.aiSnapshot = null;
     this.streaming = false;
@@ -920,9 +931,6 @@ export class SearchV3View extends JfElement {
     this.restoreBoundaryPreferences();
     this.observeWindowBox();
     setSearchApiBase(this.apiBase || '');
-    this.searchUnsubscribe = subscribeSearch((snapshot) => {
-      this.searchSnapshot = snapshot;
-    });
     this.aiUnsubscribe = subscribeAiState((snapshot) => {
       this.aiSnapshot = snapshot;
       this.applyLockState(snapshot);
@@ -1049,8 +1057,6 @@ export class SearchV3View extends JfElement {
     this.recordAbort = null;
     this.historyAbort?.abort();
     this.historyAbort = null;
-    this.searchUnsubscribe?.();
-    this.searchUnsubscribe = null;
     this.aiUnsubscribe?.();
     this.aiUnsubscribe = null;
     this.uiModeUnsubscribe?.();
@@ -1273,6 +1279,8 @@ export class SearchV3View extends JfElement {
       { id, title: null, firstUserMessage: '', createdAt: now, lastActiveAt: now },
     ]);
     this.sessions = focusSession(this.sessions, id, now);
+    // A conversation is open, so Enter continues it (WP1.1: only a window with none starts in Search).
+    this.askInConversation();
     // A REHYDRATION, not a claim (tempdoc 864 PR C): this is the position the tab already had, so
     // it corrects the URL in place. Pushing here would leave a history entry for the bare surface
     // address behind the one the reader is on, and Back would look broken on the very first press.
@@ -1296,6 +1304,13 @@ export class SearchV3View extends JfElement {
    */
   private followStoreConversation(storeActiveId: string | null): void {
     if (storeActiveId === this.sessions.activeId) return;
+    if (storeActiveId === null && this.search.hasPlace) {
+      // WP1.1 S1.13 — the bare address is the result list when this window has one: Back/Forward
+      // between results and a conversation returns to the list, its query and its chosen files.
+      this.returnToResults();
+      clearLastViewedConversation();
+      return;
+    }
     if (storeActiveId === null) {
       // The hero is a real address (the bare surface URL), so arriving back at it is the teardown
       // New session does — minus the focus move, which belongs to the affordance, and minus the
@@ -1311,6 +1326,7 @@ export class SearchV3View extends JfElement {
     // An edit in another row is DROPPED rather than committed, the same rule every other move
     // between conversations applies.
     this.renamingId = null;
+    this.swapPlace(storeActiveId);
     const now = Date.now();
     if (sessionById(this.sessions, storeActiveId) === null) {
       this.sessions = mergeStoreConversations(this.sessions, [
@@ -1467,7 +1483,12 @@ export class SearchV3View extends JfElement {
       actions: [
         ...branch.map((item) => ({
           id: item.id,
-          label: item.label,
+          // WP1.1 S1.7 — a Retry says what it will search before it is pressed: the same chosen
+          // files when this window limited the turn, otherwise all files (a reloaded turn included).
+          label:
+            item.id === 'retry'
+              ? `${item.label} · ${sv3ResendScopeNote(this.search.scopeOfTurn(detail.turnId))}`
+              : item.label,
           icon: 'git-branch' as const,
           category: 'ai' as const,
           enabled: item.enabled,
@@ -1674,13 +1695,23 @@ export class SearchV3View extends JfElement {
       case 'retry': {
         const question = turn?.question ?? '';
         if (lineage.forkKey === null || question === '') return;
-        await this.branchInto(session.id, lineage.forkKey, question);
+        await this.branchInto(
+          session.id,
+          lineage.forkKey,
+          question,
+          this.search.scopeOfTurn(detail.turnId),
+        );
         return;
       }
       case 'edit': {
         const text = (detail.text ?? '').trim();
         if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
-        await this.branchInto(session.id, lineage.forkKey, text);
+        await this.branchInto(
+          session.id,
+          lineage.forkKey,
+          text,
+          this.search.scopeOfTurn(detail.turnId),
+        );
         return;
       }
       default:
@@ -1704,6 +1735,7 @@ export class SearchV3View extends JfElement {
     sessionId: string,
     fromMsgId: string,
     resend: string | null,
+    scope: Sv3AskScope | null = null,
   ): Promise<void> {
     // The preview is the conversation's OPENING question, the same thing the shipped window sends
     // (`:1485`): it is what makes the new session surface as a recent one with a name.
@@ -1714,7 +1746,9 @@ export class SearchV3View extends JfElement {
       return;
     }
     await this.openBranch(branched);
-    if (resend !== null) await this.runAsk(resend);
+    // A re-send keeps the files its turn was limited to (WP1.1 S1.7) — or, for a turn this window
+    // did not limit, asks all files, which is what its Retry/Edit said it would do.
+    if (resend !== null) await this.runAsk(resend, scope);
   }
 
   /**
@@ -1729,6 +1763,7 @@ export class SearchV3View extends JfElement {
    */
   private async openBranch(id: string): Promise<void> {
     const prevId = this.sessions.activeId;
+    this.swapPlace(id);
     const now = Date.now();
     this.sessions = mergeStoreConversations(this.sessions, [
       { id, title: null, firstUserMessage: '', createdAt: now, lastActiveAt: now },
@@ -2120,6 +2155,10 @@ export class SearchV3View extends JfElement {
   private onCitationOpen(event: Event): void {
     const detail = (event as CustomEvent<Sv3CitationOpen>).detail;
     if (!detail?.docPath) return;
+    this.openPane(detail);
+  }
+
+  private openPane(detail: Sv3CitationOpen): void {
     const available = this.availableWidth();
     this.paneOverlay = !sv3PaneIsInline(available);
     this.paneWidthPx = clampSv3PaneWidth(this.paneWidthPx, available, this.sidebarOccupiedWidth());
@@ -2348,6 +2387,15 @@ export class SearchV3View extends JfElement {
     const detail = (event as CustomEvent<Sv3ComposerSubmit>).detail;
     const text = (detail?.query ?? '').trim();
     if (text === '') return;
+    // WP1.1 — a SEARCH is decided before the run is consulted at all: it is not a send into any
+    // conversation, so it can never steer, answer or stop a run (S1.8).
+    if (detail?.tier === 'search') {
+      this.searchNow(text);
+      return;
+    }
+    // A chord pressed in Search mode reached here past none of the composer's run rules — the
+    // composer's slot was the search slot — so they are applied here, the same ones.
+    if (this.tier === 'search' && this.chordRefused()) return;
     if (this.steerableRun !== null) {
       this.steerLiveRun(text);
       return;
@@ -2356,7 +2404,192 @@ export class SearchV3View extends JfElement {
       this.delegate(text);
       return;
     }
-    void this.runAsk(text);
+    // The prepared files belong to an Ask sent FROM the result list, and to that one Ask only.
+    void this.runAsk(text, this.search.showing ? this.search.takeScope() : null);
+  }
+
+  /** Whether a response or a delegated run is live — the slot's `running`, read in one place. */
+  private isRunning(run: Sv3RunView | null): boolean {
+    return (
+      this.streaming ||
+      run?.phase === 'dispatching' ||
+      run?.phase === 'running' ||
+      run?.phase === 'holding'
+    );
+  }
+
+  /**
+   * The composer's run rules for a Ctrl+Enter pressed in Search mode: a held decision takes no
+   * send, a live run takes only a steer, and an idle window delegates only when the agent can run.
+   */
+  private chordRefused(): boolean {
+    const run = this.projectRun();
+    if (run !== null && run.prompts.length > 0) return true;
+    if (this.isRunning(run)) return this.steerableRun === null;
+    return this.delegateUnavailableReason !== '';
+  }
+
+  /* ── Search mode (WP1.1) ─────────────────────────────────────────────────────────────────── */
+
+  /** A settled keystroke. In Search mode it is a search, staged exactly as the default window's. */
+  private onComposerDraft(event: Event): void {
+    const detail = (event as CustomEvent<Sv3ComposerDraft>).detail;
+    if (this.tier !== 'search' || detail === undefined) return;
+    this.search.type(detail.text);
+    if (detail.text.trim() !== '') this.enterResults(detail.previous);
+  }
+
+  /** Enter in Search mode, or the palette's search: the full pass, now. */
+  private searchNow(text: string): void {
+    this.search.submit(text);
+    this.enterResults(this.currentDraft());
+  }
+
+  /**
+   * Show the result list. From a conversation this is a MOVE, not a teardown: the conversation keeps
+   * streaming, running or waiting for its decision (nothing is aborted or detached), stays in the
+   * sidebar one click away, and keeps its unsent draft (`leftDraft`, the text before this keystroke)
+   * for when the reader goes back. The address moves to the bare surface, so Back returns to it.
+   */
+  private enterResults(leftDraft: string): void {
+    if (!this.search.showing) {
+      const leaving = this.sessions.activeId;
+      if (leaving !== null) {
+        this.placeDrafts.set(leaving, leftDraft);
+        this.sessions = startNewSession(this.sessions);
+        setActiveConversation(null);
+        clearLastViewedConversation();
+      }
+      this.renamingId = null;
+      this.recordNotice = false;
+      // A cited document belonged to the conversation's answer, not to this list.
+      this.closePane();
+      this.search.show();
+    }
+    void this.setComposerState('docked');
+  }
+
+  /** Back/Forward onto the bare address while this window has a result list. */
+  private returnToResults(): void {
+    const leaving = this.sessions.activeId;
+    if (leaving !== null) this.placeDrafts.set(leaving, this.currentDraft());
+    this.renamingId = null;
+    this.recordNotice = false;
+    this.closePane();
+    this.sessions = startNewSession(this.sessions);
+    this.search.show();
+    this.tier = this.search.pendingScope !== null ? 'ask' : 'search';
+    this.tierFollowsPlace = false;
+    const composer = this.composer;
+    if (composer !== null) composer.draft = this.placeDrafts.get(RESULTS_PLACE) ?? this.search.query;
+    void this.setComposerState('docked');
+  }
+
+  /**
+   * A conversation is being opened by navigation (a row, Back/Forward, a branch, a version). The
+   * place being left keeps its draft and the one arrived at gets its own back; the result list is
+   * no longer on screen, and Enter continues the conversation rather than searching away from it.
+   * Leaving the hero is not leaving a place: its draft travels, as it always has.
+   */
+  private swapPlace(to: string): void {
+    const from = this.search.showing ? RESULTS_PLACE : this.sessions.activeId;
+    if (from === to) return;
+    if (from !== null) this.placeDrafts.set(from, this.currentDraft());
+    this.search.hide();
+    this.askInConversation();
+    const composer = this.composer;
+    if (from !== null && composer !== null) composer.draft = this.placeDrafts.get(to) ?? '';
+  }
+
+  /** Opening a conversation from Search mode: Enter now continues it. */
+  private askInConversation(): void {
+    if (this.tier !== 'search') return;
+    this.tier = 'ask';
+    this.tierFollowsPlace = true;
+  }
+
+  /** A send opened a conversation from the result list: the list keeps its query for Back. */
+  private leaveResultsBySending(): void {
+    if (!this.search.showing) return;
+    this.placeDrafts.set(RESULTS_PLACE, this.search.query);
+    this.search.hide();
+  }
+
+  private onResultsFilterRemove(event: Event): void {
+    const filter = (event as CustomEvent<Sv3ResultsFilterRemove>).detail;
+    if (filter === undefined) return;
+    if (filter.kind === 'scope') removeScopeChip(filter.index);
+    else if (filter.kind === 'date') clearFilters();
+    else toggleFacetValue(filter.field, filter.value);
+    this.search.rerun();
+  }
+
+  /** The card's facet chips — the default window's handler, on the same store. */
+  private onCardFacetToggle(event: Event): void {
+    const detail = (event as CustomEvent<{ field: string; value: string }>).detail;
+    if (detail === undefined) return;
+    toggleFacetValue(detail.field, detail.value);
+    this.search.rerun();
+  }
+
+  private onCardSelection(event: Event): void {
+    const detail = (event as CustomEvent<CardSelectionDetail>).detail;
+    if (detail === undefined) return;
+    this.search.select(detail.ids);
+  }
+
+  /** Open a hit in the document pane — the one pane writer, with no citation to anchor. */
+  private onCardOpen(event: Event): void {
+    const id = (event as CustomEvent<{ id: string }>).detail?.id;
+    const hit = this.search.snapshot?.results.find((candidate) => candidate.id === id);
+    if (hit === undefined) return;
+    if (hit.path === '') {
+      emitEphemeralToast({ message: SV3_RESULT_NO_DOCUMENT, severity: 'warning' });
+      return;
+    }
+    this.openPane({
+      docPath: hit.path,
+      anchor: null,
+      turnId: '',
+      sourceIndex: SV3_SOURCE_INDEX_ABSENT,
+    });
+  }
+
+  private onCardScopeFile(event: Event): void {
+    const path = (event as CustomEvent<{ path: string }>).detail?.path ?? '';
+    this.prepareAsk(sv3ScopeFromPath(path));
+  }
+
+  private onResultsAsk(): void {
+    if (this.askUnavailableReason !== '') {
+      this.refuseAsk();
+      return;
+    }
+    this.prepareAsk(this.search.prepareFromSelection());
+  }
+
+  /**
+   * Make the next Ask one about these files: fixed now, so a later re-rank or filter cannot change
+   * it (S1.6). Refused — never widened — when the choice names no document, and refused with the
+   * existing reason when chat cannot run, keeping the query and the choice (S1.4).
+   */
+  private prepareAsk(scope: Sv3AskScope | null): void {
+    if (this.askUnavailableReason !== '') {
+      this.refuseAsk();
+      return;
+    }
+    if (scope === null) {
+      emitEphemeralToast({ message: SV3_RESULT_NO_DOCUMENT, severity: 'warning' });
+      return;
+    }
+    this.search.prepare(scope);
+    this.tier = 'ask';
+    this.tierFollowsPlace = false;
+    void this.focusComposer();
+  }
+
+  private refuseAsk(): void {
+    emitEphemeralToast({ message: this.askUnavailableReason, severity: 'warning' });
   }
 
   /**
@@ -2397,12 +2630,16 @@ export class SearchV3View extends JfElement {
    * busy send before it leaves, so this method is not a second gate re-deciding the same question —
    * it opens the turn, dispatches through the window's single ask site, and settles that turn.
    */
-  private async runAsk(rawQuestion: string): Promise<void> {
+  private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null): Promise<void> {
     const question = rawQuestion.trim();
     if (question === '') return;
+    this.leaveResultsBySending();
     this.sessions = submitInSession(this.sessions, question, Date.now(), 'ask', createConversationId());
     const ref = latestTurnRef(this.sessions);
     if (ref === null) return;
+    // WP1.1 S1.7 — remembered by turn so its Retry/Edit can keep the same files. Window-local: the
+    // store keeps no scope with a turn, so after a reload the turn is honestly an unscoped one.
+    if (scope !== null) this.search.recordTurnScope(ref.turnId, scope);
     this.claimConversation(ref.sessionId);
     this.composer?.clearDraft();
     void this.setComposerState('docked');
@@ -2465,6 +2702,9 @@ export class SearchV3View extends JfElement {
         // client, so the one place a question is dispatched is also the one place its parameters
         // are decided — and a rung changed mid-stream cannot rewrite a request already in flight.
         effort: this.effort,
+        // The chosen files' PATHS (what the backend's `docIds` filter matches), or none at all —
+        // never an empty list standing in for a choice, which would mean the whole index.
+        ...(scope !== null ? { docIds: scope.paths } : {}),
         signal: abort.signal,
       },
       {
@@ -2529,6 +2769,7 @@ export class SearchV3View extends JfElement {
     const tier = (event as CustomEvent<Sv3TierChange>).detail?.tier;
     if (!isSv3Tier(tier)) return;
     this.tier = tier;
+    this.tierFollowsPlace = false;
   }
 
   /** Halting is always the reader's; the turn settles `halted` through the sink's own terminal. */
@@ -2637,6 +2878,7 @@ export class SearchV3View extends JfElement {
     // Defence in depth, not a second gate: the composer already refuses an unavailable delegate and
     // keeps the draft. This exists because `delegate` is reachable from the window's own routing.
     if (this.delegateUnavailableReason !== '') return;
+    this.leaveResultsBySending();
     this.sessions = submitInSession(this.sessions, text, Date.now(), 'agent', createConversationId());
     const ref = latestTurnRef(this.sessions);
     if (ref === null) return;
@@ -3018,19 +3260,16 @@ export class SearchV3View extends JfElement {
    * decides what search means in a conversational window. It deliberately does NOT touch the session
    * list: a search is not a turn, and recording it as one would fabricate a conversation.
    */
-  private runSearch(rawQuery: string): void {
-    const query = rawQuery.trim();
-    if (query === '') return;
-    this.asked = true;
-    setQuery(query);
-    submitSearch();
-    void this.setComposerState('docked');
-  }
-
   private onPaletteRun(event: Event): void {
     const id = (event as CustomEvent<Sv3PaletteRun>).detail?.id ?? '';
-    if (id === SV3_COMMAND_SEARCH_TEXT) {
-      this.runSearch(this.composer?.draft ?? '');
+    // WP1.1 S1.11 — the palette's search IS Search mode: the mode changes where the reader can see
+    // it, the draft is searched exactly as Enter would search it, and the caret goes back to it.
+    if (id === SV3_COMMAND_SEARCH) {
+      this.tier = 'search';
+      this.tierFollowsPlace = false;
+      const draft = (this.composer?.draft ?? '').trim();
+      if (draft !== '') this.searchNow(draft);
+      void this.focusComposer();
       return;
     }
     if (id === SV3_COMMAND_EXPORT_MARKDOWN) this.exportActiveConversation();
@@ -3063,8 +3302,10 @@ export class SearchV3View extends JfElement {
     this.renamingId = null;
     const before = this.sessions;
     const prevId = before.activeId;
+    if (sessionById(before, id) === null) return; // unknown id — nothing was claimed, so nothing to record
+    this.swapPlace(id);
     this.sessions = focusSession(this.sessions, id, Date.now());
-    if (this.sessions === before) return; // unknown id — nothing was claimed, so nothing to record
+    if (this.sessions === before) return;
     this.claimConversation(id);
     // 857 D4 (drafted as 854) — the evidence pane belongs to the conversation it was opened against; a real switch
     // closes it. Guarded on the id captured BEFORE the claim, not object identity: focusSession
@@ -3163,12 +3404,10 @@ export class SearchV3View extends JfElement {
    * the same judgement or the reader gets offered a delete that silently does nothing.
    */
   private runGate(run: Sv3RunView | null = this.projectRun()): Sv3RunGate {
-    const snapshot = this.searchSnapshot;
     // `isRefining` counts too: the store runs a re-query BEHIND displayed results quietly
     // (`state/searchState.ts:611` — no skeleton, so the content surface keeps the old rows), and the
     // row's dot is then the only thing on screen saying the session is running a pass.
-    const searching =
-      this.asked && (snapshot?.isSearching === true || snapshot?.isRefining === true);
+    const searching = this.search.busy;
     const local = this.run;
     // The render pass HANDS IN the projection it already made: projecting the feed a second time per
     // frame would be the same answer at twice the cost.
@@ -3333,7 +3572,12 @@ export class SearchV3View extends JfElement {
     // being started, and a pane left open would attach another session's evidence to a blank hero.
     this.closePane();
     this.sessions = startNewSession(this.sessions);
-    this.asked = false;
+    // WP1.1 — a new session leaves the result list, its choice and its prepared Ask behind. Its
+    // mode is the reader's: Search, unless they chose another one themselves.
+    this.search.reset();
+    this.placeDrafts.delete(RESULTS_PLACE);
+    if (this.tierFollowsPlace) this.tier = SV3_TIER_DEFAULT;
+    this.tierFollowsPlace = false;
     this.composer?.clearDraft();
     void this.setComposerState('hero');
   }
@@ -3423,19 +3667,19 @@ export class SearchV3View extends JfElement {
   }
 
   render(): TemplateResult {
-    const results: Sv3ResultsView = projectSv3Results(this.searchSnapshot, this.asked);
+    const results = this.search.view(projectAvailability('documents', this.aiSnapshot));
     const run = this.projectRun();
     const turns = activeTurns(this.sessions);
     const pendingPrompt = run !== null && run.prompts.length > 0;
+    const scope = this.search.showing ? this.search.pendingScope : null;
     const slot = sv3PrimaryAction({
       pendingPrompt,
-      running:
-        this.streaming ||
-        run?.phase === 'dispatching' ||
-        run?.phase === 'running' ||
-        run?.phase === 'holding',
+      running: this.isRunning(run),
       followUp: turns.length > 0,
       tier: this.tier,
+      steerable: this.steerableRun !== null,
+      delegateReady: this.delegateUnavailableReason === '',
+      scoped: scope !== null,
     });
     // Relative timestamps are computed HERE, on render, and never ticked: a sidebar that re-renders
     // itself every second is continuous motion at rest, which the spec's duty-cycle law rules out.
@@ -3476,6 +3720,15 @@ export class SearchV3View extends JfElement {
         data-testid="sv3-column"
         @sv3-composer-state-request=${this.onStateRequest}
         @sv3-composer-submit=${this.onComposerSubmit}
+        @sv3-composer-draft=${this.onComposerDraft}
+        @sv3-composer-scope-clear=${() => this.search.clearScope()}
+        @sv3-results-filter-remove=${this.onResultsFilterRemove}
+        @sv3-results-ask=${this.onResultsAsk}
+        @sv3-results-clear-selection=${() => this.search.select([])}
+        @card-open=${this.onCardOpen}
+        @card-selection=${this.onCardSelection}
+        @card-facet-toggle=${this.onCardFacetToggle}
+        @card-scope-file=${this.onCardScopeFile}
         @sv3-composer-stop=${this.onComposerStop}
         @sv3-composer-answer=${this.onComposerAnswer}
         @sv3-effort-change=${this.onEffortChange}
@@ -3494,6 +3747,7 @@ export class SearchV3View extends JfElement {
           state=${this.composerState}
           .view=${results}
           .turns=${turns}
+          .turnScopes=${this.search.scopesByTurn}
           .run=${run}
           .liveEvidencePaths=${this.agentController()?.groundingDeltaPaths ?? EMPTY_EVIDENCE_PATHS}
           ?record-notice=${this.recordNotice}
@@ -3531,6 +3785,7 @@ export class SearchV3View extends JfElement {
           .corpus=${projectSv3Corpus(this.aiSnapshot)}
           effort=${this.effort}
           tier=${this.tier}
+          scope-label=${scope !== null ? sv3ScopeLabel(scope) : ''}
           model-label=${this.currentModelLabel ?? ''}
           data-testid="sv3-composer"
         ></jf-sv3-composer>

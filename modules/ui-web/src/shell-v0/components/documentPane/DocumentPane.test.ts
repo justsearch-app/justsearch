@@ -262,6 +262,33 @@ describe('DocumentPane — empty state', () => {
   });
 });
 
+describe('DocumentPane — a document the index no longer has (WP1.1 S1.5)', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    vi.restoreAllMocks();
+  });
+
+  it('says the file is no longer in the index, not a bare status code', async () => {
+    stubFetchOnce({ ok: false, status: 404 });
+    const el = make();
+    el.docPath = 'Contracts/Gone.pdf';
+    await flush(el);
+
+    const alert = el.shadowRoot?.querySelector('jf-error-alert');
+    expect(alert?.textContent).toContain('no longer in your index');
+    expect(alert?.textContent).toMatch(/moved or deleted/);
+    expect(alert?.textContent).not.toContain('HTTP 404');
+  });
+
+  it('keeps the status for any other failure', async () => {
+    stubFetchOnce({ ok: false, status: 503 });
+    const el = make();
+    el.docPath = 'notes/thread.md';
+    await flush(el);
+    expect(el.shadowRoot?.querySelector('jf-error-alert')?.textContent).toContain('HTTP 503');
+  });
+});
+
 describe('DocumentPane — load + render (markdown)', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
