@@ -135,12 +135,7 @@ final class ChatControllerLifecycleSeamTest {
     CompletableFuture<Throwable> start = background(() -> manager.switchToOnlineMode());
     seam.awaitPortBinding(1);
     try {
-      await(() -> Thread.getAllStackTraces().entrySet().stream().anyMatch(thread ->
-          thread.getKey().getState() == Thread.State.TIMED_WAITING
-              && java.util.Arrays.stream(thread.getValue()).anyMatch(frame ->
-                  frame.getClassName().equals("io.justsearch.app.inference.LlamaServerOps")
-                      && frame.getMethodName().equals("awaitServerHealth"))),
-          "the manager to poll health before the port binds");
+      awaitStartupHealthPoll();
       assertLockFree(lifecycleLock, "while a start waits for health before its port binds");
       assertFalse(start.isDone(), "the probe ran before the port bound");
     } finally {
@@ -152,8 +147,9 @@ final class ChatControllerLifecycleSeamTest {
     seam.releaseHealth();
     assertNull(start.get(60, TimeUnit.SECONDS), "the start completes");
 
-    // A relaunch's drain of an in-flight reply, then the relaunched server's health wait.
+    // A relaunch drains, waits for its port, then waits for a healthy response.
     seam.holdHealth();
+    seam.holdPortBinding();
     AutoCloseable reply = exchange(manager, "GENERATE");
     InferenceConfig candidate = seam.withModel("b.gguf");
     var resolved = seam.resolvedWithModel("b.gguf");
@@ -165,11 +161,23 @@ final class ChatControllerLifecycleSeamTest {
         prepared.completeExceptionally(failure);
       }
     });
-    await(() -> draining(manager), "the relaunch to drain");
-    assertLockFree(lifecycleLock, "while a relaunch drains an in-flight reply");
-    assertEquals(1, seam.models().size(), "the probe ran during the drain");
-    reply.close();
+    try {
+      await(() -> draining(manager), "the relaunch to drain");
+      assertLockFree(lifecycleLock, "while a relaunch drains an in-flight reply");
+      assertEquals(1, seam.models().size(), "the probe ran during the drain");
+    } finally {
+      reply.close();
+    }
 
+    seam.awaitPortBinding(2);
+    try {
+      awaitStartupHealthPoll();
+      assertLockFree(lifecycleLock,
+          "while a relaunched server is waiting for health before its port binds");
+      assertFalse(prepared.isDone(), "the probe ran before the candidate's port bound");
+    } finally {
+      seam.releasePortBinding();
+    }
     seam.awaitHealth(2);
     assertLockFree(lifecycleLock, "while a relaunched server is waiting for health");
     assertFalse(prepared.isDone(), "the probe ran during the candidate's health wait");
@@ -194,6 +202,15 @@ final class ChatControllerLifecycleSeamTest {
       }
     });
     return result;
+  }
+
+  private static void awaitStartupHealthPoll() throws Exception {
+    await(() -> Thread.getAllStackTraces().entrySet().stream().anyMatch(thread ->
+        thread.getKey().getState() == Thread.State.TIMED_WAITING
+            && java.util.Arrays.stream(thread.getValue()).anyMatch(frame ->
+                frame.getClassName().equals("io.justsearch.app.inference.LlamaServerOps")
+                    && frame.getMethodName().equals("awaitServerHealth"))),
+        "the manager to poll health before the port binds");
   }
 
   private static void assertLockFree(Object lock, String during) throws Exception {
