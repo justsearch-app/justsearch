@@ -600,3 +600,14 @@ nothing, a restored draft is kept, a non-404 failure keeps its status).
   "note": "Sources and obsolete entries checked; conflict search repeated. Count prefix preserves the numeric oracle while allowing shared-card metadata. All 57 checks reran successfully. This accepts test intent only; narrow-pane S1.12 needs an owner decision."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "agent-session-7wy3j43l",
+  "verdict": "reject",
+  "digest": "sha256:dc2c2d82c9a428c5f5cb26fc2a06f336ef5ee1fb4f931b26e80a2cf129cb9b96",
+  "note": "Reject: entry 3 does not keep the whole oracle: exact observed count-label equality became startsWith, the count probe reads expected text, and visible path text became a title attribute. Missing retirement source/classification or restored assertions. Entry 5 lacks a source banning every AI/model mention (SM1 only forbids a no-AI claim). Entry 9 lacks sources for first-seen path order and Set object identity (SM6 specifies membership). Entries 18/19 lack sources forbidding HTTP 404 beside a missing-file explanation and requiring literal HTTP 503 for other failures. All 57 declared checks reran successfully; repaired check assertion-failed on merge-base. Conflict search repeated; Obsolete entries warranted. Test intent only."
+}
+```
