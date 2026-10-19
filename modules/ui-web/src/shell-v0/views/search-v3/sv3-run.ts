@@ -805,7 +805,7 @@ export const SV3_SEARCH_SEND_HINT = 'Enter searches';
  * WP1.1 — a scoped Ask. The chord still delegates, and says so with its one difference: a delegated
  * task is not limited to the chosen files, and a hint that let a reader assume it was would lie.
  */
-export const SV3_SCOPED_SEND_HINT =
+const SV3_SCOPED_SEND_HINT =
   'Enter asks about the chosen files · Ctrl+Enter delegates to the agent, without them';
 
 /**

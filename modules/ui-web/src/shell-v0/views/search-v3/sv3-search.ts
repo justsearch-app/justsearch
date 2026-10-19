@@ -87,7 +87,7 @@ export function sv3PruneSelection(
 }
 
 /** How many documents a choice of rows names — several hits from one document count once. */
-export function sv3ChosenDocumentCount(
+function sv3ChosenDocumentCount(
   hits: readonly Sv3ChoosableHit[],
   selected: ReadonlySet<string>,
 ): number {
@@ -142,7 +142,7 @@ function dateLabel(spec: SearchFilterSpec): string {
  * including ones set in the default window (a pinned file) or by a plugin (the date range, which no
  * control in either window sets).
  */
-export function sv3ActiveFilters(
+function sv3ActiveFilters(
   chips: readonly SearchScopeChip[],
   dates: SearchFilterSpec,
   facets: Readonly<Record<string, readonly string[]>>,
@@ -168,7 +168,7 @@ export function sv3ActiveFilters(
   return out;
 }
 
-export type Sv3ResultsStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'unreachable';
+type Sv3ResultsStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'unreachable';
 
 /** Everything the result list renders, derived once per window render. */
 export interface Sv3ResultsView {

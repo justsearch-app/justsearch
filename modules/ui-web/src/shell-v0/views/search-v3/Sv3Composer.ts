@@ -118,7 +118,7 @@ export interface Sv3ComposerSubmit {
  * window has to hear the draft before it is sent; it ignores the event in the other modes.
  * `previous` is the draft before this edit — what a place the reader is LEAVING should keep.
  */
-export const SV3_COMPOSER_DRAFT = 'sv3-composer-draft';
+const SV3_COMPOSER_DRAFT = 'sv3-composer-draft';
 
 export interface Sv3ComposerDraft {
   readonly text: string;
@@ -126,7 +126,7 @@ export interface Sv3ComposerDraft {
 }
 
 /** WP1.1 — the reader dropped the chosen files from the prepared Ask, which then asks all files. */
-export const SV3_COMPOSER_SCOPE_CLEAR = 'sv3-composer-scope-clear';
+const SV3_COMPOSER_SCOPE_CLEAR = 'sv3-composer-scope-clear';
 
 /**
  * Raised when the reader halts a streaming response (tempdoc 822 Phase F1). The window holds the

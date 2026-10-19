@@ -30,14 +30,14 @@ import '../../components/Control.js';
 import './Sv3Empty.js';
 
 /** A restriction's remove control was pressed. */
-export const SV3_RESULTS_FILTER_REMOVE = 'sv3-results-filter-remove';
+const SV3_RESULTS_FILTER_REMOVE = 'sv3-results-filter-remove';
 export type Sv3ResultsFilterRemove = Sv3ActiveFilter;
 
 /** "Ask about these files" — prepare an Ask limited to the chosen rows' documents. */
-export const SV3_RESULTS_ASK = 'sv3-results-ask';
+const SV3_RESULTS_ASK = 'sv3-results-ask';
 
 /** Forget the chosen rows. */
-export const SV3_RESULTS_CLEAR_SELECTION = 'sv3-results-clear-selection';
+const SV3_RESULTS_CLEAR_SELECTION = 'sv3-results-clear-selection';
 
 const SKELETON_ROWS = 3;
 
