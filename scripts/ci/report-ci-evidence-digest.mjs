@@ -246,7 +246,7 @@ function normalizeStep(step) {
   };
 }
 
-function normalizeJob(job, policyEntry, artifacts) {
+function normalizeJob(job, policyEntry, artifacts, splitRun) {
   const steps = (job.steps || []).map(normalizeStep);
   const failedSteps = steps.filter((step) => {
     const conclusion = String(step.conclusion || '').toLowerCase();
@@ -255,7 +255,7 @@ function normalizeJob(job, policyEntry, artifacts) {
   });
   const name = job.name || 'unknown job';
   const expected = new Set(policyEntry?.requiredStatusChecks || []);
-  const baseArtifact = name === 'Unit tests (app-ui)' && steps.some((s) => /Require every app-ui part/.test(s.name))
+  const baseArtifact = name === 'Unit tests (app-ui)' && (splitRun || steps.some((s) => /Require every app-ui part/.test(s.name)))
     ? null : UNIT_ARTIFACTS.get(name) || null;
   const part = /^(?:Unit tests \(app-ui-(?:ui|services)\)|Windows-native tests \((?:node|contracts)\))$/.test(name);
   const partBase = baseArtifact || WINDOWS_ARTIFACTS.get(name);
@@ -504,7 +504,8 @@ export function buildDigest({
 }) {
   const ciPolicy = (policy.workflows || []).find((workflow) => workflow.name === 'CI') || null;
   const artifacts = artifactList(artifactsDoc);
-  const jobs = (jobsDoc?.jobs || []).map((job) => normalizeJob(job, ciPolicy, artifacts));
+  const splitRun = (jobsDoc?.jobs || []).some((job) => job.name === 'Unit tests (app-ui-ui)' || job.name === 'Unit tests (app-ui-services)');
+  const jobs = (jobsDoc?.jobs || []).map((job) => normalizeJob(job, ciPolicy, artifacts, splitRun));
   const unitAttribution = summarizeUnitAttribution(jobs, artifacts, unitPayloads);
   const buildEvidence = summarizeBuildEvidence(jobs, artifacts, buildPayloads);
   const partEvidence = jobs.filter((job) => job.partArtifact).map((job) => ({
@@ -621,7 +622,7 @@ export function renderMarkdown(report) {
   if (report.partEvidence.length) {
     lines.push('', '## Part Evidence', '', '| Job | Attempt | Artifact |', '|---|---:|---|');
     for (const part of report.partEvidence) {
-      lines.push(`| ${part.job} | ${part.attempt || 1} | ${part.artifactName}${part.artifactPresent ? '' : ' missing'} |`);
+      lines.push(`| ${part.job} | ${part.attempt ?? 'unknown'} | ${part.artifactName}${part.artifactPresent ? '' : ' missing'} |`);
     }
   }
   lines.push('', '## Build Evidence', '');
