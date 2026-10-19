@@ -71,7 +71,9 @@ MCP server on?" is exactly "which port is the API on?":
   bridge initializes a new session there first. Idle pooled connections are closed after 25 s,
   before the Engine's 30 s idle expiry can cross a request. Closing stdin stops either client,
   also during discovery. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
-  the Roaming folder (so a redirected folder is still found).
+  the Roaming folder (so a redirected folder is still found), waiting up to 30 s for the answer;
+  a lookup that times out (`ROAMING_LOOKUP_TIMEOUT`) or fails (`ROAMING_LOOKUP_FAILED`) is
+  listed among the folders tried when no Engine is found.
 - **Order `scripts/prod/justsearch-mcp.mjs` tries:** `--port`, then `JUSTSEARCH_API_PORT`, then
   the manifest in the legacy `JUSTSEARCH_HOME` folder when set (it wins over
   `JUSTSEARCH_DATA_DIR`), then `JUSTSEARCH_DATA_DIR`, then the desktop app's folder, then a dev

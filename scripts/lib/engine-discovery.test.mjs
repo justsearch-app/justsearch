@@ -1838,6 +1838,54 @@ test('D1: a Windows-style lazily resolved folder (the OS-reported Roaming folder
   assert.equal(selected.dataDir, reported);
 });
 
+// A stand-in for the PowerShell start: a child that answers folder after delayMs.
+function slowLookup(folder, delayMs, timeoutMs) {
+  return { file: process.execPath, args: ['-e', `setTimeout(() => process.stdout.write(${JSON.stringify(folder)}), ${delayMs})`], timeoutMs };
+}
+
+test('D1: a Roaming folder lookup that outlasts its bound is a named error among the folders tried, not a silent skip', async () => {
+  const { selectEngine, describeTried, roamingAppDataFromOs } = require(ENGINE_DISCOVERY);
+  const started = Date.now();
+  const { selected, tried } = await selectEngine([
+    {
+      source: 'desktop app (Roaming folder the OS reports)',
+      resolveDataDir: async () => {
+        const roaming = await roamingAppDataFromOs(slowLookup('C:\\Users\\x\\AppData\\Roaming', 5000, 200));
+        return roaming ? path.win32.join(roaming, 'io.justsearch.shell') : null;
+      },
+    },
+  ]);
+  assert.ok(Date.now() - started < 4000, 'the bound, not the slow lookup, ends the wait');
+  assert.equal(selected, null);
+  assert.equal(tried.length, 1, 'the folder that could not be determined is listed');
+  assert.equal(tried[0].status, 'ROAMING_LOOKUP_TIMEOUT');
+  assert.match(describeTried(tried)[0], /^desktop app \(Roaming folder the OS reports\): folder unknown \(ROAMING_LOOKUP_TIMEOUT: the Roaming folder lookup \(.+\) did not answer within 200 ms\)$/);
+});
+
+test('D1: a Roaming folder lookup slower than the old 10 s bound but inside its own still finds the Engine', async (t) => {
+  const root = tempRoot(t);
+  const engine = await startService(t);
+  const reported = path.join(root, 'Roaming');
+  writeManifest(path.join(reported, 'io.justsearch.shell'), manifestFor(engine));
+  const { selectEngine, roamingAppDataFromOs, ROAMING_QUERY_TIMEOUT_MS } = require(ENGINE_DISCOVERY);
+  // Scaled by a tenth: a 1.1 s lookup (the 10.8 s cold start) against 3 s (the 30 s bound); the
+  // old bound would have been 1 s.
+  const { selected, tried } = await selectEngine([
+    {
+      source: 'desktop app (Roaming folder the OS reports)',
+      resolveDataDir: async () => path.join(await roamingAppDataFromOs(slowLookup(reported, 1100, ROAMING_QUERY_TIMEOUT_MS / 10)), 'io.justsearch.shell'),
+    },
+  ]);
+  assert.equal(selected?.instanceId, engine.instanceId, JSON.stringify(tried));
+});
+
+test('D1: production bounds the Roaming folder lookup at 30 s, three times the PowerShell cold start seen on hosted Windows', () => {
+  const { ROAMING_QUERY_TIMEOUT_MS } = require(ENGINE_DISCOVERY);
+  assert.equal(ROAMING_QUERY_TIMEOUT_MS, 30000);
+  const src = fs.readFileSync(ENGINE_DISCOVERY, 'utf8');
+  assert.match(src, /function roamingQuery\(\) \{\n  return \{\n    file: windowsTool\('WindowsPowerShell', 'v1\.0', 'powershell\.exe'\),\n[^}]*?\n    timeoutMs: ROAMING_QUERY_TIMEOUT_MS,\n  \};\n\}/, 'the PowerShell lookup uses that bound');
+});
+
 test('D1: Windows reports the Roaming known folder even to a process started without APPDATA', { skip: !IS_WINDOWS && 'Windows known folder' }, async () => {
   const env = { ...process.env };
   for (const k of Object.keys(env)) if (/^APPDATA$/i.test(k)) delete env[k];

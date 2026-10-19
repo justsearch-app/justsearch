@@ -90,6 +90,11 @@ function idleRetireMs(env = process.env) {
   return /^\d+$/.test(raw) ? Number(raw) : IDLE_RETIRE_MS;
 }
 const OS_QUERY_TIMEOUT_MS = 10000;
+/**
+ * The Roaming folder lookup starts PowerShell, whose first start on a cold or busy machine takes
+ * about 10 s (a fresh hosted Windows runner took 10.06 s and 10.8 s), so it gets its own bound.
+ */
+const ROAMING_QUERY_TIMEOUT_MS = 30000;
 /** The server may not have accepted a fresh connection yet; it is looked up again this often. */
 const PROOF_RETRY_MS = 10;
 
@@ -152,33 +157,52 @@ function windowsTool(...parts) {
   return path.win32.join(nonEmpty(process.env.SystemRoot) || 'C:\\Windows', 'System32', ...parts);
 }
 
-function runTool(file, args) {
+function runTool(file, args, timeoutMs = OS_QUERY_TIMEOUT_MS) {
   return new Promise((resolve) => {
     execFile(
       file,
       args,
-      { encoding: 'utf8', timeout: OS_QUERY_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
-      (error, stdout) => resolve(error ? { error: error.message } : { stdout }),
+      { encoding: 'utf8', timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
+      (error, stdout) =>
+        resolve(error ? { error: error.message, timedOut: error.killed === true && error.code !== 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' } : { stdout }),
     );
   });
+}
+
+function roamingQuery() {
+  return {
+    file: windowsTool('WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    args: [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      "[Console]::OutputEncoding = [Text.Encoding]::UTF8; [Environment]::GetFolderPath('ApplicationData')",
+    ],
+    timeoutMs: ROAMING_QUERY_TIMEOUT_MS,
+  };
+}
+
+function lookupError(code, detail) {
+  return Object.assign(new Error(`the Roaming folder lookup ${detail}`), { code });
 }
 
 /**
  * The RoamingAppData known folder as Windows reports it ([Environment]::GetFolderPath
  * ('ApplicationData') calls the shell folder API, as Tauri's dirs-sys does through
  * SHGetKnownFolderPath). Covers a process started without APPDATA and a redirected folder.
- * Resolves to null when it cannot be asked.
+ * Resolves to null off Windows. A lookup that does not answer within its bound rejects with
+ * code ROAMING_LOOKUP_TIMEOUT, and one that fails or answers no absolute folder with
+ * ROAMING_LOOKUP_FAILED, so discovery names it instead of skipping the folder silently.
+ * query ({file, args, timeoutMs}) replaces the PowerShell lookup in tests.
  */
-async function roamingAppDataFromOs() {
-  if (process.platform !== 'win32') return null;
-  const res = await runTool(windowsTool('WindowsPowerShell', 'v1.0', 'powershell.exe'), [
-    '-NoProfile',
-    '-NonInteractive',
-    '-Command',
-    "[Console]::OutputEncoding = [Text.Encoding]::UTF8; [Environment]::GetFolderPath('ApplicationData')",
-  ]);
-  const folder = res.stdout ? res.stdout.trim() : '';
-  return folder && path.win32.isAbsolute(folder) ? folder : null;
+async function roamingAppDataFromOs(query = process.platform === 'win32' ? roamingQuery() : null) {
+  if (!query) return null;
+  const res = await runTool(query.file, query.args, query.timeoutMs);
+  if (res.timedOut) throw lookupError('ROAMING_LOOKUP_TIMEOUT', `(${path.basename(query.file)}) did not answer within ${query.timeoutMs} ms`);
+  if (res.error) throw lookupError('ROAMING_LOOKUP_FAILED', `(${path.basename(query.file)}) failed: ${res.error}`);
+  const folder = res.stdout.trim();
+  if (!path.win32.isAbsolute(folder)) throw lookupError('ROAMING_LOOKUP_FAILED', `(${path.basename(query.file)}) answered ${JSON.stringify(folder)}, not an absolute folder`);
+  return folder;
 }
 
 /** A /proc/net/tcp{,6} address (hex, kernel byte order) as dotted IPv4, or null if not IPv4. */
@@ -640,10 +664,16 @@ async function selectEngine(candidates, options = {}) {
   const tried = [];
   for (let candidate of candidates) {
     if (candidate && !candidate.dataDir && typeof candidate.resolveDataDir === 'function') {
-      candidate = { source: candidate.source, dataDir: await candidate.resolveDataDir() };
+      try {
+        candidate = { source: candidate.source, dataDir: await candidate.resolveDataDir() };
+      } catch (err) {
+        // The folder could not be determined: name why among the folders tried.
+        tried.push({ source: candidate.source, dataDir: null, ok: false, status: err.code || 'lookup-failed', detail: err.message });
+        continue;
+      }
     }
     if (!candidate || !nonEmpty(candidate.dataDir)) continue;
-    if (tried.some((t) => sameFolder(t.dataDir, candidate.dataDir))) continue;
+    if (tried.some((t) => t.dataDir && sameFolder(t.dataDir, candidate.dataDir))) continue;
     const result = await validateCandidate(candidate, options);
     tried.push(result);
     if (result.ok) return { selected: result, tried };
@@ -663,7 +693,14 @@ async function selectPinned(candidates, port, options = {}) {
   const tried = [];
   for (let candidate of candidates) {
     if (candidate && !candidate.dataDir && typeof candidate.resolveDataDir === 'function') {
-      candidate = { source: candidate.source, dataDir: await candidate.resolveDataDir() };
+      let dataDir = null;
+      try {
+        dataDir = await candidate.resolveDataDir();
+      } catch {
+        // A folder that cannot be determined holds no manifest this pin can be checked against;
+        // the pin then needs the token-bound proof, as for a port no manifest names.
+      }
+      candidate = { source: candidate.source, dataDir };
     }
     if (!candidate || !nonEmpty(candidate.dataDir)) continue;
     if (seen.some((dataDir) => sameFolder(dataDir, candidate.dataDir))) continue;
@@ -706,7 +743,7 @@ function standardCandidates({ env = process.env, platform = null, userHome = nul
 
 /** One line per folder tried, for error messages. */
 function describeTried(tried) {
-  return tried.map((t) => `${t.source}: ${t.dataDir} (${t.ok ? 'selected' : `${t.status}: ${t.detail}`})`);
+  return tried.map((t) => `${t.source}: ${t.dataDir ?? 'folder unknown'} (${t.ok ? 'selected' : `${t.status}: ${t.detail}`})`);
 }
 
 module.exports = {
@@ -720,6 +757,7 @@ module.exports = {
   selectEngine,
   selectPinned,
   engineRequest,
+  ROAMING_QUERY_TIMEOUT_MS,
   roamingAppDataFromOs,
   standardCandidates,
   describeTried,

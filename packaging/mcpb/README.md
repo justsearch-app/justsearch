@@ -22,7 +22,8 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    see 3.), answers `GET /api/runtime/live` with the same pid and instance id, and
    `GET /api/health` answers 200 (a proven Engine still starting, 503, is re-checked for up to
    30 s, so starting the host and the app together works); there is no default-port guess. On Windows, when `%APPDATA%`
-   is unset in its environment, it also asks Windows for the Roaming folder. The bridge never
+   is unset in its environment, it also asks Windows for the Roaming folder (waiting up to 30 s
+   for that answer; a lookup that times out or fails is named in the not-found error). The bridge never
    looks in a dev checkout: when the installed app and a dev Engine both run, it uses the
    installed app; set `JUSTSEARCH_DATA_DIR` to the checkout's data folder (for example
    `<checkout>/modules/ui-web/.dev-data`) or `JUSTSEARCH_API_PORT` to use the dev Engine.
