@@ -1319,11 +1319,9 @@ describe('AgentSessionController interaction methods', () => {
 
   it('a lost answer to a direction the run took shows only the run report, in both windows', async () => {
     ctrl.sessionId = 'sess-lost';
-    // The run reports the direction queued while the POST is in flight; then the answer is lost.
-    globalThis.fetch = vi.fn(() => {
-      ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'queued' });
-      return Promise.reject(new TypeError('Failed to fetch'));
-    }) as unknown as typeof fetch;
+    // The run reports the direction queued, echoing the send's request id, while the POST is in
+    // flight; then the answer is lost.
+    globalThis.fetch = takenSteer(ctrl, 'd1', 'lost');
     expect(await ctrl.steer('Answer in French.')).toBe(false);
     ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
     expect(bothWindows(ctrl)).toEqual({
@@ -1334,11 +1332,20 @@ describe('AgentSessionController interaction methods', () => {
 
   it('a 5xx answer is settled by the run report that follows it, in both windows', async () => {
     ctrl.sessionId = 'sess-5xx';
-    globalThis.fetch = mockFetchError(502, 'bad gateway');
+    let requestId: string | undefined;
+    globalThis.fetch = vi.fn((_url: string, init?: RequestInit) => {
+      requestId = (JSON.parse(String(init?.body)) as { clientRequestId?: string }).clientRequestId;
+      return Promise.resolve(new Response('bad gateway', { status: 502 }));
+    }) as unknown as typeof fetch;
     expect(await ctrl.steer('Answer in French.')).toBe(false);
     expect(bothWindows(ctrl).v3).toHaveLength(1);
     expect(bothWindows(ctrl).old).toHaveLength(1);
-    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd2', outcome: 'queued' });
+    ctrl.onDirectiveAcknowledged({
+      directiveText: 'Answer in French.',
+      directiveId: 'd2',
+      outcome: 'queued',
+      clientRequestId: requestId,
+    });
     ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd2', outcome: 'applied' });
     expect(bothWindows(ctrl)).toEqual({
       v3: [['Steered', 'Answer in French.']],
@@ -1429,21 +1436,27 @@ describe('AgentSessionController interaction methods', () => {
     });
   });
 
-  // A server that does not echo request ids cannot tell identical sends apart, so its report settles
-  // a note only while this window sent that text once.
-  it('a report without a request id does not settle a note when the same text was sent twice', async () => {
-    ctrl.sessionId = 'sess-old-server';
-    globalThis.fetch = blockedSteer();
-    expect(await ctrl.steer('Answer in French.')).toBe(false);
-    globalThis.fetch = mockFetchJson({ status: 'injected' });
-    expect(await ctrl.steer('Answer in French.')).toBe(true);
-    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'queued' });
-    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
-    expect(bothWindows(ctrl)).toEqual({
-      v3: [['Progress', LOST], ['Steered', 'Answer in French.']],
-      old: [['note', LOST], ['direction', 'Answer in French.', 'applied']],
-    });
-  });
+  // WP6.2 S8.2 (review 5) — a report that echoes no request id belongs to another send: another
+  // client's (the id is optional), or one from before the echo. Whatever its words, it never settles
+  // this window's note.
+  it.each([
+    ['blocked', () => blockedSteer()],
+    ['5xx', () => mockFetchError(502, 'bad gateway')],
+  ] as const)(
+    "another client's report without a request id never settles this window's %s note, in both windows",
+    async (_failure, failedSend) => {
+      ctrl.sessionId = 'sess-other-client';
+      globalThis.fetch = failedSend();
+      expect(await ctrl.steer('Answer in French.')).toBe(false);
+      const note = bothWindows(ctrl).v3[0]!;
+      ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'queued' });
+      ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
+      expect(bothWindows(ctrl)).toEqual({
+        v3: [note, ['Steered', 'Answer in French.']],
+        old: [['note', note[1]], ['direction', 'Answer in French.', 'applied']],
+      });
+    },
+  );
 
   // The steer handler answers 404 only when no live run took the direction, so it is the one failure
   // that is a known refusal, still named as the run having finished.

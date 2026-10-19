@@ -183,14 +183,11 @@ import type {
 } from '../../api/generated/shape-handlers/shared.js';
 export type { AgentSource, AgentSentenceCite };
 
-/** WP6.2 — one steer send, for matching the run's report of the direction it produced. */
-interface UnconfirmedSteer {
-  text: string;
-  /** Sent with the direction and echoed in its queued report. */
-  clientRequestId: string;
-  /** Directions the run had reported before this send began. */
-  reportedBefore: ReadonlySet<string>;
-}
+/**
+ * WP6.2 S8.2 — the `phase` of a steer send's note while that send's outcome is unconfirmed. The note
+ * is window-local (never saved) and stays until the run's report of that send's own direction removes it.
+ */
+export const UNCONFIRMED_STEER_PHASE = 'steer-unconfirmed';
 
 /**
  * Tempdoc 577 §2.14 Root III — one agent tool as the authority-space projection reads it (the rich
@@ -633,10 +630,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   private pendingAutoApprovals: string[] = [];
   // WP6.2 S8.2 — steer sends whose outcome is unknown (answer lost or a status that can follow the run
   // queueing the direction): the note shown for each, until the run reports the direction that send produced.
-  private unconfirmedSteers: Array<UnconfirmedSteer & { noteId: string }> = [];
-  // WP6.2 — how often this run was sent each direction text, so a report that echoes no request id
-  // (a server from before the echo) settles an unconfirmed send only while its text is unambiguous.
-  private steerSends = new Map<string, number>();
+  private unconfirmedSteers: Array<{ clientRequestId: string; noteId: string }> = [];
   // 543-fwd #6 — causation: the previous agent tool-call's journal entry id in
   // the CURRENT turn. The bridge chains each tool-call to it so the journal
   // records a per-turn causation chain (real-agent causation was empty before —
@@ -715,20 +709,14 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       return false;
     }
     // WP6.2 — this send's own id: the run echoes it in the queued report of the direction it produces,
-    // so two sends with the same words are told apart. The directions the run has already reported
-    // tell a report for THIS send from an earlier one where the server echoes no id.
-    const send: UnconfirmedSteer = {
-      text: trimmed,
-      clientRequestId: crypto.randomUUID(),
-      reportedBefore: new Set(this.conversation.flatMap((e) => (e.directiveId ? [e.directiveId] : []))),
-    };
-    this.steerSends.set(trimmed, (this.steerSends.get(trimmed) ?? 0) + 1);
+    // so two sends with the same words, or another client's, are told apart.
+    const clientRequestId = crypto.randomUUID();
     let failure: string;
     try {
       const res = await authorizedFetch(`${this.apiBase}/api/chat/agent/steer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: this.sessionId, text: trimmed, clientRequestId: send.clientRequestId }),
+        body: JSON.stringify({ sessionId: this.sessionId, text: trimmed, clientRequestId }),
       });
       if (res.ok) return true;
       // Tempdoc 565 §33 — a failed steer must NOT be silent. WP6.2 — and must not claim more than it
@@ -749,34 +737,24 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     // (the report can come over the stream before the answer) settles it now; otherwise the note says
     // the outcome is unconfirmed until a report removes it. The text is not handed back to re-send: the
     // run may already have applied it.
-    if (this.reportedFor(send)) return false;
-    this.steerFailureNote(`${failure} If it did, it shows here as your direction.`);
-    this.unconfirmedSteers.push({ ...send, noteId: this.conversation[this.conversation.length - 1]!.id });
+    if (this.reportedFor(clientRequestId)) return false;
+    this.steerFailureNote(`${failure} If it did, it shows here as your direction.`, UNCONFIRMED_STEER_PHASE);
+    this.unconfirmedSteers.push({ clientRequestId, noteId: this.conversation[this.conversation.length - 1]!.id });
     return false;
   }
 
   /**
-   * WP6.2 — whether the run reported the direction this send produced: the report that echoes the
-   * send's request id. A report that echoes none (a server from before the echo) is matched by text,
-   * first reported after the send began, and only while the run was sent that text once — otherwise
-   * it may be another send's.
+   * WP6.2 — whether the run reported the direction a send produced: only the report that echoes the
+   * send's own request id. A report that echoes none is another send's (another client's, or from a
+   * server before the echo), whatever its words.
    */
-  private reportedFor(send: UnconfirmedSteer): boolean {
-    return this.conversation.some(
-      (e) =>
-        e.type === 'steer-directive' &&
-        (e.clientRequestId
-          ? e.clientRequestId === send.clientRequestId
-          : e.content === send.text &&
-            !!e.directiveId &&
-            !send.reportedBefore.has(e.directiveId) &&
-            this.steerSends.get(send.text) === 1),
-    );
+  private reportedFor(clientRequestId: string): boolean {
+    return this.conversation.some((e) => e.type === 'steer-directive' && e.clientRequestId === clientRequestId);
   }
 
   /** WP6.2 — a run report for a direction whose send was unconfirmed replaces the unconfirmed note. */
   private settleUnconfirmedSteers(): void {
-    const settled = this.unconfirmedSteers.filter((u) => this.reportedFor(u));
+    const settled = this.unconfirmedSteers.filter((u) => this.reportedFor(u.clientRequestId));
     if (settled.length === 0) return;
     this.unconfirmedSteers = this.unconfirmedSteers.filter((u) => !settled.includes(u));
     const notes = new Set(settled.map((u) => u.noteId));
@@ -784,10 +762,17 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   /** Tempdoc 565 §33 — a one-line system note when a steer couldn't be delivered. */
-  private steerFailureNote(content: string): void {
+  private steerFailureNote(content: string, phase?: string): void {
     this.conversation = [
       ...this.conversation,
-      { id: this.nextEntryId(), type: 'progress', content, severity: 'warn', timestamp: Date.now() },
+      {
+        id: this.nextEntryId(),
+        type: 'progress',
+        content,
+        severity: 'warn',
+        ...(phase ? { phase } : {}),
+        timestamp: Date.now(),
+      },
     ];
     this.notify();
   }
@@ -923,7 +908,6 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   private resetRunState(): void {
     this.conversation = [];
     this.unconfirmedSteers = [];
-    this.steerSends = new Map();
     this.toolCalls = {};
     this.streamingText = '';
     this.lastStreamedAnswer = '';

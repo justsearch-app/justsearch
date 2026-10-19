@@ -261,8 +261,10 @@ import {
   sv3RunPresenceStart,
   sv3RunPresenceTitle,
   sv3RunSessionStatus,
+  sv3UnconfirmedSteerNotes,
   SV3_RUN_FEED_EMPTY,
   type Sv3RunFeed,
+  type Sv3RunFeedItem,
   shouldAutoContinue,
   type Sv3RunLocal,
   type Sv3RunTurnState,
@@ -839,6 +841,13 @@ export class SearchV3View extends JfElement {
   private run: Sv3RunLocal | null = null;
   /** Whether the run was observed LIVE, so its terminal is an EDGE rather than a repeated verdict. */
   private runLive = false;
+  /**
+   * WP6.2 S8.2 — per turn, the run's notes for steer sends whose outcome is unconfirmed. Window-local
+   * and never saved: the settled turn renders from the record, which does not carry them, so they are
+   * kept here for as long as this window holds the conversation, until the run's report of that send
+   * removes them.
+   */
+  private unconfirmedSteerNotes: ReadonlyMap<string, readonly Sv3RunFeedItem[]> = new Map();
   /**
    * Controller run ids this window has already given a session (Phase F3 presence). Adoption happens
    * once per run: without the latch, the same live run would be re-adopted on the next notification
@@ -2812,6 +2821,7 @@ export class SearchV3View extends JfElement {
       // id is only knowable once the server names it, which is here rather than at dispatch.
       if (ctrl.sessionId !== null) this.adoptedRunIds.add(ctrl.sessionId);
       const feed = projectSv3RunFeed(ctrl, local.entryStart);
+      this.keepUnconfirmedSteerNotes(local.turnId, sv3UnconfirmedSteerNotes(ctrl, local.entryStart, feed));
       const status = sv3RunSessionStatus(ctrl, feed);
       if (status === 'live' || status === 'holding') {
         this.runLive = true;
@@ -2824,6 +2834,16 @@ export class SearchV3View extends JfElement {
     }
     this.requestUpdate();
   };
+
+  /** Replaced only when the turn's set of notes changes, so an unchanged frame re-renders nothing new. */
+  private keepUnconfirmedSteerNotes(turnId: string, notes: readonly Sv3RunFeedItem[]): void {
+    const kept = this.unconfirmedSteerNotes.get(turnId) ?? [];
+    if (kept.length === notes.length && kept.every((n, i) => n.id === notes[i]!.id)) return;
+    const next = new Map(this.unconfirmedSteerNotes);
+    if (notes.length > 0) next.set(turnId, notes);
+    else next.delete(turnId);
+    this.unconfirmedSteerNotes = next;
+  }
 
   /**
    * Tempdoc 859 §D §2.5 / P3 — a decision made once is RE-APPLIED, not re-asked.
@@ -3496,6 +3516,7 @@ export class SearchV3View extends JfElement {
           .turns=${turns}
           .run=${run}
           .liveEvidencePaths=${this.agentController()?.groundingDeltaPaths ?? EMPTY_EVIDENCE_PATHS}
+          .unconfirmedSteerNotes=${this.unconfirmedSteerNotes}
           ?record-notice=${this.recordNotice}
           ?history-locked=${this.historyLocked}
           ?locked-refusal=${this.lockedRefusal}

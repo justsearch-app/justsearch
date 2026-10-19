@@ -42,11 +42,12 @@
  * cards on screen — the same construction the retired search-v2 window used for its receipt,
  * expressed as a projection both halves read.
  */
-import type {
-  AgentSessionController,
-  ConversationEntry,
-  ToolCall,
-  ToolRisk,
+import {
+  UNCONFIRMED_STEER_PHASE,
+  type AgentSessionController,
+  type ConversationEntry,
+  type ToolCall,
+  type ToolRisk,
 } from '../../controllers/AgentSessionController.js';
 import type { Sv3TurnStatus } from './sv3-sessions.js';
 // Tempdoc 859 §D §2.6 — the ONE cut-short authority. Imported, never re-derived: a second copy of
@@ -216,6 +217,24 @@ const RUN_NOTE_LABEL: Partial<Record<ConversationEntry['type'], string>> = {
   handoff: 'Handoff',
   'run-node': 'Node',
 };
+
+/**
+ * WP6.2 S8.2 — the feed's notes for this run's steer sends whose outcome is still unconfirmed. The
+ * record never carries them (they are window-local), so a settled turn keeps them beside its recorded
+ * activity; the controller removes one when the run reports the direction that send produced.
+ */
+export function sv3UnconfirmedSteerNotes(
+  source: Sv3RunSource,
+  from: number,
+  feed: Sv3RunFeed,
+): readonly Sv3RunFeedItem[] {
+  const unconfirmed = new Set(
+    source.conversation
+      .slice(Math.max(0, from))
+      .flatMap((e) => (e.phase === UNCONFIRMED_STEER_PHASE ? [e.id] : [])),
+  );
+  return unconfirmed.size === 0 ? [] : feed.items.filter((i) => i.kind === 'note' && unconfirmed.has(i.id));
+}
 
 /**
  * Project the run's own slice of the shared conversation into the feed.

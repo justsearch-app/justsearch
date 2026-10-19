@@ -30,6 +30,8 @@ Review history (round 3: lost-response false certainty): a third independent ver
 
 Review history (round 4: identical-text sends): a fourth independent verifier failed 4314760ee on S8.2 because a send blocked before it reached the server lost its "could not confirm" note as soon as the user's identical second send was reported, in both windows: the window matched the run's reports to unconfirmed sends by text, and neither the steer answer nor the direction's report named the send that produced it (the report can also arrive over the stream before the answer). Decided by the orchestrator (2026-10-19): an exact, additive link. The window now sends a fresh clientRequestId with each steer; AgentController.handleSteeringDirective validates it (1-64 letters, digits, '-' or '_'; absent or null stays valid for older windows) and hands it with the direction to AgentSession.submitDirection, whose queued DirectiveAcknowledged report echoes it (an optional clientRequestId field in the event schema, the generated payload type and the saved event; final reports and every record written before carry none, so their meaning is unchanged). An unconfirmed send is settled only by the report carrying its own request id; a report without one still settles by text only while the window sent that text once. The unconfirmed note is not saved, so reload shows only the run's own reports, as before. The new checks are in uiux-agent-steering-ui.json (fail-before on 485fe86b8) and, run with --before e0a1ddd7a (the candidate this verifier failed), in uiux-agent-steering-ui-review4.json and uiux-agent-steering-java-review4.json, where each repaired check fails by assertion. The Java before-run applies uiux-agent-steering-review4-compat.patch, which only adds the three-argument AgentService.injectSteeringDirective overload delegating to the existing one (ignoring the request id) so the checks compile; acceptsADirectionWithoutARequestId passes there, as a preservation check should. The earlier frontend evidence files were re-run unchanged because AgentSessionController.test.ts changed.
 
+Review history (round 5: another client's report; the note through completion): a fifth independent verifier failed 524effe79 on S8.2. (1) A send blocked before it reached the server lost its "could not confirm" note when another client sent the same words to the same run without a request id (clientRequestId is optional): the window still settled an unconfirmed send by text when the report echoed no request id. (2) Search v3 hid the note once the run ended, because the settled turn renders from the canonical record, which never carries the window-local note (the old window kept it). Decided by the orchestrator (2026-10-19): the text fallback is removed, so an unconfirmed send is settled only by the report carrying its own request id; the note stays visible in both windows for as long as the conversation is open there, until that report removes it; the note is not saved, so after reload only the run's own saved reports show (no persistence added). The controller tags the note (phase steer-unconfirmed) and Search v3 keeps the run's tagged notes per turn and draws them after the turn's recorded activity. The Review-4 controller entry no longer asserts settling by an id-less report: its check "a report without a request id does not settle a note when the same text was sent twice" is replaced by the review-5 checks, and two review-3 checks ("a lost answer …", "a 5xx answer …") now have the run's queued report echo the send's request id, as the server does since review 4. The review-5 checks are in uiux-agent-steering-ui-review5.json, run with --before 90eda00f6 (the candidate this verifier failed in content; 524effe79 has the same frontend code): each repaired check fails there by assertion, and the old window's "alone" case passes there, as a preservation check should. The four earlier frontend evidence files were re-run with their original before refs and check lists (less the replaced review-4 check) because the test files changed; every classification matches the committed one.
+
 No acceptance record is supplied by the builder.
 
 ```json
@@ -624,7 +626,7 @@ No acceptance record is supplied by the builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Review 3. A steer whose answer is lost after the run took it, or answered with a status other than 404 (5xx), is not reported as not applied: the note says the direction could not be confirmed (naming the connection failure or the HTTP status), and once the run reports the direction (queued during the request, or after the failure) only that report shows, once, in both windows: 'Steered' in Search v3 and the old window's applied chip. A report for an earlier direction with the same text does not settle it.",
+      "behaviour": "Review 3. A steer whose answer is lost after the run took it, or answered with a status other than 404 (5xx), is not reported as not applied: the note says the direction could not be confirmed (naming the connection failure or the HTTP status), and once the run reports the direction that send produced (its queued report, during the request or after the failure, echoes the send's request id) only that report shows, once, in both windows: 'Steered' in Search v3 and the old window's applied chip. A report for an earlier direction with the same text does not settle it.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -656,7 +658,7 @@ No acceptance record is supplied by the builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Review 4. Two steer sends with the same text are two sends, each settled only by the run's report of the direction it produced: the window sends a fresh clientRequestId with each send and the run's queued report echoes it. A send blocked before it reached the server keeps its 'could not confirm' note when a later identical send is taken and applied, and the applied direction shows once ('Steered' in Search v3, the old window's applied chip); the same holds when an earlier identical send was taken but its queued report arrives only after the second send failed; of two unconfirmed identical sends, the one the run reports (queued during its lost request) shows only its report while the other keeps its note. A report that echoes no request id (a server from before the echo) still settles a note by its text only while the window sent that text once; after two identical sends it settles neither.",
+      "behaviour": "Review 4. Two steer sends with the same text are two sends, each settled only by the run's report of the direction it produced: the window sends a fresh clientRequestId with each send and the run's queued report echoes it. A send blocked before it reached the server keeps its 'could not confirm' note when a later identical send is taken and applied, and the applied direction shows once ('Steered' in Search v3, the old window's applied chip); the same holds when an earlier identical send was taken but its queued report arrives only after the second send failed; of two unconfirmed identical sends, the one the run reports (queued during its lost request) shows only its report while the other keeps its note.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -677,8 +679,7 @@ No acceptance record is supplied by the builder.
       "newChecks": [
         "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a blocked send keeps its note when an identical later send is reported, in both windows",
         "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a blocked send is not settled by an earlier identical send reported after it failed, in both windows",
-        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#two unconfirmed identical sends are each settled only by their own report, in both windows",
-        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a report without a request id does not settle a note when the same text was sent twice"
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#two unconfirmed identical sends are each settled only by their own report, in both windows"
       ]
     },
     {
@@ -743,6 +744,105 @@ No acceptance record is supplied by the builder.
           "quote": "A direction is shown and recorded as applied only when it went out in a model request. A direction that never did (run finished, stopped, failed, hit its step or budget limit, or the run was interrupted before the next step) is reported as not applied, in Search v3 and the old window, live and after reload or reconnect; a network or HTTP failure of the send is reported as such, not as \"the run already finished\".",
           "label": "agent-drafted, owner-adopted"
         }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Review 5. An unconfirmed steer send (blocked before it reached the server, or answered 5xx) is settled only by the run's report that echoes its own request id. A report of a direction with the same words that echoes no request id (another client's send, or a server from before the echo) never settles it: the 'could not confirm' note stays beside that direction, which shows once as applied ('Steered' in Search v3, the old window's applied chip).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AS2",
+          "quote": "A direction is shown and recorded as applied only when it went out in a model request. A direction that never did (run finished, stopped, failed, hit its step or budget limit, or the run was interrupted before the next step) is reported as not applied, in Search v3 and the old window, live and after reload or reconnect; a network or HTTP failure of the send is reported as such, not as \"the run already finished\".",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AN4",
+          "quote": "Search v3 Delegate and the old window's agent view show steering as before for applied directions.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-agent-steering-ui-review5.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#another client's report without a request id never settles this window's blocked note, in both windows",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#another client's report without a request id never settles this window's 5xx note, in both windows"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Review 5. In Search v3, the note of a steer send whose outcome is unconfirmed (the note the real controller shows for a connection failure) stays on the run's turn after the run ends and the turn renders from its canonical record, which does not carry the note; it stays through a later run in the same conversation, shown once; and it disappears when the controller removes it because the run reported the direction that send produced.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AS2",
+          "quote": "A direction is shown and recorded as applied only when it went out in a model request. A direction that never did (run finished, stopped, failed, hit its step or budget limit, or the run was interrupted before the next step) is reported as not applied, in Search v3 and the old window, live and after reload or reconnect; a network or HTTP failure of the send is reported as such, not as \"the run already finished\".",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-agent-steering-ui-review5.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts#shows the note on the settled turn, through a later run, until its own report removes it",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts#drops the note once the run reports the direction that send produced"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Review 5. In the old window, after an unconfirmed steer send, another client's report of a direction with the same words and no request id, the run's completion and its record loading, the 'could not confirm' note is still rendered once and the other client's direction shows one applied chip.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AS2",
+          "quote": "A direction is shown and recorded as applied only when it went out in a model request. A direction that never did (run finished, stopped, failed, hit its step or budget limit, or the run was interrupted before the next step) is reported as not applied, in Search v3 and the old window, live and after reload or reconnect; a network or HTTP failure of the send is reported as such, not as \"the run already finished\".",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AN4",
+          "quote": "Search v3 Delegate and the old window's agent view show steering as before for applied directions.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-agent-steering-ui-review5.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts#after the run completes and its record loads, beside another client's direction with the same words"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Review 5. In the old window, the 'could not confirm' note of an unconfirmed steer send is still rendered once after the run completes and its record loads, with no direction chip.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AS2",
+          "quote": "A direction is shown and recorded as applied only when it went out in a model request. A direction that never did (run finished, stopped, failed, hit its step or budget limit, or the run was interrupted before the next step) is reported as not applied, in Search v3 and the old window, live and after reload or reconnect; a network or HTTP failure of the send is reported as such, not as \"the run already finished\".",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-agent-steering-ui-review5.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts#after the run completes and its record loads, alone"
       ]
     }
   ]
