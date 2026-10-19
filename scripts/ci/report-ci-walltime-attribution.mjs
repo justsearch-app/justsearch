@@ -190,6 +190,7 @@ export function buildWalltimeReport({ run = {}, jobs = [], selfJob = null, suite
       warnings.push(`unit attribution missing for ${job.name}`);
     }
   }
+  totals.unitTestCpuSeconds = jobReports.reduce((sum, job) => sum + (job.components?.testCpuSeconds || 0), 0);
   totals.runnerMinutes = totals.summedJobSeconds / 60;
   totals.requiredCiElapsedSeconds = requiredCompletion.elapsedSeconds;
 
