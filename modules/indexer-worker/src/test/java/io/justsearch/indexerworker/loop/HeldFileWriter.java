@@ -39,7 +39,7 @@ public final class HeldFileWriter {
   private final CountDownLatch release = new CountDownLatch(1);
 
   /**
-   * @param holdBefore the 1-based row publication the writer is held before: 1 holds it before
+   * @param holdBefore the 1-based row publication the writer is held before (0 never holds): 1 holds it before
    *     the file's first row, 2 after the parent and before its first chunk
    */
   public HeldFileWriter(RunningRuntime target, FileMutationFence fence, int holdBefore) {

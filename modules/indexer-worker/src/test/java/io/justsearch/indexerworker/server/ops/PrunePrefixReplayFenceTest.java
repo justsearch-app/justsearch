@@ -330,6 +330,41 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
     assertTrue(buffered().isEmpty());
   }
 
+  @Test
+  void aVduResultAfterThePrunesRemovalOfItsFileWritesNoRow() throws Exception {
+    // RP3 (preserve): a VDU result cannot publish a path's first rows. It writes chunks only
+    // under a parent it reads inside the fence; once the prune's first batch removed the file,
+    // it writes nothing, so the prune's last pass needs no report from it.
+    // The scan visits paths in order: this one is in the first batch, the others fill it.
+    Path file = Files.writeString(root.resolve("a-scan.pdf"), "scan");
+    String path = key(file);
+    indexed(runtime, path, 0);
+    for (int i = 0; i < 150; i++) {
+      indexed(runtime, key(root.resolve("gone-" + i + ".txt")), 0);
+    }
+    Files.delete(file);
+    String content = "Recognised text with enough words for several chunks. ".repeat(400);
+    AtomicBoolean firstBatchDone = new AtomicBoolean();
+    AtomicInteger vduApplied = new AtomicInteger(-1);
+    WorkerIngestService[] service = new WorkerIngestService[1];
+    // Right after the prune's first batch leaves the fence, before its last pass.
+    service[0] = publisher(runtime, () -> {
+      if (firstBatchDone.compareAndSet(false, true)) {
+        vduApplied.set(service[0].updateVduResult(UpdateVduResultRequest.newBuilder()
+            .setDocId(path).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
+            .setExtractedContent(content).build(), CallContext.none()).getSuccess() ? 1 : 0);
+      }
+    });
+
+    assertEquals("", service[0].pruneMissing(io.justsearch.ipc.PruneRequest.newBuilder()
+        .setPathPrefix(root.toString()).build(), CallContext.none()).getError());
+
+    assertEquals(0, vduApplied.get(),
+        "precondition: the VDU result ran after the file's removal and found no parent");
+    assertEquals(0, committedRows(path),
+        "a VDU result for a removed file leaves no row");
+  }
+
   // ------------------------------------------------------------ RP2: SYNC_ROOT
 
   private void bufferSync(String generation, boolean force) {

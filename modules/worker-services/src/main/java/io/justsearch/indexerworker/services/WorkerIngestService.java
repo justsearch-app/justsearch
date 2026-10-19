@@ -372,14 +372,29 @@ public final class WorkerIngestService {
 
         @Override
         public io.justsearch.adapters.lucene.runtime.PruneOps.Publications watch() {
-          io.justsearch.indexerworker.loop.FileMutationFence fence =
-              mutationAdmission == null || indexingLoop == null
-                  ? null : indexingLoop.fileMutationFence();
+          io.justsearch.indexerworker.loop.FileMutationFence fence = fileMutationFence();
           // No loop, or one without a fence of its own (a test double), records nothing.
           return fence == null
               ? io.justsearch.adapters.lucene.runtime.PruneOps.Publications.NONE : fence.watch();
         }
       };
+
+  private io.justsearch.indexerworker.loop.FileMutationFence fileMutationFence() {
+    return mutationAdmission == null || indexingLoop == null
+        ? null : indexingLoop.fileMutationFence();
+  }
+
+  /**
+   * Tells a running prune that rows of {@code path} were published, as the loop's writers do; call
+   * it inside the fence, before it is released. A prune whose scan ran before these rows existed
+   * judges {@code path} in its last pass.
+   */
+  private void publishedUnderFence(String path) {
+    io.justsearch.indexerworker.loop.FileMutationFence fence = fileMutationFence();
+    if (fence != null) {
+      fence.published(path);
+    }
+  }
 
   /**
    * For a replay service that stands in for {@code publisher}, the live Worker whose indexing loop
@@ -2644,8 +2659,14 @@ public final class WorkerIngestService {
             documentIdentityStore.rekey(oldPathHash, newPathHash, System.currentTimeMillis());
 
         // Inside the file-mutation fence: a prune applying a batch never sees a rename half done.
-        int count = withFileMutationFence(
-            () -> ingestLifecycle.indexingCoordinator().updateDocumentPaths(oldPath, newPath));
+        // The new path's rows may be its first, published after a prune's scan.
+        int count = withFileMutationFence(() -> {
+          int moved = ingestLifecycle.indexingCoordinator().updateDocumentPaths(oldPath, newPath);
+          if (moved > 0) {
+            publishedUnderFence(newPath);
+          }
+          return moved;
+        });
         // Green may not contain the document yet while Blue still serves it. Moving the durable
         // identity is therefore a successful rename even when this generation has no Lucene row.
         // Store-first is deliberate: if Lucene throws after the move, the RPC fails and retry or
