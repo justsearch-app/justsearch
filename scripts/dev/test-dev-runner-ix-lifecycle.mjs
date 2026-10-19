@@ -84,7 +84,7 @@ test('running record preserves the first-ready retry incarnation', async t => {
   const end=source.indexOf('\n  };',begin)+5;
   const spawn={cwd:'.',command:'fixture',args:[],shell:false};
   const context={fs,path,process:{pid:10},runJson:null,runId:'retry',startedAt:at(0),
-    backend:{pid:102},frontend:{pid:103},startingRun:{incarnation:2,identities:{backend:{pid:102}}},
+    backend:{pid:102},frontend:{pid:103},startingRun:{incarnation:2,identities:{backend:{pid:102}},logs:{supervisor:'.'}},
     firstReady:{n:2,incarnation:2},readyIncarnation:2,engineIdentityAsync:async()=>({pid:102}),
     runnerIdentity:{pid:10},frontendIdentity:{pid:103},apiPortRequested:0,apiPortActual:4999,uiPort:5999,
     apiBaseUrl:'',uiUrl:'',dataDir:'.',repoRoot:'.',toPosix:v=>v,effectiveChatProfile:'',devHotReload:{},
