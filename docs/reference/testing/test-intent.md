@@ -319,6 +319,12 @@ The gate rejects the evidence when any of these hold:
 A changeset with entries needs an acceptance record from someone other than its author. The
 acceptor is the verifier above the depth floor, or the orchestrator below it when it did not build.
 
+Accept once, on the final candidate. The author groups every entry of one change in one changeset,
+with its evidence prepared, before asking for acceptance; the acceptor records one acceptance on
+that changeset's digest after the last change to the tests. Accepting an intermediate candidate
+only produces a stale record to redo. A rejection, an audit or a tie-break still adds its own
+record.
+
 The acceptor works in this order:
 
 1. Reads the before-state test, the agreed scenarios and the cited sources.
@@ -336,7 +342,8 @@ The record carries a digest over the content of every flagged item the changeset
 and after), the changeset above the acceptance heading, and every evidence file it cites. Any
 later edit to a flagged item, an entry or an evidence file makes the record stale, and the
 acceptor reviews again and appends a new record. A rebase, a merge-group build or the squash push
-to main leaves the digest unchanged. The gate fails when:
+to main leaves the digest unchanged while the flagged items' before and after content stays the
+same; a rebase onto a base that changed a flagged item's before content makes the record stale. The gate fails when:
 
 - the record is missing or stale;
 - it was written by the author's session;
