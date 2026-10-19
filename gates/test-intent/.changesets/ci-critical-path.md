@@ -13,14 +13,15 @@ author-session: 01a1520d-5a3b-7373-9834-7dd1b5fb7221
     {
       "items": [
         ".github/workflows/ci.yml",
-        "scripts/ci/unit-test-shard-policy.v1.json"
+        "scripts/ci/unit-test-shard-policy.v1.json",
+        "gradle.properties"
       ],
       "class": "Adaptation",
       "moved": [
         "split",
         "instrumentation"
       ],
-      "whatMoved": "The existing app-ui module tasks and Windows-native Node, conformance, JVM and release checks move to parallel jobs. Every input, assertion, test budget, retry setting, platform selection and conformance repetition stays intact. Required check names become aggregates requiring success from both expected parts. Evidence artifacts gain part and attempt identity. CP2 evidence pending hosted comparison of run 39182583158 and the candidate.",
+      "whatMoved": "The existing app-ui module tasks and Windows-native Node, conformance, JVM and release checks move to parallel jobs. Every input, assertion, test budget, retry setting, platform selection and conformance repetition stays intact. Required check names become aggregates requiring success from both expected parts. Evidence artifacts gain part and attempt identity. This throwaway run disables Gradle build and setup caches solely to measure cold execution; no task or test selection changes. CP2 evidence pending hosted comparison of run 39182583158 and the candidate.",
       "sources": [
         {
           "kind": "owner-words",
