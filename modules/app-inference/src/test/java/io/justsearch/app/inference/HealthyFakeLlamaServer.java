@@ -25,7 +25,8 @@ import java.util.concurrent.TimeUnit;
  * device-lost CUDA error and answers 500; {@code --loading-until-signal} answers {@code /health}
  * 503 until {@link #signalReady}. {@code --spawn-lingerer} starts one more process once serving,
  * which outlives the server (as a crash reporter or a wrapper's child can) until {@link
- * #releaseLingerers}, or 90 s.
+ * #releaseLingerers}, or 90 s. {@code --exit-after-health MS} exits (code 1) MS ms after the
+ * first healthy {@code /health} answer.
  */
 public final class HealthyFakeLlamaServer {
   private static final String HOME_PROPERTY = "fake.llama.home";
@@ -227,6 +228,8 @@ public final class HealthyFakeLlamaServer {
     HttpServer server =
         HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);
     Path readySignal = home == null ? null : Path.of(home, READY_SIGNAL);
+    String exitAfterHealth = value(behaviour.toArray(String[]::new), "--exit-after-health", null);
+    var healthAnswered = new java.util.concurrent.atomic.AtomicBoolean();
     server.createContext("/health", exchange -> {
       boolean loading = behaviour.contains("--loading-until-signal")
           && (readySignal == null || !Files.exists(readySignal));
@@ -236,6 +239,9 @@ public final class HealthyFakeLlamaServer {
       exchange.sendResponseHeaders(loading ? 503 : 200, body.length);
       exchange.getResponseBody().write(body);
       exchange.close();
+      if (!loading && exitAfterHealth != null && healthAnswered.compareAndSet(false, true)) {
+        exitLater(Long.parseLong(exitAfterHealth));
+      }
     });
     var slots = new java.util.concurrent.Semaphore(Integer.parseInt(value(args, "-np", "1")));
     if (behaviour.contains("--single-slot-stream")) {
@@ -327,6 +333,20 @@ public final class HealthyFakeLlamaServer {
     }
     server.stop(0);
     System.exit(0);
+  }
+
+  /** {@code --exit-after-health MS}: the server exits (code 1) MS ms after its first 200 health. */
+  // This disposable child JVM must reproduce a server that dies on its own.
+  @SuppressWarnings("PMD.DoNotTerminateVM")
+  private static void exitLater(long delayMs) {
+    Thread.ofPlatform().daemon().start(() -> {
+      try {
+        Thread.sleep(delayMs);
+      } catch (InterruptedException ignored) {
+        // exit at once
+      }
+      Runtime.getRuntime().halt(1);
+    });
   }
 
   private static String value(String[] args, String flag, String fallback) {

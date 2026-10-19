@@ -53,6 +53,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -92,7 +93,11 @@ final class LlamaServerOps {
 
   private static final long HEALTH_CHECK_TIMEOUT_MS =
       SUPERVISION_POLICY.healthCheckTimeoutMs(); // SYS-PROP-LEGACY-COMPAT: read in policy defaults() at static init
+  // The startup health wait polls soon after launch and backs off to this cap: a server that is
+  // healthy within milliseconds is seen within milliseconds, and a long model load is polled no
+  // more often than before once the cap is reached (25, 50, 100, 200, 400, then 500 ms).
   private static final long HEALTH_CHECK_INTERVAL_MS = 500;
+  private static final long HEALTH_CHECK_FIRST_INTERVAL_MS = 25;
   private static final long HEALTH_CHECK_PROGRESS_LOG_INTERVAL_MS = 10_000;
   private static final String PATH_HEALTH = "/health";
   private static final String PATH_PROPS = "/props";
@@ -181,6 +186,9 @@ final class LlamaServerOps {
   // Spec A §3.3: every supervision timer reads the monotonic clock. Tests replace it by
   // reflection (ChatCrashRestartTest); production never does.
   private volatile LongSupplier monotonicNanos = System::nanoTime;
+  // Told each pause of the startup health wait before it is slept. Tests replace it by reflection
+  // (LlamaServerStartupHealthPollTest) to see the intervals; production never does.
+  private volatile LongConsumer startupHealthPauses = pauseMs -> {};
 
   /**
    * Spec A §7.4: counts resumes from sleep. A start waiting for health restarts its deadline in
@@ -1209,6 +1217,7 @@ final class LlamaServerOps {
     long progressNanos = TimeUnit.MILLISECONDS.toNanos(HEALTH_CHECK_PROGRESS_LOG_INTERVAL_MS);
     long nextProgressLog = startTime + progressNanos;
     long resumesSeen = resumes.get();
+    long pollIntervalMs = HEALTH_CHECK_FIRST_INTERVAL_MS; // per physical attempt: this call
 
     while (true) {
       long now = clock.getAsLong();
@@ -1282,7 +1291,8 @@ final class LlamaServerOps {
       }
 
       try {
-        Thread.sleep(HEALTH_CHECK_INTERVAL_MS);
+        startupHealthPauses.accept(pollIntervalMs);
+        Thread.sleep(pollIntervalMs);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new ModeTransitionException(
@@ -1290,6 +1300,7 @@ final class LlamaServerOps {
             "Health check interrupted",
             e);
       }
+      pollIntervalMs = Math.min(pollIntervalMs * 2, HEALTH_CHECK_INTERVAL_MS);
     }
 
     throw new ModeTransitionException(
