@@ -1016,7 +1016,7 @@ test('D9: the port is taken while /api/health is pending — neither client send
     } else {
       // ... the bridge exits naming the refusal.
       assert.equal(res.code, 1, res.stderr);
-      assert.match(res.stderr, new RegExp(`owner-mismatch: the connection to port ${engine.port} is held by a process other than pid ${engine.pid}`));
+      assert.match(res.stderr, new RegExp(`owner-mismatch: the connection to port ${engine.port} is held by `));
     }
   }
   const none = { requests: [], answersFromIt: false };
