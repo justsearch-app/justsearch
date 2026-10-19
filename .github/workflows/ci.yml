@@ -1276,7 +1276,8 @@ jobs:
   windows-native-node:
     name: Windows-native tests (node)
     runs-on: windows-latest
-    timeout-minutes: 25
+    # cp-verify forced timeout on the first attempt only.
+    timeout-minutes: ${{ github.run_attempt == '1' && 1 || 25 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
