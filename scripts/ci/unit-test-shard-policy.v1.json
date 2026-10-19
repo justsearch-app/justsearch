@@ -25,7 +25,11 @@
         "maxSkipped": 50
       },
       "jobId": "app-ui-ui",
-      "jobName": "Unit tests (app-ui-ui)"
+      "jobName": "Unit tests (app-ui-ui)",
+      "commands": [
+        "npm run test:unit:run --prefix modules/ui-web",
+        "npm run test:unit:lockdown --prefix modules/ui-web"
+      ]
     },
     {
       "lane": "app-ui-services",
@@ -181,7 +185,9 @@
         ":modules:adapters-lucene:test",
         ":modules:app-inference:test",
         ":modules:worker-services:test",
-        ":modules:ort-common:test"
+        ":modules:ort-common:test",
+        ":modules:configuration:test",
+        ":modules:indexer-worker:test"
       ]
     }
   ],

@@ -265,6 +265,8 @@ describe('Shell — slice 492 substrate integration', () => {
     opts()[0]!.click();
     await shell.updateComplete;
     expect(getUiMode()).toBe('simple');
+    // Finish the click's queued write while its transport fixture is still installed.
+    await enqueueUiModePersistence(async () => undefined);
   });
 
   it('923 review — topbar persistence joins the shared cross-control mode queue', async () => {
