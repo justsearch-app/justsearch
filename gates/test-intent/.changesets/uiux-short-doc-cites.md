@@ -173,3 +173,14 @@ After the author wrote these entries, the orchestrator corrected one comment in 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-xgwrl_sz",
+  "verdict": "accept",
+  "digest": "sha256:d36f3ca7ea1c74c63f6696c2138bbeabe3f2f47b7b3c416690977e9bb54940ed",
+  "note": "All three entries are New. Expectations follow from VS1/2/3/5/6/7/8, VN1/4 and the quoted design delegation; the fallback choices preserve existing behavior. Independent locked rerun matches all 37 passing candidate cases, eight repaired baseline assertion failures and 29 baseline preservation passes. Evidence digests match; tampering/staleness counterexamples reject. This accepts test intent only, not full UI/restart coverage. Process deviation: entries were exposed while initially reading the rules, before provisional classification."
+}
+```
