@@ -75,6 +75,21 @@ export class Switch extends JfElement {
       opacity: 0.5;
       cursor: not-allowed;
     }
+    /* Forced colors (Windows High Contrast) repaint both fills as Canvas, which made the thumb
+       disappear and on/off identical. The thumb is restated in CanvasText, and "on" takes the
+       selection pair: a Highlight track under a HighlightText thumb. */
+    @media (forced-colors: active) {
+      .switch::after {
+        background: CanvasText;
+      }
+      .switch.on {
+        background: Highlight;
+        border-color: Highlight;
+      }
+      .switch.on::after {
+        background: HighlightText;
+      }
+    }
   `;
 
   private toggle(): void {

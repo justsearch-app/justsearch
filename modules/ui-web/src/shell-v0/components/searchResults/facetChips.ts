@@ -109,12 +109,30 @@ export const facetChipStyles: CSSResult = css`
     background: var(--surface-hover);
     color: var(--text-primary);
     border-color: var(--accent-command);
-    outline: none;
+    outline: 2px solid transparent;
   }
   .facet-chip.selected {
     background: var(--accent-tint);
     color: var(--accent-on-tint);
     border-color: var(--accent-command);
+  }
+  /* Forced colors (Windows High Contrast) erase the selected chip's fill, so it takes the selection
+     pair ('forced-color-adjust: none' keeps the browser's Canvas backplate from landing behind its
+     text). That also stops the transparent focus outline above from being repainted, so a selected
+     chip states its ring. */
+  @media (forced-colors: active) {
+    .facet-chip.selected {
+      forced-color-adjust: none;
+      background: Highlight;
+      border-color: Highlight;
+    }
+    .facet-chip.selected,
+    .facet-chip.selected * {
+      color: HighlightText;
+    }
+    .facet-chip.selected:focus-visible {
+      outline-color: Highlight;
+    }
   }
   .facet-count {
     font-variant-numeric: tabular-nums;

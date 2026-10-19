@@ -153,6 +153,20 @@ export class OptionButtonGroupRenderer extends JsonFormsRendererBase {
       background: var(--accent-tint-08);
       color: var(--text-tint);
     }
+    /* Forced colors (Windows High Contrast) erase the selected card's tint and edge, so it takes the
+       selection pair ('forced-color-adjust: none' keeps the browser's Canvas backplate from landing
+       behind its text). A selected swatch keeps its outline, which forced colors still paint. */
+    @media (forced-colors: active) {
+      .option-btn.selected:not(.option-btn-swatch) {
+        forced-color-adjust: none;
+        background: Highlight;
+        border-color: Highlight;
+        color: HighlightText;
+      }
+      .option-btn.selected:not(.option-btn-swatch) * {
+        color: HighlightText;
+      }
+    }
     .option-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;

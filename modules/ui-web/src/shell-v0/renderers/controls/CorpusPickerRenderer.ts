@@ -60,6 +60,10 @@ export class CorpusPickerRenderer extends JsonFormsRendererBase {
       font: inherit;
       padding: 0.125rem 0;
     }
+    /* Transparent, not none: invisible as before, but forced colors repaint it into a ring. */
+    .picker__input:focus-visible {
+      outline: 2px solid transparent;
+    }
     .picker__hint {
       font-size: var(--font-size-xs);
       color: var(--text-secondary);

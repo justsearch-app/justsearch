@@ -625,6 +625,22 @@
   --surface-2: #eeeeee;
 }
 
+/* === Forced colors (Windows High Contrast) ===
+   Under `forced-colors: active` the browser replaces every author colour with the user's system
+   palette and drops box-shadows, but leaves blur and the alpha of a fill alone. So: (a) the focus
+   ring token becomes the system Highlight, which forced colors keep because it IS a system colour;
+   (b) the one blur multiplier goes to 0, which also turns the glass surfaces that derive their
+   translucency from it opaque (a blurred, see-through panel is unreadable in a two-colour palette).
+   Independent of the app's own `.high-contrast` switch above: neither block sets what the other
+   sets, so either works alone and both compose. Search v3 keeps its own palette on its window host
+   and answers the same media query in `sv3-tokens.css.ts`. */
+@media (forced-colors: active) {
+  :root {
+    --focus-ring-color: Highlight;
+    --glass-blur-scale: 0;
+  }
+}
+
 /* 569 §19 Seam 4 — the reduced-motion adaptation axis. When the user selects motion = reduced, the
    adaptation-profile authority toggles `.motion-reduced` on the root; this near-zeroes animations +
    transitions app-wide (mirroring the OS-level `prefers-reduced-motion`), quieting the co-projected
