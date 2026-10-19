@@ -46,14 +46,19 @@ fn stat(raw: &str) -> io::Result<(&str, &str)> {
     Ok((state, ticks))
 }
 
+fn proc_read_error(error: io::Error) -> io::Error {
+    // Linux ESRCH (3) can occur when a process is reaped after opening its stat file.
+    if (error.kind() == io::ErrorKind::NotFound || error.raw_os_error() == Some(3))
+        && Path::new("/proc/self/stat").is_file()
+    {
+        io::Error::new(io::ErrorKind::NotFound, "process ended")
+    } else {
+        io::Error::other(format!("process birth identity unreadable: {error}"))
+    }
+}
+
 fn birth(pid: u32) -> io::Result<Identity> {
-    let raw = std::fs::read_to_string(format!("/proc/{pid}/stat")).map_err(|error| {
-        if error.kind() == io::ErrorKind::NotFound && Path::new("/proc/self/stat").is_file() {
-            error
-        } else {
-            io::Error::other(format!("process birth identity unreadable: {error}"))
-        }
-    })?;
+    let raw = std::fs::read_to_string(format!("/proc/{pid}/stat")).map_err(proc_read_error)?;
     let (state, ticks) = stat(&raw)?;
     if matches!(state, "Z" | "X" | "x") {
         return Err(io::Error::new(io::ErrorKind::NotFound, "process ended"));
@@ -127,7 +132,10 @@ pub(crate) fn terminate(identity: &Identity, executable: &Path) -> Result<(), St
     }
     match capture(identity.pid) {
         Ok((seen, _)) if seen != *identity => return Ok(()),
-        Ok((_, exe)) if exe != executable => eprintln!("Managed child {} executable changed: {:?} -> {:?}; birth identity still matches", identity.pid, executable, exe),
+        Ok((_, exe)) if exe != executable => eprintln!(
+            "Managed child {} executable changed: {:?} -> {:?}; birth identity still matches",
+            identity.pid, executable, exe
+        ),
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
         Err(e) => return Err(format!("Managed child identity unknown: {e}")),
         _ => {}
@@ -220,6 +228,28 @@ mod tests {
         let mut candidate = identity;
         candidate.pid = u32::MAX;
         assert!(!candidate.valid(candidate.pid));
+    }
+
+    #[test]
+    fn reaped_process_stat_read_is_ended() {
+        use std::io::Read;
+
+        let mut child = std::process::Command::new("sleep")
+            .arg("30")
+            .spawn()
+            .unwrap();
+        let file = std::fs::File::open(format!("/proc/{}/stat", child.id()));
+        child.kill().unwrap();
+        child.wait().unwrap();
+
+        let error = file
+            .unwrap()
+            .read_to_string(&mut String::new())
+            .unwrap_err();
+        assert_eq!(error.raw_os_error(), Some(3), "expected Linux ESRCH");
+        let error = proc_read_error(error);
+        assert_eq!(error.kind(), io::ErrorKind::NotFound);
+        assert_eq!(error.to_string(), "process ended");
     }
 
     #[test]
