@@ -222,3 +222,14 @@ The blank-id search-event check is strengthened to require the agreed refusal.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-cioh0sjw",
+  "verdict": "reject",
+  "digest": "sha256:4363abd91f9de9515925a0922f5d10beb19a28f9380c310c106aec2a03c314fa",
+  "note": "AgentRunStoreTest.java is classed New/repaired, but the change removes an existing expectation (appendSearchEvent returns null for a blank or null conversationId) and replaces it with a throw. That removal needs an Obsolete entry with a conflict search and a source that changes this behaviour. PS1 does not: the old null return already refused a blank id before any filesystem access, so PS1 neither makes the old behaviour a defect nor requires an exception. Either keep the old expectation, or cite a source (owner words) that a blank id must raise. The other entries hold: their expectations follow from PS1-PS3/PN1-PN2, and the fail-before evidence is an assertion failure on 117e89be9 for each repaired check."
+}
+```
