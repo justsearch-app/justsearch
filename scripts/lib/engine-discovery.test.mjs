@@ -104,7 +104,7 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
     let body = '';
     req.on('data', (c) => (body += c));
     req.on('end', () => {
-      requests.push({ method: req.method, url: req.url, headers: req.headers, body });
+      requests.push({ method: req.method, url: req.url, headers: req.headers, body, health: healthStatus });
       const json = (status, obj) => {
         res.writeHead(status, { 'content-type': 'application/json' });
         res.end(JSON.stringify(obj));
@@ -151,7 +151,10 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
     return closed;
   };
   t.after(close);
-  return { kind, pid, instanceId: id, port: server.address().port, requests, token, close };
+  const setHealth = (status) => {
+    healthStatus = status;
+  };
+  return { kind, pid, instanceId: id, port: server.address().port, requests, token, close, setHealth };
 }
 
 /** Resolve once the service has received the client's notifications/initialized (its handshake is done). */
@@ -257,13 +260,13 @@ function run(args, { env, cwd, input, timeoutMs = 20000 }) {
 }
 
 /** discover() of the production MCP server, in a child with the given machine. */
-async function prodDiscover(m, { port, envExtra = {} } = {}) {
+async function prodDiscover(m, { port, envExtra = {}, timeoutMs } = {}) {
   const script =
     `import(${JSON.stringify(pathToFileURL(DISCOVERY_MJS).href)})` +
     `.then((d) => d.discover(${port ? `{ port: ${port} }` : ''}))` +
     '.then((r) => { process.stdout.write(JSON.stringify(r)); })' +
     '.catch((e) => { process.stderr.write(e.message); process.exit(3); });';
-  const res = await run(['--input-type=module', '-e', script], { env: { ...m.env, ...envExtra }, cwd: m.cwd });
+  const res = await run(['--input-type=module', '-e', script], { env: { ...m.env, ...envExtra }, cwd: m.cwd, timeoutMs });
   return { ...res, result: res.code === 0 ? JSON.parse(res.stdout) : null };
 }
 
@@ -624,24 +627,63 @@ test('D4/D9: a foreign server copying the manifest identity with an unrelated li
   assert.deepEqual(impostor.requests, [], 'nothing at all is sent to the impostor');
 });
 
-test('D4: an Engine with the right identity whose /api/health answers 503 is refused; a later valid one is still found', async (t) => {
+test('D4: a proven Engine still starting (/api/health 503) is waited for and admitted once it answers 200 — by both clients, no token before 200', async (t) => {
+  for (const client of ['production MCP', 'bundle']) {
+    const root = tempRoot(t);
+    const m = machine(root);
+    const engine = await startService(t, { healthStatus: 503 });
+    writeManifest(m.desktop, manifestFor(engine));
+    const ready = setTimeout(() => engine.setHealth(200), 2500);
+    t.after(() => clearTimeout(ready));
+    if (client === 'production MCP') {
+      const res = await prodDiscover(m);
+      assert.equal(res.result?.instanceId, engine.instanceId, `${client}: ${res.stderr}`);
+    } else {
+      assertConnectedTo(await bridgeSession(m, bundle(root)), engine);
+    }
+    assert.ok(engine.requests.some((r) => r.url === '/api/health' && r.health === 503), `${client}: it was seen starting`);
+    const credentialed = engine.requests.filter((r) => r.url === '/api/mcp/token' || r.url === '/mcp');
+    assert.ok(credentialed.length > 0, client);
+    assert.ok(credentialed.every((r) => r.health === 200), `${client}: nothing past the probes before health 200`);
+  }
+});
+
+test('D4: an Engine that stays at /api/health 503 is rejected after the bound; a later valid one is still found', async (t) => {
+  const { selectEngine, STARTUP_WAIT_MS } = require(ENGINE_DISCOVERY);
   const root = tempRoot(t);
-  const m = machine(root);
   const starting = await startService(t, { healthStatus: 503 });
   const startingDir = path.join(root, 'starting-data');
   writeManifest(startingDir, manifestFor(starting));
   const engine = await startService(t);
-  writeManifest(m.desktop, manifestFor(engine));
-
-  const { selectEngine } = require(ENGINE_DISCOVERY);
-  const { selected, tried } = await selectEngine([{ source: 'starting', dataDir: startingDir }]);
-  assert.equal(selected, null, 'an unhealthy Engine is not admitted');
+  const good = path.join(root, 'good');
+  writeManifest(good, manifestFor(engine));
+  const t0 = Date.now();
+  const { selected, tried } = await selectEngine(
+    [{ source: 'starting', dataDir: startingDir }, { source: 'good', dataDir: good }],
+    { startupWaitMs: 1500 },
+  );
+  assert.ok(Date.now() - t0 >= 1000, `it was waited for (${Date.now() - t0} ms)`);
   assert.equal(tried[0].status, 'unhealthy', tried[0].detail);
-
-  const res = await prodDiscover(m, { envExtra: { JUSTSEARCH_DATA_DIR: startingDir } });
-  assert.equal(res.result?.instanceId, engine.instanceId, res.stderr);
-  assertConnectedTo(await bridgeSession(m, bundle(root), { JUSTSEARCH_DATA_DIR: startingDir }), engine);
+  assert.equal(selected?.instanceId, engine.instanceId);
+  assert.ok(STARTUP_WAIT_MS >= 10000 && STARTUP_WAIT_MS <= 60000, `the shipped bound is a constant of ~30 s (${STARTUP_WAIT_MS} ms)`);
   assert.ok(!starting.requests.some((r) => r.url === '/mcp' || r.url === '/api/mcp/token'), 'nothing past the probes reaches it');
+});
+
+test('D4: production MCP gives up on an Engine stuck at 503 after STARTUP_WAIT_MS and uses the desktop Engine', async (t) => {
+  const bound = require(ENGINE_DISCOVERY).STARTUP_WAIT_MS ?? 30000;
+  const root = tempRoot(t);
+  const m = machine(root);
+  const stuck = await startService(t, { healthStatus: 503 });
+  const stuckDir = path.join(root, 'stuck-data');
+  writeManifest(stuckDir, manifestFor(stuck));
+  const engine = await startService(t);
+  writeManifest(m.desktop, manifestFor(engine));
+  const t0 = Date.now();
+  const res = await prodDiscover(m, { envExtra: { JUSTSEARCH_DATA_DIR: stuckDir }, timeoutMs: bound + 30000 });
+  const elapsed = Date.now() - t0;
+  assert.ok(elapsed >= bound - 2000 && elapsed < bound + 15000, `it waited about ${bound} ms (took ${elapsed} ms)`);
+  assert.equal(res.result?.instanceId, engine.instanceId, res.stderr);
+  assert.ok(!stuck.requests.some((r) => r.url === '/api/mcp/token'), 'no token is fetched from it');
 });
 
 test('D9: after initialize the Engine goes away and a foreign server takes its port — the bridge sends it nothing, not the old token', async (t) => {

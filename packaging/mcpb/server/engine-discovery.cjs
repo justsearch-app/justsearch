@@ -36,6 +36,13 @@ const path = require('path');
 /** tauri.conf.json `identifier`; Tauri appends it to the OS data folder. */
 const DESKTOP_APP_IDENTIFIER = 'io.justsearch.shell';
 const PROBE_TIMEOUT_MS = 2000;
+/**
+ * How long a proven Engine (owner and identity match) that answers /api/health 503 — still
+ * starting — is waited for before it is rejected. Hosts often start an agent client and the
+ * desktop app together at login. Each attempt is bounded by PROBE_TIMEOUT_MS.
+ */
+const STARTUP_WAIT_MS = 30000;
+const STARTUP_RETRY_MS = 1000;
 const PROBE_MAX_BYTES = 64 * 1024;
 const OS_QUERY_TIMEOUT_MS = 10000;
 
@@ -302,10 +309,11 @@ function readManifest(candidate) {
  * Validate one candidate folder. Accepts only when the manifest is complete, its pid is alive
  * (or cannot be checked), the OS says that pid holds the listening socket on head.apiPort, the
  * service there answers /api/runtime/live with the manifest's pid and instanceId, and
- * /api/health answers 200. Nothing is sent to the port before the owner check, and no
- * credentials are sent at all.
+ * /api/health answers 200. A proven Engine that answers 503 (starting) is re-checked for up to
+ * startupWaitMs, the owner proof repeated before each attempt; anything else is rejected at once.
+ * Nothing is sent to the port before the owner check, and no credentials are sent at all.
  */
-async function validateCandidate(candidate, { timeoutMs = PROBE_TIMEOUT_MS } = {}) {
+async function validateCandidate(candidate, { timeoutMs = PROBE_TIMEOUT_MS, startupWaitMs = STARTUP_WAIT_MS } = {}) {
   const read = readManifest(candidate);
   if (read.ok === false) return read;
   const { manifest, pid, instanceId, port } = read;
@@ -325,10 +333,18 @@ async function validateCandidate(candidate, { timeoutMs = PROBE_TIMEOUT_MS } = {
       `port ${port} answers as ${seen}, manifest says pid ${pid}, instance ${instanceId}`,
     );
   }
-  const health = await getJson(port, '/api/health', timeoutMs);
-  if (health.status !== 200) {
+  const deadline = Date.now() + startupWaitMs;
+  for (;;) {
+    const health = await getJson(port, '/api/health', timeoutMs);
+    if (health.status === 200) break;
     const why = health.error ? health.error : `HTTP ${health.status}`;
-    return reject(candidate, 'unhealthy', `pid ${pid} on port ${port} is not ready: /api/health ${why}`);
+    if (health.status !== 503 || Date.now() + STARTUP_RETRY_MS > deadline) {
+      const waited = health.status === 503 ? ` after waiting ${Math.round(startupWaitMs / 1000)} s` : '';
+      return reject(candidate, 'unhealthy', `pid ${pid} on port ${port} is not ready${waited}: /api/health ${why}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, STARTUP_RETRY_MS));
+    const still = await portOwnedBy(port, pid);
+    if (!still.ok) return reject(candidate, still.status, still.detail);
   }
   return { ...candidate, ok: true, status: 'ok', port, pid, instanceId, lifecycle: manifest.lifecycle || null };
 }
@@ -403,6 +419,7 @@ function describeTried(tried) {
 
 module.exports = {
   DESKTOP_APP_IDENTIFIER,
+  STARTUP_WAIT_MS,
   desktopAppDataDir,
   validateCandidate,
   confirmEngine,

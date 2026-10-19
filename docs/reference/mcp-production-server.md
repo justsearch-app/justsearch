@@ -38,7 +38,8 @@ MCP server on?" is exactly "which port is the API on?":
   (after `--port` / `JUSTSEARCH_API_PORT` / `JUSTSEARCH_DATA_DIR`), accept it only when the pid is
   alive, the operating system reports that pid as the owner of the listening socket on that port,
   `GET /api/runtime/live` there reports the same pid and instance, and `GET /api/health` answers
-  200 (an Engine still starting is refused), and otherwise fail with a list of every folder they
+  200 (an Engine that passes those checks but is still starting, health 503, is re-checked for up
+  to 30 s before it is passed over; no token is fetched before 200), and otherwise fail with a list of every folder they
   tried. Before sending the session token again they re-check that the same Engine still holds
   the port; the bridge then re-discovers, the stdio server reports `ENGINE_GONE` and must be
   restarted. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for

@@ -20,7 +20,8 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    A manifest counts only if its pid is alive, the operating system reports that pid as the
    owner of the listening socket on its `head.apiPort` (Linux `/proc`, Windows `netstat -ano`),
    the service there answers `GET /api/runtime/live` with the same pid and instance id, and
-   `GET /api/health` answers 200; there is no default-port guess. On Windows, when `%APPDATA%`
+   `GET /api/health` answers 200 (a proven Engine still starting, 503, is re-checked for up to
+   30 s, so starting the host and the app together works); there is no default-port guess. On Windows, when `%APPDATA%`
    is unset in its environment, it also asks Windows for the Roaming folder. The bridge never
    looks in a dev checkout: when the installed app and a dev Engine both run, it uses the
    installed app; set `JUSTSEARCH_DATA_DIR` to the checkout's data folder (for example
