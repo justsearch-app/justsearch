@@ -220,3 +220,14 @@ B9 remains unchanged: catching a drain that proceeds after 1.5 seconds requires 
 ## Acceptance records
 
 Pending independent verification; no builder acceptance.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-slow-tests-b-cc6d91b2",
+  "verdict": "accept",
+  "digest": "sha256:a000f673b051805293ad37d4fb05d188026b74c6e5965e95cbdc642be2ce8f22",
+  "note": "Round 2 at 80b3a61: B8 catches 300 ms, 1 s, reconciler and fourth-unload reloads 5/5 (baseline misses 1 s); round-1 mutations, stability and cross-module checks hold for the unchanged rest."
+}
+```
