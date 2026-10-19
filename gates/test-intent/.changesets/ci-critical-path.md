@@ -46,3 +46,14 @@ Comparison SHA-256: `745b1a45476e3759bb00c1351834c8b420ee289e48202e230b2016f188b
 No acceptance record is authored here.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-critical-path-cc6d91b2",
+  "verdict": "accept",
+  "digest": "sha256:4b49a0362769dabab5eaac58fafaeea9dba8465df2310364d60eb1ac4b27c328",
+  "note": "Recheck at a92013dc8 (rebased on 47bfff2aa). Own identity comparison of PR run 39232354022 against main run 39231519190: app-ui parts 8059 JUnit keys/8131 executions/20 skips identical; Windows 139 JUnit keys plus 190 log identities (57 dev-runner files incl. vite-loopback, conformance cases and repeats, signing, engine-discovery 28 cases with 4 skips) identical. Engine discovery runs once per OS with main's pass/skip set; ui-web install and comment kept. Header-only transcripts removed. Earlier acceptance on b08b7c61b superseded."
+}
+```
