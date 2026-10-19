@@ -63,21 +63,32 @@ function spawnNode(args, options, stop) {
   return child;
 }
 
-/** Stop one child and wait for it to exit. Returns what went wrong, if anything. */
+/**
+ * Stop one child and wait for it to exit: its own way first, then SIGTERM, then SIGKILL.
+ * Returns { problem, alive }. A child alive after SIGKILL is let go (unref'd, pipes closed) so
+ * the runner can still exit; the caller must not remove its folders.
+ */
 async function stopChild({ child, stop, what, exited }) {
   const name = `child pid ${child.pid} (${what})`;
-  let problem = null;
+  const gone = () => within(exited, STOP_MS, '').then(() => true, () => false);
+  const notes = [];
   if (stop === 'stdin') {
     child.stdin.end();
-    const ended = await within(exited, STOP_MS, '').then(() => true, () => false);
-    if (ended) return null;
-    problem = `${name} did not exit within ${STOP_MS} ms of its stdin closing; killed`;
+    if (await gone()) return { problem: null, alive: false };
+    notes.push(`did not exit within ${STOP_MS} ms of its stdin closing`);
   } else if (stop === 'self') {
-    problem = `${name} was still running at cleanup; killed`;
+    notes.push('was still running at cleanup');
   }
-  child.kill();
-  const ended = await within(exited, STOP_MS, '').then(() => true, () => false);
-  return ended ? problem : `${name} survived a kill for ${STOP_MS} ms`;
+  child.kill('SIGTERM');
+  if (await gone()) {
+    return { problem: notes.length ? `${name} ${notes.join(', ')}; terminated` : null, alive: false };
+  }
+  notes.push(`ignored SIGTERM for ${STOP_MS} ms`);
+  child.kill('SIGKILL');
+  if (await gone()) return { problem: `${name} ${notes.join(', ')}; force-killed`, alive: false };
+  child.unref();
+  for (const stream of [child.stdin, child.stdout, child.stderr]) stream?.destroy();
+  return { problem: `${name} ${notes.join(', ')}; STILL ALIVE ${STOP_MS} ms after SIGKILL`, alive: true };
 }
 
 /**
@@ -95,12 +106,21 @@ function cleanup(t) {
     resources.set(t, held);
     t.after(async () => {
       const problems = [];
+      let survivors = 0;
       for (const entry of [...liveChildren]) {
-        const problem = await stopChild(entry);
+        const { problem, alive } = await stopChild(entry);
         if (problem) problems.push(problem);
+        if (alive) {
+          survivors++;
+          liveChildren.delete(entry); // reported here; later tests do not wait on it again
+        }
       }
       for (const close of held.services) await close();
       for (const root of held.roots) {
+        if (survivors) {
+          problems.push(`left ${root} in place: a child is still alive`);
+          continue;
+        }
         try {
           fs.rmSync(root, { recursive: true, force: true });
         } catch (e) {
@@ -347,8 +367,17 @@ async function startImpostor(t, { port = 0, pid, instanceId, token = 'impostor-t
    */
   const settled = async () => {
     const seen = new Promise((resolve) => (synced = resolve));
-    await new Promise((resolve, reject) => http.get({ host: '127.0.0.1', port: boundPort, path: '/__settled', agent: false }, (res) => res.resume().on('end', resolve)).on('error', reject));
-    await within(seen, 10000, 'impostor report');
+    const req = http.get({ host: '127.0.0.1', port: boundPort, path: '/__settled', agent: false });
+    const answered = new Promise((resolve, reject) => {
+      req.on('response', (res) => res.resume().on('end', resolve).on('error', reject));
+      req.on('error', reject);
+    });
+    try {
+      // One deadline for the whole exchange: connect, the impostor's report, its response.
+      await within(Promise.all([answered, seen]), 10000, 'impostor report');
+    } finally {
+      req.destroy();
+    }
     return { connections: connections - 1, requests: [...requests] };
   };
   return { port: boundPort, pid: child.pid, instanceId, requests, settled };
