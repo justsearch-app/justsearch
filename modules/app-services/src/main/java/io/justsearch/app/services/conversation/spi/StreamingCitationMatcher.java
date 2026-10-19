@@ -200,9 +200,9 @@ public final class StreamingCitationMatcher implements StreamConsumer {
    * The sources to verify against (tempdoc 836 §1.4).
    *
    * <p>An injector that holds the literal text it showed the model publishes {@link
-   * RAGContext#ATTR_VERIFICATION_SOURCES}; retrieval publishes only {@link
-   * RAGContext#ATTR_CITATIONS}, whose chunk ordinals are true, so those sources carry no text and
-   * the Worker looks them up exactly as before.
+   * RAGContext#ATTR_VERIFICATION_SOURCES} — retrieval included (WP4.4). Without it, the sources
+   * are derived from {@link RAGContext#ATTR_CITATIONS} with no text and the Worker looks each one
+   * up by chunk ordinal.
    */
   @SuppressWarnings("unchecked")
   private static List<DocumentService.VerificationSource> verificationSources(
