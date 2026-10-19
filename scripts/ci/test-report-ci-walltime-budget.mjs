@@ -127,3 +127,16 @@ function attribution(jobs) {
 }
 
 console.log('test-report-ci-walltime-budget: PASS');
+
+// A pre-split job cannot be judged against a two-second aggregate's budget.
+{
+  const report = buildWalltimeBudgetReport({ attribution: { jobs: [{ name: 'Parent', wallSeconds: 2200 }] }, policy: {
+    reviewBy: '2099-01-01', lanes: [
+      { job: 'Parent', requiredCheck: 'Parent', hardTimeoutSeconds: 120, advisoryBudgets: { maxWallSeconds: 30 } },
+      { job: 'Part', requiredCheck: 'Parent', hardTimeoutSeconds: 1500, advisoryBudgets: { maxWallSeconds: 1200 } },
+    ],
+  } });
+  assert.equal(report.lanes.find((lane) => lane.job === 'Parent').ceilingSeconds, null);
+  assert.ok(report.warnings.some((warning) => warning.code === 'legacy-unsplit-lane'));
+  assert.equal(report.warnings.some((warning) => warning.code === 'walltime-over-budget'), false);
+}

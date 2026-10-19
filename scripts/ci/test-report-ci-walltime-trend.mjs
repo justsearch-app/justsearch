@@ -77,3 +77,21 @@ function run(runId, appui, build) {
 }
 
 console.log('test-report-ci-walltime-trend: PASS');
+
+// Historical work and the new aggregate share a required check name but have
+// different meanings. Do not report legacy work as an over-budget aggregate.
+{
+  const policy = { lanes: [
+    { job: 'Unit tests (app-ui)', requiredCheck: 'Unit tests (app-ui)', advisoryBudgets: { maxWallSeconds: 30 } },
+    { job: 'Unit tests (app-ui-ui)', requiredCheck: 'Unit tests (app-ui)', advisoryBudgets: { maxWallSeconds: 1200 } },
+    { job: 'Unit tests (app-ui-services)', requiredCheck: 'Unit tests (app-ui)', advisoryBudgets: { maxWallSeconds: 1440 } },
+  ] };
+  const report = buildTrendReport({ policy, runs: [
+    { jobs: [{ name: 'Unit tests (app-ui)', wallSeconds: 2200 }] },
+    { jobs: [{ name: 'Unit tests (app-ui)', wallSeconds: 2 }, { name: 'Unit tests (app-ui-ui)', wallSeconds: 1000 }, { name: 'Unit tests (app-ui-services)', wallSeconds: 1300 }] },
+  ] });
+  const aggregate = report.lanes.find((lane) => lane.job === 'Unit tests (app-ui)');
+  assert.equal(aggregate.runs, 1);
+  assert.equal(aggregate.medianSeconds, 2);
+  assert.equal(report.sustainedDrift, false);
+}
