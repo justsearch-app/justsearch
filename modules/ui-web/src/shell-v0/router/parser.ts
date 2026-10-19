@@ -3,17 +3,19 @@
  * URL parser — slice 489 §7 stage 1.
  *
  * Structural parser for shell-address URLs. The Java shell-address model
- * and URL emitters share this grammar and canonicalization.
+ * and URL emitters share this grammar; canonicalization differences are noted below.
  *
  * Grammar:
  *   justsearch://surface/<surfaceId>[?key=value&...]    → Navigation
  *   justsearch://op/<opId>[?argName=value&...]          → Invocation
+ *   justsearch://query?q=<text>[&key=value&...]        → Query
+ *   justsearch://answer?q=<prompt>[&shape=<id>]        → Answer
  *
  * Rules:
  *   - scheme must be `justsearch:`
- *   - host must be `op` or `surface`
- *   - pathname is /<id>; strip leading slash; require single segment
- *   - id must match /^[A-Za-z0-9_.\-]+$/
+ *   - host must be `op`, `surface`, `query`, or `answer`
+ *   - for `op` and `surface`, pathname is /<id>; strip surrounding slashes; require single segment
+ *   - op/surface id must match /^(core|vendor\.[a-z][a-z0-9-]*)\.[a-z][a-z0-9-]*$/
  *   - args use URLSearchParams; repeated keys → array
  *
  * Returns `null` for malformed input — pure function, no exceptions.
@@ -153,8 +155,10 @@ export function parseUrl(raw: string): ShellAddress | null {
  * Invocation, which are an args-parsing concern). For Navigation, the round
  * trip is exact.
  *
- * Canonicalization rules: keys sorted alphabetically; repeated keys preserved
- * for array values; values URL-encoded. Matches `URLSurfaceEmitter`.
+ * Like `URLSurfaceEmitter`, keys are sorted alphabetically and array values
+ * produce repeated keys in array order. Value encoding differs: this uses
+ * `encodeURIComponent` (space → %20, apostrophe unchanged); Java uses
+ * `URLEncoder` (space → +, apostrophe → %27).
  */
 export function canonicalize(addr: ShellAddress): string {
   if (addr.kind === 'answer') {

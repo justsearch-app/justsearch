@@ -30,14 +30,16 @@ import java.util.TreeMap;
  *   justsearch://surface/&lt;surfaceId&gt;[?key=value&amp;key=value...]
  * </pre>
  *
- * <p>Canonicalization: keys sorted alphabetically; values URL-encoded; array
- * values produce repeated keys ({@code ?ids=a&ids=b} not {@code ?ids=a,b}) —
- * matches the frontend URL parser convention.
+ * <p>Like the frontend URL parser, keys are sorted alphabetically and array
+ * values produce repeated keys in array order ({@code ?ids=a&ids=b} not
+ * {@code ?ids=a,b}). Value encoding differs: Java uses {@code URLEncoder}
+ * (space → +, apostrophe → %27); the frontend uses {@code encodeURIComponent}
+ * (space → %20, apostrophe unchanged).
  *
  * <p>Per slice 489 §13 anti-pattern #3: the Java and TS implementations of
  * the grammar must stay in sync. The frontend URL parser and this emitter
- * share the same canonicalization rules. A future wire-contract
- * integration ({@code contracts/wire/}) can drive both sides from one source,
+ * share key ordering and repeated-key handling, with the encoding differences above.
+ * A future wire-contract integration ({@code contracts/wire/}) can drive both sides from one source,
  * but is out of scope for slice 489.
  *
  * <p>Per slice 489 §13 anti-pattern #6 (and the parametric

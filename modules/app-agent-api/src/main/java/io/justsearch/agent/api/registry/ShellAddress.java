@@ -54,7 +54,7 @@ import java.util.Optional;
  * Navigation is forwarded.
  *
  * <p>This Java record is the canonical model for tests + future server-side
- * validation. The FE TS counterpart in {@code modules/ui-web/src/api/url-router/}
+ * validation. The FE TS URL parser in {@code modules/ui-web/src/shell-v0/router/parser.ts}
  * shares the grammar by hand — the wire-contract pipeline integration
  * ({@code contracts/wire/}) is a follow-up if the grammar grows.
  */
