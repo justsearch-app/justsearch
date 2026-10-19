@@ -8,8 +8,8 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
 # Test-intent entries: replayed and late prunes leave no rows of a deleted file
 
 Stacked on #793 (prune-complete). Sources are the owner-adopted scenarios RP1-RP11 (v2) of this
-task. Checks pinning repaired behaviour carry an assertion fail-before on the #793 head 5be9fb900
-(run-evidence.mjs --before 5be9fb900 with the compatibility patch
+task. Checks pinning repaired behaviour carry an assertion fail-before on the #793 head b8eb9217e
+(run-evidence.mjs --before b8eb9217e with the compatibility patch
 gates/test-intent/evidence/prune-replay-before-compat.patch: a FileMutationFence that is the plain
 fair lock the loop already used and records nothing, an IndexingLoop accessor returning null, a
 replay context that ignores the publisher, and a promotion overload that ignores the prune stop
@@ -24,6 +24,11 @@ Post-deferred-upgrade and failed-migration drains: the services whose loop is li
 exist, because it runs before any application service, and so any indexing loop, is built
 (KnowledgeServer boot path, before appServices = newAppServices()); it keeps the replay service's
 root authority (recorded volume) and needs no fence.
+
+Late publications (RP3). The loop's writer and a rename report the path whose rows they publish,
+inside the fence; the prune's last pass judges those paths. A VDU result needs none: it writes
+chunks only under a parent it finds inside the fence (ChunkDocumentWriter refuses without the
+parent's identity), so it never publishes a path's first rows.
 
 RP5 bound. A file recreated after its last absence check loses its rows to the batch; a replayed
 prune re-probes every file it removed once its removal is committed and queues the present ones for
@@ -44,7 +49,7 @@ run-evidence.mjs. No acceptance is recorded by the builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "With the indexing loop's real JobBatchWriter held inside the file-mutation fence (after the file's parent, or before its first row) and the file then deleted: a promotion replay, a best-effort replay, a replayed normal SYNC_ROOT and a replayed forced SYNC_ROOT in the promotion all leave 0 committed rows (parent and chunks) of the file once the writer finishes; so does a best-effort replay raced by a VDU result replacing chunks, and a normal sync or direct prune whose scan ran before the file's first row. The promotion keeps its PRUNE_PREFIX or SYNC_ROOT receipt under its generation; a best-effort drain removes it. A replayed prune of a folder replaced at the added path, or of a folder with no recorded volume, removes nothing (3 rows kept) and its PRUNE_PREFIX stays buffered. The harness accepts a stop point at a replayed prune's first removal, only with a self-exit; stopping there leaves the committed index with all rows of the file and every receipt, the retry removes the deleted file and keeps the live one, and finishing the promotion removes only the replayed receipts, not another generation's. A file recreated after the replayed prune committed its removal is queued for indexing before the drain acknowledges the prune.",
+      "behaviour": "With the indexing loop's real JobBatchWriter held inside the file-mutation fence (after the file's parent, or before its first row) and the file then deleted: a promotion replay, a best-effort replay, a replayed normal SYNC_ROOT and a replayed forced SYNC_ROOT in the promotion all leave 0 committed rows (parent and chunks) of the file once the writer finishes; so does a best-effort replay raced by a VDU result replacing chunks, and a normal sync or direct prune whose scan ran before the file's first row. The promotion keeps its PRUNE_PREFIX or SYNC_ROOT receipt under its generation; a best-effort drain removes it. A replayed prune of a folder replaced at the added path, or of a folder with no recorded volume, removes nothing (3 rows kept) and its PRUNE_PREFIX stays buffered. The harness accepts a stop point at a replayed prune's first removal, only with a self-exit; stopping there leaves the committed index with all rows of the file and every receipt, the retry removes the deleted file and keeps the live one, and finishing the promotion removes only the replayed receipts, not another generation's. A file recreated after the replayed prune committed its removal is queued for indexing before the drain acknowledges the prune. A rename held inside the fence that moves a file's parent and chunks from outside the root into it, to a destination deleted before the prune's scan, leaves 0 committed rows at the destination once the rename finishes, on a normal sync, a direct prune and a best-effort replay (whose PRUNE_PREFIX is then removed).",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -109,6 +114,9 @@ run-evidence.mjs. No acceptance is recorded by the builder.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#aFileRecreatedAfterItsRemovalIsQueuedBeforeTheReplayEnds",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aSyncRemovesAFileWhoseFirstRowsArePublishedAfterItsScan",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aDirectPruneRemovesAFileWhoseFirstRowsArePublishedAfterItsScan",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aSyncRemovesAFileWhoseRowsARenameMovesInAfterItsScan",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aDirectPruneRemovesAFileWhoseRowsARenameMovesInAfterItsScan",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aReplayedPruneRemovesAFileWhoseRowsARenameMovesInAfterItsScan",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/MigrationTransitionBarrierTest.java#pruneReplayCutRequiresAnInstalledHarnessSelfExit"
       ]
     },
@@ -119,7 +127,7 @@ run-evidence.mjs. No acceptance is recorded by the builder.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayUncertainRootTest.java"
       ],
       "class": "New",
-      "behaviour": "Preservation, passing on the #793 head and after. A promotion replay with the loop's real writer held mid-file on a live file completes once the writer is released, removes the deleted file and keeps the live file's parent and chunks; a normal direct prune does the same for a live file written while it runs. A refused candidate replayed on the source removes the deleted file, keeps the live one and settles its receipts. A committed but unacknowledged prune retried after the file was indexed again keeps its 3 rows. Native committed-witness settlement refuses a PRUNE_PREFIX receipt and keeps it. A prune followed by an UPSERT for a file that is present keeps its rows and queues it; an explicit DELETE after a prune removes its present file while the prune removes only the deleted one and a live file keeps its rows; a VDU result before the prune gives its live file chunks, one after it for the removed file does not bring it back, and that drain keeps every receipt. A buffered prune of a missing folder removes nothing and stays buffered; of a present, added folder it removes the deleted file.",
+      "behaviour": "Preservation, passing on the #793 head and after. A promotion replay with the loop's real writer held mid-file on a live file completes once the writer is released, removes the deleted file and keeps the live file's parent and chunks; a normal direct prune does the same for a live file written while it runs. A refused candidate replayed on the source removes the deleted file, keeps the live one and settles its receipts. A committed but unacknowledged prune retried after the file was indexed again keeps its 3 rows. Native committed-witness settlement refuses a PRUNE_PREFIX receipt and keeps it. A prune followed by an UPSERT for a file that is present keeps its rows and queues it; an explicit DELETE after a prune removes its present file while the prune removes only the deleted one and a live file keeps its rows; a VDU result before the prune gives its live file chunks, one after it for the removed file does not bring it back, and that drain keeps every receipt. A buffered prune of a missing folder removes nothing and stays buffered; of a present, added folder it removes the deleted file. A file renamed into the root during a replayed prune, and still there, keeps every row it had. A VDU result for a file the prune's first batch already removed writes no row (it finds no parent), so a direct prune leaves the file with 0 rows.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -174,6 +182,8 @@ run-evidence.mjs. No acceptance is recorded by the builder.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#anExplicitDeleteAfterThePruneKeepsItsSemantics",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#vduUpdatesAroundThePruneKeepTheirOrderAndAMissedOneKeepsEveryReceipt",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aFileStillPresentKeepsTheRowsItsWriterPublishedDuringThePrune",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneLatePublicationTest.java#aFileRenamedInDuringAReplayedPruneKeepsItsRows",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayFenceTest.java#aVduResultAfterThePrunesRemovalOfItsFileWritesNoRow",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayUncertainRootTest.java#aBufferedPruneOfAMissingFolderRemovesNothingAndStaysBuffered",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/PrunePrefixReplayUncertainRootTest.java#aBufferedPruneOfAPresentFolderRemovesTheDeletedFile"
       ]
