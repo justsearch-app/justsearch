@@ -38,6 +38,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # cp-verify cold run: fresh setup-gradle key prefix so no Gradle home cache entry matches.
+  GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: "cpverify-cold-20261019a-"
   NODE_VERSION: "24.14.0"
   JAVA_VERSION: "25"
 
