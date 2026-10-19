@@ -26,6 +26,8 @@ Coverage limits: no live Engine/Qwen check was run by the builder (S6.3's French
 
 Review history: a second independent verifier failed 30d55b804 on two regressions, and the review-2 repair answers them. (1) Recovery, which the unlock listener re-runs while the process still runs agents, reported a still-queued direction of a live run not_applied/run_interrupted; the live loop then sent it and reported it applied, so one direction had two final outcomes (the same pass also stamped the live run interrupted, which was pre-existing). The running loop now owns its run in the store from before its first write to after its last, and recovery leaves an owned run alone, which also ends the false interrupted stamp on a live run. (2) The old window rendered one applied direction twice once the record carried it as well as the live run; the record now carries the directive id the live report has, and the merge shows each direction once by that id, with the furthest-known outcome. The review-2 checks are in the main evidence files (fail-before on 485fe86b8) and in uiux-agent-steering-java-review2.json / uiux-agent-steering-ui-review2.json, which run them with --before 44b5a6d43 (the candidate the verifier failed) and record each failing there by assertion for the reason under test. The changed expectations in AgentDirectionRecordTest#reloadedThreadShowsEachDirectionOnceWithItsFinalOutcome (the record's directiveId) and AgentSessionController.test.ts "a final outcome reported after done reaches the live display of both windows" (the live projection's directiveId) are part of repair (2).
 
+Review history (round 3: lost-response false certainty): a third independent verifier failed 31053095f on S8.2 because a steer whose response was lost after the Engine had accepted it (HTTP 200, direction applied once) was reported as "It was not applied" in the old window, and beside "Steered" in Search v3 while live; it rejected the two controller checks that pinned that claim for a connection failure and for an HTTP status other than 404. The steer handler (AgentController.handleSteeringDirective) answers 404 only when AgentSessionRegistry.injectSteeringDirective finds no session or AgentSession.submitDirection refuses a closed one, before anything is queued; a 400 can also follow queueing (handleControl maps an exception from publishing the queued report to 400), and a proxy can answer 5xx after forwarding, so only 404 is a known refusal. The controller now keeps "the run already finished" for 404 only; for any other failure it says the direction could not be confirmed and lets the run's own reports decide: a report for that text first seen after the send began removes the note (or prevents it), so the windows show only the run's outcome; the text is not handed back to re-send, as before. The two rejected checks are rewritten to assert only the honest diagnosis, and three new checks cover acceptance before a lost response, a 5xx followed by the run's report, and an earlier same-text direction not settling the note; all five are in uiux-agent-steering-ui.json (fail-before on 485fe86b8) and in uiux-agent-steering-ui-review3.json, run with --before 92a21116f (the candidate this verifier failed), where each fails by assertion. A new preservation check pins the 404 wording in both windows.
+
 No acceptance record is supplied by the builder.
 
 ```json
@@ -426,7 +428,7 @@ No acceptance record is supplied by the builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "In the controller both windows render from: a direction's reports update one entry per direction id (queued becomes applied in place; a late queued never undoes a final outcome; not_applied keeps its reason); a final outcome the run reports after done (queued, done, not_applied/run_finished on one SSE stream) reaches the live display, as 'Not applied' in Search v3's run feed and as the not_applied attributes (with the directive id) the old window's chip and merge read; an acknowledgement without an id, live or in a replayed exported transcript followed by an error, shows nothing (no 'Steered'), while a replayed queued/applied direction still reads 'Steered'; a failed steer says why: connection failure, HTTP status other than 404, or no session yet.",
+      "behaviour": "In the controller both windows render from: a direction's reports update one entry per direction id (queued becomes applied in place; a late queued never undoes a final outcome; not_applied keeps its reason); a final outcome the run reports after done (queued, done, not_applied/run_finished on one SSE stream) reaches the live display, as 'Not applied' in Search v3's run feed and as the not_applied attributes (with the directive id) the old window's chip and merge read; an acknowledgement without an id, live or in a replayed exported transcript followed by an error, shows nothing (no 'Steered'), while a replayed queued/applied direction still reads 'Steered'; a failed steer says why (connection failure, HTTP status other than 404, or no session yet) and claims no more than the send establishes: a connection failure or a status other than 404 says the direction could not be confirmed, never that it was not applied or that the run finished; an unconfirmed send whose direction the run reports (queued while the request was in flight, or after a 5xx) shows only that report, once, in both windows (Search v3 'Steered', the old window's applied chip); the unconfirmed note stays when the only report is for an earlier direction with the same text.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -457,8 +459,11 @@ No acceptance record is supplied by the builder.
         "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a not-applied direction keeps its reason, and a late queued report does not undo a final one",
         "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a final outcome reported after done reaches the live display of both windows",
         "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a replayed old acknowledgement is not shown as Steered; a replayed applied direction still is",
-        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#steer names a connection failure as such, not as a finished run",
-        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#steer names an HTTP error other than 404 by its status",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#steer names a connection failure as such, not as a finished run, without claiming non-application",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#steer names an HTTP error other than 404 by its status, without claiming non-application",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a lost answer to a direction the run took shows only the run report, in both windows",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a 5xx answer is settled by the run report that follows it, in both windows",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#an unconfirmed send is not settled by an earlier direction with the same text",
         "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#steer before the run has a session says so instead of dropping the direction silently"
       ]
     },
@@ -589,6 +594,58 @@ No acceptance record is supplied by the builder.
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts#shows each direction once when the live run and the record both carry it",
         "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a final outcome reported after done reaches the live display of both windows"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A steer the server refuses with 404 (answered only when no live run took the direction) still reads 'Could not steer — the run already finished.' in both windows: a Search v3 'Progress' note and the old window's progress note, and no direction entry.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AS2",
+          "quote": "A direction is shown and recorded as applied only when it went out in a model request. A direction that never did (run finished, stopped, failed, hit its step or budget limit, or the run was interrupted before the next step) is reported as not applied, in Search v3 and the old window, live and after reload or reconnect; a network or HTTP failure of the send is reported as such, not as \"the run already finished\".",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-agent-steering-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a 404 refusal of a direction still says the run already finished, in both windows"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Review 3. A steer whose answer is lost after the run took it, or answered with a status other than 404 (5xx), is not reported as not applied: the note says the direction could not be confirmed (naming the connection failure or the HTTP status), and once the run reports the direction (queued during the request, or after the failure) only that report shows, once, in both windows: 'Steered' in Search v3 and the old window's applied chip. A report for an earlier direction with the same text does not settle it.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AS2",
+          "quote": "A direction is shown and recorded as applied only when it went out in a model request. A direction that never did (run finished, stopped, failed, hit its step or budget limit, or the run was interrupted before the next step) is reported as not applied, in Search v3 and the old window, live and after reload or reconnect; a network or HTTP failure of the send is reported as such, not as \"the run already finished\".",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AN4",
+          "quote": "Search v3 Delegate and the old window's agent view show steering as before for applied directions.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-agent-steering-ui-review3.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#steer names a connection failure as such, not as a finished run, without claiming non-application",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#steer names an HTTP error other than 404 by its status, without claiming non-application",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a lost answer to a direction the run took shows only the run report, in both windows",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a 5xx answer is settled by the run report that follows it, in both windows",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#an unconfirmed send is not settled by an earlier direction with the same text"
       ]
     }
   ]

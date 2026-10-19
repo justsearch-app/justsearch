@@ -1281,24 +1281,93 @@ describe('AgentSessionController interaction methods', () => {
     expect(notes.map((n) => (n.kind === 'note' ? [n.label, n.text] : null))).toEqual([['Steered', 'Focus on Q3.']]);
   });
 
-  it('steer names a connection failure as such, not as a finished run', async () => {
+  // WP6.2 S8.2 — a send whose answer never arrived cannot say the direction was not applied: the run
+  // may have taken it (POST /api/chat/agent/steer answers 404 only when no live run took it; any other
+  // failure can follow the run queueing it). The run's own reports for that direction decide.
+  it('steer names a connection failure as such, not as a finished run, without claiming non-application', async () => {
     ctrl.sessionId = 'sess-net';
     globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch;
     expect(await ctrl.steer('focus')).toBe(false);
     const notes = ctrl.conversation.filter((e) => e.type === 'progress' && e.severity === 'warn');
-    expect(notes.map((e) => e.content)).toEqual([
-      'Could not send your direction — the connection to JustSearch failed. It was not applied.',
-    ]);
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.content).toMatch(/connection to JustSearch failed/);
+    expect(notes[0]?.content).not.toMatch(/not applied|finished/i);
   });
 
-  it('steer names an HTTP error other than 404 by its status', async () => {
+  it('steer names an HTTP error other than 404 by its status, without claiming non-application', async () => {
     ctrl.sessionId = 'sess-500';
     globalThis.fetch = mockFetchError(500, 'boom');
     expect(await ctrl.steer('focus')).toBe(false);
     const notes = ctrl.conversation.filter((e) => e.type === 'progress' && e.severity === 'warn');
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.content).toMatch(/HTTP 500/);
+    expect(notes[0]?.content).not.toMatch(/not applied|finished/i);
+  });
+
+  /** Both windows' live display of a run: Search v3's feed notes and the old window's projected items. */
+  function bothWindows(c: AgentSessionController): { v3: string[][]; old: string[][] } {
+    const v3 = projectSv3RunFeed(c, 0).items.flatMap((i) => (i.kind === 'note' ? [[i.label, i.text]] : []));
+    const old = projectLiveAgentActivity(c.conversation, c.toolCalls).flatMap((i) =>
+      i.attributes.steer === true
+        ? [['direction', i.content, String(i.attributes.directiveOutcome)]]
+        : i.kind === 'progress'
+          ? [['note', i.content]]
+          : [],
+    );
+    return { v3, old };
+  }
+
+  it('a lost answer to a direction the run took shows only the run report, in both windows', async () => {
+    ctrl.sessionId = 'sess-lost';
+    // The run reports the direction queued while the POST is in flight; then the answer is lost.
+    globalThis.fetch = vi.fn(() => {
+      ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'queued' });
+      return Promise.reject(new TypeError('Failed to fetch'));
+    }) as unknown as typeof fetch;
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
+    expect(bothWindows(ctrl)).toEqual({
+      v3: [['Steered', 'Answer in French.']],
+      old: [['direction', 'Answer in French.', 'applied']],
+    });
+  });
+
+  it('a 5xx answer is settled by the run report that follows it, in both windows', async () => {
+    ctrl.sessionId = 'sess-5xx';
+    globalThis.fetch = mockFetchError(502, 'bad gateway');
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    expect(bothWindows(ctrl).v3).toHaveLength(1);
+    expect(bothWindows(ctrl).old).toHaveLength(1);
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd2', outcome: 'queued' });
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd2', outcome: 'applied' });
+    expect(bothWindows(ctrl)).toEqual({
+      v3: [['Steered', 'Answer in French.']],
+      old: [['direction', 'Answer in French.', 'applied']],
+    });
+  });
+
+  it('an unconfirmed send is not settled by an earlier direction with the same text', async () => {
+    ctrl.sessionId = 'sess-same';
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Focus.', directiveId: 'd0', outcome: 'queued' });
+    globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch;
+    await ctrl.steer('Focus.');
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Focus.', directiveId: 'd0', outcome: 'applied' });
+    const notes = ctrl.conversation.filter((e) => e.type === 'progress' && e.severity === 'warn');
     expect(notes.map((e) => e.content)).toEqual([
-      'Could not send your direction (HTTP 500). It was not applied.',
+      'Could not confirm your direction reached the run — the connection to JustSearch failed. If it did, it shows here as your direction.',
     ]);
+  });
+
+  // The steer handler answers 404 only when no live run took the direction, so it is the one failure
+  // that is a known refusal, still named as the run having finished.
+  it('a 404 refusal of a direction still says the run already finished, in both windows', async () => {
+    ctrl.sessionId = 'gone';
+    globalThis.fetch = mockFetchJson({ error: 'session not found or finished' }, 404);
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    expect(bothWindows(ctrl)).toEqual({
+      v3: [['Progress', 'Could not steer — the run already finished.']],
+      old: [['note', 'Could not steer — the run already finished.']],
+    });
   });
 
   it('steer before the run has a session says so instead of dropping the direction silently', async () => {

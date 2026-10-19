@@ -620,6 +620,9 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   // user-initiated cancel (just end). Set right before the watchdog aborts; consumed in the catch.
   private liveWatchdogFired = false;
   private pendingAutoApprovals: string[] = [];
+  // WP6.2 S8.2 — steer sends whose outcome is unknown (answer lost or a status that can follow the run
+  // queueing the direction): the note shown for each, until the run reports a direction with its text.
+  private unconfirmedSteers: Array<{ noteId: string; text: string; reportedBefore: ReadonlySet<string> }> = [];
   // 543-fwd #6 — causation: the previous agent tool-call's journal entry id in
   // the CURRENT turn. The bridge chains each tool-call to it so the journal
   // records a per-turn causation chain (real-agent causation was empty before —
@@ -697,27 +700,58 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       this.steerFailureNote('Could not send your direction — the run has not started yet. Try again in a moment.');
       return false;
     }
+    // Directions the run has already reported, so a report for THIS send can be told from an earlier
+    // direction with the same text.
+    const reportedBefore = new Set(this.conversation.flatMap((e) => (e.directiveId ? [e.directiveId] : [])));
+    let failure: string;
     try {
       const res = await authorizedFetch(`${this.apiBase}/api/chat/agent/steer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: this.sessionId, text: trimmed }),
       });
-      if (!res.ok) {
-        // Tempdoc 565 §33 — a failed steer must NOT be silent. Surface a one-line system note so the
-        // user knows their direction didn't land; WP6.2 — and say why, since only 404 means finished.
-        this.steerFailureNote(
-          res.status === 404
-            ? 'Could not steer — the run already finished.'
-            : `Could not send your direction (HTTP ${res.status}). It was not applied.`,
-        );
+      if (res.ok) return true;
+      // Tempdoc 565 §33 — a failed steer must NOT be silent. WP6.2 — and must not claim more than it
+      // knows: the steer handler answers 404 only when no live run took the direction
+      // (AgentController.handleSteeringDirective → AgentSession.submitDirection refused it), so 404
+      // alone means it was not applied.
+      if (res.status === 404) {
+        this.steerFailureNote('Could not steer — the run already finished.');
         return false;
       }
-      return true;
+      failure = `Could not confirm your direction reached the run (HTTP ${res.status}).`;
     } catch {
-      this.steerFailureNote('Could not send your direction — the connection to JustSearch failed. It was not applied.');
-      return false;
+      failure = 'Could not confirm your direction reached the run — the connection to JustSearch failed.';
     }
+    // WP6.2 S8.2 — any other failure can follow the run queueing it (the handler maps a failure after
+    // queueing to 400; a proxy can answer 5xx; the answer itself can be lost), so the outcome is unknown
+    // and the run's own reports for this direction decide what is shown. One that already arrived
+    // settles it now; otherwise the note says the outcome is unconfirmed until a report removes it. The
+    // text is not handed back to re-send: the run may already have applied it.
+    if (this.reportedSince(trimmed, reportedBefore)) return false;
+    this.steerFailureNote(`${failure} If it did, it shows here as your direction.`);
+    this.unconfirmedSteers.push({
+      noteId: this.conversation[this.conversation.length - 1]!.id,
+      text: trimmed,
+      reportedBefore,
+    });
+    return false;
+  }
+
+  /** WP6.2 — whether the run reported a direction with this text that was not reported before. */
+  private reportedSince(text: string, reportedBefore: ReadonlySet<string>): boolean {
+    return this.conversation.some(
+      (e) => e.type === 'steer-directive' && e.content === text && !!e.directiveId && !reportedBefore.has(e.directiveId),
+    );
+  }
+
+  /** WP6.2 — a run report for a direction whose send was unconfirmed replaces the unconfirmed note. */
+  private settleUnconfirmedSteers(): void {
+    const settled = this.unconfirmedSteers.filter((u) => this.reportedSince(u.text, u.reportedBefore));
+    if (settled.length === 0) return;
+    this.unconfirmedSteers = this.unconfirmedSteers.filter((u) => !settled.includes(u));
+    const notes = new Set(settled.map((u) => u.noteId));
+    this.conversation = this.conversation.filter((e) => !notes.has(e.id));
   }
 
   /** Tempdoc 565 §33 — a one-line system note when a steer couldn't be delivered. */
@@ -859,6 +893,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   /** Clears the run-observable state (NOT the roster/tools) so a replay seek re-applies from scratch. */
   private resetRunState(): void {
     this.conversation = [];
+    this.unconfirmedSteers = [];
     this.toolCalls = {};
     this.streamingText = '';
     this.lastStreamedAnswer = '';
@@ -1813,6 +1848,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         timestamp: Date.now(),
       },
     ];
+    this.settleUnconfirmedSteers();
     this.notify();
   }
 
