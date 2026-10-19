@@ -876,6 +876,11 @@ export class SearchV3View extends JfElement {
    * reader chose it. A New session undoes exactly that switch and keeps a mode the reader chose.
    */
   private tierFollowsPlace = false;
+  /**
+   * WP1.1 — the mode the result list was left in, so going back to it restores an Ask or Delegate
+   * draft written there as that, rather than as a query it never was.
+   */
+  private resultsTier: Sv3ComposerTier = 'search';
 
   constructor() {
     super();
@@ -1226,6 +1231,10 @@ export class SearchV3View extends JfElement {
    */
   protected override willUpdate(changed: Map<string, unknown>): void {
     if (changed.has('sessions')) this.upgradeOpenPaneAnchor();
+    // Here rather than in the store's callback: by now a first connect has also restored the saved
+    // draft, which `followSharedQuery` must see before it writes the composer.
+    const move = this.search.takeSharedMove();
+    if (move !== null) this.followSharedQuery(move.previous);
   }
 
   protected override updated(changed: Map<string, unknown>): void {
@@ -2439,6 +2448,37 @@ export class SearchV3View extends JfElement {
     if (detail.text.trim() !== '') this.enterResults(detail.previous);
   }
 
+  /**
+   * WP1.1 S1.10 — the shared query moved without this window: the default window searched while this
+   * one was away (or beside it), or an address set it. On the hero or the result list in Search mode
+   * the composer's text IS the query, so it follows and the list shows what the query found — on a
+   * first entry too. A reader's own text is never the price: an Ask or Delegate draft stays as it
+   * is, and so does text this window never searched (a restored draft), with no list beside it
+   * claiming to be its results. An open conversation is left alone; Back to the list arrives at the
+   * shared query (`returnToResults`).
+   */
+  private followSharedQuery(previous: string): void {
+    if (this.tier !== 'search' || this.sessions.activeId !== null) return;
+    if (this.currentDraft().trim() !== previous.trim()) {
+      this.search.hide();
+      return;
+    }
+    const query = this.search.query;
+    this.writeDraft(query);
+    if (query.trim() !== '') this.enterResults('');
+  }
+
+  /** Put text in the composer — or, before its first render, where the composer will take it from. */
+  private writeDraft(text: string): void {
+    const composer = this.composer;
+    if (composer !== null) {
+      composer.draft = text;
+      return;
+    }
+    this.draftSeed = text;
+    this.draftSeedPending = true;
+  }
+
   /** Enter in Search mode, or the palette's search: the full pass, now. */
   private searchNow(text: string): void {
     this.search.submit(text);
@@ -2478,10 +2518,17 @@ export class SearchV3View extends JfElement {
     this.closePane();
     this.sessions = startNewSession(this.sessions);
     this.search.show();
-    this.tier = this.search.pendingScope !== null ? 'ask' : 'search';
+    this.tier = this.search.pendingScope !== null ? 'ask' : this.resultsTier;
     this.tierFollowsPlace = false;
+    // In Search mode the composer holds the query the list is for — the SHARED one, which the default
+    // window may have moved since (S1.10). An Ask or Delegate draft left here comes back as it was.
     const composer = this.composer;
-    if (composer !== null) composer.draft = this.placeDrafts.get(RESULTS_PLACE) ?? this.search.query;
+    if (composer !== null) {
+      composer.draft =
+        this.tier === 'search'
+          ? this.search.query
+          : (this.placeDrafts.get(RESULTS_PLACE) ?? this.search.query);
+    }
     void this.setComposerState('docked');
   }
 
@@ -2495,6 +2542,7 @@ export class SearchV3View extends JfElement {
     const from = this.search.showing ? RESULTS_PLACE : this.sessions.activeId;
     if (from === to) return;
     if (from !== null) this.placeDrafts.set(from, this.currentDraft());
+    if (from === RESULTS_PLACE) this.resultsTier = this.tier;
     this.search.hide();
     this.askInConversation();
     const composer = this.composer;
@@ -2512,6 +2560,7 @@ export class SearchV3View extends JfElement {
   private leaveResultsBySending(): void {
     if (!this.search.showing) return;
     this.placeDrafts.set(RESULTS_PLACE, this.search.query);
+    this.resultsTier = 'search';
     this.search.hide();
   }
 
@@ -2770,6 +2819,9 @@ export class SearchV3View extends JfElement {
     if (!isSv3Tier(tier)) return;
     this.tier = tier;
     this.tierFollowsPlace = false;
+    // WP1.1 S1.10 — beside the result list, Search mode's text is the query: text written in another
+    // mode is searched as it stands, so the composer and the list never describe different queries.
+    if (tier === 'search' && this.search.showing) this.search.type(this.currentDraft());
   }
 
   /** Halting is always the reader's; the turn settles `halted` through the sink's own terminal. */
@@ -3576,6 +3628,7 @@ export class SearchV3View extends JfElement {
     // mode is the reader's: Search, unless they chose another one themselves.
     this.search.reset();
     this.placeDrafts.delete(RESULTS_PLACE);
+    this.resultsTier = 'search';
     if (this.tierFollowsPlace) this.tier = SV3_TIER_DEFAULT;
     this.tierFollowsPlace = false;
     this.composer?.clearDraft();

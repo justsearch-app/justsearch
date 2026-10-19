@@ -212,6 +212,13 @@ export class Sv3SearchController implements ReactiveController {
   pendingScope: Sv3AskScope | null = null;
   /** The query the rows on screen answered — the stale guard's other half. */
   private answered = '';
+  /**
+   * The query as this window last knew it: what it wrote itself, or what it last saw. The store
+   * holding another one means the default window (or an address) moved the SHARED query, which
+   * this window has not followed yet — `sharedMove` holds the query it moved away from.
+   */
+  private known = '';
+  private sharedMove: { readonly previous: string } | null = null;
   private lastResults: readonly SearchHit[] | null = null;
   private chips: readonly SearchScopeChip[] = getScopeChips();
   private dates: SearchFilterSpec = getFilters();
@@ -251,6 +258,12 @@ export class Sv3SearchController implements ReactiveController {
     // A new result array is a response that passed the store's generation guard, so it answers the
     // query the store holds at that moment. Anything else (a keystroke, a pass starting) leaves the
     // rows answering whatever they answered before.
+    // Every emission is checked, the immediate one on (re)connect included: that is how a search
+    // made in the default window while this one was away reaches it.
+    if (snapshot.query !== this.known) {
+      this.sharedMove ??= { previous: this.known };
+      this.known = snapshot.query;
+    }
     if (snapshot.results !== this.lastResults) {
       this.lastResults = snapshot.results;
       this.answered = snapshot.query;
@@ -288,15 +301,30 @@ export class Sv3SearchController implements ReactiveController {
     return this.snapshot?.query ?? '';
   }
 
+  /**
+   * The shared query moved without this window — the query it moved AWAY from, once, or `null`.
+   * The window decides what follows; the controller only notices.
+   */
+  takeSharedMove(): { readonly previous: string } | null {
+    const move = this.sharedMove;
+    this.sharedMove = null;
+    return move;
+  }
+
   /** A keystroke in Search mode: the staged quick-then-refined path, exactly as the default window. */
   type(text: string): void {
-    if (text !== this.query) setQuery(text);
+    this.write(text);
   }
 
   /** Enter in Search mode: the full pass now, superseding any staged one. */
   submit(text: string): void {
-    if (text !== this.query) setQuery(text);
+    this.write(text);
     submitSearch();
+  }
+
+  private write(text: string): void {
+    this.known = text;
+    if (text !== this.query) setQuery(text);
   }
 
   /** Re-run the current query after a filter changed — the store deliberately does not. */

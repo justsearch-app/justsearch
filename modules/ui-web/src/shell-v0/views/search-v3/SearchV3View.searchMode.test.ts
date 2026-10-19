@@ -85,6 +85,8 @@ import {
   getScopeChips,
   clearScopeChips,
   resetSearchState,
+  setQuery,
+  submitSearch,
 } from '../../state/searchState.js';
 import {
   __resetSearchFiltersForTest,
@@ -1020,6 +1022,124 @@ describe('S1.10 — nothing restricts results invisibly', () => {
     await settle(el);
     expect(getFilters()).toEqual({});
     expect(backend.searches.at(-1)?.filters).toBeUndefined();
+  });
+});
+
+/* ── S1.10 — the query shared with the default window ──────────────────────────────────────── */
+
+/** The default window searching: the same shared store, while this window is not on screen. */
+async function searchInOtherWindow(query: string): Promise<void> {
+  setQuery(query);
+  submitSearch();
+  for (let turn = 0; turn < 12; turn += 1) await new Promise<void>((r) => setTimeout(r, 0));
+}
+
+async function reenter(el: Mounted): Promise<void> {
+  document.body.appendChild(el);
+  await settle(el);
+}
+
+async function headingOf(el: Mounted): Promise<string | null> {
+  const host = await results(el);
+  return host === null ? null : (q(host, 'sv3-results-heading')?.textContent ?? null);
+}
+
+describe('S1.10 — the composer, the heading and the rows describe the one shared query', () => {
+  it('follows a search made in the other window when the reader comes back', async () => {
+    backend.corpus.amber = [wireHit('a', 'docs/a.md')];
+    backend.corpus.cobalt = [wireHit('c', 'docs/c.md')];
+    aiOnline();
+    const el = await mount();
+    await searchFor(el, 'amber');
+    expect(await rowTitles(el)).toEqual(['a.md']);
+
+    el.remove();
+    await searchInOtherWindow('cobalt');
+    await reenter(el);
+
+    expect((await fieldOf(el)).value).toBe('cobalt');
+    expect(await headingOf(el)).toBe('Results for “cobalt”');
+    expect(await rowTitles(el)).toEqual(['c.md']);
+  });
+
+  it('shows the shared query on a first entry, in the composer and in the list', async () => {
+    backend.corpus.cobalt = [wireHit('c', 'docs/c.md')];
+    aiOnline();
+    await searchInOtherWindow('cobalt');
+    const searched = backend.searches.length;
+    const el = await mount();
+    await settle(el);
+
+    expect(el.tier).toBe('search');
+    expect((await fieldOf(el)).value).toBe('cobalt');
+    expect(await headingOf(el)).toBe('Results for “cobalt”');
+    expect(await rowTitles(el)).toEqual(['c.md']);
+    // Showing the shared list is not running a search of its own.
+    expect(backend.searches.length).toBe(searched);
+  });
+
+  it('returns to the list with the shared query after a conversation, too', async () => {
+    recordTurn('uc-old', 'who is the landlord?', 'Acme.');
+    backend.corpus.amber = [wireHit('a', 'docs/a.md')];
+    backend.corpus.cobalt = [wireHit('c', 'docs/c.md')];
+    aiOnline();
+    const el = await mount();
+    await settle(el);
+    await searchFor(el, 'amber');
+    restoreActiveConversation('uc-old');
+    await settle(el);
+    await type(el, 'a follow-up I am drafting');
+
+    el.remove();
+    await searchInOtherWindow('cobalt');
+    await reenter(el);
+    // Arriving back in the conversation leaves it, and its draft, alone.
+    expect(el.sessions.activeId).toBe('uc-old');
+    expect((await fieldOf(el)).value).toBe('a follow-up I am drafting');
+
+    restoreActiveConversation(null);
+    await settle(el);
+    expect(el.tier).toBe('search');
+    expect((await fieldOf(el)).value).toBe('cobalt');
+    expect(await headingOf(el)).toBe('Results for “cobalt”');
+    expect(await rowTitles(el)).toEqual(['c.md']);
+  });
+
+  it('never overwrites an unsent Ask draft; Search mode then searches what the composer holds', async () => {
+    backend.corpus.amber = [wireHit('a', 'docs/a.md')];
+    backend.corpus.cobalt = [wireHit('c', 'docs/c.md')];
+    backend.corpus['what is the rent?'] = [wireHit('r', 'docs/rent.md')];
+    aiOnline();
+    const el = await mount();
+    await searchFor(el, 'amber');
+    await chooseTier(el, 'ask');
+    await type(el, 'what is the rent?');
+
+    el.remove();
+    await searchInOtherWindow('cobalt');
+    await reenter(el);
+    expect(el.tier).toBe('ask');
+    expect((await fieldOf(el)).value).toBe('what is the rent?');
+    expect(dispatches()).toEqual([]);
+
+    // Back in Search mode, the list is the search for the text the composer holds.
+    await chooseTier(el, 'search');
+    await settle(el);
+    expect((await fieldOf(el)).value).toBe('what is the rent?');
+    expect(await headingOf(el)).toBe('Results for “what is the rent?”');
+    // The staged quick pass, once its debounce has run.
+    await vi.waitFor(async () => expect(await rowTitles(el)).toEqual(['rent.md']));
+  });
+
+  it('keeps a restored draft on a first entry and shows no list it would contradict', async () => {
+    localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), 'northfield lease');
+    backend.corpus.cobalt = [wireHit('c', 'docs/c.md')];
+    aiOnline();
+    await searchInOtherWindow('cobalt');
+    const el = await mount();
+    await settle(el);
+    expect((await fieldOf(el)).value).toBe('northfield lease');
+    expect(await results(el)).toBeNull();
   });
 });
 
