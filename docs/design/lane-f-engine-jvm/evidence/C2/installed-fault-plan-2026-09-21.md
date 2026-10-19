@@ -1,6 +1,6 @@
 # Remaining installed C2 fault points
 
-Current continuation is owned by the [handoff](../../handoff.md) and
+Current continuation is owned by the [handoff](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/handoff.md) and
 [bulk connection](bulk-reindex-connection.md). The INGEST/SETTINGS matrix below
 passed in2061; its earlier implementation notes are retained history. The separate
 bulk crash matrix is specified and evidenced in the bulk connection record.
