@@ -2,6 +2,9 @@ name: CI
 on:
   pull_request:
     branches: [main]
+concurrency:
+  group: independent-discovery-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

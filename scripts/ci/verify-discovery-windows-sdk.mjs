@@ -54,7 +54,7 @@ try {
     await run(version+'-discover-early-exit',health,version==='before'?'pass':'fail',/23|Expected values to be strictly equal/,exitSource);
     let timeoutSource=replace(source,"'.then((r) => { process.stdout.write(JSON.stringify(r)); })'","'.then((r) => { setInterval(() => {}, 1000); })'");
     timeoutSource=replace(timeoutSource,'timeoutMs = 20000','timeoutMs = 1200');
-    await run(version+'-discover-timeout',health,version==='before'?'pass':'fail',/Expected values to be strictly equal/,timeoutSource);
+    await run(version+'-discover-timeout',health,version==='before'?'pass':'fail',/null !== 0|Expected values to be strictly equal/,timeoutSource);
   }
   // Bypass the port-owner proof only in production's authenticated calls; discovery stays real.
   const unsafe=prod.replaceAll('      engineTarget,','      { ...engineTarget, engine: null },');
@@ -65,6 +65,9 @@ try {
   await run('after-surviving-child','verifier: surviving child','fail',/still running at cleanup; killed/,original+leaked);
   const assertion=`\ntest('verifier: failing assertion', async t => { const root=tempRoot(t); const m=machine(root); const c=spawnNode(['-e',"process.stdin.resume(); process.stdin.on('end',()=>process.exit(0));"],{cwd:m.cwd,stdio:['pipe','ignore','ignore']},'stdin'); await once(c,'spawn'); console.log('VERIFIER_RESOURCE '+JSON.stringify({pid:c.pid,root})); assert.fail('verifier assertion fired'); });\n`;
   await run('after-assertion-cleanup','verifier: failing assertion','fail',/verifier assertion fired/,original+assertion);
+  await run('before-arrival-deadline',health,'hang',null,replace(base,'await service.arrived;', 'await new Promise(() => {});'),prod,15000);
+  await run('before-handshake-deadline','D9: bridge reconnect','hang',null,replace(base,'const done = () =>','const done = () => false &&'),prod,15000);
+  await run('before-request-deadline','D9: production MCP re-proves','hang',null,replace(base,'await engine.arrived;', 'await new Promise(() => {});'),prod,15000);
   // Force each newly bounded kind of wait never to arrive. Expiry must fail and terminate.
   await run('after-arrival-deadline',health,'fail',/held request arriving.*nothing within 10000 ms/,replace(original,'await within(service.arrived,','await within(new Promise(() => {}),'));
   await run('after-handshake-deadline','D9: bridge reconnect','fail',/handshake: not done within 10000 ms/,replace(original,'while (!done()) {','while (true) {'));
