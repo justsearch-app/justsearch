@@ -144,7 +144,7 @@ requires branch hybrid nDCG@10 on `beir/scifact` >= the pinned MAIN E1 record
 minus **0.01**. Scoring code fixes the reference id and retained value;
 `latestRecords()` selecting a newer MAIN capture never changes this reference.
 The pinned reference is
-[`2026-10-01T16-27-42-378Z-0c6510b3`](../evidence/E/e1-quality/main/2026-10-01T16-27-42-378Z-0c6510b3.json),
+[`2026-10-01T16-27-42-378Z-0c6510b3`](https://github.com/justsearch-app/justsearch/blob/archive/machinery-cleanup-base/docs/design/lane-f-engine-jvm/evidence/E/e1-quality/main/2026-10-01T16-27-42-378Z-0c6510b3.json),
 whose raw `relevance-gate.json` reports **0.7588375946421915**. Five valid MAIN
 captures on 2026-10-01 ranged from 0.7543 to 0.7606 (range 0.0064), rounded
 up to the absolute allowance 0.01. The existing `baseline-quality` historical
