@@ -26,6 +26,10 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+const SIGNAL_POLICY = JSON.parse(fs.readFileSync(new URL('./workflow-signal-policy.v1.json', import.meta.url), 'utf8'));
+const REQUIRED_CHECKS = SIGNAL_POLICY.workflows.find((w) => w.name === 'CI').requiredStatusChecks;
+const PART_CHECKS = ['Unit tests (app-ui-ui)', 'Unit tests (app-ui-services)', 'Windows-native tests (node)', 'Windows-native tests (contracts)'];
+
 const KIND = 'justsearch-ci-walltime-attribution.v1';
 
 // Steps that are runner overhead rather than the job's actual work. Everything
@@ -117,7 +121,7 @@ function classifyStep(step) {
 // lane key used by the unit-test-attribution artifacts (e.g. "app-ui").
 const UNIT_LANE_JOB = /^Unit tests \((.+)\)$/;
 
-export function buildWalltimeReport({ run = {}, jobs = [], selfJob = null, suiteTimes = {} }) {
+export function buildWalltimeReport({ run = {}, jobs = [], selfJob = null, suiteTimes = {}, requiredChecks = REQUIRED_CHECKS }) {
   const jobReports = [];
   for (const job of Array.isArray(jobs) ? jobs : []) {
     if (selfJob && job.name === selfJob) continue;
@@ -160,12 +164,34 @@ export function buildWalltimeReport({ run = {}, jobs = [], selfJob = null, suite
   const critical = jobReports[0] || null;
   const totals = {
     jobs: jobReports.length,
-    // Jobs run in parallel, so the run's wall-clock is bounded by the slowest job.
+    // Historical field: longest single job, not elapsed required-CI completion.
     criticalPathSeconds: critical ? critical.wallSeconds : 0,
     summedJobSeconds: jobReports.reduce((a, j) => a + j.wallSeconds, 0),
     fixedTaxSeconds: jobReports.reduce((a, j) => a + j.fixedTaxSeconds, 0),
     workSeconds: jobReports.reduce((a, j) => a + j.workSeconds, 0),
   };
+
+  const requiredNames = [...requiredChecks];
+  // Preserve reporting for runs from before the split.
+  if (jobs.some((j) => PART_CHECKS.includes(j.name))) requiredNames.push(...PART_CHECKS);
+  const requiredJobs = jobs.filter((j) => requiredNames.includes(j.name));
+  const missing = requiredNames.filter((name) => !requiredJobs.some((j) => j.name === name && j.completed_at));
+  const starts = requiredJobs.map((j) => Date.parse(j.started_at)).filter(Number.isFinite);
+  const ends = requiredJobs.map((j) => Date.parse(j.completed_at)).filter(Number.isFinite);
+  const startedAt = starts.length ? new Date(Math.min(...starts)).toISOString() : null;
+  const completedAt = missing.length === 0 && ends.length ? new Date(Math.max(...ends)).toISOString() : null;
+  const requiredCompletion = {
+    startedAt, completedAt, elapsedSeconds: elapsedSeconds(startedAt, completedAt),
+    complete: Boolean(startedAt && completedAt), missingChecks: missing,
+  };
+  const warnings = missing.map((name) => `required job missing or incomplete: ${name}`);
+  for (const job of jobReports) {
+    if (UNIT_LANE_JOB.test(job.name) && job.name !== 'Unit tests (app-ui)' && !job.components) {
+      warnings.push(`unit attribution missing for ${job.name}`);
+    }
+  }
+  totals.runnerMinutes = totals.summedJobSeconds / 60;
+  totals.requiredCiElapsedSeconds = requiredCompletion.elapsedSeconds;
 
   return {
     kind: KIND,
@@ -180,6 +206,8 @@ export function buildWalltimeReport({ run = {}, jobs = [], selfJob = null, suite
     // reruns (run_attempt > 1); surface it so consumers can discount stale timings.
     rerunCaveat: Number(run.runAttempt) > 1,
     criticalPath: critical ? { job: critical.name, wallSeconds: critical.wallSeconds } : null,
+    requiredCompletion,
+    warnings,
     totals,
     jobs: jobReports,
   };
@@ -207,8 +235,11 @@ export function renderMarkdown(report) {
       ? '> Rerun (attempt > 1): the Actions jobs API reuses original-attempt step timestamps for unchanged jobs, so durations may be stale.'
       : '',
     report.criticalPath
-      ? `Critical path: **${report.criticalPath.job}** at ${fmtSeconds(report.criticalPath.wallSeconds)} (jobs run in parallel, so this bounds the run).`
+      ? `Critical path: **${report.criticalPath.job}** at ${fmtSeconds(report.criticalPath.wallSeconds)} (longest single job).`
       : 'Critical path: none (no completed jobs).',
+    '',
+    `Required CI completion: ${fmtSeconds(report.requiredCompletion.elapsedSeconds)} (${report.requiredCompletion.startedAt || 'unknown'} to ${report.requiredCompletion.completedAt || 'incomplete'}; includes aggregate scheduling).`,
+    ...report.warnings.map((warning) => `Warning: ${warning}`),
     '',
     critJob
       ? `Next lever: to shrink the run, shrink **${critJob.name}** — ${fmtSeconds(critJob.workSeconds)} addressable work vs ${fmtSeconds(critJob.fixedTaxSeconds)} fixed runner tax.`
@@ -259,8 +290,9 @@ function writeText(filePath, text) {
 // { lane: summedSuiteSeconds } map from each report's `lane` + `totals.timeSeconds`.
 // Fail-soft: a missing dir or unreadable/foreign file contributes nothing, so the
 // lane simply gets no cost breakdown rather than failing the advisory job.
-function readSuiteTimes(dir) {
+export function readSuiteTimes(dir, jobs = []) {
   const out = {};
+  const attempts = {};
   if (!dir || !fs.existsSync(dir)) return out;
   const stack = [dir];
   while (stack.length > 0) {
@@ -278,6 +310,11 @@ function readSuiteTimes(dir) {
         try {
           const data = JSON.parse(fs.readFileSync(abs, 'utf8'));
           if (data && typeof data.lane === 'string' && Number.isFinite(data.totals?.timeSeconds)) {
+            const attempt = Number(/-attempt-(\d+)/.exec(abs)?.[1] || 0);
+            const job = jobs.find((j) => j.name === `Unit tests (${data.lane})`);
+            if (attempt && job?.run_attempt && attempt !== job.run_attempt) continue;
+            if (attempt < (attempts[data.lane] ?? -1)) continue;
+            attempts[data.lane] = attempt;
             out[data.lane] = data.totals.timeSeconds;
           }
         } catch {
@@ -409,9 +446,9 @@ function main() {
 
     if (opts.jobsJson) {
       // CI path: attribute a pre-fetched jobs JSON.
-      const parsed = JSON.parse(fs.readFileSync(path.resolve(opts.jobsJson), 'utf8'));
+      const parsed = mergePaginatedJobs(fs.readFileSync(path.resolve(opts.jobsJson), 'utf8'));
       jobs = Array.isArray(parsed) ? parsed : parsed.jobs || [];
-      runAttempt = runId ? (jobs.find((j) => j.run_attempt)?.run_attempt ?? null) : jobs[0]?.run_attempt ?? null;
+      runAttempt = runId ? Math.max(...jobs.map((j) => j.run_attempt || 1), 1) : Math.max(...jobs.map((j) => j.run_attempt || 1), 1);
     } else {
       // On-demand path: fetch the run ourselves (--run-id / --latest).
       if (opts.latest && !runId) runId = resolveLatestRunId();
@@ -419,7 +456,7 @@ function main() {
       jobs = fetched;
       repository = repository ?? meta.repository;
       workflow = workflow ?? meta.workflow;
-      runAttempt = meta.runAttempt ?? jobs[0]?.run_attempt ?? null;
+      runAttempt = meta.runAttempt ?? Math.max(...jobs.map((j) => j.run_attempt || 1), 1);
       if (opts.downloadArtifacts && !unitDir) unitDir = downloadUnitArtifacts(runId);
     }
 
@@ -427,7 +464,7 @@ function main() {
       run: { runId, runAttempt, repository, workflow },
       jobs,
       selfJob: opts.selfJob,
-      suiteTimes: readSuiteTimes(unitDir && path.resolve(unitDir)),
+      suiteTimes: readSuiteTimes(unitDir && path.resolve(unitDir), jobs),
     });
     const json = `${JSON.stringify(report, null, 2)}\n`;
     const md = renderMarkdown(report);

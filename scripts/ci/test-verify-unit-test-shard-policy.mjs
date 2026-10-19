@@ -128,3 +128,42 @@ function validate({ policyDoc = policy(), workflowText = workflow(), signalDoc =
 }
 
 console.log('test-verify-unit-test-shard-policy: PASS');
+
+// The required aggregate must enforce both expected parts, including non-success
+// conclusions, and a producer cannot opt out of enforcement.
+{
+  const p = policy();
+  p.aggregates = [{ jobId: 'aggregate', requiredCheck: 'Unit tests (app-ui)', parts: ['one', 'two'] }];
+  const text = workflow() + `
+  one:
+    name: One
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+  two:
+    name: Two
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+  aggregate:
+    name: Unit tests (app-ui)
+    needs: [one, two]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require both
+        env:
+          ONE_RESULT: \${{ needs.one.result }}
+          TWO_RESULT: \${{ needs.two.result }}
+        run: test "$ONE_RESULT" = success && test "$TWO_RESULT" = success
+`;
+  const check = (workflowText) => validate({ policyDoc: p, workflowText });
+  assert.equal(check(text).ok, true, check(text).issues.join('\n'));
+  for (const altered of [
+    text.replace('needs: [one, two]', 'needs: [one]'),
+    text.replace('    if: always()\n', ''),
+    text.replace(' = success && test "$TWO_RESULT" = success', ' = success || true'),
+    text.replace('  two:\n', '  two:\n    continue-on-error: true\n'),
+    text.replace('  two:\n', '  two:\n    if: false\n'),
+  ]) assert.equal(check(altered).ok, false, altered);
+}
