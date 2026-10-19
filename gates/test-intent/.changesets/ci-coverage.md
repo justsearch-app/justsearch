@@ -312,3 +312,15 @@ Independent verification remains outstanding. No acceptance record is authored h
 
 - The owner authorized a valid task-citation prefix for the gate. Each delegationLocation
   begins with task t-20261018-6108b0 request; the complete supplied citation follows verbatim.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "ae1dc1409c1bf4f02",
+  "verdict": "accept",
+  "digest": "sha256:5bdedb5d976ea25144d5eafad34b75dff5a16ff34276433a0b54e27f6d347473"
+}
+```
