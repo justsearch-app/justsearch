@@ -1,7 +1,9 @@
 /**
  * Parser tests — slice 489 §7 stage 1.
  *
- * Covers shell-address parsing, canonicalization and URL extraction.
+ * Mirrors the scorer's parser tests (the round-2 §7 finding). Each assertion
+ * here corresponds to a behavior in agent-battery-url-scorer.mjs so the two
+ * implementations stay in lockstep.
  */
 
 import { describe, expect, it } from 'vitest';

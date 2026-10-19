@@ -52,7 +52,7 @@ python -m jseval --help
 | Directory | Purpose |
 |-----------|---------|
 | `jseval/` | Canonical benchmark + eval CLI (Python, Click-based, 45+ subcommands). Supersedes the prior `scripts/bench/` + `scripts/eval/` + `scripts/perf/` infrastructure deleted by commit `a9c484f59` (2026-03-16). |
-| `bench/` | Hardware-perf launch scripts and fixtures (`run-B1.ps1`, `lhm-log.ps1`, `passmark-b1.ptscript`) used by dev-runner tests. |
+| `bench/` | Hardware-perf launch scripts and fixtures: dev-runner tests cover `run-B1.ps1`, which calls `lhm-log.ps1` and uses `passmark-b1.ptscript`. |
 | `search/` | Search evaluation helpers and weight sweeps. |
 
 ### Quality & Validation

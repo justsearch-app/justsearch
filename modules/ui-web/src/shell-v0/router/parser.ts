@@ -50,14 +50,14 @@ export const DEFAULT_ANSWER_SHAPE = 'core.rag-ask';
 // uniformly at the syntactic stage; semantic id-in-catalog resolution still
 // happens at the resolver.
 const ID_REGEX = /^(core|vendor\.[a-z][a-z0-9-]*)\.[a-z][a-z0-9-]*$/;
-// Trailing prose punctuation strip — mirrors scorer's `trailingPunctRe`.
+// Strip trailing prose punctuation from extracted URLs.
 const TRAILING_PUNCT_REGEX = /[.,;:!?”'"]+$/;
 
 /**
  * Extract every justsearch:// URL from a free-text string.
  *
- * Mirrors the scorer's `extractUrls`. Returns matches in document order,
- * each with `{ raw, url, span }`. Used by slice 491's URLExtractor for LLM
+ * Returns matches in document order, each with `{ raw, url, span }`.
+ * Used by slice 491's URLExtractor for LLM
  * responses; the chrome's intent sources call {@link parseUrl} directly with
  * a single URL string and don't need extraction.
  */
@@ -154,8 +154,7 @@ export function parseUrl(raw: string): ShellAddress | null {
  * trip is exact.
  *
  * Canonicalization rules: keys sorted alphabetically; repeated keys preserved
- * for array values; values URL-encoded. Mirrors `URLSurfaceEmitter` and the
- * scorer's `canonicalUrlString`.
+ * for array values; values URL-encoded. Matches `URLSurfaceEmitter`.
  */
 export function canonicalize(addr: ShellAddress): string {
   if (addr.kind === 'answer') {
