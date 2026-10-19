@@ -1487,7 +1487,7 @@ public final class WorkerIngestService {
             applied = withFileMutationFence(() -> {
               try {
                 return VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled());
-              } catch (java.io.IOException e) {
+              } catch (IOException e) {
                 throw new java.io.UncheckedIOException(e);
               }
             });
