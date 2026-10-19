@@ -783,3 +783,14 @@ No acceptance record is supplied by the builder.
   "note": "Sources and before-state expectations reviewed; fresh frontend evidence matches committed classifications. Prior backend evidence reused unchanged. Test-intent acceptance only; identical-text send reconciliation fails separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-e5n6ljmu",
+  "verdict": "reject",
+  "digest": "sha256:34212e155498169d3e41816f2accca523f480ec1e848d7ff4da6b30358802c80",
+  "note": "Reject Review 4's New AgentSessionController.test.ts entry: AS2 does not warrant clearing an unconfirmed send from an id-less same-text report belonging to another client. Real API/browser probes reproduce this in both windows. Missing cases: cross-client id-less reports and retention through terminal rendering/reload; Search v3 loses the warning at completion and both windows after reload. Fresh UI and recovery evidence matches committed classifications; remaining duplicate Java replays were cancelled behind the shared lock."
+}
+```
