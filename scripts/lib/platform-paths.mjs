@@ -11,6 +11,9 @@
  * The cross-language `PlatformPathsContractTest` feeds the same fixture set
  * into every implementation and asserts identical outputs.
  *
+ * The contract's `discovery.desktopAppDataDir` (the desktop app's data folder) is implemented in
+ * `packaging/mcpb/server/engine-discovery.cjs`, which ships inside the MCPB bundle.
+ *
  * Node has no JVM system properties — sysprop-class sources in the spec are
  * skipped here. The env-var + platform-default branches are authoritative
  * for the Node side.
@@ -132,6 +135,23 @@ export function isPidAlive(pid) {
 }
 
 /**
+ * Dev convention: walk up from cwd looking for `modules/ui-web/.dev-data` or `.dev-data` at the
+ * repo root (at most 8 levels).
+ */
+export function devDataDirCandidates(cwd = process.cwd()) {
+  const out = [];
+  let walk = path.resolve(cwd);
+  for (let i = 0; i < 8; i++) {
+    out.push(path.join(walk, 'modules', 'ui-web', '.dev-data'));
+    out.push(path.join(walk, '.dev-data'));
+    const parent = path.dirname(walk);
+    if (parent === walk) break;
+    walk = parent;
+  }
+  return out;
+}
+
+/**
  * Find a running JustSearch backend by walking a prioritized list of
  * candidate data directories, reading each one's runtime manifest, and
  * returning the first manifest whose `pid` is alive on this OS.
@@ -160,16 +180,7 @@ export function findRunningManifest({cwd = process.cwd(), extraDataDirs = []} = 
     candidates.push(process.env.JUSTSEARCH_DATA_DIR.trim());
   }
 
-  // Dev convention: walk up from cwd looking for `modules/ui-web/.dev-data` or
-  // `.dev-data` at the repo root.
-  let walk = path.resolve(cwd);
-  for (let i = 0; i < 8; i++) {
-    candidates.push(path.join(walk, 'modules', 'ui-web', '.dev-data'));
-    candidates.push(path.join(walk, '.dev-data'));
-    const parent = path.dirname(walk);
-    if (parent === walk) break;
-    walk = parent;
-  }
+  candidates.push(...devDataDirCandidates(cwd));
 
   // Platform default (covers production installs).
   candidates.push(resolveDataDir());

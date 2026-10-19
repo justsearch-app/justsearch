@@ -10,13 +10,12 @@
  *   stdin  (newline-delimited JSON-RPC)  --->  POST http://127.0.0.1:<port>/mcp
  *   stdout (newline-delimited JSON-RPC)  <---  JSON or SSE response bodies
  *
- * Port discovery (in order): JUSTSEARCH_API_PORT env var, the `head.apiPort`
- * field of the runtime manifest the app writes
- * (%APPDATA%\io.justsearch.shell\runtime\manifest.json), then the default 8080.
- * A candidate counts only if GET /api/health answers. The manifest is the one
- * filesystem discovery transport (tempdoc 501 section 6 closure rule); the
- * `api-port.txt` sibling this bridge used to read stopped being written in 501
- * Phase 18, so reading it could only ever fall through to the 8080 guess.
+ * Port discovery (in order): the JUSTSEARCH_API_PORT env pin, then the runtime manifest
+ * (runtime/manifest.json) in JUSTSEARCH_DATA_DIR when set, then in the desktop app's data folder
+ * (Windows: %APPDATA%\io.justsearch.shell; Linux: $XDG_DATA_HOME or ~/.local/share, then
+ * io.justsearch.shell — see engine-discovery.cjs). A manifest counts only if its pid is alive and
+ * the service on its port reports the same pid and instance (GET /api/runtime/live); there is no
+ * default-port guess, so an unrelated service is never picked up.
  *
  * Fully offline by design: zero dependencies, Node builtins only, and no
  * network access beyond 127.0.0.1 — this bridge never downloads anything.
@@ -25,16 +24,11 @@
 'use strict';
 
 const http = require('http');
-const fs = require('fs');
-const path = require('path');
+const { describeTried, selectEngine, standardCandidates } = require('./engine-discovery.cjs');
 
-const DEFAULT_PORT = 8080;
 const HEALTH_TIMEOUT_MS = 2500;
 const REQUEST_TIMEOUT_MS = 300000; // long: answer/ingest calls can be slow on CPU
 const LOG_PREFIX = '[justsearch-mcpb]';
-
-const APPDATA = process.env.APPDATA || '';
-const MANIFEST_FILE = path.join(APPDATA, 'io.justsearch.shell', 'runtime', 'manifest.json');
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -46,10 +40,11 @@ function log(...args) {
 
 function actionableUnreachableMessage(tried) {
   return [
-    `${LOG_PREFIX} Could not reach a running JustSearch instance on 127.0.0.1 (tried port${tried.length === 1 ? '' : 's'}: ${tried.join(', ')}).`,
+    `${LOG_PREFIX} Could not reach a running JustSearch instance on 127.0.0.1. Tried:`,
+    ...(tried.length > 0 ? tried.map((t) => `  - ${t}`) : ['  - (no candidate location)']),
     '',
     'This connector is only a bridge: the actual MCP server runs inside the',
-    'JustSearch desktop app (Windows). To fix this:',
+    'JustSearch desktop app. To fix this:',
     '',
     '  1. Install JustSearch if you have not: download the installer from',
     '     https://github.com/justsearch-app/justsearch/releases and follow the',
@@ -58,20 +53,10 @@ function actionableUnreachableMessage(tried) {
     '  2. Launch JustSearch and wait for the window to load.',
     '  3. Retry from your MCP client (e.g. toggle the connector in Claude Desktop).',
     '',
-    `If JustSearch IS running, check which port it bound: ${MANIFEST_FILE}`,
+    'If JustSearch IS running, its runtime/manifest.json in the desktop data folder above',
     'should carry the live API port at head.apiPort, and',
     'http://127.0.0.1:<port>/api/health should answer in a browser.',
   ].join('\n');
-}
-
-function readManifestPort() {
-  try {
-    const port = JSON.parse(fs.readFileSync(MANIFEST_FILE, 'utf8'))?.head?.apiPort;
-    if (Number.isInteger(port) && port > 0 && port < 65536) return port;
-  } catch {
-    /* missing/unreadable/malformed manifest — fall through */
-  }
-  return null;
 }
 
 function httpGet(port, urlPath, timeoutMs) {
@@ -121,18 +106,22 @@ function fetchSessionToken(port) {
   });
 }
 
-/** Returns a live port or null. Order: env pin, runtime manifest, default 8080. */
+/**
+ * Returns a live port or null; appends one line per location tried to triedOut.
+ * Order: JUSTSEARCH_API_PORT pin, then validated runtime manifests (engine-discovery.cjs).
+ */
 async function discoverPort(triedOut) {
-  const candidates = [];
+  const tried = triedOut || [];
   const envPort = Number.parseInt(process.env.JUSTSEARCH_API_PORT || '', 10);
-  if (Number.isInteger(envPort) && envPort > 0) candidates.push(envPort);
-  const manifestPort = readManifestPort();
-  if (manifestPort !== null) candidates.push(manifestPort);
-  candidates.push(DEFAULT_PORT);
-  const unique = [...new Set(candidates)];
-  for (const port of unique) {
-    if (triedOut && !triedOut.includes(port)) triedOut.push(port);
-    if (await healthy(port)) return port;
+  if (Number.isInteger(envPort) && envPort > 0) {
+    if (await healthy(envPort)) return envPort;
+    tried.push(`JUSTSEARCH_API_PORT=${envPort} (not responding)`);
+  }
+  const { selected, tried: folders } = await selectEngine(standardCandidates());
+  tried.push(...describeTried(folders.filter((f) => !f.ok)));
+  if (selected) {
+    log(`using the Engine in ${selected.dataDir} (${selected.source}, pid ${selected.pid}, port ${selected.port})`);
+    return selected.port;
   }
   return null;
 }

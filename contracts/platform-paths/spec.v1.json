@@ -18,6 +18,30 @@
       {"name": "expandUserHomePlaceholder", "description": "Replace literal ${user.home} with the user home dir; refuses unexpanded placeholders by raising an error."}
     ]
   },
+  "discovery": {
+    "description": "Named folders where clients look for a running Engine's runtime/manifest.json. These are discovery locations only: they do not change where any start keeps its data. The Node implementation is packaging/mcpb/server/engine-discovery.cjs (shipped inside the MCPB bundle); its fixtures run in scripts/lib/engine-discovery.test.mjs. Java and Rust do not resolve these (the shell gets the folder from Tauri itself).",
+    "desktopAppDataDir": {
+      "description": "The installed desktop app's data folder: Tauri 2 app.path().app_data_dir() = dirs::data_dir() joined with the bundle identifier (tauri 2.11.5 src/path/desktop.rs, dirs 6.0.0, dirs-sys 0.5.0). The shell passes it to the Engine as -Djustsearch.data.dir (modules/shell/src-tauri/src/lib.rs resolve_app_data_dir). JUSTSEARCH_DATA_DIR never redirects it (fa882b066).",
+      "identifier": "io.justsearch.shell",
+      "identifierSource": "modules/shell/src-tauri/tauri.conf.json#identifier",
+      "platformBase": {
+        "windows": {"basis": "knownFolder", "id": "FOLDERID_RoamingAppData", "nodeApproximation": "Node cannot call SHGetKnownFolderPath: APPDATA when set and absolute (Windows sets it from that folder at logon), else userHome\\AppData\\Roaming. A redirected Roaming folder in a process launched without APPDATA is not found."},
+        "macos": {"basis": "userHome", "join": ["Library", "Application Support"]},
+        "linux": {"basis": "env", "key": "XDG_DATA_HOME", "onlyIfAbsolute": true, "fallbackBasis": "userHome", "fallbackJoin": [".local", "share"], "userHome": "HOME when non-empty, else the passwd entry"}
+      },
+      "fixtures": [
+        {"name": "desktop_linux_xdg_unset", "platform": "linux", "userHome": "/home/alice", "env": {}, "expected": "/home/alice/.local/share/io.justsearch.shell"},
+        {"name": "desktop_linux_xdg_absolute", "platform": "linux", "userHome": "/home/alice", "env": {"XDG_DATA_HOME": "/srv/xdg data"}, "expected": "/srv/xdg data/io.justsearch.shell"},
+        {"name": "desktop_linux_xdg_relative_ignored", "platform": "linux", "userHome": "/home/alice", "env": {"XDG_DATA_HOME": "relative/share"}, "expected": "/home/alice/.local/share/io.justsearch.shell"},
+        {"name": "desktop_linux_xdg_empty_ignored", "platform": "linux", "userHome": "/home/alice", "env": {"XDG_DATA_HOME": ""}, "expected": "/home/alice/.local/share/io.justsearch.shell"},
+        {"name": "desktop_linux_ignores_justsearch_data_dir", "platform": "linux", "userHome": "/home/alice", "env": {"JUSTSEARCH_DATA_DIR": "/var/lib/justsearch"}, "expected": "/home/alice/.local/share/io.justsearch.shell"},
+        {"name": "desktop_windows_appdata", "platform": "windows", "userHome": "C:\\Users\\eve", "env": {"APPDATA": "C:\\Users\\eve\\AppData\\Roaming", "LOCALAPPDATA": "C:\\Users\\eve\\AppData\\Local"}, "expected": "C:\\Users\\eve\\AppData\\Roaming\\io.justsearch.shell"},
+        {"name": "desktop_windows_appdata_unset", "platform": "windows", "userHome": "C:\\Users\\frank", "env": {"LOCALAPPDATA": "C:\\Users\\frank\\AppData\\Local"}, "expected": "C:\\Users\\frank\\AppData\\Roaming\\io.justsearch.shell"},
+        {"name": "desktop_windows_ignores_justsearch_data_dir", "platform": "windows", "userHome": "C:\\Users\\eve", "env": {"APPDATA": "C:\\Users\\eve\\AppData\\Roaming", "JUSTSEARCH_DATA_DIR": "D:\\js"}, "expected": "C:\\Users\\eve\\AppData\\Roaming\\io.justsearch.shell"},
+        {"name": "desktop_macos", "platform": "macos", "userHome": "/Users/dave", "env": {}, "expected": "/Users/dave/Library/Application Support/io.justsearch.shell"}
+      ]
+    }
+  },
   "_runnersField": "Optional per-fixture runners array. Allowed values: 'java', 'node', 'rust'. Empty/omitted = all runners. Runners not in the list skip the fixture (e.g., when an env-driven branch can't be hermetically reproduced).",
   "fixtures": [
     {
