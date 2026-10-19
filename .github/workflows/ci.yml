@@ -73,7 +73,7 @@ jobs:
       # No model blobs on a public checkout, so the model-dependent cases self-skip via their
       # own assumeTrue guards; the Golden Corpus cases use frozen vectors and need no model.
       - name: Integration tier (Golden Corpus, relevance, isolated-backend E2E)
-        run: ./gradlew.bat :modules:system-tests:integrationTest --tests io.justsearch.systemtests.supervision.EngineSupervisedRecoveryE2ETest.initialBootstrapSurvivesHostileLocks -PskipWebBuild=true --console=plain
+        run: ./gradlew.bat :modules:system-tests:integrationTest --tests io.justsearch.systemtests.supervision.EngineSupervisedRecoveryE2ETest.childLogsArtifactProbe -PskipWebBuild=true --console=plain
 
       # PR #447 review fix: R3 (failOnPassedAfterRetry=false for this advisory lane, above in
       # modules/system-tests/build.gradle.kts) keeps a self-recovered boot flake from reddening

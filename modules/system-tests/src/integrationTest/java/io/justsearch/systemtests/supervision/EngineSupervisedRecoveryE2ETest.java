@@ -1030,6 +1030,11 @@ final class EngineSupervisedRecoveryE2ETest {
     runScenario("lock-boot");
   }
 
+  @Test
+  void childLogsArtifactProbe() throws Exception {
+    runScenario("migration");
+  }
+
   static void runScenario(String scenario) throws Exception {
     boolean processingFamily = "processing".equals(scenario) || "operation".equals(scenario);
     boolean operationFault = scenario.startsWith("ingest-") || scenario.startsWith("settings-")
