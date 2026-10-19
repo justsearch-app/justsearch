@@ -110,7 +110,11 @@ describe('S4.2 inline code ends before the citation mark', () => {
 });
 
 describe('S4.3 hard breaks separate words within the same verified sentence', () => {
-  it.each(['  \n', '\\\n', '<br>'])('covers both lines for %j', async (br) => {
+  it.each([
+    ['two-space hard break', '  \n'],
+    ['backslash hard break', '\\\n'],
+    ['"<br>"', '<br>'],
+  ])('covers both lines for %s', async (_label, br) => {
     const el = await mount(`## Context\n\nThe retrieval pipeline${br}expands the original query.`, [
       mark('The retrieval pipeline expands the original query.'),
     ]);
@@ -132,8 +136,12 @@ describe('S4.3 hard breaks separate words within the same verified sentence', ()
 });
 
 describe('S4.5 plain text updates match a fresh block after DOM decoration', () => {
-  for (const next of ['Replacement answer\n  with indentation and **literal** <b>HTML</b>', 'Short', '']) {
-    it(`replaces the decorated text with ${JSON.stringify(next)}`, async () => {
+  for (const [label, next] of [
+    ['multiline literal text', 'Replacement answer\n  with indentation and **literal** <b>HTML</b>'],
+    ['"Short"', 'Short'],
+    ['""', ''],
+  ] as const) {
+    it(`replaces the decorated text with ${label}`, async () => {
       const original = `${sentences[0]} [1]`;
       const citations = [mark(sentences[0]!)];
       const el = await mount(original, citations, 'plain');
