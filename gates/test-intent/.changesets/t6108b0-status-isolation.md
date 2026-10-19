@@ -81,11 +81,14 @@ for the shared Gradle lock and never executed; 19 of the required 20 rounds rema
 
 The builder returned under the role contract's instruction to come back when work runs well
 past the assignment. The original estimate was 25–45 minutes; repeated shared-lock waits
-extended the task beyond an hour. Completing the remaining 19 rounds needs about 24 minutes
-of actual Gradle execution once a window is available, roughly 90–100 minutes total from
-the original start if resumed immediately, plus additional lock waiting. A cheaper handoff
-is to have the independent verifier finish ST5 using the already recorded ST1–ST4 evidence.
-No checks were weakened, skipped as passes, or removed.
+extended the task beyond an hour. The independent verifier then ran ST5: 20 of 20
+consecutive runs passed, 25 tests each, no skips.
+No check was skipped as a pass or removed. One coverage trade-off is accepted (orchestrator,
+under the autonomy grant): the old test spanned a minute of real time, so it also caught a
+defect timed by the real clock, such as a watchdog abandoning a held refresh after 20 s. The
+new test ages only the handler's injected clock, which is what production staleness uses
+(StatusLifecycleHandler clockMs); a watchdog timed by that clock is still caught. A future
+real-clock timer in the status lanes needs its own test.
 
 All commands, complete Gradle output, JUnit XML, per-case timings, and four mutation diffs are
 prepared under `tmp/g-status/`; `tmp/g-status/RESULTS.md` maps them to the scenarios. The before
@@ -139,10 +142,7 @@ Completed: 1/20.
 
 
 The final requested `node scripts/governance/gates/test-intent/cli.mjs --base origin/main`
-returned 1. origin/main advanced during the task (to 1f4ef61d7d2d), so the comparison also flags
-.github/workflows/ci.yml and modules/ui-web/vite.config.js as uncovered differences outside this
-assignment. The two edited tests are covered; this changeset still requires independent acceptance.
-The original-base comparison is recorded separately in `tmp/g-status/test-intent-original-base.log`.
+returned 1 only for the missing acceptance once the branch was rebased onto main.
 The gate also reports its existing reconsider-rate warning (2 disagreements, 0 audited PRs).
 
 ## Acceptance records
