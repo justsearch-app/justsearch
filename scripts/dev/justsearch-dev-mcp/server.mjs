@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const execFileP = promisify(execFile);
+const gradleLauncher = process.platform === 'win32' ? './gradlew.bat' : './gradlew';
 
 // Tempdoc 637 §H.1 — MCP-server self-freshness. The dev MCP server is a long-lived stdio process; after
 // server.mjs (or a sibling loaded module) is edited it keeps serving OLD code until the harness reconnects
@@ -305,7 +306,7 @@ export async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, c
         // unmissable while preserving any ownership/contention guidance the verdict already set.
         const staleRemedy =
           'STALE BACKEND: the running Head is serving an OLDER build than your source — behaviour may ' +
-          'reflect old code. Run `./gradlew.bat :modules:ui:installDist` then restart/reload before ' +
+          `reflect old code. Run \`${gradleLauncher} :modules:ui:installDist\` then restart/reload before ` +
           'trusting results. (Lane F stage A item A13: the head dist is the ONLY distribution now, ' +
           'so this stamp covers everything the Engine loads.)';
         ownership.recommendedAction = ownership.recommendedAction
@@ -1224,7 +1225,7 @@ export function classifyHotSwapOutcome({ exitCode, stdout = '', stderr = '', ide
         + 'record names, but WITHOUT the hot-reload classes dir on its classpath, so nothing was '
         + 'pushed. That means the process was launched from a stale distribution predating the '
         + 'hot-reload classpath. Remedy: rebuild the dist in that tree '
-        + '(./gradlew.bat :modules:ui:installDist) and restart the stack.',
+        + `(${gradleLauncher} :modules:ui:installDist) and restart the stack.`,
     } };
   }
   if (exitCode === 3) {
@@ -1293,7 +1294,7 @@ export async function main() {
         'renewals — avoids a mid-campaign takeover when the agent is busy (jseval/gradle) for minutes',
         'with no session activity. quick_health reports remaining hold via ownership.lease.remainingSec.',
         '',
-        'Prerequisites: ./gradlew.bat build must succeed before start.',
+        `Prerequisites: ${gradleLauncher} build must succeed before start.`,
         'After compaction: call quick_health to re-orient.',
         '',
         'Common errors:',
@@ -2134,7 +2135,7 @@ export async function main() {
         setCheck(
           'headDist',
           'FAIL',
-          `Missing: ${headBin}. Run: ./gradlew.bat :modules:ui:installDist`
+          `Missing: ${headBin}. Run: ${gradleLauncher} :modules:ui:installDist`
             + ' (or, for a fresh worktree: node scripts/dev/prepare-worktree.cjs)',
         );
       } else {
@@ -2522,7 +2523,7 @@ export async function main() {
       let freshness;
       if (runState === 'ACTIVE') {
         const buildArtifact = ownership?.backendStale
-          ? { state: 'STALE', reason: 'running an older build than source', remedy: 'gradlew :modules:ui:installDist then restart/reload' }
+          ? { state: 'STALE', reason: 'running an older build than source', remedy: `${gradleLauncher} :modules:ui:installDist then restart/reload` }
           : ownership
             ? { state: 'FRESH' }
             : { state: 'UNKNOWN', reason: 'ownership/build provenance could not be read' };
