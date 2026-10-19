@@ -14,6 +14,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 import { discover } from './discovery.mjs';
+import { confirmEngine } from '../../../packaging/mcpb/server/engine-discovery.cjs';
 import {
   AnswerInputSchema,
   AnswerOutputSchema,
@@ -442,7 +443,20 @@ export async function main() {
   // Build header helpers — include token header only when we have a real token
   const tokenHeaders = token ? { 'X-JustSearch-Session': token } : {};
 
-  function requireToken() {
+  async function requireToken() {
+    // The token goes only to the Engine it came from: before each call, the manifest Engine must
+    // still be the one the OS says holds the port (no network). --port / JUSTSEARCH_API_PORT are
+    // the operator's choice and are not re-checked.
+    if (backend.engine) {
+      const check = await confirmEngine(backend.engine);
+      if (!check.ok) {
+        return makeError(
+          'ENGINE_GONE',
+          `The JustSearch Engine this server connected to (pid ${backend.engine.pid}, port ${backend.port}) ` +
+            `is no longer the one serving that port (${check.status}: ${check.detail}). Restart the MCP server to reconnect.`,
+        );
+      }
+    }
     // In dev mode (token === ""), POST works without a token — don't block.
     // Only block when the token endpoint wasn't available at all (null).
     if (token === null) {
@@ -484,7 +498,7 @@ export async function main() {
     async (rawArgs) => {
       const input = AnswerInputSchema.parse(rawArgs);
 
-      const tokenErr = requireToken();
+      const tokenErr = await requireToken();
       if (tokenErr) return tokenErr;
 
       const url = `${baseUrl}/api/knowledge/retrieve-context`;
@@ -634,7 +648,7 @@ export async function main() {
     async (rawArgs) => {
       const input = SearchInputSchema.parse(rawArgs);
 
-      const tokenErr = requireToken();
+      const tokenErr = await requireToken();
       if (tokenErr) return tokenErr;
 
       const url = `${baseUrl}/api/knowledge/search`;
@@ -771,7 +785,7 @@ export async function main() {
     async (rawArgs) => {
       const input = IngestInputSchema.parse(rawArgs);
 
-      const tokenErr = requireToken();
+      const tokenErr = await requireToken();
       if (tokenErr) return tokenErr;
 
       const url = `${baseUrl}/api/knowledge/ingest`;

@@ -9,14 +9,25 @@
  *     app.path().app_data_dir() — the `discovery.desktopAppDataDir` entry of
  *     contracts/platform-paths/spec.v1.json (fixtures there; test: engine-discovery.test.mjs).
  *  2. selectEngine(): read each candidate folder's runtime/manifest.json and accept it only when
- *     its pid is alive and the service on its recorded port reports the same pid and instanceId
- *     (GET /api/runtime/live). The first valid candidate wins; every rejected one is reported.
+ *     its pid is alive, the operating system says that pid holds the listening socket on the
+ *     recorded port, the service there reports the manifest's pid and instanceId
+ *     (GET /api/runtime/live) and /api/health answers 200. The first valid candidate wins; every
+ *     rejected one is reported. confirmEngine() repeats the no-network part before a client sends
+ *     credentials again.
+ *
+ * Why the socket owner: whatever answers on the port can claim any pid and instanceId, so only
+ * the OS's record of who holds the listening socket ties the endpoint to the manifest's process.
+ * This closes a service of another user (or any other process) that binds the port after the
+ * Engine released it, or answers on a reused port, however well it copies the identity. It does
+ * not close a process of the same user: that one can already read the data folder, the manifest
+ * and the session token's source.
  *
  * Node builtins only, loopback only, CommonJS (the bridge's host may run Node 18).
  */
 
 'use strict';
 
+const { execFile } = require('child_process');
 const fs = require('fs');
 const http = require('http');
 const os = require('os');
@@ -26,6 +37,7 @@ const path = require('path');
 const DESKTOP_APP_IDENTIFIER = 'io.justsearch.shell';
 const PROBE_TIMEOUT_MS = 2000;
 const PROBE_MAX_BYTES = 64 * 1024;
+const OS_QUERY_TIMEOUT_MS = 10000;
 
 function platformKey(platform) {
   const p = platform || process.platform;
@@ -53,7 +65,9 @@ function defaultUserHome(plat, env) {
 /**
  * The desktop app's data folder (Tauri 2 app_data_dir = dirs::data_dir() + identifier):
  *  - Windows: the RoamingAppData known folder. Node cannot call SHGetKnownFolderPath, so this
- *    reads APPDATA (set from that folder at logon) and falls back to <home>\AppData\Roaming.
+ *    reads APPDATA (set from that folder at logon, redirection included) and falls back to
+ *    <home>\AppData\Roaming; without APPDATA, standardCandidates() also asks the OS for the
+ *    folder (roamingAppDataFromOs) after that guess.
  *  - Linux: XDG_DATA_HOME only when absolute (relative or empty is ignored, as dirs does), else
  *    <home>/.local/share.
  *  - macOS: <home>/Library/Application Support.
@@ -78,6 +92,118 @@ function desktopAppDataDir({ env = process.env, platform = null, userHome = null
 
 function manifestPathFor(dataDir) {
   return path.join(dataDir, 'runtime', 'manifest.json');
+}
+
+function windowsTool(...parts) {
+  return path.win32.join(nonEmpty(process.env.SystemRoot) || 'C:\\Windows', 'System32', ...parts);
+}
+
+function runTool(file, args) {
+  return new Promise((resolve) => {
+    execFile(
+      file,
+      args,
+      { encoding: 'utf8', timeout: OS_QUERY_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
+      (error, stdout) => resolve(error ? { error: error.message } : { stdout }),
+    );
+  });
+}
+
+/**
+ * The RoamingAppData known folder as Windows reports it ([Environment]::GetFolderPath
+ * ('ApplicationData') calls the shell folder API, as Tauri's dirs-sys does through
+ * SHGetKnownFolderPath). Covers a process started without APPDATA and a redirected folder.
+ * Resolves to null when it cannot be asked.
+ */
+async function roamingAppDataFromOs() {
+  if (process.platform !== 'win32') return null;
+  const res = await runTool(windowsTool('WindowsPowerShell', 'v1.0', 'powershell.exe'), [
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    "[Console]::OutputEncoding = [Text.Encoding]::UTF8; [Environment]::GetFolderPath('ApplicationData')",
+  ]);
+  const folder = res.stdout ? res.stdout.trim() : '';
+  return folder && path.win32.isAbsolute(folder) ? folder : null;
+}
+
+/** Listening TCP sockets on port (Linux): their inodes from /proc/net/tcp and tcp6. */
+function linuxListenerInodes(port) {
+  const inodes = new Set();
+  for (const file of ['tcp', 'tcp6']) {
+    let text;
+    try {
+      text = fs.readFileSync(`/proc/net/${file}`, 'utf8');
+    } catch (e) {
+      if (e.code === 'ENOENT') continue; // no IPv6
+      throw e;
+    }
+    for (const row of text.trim().split('\n').slice(1)) {
+      const f = row.trim().split(/\s+/);
+      const local = f[1] || '';
+      if (f[3] === '0A' && parseInt(local.slice(local.lastIndexOf(':') + 1), 16) === port) inodes.add(f[9]);
+    }
+  }
+  return inodes;
+}
+
+/**
+ * Does the OS say that pid, and only pid, holds every listening socket on port? Never contacts
+ * the port. Result: { ok: true } or { ok: false, status, detail }.
+ *  - Linux: every LISTEN inode on the port (any address, IPv4 and IPv6) must be one of pid's
+ *    open sockets (/proc/<pid>/fd). Another user's process cannot be read, so it never passes.
+ *  - Windows: every LISTENING row for the port in the TCP table (netstat -ano, which lists the
+ *    owning pid of every user's sockets without elevation) must name pid. Listening rows are
+ *    told apart by their foreign port 0, so the localized state column is not read.
+ *  - Elsewhere the owner cannot be checked and the candidate is refused.
+ */
+async function portOwnedBy(port, pid) {
+  if (process.platform === 'linux') {
+    let inodes;
+    try {
+      inodes = linuxListenerInodes(port);
+    } catch (e) {
+      return { ok: false, status: 'owner-unknown', detail: `cannot read the TCP table: ${e.code || e.message}` };
+    }
+    if (inodes.size === 0) return { ok: false, status: 'not-responding', detail: `nothing listens on port ${port}` };
+    const held = new Set();
+    let fds;
+    try {
+      fds = fs.readdirSync(`/proc/${pid}/fd`);
+    } catch (e) {
+      return { ok: false, status: 'owner-mismatch', detail: `cannot read pid ${pid}'s sockets (${e.code || e.message}); port ${port} is not proven to be its` };
+    }
+    for (const fd of fds) {
+      try {
+        const m = /^socket:\[(\d+)\]$/.exec(fs.readlinkSync(`/proc/${pid}/fd/${fd}`));
+        if (m) held.add(m[1]);
+      } catch {
+        /* fd closed meanwhile */
+      }
+    }
+    const foreign = [...inodes].filter((inode) => !held.has(inode));
+    return foreign.length === 0
+      ? { ok: true }
+      : { ok: false, status: 'owner-mismatch', detail: `port ${port} is held by a process other than pid ${pid}` };
+  }
+  if (process.platform === 'win32') {
+    const res = await runTool(windowsTool('NETSTAT.EXE'), ['-ano']);
+    if (!res.stdout) return { ok: false, status: 'owner-unknown', detail: `netstat failed: ${res.error}` };
+    const owners = new Set();
+    for (const line of res.stdout.split(/\r?\n/)) {
+      const f = line.trim().split(/\s+/);
+      // TCP <local> <foreign> <state> <pid>; the state may be localized, so it is not read.
+      if (f.length < 5 || f[0] !== 'TCP') continue;
+      if (Number(f[1].slice(f[1].lastIndexOf(':') + 1)) !== port || !/:0$/.test(f[2])) continue;
+      owners.add(Number(f[f.length - 1]));
+    }
+    if (owners.size === 0) return { ok: false, status: 'not-responding', detail: `nothing listens on port ${port}` };
+    const others = [...owners].filter((owner) => owner !== pid);
+    return others.length === 0
+      ? { ok: true }
+      : { ok: false, status: 'owner-mismatch', detail: `port ${port} is held by pid ${others.join(', ')}, manifest says pid ${pid}` };
+  }
+  return { ok: false, status: 'owner-unknown', detail: `cannot check who holds port ${port} on ${process.platform}` };
 }
 
 /** true alive, false dead, null unknown. EPERM means it exists under another user. */
@@ -137,13 +263,8 @@ function reject(candidate, status, detail) {
   return { ...candidate, ok: false, status, detail };
 }
 
-/**
- * Validate one candidate folder. Accepts only when the manifest is complete, its pid is alive
- * (or cannot be checked), and the service on head.apiPort answers /api/runtime/live with the
- * manifest's own pid and instanceId — which rejects stale manifests, recycled pids and a
- * foreign service that happens to answer health checks on the recorded port.
- */
-async function validateCandidate(candidate, { timeoutMs = PROBE_TIMEOUT_MS } = {}) {
+/** Read and check a folder's runtime manifest. Result: { manifest, pid, instanceId, port } or a rejection. */
+function readManifest(candidate) {
   const manifestPath = manifestPathFor(candidate.dataDir);
   let raw;
   try {
@@ -174,6 +295,22 @@ async function validateCandidate(candidate, { timeoutMs = PROBE_TIMEOUT_MS } = {
   if (pidState(pid) === false) {
     return reject(candidate, 'stale', `pid ${pid} is not running (port ${port})`);
   }
+  return { manifest, pid, instanceId, port };
+}
+
+/**
+ * Validate one candidate folder. Accepts only when the manifest is complete, its pid is alive
+ * (or cannot be checked), the OS says that pid holds the listening socket on head.apiPort, the
+ * service there answers /api/runtime/live with the manifest's pid and instanceId, and
+ * /api/health answers 200. Nothing is sent to the port before the owner check, and no
+ * credentials are sent at all.
+ */
+async function validateCandidate(candidate, { timeoutMs = PROBE_TIMEOUT_MS } = {}) {
+  const read = readManifest(candidate);
+  if (read.ok === false) return read;
+  const { manifest, pid, instanceId, port } = read;
+  const owner = await portOwnedBy(port, pid);
+  if (!owner.ok) return reject(candidate, owner.status, owner.detail);
   const live = await getJson(port, '/api/runtime/live', timeoutMs);
   if (live.status !== 200) {
     const why = live.error ? live.error : `HTTP ${live.status} from /api/runtime/live`;
@@ -188,7 +325,27 @@ async function validateCandidate(candidate, { timeoutMs = PROBE_TIMEOUT_MS } = {
       `port ${port} answers as ${seen}, manifest says pid ${pid}, instance ${instanceId}`,
     );
   }
+  const health = await getJson(port, '/api/health', timeoutMs);
+  if (health.status !== 200) {
+    const why = health.error ? health.error : `HTTP ${health.status}`;
+    return reject(candidate, 'unhealthy', `pid ${pid} on port ${port} is not ready: /api/health ${why}`);
+  }
   return { ...candidate, ok: true, status: 'ok', port, pid, instanceId, lifecycle: manifest.lifecycle || null };
+}
+
+/**
+ * Before credentials go to a previously selected Engine again: its manifest still names the same
+ * pid, instance and port, the pid is alive and the OS says it still holds the port. Never
+ * contacts the port. Result: { ok: true } or a rejection; on a rejection, select again.
+ */
+async function confirmEngine(selected) {
+  const read = readManifest(selected);
+  if (read.ok === false) return read;
+  if (read.pid !== selected.pid || read.instanceId !== selected.instanceId || read.port !== selected.port) {
+    return reject(selected, 'replaced', `the manifest now names pid ${read.pid} on port ${read.port}`);
+  }
+  const owner = await portOwnedBy(selected.port, selected.pid);
+  return owner.ok ? { ok: true } : reject(selected, owner.status, owner.detail);
 }
 
 function sameFolder(a, b) {
@@ -198,12 +355,17 @@ function sameFolder(a, b) {
 }
 
 /**
- * Validate candidates ({source, dataDir}) in order and return the first valid one.
- * Duplicate folders are tried once. Result: { selected: <validated candidate> | null, tried }.
+ * Validate candidates ({source, dataDir}, or {source, resolveDataDir: async () => dataDir} for a
+ * folder that costs an OS query and is only worth asking for when earlier ones failed) in order
+ * and return the first valid one. Duplicate folders are tried once.
+ * Result: { selected: <validated candidate> | null, tried }.
  */
 async function selectEngine(candidates, options = {}) {
   const tried = [];
-  for (const candidate of candidates) {
+  for (let candidate of candidates) {
+    if (candidate && !candidate.dataDir && typeof candidate.resolveDataDir === 'function') {
+      candidate = { source: candidate.source, dataDir: await candidate.resolveDataDir() };
+    }
     if (!candidate || !nonEmpty(candidate.dataDir)) continue;
     if (tried.some((t) => sameFolder(t.dataDir, candidate.dataDir))) continue;
     const result = await validateCandidate(candidate, options);
@@ -220,6 +382,17 @@ function standardCandidates({ env = process.env, platform = null, userHome = nul
   if (explicit) out.push({ source: 'JUSTSEARCH_DATA_DIR', dataDir: explicit });
   const desktop = desktopAppDataDir({ env, platform, userHome });
   if (desktop) out.push({ source: 'desktop app', dataDir: desktop });
+  const appData = nonEmpty(env.APPDATA);
+  if (platformKey(platform) === 'windows' && !(appData && path.win32.isAbsolute(appData))) {
+    // Started without APPDATA: the home-folder guess above may miss a redirected Roaming folder.
+    out.push({
+      source: 'desktop app (Roaming folder the OS reports)',
+      resolveDataDir: async () => {
+        const roaming = await roamingAppDataFromOs();
+        return roaming ? path.win32.join(roaming, DESKTOP_APP_IDENTIFIER) : null;
+      },
+    });
+  }
   return out;
 }
 
@@ -232,7 +405,9 @@ module.exports = {
   DESKTOP_APP_IDENTIFIER,
   desktopAppDataDir,
   validateCandidate,
+  confirmEngine,
   selectEngine,
+  roamingAppDataFromOs,
   standardCandidates,
   describeTried,
 };

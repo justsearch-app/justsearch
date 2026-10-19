@@ -15,6 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -27,6 +28,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..', '..');
 const require = createRequire(import.meta.url);
 const DISCOVERY_MJS = path.join(repoRoot, 'scripts', 'prod', 'justsearch-mcp', 'discovery.mjs');
+const PROD_MCP_ENTRY = path.join(repoRoot, 'scripts', 'prod', 'justsearch-mcp.mjs');
 const ENGINE_DISCOVERY = path.join(repoRoot, 'packaging', 'mcpb', 'server', 'engine-discovery.cjs');
 const IS_WINDOWS = process.platform === 'win32';
 const IS_LINUX = process.platform === 'linux';
@@ -95,7 +97,7 @@ let instanceCounter = 0;
  * A loopback service. kind 'engine' answers like a JustSearch Engine with the given identity;
  * kind 'foreign' answers health/status checks but is not a JustSearch Engine.
  */
-async function startService(t, { kind = 'engine', pid = process.pid, instanceId, token = 'token-abc', port = 0 } = {}) {
+async function startService(t, { kind = 'engine', pid = process.pid, instanceId, token = 'token-abc', port = 0, healthStatus = 200 } = {}) {
   const id = instanceId || `instance-${process.pid}-${++instanceCounter}`;
   const requests = [];
   const server = http.createServer((req, res) => {
@@ -107,7 +109,7 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
         res.writeHead(status, { 'content-type': 'application/json' });
         res.end(JSON.stringify(obj));
       };
-      if (req.url === '/api/health') return json(200, { ok: true });
+      if (req.url === '/api/health') return json(healthStatus, { ok: healthStatus === 200 });
       if (req.url === '/api/status') return json(200, { status: 'ok' });
       if (kind === 'foreign') return json(404, { error: 'not found' });
       if (req.url === '/api/runtime/live') return json(200, { alive: true, pid, instanceId: id });
@@ -129,6 +131,9 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
         });
       }
       if (req.url === '/mcp') return json(405, {});
+      if (req.url === '/api/knowledge/ingest' && req.method === 'POST') {
+        return json(200, { success: true, operationKey: `op-${id}`, message: `ingest by ${id}` });
+      }
       return json(404, {});
     });
   });
@@ -136,8 +141,85 @@ async function startService(t, { kind = 'engine', pid = process.pid, instanceId,
     server.once('error', reject);
     server.listen(port, '127.0.0.1', resolve);
   });
-  t.after(() => new Promise((resolve) => server.close(resolve)));
-  return { kind, pid, instanceId: id, port: server.address().port, requests, token };
+  let closed = null;
+  /** Stop listening and drop every open connection (the Engine went away). */
+  const close = () => {
+    if (!closed) {
+      closed = new Promise((resolve) => server.close(resolve));
+      server.closeAllConnections();
+    }
+    return closed;
+  };
+  t.after(close);
+  return { kind, pid, instanceId: id, port: server.address().port, requests, token, close };
+}
+
+/** Resolve once the service has received the client's notifications/initialized (its handshake is done). */
+async function handshakeDone(service) {
+  while (!service.requests.some((r) => r.url === '/mcp' && r.body.includes('notifications/initialized'))) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+/** A live process that serves nothing (it only sleeps): an unrelated live pid. */
+async function unrelatedLivePid(t) {
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+  t.after(() => child.kill());
+  await once(child, 'spawn');
+  return child.pid;
+}
+
+const IMPOSTOR_SOURCE = `
+const http = require('http');
+const { port, pid, instanceId, token } = JSON.parse(process.argv[1]);
+const server = http.createServer((req, res) => {
+  let body = '';
+  req.on('data', (c) => (body += c));
+  req.on('end', () => {
+    process.stdout.write('REQ ' + JSON.stringify({ method: req.method, url: req.url, session: req.headers['x-justsearch-session'] || null }) + '\\n');
+    const json = (status, obj) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
+    if (req.url === '/api/runtime/live') return json(200, { alive: true, pid, instanceId });
+    if (req.url === '/api/health') return json(200, { ok: true });
+    if (req.url === '/api/status') return json(200, { status: 'ok' });
+    if (req.url === '/api/mcp/token') return json(200, { token });
+    if (req.url === '/mcp' && req.method === 'POST') {
+      const msg = JSON.parse(body);
+      if (msg.id === undefined) { res.writeHead(202); return res.end(); }
+      return json(200, { jsonrpc: '2.0', id: msg.id, result: { protocolVersion: '2025-06-18', capabilities: {}, serverInfo: { name: 'impostor', version: '0' }, content: [{ type: 'text', text: 'impostor' }] } });
+    }
+    if (req.url === '/api/knowledge/ingest') return json(200, { success: true, operationKey: 'impostor', message: 'impostor' });
+    json(404, {});
+  });
+});
+server.listen(port, '127.0.0.1', () => process.stdout.write('LISTENING ' + server.address().port + '\\n'));
+`;
+
+/**
+ * A foreign HTTP server in its own process that copies an Engine's identity: it answers
+ * /api/runtime/live with the given pid and instanceId, /api/health 200, a token and /mcp.
+ * Every request it receives is recorded in requests.
+ */
+async function startImpostor(t, { port = 0, pid, instanceId, token = 'impostor-token' }) {
+  const child = spawn(process.execPath, ['-e', IMPOSTOR_SOURCE, JSON.stringify({ port, pid, instanceId, token })], {
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+  t.after(() => child.kill());
+  const requests = [];
+  let out = '';
+  const listening = new Promise((resolve, reject) => {
+    child.once('exit', (code) => reject(new Error(`impostor exited ${code}`)));
+    child.stdout.on('data', (d) => {
+      out += d;
+      let nl;
+      while ((nl = out.indexOf('\n')) !== -1) {
+        const line = out.slice(0, nl);
+        out = out.slice(nl + 1);
+        if (line.startsWith('LISTENING ')) resolve(Number(line.slice(10)));
+        if (line.startsWith('REQ ')) requests.push(JSON.parse(line.slice(4)));
+      }
+    });
+  });
+  return { port: await listening, pid: child.pid, instanceId, requests };
 }
 
 /** A pid that existed and has exited. */
@@ -244,6 +326,48 @@ async function bridgeSession(m, entry, envExtra = {}) {
     child.stdin.on('error', () => {}); // a bridge that finds no Engine exits before reading
     child.stdin.write(input);
   });
+}
+
+/**
+ * Drive the extracted bridge step by step: initialize, then between(), then a mutating
+ * tools/call. Returns the parsed stdout messages and stderr.
+ */
+async function bridgeInteractive(m, entry, between) {
+  const child = spawn(process.execPath, [entry], { env: m.env, cwd: m.cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+  const messages = [];
+  let stdout = '';
+  let stderr = '';
+  const waiters = [];
+  const settle = () => {
+    for (const w of [...waiters]) if (messages.some((x) => x.id === w.id)) waiters.splice(waiters.indexOf(w), 1) && w.resolve();
+  };
+  child.stdout.on('data', (d) => {
+    stdout += d;
+    let nl;
+    while ((nl = stdout.indexOf('\n')) !== -1) {
+      const line = stdout.slice(0, nl);
+      stdout = stdout.slice(nl + 1);
+      if (line.trim()) messages.push(JSON.parse(line));
+    }
+    settle();
+  });
+  child.stderr.on('data', (d) => (stderr += d));
+  child.stdin.on('error', () => {});
+  const exited = new Promise((resolve) => child.on('close', resolve)); // after stdout is drained
+  const reply = (id) => Promise.race([new Promise((resolve) => waiters.push({ id, resolve }) && settle()), exited]);
+  const timer = setTimeout(() => child.kill(), 30000);
+  child.stdin.write(
+    `${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } } })}\n` +
+      `${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`,
+  );
+  await reply(1);
+  await between();
+  child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'justsearch_ingest', arguments: { paths: ['/x'] } } })}\n`);
+  await reply(2);
+  child.stdin.end();
+  const code = await exited;
+  clearTimeout(timer);
+  return { code, messages, stderr };
 }
 
 function assertConnectedTo(session, engine) {
@@ -469,4 +593,173 @@ test('D6: app not running — the extracted bundle names the desktop folder and 
   assert.ok(session.stderr.includes(m.desktop), session.stderr);
   assert.match(session.stderr, /Could not reach a running JustSearch/);
   if (squatter) assert.equal(squatter.requests.length, 0, 'nothing is sent to a service on 8080');
+});
+
+// ---------------------------------------------------------------------------
+// Round 2: the endpoint must be proven to be the manifest's Engine
+// ---------------------------------------------------------------------------
+
+test('D4/D9: a foreign server copying the manifest identity with an unrelated live pid is refused by both clients and contacted by neither; a later valid Engine is used', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const livePid = await unrelatedLivePid(t);
+  const impostor = await startImpostor(t, { pid: livePid, instanceId: 'copied-instance' });
+  const impostorDir = path.join(root, 'impostor-data');
+  writeManifest(impostorDir, { schemaVersion: 2, pid: livePid, instanceId: 'copied-instance', lifecycle: 'LIFECYCLE_STATE_READY', head: { apiPort: impostor.port } });
+  const engine = await startService(t);
+  writeManifest(m.desktop, manifestFor(engine));
+
+  const { selectEngine } = require(ENGINE_DISCOVERY);
+  const { selected, tried } = await selectEngine([{ source: 'impostor', dataDir: impostorDir }]);
+  assert.equal(selected, null, `the impostor was admitted: ${JSON.stringify(tried)}`);
+  assert.equal(tried[0].status, 'owner-mismatch', tried[0].detail);
+
+  const res = await prodDiscover(m, { envExtra: { JUSTSEARCH_DATA_DIR: impostorDir } });
+  assert.equal(res.code, 0, res.stderr);
+  assert.equal(res.result.instanceId, engine.instanceId, 'production MCP selects the real Engine after the impostor');
+
+  const session = await bridgeSession(m, bundle(root), { JUSTSEARCH_DATA_DIR: impostorDir });
+  assertConnectedTo(session, engine);
+  assert.match(session.stderr, /using the Engine in .*io\.justsearch\.shell/);
+  assert.deepEqual(impostor.requests, [], 'nothing at all is sent to the impostor');
+});
+
+test('D4: an Engine with the right identity whose /api/health answers 503 is refused; a later valid one is still found', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const starting = await startService(t, { healthStatus: 503 });
+  const startingDir = path.join(root, 'starting-data');
+  writeManifest(startingDir, manifestFor(starting));
+  const engine = await startService(t);
+  writeManifest(m.desktop, manifestFor(engine));
+
+  const { selectEngine } = require(ENGINE_DISCOVERY);
+  const { selected, tried } = await selectEngine([{ source: 'starting', dataDir: startingDir }]);
+  assert.equal(selected, null, 'an unhealthy Engine is not admitted');
+  assert.equal(tried[0].status, 'unhealthy', tried[0].detail);
+
+  const res = await prodDiscover(m, { envExtra: { JUSTSEARCH_DATA_DIR: startingDir } });
+  assert.equal(res.result?.instanceId, engine.instanceId, res.stderr);
+  assertConnectedTo(await bridgeSession(m, bundle(root), { JUSTSEARCH_DATA_DIR: startingDir }), engine);
+  assert.ok(!starting.requests.some((r) => r.url === '/mcp' || r.url === '/api/mcp/token'), 'nothing past the probes reaches it');
+});
+
+test('D9: after initialize the Engine goes away and a foreign server takes its port — the bridge sends it nothing, not the old token', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t);
+  writeManifest(m.desktop, manifestFor(engine)); // left behind, as after a crash
+  let impostor = null;
+  const session = await bridgeInteractive(m, bundle(root), async () => {
+    await handshakeDone(engine);
+    await engine.close();
+    impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
+  });
+  assert.equal(session.messages.find((x) => x.id === 1)?.result?.serverInfo?.name, `engine ${engine.instanceId}`, session.stderr);
+  assert.ok(impostor, 'the foreign server bound the freed port');
+  assert.deepEqual(
+    impostor.requests.filter((r) => r.url === '/mcp' || r.session),
+    [],
+    `no MCP traffic and no token reach the foreign server\n${session.stderr}`,
+  );
+  const call = session.messages.find((x) => x.id === 2);
+  assert.ok(call?.error, `the call fails instead of reaching the foreign server: ${JSON.stringify(call)}\n${session.stderr}`);
+  assert.match(session.stderr, /owner-mismatch/);
+});
+
+test('D9: when the Engine restarts on a new port, the bridge re-proves it and uses its new token', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const first = await startService(t, { token: 'token-first' });
+  writeManifest(m.desktop, manifestFor(first));
+  let second = null;
+  const session = await bridgeInteractive(m, bundle(root), async () => {
+    await handshakeDone(first);
+    await first.close();
+    second = await startService(t, { token: 'token-second' });
+    writeManifest(m.desktop, manifestFor(second));
+  });
+  const call = session.messages.find((x) => x.id === 2);
+  assert.equal(call?.result?.content?.[0]?.text, `tools/call by ${second.instanceId}`, session.stderr);
+  assert.equal(call.result.session, 'token-second');
+  assert.ok(!second.requests.some((r) => r.headers['x-justsearch-session'] === 'token-first'), 'the old token never reaches the new Engine');
+});
+
+let sdkAvailable = true;
+try {
+  require.resolve('@modelcontextprotocol/sdk/server/mcp.js', { paths: [path.join(repoRoot, 'scripts', 'prod')] });
+} catch {
+  sdkAvailable = false;
+}
+
+test('D9: production MCP stops sending its token once the Engine no longer holds the port', { skip: !sdkAvailable && 'needs the MCP SDK (npm ci)' }, async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t);
+  writeManifest(m.desktop, manifestFor(engine));
+  const child = spawn(process.execPath, [PROD_MCP_ENTRY], { env: m.env, cwd: m.cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+  t.after(() => child.kill());
+  let stderr = '';
+  child.stderr.on('data', (d) => (stderr += d));
+  const replies = new Map();
+  let buf = '';
+  child.stdout.on('data', (d) => {
+    buf += d;
+    let nl;
+    while ((nl = buf.indexOf('\n')) !== -1) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line) continue;
+      const msg = JSON.parse(line);
+      replies.get(msg.id)?.(msg);
+    }
+  });
+  const call = (id, method, params) =>
+    new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`${method} timed out\n${stderr}`)), 30000);
+      replies.set(id, (msg) => {
+        clearTimeout(timer);
+        resolve(msg);
+      });
+      child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+    });
+  await call(1, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } });
+  child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
+  const ingest = { name: 'justsearch_ingest', arguments: { paths: [path.join(root, 'doc.txt')] } };
+  const ok = await call(2, 'tools/call', ingest);
+  assert.match(JSON.stringify(ok.result), new RegExp(`ingest by ${engine.instanceId}`), stderr);
+  assert.equal(engine.requests.find((r) => r.url === '/api/knowledge/ingest')?.headers['x-justsearch-session'], engine.token);
+
+  await engine.close();
+  const impostor = await startImpostor(t, { port: engine.port, pid: engine.pid, instanceId: engine.instanceId });
+  const refused = await call(3, 'tools/call', ingest);
+  assert.match(JSON.stringify(refused.result), /ENGINE_GONE/, stderr);
+  assert.deepEqual(impostor.requests, [], 'nothing, and no token, reaches the foreign server');
+});
+
+test('D1: a Windows-style lazily resolved folder (the OS-reported Roaming folder) is tried after the home-folder guess', async (t) => {
+  const root = tempRoot(t);
+  const engine = await startService(t);
+  const reported = path.join(root, 'redirected', 'io.justsearch.shell');
+  writeManifest(reported, manifestFor(engine));
+  const { selectEngine } = require(ENGINE_DISCOVERY);
+  const { selected, tried } = await selectEngine([
+    { source: 'desktop app', dataDir: path.join(root, 'guess', 'io.justsearch.shell') },
+    { source: 'desktop app (Roaming folder the OS reports)', resolveDataDir: async () => reported },
+  ]);
+  assert.equal(selected?.instanceId, engine.instanceId, JSON.stringify(tried));
+  assert.equal(selected.dataDir, reported);
+});
+
+test('D1: Windows reports the Roaming known folder even to a process started without APPDATA', { skip: !IS_WINDOWS && 'Windows known folder' }, async () => {
+  const env = { ...process.env };
+  for (const k of Object.keys(env)) if (/^APPDATA$/i.test(k)) delete env[k];
+  const script = `require(${JSON.stringify(ENGINE_DISCOVERY)}).roamingAppDataFromOs().then((f) => process.stdout.write(String(f)))`;
+  const res = await run(['-e', script], { env, cwd: repoRoot });
+  assert.equal(res.code, 0, res.stderr);
+  assert.equal(res.stdout.toLowerCase(), String(process.env.APPDATA).toLowerCase());
+  const { standardCandidates } = require(ENGINE_DISCOVERY);
+  const asks = (e) => standardCandidates({ env: e, userHome: 'C:\\Users\\x' }).some((c) => typeof c.resolveDataDir === 'function');
+  assert.ok(asks({}), 'without APPDATA the OS is asked');
+  assert.ok(!asks({ APPDATA: 'C:\\Users\\x\\AppData\\Roaming' }), 'with APPDATA it is not');
 });

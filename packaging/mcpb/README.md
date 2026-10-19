@@ -17,8 +17,14 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    `runtime/manifest.json` in `JUSTSEARCH_DATA_DIR` when set → the same file in the
    desktop app's data folder (`%APPDATA%\io.justsearch.shell` on Windows;
    `$XDG_DATA_HOME/io.justsearch.shell`, or `~/.local/share/io.justsearch.shell`, on Linux).
-   A manifest counts only if its pid is alive and the service on its `head.apiPort` answers
-   `GET /api/runtime/live` with the same pid and instance id; there is no default-port guess.
+   A manifest counts only if its pid is alive, the operating system reports that pid as the
+   owner of the listening socket on its `head.apiPort` (Linux `/proc`, Windows `netstat -ano`),
+   the service there answers `GET /api/runtime/live` with the same pid and instance id, and
+   `GET /api/health` answers 200; there is no default-port guess. On Windows, when `%APPDATA%`
+   is unset in its environment, it also asks Windows for the Roaming folder. The bridge never
+   looks in a dev checkout: when the installed app and a dev Engine both run, it uses the
+   installed app; set `JUSTSEARCH_DATA_DIR` to the checkout's data folder (for example
+   `<checkout>/modules/ui-web/.dev-data`) or `JUSTSEARCH_API_PORT` to use the dev Engine.
    The resolver (`server/engine-discovery.cjs`) is shared with the production MCP server and
    follows the `discovery.desktopAppDataDir` entry of `contracts/platform-paths/spec.v1.json`.
 2. If no running JustSearch is found, it exits with an actionable message that
@@ -26,7 +32,11 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
 3. It also fetches the desktop session token (`GET /api/mcp/token`) and sends
    it as `X-JustSearch-Session` on every POST, so the bridge keeps working if
    the packaged app enforces the token on non-GET requests
-   (`ApiSecurityFilters.setupSessionTokenEnforcement`).
+   (`ApiSecurityFilters.setupSessionTokenEnforcement`). Before each message it
+   re-checks, without contacting the port, that the manifest still names the same
+   Engine and that the OS still reports it as the port's owner; if not, it drops the
+   token and re-runs discovery, so the old token never reaches whatever took the port
+   (a `JUSTSEARCH_API_PORT` pin is the operator's choice and is not re-checked).
 4. Otherwise it forwards newline-delimited JSON-RPC from stdin to
    `http://127.0.0.1:<port>/mcp` (JSON and SSE response bodies both handled)
    and relays server messages back on stdout. If the app restarts on a

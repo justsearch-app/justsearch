@@ -13,9 +13,12 @@
  * Port discovery (in order): the JUSTSEARCH_API_PORT env pin, then the runtime manifest
  * (runtime/manifest.json) in JUSTSEARCH_DATA_DIR when set, then in the desktop app's data folder
  * (Windows: %APPDATA%\io.justsearch.shell; Linux: $XDG_DATA_HOME or ~/.local/share, then
- * io.justsearch.shell — see engine-discovery.cjs). A manifest counts only if its pid is alive and
- * the service on its port reports the same pid and instance (GET /api/runtime/live); there is no
- * default-port guess, so an unrelated service is never picked up.
+ * io.justsearch.shell — see engine-discovery.cjs). A manifest counts only if its pid is alive, the
+ * OS says that pid holds the listening socket on its port, the service there reports the same pid
+ * and instance (GET /api/runtime/live) and /api/health answers 200; there is no default-port
+ * guess, so an unrelated service is never picked up. Before each message that carries the session
+ * token, the bridge re-checks (without network) that the same Engine still holds the port, and
+ * selects again — fetching that Engine's own token — when it does not.
  *
  * Fully offline by design: zero dependencies, Node builtins only, and no
  * network access beyond 127.0.0.1 — this bridge never downloads anything.
@@ -24,7 +27,7 @@
 'use strict';
 
 const http = require('http');
-const { describeTried, selectEngine, standardCandidates } = require('./engine-discovery.cjs');
+const { confirmEngine, describeTried, selectEngine, standardCandidates } = require('./engine-discovery.cjs');
 
 const HEALTH_TIMEOUT_MS = 2500;
 const REQUEST_TIMEOUT_MS = 300000; // long: answer/ingest calls can be slow on CPU
@@ -107,21 +110,22 @@ function fetchSessionToken(port) {
 }
 
 /**
- * Returns a live port or null; appends one line per location tried to triedOut.
- * Order: JUSTSEARCH_API_PORT pin, then validated runtime manifests (engine-discovery.cjs).
+ * Returns { port, engine } or null; appends one line per location tried to triedOut.
+ * Order: JUSTSEARCH_API_PORT pin (engine null: the operator named the port), then validated
+ * runtime manifests (engine-discovery.cjs; engine is the selected candidate).
  */
-async function discoverPort(triedOut) {
+async function discoverEngine(triedOut) {
   const tried = triedOut || [];
   const envPort = Number.parseInt(process.env.JUSTSEARCH_API_PORT || '', 10);
   if (Number.isInteger(envPort) && envPort > 0) {
-    if (await healthy(envPort)) return envPort;
+    if (await healthy(envPort)) return { port: envPort, engine: null };
     tried.push(`JUSTSEARCH_API_PORT=${envPort} (not responding)`);
   }
   const { selected, tried: folders } = await selectEngine(standardCandidates());
   tried.push(...describeTried(folders.filter((f) => !f.ok)));
   if (selected) {
     log(`using the Engine in ${selected.dataDir} (${selected.source}, pid ${selected.pid}, port ${selected.port})`);
-    return selected.port;
+    return { port: selected.port, engine: selected };
   }
   return null;
 }
@@ -132,6 +136,7 @@ async function discoverPort(triedOut) {
 
 const state = {
   port: null,
+  engine: null, // the validated manifest candidate behind port (null for a JUSTSEARCH_API_PORT pin)
   apiToken: null, // desktop session token (X-JustSearch-Session), if enforced
   sessionId: null, // Mcp-Session-Id from the server, if it assigns one
   protocolVersion: null, // negotiated during initialize
@@ -303,14 +308,18 @@ function openGetStream() {
  * Throws if JustSearch is unreachable.
  */
 async function recoverConnection() {
+  state.apiToken = null; // the old token never goes to whatever is found next
+  state.engine = null;
   const tried = [];
-  const port = await discoverPort(tried);
-  if (port === null) {
+  const found = await discoverEngine(tried);
+  if (found === null) {
     const err = new Error('JustSearch unreachable');
     err.tried = tried;
     throw err;
   }
+  const { port } = found;
   state.port = port;
+  state.engine = found.engine;
   state.sessionId = null;
   state.apiToken = await fetchSessionToken(port); // token rotates per app start
   if (!state.initializeParams) return; // nothing to re-establish yet
@@ -333,8 +342,32 @@ async function recoverConnection() {
   log(`reconnected to http://127.0.0.1:${state.port}/mcp (new session)`);
 }
 
+/**
+ * Before a message goes out with the session token: the Engine selected earlier must still be the
+ * one the OS says holds its port, under the same manifest (confirmEngine; no network). Otherwise
+ * select again, which re-proves the endpoint and fetches its own token, before anything is sent.
+ * Concurrent messages share one check. A JUSTSEARCH_API_PORT pin is the operator's choice and is
+ * not re-checked.
+ */
+let pendingCheck = null;
+function ensureSameEngine() {
+  if (!state.engine) return Promise.resolve();
+  if (!pendingCheck) {
+    pendingCheck = (async () => {
+      const check = await confirmEngine(state.engine);
+      if (check.ok) return;
+      log(`the Engine on port ${state.port} changed (${check.status}: ${check.detail}) — re-checking where JustSearch is running...`);
+      await recoverConnection();
+    })().finally(() => {
+      pendingCheck = null;
+    });
+  }
+  return pendingCheck;
+}
+
 /** Handle one client->server message, with one transparent reconnect+retry. */
 async function handleClientMessage(message) {
+  await ensureSameEngine(); // throws (err.tried) if the app is gone
   const isInitialize = message && message.method === 'initialize';
   if (isInitialize && message.params) {
     state.initializeParams = message.params;
@@ -382,12 +415,14 @@ function failRequest(message, text) {
 
 async function main() {
   const tried = [];
-  const port = await discoverPort(tried);
-  if (port === null) {
+  const found = await discoverEngine(tried);
+  if (found === null) {
     process.stderr.write(`${actionableUnreachableMessage(tried)}\n`);
     process.exit(1);
   }
+  const { port } = found;
   state.port = port;
+  state.engine = found.engine;
   state.apiToken = await fetchSessionToken(port);
   log(`bridging stdio <-> http://127.0.0.1:${port}/mcp${state.apiToken ? ' (session token attached)' : ''}`);
 

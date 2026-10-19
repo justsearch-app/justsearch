@@ -36,8 +36,20 @@ MCP server on?" is exactly "which port is the API on?":
   `~/.local/share/io.justsearch.shell/runtime/manifest.json`, or under `$XDG_DATA_HOME` when it is
   an absolute path). The MCPB bridge and `scripts/prod/justsearch-mcp.mjs` read it themselves
   (after `--port` / `JUSTSEARCH_API_PORT` / `JUSTSEARCH_DATA_DIR`), accept it only when the pid is
-  alive and `GET /api/runtime/live` on that port reports the same pid and instance, and otherwise
-  fail with a list of every folder they tried. The backend also prints
+  alive, the operating system reports that pid as the owner of the listening socket on that port,
+  `GET /api/runtime/live` there reports the same pid and instance, and `GET /api/health` answers
+  200 (an Engine still starting is refused), and otherwise fail with a list of every folder they
+  tried. Before sending the session token again they re-check that the same Engine still holds
+  the port; the bridge then re-discovers, the stdio server reports `ENGINE_GONE` and must be
+  restarted. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
+  the Roaming folder (so a redirected folder is still found).
+- **Installed app vs. a checkout's dev Engine:** `scripts/prod/justsearch-mcp.mjs` tries the
+  installed desktop app's folder *before* a dev checkout's `.dev-data` folders, so when both are
+  running it connects to the installed app (it prints which folder it used on stderr). To use the
+  dev Engine instead, set `JUSTSEARCH_DATA_DIR` to that checkout's data folder (for example
+  `<checkout>/modules/ui-web/.dev-data`) or pass its port with `--port` / `JUSTSEARCH_API_PORT`.
+  The MCPB bridge never looks in a checkout; point it at a dev Engine with `JUSTSEARCH_DATA_DIR` or
+  `JUSTSEARCH_API_PORT`. The backend also prints
   `JUSTSEARCH_API_PORT=<port>` to stdout (captured in `logs\engine.log`) and serves
   `GET /api/health` once up. (Gradle dev tasks like `runHeadless`/`devAll` default to `33221`,
   which is why older docs and scripts mention that number — the installed app does not use it.)

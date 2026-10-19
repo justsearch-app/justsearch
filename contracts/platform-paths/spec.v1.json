@@ -25,7 +25,7 @@
       "identifier": "io.justsearch.shell",
       "identifierSource": "modules/shell/src-tauri/tauri.conf.json#identifier",
       "platformBase": {
-        "windows": {"basis": "knownFolder", "id": "FOLDERID_RoamingAppData", "nodeApproximation": "Node cannot call SHGetKnownFolderPath: APPDATA when set and absolute (Windows sets it from that folder at logon), else userHome\\AppData\\Roaming. A redirected Roaming folder in a process launched without APPDATA is not found."},
+        "windows": {"basis": "knownFolder", "id": "FOLDERID_RoamingAppData", "nodeApproximation": "Node cannot call SHGetKnownFolderPath: APPDATA when set and absolute (Windows sets it from that folder at logon), else userHome\\AppData\\Roaming (the fixtures below). For a process launched without APPDATA, discovery then also asks Windows for the folder ([Environment]::GetFolderPath('ApplicationData') via PowerShell, the same shell folder API), so a redirected Roaming folder is still found. An APPDATA overridden to another absolute folder in the client's environment is followed, although the shell ignores it."},
         "macos": {"basis": "userHome", "join": ["Library", "Application Support"]},
         "linux": {"basis": "env", "key": "XDG_DATA_HOME", "onlyIfAbsolute": true, "fallbackBasis": "userHome", "fallbackJoin": [".local", "share"], "userHome": "HOME when non-empty, else the passwd entry"}
       },

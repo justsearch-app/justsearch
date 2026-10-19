@@ -150,14 +150,17 @@ export function engineCandidates({env = process.env, cwd = process.cwd()} = {}) 
  * Priority:
  * 1. Explicit port (--port CLI arg)
  * 2. JUSTSEARCH_API_PORT env var
- * 3. The first runtime manifest, in engineCandidates() order, whose pid is alive and whose port
- *    answers GET /api/runtime/live with the manifest's pid and instanceId.
+ * 3. The first runtime manifest, in engineCandidates() order, whose pid is alive and holds the
+ *    listening socket on its port (as the OS reports it), whose port answers GET /api/runtime/live
+ *    with the manifest's pid and instanceId, and whose /api/health answers 200.
  *
  * There is no port probe: a port with no validated manifest behind it is never used unless the
  * operator named it. Once selected, fetches the session token via GET /api/mcp/token.
  *
  * @param {{ port?: number, verbose?: boolean }} opts
- * @returns {Promise<{ port: number, baseUrl: string, token: string | null, instanceId?: string, dataDir?: string, source?: string }>}
+ * @returns {Promise<{ port: number, baseUrl: string, token: string | null, instanceId?: string, dataDir?: string, source?: string, engine?: object }>}
+ *   engine: the validated manifest candidate (absent for --port / JUSTSEARCH_API_PORT); pass it to
+ *   engine-discovery.cjs confirmEngine() before sending the token again.
  */
 export async function discover({ port: explicitPort, verbose } = {}) {
   const log = verbose ? (msg) => process.stderr.write(`[justsearch-mcp] ${msg}\n`) : () => {};
@@ -203,6 +206,7 @@ export async function discover({ port: explicitPort, verbose } = {}) {
       instanceId: selected.instanceId,
       dataDir: selected.dataDir,
       source: selected.source,
+      engine: selected,
     };
   }
 
