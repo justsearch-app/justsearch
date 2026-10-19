@@ -12,8 +12,8 @@ These entries cover every test file added or changed in 25ad8e309..HEAD for the 
 Evidence: run-evidence.mjs run once over every new check with --before 25ad8e309, under the shared Gradle lock, with TMPDIR and --before-root inside this checkout's tmp/. Entries are split by each check's recorded before-result: checks that failed by assertion on 25ad8e309 carry repaired: true; checks that passed on 25ad8e309, or failed there for a reason other than an assertion, carry no repaired flag. The run's aggregate exit is therefore not 0; the per-check before-results decide the classification.
 
 Two edits serve this evidence without changing any expectation:
-- run-evidence.mjs addresses a JUnit check by method name, but the JUnit XML names a method by its @DisplayName. So the 12 new Java methods carry no method-level @DisplayName, like the neighbouring retrieval-explanation tests.
-- On the before-state, a missing control used to throw a plain Error, which counts as an exception, not an assertion. Examples are a Delegate turn's Retry/Edit/Branch and Restore for a floor that is not shown. The press and menu helpers in SearchV3View.branch/context.test.ts now fail with vitest's `assert` instead. In the same way, InteractionThreadControllerTest asserts the note's presence before reading it. As a result, those before-state failures are assertions.
+- run-evidence.mjs addresses a JUnit check by method name, but the JUnit XML names a method by its @DisplayName. So the 29 new Java methods (12 for the note, 9 in ChatStopTurnHttpTest, 8 in TurnStopsTest) carry no method-level @DisplayName, like the neighbouring retrieval-explanation tests.
+- On the before-state, a missing control used to throw a plain Error, which counts as an exception, not an assertion. Examples are a Delegate turn's Retry/Edit/Branch and Restore for a floor that is not shown. The press and menu helpers in SearchV3View.branch/context.test.ts now fail with vitest's `assert` instead. In the same way, InteractionThreadControllerTest asserts the note's presence before reading it, and ChatStopTurnHttpTest asserts the stop response's status before reading its body. As a result, those before-state failures are assertions.
 
 S2.9 reproduced on 25ad8e309: with the floor's own message excluded, the effective context returned [q1, a1, a2] instead of [a2].
 
@@ -21,9 +21,11 @@ Removed expectations (the Obsolete entry):
 - SearchV3View.branch.test.ts "a delegate turn STAMPED with real store ids still withholds by KIND" and the two sv3-branch.test.ts cases that pinned an agent turn withholding Edit, Retry and Branch (tempdoc 863 §4.A.5 A-8) are replaced. Under S2.5, Retry and Edit on a Delegate turn run the agent again. The replacements pin the opposite: the acts are offered on store ids, and the Delegate re-run is pinned in SearchV3View.branch.test.ts.
 - sv3-context.test.ts "drops out-of-context and hidden turns…" used to exclude only a turn's answer and expect the inspector to drop the whole turn. Under S2.0 what is sent matches the bar, so one hidden answer leaves its question in the prompt; SearchV3View.context.test.ts pins that. The case now excludes the whole turn.
 
-Coverage limits: no live check was run. Two of the verifier's findings are not covered, and the scenario they belong to (S2.3 / N2.3) stays open:
-- F5b (Stop right after the rewrite) has no check here.
-- The client-side Stop of an ask does not reach the Engine (the server only notices a gone client on write and does not cancel the work), so no repair was made.
+Stop (S2.3 / N2.3, F5b): Search v3's Stop now tells the Engine which turn to stop (POST /api/chat/conversations/{id}/stop with the dispatched turnId), and the Engine saves the turn with its question, its note and a stopped outcome (disposition CANCELLED) that reloads as "stopped by you". ChatStopTurnHttpTest pins it at the HTTP boundary against the saved history; SearchV3View.ask.test.ts and sv3-record.test.ts pin the client's request and its reading of the saved turn. A closed connection without Stop still runs to its answer, and a Stop for a finished or different turn changes nothing.
+
+Early Stop: a Stop that reaches the Engine before the dispatch has registered its turn (pressed in the instant after Send) is kept by TurnStops for up to 60 s (at most 256 kept, each used once) and stops the turn as it starts; the turn is saved with its question and an empty stopped answer, with no note because nothing was rewritten. A late Stop for a finished turn is not kept, so it never stops a later dispatch naming the same turn. Search v3 names each dispatch with a fresh random id rather than the turn's position, which a reload or a second window could hand out again. ChatStopTurnHttpTest pins both at the HTTP boundary against the saved history; TurnStopsTest pins the bounds (count, age, once, finished) with a stand-in clock. TurnStops is new, and its test would not compile on 25ad8e309, which would also stop every other app-services check there from compiling. So the fail-before applies the compat before-patch gates/test-intent/evidence/uiux-v3-followups-compat.patch. It adds only a TurnStops that does nothing: its stop answers false and it keeps and cancels nothing, which is 25ad8e309's behaviour, where no Stop reaches the Engine. No production code at 25ad8e309 reads it. The old window now shows a saved stopped turn as "Stopped by you." with its note, and an early Stop's empty answer is not drawn as an answer (AskTerminalReload.test.ts).
+
+Coverage limits: no live check was run. The client's switch from the turn's position to a random dispatch id has no check of its own; the existing SearchV3View.ask.test.ts cases pin that each dispatch carries an id and the Stop names that same id.
 
 No acceptance record is supplied by the builder.
 
@@ -647,6 +649,235 @@ No acceptance record is supplied by the builder.
     },
     {
       "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Over HTTP, against the real ConversationEngine and the file store, POST /api/chat/conversations/{id}/stop with the dispatched turnId stops that turn and the Engine saves it as stopped: after a Stop right after the rewrite note (F5b), while the documents are retrieved, while the finished answer is checked, or late in the answer, the saved history holds the question and an assistant row with disposition CANCELLED, the rewrite's standaloneQuestion and whatever had streamed (empty for an early Stop, the whole text when the answer was being checked), and never a failed or complete turn. Preserved: a connection closed without Stop keeps the turn running to its complete answer with its note; a Stop for a turn that already finished answers stopped:false and leaves the saved history unchanged; a Stop naming another turn answers stopped:false and the running turn completes. On 25ad8e309 every case fails by assertion: the route does not exist (404), only the question is saved after a Stop, and the closed-connection turn's answer carries no note (the note's saving came after 25ad8e309).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS3",
+          "quote": "A rewrite followed by retrieval failure, generation failure or Stop: after reload the turn shows the same note it showed live (or none in both), never a mismatch.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FN3",
+          "quote": "Streaming, stop, late stop (\"stopped by you\" after reload).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#stopRightAfterTheRewriteSavesTheTurnStoppedWithItsNote",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#stopWhileTheDocumentsAreRetrievedSavesTheTurnStoppedNotFailed",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#stopWhileTheAnswerIsCheckedSavesTheWholeTextAsStopped",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#lateStopSavesWhatStreamedAsStopped",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aClosedConnectionWithoutStopKeepsTheTurnRunningToItsAnswer",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopAfterTheTurnFinishedChangesNothing",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopNamingAnotherTurnLeavesTheRunningTurnAlone"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Search v3's Ask dispatches each turn with its own non-empty turnId, and the reader's Stop POSTs that turnId to the conversation's /stop route once while the turn shows as halted on screen; two turns carry different ids and a Stop on the second names the second. On 25ad8e309 the dispatch carries no turnId and no stop request is sent, so both fail by assertion.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS3",
+          "quote": "A rewrite followed by retrieval failure, generation failure or Stop: after reload the turn shows the same note it showed live (or none in both), never a mismatch.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FN3",
+          "quote": "Streaming, stop, late stop (\"stopped by you\" after reload).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#asks the Engine to stop the very turn it dispatched, and halts it on screen",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#names each turn apart, so a Stop can only reach the turn it was pressed on"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preserved: an answer that finished sends no stop request, and the window going away mid-answer (unmount) aborts the stream locally without telling the Engine to stop, so a closed tab keeps today's behaviour. Passes on 25ad8e309.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FN3",
+          "quote": "Streaming, stop, late stop (\"stopped by you\" after reload).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#sends no stop for an answer that finished, nor when the window goes away mid-answer"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A /history record whose assistant row the Engine saved with disposition CANCELLED and a standaloneQuestion reads back as the reader's halt: status halted, with the turn's note and its partial text, on the store-minted ids. It passes on the client as it stands; on 25ad8e309 it fails by assertion because the record did not yet project the note.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS3",
+          "quote": "A rewrite followed by retrieval failure, generation failure or Stop: after reload the turn shows the same note it showed live (or none in both), never a mismatch.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FN3",
+          "quote": "Streaming, stop, late stop (\"stopped by you\" after reload).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts#reads a turn the Engine saved as stopped as the reader’s halt, with its note and its text"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Over HTTP, against the real ConversationEngine and the file store: a Stop that reaches the Engine before the dispatch of its turn (the Stop overtook Send) still stops that turn when it starts. The saved history holds the question and an assistant row with disposition CANCELLED, empty content, no terminalError and no standaloneQuestion; the stream carried no rag.rewrite (no note live, none saved) and the model was never asked to answer. Preserved: a Stop for a turn that already finished answers 200 stopped:false and is not kept, so a later dispatch naming the same turn runs to its complete answer with no disposition. On 25ad8e309 both fail by assertion: the stop route does not exist (404). Before this repair the early Stop answered stopped:false and only the question was saved.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS3",
+          "quote": "A rewrite followed by retrieval failure, generation failure or Stop: after reload the turn shows the same note it showed live (or none in both), never a mismatch.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FN3",
+          "quote": "Streaming, stop, late stop (\"stopped by you\" after reload).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopThatOvertakesItsDispatchStopsTheTurnWhenItStarts",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopForAFinishedTurnIsNotKeptForALaterDispatch"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java"
+      ],
+      "class": "New",
+      "behaviour": "TurnStops, the Engine's record of the turns a Stop can reach: a Stop on a running turn cancels its work with user_stop at once; a Stop before the turn starts cancels it when it starts, used once, only for that conversation and turn id; it still applies just inside EARLY_STOP_TTL; and of more than MAX_EARLY_STOPS early Stops the newest are kept, the oldest dropped. On 25ad8e309, with the compat before-patch's do-nothing TurnStops (no Stop reaches any turn, as no stop route existed), each fails by assertion: no work is cancelled.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS3",
+          "quote": "A rewrite followed by retrieval failure, generation failure or Stop: after reload the turn shows the same note it showed live (or none in both), never a mismatch.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FN3",
+          "quote": "Streaming, stop, late stop (\"stopped by you\" after reload).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#aStopOnARunningTurnCancelsItAtOnce",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#aStopBeforeTheTurnStartsCancelsItWhenItStarts",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#anEarlyStopIsUsedOnce",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#anEarlyStopNamesOnlyItsOwnTurn",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#anEarlyStopWithinItsTimeStillApplies",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#onlyTheNewestEarlyStopsAreKept"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java"
+      ],
+      "class": "New",
+      "behaviour": "TurnStops keeps its early Stops bounded: one older than EARLY_STOP_TTL no longer stops its turn, and a Stop after the turn finished is not kept (answers false), so a later start of the same turn is not cancelled. These pass on 25ad8e309 with the compat before-patch's do-nothing TurnStops, which keeps nothing: they guard against leaks, not a before-state defect.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS3",
+          "quote": "A rewrite followed by retrieval failure, generation failure or Stop: after reload the turn shows the same note it showed live (or none in both), never a mismatch.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FN3",
+          "quote": "Streaming, stop, late stop (\"stopped by you\" after reload).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#anEarlyStopExpires",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#aStopAfterTheTurnFinishedIsNotKept"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The old window (Unified Chat) reading /api/thread records shows a turn the Engine saved as stopped (disposition CANCELLED) as \"Stopped by you.\": an early Stop shows its \"Interpreted as\" note and the Stop, with no answer block standing in for an empty answer; a late Stop keeps the text that had streamed and says it was stopped; a finished answer says nothing of the kind. On 25ad8e309 it fails by assertion: the stopped turn renders as a plain, empty answer bubble.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FN3",
+          "quote": "Streaming, stop, late stop (\"stopped by you\" after reload).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS3",
+          "quote": "A rewrite followed by retrieval failure, generation failure or Stop: after reload the turn shows the same note it showed live (or none in both), never a mismatch.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts#reloaded Unified Chat shows a turn the reader stopped as stopped, with its note, not as an answer"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-branch.test.ts",
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-context.test.ts"
@@ -681,6 +912,16 @@ No acceptance record is supplied by the builder.
         "signature"
       ],
       "whatMoved": "sv3-branch.test.ts: two describe titles renamed (\"the KIND the gate reads…\" → \"the KIND a re-run reads…\"; \"an agent turn withholds edit, retry and branch on its KIND…\" → \"an agent turn is gated like an ask turn…\"); the four cases 'reads the ask turn after it as an ask turn, which keeps its own affordances', 'falls back to the activity inference only for a record that cannot say', 'the IDENTICAL turn with kind \"ask\" offers both — the control proving case 1 is about kind' and 'the ask turn AFTER a delegate turn gains Edit (863 §4.A.5 A-8.2)' are byte-identical. sv3-context.test.ts 'counts a turn as hidden when EITHER of its messages is excluded': sv3ExcludedMessageIds now takes the /history settings instead of the turn contexts; the same input history is passed and the same expected [stored(4)] kept, as are the hasExcluded and turn-count expectations."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "SearchV3View.ask.test.ts stubStream(): the shared fetch stand-in now answers any request other than POST /api/chat/dispatch with a plain 200 {stopped: true} and keeps capturing the abort signal from the dispatch alone, so the Stop's own request no longer replaces the stream's signal. Every existing case's input and expected values are unchanged."
     }
   ]
 }

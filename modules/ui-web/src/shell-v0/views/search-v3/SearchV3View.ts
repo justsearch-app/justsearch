@@ -181,6 +181,7 @@ import {
   SV3_EFFORT_DEFAULT,
   isSv3Effort,
   sv3Ask,
+  sv3StopAsk,
   type Sv3Effort,
 } from './sv3-ask.js';
 // The app-wide CONVERSATION authority (tempdoc 510 Design D; inventory A1). A v3 session IS a
@@ -850,6 +851,8 @@ export class SearchV3View extends JfElement {
   private draftSeedPending = false;
   /** The in-flight ask's abort handle; null exactly when no response is streaming. */
   private askAbort: AbortController | null = null;
+  /** The reader's Stop for that ask: the Engine ends the turn, then the stream is let go. */
+  private askStop: (() => void) | null = null;
   /**
    * What this window remembers about the delegated run it dispatched — including the explicit turn
    * ref that is its `activeTurnId`. Not reactive state: it is mutated in place by the controller's
@@ -2823,7 +2826,18 @@ export class SearchV3View extends JfElement {
     void this.setComposerState('docked');
 
     const abort = new AbortController();
+    // Stop is explicit: the Engine is told to end THIS turn, then the stream is let go. Only the
+    // reader's Stop does this; a window that unmounts or starts afresh only lets the stream go
+    // (`abortAsk`), and the Engine finishes and saves the turn, as it does for a closed tab. The id
+    // the Stop names is this dispatch's own, never the turn's place in the list, which another
+    // window or a reload can hand out again: the Engine ignores a Stop for a turn that finished.
+    const dispatchId = crypto.randomUUID();
+    const stop = (): void => {
+      void sv3StopAsk(this.apiBase, ref.sessionId, dispatchId);
+      abort.abort();
+    };
     this.askAbort = abort;
+    this.askStop = stop;
     this.streaming = true;
     // The controller is per-ASK, not per-turn: it accumulates and times one stream's thinking, and
     // the blocks it finalizes are written onto the turn below. Resetting here is what stops the
@@ -2831,14 +2845,14 @@ export class SearchV3View extends JfElement {
     this.askReasoning.reset();
     this.askReasoningTurnId = ref.turnId;
     // The app-wide activity indicator, raised for the duration and settled at the terminal below
-    // (inventory G11). Cancelling through the SAME abort handle Stop uses, so there is one way to
-    // stop this stream however the reader reaches it.
+    // (inventory G11). Cancelling through the SAME stop the Stop control uses, so there is one way
+    // to stop this turn however the reader reaches it.
     setAiActivity({
       state: 'streaming',
       shapeId: SV3_ASK_SHAPE_ID,
       startedAtMs: Date.now(),
       canCancel: true,
-      cancel: () => abort.abort(),
+      cancel: stop,
     });
     // Every terminal below settles the SAME ref the dispatch opened, so a reader who claims another
     // session mid-stream still gets the answer written where it was asked.
@@ -2866,6 +2880,7 @@ export class SearchV3View extends JfElement {
       // control in the slot.
       if (this.askAbort === abort) {
         this.askAbort = null;
+        this.askStop = null;
         this.streaming = false;
         this.askReasoningTurnId = null;
         this.settleAiActivity();
@@ -2886,6 +2901,7 @@ export class SearchV3View extends JfElement {
         // never an empty list standing in for a choice, which would mean the whole index.
         ...(scope !== null ? { docIds: scope.paths } : {}),
         context,
+        turnId: dispatchId,
         signal: abort.signal,
       },
       {
@@ -2956,7 +2972,7 @@ export class SearchV3View extends JfElement {
     if (tier === 'search' && this.search.showing) this.search.type(this.currentDraft());
   }
 
-  /** Halting is always the reader's; the turn settles `halted` through the sink's own terminal. */
+  /** Lets the stream go; the turn settles `halted` through the sink's own terminal. */
   private abortAsk(): void {
     this.askAbort?.abort();
   }
@@ -3773,7 +3789,7 @@ export class SearchV3View extends JfElement {
    */
   private onComposerStop(): void {
     if (this.streaming) {
-      this.abortAsk();
+      this.askStop?.();
       return;
     }
     this.haltRun();

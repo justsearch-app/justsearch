@@ -65,7 +65,11 @@ function stubStream(): FakeStream {
     wake?.();
     wake = null;
   };
-  fetchMock.mockImplementation(async (_url: unknown, init: { signal?: AbortSignal }) => {
+  fetchMock.mockImplementation(async (url: unknown, init: { signal?: AbortSignal }) => {
+    // The stream stands in for the dispatch alone; the Stop's own request is answered plainly.
+    if (!String(url).includes('/api/chat/dispatch')) {
+      return { ok: true, status: 200, json: () => Promise.resolve({ stopped: true }) };
+    }
     signal = init?.signal ?? null;
     return {
       ok: true,
@@ -408,6 +412,85 @@ describe('the primary slot renders exactly one of Send and Stop', () => {
     // The slot is back to Send, so the next question is sendable.
     await composer.updateComplete;
     expect(q(composer, 'sv3-composer-send')).not.toBeNull();
+  });
+});
+
+describe('Stop is told to the Engine, so the saved turn says what the live one did (S2.3)', () => {
+  const stops = (): unknown[][] =>
+    fetchMock.mock.calls.filter((call) =>
+      /\/api\/chat\/conversations\/[^/]+\/stop$/.test(String(call[0])),
+    );
+  const sent = (call: unknown[] | undefined): Record<string, unknown> =>
+    JSON.parse(String((call?.[1] as RequestInit | undefined)?.body ?? '{}')) as Record<string, unknown>;
+
+  it('asks the Engine to stop the very turn it dispatched, and halts it on screen', async () => {
+    aiOnline();
+    const stream = stubStream();
+    const el = await mount();
+    await ask(el, 'and who owns it?');
+    stream.emit('rag.rewrite', { standalone: 'Who owns Project Cobalt?' });
+    await settle(el);
+
+    const composer = await region(el, 'jf-sv3-composer');
+    (q(composer, 'sv3-composer-stop') as HTMLButtonElement).click();
+    await settle(el);
+
+    const dispatched = sent(dispatches()[0]);
+    expect(typeof dispatched.turnId).toBe('string');
+    expect(dispatched.turnId).not.toBe('');
+    expect(stops()).toHaveLength(1);
+    const stop = stops()[0];
+    expect(String(stop?.[0])).toBe(
+      `http://127.0.0.1:9999/api/chat/conversations/${encodeURIComponent(String(dispatched.conversationId))}/stop`,
+    );
+    expect((stop?.[1] as RequestInit).method).toBe('POST');
+    expect(sent(stop)).toEqual({ turnId: dispatched.turnId });
+    const turn = turnsOf(await region(el, 'jf-sv3-main'))[0] as HTMLElement;
+    expect(turn.dataset.status).toBe('halted');
+    expect(textIn(turn, 'sv3-turn-note')).toBe(TURN_HALTED);
+  });
+
+  it('names each turn apart, so a Stop can only reach the turn it was pressed on', async () => {
+    aiOnline();
+    const first = stubStream();
+    const el = await mount();
+    await ask(el, 'first');
+    first.emit('done', {});
+    first.end();
+    await settle(el);
+    // The second answer streams and is stopped; the stream's own frames do not matter here.
+    stubStream();
+    await ask(el, 'second');
+    const composer = await region(el, 'jf-sv3-composer');
+    (q(composer, 'sv3-composer-stop') as HTMLButtonElement).click();
+    await settle(el);
+
+    const [firstSent, secondSent] = dispatches().map(sent);
+    expect(firstSent?.turnId).not.toBe(secondSent?.turnId);
+    expect(stops().map(sent)).toEqual([{ turnId: secondSent?.turnId }]);
+  });
+
+  it('sends no stop for an answer that finished, nor when the window goes away mid-answer', async () => {
+    aiOnline();
+    let stream = stubStream();
+    const el = await mount();
+    await ask(el, 'what changed?');
+    stream.emit('chunk', { text: 'Everything.' });
+    stream.emit('done', {});
+    stream.end();
+    await settle(el);
+    expect(stops()).toHaveLength(0);
+
+    // Leaving is not stopping: the Engine keeps the turn running and saves its answer.
+    stream = stubStream();
+    await ask(el, 'and then?');
+    stream.emit('chunk', { text: 'Half' });
+    await settle(el);
+    el.remove();
+    await settle(el);
+    expect(stops()).toHaveLength(0);
+    stream.end();
+    await settle(el);
   });
 });
 

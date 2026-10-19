@@ -44,6 +44,7 @@ import {
 } from '../../../api/streams.js';
 import type { CoreRagAskHandlers } from '../../../api/generated/shape-handlers/core-rag-ask.js';
 import { buildRequestBody } from '../unifiedChatRequest.js';
+import { authorizedFetch } from '../../api/authorizedFetch.js';
 // The ONE stream-error vocabulary (slice 497; inventory E9). A technical code becomes the same
 // sentence here as it does in the shipped window; an abort never reaches it (see the catch below).
 import { friendlyStreamError } from '../../utils/streamError.js';
@@ -207,6 +208,8 @@ export interface Sv3AskRequest {
    * all the model and the follow-up rewrite know of the earlier turns. Omitted or empty sends none.
    */
   readonly context?: readonly { readonly role: string; readonly content: string }[];
+  /** This dispatch's own id, which the reader's Stop names to the Engine ({@link sv3StopAsk}). */
+  readonly turnId?: string;
   readonly signal?: AbortSignal;
 }
 
@@ -372,6 +375,7 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   if (req.context !== undefined && req.context.length > 0) {
     body.context = req.context.map((m) => ({ role: m.role, content: m.content }));
   }
+  if (req.turnId !== undefined) body.turnId = req.turnId;
 
   let sources: readonly RetrievalCitation[] = [];
   let matches: readonly CitationMatch[] = [];
@@ -523,4 +527,31 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   }
 
   sink.onDone(usage);
+}
+
+/**
+ * The reader's Stop, told to the Engine (S2.3). Aborting the stream alone only leaves: the Engine
+ * keeps answering and saves a turn the reader never saw finish. Told, it ends the turn and saves it
+ * as stopped, with its question, its "Interpreted as" note and what had streamed, so a reload says
+ * what the live turn says. A Stop that overtakes its dispatch stops the turn when it starts. A closed
+ * tab sends nothing, and a turn that already finished is left as it is. Best-effort: the turn halts
+ * on screen whatever the answer.
+ */
+export async function sv3StopAsk(
+  apiBase: string,
+  conversationId: string,
+  turnId: string,
+): Promise<void> {
+  try {
+    await authorizedFetch(
+      `${apiBase}/api/chat/conversations/${encodeURIComponent(conversationId)}/stop`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ turnId }),
+      },
+    );
+  } catch {
+    // The halt stands on screen; the saved turn is whatever the Engine finished.
+  }
 }

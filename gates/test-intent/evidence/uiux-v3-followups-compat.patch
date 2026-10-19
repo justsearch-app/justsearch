@@ -1,0 +1,30 @@
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/conversation/TurnStops.java b/modules/app-services/src/main/java/io/justsearch/app/services/conversation/TurnStops.java
+new file mode 100644
+index 000000000..3f29f652b
+--- /dev/null
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/conversation/TurnStops.java
+@@ -0,0 +1,24 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.app.services.conversation;
++
++import io.justsearch.app.api.EngineWorkHandle;
++import java.time.Duration;
++import java.util.function.LongSupplier;
++
++/** Compat scaffolding for fail-before evidence: declarations only; no before-state code reads it. */
++final class TurnStops {
++  static final Duration EARLY_STOP_TTL = Duration.ofSeconds(60);
++  static final int MAX_EARLY_STOPS = 256;
++
++  record Turn(String conversationId, String turnId) {}
++
++  TurnStops(String reason, LongSupplier nanoTime) {}
++
++  void started(Turn turn, EngineWorkHandle work) {}
++
++  void finished(Turn turn, EngineWorkHandle work) {}
++
++  boolean stop(Turn turn) {
++    return false;
++  }
++}

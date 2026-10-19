@@ -207,9 +207,9 @@ final class SubstrateDrivenEngineTest {
     org.mockito.Mockito.when(docs.retrieveContext(
             org.mockito.ArgumentMatchers.any(io.justsearch.app.api.RetrieveContextParams.class),
             org.mockito.ArgumentMatchers.any()))
-        .thenReturn(java.util.concurrent.CompletableFuture.failedFuture(
+        .thenReturn(CompletableFuture.failedFuture(
             new IllegalStateException("worker retrieval unavailable")));
-    var rag = new io.justsearch.app.services.conversation.spi.RAGContext(docs, java.time.Duration.ofMillis(500));
+    var rag = new io.justsearch.app.services.conversation.spi.RAGContext(docs, Duration.ofMillis(500));
     var rewrite = new ContextInjector() {
       @Override public String id() { return "core.test-rewrite"; }
       @Override public io.justsearch.agent.api.conversation.InjectorResult inject(ConversationContext ctx) {

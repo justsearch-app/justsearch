@@ -96,6 +96,16 @@ public final class ConversationEngine {
   private final io.justsearch.agent.api.conversation.ConversationStore conversationStore;
   private final io.justsearch.app.api.EngineAdmissionService admission;
 
+  /** The dispatch body key naming the turn, so the reader's Stop can name the turn it means. */
+  public static final String TURN_ID_KEY = "turnId";
+  /** The cancellation reason of the reader's own Stop, the one cancellation saved as theirs. */
+  public static final String USER_STOP_REASON = "user_stop";
+  /** The disposition a stopped turn is saved with; the record reads it as "stopped by you". */
+  static final String STOPPED_DISPOSITION = "CANCELLED";
+
+  /** The recording turns a Stop can reach: running now, or stopped before they started. */
+  private final TurnStops turnStops = new TurnStops(USER_STOP_REASON, System::nanoTime);
+
   /**
    * Constructs the engine. Phase B-compatible overload (registries + LLM source default to
    * empty / unavailable) — used by tests and pre-substrate-driven assembly.
@@ -268,6 +278,18 @@ public final class ConversationEngine {
         runAdmitted(shapeId, body, audience, sink, context, work, background);
       }
     }
+  }
+
+  /**
+   * The reader pressed Stop on a turn: its work is cancelled with {@link #USER_STOP_REASON}, and
+   * the turn is saved as stopped, with its question, its rewrite note and whatever had streamed.
+   * A Stop that overtook its dispatch stops the turn the moment it starts ({@link TurnStops}); a
+   * turn that already finished is left alone.
+   *
+   * @return whether a running turn was asked to stop now
+   */
+  public boolean stopTurn(String conversationId, String turnId) {
+    return turnStops.stop(new TurnStops.Turn(conversationId, turnId));
   }
 
   @FunctionalInterface
@@ -468,9 +490,12 @@ public final class ConversationEngine {
     // "interrupted" — the inverse dishonesty. Only a process death leaves the mark set, which is
     // exactly the condition it encodes.
     var openTurnKey = new AtomicReference<String>();
+    TurnStops.Turn running = runningTurn(shape, body, work);
+    if (running != null) turnStops.started(running, work);
     try {
       dispatchSubstrateDrivenBody(shape, body, audience, sink, openTurnKey, engineContext, work);
     } finally {
+      if (running != null) turnStops.finished(running, work);
       String key = openTurnKey.get();
       if (key != null && conversationStore != null) {
         try {
@@ -480,6 +505,16 @@ public final class ConversationEngine {
         }
       }
     }
+  }
+
+  /** The turn a Stop can name: one that is recorded, names itself and runs as Engine work. */
+  private static TurnStops.Turn runningTurn(
+      ConversationShape shape, Map<String, Object> body, io.justsearch.app.api.EngineWorkHandle work) {
+    String conversationId = persistenceKey(shape, body);
+    return work != null && conversationId != null
+            && body.get(TURN_ID_KEY) instanceof String turnId && !turnId.isBlank()
+        ? new TurnStops.Turn(conversationId, turnId)
+        : null;
   }
 
   private void dispatchSubstrateDrivenBody(
@@ -551,13 +586,26 @@ public final class ConversationEngine {
     // re-render would produce identical output).
     String systemPrompt = assembleSystemPrompt(contributors, ctx);
 
+    String retrievalRecordId = sessionId != null ? sessionId : threadId;
+    if (stoppedByUser(work)) {
+      // Stopped before it began (a Stop that overtook the dispatch): nothing was rewritten,
+      // retrieved or answered.
+      recordStopped(retrievalRecordId, shape, body, false, Map.of(), null, "", sink);
+      return;
+    }
+
     // Run injectors once per request (iteration 0 only). Each injector may emit SSE events
     // (forwarded to sink) and may declare a terminal error that aborts before the LLM call.
     InjectorRunResult injectorRun = runInjectors(injectors, ctx, sink);
     // Read once, after the injectors: the rewrite (if any) happened among them, and every outcome
     // row this turn writes below carries it.
     String standalone = standaloneQuestion(ctx);
-    String retrievalRecordId = sessionId != null ? sessionId : threadId;
+    if (stoppedByUser(work)) {
+      // Stopped while the question was being rewritten or its documents retrieved: nothing was
+      // answered, and the question has not been recorded yet.
+      recordStopped(retrievalRecordId, shape, body, false, injectorRun.retrievalMetadata, standalone, "", sink);
+      return;
+    }
     if (injectorRun.terminated) {
       // A turn whose retrieval reported what it did, or whose question was rewritten (the reader saw
       // "Interpreted as" live), is saved with its outcome even though it ends here: a retrieval that
@@ -633,122 +681,146 @@ public final class ConversationEngine {
 
     String accumulatedFinalText = "";
     Map<String, Object> mergedDoneEntries = new LinkedHashMap<>();
-    for (int i = 0; i < hardCap; i++) {
-      List<Map<String, Object>> llmInput = buildLlmInput(systemPrompt, ctx.messages());
+    // Whether this iteration's answer is already recorded: a Stop after that changes nothing saved.
+    boolean answerRecorded = false;
+    try {
+      for (int i = 0; i < hardCap; i++) {
+        answerRecorded = false;
+        List<Map<String, Object>> llmInput = buildLlmInput(systemPrompt, ctx.messages());
 
-      String finalText;
-      AtomicReference<OnlineAiService.AiUsage> usageRef = new AtomicReference<>();
-      // Tempdoc 848 §2.2 — per-`streamLlm` (therefore per-iteration) by construction: an ITERATING
-      // shape's iteration-3 record carries iteration-3's thinking, with no cross-iteration bleed.
-      AtomicReference<List<ReasoningTrace>> reasoningRef = new AtomicReference<>();
-      try {
-        finalText =
-            streamLlm(
-                ai, llmInput, maxTokens, sampling, consumers, ctx, usageRef, reasoningRef, sink);
-      } catch (LlmStreamException e) {
-        emitError(sink, e.getMessage(), e.errorCode);
-        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
-            e.getMessage(), e.errorCode);
-        return;
-      }
-      accumulatedFinalText = finalText;
-      checkWork(work);
-
-      // Stream consumers: onDone dispatch. Collect message deltas + done-payload entries.
-      List<Map<String, Object>> aggregateDeltas = new ArrayList<>();
-      mergedDoneEntries.clear();
-      for (StreamConsumer consumer : consumers) {
-        checkWork(work);
-        StreamConsumerResult result;
+        String finalText;
+        AtomicReference<OnlineAiService.AiUsage> usageRef = new AtomicReference<>();
+        // Tempdoc 848 §2.2 — per-`streamLlm` (therefore per-iteration) by construction: an ITERATING
+        // shape's iteration-3 record carries iteration-3's thinking, with no cross-iteration bleed.
+        AtomicReference<List<ReasoningTrace>> reasoningRef = new AtomicReference<>();
         try {
-          result = consumer.onDone(finalText, ctx);
-        } catch (Exception e) {
-          LOG.warn("StreamConsumer {} onDone threw; emitting error event", consumer.id(), e);
-          emitError(sink, "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
+          finalText =
+              streamLlm(
+                  ai, llmInput, maxTokens, sampling, consumers, ctx, usageRef, reasoningRef, sink);
+        } catch (LlmStreamException e) {
+          if (stoppedByUser(work)) {
+            recordStopped(retrievalRecordId, shape, body, true, injectorRun.retrievalMetadata, standalone,
+                e.partialText, sink);
+            return;
+          }
+          emitError(sink, e.getMessage(), e.errorCode);
           persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
-              "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
+              e.getMessage(), e.errorCode);
           return;
         }
-        result.events().forEach(sink);
-        aggregateDeltas.addAll(result.messageDeltas());
-        mergedDoneEntries.putAll(result.donePayloadEntries());
-      }
-      mergedDoneEntries.putAll(injectorRun.retrievalMetadata);
+        accumulatedFinalText = finalText;
+        checkWork(work);
 
-      // Tempdoc 610 §E.4 / §G — surface the prompt-token occupancy on the done payload so the FE can
-      // render a context-budget meter. The model context window (the meter's denominator) is FE-side
-      // (aiState). The usage is captured per LLM call; the last iteration's value is what the meter shows.
-      OnlineAiService.AiUsage usage = usageRef.get();
-      if (usage != null && usage.promptTokens() != null) {
-        mergedDoneEntries.put("promptTokens", usage.promptTokens());
-        if (usage.totalTokens() != null) {
-          mergedDoneEntries.put("totalTokens", usage.totalTokens());
-        }
-      }
-      // Tempdoc 835 §9c.4 — completionTokens was captured on AiUsage and dropped here. It is the
-      // denominator for every reasoning-budget decision (reasoning and answer tokens share this
-      // number), so a turn's cost is unmeasurable without it.
-      if (usage != null && usage.completionTokens() != null) {
-        mergedDoneEntries.put("completionTokens", usage.completionTokens());
-      }
-      // Tempdoc 610 §I.2 — the per-phase split rides the done payload alongside the real total.
-      mergedDoneEntries.put("contextBreakdown", contextBreakdown);
-
-      // Append the assistant message and any consumer message deltas before the next
-      // iteration's decision + LLM call.
-      Map<String, Object> assistantMsg = assistantMessage(finalText);
-      checkWork(work);
-      ctx.appendMessage(assistantMsg);
-      ctx.appendMessages(aggregateDeltas);
-      // Slice 496 §3.B / tempdoc 561 P-A: persist the assistant message WITH its evidence (citations +
-      // producer calibration from the done-payload), so the unified thread surfaces grounding FROM the
-      // record, not an FE-side content re-match. Evidence is kept off the LLM-context copy so it never
-      // pollutes the next prompt. PERSISTENT shapes record under sessionId; recordsToThread ephemeral
-      // shapes (RAG) record under threadId (the request's conversationId).
-      if (sessionId != null && conversationStore != null) {
-        conversationStore.appendMessage(
-            sessionId,
-            shape.id().value(),
-            persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone));
-      } else if (threadId != null && conversationStore != null) {
-        conversationStore.appendMessage(
-            threadId,
-            shape.id().value(),
-            persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone));
-      }
-
-      // Iteration decision.
-      IterationDecision decision;
-      try {
-        decision = controller.next(ctx);
-      } catch (Exception e) {
-        LOG.warn("IterationController {} threw; treating as STOP_ERROR", controller.id(), e);
-        emitError(sink, "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
-        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
-            "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
-        return;
-      }
-
-      switch (decision) {
-        case STOP_SUCCESS -> {
+        // Stream consumers: onDone dispatch. Collect message deltas + done-payload entries.
+        List<Map<String, Object>> aggregateDeltas = new ArrayList<>();
+        mergedDoneEntries.clear();
+        for (StreamConsumer consumer : consumers) {
           checkWork(work);
-          emitDone(sink, accumulatedFinalText, ctx.iteration() + 1, mergedDoneEntries);
-          return;
+          StreamConsumerResult result;
+          try {
+            result = consumer.onDone(finalText, ctx);
+          } catch (Exception e) {
+            // A consumer cut off by the reader's Stop has not failed: the turn was stopped.
+            if (stoppedByUser(work)) checkWork(work);
+            LOG.warn("StreamConsumer {} onDone threw; emitting error event", consumer.id(), e);
+            emitError(sink, "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
+            persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+                "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
+            return;
+          }
+          result.events().forEach(sink);
+          aggregateDeltas.addAll(result.messageDeltas());
+          mergedDoneEntries.putAll(result.donePayloadEntries());
         }
-        case STOP_ERROR -> {
-          emitError(sink, "Conversation terminated with error", "CONTROLLER_STOP");
-          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
-              "Conversation terminated with error", "CONTROLLER_STOP");
-          return;
-        }
-        case CONTINUE -> ctx.incrementIteration();
-      }
-    }
+        mergedDoneEntries.putAll(injectorRun.retrievalMetadata);
 
-    // Reached hard cap without STOP_*
-    LOG.warn("Substrate-driven shape {} reached iteration hard cap {}", shape.id().value(), hardCap);
-    checkWork(work);
-    emitDone(sink, accumulatedFinalText, hardCap, mergedDoneEntries);
+        // Tempdoc 610 §E.4 / §G — surface the prompt-token occupancy on the done payload so the FE can
+        // render a context-budget meter. The model context window (the meter's denominator) is FE-side
+        // (aiState). The usage is captured per LLM call; the last iteration's value is what the meter shows.
+        OnlineAiService.AiUsage usage = usageRef.get();
+        if (usage != null && usage.promptTokens() != null) {
+          mergedDoneEntries.put("promptTokens", usage.promptTokens());
+          if (usage.totalTokens() != null) {
+            mergedDoneEntries.put("totalTokens", usage.totalTokens());
+          }
+        }
+        // Tempdoc 835 §9c.4 — completionTokens was captured on AiUsage and dropped here. It is the
+        // denominator for every reasoning-budget decision (reasoning and answer tokens share this
+        // number), so a turn's cost is unmeasurable without it.
+        if (usage != null && usage.completionTokens() != null) {
+          mergedDoneEntries.put("completionTokens", usage.completionTokens());
+        }
+        // Tempdoc 610 §I.2 — the per-phase split rides the done payload alongside the real total.
+        mergedDoneEntries.put("contextBreakdown", contextBreakdown);
+
+        // Append the assistant message and any consumer message deltas before the next
+        // iteration's decision + LLM call.
+        Map<String, Object> assistantMsg = assistantMessage(finalText);
+        checkWork(work);
+        ctx.appendMessage(assistantMsg);
+        ctx.appendMessages(aggregateDeltas);
+        // Slice 496 §3.B / tempdoc 561 P-A: persist the assistant message WITH its evidence (citations +
+        // producer calibration from the done-payload), so the unified thread surfaces grounding FROM the
+        // record, not an FE-side content re-match. Evidence is kept off the LLM-context copy so it never
+        // pollutes the next prompt. PERSISTENT shapes record under sessionId; recordsToThread ephemeral
+        // shapes (RAG) record under threadId (the request's conversationId).
+        if (sessionId != null && conversationStore != null) {
+          conversationStore.appendMessage(
+              sessionId,
+              shape.id().value(),
+              persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone));
+        } else if (threadId != null && conversationStore != null) {
+          conversationStore.appendMessage(
+              threadId,
+              shape.id().value(),
+              persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone));
+        }
+        answerRecorded = true;
+
+        // Iteration decision.
+        IterationDecision decision;
+        try {
+          decision = controller.next(ctx);
+        } catch (Exception e) {
+          LOG.warn("IterationController {} threw; treating as STOP_ERROR", controller.id(), e);
+          emitError(sink, "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
+          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+              "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
+          return;
+        }
+
+        switch (decision) {
+          case STOP_SUCCESS -> {
+            checkWork(work);
+            emitDone(sink, accumulatedFinalText, ctx.iteration() + 1, mergedDoneEntries);
+            return;
+          }
+          case STOP_ERROR -> {
+            emitError(sink, "Conversation terminated with error", "CONTROLLER_STOP");
+            persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+                "Conversation terminated with error", "CONTROLLER_STOP");
+            return;
+          }
+          case CONTINUE -> ctx.incrementIteration();
+        }
+      }
+
+      // Reached hard cap without STOP_*
+      LOG.warn("Substrate-driven shape {} reached iteration hard cap {}", shape.id().value(), hardCap);
+      checkWork(work);
+      emitDone(sink, accumulatedFinalText, hardCap, mergedDoneEntries);
+    } catch (io.justsearch.app.api.EngineWorkCancelledException cancelled) {
+      // The reader's Stop landed after the text was produced but before the answer was recorded
+      // (while its citations were checked, say): the text is saved, as stopped.
+      if (answerRecorded || !stoppedByUser(work)) throw cancelled;
+      recordStopped(retrievalRecordId, shape, body, true, injectorRun.retrievalMetadata, standalone,
+          accumulatedFinalText, sink);
+    }
+  }
+
+  /** Whether the turn's work was cancelled by the reader's Stop ({@link #stopTurn}), not otherwise. */
+  private static boolean stoppedByUser(io.justsearch.app.api.EngineWorkHandle work) {
+    return work != null && work.cancellationReason().filter(USER_STOP_REASON::equals).isPresent();
   }
 
   private static void checkWork(io.justsearch.app.api.EngineWorkHandle work) {
@@ -918,9 +990,10 @@ public final class ConversationEngine {
     if (error.get() != null) {
       Throwable err = error.get();
       if (err instanceof io.justsearch.app.api.EngineWorkCancelledException cancelled) {
-        throw new LlmStreamException(cancelled.getMessage(), cancelled.reasonCode());
+        throw new LlmStreamException(cancelled.getMessage(), cancelled.reasonCode(), fullText.toString());
       }
-      throw new LlmStreamException(err.getMessage() == null ? err.toString() : err.getMessage(), "LLM_ERROR");
+      throw new LlmStreamException(err.getMessage() == null ? err.toString() : err.getMessage(), "LLM_ERROR",
+          fullText.toString());
     }
 
     // Tempdoc 848 §2.1 — a region still open at stream end (the turn ended on thinking, or thought
@@ -1150,6 +1223,27 @@ public final class ConversationEngine {
     // by a failed retrieval, a failed generation or a Stop was still shown live, so the record keeps it.
     putIfPresent(error, "standaloneQuestion", standaloneQuestion);
     conversationStore.appendMessage(recordId, shape.id().value(), error);
+  }
+
+  /**
+   * The reader's Stop, saved as the turn's outcome: the text that had streamed (none, for an early
+   * Stop), the rewrite note and the {@link #STOPPED_DISPOSITION} the record reads as "stopped by
+   * you". An answer row rather than an error row, so the turn keeps what it said and stays
+   * addressable.
+   */
+  private void recordStopped(String recordId, ConversationShape shape, Map<String, Object> body,
+      boolean questionRecorded, Map<String, Object> retrievalMetadata, String standaloneQuestion,
+      String text, Consumer<SseEvent> sink) {
+    if (recordId != null && conversationStore != null) {
+      if (!questionRecorded) {
+        conversationStore.appendMessage(recordId, shape.id().value(), threadUserMessage(body));
+      }
+      Map<String, Object> outcome = new LinkedHashMap<>(retrievalMetadata);
+      outcome.put("disposition", STOPPED_DISPOSITION);
+      conversationStore.appendMessage(recordId, shape.id().value(),
+          persistedAssistant(assistantMessage(text), outcome, null, standaloneQuestion));
+    }
+    emitError(sink, "Stopped by the user", STOPPED_DISPOSITION);
   }
 
   /**
@@ -1526,10 +1620,17 @@ public final class ConversationEngine {
   private static final class LlmStreamException extends Exception {
     private static final long serialVersionUID = 1L;
     final String errorCode;
+    /** The text that had streamed when the call ended; a stopped turn keeps it. */
+    final String partialText;
 
     LlmStreamException(String message, String errorCode) {
+      this(message, errorCode, "");
+    }
+
+    LlmStreamException(String message, String errorCode, String partialText) {
       super(message);
       this.errorCode = errorCode;
+      this.partialText = partialText;
     }
   }
 }
