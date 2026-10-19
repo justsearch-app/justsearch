@@ -12,16 +12,15 @@
  *   took ~83s per CI run because OpenRewrite is incompatible with Gradle's
  *   configuration cache (it explicitly opts out via
  *   `notCompatibleWithConfigurationCache` in `AbstractRewriteTask`). This script
- *   matches the *exact same scope* as the recipe — bare form only — and runs in
- *   ~1s. Tempdoc 289 line 507 documents the recipe's scope: "the recipe targets
- *   simple `log.error(e.getMessage())` patterns but does NOT catch
- *   `log.error("prefix: {}", e.getMessage())`".
+ *   checks the bare form only and runs in ~1s. Its scope is narrower than the
+ *   recipe's, which also rewrites parameterized and concatenated `e.getMessage()`
+ *   arguments and bare `getLocalizedMessage()` calls.
  *
  * Scope (in scope / out of scope):
  *   IN  : log.error(e.getMessage())                    — bare form, exception lost
  *   OUT : log.error("text", e)                         — exception passed correctly
- *   OUT : log.error("text {}", e.getMessage())         — parameterized form (recipe also skips this)
- *   OUT : log.error("text: " + e.getMessage())         — concatenated (recipe also skips this)
+ *   OUT : log.error("text {}", e.getMessage())         — parameterized form
+ *   OUT : log.error("text: " + e.getMessage())         — concatenated
  *
  * Usage:
  *   node scripts/ci/check-slf4j-bare-message-logging.mjs --mode gate
@@ -265,8 +264,7 @@ function stripCommentsAndStrings(src) {
 // - Multiline-tolerant: `\s` in JS regex includes `\n`, so
 //   `log.error(\n  e.getMessage()\n)` is also caught.
 // - Identifier before `.getMessage()`: `[A-Za-z_$][\w$]*` — covers `e`, `ex`,
-//   `cause`, etc. Does not match chained calls (`getCause().getMessage()`),
-//   which is consistent with OpenRewrite's narrower scope per tempdoc 289.
+//   `cause`, etc. Does not match chained calls (`getCause().getMessage()`).
 // - Sole argument: the closing `)` immediately after `.getMessage()` (with
 //   optional whitespace) ensures only the bare form is matched, not
 //   parameterized or concatenated forms.
