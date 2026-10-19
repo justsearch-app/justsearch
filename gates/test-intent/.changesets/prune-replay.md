@@ -281,3 +281,14 @@ run-evidence.mjs. No acceptance is recorded by the builder.
   "note": "Exact d32b55abe verified against b8eb9217e in separate verifier session. Replayed and late-publication races, live-child regression, independent cleanup/root/restart cases, three-round benchmark and actual Engine HTTP replay rerun. Evidence: verifier-replay-5/scenario-evidence.json; limits explicitly recorded."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-replay-6",
+  "verdict": "accept",
+  "digest": "sha256:305f0aa97ad272adbff2797a4ff08c3cc939d3caedf156b8a895de37c8ed21fa",
+  "note": "Exact 76bbabddd independently rerun in a separate verifier session and checkout: all three rename checks fail on 1aa135724 at the intended zero-row assertion (12 rows remain), and all 37 candidate checks pass (repaired 19, preserve 15, rename 3). Evidence records f5f8e15a5/tree 68b9ae3f, the merged executable source head before this metadata-only commit; source/check blobs are identical to 76bbabddd. Independent close/reopen of Lucene and SQLite confirms replacement refusal is limited to the live registration. Evidence: verifier-replay-6/baseline-rename.json, count-comparison.json, provenance.json, root-session-scope.log. Prior product HTTP and benchmark acceptance was outside this focused rerun."
+}
+```
