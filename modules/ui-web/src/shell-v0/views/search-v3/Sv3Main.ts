@@ -2797,6 +2797,7 @@ export class Sv3Main extends JfElement {
           prose
           data-turn-id=${turn.id}
           .text=${item.text}
+          ?is-streaming=${terminal && turn.status === 'streaming'}
           .citations=${terminal ? [...(turn.evidence?.marks ?? [])] : []}
           frame=${terminal ? (sv3AnswerFrame(turn) ?? 'grounded') : 'grounded'}
           .sourceCount=${terminal ? (turn.evidence?.sources.length ?? 0) : 0}
