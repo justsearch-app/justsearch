@@ -33,7 +33,8 @@ justsearch-headless.cmd mcp-lite
 On Linux, from an installed Gradle distribution, use its native launcher:
 
 ```sh
-JUSTSEARCH_MODE=mcp-lite /absolute/path/to/ui/bin/ui
+JAVA_OPTS="-Djustsearch.prod=true -Djustsearch.repo.root=/absolute/path/to/ui" \
+  JUSTSEARCH_MODE=mcp-lite /absolute/path/to/ui/bin/ui
 ```
 
 On Windows, the PowerShell form is:
@@ -118,6 +119,8 @@ Type=simple
 Environment=JUSTSEARCH_MODE=headless
 Environment=JUSTSEARCH_DATA_DIR=/absolute/path/to/engine-data
 Environment=JUSTSEARCH_HOME=/absolute/path/to/ai-assets
+Environment="JAVA_OPTS=-Djustsearch.prod=true -Djustsearch.repo.root=\"/absolute/path/to/ui\" -XX:ErrorFile=\"/absolute/path/to/engine-data/crashes/hs_err_pid%%p.log\" -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=\"/absolute/path/to/engine-data/crashes/\" -XX:+ExitOnOutOfMemoryError"
+ExecStartPre=/usr/bin/mkdir -p /absolute/path/to/engine-data/crashes
 ExecStart=/absolute/path/to/ui/bin/ui
 Restart=on-failure
 RestartPreventExitStatus=2
@@ -130,6 +133,15 @@ WantedBy=default.target
 Run `systemctl --user daemon-reload` and
 `systemctl --user enable --now justsearch.service`. A clean exit stays stopped.
 Use `journalctl --user -u justsearch.service` to inspect a failure.
+
+`-Djustsearch.prod=true` selects production mode. `justsearch.repo.root` points
+the configuration loader at the installed distribution, as the desktop shell
+does; it requires no repository checkout or particular working directory. The
+crash directory is created before each start. JVM fatal reports land there as `hs_err_pid<PID>.log`,
+and heap OOMs leave `java_pid<PID>.hprof` before exiting 3. In a systemd unit,
+`%%p` passes the JVM's literal `%p` placeholder; the escaped quotes preserve paths
+containing spaces in `JAVA_OPTS`. Quote paths with spaces in `ExecStartPre` and
+`ExecStart` too. Heap dumps are not included automatically in diagnostics exports.
 
 On Windows, Task Scheduler's **Restart the task if it fails** setting needs a
 launcher that reports exit 2 as success, so the scheduler leaves a locked profile

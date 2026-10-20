@@ -125,7 +125,7 @@ function writeShutdownRequest(dataDir, { reason, deadlineEpochMs, issuedBy = 'su
  * adapter watching stderr reads it as silence. Found exactly that way.
  */
 function makeWorkDir(label) {
-  const root = path.join(process.env.TMPDIR || path.join(repoRoot, 'tmp'), 'supervisor-conformance');
+  const root = path.join(repoRoot, 'tmp', 'supervisor-conformance');
   fs.mkdirSync(root, { recursive: true });
   return fs.mkdtempSync(path.join(root, `${label}-`));
 }

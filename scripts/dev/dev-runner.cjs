@@ -3090,6 +3090,7 @@ async function runAdmittedStart(opts, ctx) {
 
   const actuator = engineActuator.createEngineActuator({
     dataDir,
+    heapDumpDir: logsDir,
     runId,
     policy: supervisionPolicy,
     spawnChild: (n, port, incarnationEnv, startup) => {

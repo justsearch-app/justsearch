@@ -3,6 +3,15 @@ const fs = require('fs');
 const path = require('path');
 const ledger = require('./exit-ledger.cjs');
 
+function prepareCrashFolder(directory) {
+  fs.mkdirSync(directory, { recursive: true });
+  const dumps = fs.readdirSync(directory, { withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name.endsWith('.hprof'))
+    .map(entry => ({ name: entry.name, at: fs.statSync(path.join(directory, entry.name)).mtimeMs }))
+    .sort((a, b) => a.at - b.at || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  for (const dump of dumps.slice(1, -1)) fs.unlinkSync(path.join(directory, dump.name));
+}
+
 function recoveryData(dataDir, now = Date.now()) {
   let recentExits = null;
   try {
@@ -51,4 +60,4 @@ function latestCrash(dataDir) {
   }
   return null;
 }
-module.exports = { recoveryData };
+module.exports = { recoveryData, prepareCrashFolder };

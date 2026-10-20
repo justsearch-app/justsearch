@@ -6,7 +6,7 @@ import os from 'node:os';
 const require = createRequire(import.meta.url);
 const { createSupervisionLoop, loadPolicy } = require('./lib/engine-supervisor.cjs');
 
-function fixture({ failFirst = false, crashFirstFour = false } = {}) {
+function fixture({ failFirst = false, crashFirstFour = false, failAt = 0 } = {}) {
   let now = 0, n = 0, exited = false, pendingExit = null, spawnedAt = 0;
   const records = [], ports = [];
   const actor = {
@@ -15,7 +15,7 @@ function fixture({ failFirst = false, crashFirstFour = false } = {}) {
       ports.push(apiPort);
       spawnedAt = now;
       n++;
-      if (failFirst && n === 1) throw new Error('Java executable missing: C:/Name With Spaces/java.exe');
+      if ((failFirst && n === 1) || n === failAt) throw new Error('Java executable missing: C:/Name With Spaces/java.exe');
       exited = false;
       return { pid: 100 + n };
     },
@@ -98,6 +98,13 @@ test('E3: restarting a terminal actor reaches a different binding without anothe
 test('E18: headless restart instructions exclude locked profiles and describe shell-independent quarantine', () => {
   const docs = fs.readFileSync(new URL('../../docs/how-to/headless-runtime.md', import.meta.url), 'utf8');
   assert.match(docs, /Restart=on-failure/);
+  assert.match(docs, /JAVA_OPTS=-Djustsearch.prod=true/);
+  assert.match(docs, /Environment="JAVA_OPTS=.*-Djustsearch.repo.root=/);
+  assert.match(docs, /-XX:ErrorFile=.*crashes\/hs_err_pid%%p\.log/);
+  assert.match(docs, /-XX:\+HeapDumpOnOutOfMemoryError/);
+  assert.match(docs, /-XX:HeapDumpPath=.*crashes\//);
+  assert.match(docs, /-XX:\+ExitOnOutOfMemoryError/);
+  assert.match(docs, /ExecStartPre=\/usr\/bin\/mkdir -p .*crashes/);
   assert.match(docs, /RestartPreventExitStatus=2/);
   assert.match(docs, /\$engineExit -eq 2/);
   assert.match(docs, /no desktop supervisor/);
@@ -136,4 +143,50 @@ test('E4: a delayed generation passes a numeric requested port to the real spawn
   await done;
   assert.equal(ports[4], 0, 'an exhausted generation must not pass null as JUSTSEARCH_API_PORT');
   assert(ports.every(Number.isInteger));
+});
+
+test('E1: JS spawn preparation retains the oldest and newest heap dumps and all fatal logs', () => {
+  const { createEngineActuator } = require('./lib/engine-actuator.cjs');
+  const profile = fs.mkdtempSync(`${os.tmpdir()}/heap-retention-`);
+  const directory = `${profile}/crashes`;
+  fs.mkdirSync(directory);
+  try {
+    for (let n = 1; n <= 5; n++) {
+      const file = `${directory}/heap-${n}.hprof`;
+      fs.writeFileSync(file, `dump ${n}`); fs.utimesSync(file, n, n);
+    }
+    fs.writeFileSync(`${directory}/hs_err_pid1.log`, 'first native crash');
+    fs.mkdirSync(`${directory}/not-a-dump.hprof`);
+    const actor = createEngineActuator({ dataDir: profile, heapDumpDir: directory, runId: 'retention', policy: loadPolicy(),
+      spawnChild() { throw new Error('spawn boundary reached'); } });
+    assert.throws(() => actor.spawnEngine({ n: 1, cause: 'INITIAL', apiPort: 0 }), /spawn boundary reached/);
+    const dumps = fs.readdirSync(directory, { withFileTypes: true })
+      .filter(entry => entry.isFile() && entry.name.endsWith('.hprof')).map(entry => entry.name).sort();
+    assert.deepEqual(dumps, ['heap-1.hprof', 'heap-5.hprof']);
+    assert.equal(fs.readFileSync(`${directory}/hs_err_pid1.log`, 'utf8'), 'first native crash');
+    assert(fs.statSync(`${directory}/not-a-dump.hprof`).isDirectory());
+    assert.throws(() => actor.spawnEngine({ n: 2, cause: 'RESTART', apiPort: 0 }), /spawn boundary reached/);
+    assert(fs.existsSync(`${directory}/heap-1.hprof`));
+    assert(fs.existsSync(`${directory}/heap-5.hprof`));
+  } finally { fs.rmSync(profile, { recursive: true, force: true }); }
+});
+
+test('E3: manual restart after exhaustion and a refused delayed spawn starts one fresh generation', async () => {
+  const f = fixture({ crashFirstFour: true, failAt: 5 });
+  const stopped = await f.loop.run();
+  assert.equal(stopped.state, 'exhausted');
+  assert(f.records.some(state => state.state === 'exhausted' && state.restartCount === 3));
+  const finished = f.records.at(-1);
+  const previousSpawns = f.spawnCount();
+  f.loop.restartEngine();
+  assert.throws(() => f.loop.restartEngine(), /already/);
+  await until(() => f.records.at(-1)?.state === 'running' && f.records.at(-1)?.incarnation === 6);
+  const restarted = f.records.at(-1);
+  await f.loop.hostQuit();
+  assert.equal(restarted.restartCount, 0);
+  assert.match(finished.reason, /restart_failed/);
+  assert.equal(previousSpawns, 5);
+  assert.equal(restarted.apiPort, 8006);
+  assert.equal(restarted.instanceId, 'instance-6');
+  assert.equal(f.spawnCount(), 6);
 });

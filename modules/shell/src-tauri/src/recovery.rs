@@ -11,6 +11,24 @@ pub(crate) fn jvm_options(data_dir: &Path) -> Result<Vec<String>, String> {
         eprintln!("{reason}");
         reason
     })?;
+    // Preserve the first OOM and the latest one, while bounding repeated OOM disk use.
+    let prune = || -> std::io::Result<()> {
+        let mut dumps = Vec::new();
+        for entry in std::fs::read_dir(&dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_file()
+                && entry.path().extension().is_some_and(|ext| ext == "hprof")
+            {
+                dumps.push((entry.metadata()?.modified()?, entry.path()));
+            }
+        }
+        dumps.sort();
+        for (_, path) in dumps.iter().skip(1).take(dumps.len().saturating_sub(2)) {
+            std::fs::remove_file(path)?;
+        }
+        Ok(())
+    };
+    prune().map_err(|error| format!("Cannot retain heap dumps in {}: {error}", dir.display()))?;
     eprintln!("Engine crash evidence: {}", dir.display());
     // A PID can be reused after a relaunch. Give each boot its own artifact names.
     let boot = uuid::Uuid::new_v4();
@@ -180,6 +198,41 @@ mod tests {
             std::fs::read_to_string(report).unwrap(),
             "first crash evidence"
         );
+    }
+
+    #[test]
+    fn spawn_preparation_keeps_only_the_first_and_latest_heap_dumps() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("crashes");
+        std::fs::create_dir_all(&dir).unwrap();
+        for n in 1..=5 {
+            let path = dir.join(format!("heap-{n}.hprof"));
+            let file = std::fs::File::create(path).unwrap();
+            file.set_times(
+                std::fs::FileTimes::new()
+                    .set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(n)),
+            )
+            .unwrap();
+        }
+        std::fs::write(dir.join("hs_err_pid1.log"), "first native crash").unwrap();
+        std::fs::create_dir(dir.join("not-a-dump.hprof")).unwrap();
+        jvm_options(root.path()).unwrap();
+        let mut dumps: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(Result::unwrap)
+            .filter(|e| {
+                e.file_type().unwrap().is_file()
+                    && e.path().extension().is_some_and(|ext| ext == "hprof")
+            })
+            .map(|e| e.file_name())
+            .collect();
+        dumps.sort();
+        assert_eq!(dumps, vec!["heap-1.hprof", "heap-5.hprof"]);
+        assert!(dir.join("hs_err_pid1.log").is_file());
+        assert!(dir.join("not-a-dump.hprof").is_dir());
+        jvm_options(root.path()).unwrap();
+        assert!(dir.join("heap-1.hprof").is_file());
+        assert!(dir.join("heap-5.hprof").is_file());
     }
 
     #[test]

@@ -999,6 +999,128 @@ mod tests {
     }
 
     #[test]
+    fn manual_restart_after_finished_exhaustion_reaches_ready_with_a_new_generation() {
+        let dir = tempfile::tempdir().unwrap();
+        let host = Arc::new(EngineHost::default());
+        let failed_host = host.clone();
+        let failed_dir = dir.path().to_path_buf();
+        let spent = Arc::new(AtomicUsize::new(0));
+        let observed_spent = spent.clone();
+        let crash_host = host.clone();
+        host.start_supervisor(move || {
+            let mut attempts = 0;
+            let mut actuator = crate::shell_actuator::ShellActuator::new(
+                failed_host,
+                failed_dir,
+                move || {
+                    attempts += 1;
+                    if attempts == 5 {
+                        return Err("replacement Java unavailable".into());
+                    }
+                    crash_host.reset_for_successor()?;
+                    let mut command =
+                        crate::containment::engine_command("node").map_err(|e| e.to_string())?;
+                    command
+                        .args(["-e", "process.exit(1)"])
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null());
+                    crash_host.admit(PreparedCommand { command }).map(|c| c.pid)
+                },
+                move |record| {
+                    if record.state == "exhausted" && record.restart_count == 3 {
+                        observed_spent.fetch_add(1, Ordering::SeqCst);
+                    }
+                },
+            );
+            let mut policy = supervisor::load_policy();
+            policy.cooldown_increment_ms = 0;
+            policy.max_cooldown_ms = 0;
+            policy.exhausted_retry_delay_ms = 1;
+            let mut supervisor = supervisor::Supervisor::new(policy);
+            supervisor::run_supervision(&mut supervisor, &mut actuator);
+        })
+        .unwrap();
+        let until = Instant::now() + Duration::from_secs(10);
+        while host.supervisor_running() {
+            assert!(Instant::now() < until, "failed generation did not finish");
+            thread::sleep(Duration::from_millis(5));
+        }
+        assert_eq!(spent.load(Ordering::SeqCst), 1);
+        assert!(host
+            .latest_record()
+            .unwrap()
+            .reason
+            .unwrap()
+            .contains("replacement Java unavailable"));
+        assert!(matches!(
+            host.terminal_outcome(),
+            Some(supervisor::Outcome::Exhausted { .. })
+        ));
+        assert_eq!(
+            host.request_manual_restart(),
+            Ok(false),
+            "a new actor must own this restart"
+        );
+
+        let spawn_host = host.clone();
+        let successor_host = host.clone();
+        let data_dir = dir.path().to_path_buf();
+        let spawn_dir = data_dir.clone();
+        let fake_engine = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../scripts/supervisor-conformance/fake-engine.mjs");
+        host.start_supervisor(move || {
+            let mut actuator = crate::shell_actuator::ShellActuator::new(
+                successor_host,
+                data_dir,
+                move || {
+                    spawn_host.reset_for_successor()?;
+                    let mut command =
+                        crate::containment::engine_command("node").map_err(|e| e.to_string())?;
+                    command
+                        .arg(&fake_engine)
+                        .env("JUSTSEARCH_DATA_DIR", &spawn_dir)
+                        .env("JUSTSEARCH_API_PORT", "0")
+                        .env("JUSTSEARCH_FAKE_ENGINE_FAULT_GATE", "")
+                        .env("JUSTSEARCH_FAKE_ENGINE_PLAN", "")
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null());
+                    spawn_host.admit(PreparedCommand { command }).map(|c| c.pid)
+                },
+                |_| {},
+            );
+            let mut supervisor = supervisor::Supervisor::new(supervisor::load_policy());
+            supervisor::run_supervision(&mut supervisor, &mut actuator);
+        })
+        .unwrap();
+        assert!(host.start_supervisor(|| panic!("duplicate owner")).is_err());
+        let until = Instant::now() + Duration::from_secs(10);
+        while host
+            .latest_record()
+            .is_none_or(|state| state.state != "running")
+            && Instant::now() < until
+        {
+            thread::sleep(Duration::from_millis(10));
+        }
+        let restarted = host.latest_record().unwrap();
+        let binding = host.binding_snapshot();
+        host.post_stop("quit", None, Duration::from_secs(2))
+            .unwrap();
+        host.supervisor
+            .lock()
+            .unwrap()
+            .take()
+            .unwrap()
+            .join()
+            .unwrap();
+        assert_eq!(restarted.state, "running");
+        assert_eq!(restarted.restart_count, 0);
+        assert!(binding.port.is_some());
+        assert!(binding.token.is_some());
+        assert!(binding.instance_id.is_some());
+        assert!(host.child_pid().is_none());
+    }
+
+    #[test]
     fn manual_restart_refuses_quit_and_update_holds_without_admitting_a_child() {
         let host = EngineHost::default();
         host.publish_state(None, &terminal_record("native crash"), |_| {});
