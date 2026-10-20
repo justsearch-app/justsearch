@@ -524,3 +524,14 @@ like acceptance, must come from another session. No author approval is supplied.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "92a21fb6-b2be-4233-b0b5-3b5a2910d56b",
+  "verdict": "accept",
+  "digest": "sha256:6ee3080b467b5dbd824f79bc9b9b053ce32f86dca22cf86eb85373bab1f3ec80",
+  "note": "All 11 entries match their class and owner-adopted T1-T19 sources; reran the Java security pins and web token/stream pins (both fail on base by assertion for the reason under test and pass on fcdac3d8f), and the 0073e38aa and http.test.ts edits add only the token or capture the outcome without weakening any assertion."
+}
+```
