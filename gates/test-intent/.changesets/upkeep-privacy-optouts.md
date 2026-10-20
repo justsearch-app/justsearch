@@ -97,3 +97,14 @@ Existing C2 observations (not substitutes for D4):
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-07s99x7b",
+  "verdict": "accept",
+  "digest": "sha256:06c4f6a75132d13599ec8ab9b98437f8e1e76596b7a4bf264b74e4691a9caafc",
+  "note": "Sources support unset->true only; Java+UI checks fail on c00a0cb24 by assertion and pass on d6990260a, re-run independently"
+}
+```
