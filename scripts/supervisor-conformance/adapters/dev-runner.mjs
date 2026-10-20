@@ -41,6 +41,13 @@ const JS_ENGINE_STOP = 0x4A530002;
 /** An idle stand-in for the Vite dev server: the supervisor is not the frontend's supervisor. */
 const IDLE_FRONTEND = [process.execPath, '-e', 'setInterval(() => {}, 60000)'];
 
+// Fixture startup includes the Windows PowerShell job host, C# compilation and identity capture.
+// Hosted job 118612815529 spent the old 10s before discovering an otherwise healthy fake Engine.
+// Allow that setup here only; explicit start-timeout cases and the restart policy stay bounded.
+const FIXTURE_START_TIMEOUT_MS = 60_000;
+// Discovery and HTTP readiness have separate budgets; include runner setup before both begin.
+const FIRST_RUNNING_TIMEOUT_MS = 2 * FIXTURE_START_TIMEOUT_MS + 20_000;
+
 export async function available({ io }) {
   const devRunner = path.join(io.repoRoot, 'scripts', 'dev', 'dev-runner.cjs');
   if (!fs.existsSync(devRunner)) return { ok: false, reason: `not found: ${devRunner}` };
@@ -112,7 +119,7 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
   if (!fs.existsSync(planPath)) io.writeEnginePlan(workDir, enginePlanFor(testCase));
   // A case may bound the first boot's start (Spec F §7.2 `startTimeoutMs`); the dev-runner's knobs
   // for it are the port and readiness timeouts.
-  const startTimeoutMs = String(testCase.startTimeoutMs ?? 10000);
+  const startTimeoutMs = String(testCase.startTimeoutMs ?? FIXTURE_START_TIMEOUT_MS);
   const uiPort = await freePort();
   const statePath = path.join(dataDir, 'runtime', 'supervisor.v1.json');
   const faultGatePath = path.join(workDir, 'first-incarnation-running.json');
@@ -144,8 +151,7 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
         JUSTSEARCH_FAKE_ENGINE_PLAN: planPath,
         JUSTSEARCH_FAKE_ENGINE_FAULT_GATE: faultGatePath,
         JUSTSEARCH_SUPERVISOR_HARNESS_REQUEST_REASON: testCase.request?.reason ?? '',
-        // Keep the first incarnation's start bounded: the default is 15 s locally and 300 s in CI,
-        // and a case that hangs for either is a case nobody will run.
+        // Bound fixture setup independently of the product's local and CI defaults.
         JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: startTimeoutMs,
         JUSTSEARCH_DEV_RUNNER_BACKEND_READY_TIMEOUT_MS: startTimeoutMs,
         CI: '',
@@ -252,7 +258,7 @@ export async function runCase({ testCase, policy, io }) {
     const running = await watchSupervisor({
       statePath: run.statePath,
       predicate: (s) => s.state === 'running' && s.incarnation === 1,
-      timeoutMs: 20_000,
+      timeoutMs: FIRST_RUNNING_TIMEOUT_MS,
       io,
       seen: run.seen,
     });
@@ -616,7 +622,7 @@ async function runLifecycleCase({ testCase, policy, io }) {
       const first = await driveCase({ testCase, policy, io, workDir, keepWorkDir: true });
       runs.push(first);
       const up = await watchSupervisor({ statePath: first.statePath, predicate: (s) => s.state === 'running',
-        timeoutMs: 20_000, io, seen: first.seen, faultGatePath: first.faultGatePath });
+        timeoutMs: FIRST_RUNNING_TIMEOUT_MS, io, seen: first.seen, faultGatePath: first.faultGatePath });
       if (!up) {
         problems.push(`the first supervisor never reached running. stderr: ${first.output.stderr.slice(-1200)}`);
         return { problems };
@@ -642,7 +648,8 @@ async function runLifecycleCase({ testCase, policy, io }) {
       statePath: run.statePath,
       predicate: (s) => s.state === reach.state && s.incarnation === reach.incarnation
         && (!previousRunId || s.runId !== previousRunId),
-      timeoutMs: 40_000,
+      // Include fixture setup before the lifecycle case's existing recovery observation budget.
+      timeoutMs: FIRST_RUNNING_TIMEOUT_MS + 40_000,
       io,
       seen: run.seen,
       faultGatePath: run.faultGatePath,
