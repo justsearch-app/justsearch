@@ -784,3 +784,14 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
   "note": "Re-ran run-evidence on f498321a9 to scratch for the 7 saved-data checks (verifier-5 evidence/run-evidence/): vs bf1713ab2 all 7 fail by assertion and pass on the candidate; vs the real base 117e89be9, 6 fail by assertion. The PN1s quote is verbatim in the agreed text and supports each expectation; class New fits. Verifier-4's three N9.1 failures are fixed live (backup restore, invalid-parent branches) and in a scratch HTTP check (run join). Omission: SavedStoreIdsHttpTest#branchWithInvalidSavedParentOpensLikeMissingParentOverHttp is entered repaired:true, but it passes on 117e89be9: its fixture never saves the parent conversation, so the base already treats the parent as missing. Its only fail-before is against bf1713ab2, an intermediate commit of this change, which the second rejection on this changeset ruled out (preservation check, needs an entry without repaired and evidence without --before). Fix: either split it into a preservation entry, or save the parent under the invalid name as the before build does (live on 117e89be9 the branch then shows the parent turns), so it fails on 117e89be9 by assertion."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-mgpgjl4p",
+  "verdict": "accept",
+  "digest": "sha256:1548ae3af9e0ca83c6372e46276061887749b21984376edff7c6f26aa1ac6bf4",
+  "note": "Judged e97f404cb against the fifth rejection (08da0572d). git diff 08da0572d..e97f404cb touches only this changeset and the new evidence file uiux-safe-ids-saved-parent-preserve.json; no test or product file changed. SavedStoreIdsHttpTest#branchWithInvalidSavedParentOpensLikeMissingParentOverHttp is now its own New entry without repaired, citing the same verbatim PN1s quote, with its expectation (branches with invalid saved parents keep their own history and thread events) kept and the behaviour text split accurately; the two other SavedStoreIdsHttpTest checks stay repaired with the unchanged uiux-safe-ids-saved-data.json (assertion fail-before). Re-ran run-evidence for the check to scratch (verifier evidence/run-evidence/saved-parent-preserve-rerun.json): same command, content digest sha256:c5605cd3..., both cases passed, failBefore null, matching the committed file except revision/tree. On a detached 117e89be9 with only the test file added it passes (2 tests, 0 skipped, 0 failures), so it is a valid preservation check. The rejection's point is resolved. Note: saved-data.json still lists this check with its bf1713ab2 fail-before, but no entry relies on that for it."
+}
+```
