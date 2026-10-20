@@ -36,7 +36,7 @@ Source-of-truth file paths reference the post-§31-merge repository state (HEAD 
 | Slot | Named production consumer(s) | Verdict |
 |---|---|---|
 | `inference().onlineAi()` | `InferenceHandlers` (5 callsites in `InferenceHandlers.java`); `BrainRuntimeServiceImpl` (constructor parameter); `OfflineCoordinatorBuilder.build` (3rd argument) | healthy (≥ 3) |
-| `inference().brainRuntime()` | `BrainRuntimeController`-side caller (`SwitchInferenceModeHandler` and `TriggerOfflineProcessingHandler` via `OperationHandlerRegistrations.registerWorker`); `LocalApiServer` controller wiring | healthy (≥ 2) |
+| `inference().brainRuntime()` | `TriggerOfflineProcessingHandler` via `OperationHandlerRegistrations.registerWorker`; `HeadAssembly` service-graph wiring | healthy (≥ 2) |
 | `inference().runtimeVariant()` | `ActivateRuntimeVariantHandler`, `DeactivateRuntimeVariantHandler` (operation handlers); `LocalApiServer` controller wiring | healthy (≥ 2) |
 | `inference().packImport()` | `PreflightAiPackHandler`, `ImportAiPackHandler` (operation handlers); `LocalApiServer` controller wiring | healthy (≥ 2) |
 | `inference().brainInstall()` | `StartAiInstallHandler`, `CancelAiInstallHandler`, `RepairAiInstallHandler` (operation handlers); `LocalApiServer` controller wiring | healthy (≥ 3) |
@@ -80,20 +80,20 @@ ServicePhase. Its former controller callback was removed; only diagnostic SPI bi
 | Slot | Named production consumer | Verdict |
 |---|---|---|
 | `substrateOut.healthOut.lifecycleSnapshotTap` | `StatusLifecycleHandler` (`LocalApiServer.java:596`) | fragility signal (1) — inherent to status-deck contract; not eligible for retraction |
-| `substrateOut.operationOut.capabilitiesChangeRegistry` | `InfraRoutes.handleInfraCapabilities` (via `HeadAssembly.capabilitiesChangeRegistry()` accessor — `HeadAssembly.java:553`, `InfraRoutes.java:66`) | fragility signal (1) — inherent to `/infra/capabilities` endpoint contract; not eligible for retraction |
+| `substrateOut.operationOut.capabilitiesChangeRegistry` | `InfraRoutes` (`GET /infra/capabilities`) (via `HeadAssembly.capabilitiesChangeRegistry()` accessor — `HeadAssembly.java:553`, `InfraRoutes.java:66`) | fragility signal (1) — inherent to `/infra/capabilities` endpoint contract; not eligible for retraction |
 
 ### Endpoint slots
 
 | Slot | Named production consumer | Verdict |
 |---|---|---|
-| `GET /api/boot/phases` (shipped 2026-05-21 in tempdoc 541) | `<jf-boot-phases-panel>` Lit element — `modules/ui-web/src/shell-v0/components/BootPhasesPanel.ts`. Registered via Shell.ts side-effect import (`Shell.ts:47`); mounted in `LogSurface.ts` under the BOOT_TRACE filter chip. Backend: `BootRoutes.register` in `modules/ui/src/main/java/io/justsearch/ui/api/routes/BootRoutes.java`. | fragility signal (1) — single FE consumer; ships in lockstep with the endpoint. Eligible for retraction if the panel is ever unmounted from every surface. |
+| `GET /api/boot/phases` (shipped 2026-05-21 in tempdoc 541) | `<jf-boot-phases-panel>` Lit element — `modules/ui-web/src/shell-v0/components/BootPhasesPanel.ts`. Registered via the `LogSurface.ts:48` side-effect import; mounted in `LogSurface.ts` under the BOOT_TRACE filter chip. Backend: `BootRoutes.register` in `modules/ui/src/main/java/io/justsearch/ui/api/routes/BootRoutes.java`. | fragility signal (1) — single FE consumer; ships in lockstep with the endpoint. Eligible for retraction if the panel is ever unmounted from every surface. |
 
 ## Audit history
 
 | Date | Auditor | Outcome | Changes |
 |---|---|---|---|
 | 2026-05-21 | tempdoc 541 P2 (initial slot enumeration) | first cut — 13 slots enumerated; 4 indirect-cardinality slots resolved via deeper grep; helper-slot cardinalities clarified (1 external + 1 internal-composition each). `EffectiveConfigController` removed from `gpuCapabilitiesService` consumer list (not actually a consumer). | Initial document. |
-| 2026-05-21 | tempdoc 541 fix-pass F.2 (real grep-verified audit) | All 13 slots audited against branch `worktree-541-composition-substrate` HEAD. Sample evidence verified live (commands below). **No retractions, no verdict changes.** The proposed `GET /api/boot/phases` endpoint shipped in fix-pass Tier 3 with its named FE consumer (`BootPhasesPanel.ts` registered via `Shell.ts:47` side-effect import, mounted in `LogSurface.ts` under the BOOT_TRACE filter chip). Endpoint row should be re-classified from "C-018-unnamed-pending" to "fragility signal (1)" in the v2 contract. | Verified slot consumers via grep:<br/>- `capabilitiesChangeRegistry` → `InfraRoutes.java:66-68` ✓ direct read.<br/>- `lifecycleSnapshotTap` → `LocalApiServer.java:596` ✓ direct read via `StatusLifecycleHandler:93,170,273`.<br/>- `gpuCapabilitiesService` → `InferenceHandlers.java:34-51,140` ✓ direct read.<br/>- `/api/boot/phases` → `BootPhasesPanel.ts` registered via `Shell.ts:47`, mounted in `LogSurface.ts:504` under BOOT_TRACE filter ✓ named consumer at landing. |
+| 2026-05-21 | tempdoc 541 fix-pass F.2 (real grep-verified audit) | All 13 slots audited against branch `worktree-541-composition-substrate` HEAD. Sample evidence verified live (commands below). **No retractions, no verdict changes.** The proposed `GET /api/boot/phases` endpoint shipped in fix-pass Tier 3 with its named FE consumer (`BootPhasesPanel.ts` registered via a side-effect import (current location: `LogSurface.ts:48`), mounted in `LogSurface.ts` under the BOOT_TRACE filter chip). Endpoint row should be re-classified from "C-018-unnamed-pending" to "fragility signal (1)" in the v2 contract. | Verified slot consumers via grep:<br/>- `capabilitiesChangeRegistry` → `InfraRoutes.java:66-68` ✓ direct read.<br/>- `lifecycleSnapshotTap` → `LocalApiServer.java:596` ✓ direct read via `StatusLifecycleHandler:93,170,273`.<br/>- `gpuCapabilitiesService` → `InferenceHandlers.java:34-51,140` ✓ direct read.<br/>- `/api/boot/phases` → `BootPhasesPanel.ts` registered via a side-effect import (current location: `LogSurface.ts:48`), mounted under the BOOT_TRACE filter under BOOT_TRACE filter ✓ named consumer at landing. |
 
 ## How this contract is enforced
 

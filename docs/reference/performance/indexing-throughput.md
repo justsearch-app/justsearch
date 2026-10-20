@@ -14,55 +14,63 @@ for indexing loop architecture see `docs/explanation/03-knowledge-server.md`.
 
 ## Throughput-Governing Parameters
 
-All parameters below are compile-time constants in `modules/indexer-worker`.
-No env-var overrides exist for these values today.
+The loop policies live in `modules/worker-services`; the embedding and SPLADE
+encoders live in `modules/worker-core`. Property-key rows are configuration
+defaults resolved through `EnvRegistry` / `ResolvedConfig` and can be overridden.
+The remaining named constants are compiled into the indicated class.
 
 ### Loop Pacing
 
 | Parameter | Value | Class | Effect |
 | :--- | :--- | :--- | :--- |
 | **Primary indexing** | | | |
-| `POLL_BATCH_SIZE` | 16 | `LoopPacingPolicy` | Max jobs dequeued per loop iteration |
+| `justsearch.backfill.poll_batch_size` | 16 | `EnvRegistry` | Max jobs dequeued per loop iteration |
 | `IDLE_SLEEP_MS` | 1000 ms | `LoopPacingPolicy` | Sleep between iterations when queue empty and no recent activity |
 | `ACTIVE_IDLE_SLEEP_MS` | 100 ms | `LoopPacingPolicy` | Sleep between iterations when recently active |
 | `justsearch.indexing.foreground_duty_pct` | 20 | `IndexingPacing` | Minimum share of wall time indexing keeps while foreground search RPCs are in flight (a duty cycle; replaced the `BREATH_HOLD_MS` pause) |
 | `justsearch.indexing.foreground_cooldown_ms` | 500 ms | `IndexingPacing` | How long after the last foreground RPC the Worker still counts as contended |
 | **Commit policy** | | | |
-| `COMMIT_INTERVAL_MS` | 10000 ms | `LoopPacingPolicy` | Time-based Lucene commit trigger |
-| `MAX_DOCS_BEFORE_COMMIT` | 1000 | `LoopPacingPolicy` | Count-based Lucene commit trigger |
+| `justsearch.backfill.commit_interval_ms` | 10000 ms | `EnvRegistry` | Time-based Lucene commit trigger for primary indexing |
+| `justsearch.backfill.max_docs_before_commit` | 1000 | `EnvRegistry` | Count-based Lucene commit trigger for primary indexing |
 | **Backfill pacing** | | | |
-| `EMBEDDING_BACKFILL_BATCH_SIZE` | 100 | `LoopPacingPolicy` | Doc and chunk embedding backfill batch |
-| `NER_BACKFILL_BATCH_SIZE` | 100 | `LoopPacingPolicy` | NER extraction backfill batch |
-| `DISAMBIGUATION_BACKFILL_BATCH_SIZE` | 500 | `LoopPacingPolicy` | Entity disambiguation backfill batch |
-| `SPLADE_BACKFILL_BATCH_SIZE` | 50 | `LoopPacingPolicy` | SPLADE backfill batch (idle path) |
-| `SPLADE_INTERLEAVE_BATCH_SIZE` | 10 | `LoopPacingPolicy` | SPLADE batch during primary indexing |
-| `SPLADE_INTERLEAVE_INTERVAL_MS` | 5000 ms | `LoopPacingPolicy` | Min interval between SPLADE interleaves |
+| `justsearch.backfill.embedding_batch_size` | 100 | `EnvRegistry` | Doc and chunk embedding backfill batch |
+| `justsearch.backfill.ner_batch_size` | 100 | `EnvRegistry` | NER extraction backfill batch |
+| `justsearch.backfill.disambiguation_batch_size` | 500 | `EnvRegistry` | Entity disambiguation backfill batch |
+| `justsearch.backfill.splade_batch_size` | 200 | `EnvRegistry` | SPLADE backfill batch (idle path) |
+| `justsearch.backfill.splade_interleave_batch_size` | 10 | `EnvRegistry` | SPLADE batch during primary indexing |
+| `justsearch.backfill.splade_interleave_interval_ms` | 5000 ms | `EnvRegistry` | Min interval between SPLADE interleaves |
 
 ### Embedding Inference
 
 | Parameter | Value | Class | Effect |
 | :--- | :--- | :--- | :--- |
-| `MAX_ORT_BATCH_SIZE` | 8 | `OnnxEmbeddingEncoder` | ORT session sub-batch ceiling (batch=8 optimal for 300M-param models on GPU — batch=16+ causes BFCArena OOM on RTX 4070 2048MB arena) |
+| `MAX_ORT_BATCH_SIZE` | 8 | `OnnxEmbeddingEncoder` | ORT session sub-batch ceiling; the device-memory plan can choose a smaller batch |
 | `chunkSize` | min(512, maxSeqLen) | `OnnxEmbeddingEncoder` | Sliding-window chunk width in tokens |
 | `chunkOverlap` | 128 | `OnnxEmbeddingEncoder` | Overlap between adjacent chunks in tokens |
-| `DEFAULT_GPU_MEM_MB` | 2048 | `OnnxEmbeddingEncoder` | GPU arena allocation for embedding sessions |
+| `justsearch.embed.gpu_mem_mb` | 6144 MB | `ResolvedConfigBuilder` | GPU arena limit for embedding sessions |
 
 ### SPLADE Inference
 
 | Parameter | Value | Class | Effect |
 | :--- | :--- | :--- | :--- |
 | `MAX_SPLADE_BATCH_SIZE_CPU` | 4 | `SpladeEncoder` | Max texts per ORT call on CPU (batch=4 optimal, 2.28x; batch=8 regresses) |
-| `MAX_SPLADE_BATCH_SIZE_GPU` | 8 | `SpladeEncoder` | Max texts per ORT call on GPU |
+| `MAX_SPLADE_BATCH_SIZE_GPU` | 4 | `SpladeEncoder` | Max texts per ORT call on GPU |
 | `SEQ_LEN_BUCKETS` | {128, 256, 384, 512} | `SpladeEncoder` | Fixed tensor shapes to prevent BFCArena fragmentation |
 | `maxSequenceLength` | 512 | `SpladeConfig` | Token truncation ceiling (default, env-overridable) |
 | `gpuMemLimitBytes` | 4096 MB | `SpladeConfig` | GPU arena for SPLADE sessions (default, env-overridable) |
-| `gpuEnabled` | false | `SpladeConfig` | GPU off by default (env-overridable via `JUSTSEARCH_SPLADE_GPU_ENABLED`) |
+| `justsearch.splade.gpu_enabled` | Per-model override, else master switch, else false | `ResolvedConfigBuilder` | Per-model override via `JUSTSEARCH_SPLADE_GPU_ENABLED`; device availability and enterprise policy can disable GPU use |
 
 ## Measured Throughput
 
-Measurements from tempdocs 268, 273, 278 on developer hardware
-(20 logical cores, RTX 4070 12 GB VRAM). Methodology: Claim A
-(engine-only) and Claim B (pipeline) benchmarks via `scripts/bench/`.
+Current release rates are projected from `scripts/jseval/release.v1.json` into
+the [engine-quality scorecard](../benchmarks/scorecard.md), with separate indexing
+and enrichment rates for each corpus. Use that source for current comparisons.
+
+The measurements below are historical (March–April 2026), from tempdocs 268,
+273, 278, 310, 311, 312 and 334 on developer hardware
+(20 logical cores, RTX 4070 12 GB VRAM). They used the former Claim A
+(engine-only) and Claim B (pipeline) harnesses; those runners are no longer
+under `scripts/bench/`.
 
 ### Baseline Rates (pre-optimization)
 
@@ -71,54 +79,19 @@ Measurements from tempdocs 268, 273, 278 on developer hardware
 | Engine-only (no extraction or embedding) | 2,800–3,600 docs/sec | Claim A suite | Lucene write ceiling |
 | Full pipeline (Tika + embed + SPLADE inline) | ~4 docs/sec | Mixed files | Pre-tempdoc-278 baseline |
 
-### Current Rates (combined single-pass enrichment)
+### Historical combined enrichment (2026-04)
 
-Default model: EmbeddingGemma-300M Q4 GPU, INT8 CPU fallback (tempdoc 334).
-Embedding is deferred to backfill during primary indexing — docs get
-`EMBEDDING_STATUS=PENDING` and are enriched post-ingest by combined single-pass
-backfill (embed + SPLADE + NER in one read-modify-write per doc). SPLADE is
-gated on embedding completion.
+The former “Current Rates” table, stage timeline, and batch breakdown described
+the April 2026 EmbeddingGemma configuration (tempdocs 311 and 334). Refer to those
+dated records for the experiment; use the [scorecard](../benchmarks/scorecard.md)
+for current release figures. End-to-end completion time and the release's
+separate indexing/enrichment rates are different metrics.
 
-| Configuration | Rate | Dataset | GPU | Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| **Primary indexing (deferred embed)** | **170 docs/sec** | SciFact (5.2K) | N/A | Embedding deferred; completes at 29s. Post-311 GPU serialization. |
-| **Full pipeline (ingest to fully indexed)** | **~16.5 docs/sec (GPU)** | SciFact (5.2K) | GPU all phases | 5,184 docs in ~310s (5.2 min); SPLADE-bottlenecked |
-| Primary indexing (inline embed, migration) | ~5.8–8.6 docs/sec | SciFact | GPU/CPU | Only during blue-green migration (see §Migration) |
-
-**Caveat:** The 201 docs/sec measurement was on SciFact (plain text `.txt`
-files) which bypass structured extraction entirely. PDF documents with layout
-detection have significantly different throughput (~4 pages/sec CPU with
-VDU/VLM re-extraction engaged). PDF throughput without
-the layout detector (Tika SAX only) is not separately benchmarked. For
-ingestion quality measurements on PDF documents, see tempdoc 252.
-
-**Stage completion timeline** (SciFact 5,184 docs, RTX 4070, GPU):
-
-| Stage | Current (post-311) | Pre-311 | Notes |
-| :--- | :--- | :--- | :--- |
-| Primary indexing | 29s (170 docs/s) | 25s (201 docs/s) | -15%, minor |
-| Embedding 100% | **302s** | 179s | **+69%**, GPU serialization cost |
-| SPLADE 100% | **310s** | 241s | +29%, bottleneck |
-| NER complete | 223s | 262s | -15%, faster |
-| Chunks 100% | 210s | 272s | -23%, faster |
-| **Total** | **~310s** | **~330s** | -6%, NER/chunk gains offset embed loss |
-
-**Note (2026-04-09):** Embedding stage regressed 69% (179s → 302s)
-after the GPU inference serialization fix (tempdoc 311, commit
-`215b72f22`). The `Semaphore(1)` per `NativeSessionHandle` (formerly `OrtSessionManager`, renamed in tempdoc 397 §14.23) prevents
-concurrent embedding + SPLADE GPU calls that previously overlapped.
-Total pipeline time is similar (~310s vs ~330s) because NER and chunks
-improved, masking the embedding regression. See tempdoc 311 for the
-open question on per-session semaphore relaxation.
-
-**Combined backfill per 100-doc batch** (1,203ms avg):
-
-| Phase | Time | % |
-| :--- | :--- | :--- |
-| SPLADE (v3 FP16 GPU) | 476ms | 40% |
-| Embedding (Q4 GPU) | 390ms | 32% |
-| NER (DistilBERT FP16 GPU) | 209ms | 17% |
-| Write + fetch + overhead | 128ms | 11% |
+**Historical note (2026-04-09):** the GPU inference serialization fix
+(tempdoc 311, commit `215b72f22`) used a per-session `Semaphore(1)` to prevent
+overlapping GPU calls. `NativeSessionHandle` now acquires a per-device
+`DeviceEncoderGate` seat for GPU execution; the old semaphore description
+does not describe current coordination.
 
 Pre-optimization rates (tempdocs 268, 273, 278):
 
@@ -129,8 +102,8 @@ Pre-optimization rates (tempdocs 268, 273, 278):
 
 ### SPLADE Model Optimization (2026-03-16)
 
-The default SPLADE model (`naver/splade-v3`) was the only FP32 model in
-the pipeline (embedding and reranker are already INT8). ORT transformer
+The then-default SPLADE model (`naver/splade-v3`) was the only FP32 model in
+the pipeline (embedding and reranker were already INT8). ORT transformer
 optimizer (O3) + dynamic INT8 quantization reduces the model from 532 MB
 to 134 MB with 1.55x CPU throughput and no quality regression.
 
@@ -145,7 +118,9 @@ to 134 MB with 1.55x CPU throughput and no quality regression.
 Quality validation (SciFact, 300 queries): SPLADE nDCG@10 delta -0.004
 (FP32: 0.590, O3+INT8: 0.586). Lexical unchanged. Zero query errors.
 
-### Why these rates
+### Why the historical rates differed
+
+This breakdown describes the tempdoc 334 configuration, not the current release.
 
 **Primary indexing** (deferred embedding): With embedding deferred to
 backfill (tempdoc 312 item 19), extract and write are ~2.5ms/doc each,
@@ -220,7 +195,9 @@ now encode-limited.
 Batch write also applied to embedding and NER backfill stages, reducing
 chunk embedding batch time from 18-25s to 7-13s.
 
-### Remaining optimization opportunities
+### Historical optimization notes
+
+The completion statuses and opportunities below reflect the March–April 2026 work.
 
 1. ~~Eliminate per-doc NRT refresh~~ — **Done** (tempdoc 310). Write cost
    reduced from 88ms/doc to 0.3ms/doc. Pipeline is now encode-limited.
@@ -250,7 +227,7 @@ enrichment (one RMW per doc). SPLADE is gated on embedding completion.
 ### Idle-loop priority
 
 1. **Combined enrichment (embed + SPLADE + NER)** — single-pass backfill via `EmbeddingBackfillOps`; GPU-gated via `shouldRunBackfill()`; SPLADE gated on embedding completion
-2. **Chunk vector backfill** — runs when doc embedding queue empty; gated by `ragChunkVectorsEnabled`
+2. **Chunk vector backfill** — runs when doc embedding queue empty; gated by `chunkVectorsEnabled`
 3. **Disambiguation backfill** — runs when NER queue empty
 
 ## Related Documents
