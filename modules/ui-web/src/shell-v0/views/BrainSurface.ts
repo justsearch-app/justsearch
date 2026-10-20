@@ -2471,9 +2471,10 @@ export class BrainSurface extends JfElement {
     const pct = progress.enrichingPercent;
     // Tempdoc 807 A.3 — these are fields off the RETAINED snapshot. With the backend gone they kept
     // animating a confident "Building semantic search 2.0% · 5,084 pending" (round 13, R13-F2): the
-    // numbers were right, the present tense was not. Not live ⟹ stop asserting progress — no spinner,
-    // no live-work colouring, every figure explicitly labelled as the last observation.
-    if (!live) {
+    // numbers were right, the present tense was not. An unconfirmed observation (expired or
+    // explicitly stale) stops asserting progress: no spinner, no live-work colouring, and every
+    // figure explicitly labelled as the last observation.
+    if (!progress.activity.confirmed) {
       return html`
         <div class="section" data-testid="brain-enrichment-progress">
           <div style="display: flex; gap: 0.625rem; align-items: flex-start">

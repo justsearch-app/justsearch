@@ -2,12 +2,14 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: builder-uiux-status-freshness-20261020
+author-session: builder-uiux-status-explicit-stale-20261020
 ---
 
 # Test-intent entries
 
 Durable WP3.3 checks, updated for the second verifier's S33.4 observation-age repair. Additional exact-candidate fail-before evidence is in `gates/test-intent/evidence/uiux-status-freshness-4c59d07c0.json`; the original-base evidence below is regenerated for all changed check files. The incompatible placement field and its isolated worker/mapper tests are retired together: all their production members are removed, and the complete scheduler/mapper source files return to f6a14b5a6. The regenerated fixture also returns byte-for-byte to f6a14b5a6. No branch-base test or compatibility baseline is removed. Existing acceptance records are retained below for history; independent verification must accept the final digest. The builder does not write acceptance.
+
+Third-verifier follow-up: Brain honours explicit stale flags as well as observation age. Additional exact-candidate fail-before evidence is in `gates/test-intent/evidence/uiux-status-explicit-stale-a53780a50.json`; the original-base evidence is regenerated after the final test edits. The active measured fixture variants are stamped at response time; their registered gate checks are unchanged.
 
 The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.1–S33.6. Each source retains its original ID in agreedScenario and its verbatim agreed quote.
 
@@ -386,7 +388,7 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
         "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts"
       ],
       "class": "New",
-      "behaviour": "S33.4 Brain enrichment reports an expired observation as unconfirmed without claiming the reachable Engine is disconnected or animating current activity; fresh status restores the live presentation. The existing harness gains the indexingStatusLive field paired with its existing liveness input; the previous preservation oracles are retained.",
+      "behaviour": "S33.4 Brain enrichment reports an expired observation as unconfirmed without claiming the reachable Engine is disconnected or animating current activity; fresh status restores the live presentation. The existing harness gains the indexingStatusLive field paired with its existing liveness input; the previous preservation oracles are retained. A fresh worker timestamp does not override meta.workerRpcStale or an explicitly stale indexing lane: Brain uses the shared activity confirmation, retains figures as last observed without a spinner, and recovers on the next confirmed observation.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -415,9 +417,39 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
       ],
       "evidence": "gates/test-intent/evidence/uiux-status-ui.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers"
+        "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 a fresh timestamp with 'worker RPC stale' is unconfirmed, then recovers",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 a fresh timestamp with 'indexing lane stale' is unconfirmed, then recovers"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "scripts/jseval/jseval/ui_fixtures.py"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "Only the indexing and enriching measured-capture variants replace the canonical January 2024 meta.workerRpcAtMs with the response-time UTC timestamp on every poll. They continue to represent confirmed ongoing work. All counters, phases, stale flags, freshness windows, selectors, axe baselines and proportion assertions are preserved. The measured registered gates fail on a53780a50 waiting for task-aggregate; complete before/after sweeps are retained under tmp/uiux-status/explicit-stale/. Script fixture support is outside product test-intent scope; recorded here for review.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "N333",
+          "quote": "N33.3 Both themes, High Contrast, axe and proportion gates; the task list stays clear of the rail.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "N33.3"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S334",
+          "quote": "S33.4 When a reason clears, its explanation disappears after the next fresh status observation; when status is stale or unavailable, surfaces mark the observation as unconfirmed instead of asserting current activity or quiescence.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.4"
+        }
+      ]
     }
   ]
 }

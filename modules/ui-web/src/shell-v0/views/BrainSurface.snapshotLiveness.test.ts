@@ -106,6 +106,35 @@ function domOf(tpl: TemplateResult | symbol): HTMLElement {
 }
 
 describe('BrainSurface — enrichment progress card (807)', () => {
+  it.each([
+    { reason: 'worker RPC stale', workerRpcStale: true, staleSources: [] },
+    { reason: 'indexing lane stale', workerRpcStale: false, staleSources: ['indexing'] },
+  ])('S33.4 a fresh timestamp with $reason is unconfirmed, then recovers', ({ workerRpcStale, staleSources }) => {
+    const el = harness(true);
+    const fresh = {
+      ...(el.systemStatus as object),
+      meta: { workerRpcAtMs: Date.now(), workerRpcStale: false },
+    };
+    el.systemStatus = {
+      ...fresh,
+      meta: { ...fresh.meta, workerRpcStale },
+      operating: { freshness: { staleSources } },
+    };
+
+    const observed = domOf(el.renderEnrichmentProgress());
+    expect(observed.textContent).toContain('Indexing status unconfirmed');
+    expect(observed.textContent).toContain('pending when last observed');
+    expect(observed.textContent).not.toContain(DISCONNECTED);
+    expect(observed.textContent).not.toContain('Building semantic search');
+    expect(observed.querySelector('.spin, [class*="spin"]')).toBeNull();
+
+    el.systemStatus = fresh;
+    const recovered = domOf(el.renderEnrichmentProgress());
+    expect(recovered.textContent).toContain('Building semantic search');
+    expect(recovered.textContent).not.toContain('Indexing status unconfirmed');
+    expect(recovered.querySelector('.spin, [class*="spin"]')).not.toBeNull();
+  });
+
   it('S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers', () => {
     const el = harness(true);
     const state = el._unifiedAiState as AiState;
