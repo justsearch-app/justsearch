@@ -42,6 +42,10 @@ The remaining named constants are compiled into the indicated class.
 
 ### Embedding Inference
 
+The default embedding model is `gte-multilingual-base`; `EmbeddingOnnxModelDiscovery`
+auto-discovers `onnx/gte-multilingual-base/` under the configured model roots unless
+an explicit ONNX model path is supplied.
+
 | Parameter | Value | Class | Effect |
 | :--- | :--- | :--- | :--- |
 | `MAX_ORT_BATCH_SIZE` | 8 | `OnnxEmbeddingEncoder` | ORT session sub-batch ceiling; the device-memory plan can choose a smaller batch |
