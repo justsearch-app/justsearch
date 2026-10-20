@@ -57,7 +57,8 @@ class OwnerOnlyDirectoryTest {
     var warnings = new ArrayList<String>();
     var parentMode = Files.getPosixFilePermissions(data);
     for (int i = 0; i < 2; i++) {
-      OwnerOnlyDirectory.ensure(runtime, path -> fail("must not repair a link"), warnings::add);
+      assertDoesNotThrow(() -> OwnerOnlyDirectory.ensure(runtime,
+          path -> fail("must not repair a link"), warnings::add));
     }
     assertEquals(parentMode, Files.getPosixFilePermissions(data));
     assertEquals(1, warnings.size());

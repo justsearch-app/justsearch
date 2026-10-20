@@ -85,9 +85,9 @@ class EncryptionKeystorePermissionsTest {
     var mode = Files.getPosixFilePermissions(outside);
     Files.createSymbolicLink(data.resolve("encryption"), outside);
     var parentMode = Files.getPosixFilePermissions(data);
-    var keys = restart();
+    var keys = assertDoesNotThrow(this::restart);
     keys.setup("passphrase".toCharArray());
-    var next = restart();
+    var next = assertDoesNotThrow(this::restart);
     next.unlock("passphrase".toCharArray());
     assertArrayEquals(keys.dek(), next.dek());
     assertEquals(parentMode, Files.getPosixFilePermissions(data));

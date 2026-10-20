@@ -57,7 +57,7 @@ class RuntimeDirectoryPermissionsTest {
     var mode = Files.getPosixFilePermissions(outside);
     Files.createSymbolicLink(data.resolve("runtime"), outside);
     var parentMode = Files.getPosixFilePermissions(data);
-    try (var publisher = new RuntimeManifestPublisher(data)) {
+    try (var publisher = assertDoesNotThrow(() -> new RuntimeManifestPublisher(data))) {
       publisher.publishHead(54321, "test-token");
       assertTrue(Files.isRegularFile(outside.resolve("manifest.json")));
     }
@@ -96,7 +96,7 @@ class RuntimeDirectoryPermissionsTest {
       logging.when(() -> LoggerFactory.getLogger(Mockito.<Class<?>>argThat(type -> type != null
           && type.getName().equals("io.justsearch.configuration.persistence.OwnerOnlyDirectory"))))
           .thenReturn(warning);
-      try (var publisher = new RuntimeManifestPublisher(data)) {
+      try (var publisher = assertDoesNotThrow(() -> new RuntimeManifestPublisher(data))) {
         publisher.publishHead(54321, "test-token");
         assertTrue(Files.isRegularFile(runtime.resolve("manifest.json")));
       }
@@ -127,7 +127,8 @@ class RuntimeDirectoryPermissionsTest {
         assertTrue(Files.isRegularFile(runtime.resolve("manifest.json")));
       }
       assertEquals("do-not-delete", Files.readString(marker));
-      Mockito.verify(warning, Mockito.times(1)).warn(Mockito.startsWith("Could not protect owner-only directory"));
+      assertDoesNotThrow(() -> Mockito.verify(warning, Mockito.times(1))
+          .warn(Mockito.startsWith("Could not protect owner-only directory")));
     }
   }
 

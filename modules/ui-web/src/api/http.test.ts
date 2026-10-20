@@ -61,7 +61,9 @@ describe('http module', () => {
         .mockResolvedValueOnce(Response.json({ recovered: true }));
       globalThis.fetch = send;
       const { request } = await import('./http');
-      await expect(request('http://127.0.0.1:33221', '/api/preview')).resolves.toEqual({ recovered: true });
+      const outcome = await request('http://127.0.0.1:33221', '/api/preview')
+        .then(value => ({ value }), error => ({ error }));
+      expect(outcome).toEqual({ value: { recovered: true } });
       expect(new Headers(send.mock.calls[0]?.[1]?.headers).get('X-JustSearch-Session')).toBe('old-token');
       expect(new Headers(send.mock.calls[1]?.[1]?.headers).get('X-JustSearch-Session')).toBe('new-token');
       expect(send).toHaveBeenCalledTimes(2);
