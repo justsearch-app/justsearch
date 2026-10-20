@@ -1543,3 +1543,14 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
   "note": "Entry 22 allows a 20 ms whole poll under a Q6 amendment absent from the supplied complete agreement, which requires under 10 ms p95."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a158f5-1b26-7c80-81bf-58ecfbd5b7d8",
+  "verdict": "accept",
+  "digest": "sha256:e38068e824267d4dcc0629767dfeed8d1a78ae20d8df7af564b1c2864bc3e5c8",
+  "note": "Test-intent classifications, sources and receipts are valid; candidate delivery separately fails Q15/Q26 in the independent installed-Engine probe."
+}
+```
