@@ -26,7 +26,7 @@ An explicit `justsearch://` URL alongside the flag keeps its destination.
 
 Find JustSearch in Start, choose **Open file location**, then use the shortcut's
 **Properties → Target** to find the installed executable. Create a separate
-shortcut to that executable and append ` --focus-search` to its Target, outside
+shortcut to that executable and append a space and `--focus-search` to its Target, outside
 the closing quote, for example:
 
 ```text
