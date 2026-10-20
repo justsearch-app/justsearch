@@ -1615,7 +1615,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
         "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsEnqueueBurstTest.java"
       ],
       "class": "New",
-      "behaviour": "Hold a real Engine subscription delivery and submit 2,005 actual files through the real ingest client. Invisible newly inserted PENDING rows must not fill the handoff. Installed no-observer and stalled-socket-reader probes separately measure submission through all rows PENDING: zero enqueue overflows in both. Later DONE-phase overflows fall under Q26; terminal continuity across them is checked independently under Q17. All original assertions and the 256-slot capacity remain unchanged.",
+      "behaviour": "Hold a real Engine subscription delivery and submit 2,005 actual files through the real ingest client. Invisible newly inserted PENDING rows must not fill the handoff. Installed no-observer and stalled-socket-reader probes separately measure submission through all rows PENDING: zero enqueue overflows in both. Later DONE-phase overflows fall under Q26; terminal continuity across them is checked independently under Q17. All original assertions and the 256-slot capacity remain unchanged. Fixture captures the predecessor ConfigStore.GLOBAL before publication and restores it in teardown finally, including startup and shutdown failures. The no-Engine before/after isolation probe is documented in gates/test-intent/evidence/queue-scale-config-isolation.md; no burst assertion changes.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1649,7 +1649,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/queue-scale-browser-drain.json",
+      "evidence": "gates/test-intent/evidence/queue-scale-config-isolation.json",
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsEnqueueBurstTest.java"
       ],

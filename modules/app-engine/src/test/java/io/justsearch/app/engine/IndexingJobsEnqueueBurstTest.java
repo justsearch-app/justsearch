@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
@@ -23,16 +24,23 @@ import org.junit.jupiter.api.io.TempDir;
 @Timeout(180)
 final class IndexingJobsEnqueueBurstTest {
 
+  private final ConfigStore previousConfig = ConfigStore.globalOrNull();
   private EngineRoot root;
 
   @AfterEach
   void tearDown() {
-    if (root != null) {
-      root.admission().beginClosing();
-      root.quiesceProducers();
-      assertTrue(root.admission().awaitDrained(java.time.Duration.ofSeconds(30)));
-      root.close();
-      root = null;
+    try {
+      if (root != null) {
+        root.admission().beginClosing();
+        root.quiesceProducers();
+        assertTrue(root.admission().awaitDrained(java.time.Duration.ofSeconds(30)));
+        root.close();
+        root = null;
+      }
+    } finally {
+      ConfigStore current = ConfigStore.globalOrNull();
+      if (current != null) ConfigStore.restoreGlobal(current, previousConfig);
+      else if (previousConfig != null) ConfigStore.setGlobal(previousConfig);
     }
   }
 
