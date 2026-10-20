@@ -77,6 +77,17 @@ public interface AgentService extends AgentRunQueries {
   }
 
   /**
+   * WP6.2 — {@link #injectSteeringDirective(String, String)} for one send that names itself: the
+   * window's {@code clientRequestId} (null when the client sent none) is echoed in the direction's
+   * queued {@link AgentEvent.DirectiveAcknowledged} report, so the window can tell which of several
+   * sends with the same text the run took. The default ignores it, so legacy implementations keep
+   * working unchanged.
+   */
+  default boolean injectSteeringDirective(String sessionId, String text, String clientRequestId) {
+    return injectSteeringDirective(sessionId, text);
+  }
+
+  /**
    * Tempdoc 577 Ext III — the over-budget remedy: grant a running session additional tokens (POST
    * /api/chat/agent/budget). Returns true when the session was found and the budget raised; false
    * (404) for an unknown/finished session or a non-positive grant. Default no-op returns false so
