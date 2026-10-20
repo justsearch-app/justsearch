@@ -176,6 +176,7 @@ class WorkerUserExclusionsEngineTest extends LuceneExecutorTestBase {
       var service = new WorkerIngestService(mock(JobQueue.class), mock(IndexingLoop.class), null,
           IndexingPacing.unthrottled(), null, null, runtime, runtime, null, 0L);
       service.seedRootVolumesAfterUpgrade(List.of(root));
+      service.useExclusionRoots(() -> List.of(root));
       assertEquals(java.util.Set.of(key(file), key(keep)), java.util.Set.copyOf(service.queryPendingVdu(
           QueryPendingVduRequest.newBuilder().build(), CallContext.none()).getDocIdsList()));
       for (String status : List.of(SchemaFields.EMBEDDING_STATUS, SchemaFields.NER_STATUS, SchemaFields.SPLADE_STATUS)) {
@@ -356,6 +357,7 @@ class WorkerUserExclusionsEngineTest extends LuceneExecutorTestBase {
       var service = new WorkerIngestService(mock(JobQueue.class), mock(IndexingLoop.class), null,
           IndexingPacing.unthrottled(), null, null, runtime, runtime, null, 0L);
       service.seedRootVolumesAfterUpgrade(List.of(root));
+      service.useExclusionRoots(() -> List.of(root));
       assertEquals(List.of(id), runtime.documentFieldOps().queryDocIdsByField(
           SchemaFields.EMBEDDING_STATUS, "PENDING", 10),
           "EN2: a declared no-file source stays eligible even when its provenance path matches a file exclusion");

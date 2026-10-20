@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: 01a15819-2a8c-73e1-84af-4f19e90308d0
+author-session: builder-vgrmxeu1-r1
 ---
 
 # Test-intent entries
@@ -72,7 +72,7 @@ No frontend edit is required by D4/D5.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-exclusions-preserved.json",
+      "evidence": "gates/test-intent/evidence/uiux-exclusions-engine-preserved.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EN2VerifiedDeletionStillRemovesParentAndChunks",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EN2DeclaredNoFileProjectionKeepsEnrichmentEligibility"
@@ -100,7 +100,6 @@ No frontend edit is required by D4/D5.
     },
     {
       "items": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java"
       ],
       "class": "New",
@@ -118,7 +117,27 @@ No frontend edit is required by D4/D5.
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java#EX1AllScanModesUseSavedPolicyAndEN2KeepOtherFiles",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java#EX1CandidateReconcileHonoursUserExclusions",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java#EX1LiveCreatesChangesAndMovesUseSavedPolicy",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java#EX1LiveCreatesChangesAndMovesUseSavedPolicy"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java"
+      ],
+      "class": "New",
+      "behaviour": "EX1: repaired admission/matching/current-policy behaviour in the named checks.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "EX1",
+          "quote": "(broken today) After exclusion patterns are saved, a file that matches them does not enter the index by any path: the periodic folder check, a live file event (create, change, move or rename into the excluded location), a watcher-overflow re-check, a per-folder reconcile, an incremental or forced Reindex, a full rebuild, an MCP or agent ingest of a watched path, or the boot walk after a restart. Checked with a fixture that is not yet indexed and one that was indexed before the pattern was saved and then removed by Apply.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-exclusions-engine-repaired.json",
+      "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EX1ExplicitIngestOfWatchedPathCannotBypassPolicy",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EX1AppliedMatchesStayAbsentThroughMaintenanceScansExplicitIngestAndBootWalk",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EX1RenameCannotPublishExistingRowsAtExcludedDestination"
@@ -127,7 +146,6 @@ No frontend edit is required by D4/D5.
     },
     {
       "items": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsTest.java"
       ],
       "class": "New",
@@ -143,7 +161,27 @@ No frontend edit is required by D4/D5.
       ],
       "evidence": "gates/test-intent/evidence/uiux-exclusions-repaired.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsTest.java#EX2QueuedWorkUsesCurrentPolicyAndEN1BuiltInSkipsRemain",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsTest.java#EX2QueuedWorkUsesCurrentPolicyAndEN1BuiltInSkipsRemain"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java"
+      ],
+      "class": "New",
+      "behaviour": "EX2: repaired admission/matching/current-policy behaviour in the named checks.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "EX2",
+          "quote": "Work prepared or queued before the patterns changed cannot add a now-excluded file: jobs already in the queue, a Reindex prepared with the older list, and a recorded Reindex replayed after a restart all honour the list current when the file is processed (or drop the file); none restores a document silently.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-exclusions-engine-repaired.json",
+      "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EX2RecordedEnumerationReplayedAfterRestartUsesCurrentPolicy",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EX2PolicySavedAfterExtractionPreventsPublication"
       ],
@@ -252,7 +290,7 @@ No frontend edit is required by D4/D5.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-exclusions-repaired.json",
+      "evidence": "gates/test-intent/evidence/uiux-exclusions-engine-repaired.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EX5SavedPolicyRetainsIndexedTextButStopsFurtherEnrichment"
       ],
@@ -263,7 +301,6 @@ No frontend edit is required by D4/D5.
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/LegacyExclusionUpgradeTest.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsTest.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java",
         "modules/app-services/src/test/resources/io/justsearch/app/services/settings/legacy-exclusions-f9bd104d2.json"
       ],
       "class": "New",
@@ -292,7 +329,34 @@ No frontend edit is required by D4/D5.
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsTest.java#AX1QueuedWorkUsesCurrentPolicyAndEN1BuiltInSkipsRemain",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java#AX1AllScanModesUseSavedPolicyAndEN2KeepOtherFiles",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java#AX1CandidateReconcileHonoursUserExclusions",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java#AX1LiveCreatesChangesAndMovesUseSavedPolicy",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java#AX1LiveCreatesChangesAndMovesUseSavedPolicy"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java"
+      ],
+      "class": "New",
+      "behaviour": "EN1/AX1/AX2: a settings list actually written by f9bd104d2 survives upgrade and restart; malformed entries match literal names, valid entries retain the current class/alternative meaning, replay can recompile captured lists, and Preview/Apply preserve exact saved labels and file membership. The fixture is portable, immutable before-version output.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AX1",
+          "quote": "an invalid saved entry is matched as a literal name, never stops indexing, the other entries keep working, Preview/editor show the saved list and the editor warns about each such entry",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AX2",
+          "quote": "the new meaning of [ ] and { } applies to old lists and the editor's pattern help says so",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-exclusions-engine-ax-repaired.json",
+      "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#AX1ExplicitIngestOfWatchedPathCannotBypassPolicy",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#AX1RecordedEnumerationReplayedAfterRestartUsesCurrentPolicy"
       ],
@@ -441,6 +505,46 @@ No frontend edit is required by D4/D5.
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerScanOpsRecordedTest.java#AX1MalformedRecordedGlobMatchesLiteralNameAndKeepsOtherEntriesWorking"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineExclusionReplayPolicyTest.java"
+      ],
+      "class": "New",
+      "behaviour": "S31.5 / EX5: after successful live cutover replays a persisted legacy SYNC_ROOT, the serving runtime continues filtering excluded files from VDU, embedding, NER and SPLADE pending selections and cache rechecks; existing text remains readable and the live KnowledgeClient selection agrees.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "EX5",
+          "quote": "Make the source-processing policy that the runtime applies always be the serving service's policy, across every runtime transition (generation switch, migration cutover with and without replay, rebuild, reload, restart): a temporary or non-serving WorkerIngestService must never replace it, and the binding must not depend on construction order.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-exclusions-replay-policy.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineExclusionReplayPolicyTest.java#EX5LegacySyncReplayKeepsServingPolicyAfterLiveCutover"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The two direct enrichment fixtures explicitly supply their existing root through useExclusionRoots, matching the composing owner's policy binding after construction. All inputs, status selections, save/remove actions, identity handling, retained-content assertions and no-file eligibility assertions stay unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "EX5",
+          "quote": "a temporary or non-serving WorkerIngestService must never replace it, and the binding must not depend on construction order.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
     }
   ]
 }
@@ -453,6 +557,23 @@ No frontend edit is required by D4/D5.
 - 2026-10-20: Reworked after verifier rejection 8cf789758. Removed finding-8 claims from both EX4 entries (AX3); added before-version-written upgrade data and EN1/AX1 admission, replay, Preview/Apply and editor checks, plus AX2 pattern help. Existing rejection record retained below. Builder session agent-session-2xmru_je.
 
 - 2026-10-20: Reworked after verifier rejection 47e8d1e79 under agent-adopted D1-D5: restore malformed operator override fallback with a once-per-policy warning (EN1 evidence); retain omitted empty diagnostics and the original projection oracle; replace recorded invalid-glob refusal under AX1 with real-base fail-before evidence; document the D4/D5 conditional no-change findings. Both rejection records retained byte-identical. Builder session 01a15819-2a8c-73e1-84af-4f19e90308d0.
+
+### R1 ownership repair
+
+Policy binding now belongs to the existing common owner-wiring call, `useExclusionRoots`, rather
+than construction of an ingest service. KnowledgeServer calls it for every composed service set
+before publication, including Green preparation and promotion, reload, rebuild and restart.
+Temporary SYNC_ROOT and VDU recovery services do not call it. This makes binding independent of
+replay-helper construction order and needs no rebind after replay.
+
+The Engine regression ingests real files, saves a qualified exclusion after Green contains them,
+persists a generation-scoped legacy SYNC_ROOT, completes live cutover and verifies four pending
+processing selections, the cache recheck, retained text and the KnowledgeClient selection. Pending
+status seeding uses the real runtime coordinator to avoid requiring model files.
+
+The before-version compatibility patch only supplies the missing roots-wiring method as a no-op
+for the existing direct service fixtures on f9bd104d2. It installs no policy or repaired behavior.
+Affected fixture evidence is refreshed separately by the evidence runner; unrelated evidence and historical acceptance records are retained.
 
 ## Acceptance records
 

@@ -211,9 +211,6 @@ public final class WorkerIngestService {
     this.rootVolumes = RootVolumeLedger.under(indexBasePath);
     this.rootWitness = RootWitness.of(rootVolumes, this::registeredRootIdentity,
         folder -> rootWatcherRegistry.declaresRootCovering(folder));
-    if (ingestLifecycle != null) {
-      ingestLifecycle.useSourceProcessingPolicy(this::sourceProcessingAllowed);
-    }
     this.migrationOps = new MigrationControlOps(this.indexGenerationManager);
     this.upgradeQuiescence =
         new WorkerUpgradeQuiescence(jobQueue, indexingLoop, this.indexGenerationManager);
@@ -1222,9 +1219,16 @@ public final class WorkerIngestService {
   private volatile java.util.Collection<Path> bootExclusionRoots = List.of();
   private volatile Supplier<java.util.Collection<Path>> exclusionRoots = () -> bootExclusionRoots;
 
-  /** The Head owns watched membership independently of whether a native watch is live. */
+  /**
+   * The composing owner binds its current file policy and Head-owned watched membership before
+   * publication. Construction alone must not bind: temporary replay services share the runtime
+   * but never own its processing policy.
+   */
   public void useExclusionRoots(Supplier<java.util.Collection<Path>> roots) {
     exclusionRoots = java.util.Objects.requireNonNull(roots, "roots");
+    if (ingestLifecycle != null) {
+      ingestLifecycle.useSourceProcessingPolicy(this::sourceProcessingAllowed);
+    }
   }
 
   /** Current user policy, including saved roots not yet registered with a native watcher. */
