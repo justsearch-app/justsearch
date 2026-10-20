@@ -2270,11 +2270,16 @@ mod tests {
             .env("JUSTSEARCH_TLS_TEST_CHILD", &name)
             .output()
             .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let ran_exactly_this_test = stdout.lines().any(|line| line == "running 1 test")
+            && stdout
+                .lines()
+                .any(|line| line.starts_with("test result: ok. 1 passed; 0 failed;"));
         assert_eq!(
-            output.status.success(),
-            true,
+            (output.status.success(), ran_exactly_this_test),
+            (true, true),
             "fresh-process check failed:\n{}\n{}",
-            String::from_utf8_lossy(&output.stdout),
+            stdout,
             String::from_utf8_lossy(&output.stderr),
         );
         false

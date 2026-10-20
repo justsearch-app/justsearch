@@ -8,6 +8,8 @@ author-session: upkeep-g-updater-tls
 # Test-intent entries
 
 The provider regression pins the no-hang defect; the signature check pins unchanged trust behavior.
+Both fresh-process checks require successful child exit, exactly one running test, and a libtest summary reporting one passed and zero failed; an unmatched child filter is a failure.
+A temporary wrong-name probe fails with the original helper (the expected panic is absent) and passes with the hardened helper; logs are under tmp/evidence/helper-vacuity-20261020-1436/. The probe is removed after validation.
 The fail-before compatibility patch introduces only a no-op initializer interface so the new test can compile on the old implementation.
 Baseline signature preservation is also run on the unchanged production sources with the new test module transplanted; logs are under tmp/evidence/.
 
@@ -19,7 +21,7 @@ Baseline signature preservation is also run on the unchanged production sources 
         "modules/shell/src-tauri/src/updater.rs#cfg(test)"
       ],
       "class": "Defect pin",
-      "behaviour": "In a fresh process, the shared startup initializer installs ring, repeated initialization preserves the installed provider, and both the release-client (20 seconds) and backend-client (HEAD_TIMEOUT) configurations build without panic or error. Tests use the production initializer; the real-shell evidence separately exercises check_release through real IPC.",
+      "behaviour": "In a fresh process, the shared startup initializer installs ring, repeated initialization preserves the installed provider, and both the release-client (20 seconds) and backend-client (HEAD_TIMEOUT) configurations build without panic or error. The child must report running exactly one test and a summary of one passed and zero failed. Tests use the production initializer; the real-shell evidence separately exercises check_release through real IPC.",
       "defectSource": {
         "kind": "defect-source",
         "safeguard": "no hang",
@@ -38,7 +40,7 @@ Baseline signature preservation is also run on the unchanged production sources 
           "delegationLocation": "task t-20261019-9d870e request",
           "delegationScope": "the remaining upkeep work, including defects found during it",
           "label": "agent choice",
-          "choice": "Install the already enabled ring provider in one shared initializer before either startup path constructs clients; ignore repeated-install errors and check both client configurations in a fresh process."
+          "choice": "Install the already enabled ring provider in one shared initializer before either startup path constructs clients; ignore repeated-install errors and check both client configurations in a fresh process. Require the child to exit successfully and report exactly one running test, one passed and zero failed, so an outdated test name cannot pass vacuously."
         }
       ],
       "evidence": "gates/test-intent/evidence/updater-tls-provider.json",
@@ -51,7 +53,7 @@ Baseline signature preservation is also run on the unchanged production sources 
         "modules/shell/src-tauri/src/updater.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Preserve signed-metadata validation: an Ed25519 signature is accepted for the original bytes, and rejected for tampered bytes with the existing verification error. The trust-key override is confined to a fresh test subprocess. This is a new check of unchanged behavior, not a repaired expectation.",
+      "behaviour": "Preserve signed-metadata validation: an Ed25519 signature is accepted for the original bytes, and rejected for tampered bytes with the existing verification error. The trust-key override is confined to a fresh test subprocess whose output must report exactly one running test, one passed and zero failed. This is a new check of unchanged behavior, not a repaired expectation.",
       "sources": [
         {
           "kind": "owner-words",
@@ -64,7 +66,7 @@ Baseline signature preservation is also run on the unchanged production sources 
           "delegationLocation": "task t-20261019-9d870e request",
           "delegationScope": "the remaining upkeep work, including defects found during it",
           "label": "agent choice",
-          "choice": "Add a direct preservation check of the existing signature verifier with authentic and tampered metadata; the claimed existing direct signature test was absent."
+          "choice": "Add a direct preservation check of the existing signature verifier with authentic and tampered metadata; the claimed existing direct signature test was absent. Require the shared child harness to report exactly one running test, one passed and zero failed, so the signature check also rejects an outdated test name."
         }
       ],
       "evidence": "gates/test-intent/evidence/updater-tls-signature.json",
