@@ -65,17 +65,17 @@ impl WindowsProbe {
         command
     }
 
-    pub fn assert_folder(&self, expected: &Path, selected: Option<&Path>) {
+    pub fn assert_folder(&self, expected: &Path, item: Option<&Path>) {
         let output = self
             .command("observe")
             .env("OPEN_GUARD_EXPECTED", expected)
-            .env("OPEN_GUARD_SELECTED", selected.unwrap_or(Path::new("")))
+            .env("OPEN_GUARD_SELECTED", item.unwrap_or(Path::new("")))
             .output()
             .unwrap();
         assert_eq!(
             output.status.code(),
             Some(0),
-            "actual Explorer window/selection: {} {}",
+            "actual Explorer folder/focused or selected item: {} {}",
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );

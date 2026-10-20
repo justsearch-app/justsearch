@@ -25,7 +25,7 @@ function Observation($entries) {
     $json = $entries | Select-Object Hwnd, Path,
         @{ Name = 'ExpectedPath'; Expression = { $env:OPEN_GUARD_EXPECTED } },
         @{ Name = 'ExpectedSelection'; Expression = { $env:OPEN_GUARD_SELECTED } },
-        SelectionCount, Selected, PipelineSelected |
+        SelectionCount, Selected, Focused, PipelineSelected |
         ConvertTo-Json -Depth 4 -Compress
     if ($env:OPEN_GUARD_OBSERVATIONS) {
         Add-Content -LiteralPath $env:OPEN_GUARD_OBSERVATIONS -Value $json -Encoding UTF8
@@ -46,11 +46,15 @@ if ($Mode -eq 'observe') {
                 $selected = @(for ($index = 0; $index -lt $items.Count; $index++) {
                     [string]$items.Item($index).Path
                 })
+                $focused = try { [string]$entry.Window.Document.FocusedItem.Path } catch { '' }
                 $pipeline = @($items | ForEach-Object { [string]$_.Path })
                 $entry | Add-Member -NotePropertyName SelectionCount -NotePropertyValue $items.Count
                 $entry | Add-Member -NotePropertyName Selected -NotePropertyValue $selected
+                $entry | Add-Member -NotePropertyName Focused -NotePropertyValue $focused
                 $entry | Add-Member -NotePropertyName PipelineSelected -NotePropertyValue $pipeline
-                if (!$env:OPEN_GUARD_SELECTED -or $selected -icontains $env:OPEN_GUARD_SELECTED) {
+                # Hosted Explorer focuses /select targets without selecting them. Still require
+                # this exact folder AND this exact focused/selected target; never the folder alone.
+                if (!$env:OPEN_GUARD_SELECTED -or $focused -ieq $env:OPEN_GUARD_SELECTED -or $selected -icontains $env:OPEN_GUARD_SELECTED) {
                     Observation @($entry)
                     exit 0
                 }
@@ -59,7 +63,7 @@ if ($Mode -eq 'observe') {
         Start-Sleep -Milliseconds 200
     } while ([DateTime]::UtcNow -lt $deadline)
     Observation $last
-    [Console]::Error.WriteLine("No actual Explorer window at '$env:OPEN_GUARD_EXPECTED' with selection '$env:OPEN_GUARD_SELECTED'")
+    [Console]::Error.WriteLine("No actual Explorer window at '$env:OPEN_GUARD_EXPECTED' with focused or selected item '$env:OPEN_GUARD_SELECTED'")
     exit 1
 }
 # Every test holds the same Rust mutex. Record new window HWND/location pairs, including wrong

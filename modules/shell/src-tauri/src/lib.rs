@@ -3441,13 +3441,27 @@ mod open_guard_tests {
     }
 
     #[cfg(windows)]
-    #[test]
-    fn windows_comma_reveal_window_and_selection() {
+    fn windows_observe_reveal(name: &str) {
         let dir = tempdir().unwrap();
-        let file = PathBuf::from(fixture(dir.path(), "a,b2.txt"));
+        // A parent-only open must not pass by incidentally focusing its sole/first file.
+        fixture(dir.path(), "000-unrelated.txt");
+        let file = PathBuf::from(fixture(dir.path(), name));
         let gui = windows_probe::WindowsProbe::new(dir.path(), &[&file]);
         let (item, parent) = reveal_target(file.to_str().unwrap()).unwrap();
         assert_plain_dispatched_path(dispatch_reveal_target(&item, &parent), &file);
         gui.assert_folder(dir.path(), Some(&file));
     }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_plain_reveal_window_control() {
+        windows_observe_reveal("plain.txt");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_comma_reveal_window_and_selection() {
+        windows_observe_reveal("a,b2.txt");
+    }
+
 }
