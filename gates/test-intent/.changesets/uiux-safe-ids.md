@@ -44,6 +44,8 @@ Review history: verifier-4 found invalid ids in saved branch parents, run/conver
 
 Review history: verifier-5 found that the invalid saved-parent HTTP check already passes on the real base 117e89be9. It is now a preservation entry, retaining its expectation and PN1s source, with candidate-only evidence generated without --before. Existing acceptance and rejection records remain unchanged.
 
+Review history: the independent audit rejected the batch-name preservation citation. That entry now also cites S9.1’s single-plain-name rule and the Windows reserved-name bound. Every cited orchestrator amendment after verifier-1 through verifier-4 is now a delegated choice quoting the user’s delegation; the restore notice’s exact wording has its own delegated choice alongside the saved-data scenario. Existing review records and execution evidence remain unchanged.
+
 ```json
 {
   "entries": [
@@ -244,18 +246,20 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PS1b",
-          "quote": "S9.1 covers every id from a request that becomes a path, including batch/file-history ids on agent routes (the file-history route still read any .json by a traversal id; undo uses the same lookup).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 covers every id from a request that becomes a path, including batch/file-history ids on agent routes (the file-history route still read any .json by a traversal id; undo uses the same lookup).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PS1w",
-          "quote": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
         },
         {
           "kind": "owner-adopted-scenario",
@@ -281,11 +285,12 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "Reject Windows device names and trailing dot/space aliases before store access.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PS1w",
-          "quote": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-amendments.json",
@@ -304,18 +309,20 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "Refuse unsafe history/undo ids and Windows aliases on HTTP before querying stores.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PS1b",
-          "quote": "S9.1 covers every id from a request that becomes a path, including batch/file-history ids on agent routes (the file-history route still read any .json by a traversal id; undo uses the same lookup).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 covers every id from a request that becomes a path, including batch/file-history ids on agent routes (the file-history route still read any .json by a traversal id; undo uses the same lookup).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PS1w",
-          "quote": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
         },
         {
           "kind": "owner-adopted-scenario",
@@ -349,11 +356,12 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "Normalize optional blank body ids to absence before dispatch and approval; pin that behavior even where the old dispatch path used blank sessionId as a store key.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PN3",
-          "quote": "An optional id field in a request body that is empty or blank is treated as absent, exactly as before (not refused); stores still refuse a blank id.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.3 An optional id field in a request body that is empty or blank is treated as absent, exactly as before (not refused); stores still refuse a blank id.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-amendments.json",
@@ -395,6 +403,21 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
           "scenario": "PN1",
           "quote": "Every id format the app creates or has created (UUIDs, the throwaway title-session prefix, branch ids, run ids, ids in saved data from earlier versions) keeps working for every operation; saved data from before the change loads unchanged.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-amendments-preserve.json",
@@ -410,11 +433,12 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "Refuse Windows reserved devices with Unicode line separators in extensions. This test cannot compile on base 117e89be9 because StoreIds was introduced in this branch; its assertion fail-before uses b359747af.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PS1w",
-          "quote": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-unicode-extensions.json",
@@ -431,11 +455,12 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "Preserve the HTTP status and body for optional blank conversationId compared with an absent field.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PN3",
-          "quote": "An optional id field in a request body that is empty or blank is treated as absent, exactly as before (not refused); stores still refuse a blank id.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.3 An optional id field in a request body that is empty or blank is treated as absent, exactly as before (not refused); stores still refuse a blank id.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-review-preserve.json",
@@ -474,11 +499,12 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "Refuse superscript Windows device names, console devices, and reserved device names with spaces before an extension through the shared resolver, conversation store and decoded HTTP route.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PS1w",
-          "quote": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
         },
         {
           "kind": "owner-adopted-scenario",
@@ -504,11 +530,12 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "Omit invalid legacy conversation folders before metadata reads, preserve their exact file bytes, keep valid rows and list filters, and warn once per skipped folder across repeated listings.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PN1e",
-          "quote": "a folder or file with a name that is not a valid id inside any store (blank-named conversation folders made by the old dispatch bug, or any other invalid name found on disk) is skipped by every operation that enumerates the store (conversation and session lists, branch and child checks, presence, thread views, run lists); it never makes an operation on a valid id fail, and its files stay on disk.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.1: a folder or file with a name that is not a valid id inside any store (blank-named conversation folders made by the old dispatch bug, or any other invalid name found on disk) is skipped by every operation that enumerates the store (conversation and session lists, branch and child checks, presence, thread views, run lists); it never makes an operation on a valid id fail, and its files stay on disk.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-review-repair.json",
@@ -525,18 +552,20 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "Preserve ordinary names that resemble Windows reserved names.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PS1w",
-          "quote": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PS1x",
-          "quote": "S9.1 Windows names: also refuse superscript device names (COM¹-³, LPT¹-³), CONIN$, CONOUT$, and reserved names followed by spaces before an extension (\"NUL .txt\").",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse superscript device names (COM¹-³, LPT¹-³), CONIN$, CONOUT$, and reserved names followed by spaces before an extension (\"NUL .txt\").",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-review-preserve.json",
@@ -552,11 +581,12 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "Skip invalid run folders before reads in every run projection and scoped deletion, including startup retention; leave invalid files unchanged.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PN1e",
-          "quote": "a folder or file with a name that is not a valid id inside any store (blank-named conversation folders made by the old dispatch bug, or any other invalid name found on disk) is skipped by every operation that enumerates the store (conversation and session lists, branch and child checks, presence, thread views, run lists); it never makes an operation on a valid id fail, and its files stay on disk.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.1: a folder or file with a name that is not a valid id inside any store (blank-named conversation folders made by the old dispatch bug, or any other invalid name found on disk) is skipped by every operation that enumerates the store (conversation and session lists, branch and child checks, presence, thread views, run lists); it never makes an operation on a valid id fail, and its files stay on disk.",
+          "label": "agent choice"
         },
         {
           "kind": "owner-adopted-scenario",
@@ -588,11 +618,12 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "Skip journals with invalid batch ids before reads and limits, including startup retention; leave invalid files unchanged.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PN1e",
-          "quote": "a folder or file with a name that is not a valid id inside any store (blank-named conversation folders made by the old dispatch bug, or any other invalid name found on disk) is skipped by every operation that enumerates the store (conversation and session lists, branch and child checks, presence, thread views, run lists); it never makes an operation on a valid id fail, and its files stay on disk.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.1: a folder or file with a name that is not a valid id inside any store (blank-named conversation folders made by the old dispatch bug, or any other invalid name found on disk) is skipped by every operation that enumerates the store (conversation and session lists, branch and child checks, presence, thread views, run lists); it never makes an operation on a valid id fail, and its files stay on disk.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-enumeration-repair.json",
@@ -610,11 +641,12 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "Through running HTTP handlers backed by real stores, retain valid conversation lists, branching, inherited history and child protection, deletion, sessions, presence and thread views beside invalid folders; preserve invalid files.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PN1e",
-          "quote": "a folder or file with a name that is not a valid id inside any store (blank-named conversation folders made by the old dispatch bug, or any other invalid name found on disk) is skipped by every operation that enumerates the store (conversation and session lists, branch and child checks, presence, thread views, run lists); it never makes an operation on a valid id fail, and its files stay on disk.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.1: a folder or file with a name that is not a valid id inside any store (blank-named conversation folders made by the old dispatch bug, or any other invalid name found on disk) is skipped by every operation that enumerates the store (conversation and session lists, branch and child checks, presence, thread views, run lists); it never makes an operation on a valid id fail, and its files stay on disk.",
+          "label": "agent choice"
         },
         {
           "kind": "owner-adopted-scenario",
@@ -646,11 +678,12 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "Over HTTP, valid branches with invalid saved parents retain their own history and thread events.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PN1s",
-          "quote": "An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.1 (after verifier-4, 2026-10-20 07:00; orchestrator decision under the user's delegation) An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-saved-parent-preserve.json",
@@ -666,11 +699,12 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "Over HTTP, valid conversation lists ignore runs naming invalid conversations while keeping those runs, and v1 backups restore valid conversations and report skipped invalid entries.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PN1s",
-          "quote": "An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.1 (after verifier-4, 2026-10-20 07:00; orchestrator decision under the user's delegation) An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-saved-data.json",
@@ -688,11 +722,12 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "An invalid saved last-session pointer reads as missing, without trimming it into another valid id or changing its bytes; session and presence indexes skip invalid saved session references and retain valid runs.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PN1s",
-          "quote": "An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.1 (after verifier-4, 2026-10-20 07:00; orchestrator decision under the user's delegation) An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-saved-data.json",
@@ -710,11 +745,20 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
       "behaviour": "The existing restore notice states both restored and skipped counts, handles singular skipped entries, and does not claim invalid entries already exist when all entries are skipped.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PN1s",
-          "quote": "An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.1 (after verifier-4, 2026-10-20 07:00; orchestrator decision under the user's delegation) An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "The restore notice uses \"Restored 2 conversations.\" and \"Skipped 5 entries with invalid ids.\" when two conversations are restored and five entries are skipped. When no conversations are restored and one entry is skipped, it uses \"Nothing new to restore. Skipped 1 entry with an invalid id.\".",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-saved-data.json",
