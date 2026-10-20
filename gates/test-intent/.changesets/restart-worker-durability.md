@@ -466,3 +466,14 @@ An independent verifier supplies acceptance after checking the final candidate a
   "note": "Verified Linux part A on 09060a67a vs f9bd104d2 with fresh installed, SIGKILL, refusal, preservation and mutation checks. Windows unverified; independence is a separate Codex session."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-822b-codex",
+  "verdict": "accept",
+  "digest": "sha256:c6dc28cdb214190d25aebd1576a70a2560339a5b767a04b27dfd970b67259d29",
+  "note": "Delta 5dae1007b..28c2d7508 verified: Linux PMD, store gate, four CI classes, 13 paired installed cases, SIGKILL/temp cleanup and rollback checks. Windows contracts independent; native candidate unverified. Separate Codex session only."
+}
+```
