@@ -54,3 +54,14 @@ Product test assertions and task membership are retained. Independent acceptance
   "note": "Independent diff review: only the delegated merge-group test skips and dispatch-only advisory scheduling change execution; required contexts and PR/main required test commands are retained."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "auditor-ci-light-queue-codex",
+  "verdict": "accept",
+  "digest": "sha256:c76eaa2a47e9facb672afbc7822e8524803b4d9859f0f9f62d4becddf31327ab",
+  "note": "Independent audit: event conditions match the delegated choice; commands, selections, required contexts and strict aggregate results are preserved; before/after checks pass as expected."
+}
+```
