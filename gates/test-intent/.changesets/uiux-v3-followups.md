@@ -1181,3 +1181,14 @@ No acceptance record is supplied by the builder.
   "note": "Reviewed baseline tests, agreed FS/FN sources, then candidate diff. Independent rerun: all 92 checks pass; all 77 repaired checks fail by assertion on 117e89be9, and 15 preservation checks pass there. Compatibility patch declares only inert before-state Stop types. Test-intent accepted; shipped-model live verification remains separate."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-pltq1r9l",
+  "verdict": "reject",
+  "digest": "sha256:b6057d64bb2fc2326c8f0d0e5459ace2cb1e3f6640d48e8711eeb575bc1625ea",
+  "note": "Reviewed scenarios FS0/FS10, the 917d7d60b tests, then the diff. Re-ran evidence: six new checks fail by assertion on 917d7d60b and pass; three preservation checks pass on both; 23 refreshed context checks match. Reject: (1) 'keeps the last saved snapshot when a newer floor write also cannot refresh before an older Restore response' expects the window to show floor storedId(0) while the store holds storedId(3), with no uncertainty shown. That contradicts its cited FS10 ('never leave the bar showing a state that is not the saved one'); the expectation follows the code, not the source. (2) Omission: the entry claims every context write keeps the saved state, but no check covers an older write whose REQUEST reaches the store after a newer write's refresh, then fails its own refresh. Real-HTTP and component probes show this regressed from 917d7d60b for Restore, Exclude and Include all (R4/R5/R10); for Exclude, the next Ask sends excluded messages. (3) Omission: no check covers a single saved Reset-to-here, Compact or summary edit whose refresh fails. Shown and sent state then differ from the store (R2/R3, before and after). Evidence: verifier-3 real/summary.txt."
+}
+```
