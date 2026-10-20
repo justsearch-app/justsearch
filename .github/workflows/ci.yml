@@ -1148,6 +1148,11 @@ jobs:
       - name: Frontend unit tests
         run: npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4
 
+      # boot-lockdown.test.ts loads the production bundle under SES in headless Chromium.
+      - name: Install headless Chromium for lockdown tests
+        working-directory: modules/ui-web
+        run: npx --no-install playwright-core install --with-deps chromium
+
       - name: Frontend lockdown tests
         run: npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4
 
