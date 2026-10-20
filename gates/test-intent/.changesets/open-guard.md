@@ -7,15 +7,15 @@ author-session: open-guard-builder
 
 # Test-intent entries
 
-All eleven earlier Windows checks **passed on hosted Windows at `e22910c2de10eb90232fff11cc9c3248f454a23c`**: [original refusals](../evidence/open-guard-windows-repaired.json), [round-3 dispatch](../evidence/open-guard-windows-round3-repaired.json), [round-4 repairs](../evidence/open-guard-windows-round4-repaired.json), and [round-4 preservation](../evidence/open-guard-windows-round4-preserved.json). Those committed results cover Invoice/PATHEXT, mapped UNC documents and folders, and document/bracket-folder markers. Their source-file digests are stale after round 5; all four reruns are in `tmp/open-guard/windows-evidence-command.txt`.
+All eleven earlier Windows checks **passed on hosted Windows at `e22910c2de10eb90232fff11cc9c3248f454a23c`**: [original refusals](../evidence/open-guard-windows-repaired.json), [round-3 dispatch](../evidence/open-guard-windows-round3-repaired.json), [round-4 repairs](../evidence/open-guard-windows-round4-repaired.json), and [round-4 preservation](../evidence/open-guard-windows-round4-preserved.json). Those results cover Invoice/PATHEXT, mapped UNC documents and folders, and document/bracket-folder markers. All four were rerun on the final dispatch in hosted windows-latest run 39428698231 at 75bab60ce (job log kept in the task evidence); the committed evidence files are those reruns.
 
-Round 9 supersedes the round-8 focus-or-selection interpretation. The supplied hosted round-8 log `tmp/open-guard/round9/hosted-round8-job.log:580,700,828` records the correct parent with SelectionCount=0 and Focused=000-unrelated.txt for both legacy Explorer /select and the candidate. The earlier single-file probe could not distinguish incidental focus from reveal targeting. Hosted Explorer therefore provides no reliable observable selection or focus for a reveal. These are supplied Windows observations, not executions by this Linux builder.
+Round 9 supersedes the round-8 focus-or-selection interpretation. The hosted round-8 log (run 39423698535) records the correct parent with SelectionCount=0 and Focused=000-unrelated.txt for both legacy Explorer /select and the candidate. The earlier single-file probe could not distinguish incidental focus from reveal targeting. Hosted Explorer therefore provides no reliable observable selection or focus for a reveal. These are supplied Windows observations, not executions by this Linux builder.
 
 The GUI checks now require the **exact parent folder window** for both plain and comma reveals, recording Selected, SelectionCount, Focused and pipeline values as observations only. They still poll for the exact unique fixture parent. The plain reveal control must pass before/after 143fd387b; the comma reveal must assertion-fail before (Desktop) and pass after. Every other check and cleanup remains unchanged.
 
 Item targeting is independently checked at the native item-ID level. Production and the new Windows test use the same `windows_reveal::with_item_ids` function, including the exact parent/count/children arguments handed to SHOpenFolderAndSelectItems. For a,b2.txt, Q3 [draft].txt and plain.txt, SHGetPathFromIDListEx must resolve the parent to the exact parent and ILCombine(parent, child) to the exact file. The test requires exactly one child. The hosted command runs two production-helper mutations: passing the parent alone (count=0) and passing the parent's own last child instead of the file's. Both must produce executed assertion failures; a compile error or unavailable runner does not count. The mutation patches are `open-guard-round9-parent-only.patch` and `open-guard-round9-wrong-child.patch`; their native runtime results, like the new PIDL and amended GUI checks, were verified on hosted windows-latest run 39428698231 at 75bab60ce. Linux applied and Windows-target typechecked the candidate and both mutations, but cannot execute Windows shell APIs.
 
-Linux mutation reasoning, after applying and typechecking both patches (`tmp/open-guard/round9/validate-windows.log`): parent-only passes count=0, so the shared-argument test returns Err before reading children and fails its outer assert_eq against Ok. Wrong-child appends the parent folder's own final ID to that parent, which cannot equal any of the three requested file names; resolution either errors or yields a different target, and the same assertion rejects it. This is reasoning over the patched code, not a claimed native Windows mutation pass. The hosted script requires the actual assertion failures and preserves their evidence.
+Linux mutation reasoning, after applying and typechecking both patches: parent-only passes count=0, so the shared-argument test returns Err before reading children and fails its outer assert_eq against Ok. Wrong-child appends the parent folder's own final ID to that parent, which cannot equal any of the three requested file names; resolution either errors or yields a different target, and the same assertion rejects it. The hosted runs of both mutations in hosted windows-latest run 39428698231 at 75bab60ce (job log kept in the task evidence) failed by assertion; their evidence is open-guard-windows-round9-parent-only.json and open-guard-windows-round9-wrong-child.json.
 
 Production PIDL semantics stay as in round 7: folders use SEE_MASK_IDLIST/lpIDList with lpFile NULL; reveal uses the resolved parent plus relative child. Documents and URLs retain their dispatch. The command attempts every evidence group, including both mutation controls, then exits nonzero if any unexpected result occurred. Each GUI test's cleanup finishes before the next call. The job owns 8.3/long-path setup. macOS is out of scope.
 
@@ -102,7 +102,7 @@ The author has not accepted these entries; independent acceptance remains for th
           "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_refuses_mixed_network_device_and_ads_inputs",
           "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_symlinks_resolve_document_and_refuse_disguised_launcher"
         ],
-        "scope": "Passed on hosted Windows at e22910c2d; source digest changed and rerun required for round 5."
+        "scope": "Passed on hosted Windows at e22910c2d and again on the final dispatch in hosted windows-latest run 39428698231 at 75bab60ce (job log kept in the task evidence)."
       }
     },
     {
@@ -238,7 +238,7 @@ The author has not accepted these entries; independent acceptance remains for th
           "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_real_dispatch_handles_brackets_and_question_like_names",
           "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_refuses_verbatim_only_dispatch"
         ],
-        "scope": "Passed on hosted Windows at e22910c2d; source digest changed and rerun required for round 5."
+        "scope": "Passed on hosted Windows at e22910c2d and again on the final dispatch in hosted windows-latest run 39428698231 at 75bab60ce (job log kept in the task evidence)."
       }
     },
     {
@@ -379,7 +379,7 @@ The author has not accepted these entries; independent acceptance remains for th
         "checks": [
           "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_folder_window_control"
         ],
-        "scope": "Passed on 143fd387b in hosted run 39412497810; artifact provided under tmp/open-guard/round6/evidence/. The rerun with the changed observer passed in run 39428698231."
+        "scope": "Passed on 143fd387b in hosted run 39412497810; The rerun with the changed observer passed in run 39428698231."
       }
     },
     {
