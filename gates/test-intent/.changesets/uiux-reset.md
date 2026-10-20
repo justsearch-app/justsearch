@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: agent-session-_sq_p_57
+author-session: agent-session-06wpvp_0
 ---
 
 # Test-intent entries
@@ -58,6 +58,24 @@ files. The c00a0cb24 compatibility seam is unchanged. The renamed parent-link ch
 is included in 97dc55c62 evidence and is no longer claimed against the legacy seam.
 No Java files were changed. Actual Windows junction/WebView checks remain unverified.
 
+Review history: 2026-10-20 — builder agent-session-06wpvp_0 repaired bounded
+retry/settling for recreated storage (RA3), allowed the linked data root (RA2),
+reclassified entry 7 as New, replaced rejected brief/orchestrator sources with
+agreed RA1/RA4, and removed the superseded RS4 startup sentence. Existing review
+records and evidence files are retained unchanged; independent acceptance is pending.
+
+Round 4: uiux-reset-root-retry.json uses --before 769eb6ec6 for both new checks.
+The RA3 check starts and joins its own separate Unix process, which recreates storage
+750 ms after deletion. RA2 exercises a real linked root and an internal external link;
+the Windows junction branch remains unverified here. Existing Rust source digests
+are refreshed in uiux-reset-original-shell-refresh.json against the unchanged
+c00a0cb24 compatibility seam and uiux-reset-links-refresh.json against 97dc55c62.
+Preservation checks passing before cause aggregate producer exit 1 in the original
+refresh; each repaired check must still be an assertion failure before. No frontend
+tests or production files are changed this round; their evidence is retained.
+All evidence uses two Cargo jobs, source-only frontend assets, and temporary
+before worktrees below tmp/wp51-retry, removed by the official producer.
+
 ```json
 {
   "entries": [
@@ -79,7 +97,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
           "scenario": "RS4",
-          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes. It never stops the app from starting.",
+          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -104,7 +122,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage"
       ],
@@ -121,7 +139,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
           "scenario": "RS4",
-          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes. It never stops the app from starting.",
+          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -139,7 +157,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry"
       ],
@@ -163,7 +181,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
           "scenario": "RS4",
-          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes. It never stops the app from starting.",
+          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -174,7 +192,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data"
       ],
@@ -198,7 +216,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
           "scenario": "RS4",
-          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes. It never stops the app from starting.",
+          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -209,7 +227,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work"
       ],
@@ -244,7 +262,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data"
       ],
@@ -265,7 +283,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_models_and_runtime_keep_their_bytes"
       ]
@@ -285,7 +303,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn3_normal_start_does_not_enumerate_or_modify_stores"
       ]
@@ -294,20 +312,22 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
       "items": [
         "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "rename"
-      ],
-      "whatMoved": "Explicit owner-directed adaptation: rename rs7_native_bin_link_is_removed_without_traversing_its_target to rs7_native_bin_link_is_kept_without_traversing_its_target and change the link-entry expectation from deleted to preserved. The owner decision supersedes the old oracle; the external runtime and sentinel preservation assertions, filesystem setup and reset call are unchanged. This is an oracle change, classified Adaptation as explicitly required by the continuation brief. New parent-link/receipt regression coverage below separately supplies assertion fail-before evidence against 97dc55c62.",
+      "class": "New",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
-          "scenario": "RS7",
-          "quote": "Decision (orchestrator): a link or junction anywhere on the path to a kept item (for example native-bin itself, not only native-bin/llama-server or models) is kept as it is: never deleted, never traversed. What sits behind it is outside the data folder, so the reset neither deletes it nor counts it as remaining; the receipt names it as kept (a link to a folder outside the app data) so the outcome stays honest.",
+          "scenario": "RA1",
+          "quote": "A link or junction anywhere on the path to a kept item (models, native-bin/llama-server, including native-bin itself) is kept as it is: never deleted, never traversed; the outcome names it as kept.",
           "label": "agent-drafted, owner-adopted"
         }
-      ]
+      ],
+      "behaviour": "A linked native-bin parent is retained as it is; its external runtime and other-application sentinel remain untouched.",
+      "evidence": "gates/test-intent/evidence/uiux-reset-links-refresh.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target"
+      ],
+      "repaired": true
     },
     {
       "items": [
@@ -324,7 +344,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_nested_links_leave_indexed_files_and_other_applications_untouched"
       ]
@@ -340,7 +360,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
           "scenario": "RS4",
-          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes. It never stops the app from starting.",
+          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -358,7 +378,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart"
       ],
@@ -375,7 +395,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
           "scenario": "RS4",
-          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes. It never stops the app from starting.",
+          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -410,7 +430,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
           "scenario": "RS4",
-          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes. It never stops the app from starting.",
+          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -480,7 +500,7 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
           "scenario": "RS4",
-          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes. It never stops the app from starting.",
+          "quote": "The outcome is reported to the user as either complete or a list of what could not be removed. It is never reported complete while something remains, for example a file held by an Engine or AI runtime left over from the previous session. An incomplete wipe is retried at the next start and stays reported until it completes.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -714,8 +734,8 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
-          "scenario": "RS4",
-          "quote": "Repair the defect at its cause: the boot order must not depend on timing between the lockdown and the reset gate's await. Keep the reset gate's guarantee that no normal UI or backend starts before the reset state is known. Find every reload and start path that goes through this boot (the verifier lists the ones it saw) and prove each mounts.",
+          "scenario": "RA4",
+          "quote": "Every reload or restart path of the window (reset outcome screens, Engine recovery) shows the app again; none leaves an empty window.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -723,6 +743,13 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
           "task": "t-20261019-bd718f",
           "scenario": "RN3",
           "quote": "A normal start with no pending reset deletes nothing and starts as quickly as before.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RS4",
+          "quote": "Finding 1 decided: while a reset is incomplete, the app does not start into normal use; it shows the reset as incomplete, what remains, and offers Retry or Cancel reset (Cancel keeps the remaining data as ordinary data). No new work exists during an incomplete reset, so retries cannot erase it. Verify failure -> restart -> retry and failure -> cancel.",
           "label": "agent-drafted, owner-adopted"
         }
       ],
@@ -745,12 +772,12 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
-          "scenario": "RN1",
-          "quote": "Decision (orchestrator): a kept path (models, native-bin/llama-server) that is itself a link or junction is kept as it is: never deleted, never traversed. Today the candidate removes it, which cuts the app off from the runtime (verifier case p5). Add a check.",
+          "scenario": "RA1",
+          "quote": "A link or junction anywhere on the path to a kept item (models, native-bin/llama-server, including native-bin itself) is kept as it is: never deleted, never traversed; the outcome names it as kept.",
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-boot-repair.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-links-refresh.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets"
       ],
@@ -766,12 +793,12 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
-          "scenario": "RN1",
-          "quote": "Decision (orchestrator): a link or junction anywhere on the path to a kept item (for example native-bin itself, not only native-bin/llama-server or models) is kept as it is: never deleted, never traversed. What sits behind it is outside the data folder, so the reset neither deletes it nor counts it as remaining; the receipt names it as kept (a link to a folder outside the app data) so the outcome stays honest.",
+          "scenario": "RA1",
+          "quote": "A link or junction anywhere on the path to a kept item (models, native-bin/llama-server, including native-bin itself) is kept as it is: never deleted, never traversed; the outcome names it as kept.",
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-boot-repair.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-links-refresh.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart"
       ],
@@ -787,14 +814,56 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
-          "scenario": "RN1",
-          "quote": "Decision (orchestrator): a link or junction anywhere on the path to a kept item (for example native-bin itself, not only native-bin/llama-server or models) is kept as it is: never deleted, never traversed. What sits behind it is outside the data folder, so the reset neither deletes it nor counts it as remaining; the receipt names it as kept (a link to a folder outside the app data) so the outcome stays honest.",
+          "scenario": "RA1",
+          "quote": "A link or junction anywhere on the path to a kept item (models, native-bin/llama-server, including native-bin itself) is kept as it is: never deleted, never traversed; the outcome names it as kept.",
           "label": "agent-drafted, owner-adopted"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-reset-boot-repair.json",
       "newChecks": [
         "modules/ui-web/src/boot/factoryReset.test.ts#RN1 the receipt names kept links outside app data separately from failures"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "A linked data root can request and complete a reset through dismissal, clearing the actual data directory while retaining models and the root link and unlinking internal links without touching their targets.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RA2",
+          "quote": "If the app data folder itself is a link or junction (for example the user moved it), the reset clears the folder it points to, the folder the app uses for its data; links inside it are still never followed.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-root-retry.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra2_linked_data_root_is_cleared_without_following_internal_links"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "A separate previous-session stand-in process recreates storage after the initial deletion; the bounded wipe removes that storage before returning a clean disk outcome.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RA3",
+          "quote": "A file or folder recreated during the wipe by a process of the previous session that has not yet exited is retried for a short, bounded time before the wipe reports anything as remaining; the outcome stays honest if it still remains.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-root-retry.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra3_retries_storage_recreated_by_a_previous_session_process"
       ],
       "repaired": true
     }

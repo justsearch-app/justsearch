@@ -72,9 +72,11 @@ fn is_link(metadata: &fs::Metadata) -> bool {
 }
 
 fn check_root(dir: &Path) -> Result<(), String> {
-    let metadata = fs::symlink_metadata(dir).map_err(|e| e.to_string())?;
-    if is_link(&metadata) || !metadata.is_dir() {
-        return Err("The app data folder must be a real directory, not a link".into());
+    // The root is the app's data location even when the user relocated it via
+    // a link/junction. Only this root may be followed; visit uses link metadata
+    // for every entry inside it.
+    if !fs::metadata(dir).map_err(|e| e.to_string())?.is_dir() {
+        return Err("The app data folder must point to a directory".into());
     }
     Ok(())
 }
@@ -247,16 +249,14 @@ fn visit(
             }
             continue;
         }
-        if metadata.is_dir() && !is_link(&metadata) {
-            if !native_bin && name == "native-bin" {
-                visit(&path, true, remove, failures, kept_links);
-                if remove {
-                    if let Err(e) = sync_directory(&path) {
-                        failures.push(failure(&path, e));
-                    }
+        if metadata.is_dir() && !is_link(&metadata) && !native_bin && name == "native-bin" {
+            visit(&path, true, remove, failures, kept_links);
+            if remove {
+                if let Err(e) = sync_directory(&path) {
+                    failures.push(failure(&path, e));
                 }
-                continue;
             }
+            continue;
         }
         if remove {
             if let Err(e) = remove_entry(&path, &metadata) {
@@ -284,6 +284,10 @@ pub(crate) fn run_pending(dir: &Path, cleanup: impl FnOnce() -> Result<(), Strin
     if let Err(e) = cleanup() {
         result.remaining.push(failure(&dir.join("runtime"), e));
     } else {
+        // A previous WebView's network process can briefly outlive the shell
+        // and recreate storage after removal. Keep retrying for a short window
+        // even when an early verification is clean; never wait indefinitely.
+        use std::time::{Duration, Instant};
         visit(
             dir,
             false,
@@ -291,13 +295,32 @@ pub(crate) fn run_pending(dir: &Path, cleanup: impl FnOnce() -> Result<(), Strin
             &mut result.remaining,
             &mut result.kept_links,
         );
-        visit(
-            dir,
-            false,
-            false,
-            &mut result.remaining,
-            &mut result.kept_links,
-        );
+        // A large initial deletion must not consume the retry window.
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            std::thread::sleep(
+                Duration::from_millis(100).min(deadline.saturating_duration_since(Instant::now())),
+            );
+            visit(
+                dir,
+                false,
+                false,
+                &mut result.remaining,
+                &mut result.kept_links,
+            );
+            if Instant::now() >= deadline {
+                break;
+            }
+            result.remaining.clear();
+            result.kept_links.clear();
+            visit(
+                dir,
+                false,
+                true,
+                &mut result.remaining,
+                &mut result.kept_links,
+            );
+        }
     }
     if !result.remaining.is_empty() {
         result.phase = Phase::Incomplete;
@@ -358,6 +381,126 @@ mod tests {
         let path = dir.join(name);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, bytes).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn ra3_retries_storage_recreated_by_a_previous_session_process() {
+        let dir = temp();
+        let control = temp();
+        seed(dir.path(), "storage/private", b"old webview data");
+        request(dir.path()).unwrap();
+        // A separate process survives deletion of its storage directory, then
+        // recreates it after the first deletion/verification can have finished.
+        let mut predecessor = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(
+                r#"
+                touch "$2/ready"
+                attempt=0
+                while [ "$attempt" -lt 400 ]; do
+                    if [ ! -d "$1/storage" ]; then
+                        sleep 0.75
+                        mkdir -p "$1/storage" || exit 1
+                        printf 'old session' > "$1/storage/recreated" || exit 1
+                        exit 0
+                    fi
+                    attempt=$((attempt + 1))
+                    sleep 0.005
+                done
+                exit 1
+            "#,
+            )
+            .arg("reset-predecessor")
+            .arg(dir.path())
+            .arg(control.path())
+            .spawn()
+            .unwrap();
+        let ready_deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        while !control.path().join("ready").exists() && std::time::Instant::now() < ready_deadline {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let ready = control.path().join("ready").exists();
+        let started = std::time::Instant::now();
+        let result = run_pending(dir.path(), || Ok(()));
+        let exited = predecessor.wait().unwrap();
+        assert!(
+            ready && exited.success(),
+            "stand-in process must recreate storage"
+        );
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(5),
+            "retry must be bounded"
+        );
+        assert_eq!(
+            fs::symlink_metadata(dir.path().join("storage"))
+                .err()
+                .map(|error| error.kind()),
+            Some(std::io::ErrorKind::NotFound),
+            "storage recreated by the previous session must be removed before reporting success"
+        );
+        assert_eq!(result.phase, Phase::AwaitingStorage);
+        assert!(result.remaining.is_empty());
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn ra2_linked_data_root_is_cleared_without_following_internal_links() {
+        let parent = temp();
+        let target = temp();
+        let external = temp();
+        let root = parent.path().join("relocated-data");
+        seed(target.path(), "conversations/private", b"delete");
+        seed(target.path(), "models/model.gguf", b"kept model");
+        seed(external.path(), "sentinel", b"untouched");
+        let internal = target.path().join("external-link");
+        #[cfg(unix)]
+        for (destination, link) in [
+            (target.path(), root.as_path()),
+            (external.path(), internal.as_path()),
+        ] {
+            std::os::unix::fs::symlink(destination, link).unwrap();
+        }
+        #[cfg(windows)]
+        for (destination, link) in [
+            (target.path(), root.as_path()),
+            (external.path(), internal.as_path()),
+        ] {
+            let result = std::process::Command::new("cmd")
+                .args(["/C", "mklink", "/J"])
+                .arg(link)
+                .arg(destination)
+                .output()
+                .unwrap();
+            assert!(
+                result.status.success(),
+                "junction creation failed: {result:?}"
+            );
+        }
+        let original = fs::read_link(&root).unwrap();
+        assert_eq!(
+            request(&root),
+            Ok(()),
+            "a relocated app data root must support reset"
+        );
+        let result = run_pending(&root, || Ok(()));
+        assert_eq!(result.phase, Phase::AwaitingStorage);
+        assert!(result.remaining.is_empty());
+        assert!(!target.path().join("conversations").exists());
+        assert!(fs::symlink_metadata(&internal).is_err());
+        assert_eq!(
+            fs::read(external.path().join("sentinel")).unwrap(),
+            b"untouched"
+        );
+        assert_eq!(
+            fs::read(target.path().join("models/model.gguf")).unwrap(),
+            b"kept model"
+        );
+        assert_eq!(fs::read_link(&root).unwrap(), original);
+        storage_cleared(&root).unwrap();
+        assert_eq!(read_status(&root).phase, Phase::Complete);
+        dismiss(&root).unwrap();
+        assert_eq!(read_status(&root).phase, Phase::Idle);
     }
 
     #[test]
