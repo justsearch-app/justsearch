@@ -295,8 +295,8 @@ def _demo_url(ui_url: str, **extra: str) -> str:
 
 
 async def _type_and_search(page, query: str = "justsearch") -> None:
-    # Search v3 owns retrieval. Its composer does not use the retired `search-input` testid and a
-    # draft is not a search until the command palette's explicit "Search this text" action runs.
+    # Search v3 owns retrieval. Its composer opens in Search mode (WP1.1): typing lists matching
+    # documents and Enter runs the full search at once, on the shared results card.
     await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(state="visible", timeout=15_000)
     await page.evaluate("() => { location.hash = 'justsearch://surface/core.search-v3-surface'; }")
     window = page.locator(S.CSS_SV3_WINDOW)
@@ -304,11 +304,8 @@ async def _type_and_search(page, query: str = "justsearch") -> None:
     inp = page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first
     await inp.wait_for(state="visible", timeout=10_000)
     await inp.fill(query)
-    await window.get_by_role("button", name="Open command palette", exact=True).click()
     async with page.expect_response("**/api/knowledge/search", timeout=30_000):
-        await page.locator(S.CSS_SV3_PALETTE).get_by_role(
-            "option", name="Search this text", exact=True
-        ).click()
+        await inp.press("Enter")
     await page.locator(S.CSS_SV3_RESULT_ROW).first.wait_for(state="visible", timeout=30_000)
 
 
@@ -973,13 +970,10 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await window.wait_for(state="visible", timeout=15_000)
         composer = window.locator("jf-sv3-composer textarea")
         await composer.fill("failure presentation check")
-        await window.get_by_role("button", name="Open command palette", exact=True).click()
         async with page.expect_response("**/api/knowledge/search", timeout=15_000) as response:
-            await window.locator("jf-sv3-palette").get_by_role(
-                "option", name="Search this text", exact=True
-            ).click()
+            await composer.press("Enter")
         assert (await response.value).status == 502
-        alert = page.locator('[data-testid="sv3-main-unreachable"]')
+        alert = page.locator('jf-sv3-results [data-testid="sv3-results-failed"]')
         await alert.wait_for(state="visible", timeout=15_000)
         text = await alert.inner_text()
         assert "The search index is not available." in text, text
@@ -1338,6 +1332,43 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await _settings_setup(page)
         await page.keyboard.press("Tab")
         await _settle_focus_marks(page)
+
+    async def setup_sv3_search_results(page):
+        # WP1.1 S1.12 — Search mode's result list stays reachable beside the floating composer, at a
+        # narrow width and with a long list. DETERMINISTIC: the `sv3-results` fixtures variant
+        # answers any search with 24 hits, which overflows the pinned 760x720 viewport; a fresh
+        # window opens in Search, so Enter in the composer is the whole path in.
+        #
+        # Measured at MAX SCROLL for the same reason as `sv3-composer-occlusion`: at rest the end of
+        # the list is nowhere near the dock, and "the card does not run under the glass" only means
+        # something where "scrolled to the end" is claimed to mean "the last row is above it".
+        await page.set_viewport_size({"width": 760, "height": 720})
+        await page.goto(demo, wait_until="domcontentloaded", timeout=timeout_ms)
+        await page.evaluate(
+            "() => { location.hash = 'justsearch://surface/core.search-v3-surface'; }"
+        )
+        await page.locator(S.CSS_SV3_WINDOW).first.wait_for(state="visible", timeout=20_000)
+        composer = page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first
+        await composer.wait_for(state="visible", timeout=10_000)
+        await composer.fill("notes")
+        await composer.press("Enter")
+        rows = page.locator(S.CSS_SV3_RESULT_ROW)
+        await rows.nth(23).wait_for(state="attached", timeout=20_000)
+        # The refined pass settles the card's meta line; wait for it so the capture is not mid-pass.
+        await page.locator('jf-sv3-results [data-testid="meta-refining"]').first.wait_for(
+            state="detached", timeout=10_000
+        )
+        # Through a shadow-piercing locator: the window mounts inside the shell's shadow root, so a
+        # `document.querySelector('jf-sv3-window')` walk finds nothing and would scroll nothing.
+        scroller = page.locator('jf-sv3-window [data-testid="sv3-main-scroller"]').first
+        at_end = await scroller.evaluate(
+            "(s) => { s.scrollTop = s.scrollHeight;"
+            " return s.scrollHeight - s.scrollTop - s.clientHeight <= 1 && s.scrollTop > 0; }"
+        )
+        if not at_end:
+            raise AssertionError("sv3-search-results: the result list did not overflow and scroll to its end")
+        if cooldown_ms > 0:
+            await asyncio.sleep(cooldown_ms / 1000)
 
     async def setup_tasks_occlusion(page):
         # Tempdoc 813 Slice D — the capture that proves the redesigned Tasks panel cannot cover the
@@ -2388,6 +2419,10 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
              forced_colors="active"),
         Step("settings-forced-colors", setup=setup_settings_forced_colors, isolated=True,
              forced_colors="active"),
+        # WP1.1 S1.12 — Search mode's long result list at a narrow width, scrolled to the end, under
+        # the floating composer. The `sv3-results` variant serves the 24 hits that make it overflow.
+        Step("sv3-search-results", setup=setup_sv3_search_results, isolated=True,
+             fixtures_variant="sv3-results"),
         # --- Tempdoc 813 §4/§5: the ENRICHING tier (folder rows + the aggregate card) ---
         # The one deterministic capture of the drained-but-enriching state: both folder arms (percent
         # caveat / "fully searchable") and the index-wide aggregate card, from the `enriching`

@@ -6,9 +6,11 @@ import static io.justsearch.adapters.lucene.runtime.QueryFilterBuilder.normalize
 
 import io.justsearch.indexing.SchemaFields;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -23,8 +25,11 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
+import org.apache.lucene.search.TermInSetQuery;
 import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.util.BytesRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,6 +111,55 @@ public final class PruneOps {
   }
 
   /**
+   * Holds off file publications while one batch of deletions is applied.
+   *
+   * <p>Primary ingestion writes a file's parent and all of its chunks inside the Worker's
+   * file-mutation fence, and VDU chunk replacement and renames hold the same fence. A batch applied
+   * inside it therefore sees each file's rows wholly or not at all, and no row of a file can be
+   * published between the last check of its absence and its deletion.
+   */
+  @FunctionalInterface
+  public interface WriterFence {
+    /** Runs {@code batch} with file publications held off and returns its result. */
+    boolean hold(BooleanSupplier batch);
+
+    /**
+     * Starts recording the files whose rows a writer publishes under this fence from now on. A
+     * writer checks that its file still exists before it publishes, inside the fence; one that
+     * passed that check before the file was deleted can still publish the file's first rows after
+     * the prune's scan, which then never saw them. The prune therefore judges the recorded files
+     * once more, in its last pass inside the fence.
+     */
+    default Publications watch() {
+      return Publications.NONE;
+    }
+
+    /** For a prune with no concurrent file publisher to coordinate with. */
+    WriterFence NONE = BooleanSupplier::getAsBoolean;
+  }
+
+  /** The files whose rows were published under a {@link WriterFence} since its watch began. */
+  public interface Publications extends AutoCloseable {
+    /** The stored paths recorded since the last call; asked while holding the fence. */
+    Set<String> take();
+
+    /** Stops recording. */
+    @Override
+    void close();
+
+    /** Records nothing: there is no writer to record. */
+    Publications NONE = new Publications() {
+      @Override
+      public Set<String> take() {
+        return Set.of();
+      }
+
+      @Override
+      public void close() {}
+    };
+  }
+
+  /**
    * Prunes under {@code pathPrefix}, with the prefix folder itself as the root that vouches for
    * absence ({@link PresenceGuard#forRoot}).
    *
@@ -172,11 +226,39 @@ public final class PruneOps {
       int throttleBatchSize,
       PresenceGuard guard,
       Consumer<String> confirmedDeletionSink) {
+    return pruneByPathPrefix(
+        pathPrefix, abortChecker, throttleBatchSize, guard, confirmedDeletionSink, WriterFence.NONE);
+  }
+
+  /**
+   * As {@link #pruneByPathPrefix(String, BooleanSupplier, int, PresenceGuard, Consumer)}, applying
+   * each batch inside {@code writerFence}.
+   *
+   * <p>Every row of a file the prune reports deleted is removed (task: a directory sync removes
+   * every row of a deleted file). The scan reads a view refreshed when the prune starts, so it
+   * finds every file whose rows were written before it. The scan only nominates files: inside the
+   * fence each nominated file's absence is checked again, and the rows removed are the ones a
+   * freshly refreshed view holds for it at that moment, each selected by the same rules as the
+   * scan. A chunk written after the scan (a re-index or a VDU replacement gives chunks new ids) is
+   * therefore removed with its file, a file that came back or can no longer be judged keeps its
+   * rows, and a renamed file's rows, which no longer carry the old path, are left alone. A file
+   * whose first rows a writer published after the scan ({@link WriterFence#watch}) is judged in a
+   * last pass inside the fence, once every writer that started before it has finished. Confirmed
+   * deletions are committed and the search view refreshed before the prune returns.
+   */
+  public PruneResult pruneByPathPrefix(
+      String pathPrefix,
+      BooleanSupplier abortChecker,
+      int throttleBatchSize,
+      PresenceGuard guard,
+      Consumer<String> confirmedDeletionSink,
+      WriterFence writerFence) {
     if (pathPrefix == null || pathPrefix.isBlank()) {
       throw new IllegalArgumentException("pruneByPathPrefix requires non-blank prefix");
     }
     Objects.requireNonNull(guard, "guard");
     Objects.requireNonNull(confirmedDeletionSink, "confirmedDeletionSink");
+    Objects.requireNonNull(writerFence, "writerFence");
     if (throttleBatchSize <= 0) {
       throttleBatchSize = 100;
     }
@@ -184,7 +266,6 @@ public final class PruneOps {
     String idField = session.fieldMapper.idField();
     String normalized = normalizePathPrefix(pathPrefix);
     int checked = 0;
-    Batch batch = new Batch(guard, confirmedDeletionSink);
     Path boundary;
     try {
       boundary = Path.of(pathPrefix);
@@ -200,6 +281,23 @@ public final class PruneOps {
     if (mgr == null) {
       throw new IllegalStateException("SearcherManager not available (runtime closed?)");
     }
+    Query query = new BooleanQuery.Builder()
+        .add(new PrefixQuery(new Term(SchemaFields.PATH, normalized)), BooleanClause.Occur.SHOULD)
+        // Legacy documents may have only a filesystem doc_id. Validate the stored path below
+        // before applying this fallback so an ID cannot pull another backing path into scope.
+        .add(new PrefixQuery(new Term(idField, normalized)), BooleanClause.Occur.SHOULD)
+        .add(
+            new BooleanQuery.Builder()
+                .add(new PrefixQuery(new Term(SchemaFields.PARENT_DOC_ID, normalized)),
+                    BooleanClause.Occur.FILTER)
+                .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")),
+                    BooleanClause.Occur.FILTER)
+                .build(),
+            BooleanClause.Occur.SHOULD)
+        .setMinimumNumberShouldMatch(1)
+        .build();
+    Batch batch =
+        new Batch(guard, confirmedDeletionSink, writerFence, mgr, normalized, idField, boundary);
     if (!guard.rootCurrent()) {
       log.warn("pruneByPathPrefix: root unavailable or changed, nothing pruned for prefix {}",
           normalized);
@@ -207,29 +305,16 @@ public final class PruneOps {
     }
     IndexSearcher searcher = null;
     Completion completion = Completion.COMPLETE;
+    // Recording starts before the scan's view is taken: a publication it misses was written
+    // before that view, so the scan sees it.
+    Publications late = writerFence.watch();
     try {
+      // The background refresh may lag the writer by its whole interval; a stale view would miss
+      // files written since, or hold only some of a file's chunks.
+      mgr.maybeRefreshBlocking();
       searcher = mgr.acquire();
-      Query query = new BooleanQuery.Builder()
-          .add(new PrefixQuery(new Term(SchemaFields.PATH, normalized)), BooleanClause.Occur.SHOULD)
-          // Legacy documents may have only a filesystem doc_id. Validate the stored path below
-          // before applying this fallback so an ID cannot pull another backing path into scope.
-          .add(new PrefixQuery(new Term(idField, normalized)), BooleanClause.Occur.SHOULD)
-          .add(
-              new BooleanQuery.Builder()
-                  .add(new PrefixQuery(new Term(SchemaFields.PARENT_DOC_ID, normalized)),
-                      BooleanClause.Occur.FILTER)
-                  .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")),
-                      BooleanClause.Occur.FILTER)
-                  .build(),
-              BooleanClause.Occur.SHOULD)
-          .setMinimumNumberShouldMatch(1)
-          .build();
 
-      // Stored-field visitor: we need doc_id for deletion and path for file existence check.
-      // Avoid decoding large stored fields (content).
-      org.apache.lucene.index.StoredFields storedFields = searcher.storedFields();
-      Set<String> storedAllowlist =
-          Set.of(idField, SchemaFields.PATH, SchemaFields.PARENT_DOC_ID, SchemaFields.IS_CHUNK);
+      StoredFields storedFields = searcher.storedFields();
 
       // Page through results to avoid allocating a potentially huge ScoreDoc[] (Integer.MAX_VALUE).
       final int pageSize = 10_000;
@@ -267,36 +352,12 @@ public final class PruneOps {
             }
           }
 
-          // Read doc_id (for deletion) and path (for file existence check).
-          // The 'path' field contains the parent file path for both parent docs and chunks,
-          // avoiding the need to parse "#chunk_" from doc_id.
-          Map<String, String> docFields =
-              SearchResultFormatter.extractFromStoredFields(
-                  storedFields, scoreDoc.doc, false, storedAllowlist);
-          String docId = docFields.get(idField);
-          String filePath = docFields.get(SchemaFields.PATH);
-          String parentDocId = docFields.get(SchemaFields.PARENT_DOC_ID);
-          if (docId == null || docId.isBlank()) {
+          Row row = Row.read(searcher, storedFields, scoreDoc.doc, idField);
+          if (row == null) {
             continue;
           }
-          // Explicit paths take precedence. For a pathless chunk, resolve the exact owner's
-          // stored path before falling back to its legacy filesystem ID if no path is available.
-          if (filePath == null || filePath.isBlank()) {
-            filePath = docId;
-            if ("true".equals(docFields.get(SchemaFields.IS_CHUNK))
-                && parentDocId != null && !parentDocId.isBlank()) {
-              filePath = parentDocId;
-              var ownerDocs = searcher.search(new TermQuery(new Term(idField, parentDocId)), 1);
-              if (ownerDocs.scoreDocs.length > 0) {
-                String ownerPath = SearchResultFormatter.extractFromStoredFields(
-                    storedFields, ownerDocs.scoreDocs[0].doc, false, Set.of(SchemaFields.PATH))
-                    .get(SchemaFields.PATH);
-                if (ownerPath != null && !ownerPath.isBlank()) {
-                  filePath = ownerPath;
-                }
-              }
-            }
-          }
+          String docId = row.docId();
+          String filePath = row.filePath();
           if (!normalizePathPrefix(filePath).startsWith(normalized)) {
             continue;
           }
@@ -341,37 +402,46 @@ public final class PruneOps {
           if (presence == PathPresence.ABSENT) {
             // Ownership fields never authorize deletion of another document. Parents and chunks
             // are independently selected and checked, including divergent explicit child paths.
-            batch.candidates.add(new Candidate(docId, filePath));
+            batch.candidates.add(new Candidate(docId, filePath, file));
           }
         }
         after = topDocs.scoreDocs[topDocs.scoreDocs.length - 1];
       }
-      if (completion == Completion.COMPLETE && !batch.flush()) {
-        completion = Completion.INCOMPLETE;
-      }
-      // A root that stopped being the same root during the run makes the run incomplete even when
-      // no deletion was pending to notice it; one check per run, not per batch.
-      if (completion == Completion.COMPLETE && judged > 0 && !batch.lastFlushAskedRoot
-          && !guard.rootCurrent()) {
-        log.warn("pruneByPathPrefix: the root is no longer the same root; reporting incomplete for"
-            + " prefix {}", normalized);
+      // The last batch waits for every writer that checked its file before it, and judges the
+      // files they published since the scan began along with its own.
+      if (completion == Completion.COMPLETE && !batch.flushLate(late)) {
         completion = Completion.INCOMPLETE;
       }
       if (completion == Completion.COMPLETE && batch.keptUnknown > 0) {
         completion = Completion.INCOMPLETE;
       }
 
-      // Commit whatever was confirmed and removed, unless the caller cancelled the run.
+      // Commit whatever was confirmed and removed, unless the caller cancelled the run. The commit
+      // refreshes only the admission reader: refresh the search view too, so a search started
+      // after this prune returns sees none of the removed rows.
       if (batch.pruned > 0 && completion != Completion.ABORTED) {
         commitOps.commitAndTrack(CommitReason.PRUNE);
+        mgr.maybeRefreshBlocking();
+      }
+      // A root that stopped being the same root during the run makes the run incomplete even when
+      // no deletion was pending to notice it, and even after the last batch asked it: asked once
+      // more, after the removals are committed and published.
+      if (completion == Completion.COMPLETE && judged > 0 && !guard.rootCurrent()) {
+        log.warn("pruneByPathPrefix: the root is no longer the same root; reporting incomplete for"
+            + " prefix {}", normalized);
+        completion = Completion.INCOMPLETE;
       }
       log.info(
-          "pruneByPathPrefix: {} - {} checked, {} pruned, {} kept (presence unknown) for prefix {}",
+          "pruneByPathPrefix: {} - {} checked, {} pruned, {} kept (presence unknown) for prefix {};"
+              + " writer fence held {} ms over {} batches (longest {} ms)",
           completion,
           checked,
           batch.pruned,
           batch.keptUnknown,
-          normalized);
+          normalized,
+          java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(batch.fenceNanos),
+          batch.fencedBatches,
+          java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(batch.longestFenceNanos));
       return new PruneResult(batch.pruned, completion, batch.keptUnknown);
 
     } catch (InterruptedException e) {
@@ -381,6 +451,7 @@ public final class PruneOps {
     } catch (IOException e) {
       throw new IndexRuntimeIOException(classifyIOException(e), "Prune failed", e);
     } finally {
+      late.close();
       if (searcher != null) {
         try {
           mgr.release(searcher);
@@ -391,54 +462,308 @@ public final class PruneOps {
     }
   }
 
-  private record Candidate(String docId, String filePath) {}
+  /**
+   * Removes the rows whose own backing path is {@code filePath}, by the rules a prune of a folder
+   * holding it applies: once the file is confirmed absent beneath a listable folder up to {@code
+   * boundary}, with {@code guard}'s root vouching for it before and after that check. A row of
+   * another file is never removed through its parent, so a chunk whose explicit path names a live
+   * file keeps its row. Applied inside {@code writerFence}; nothing is committed.
+   *
+   * @return the number of rows removed
+   */
+  public int pruneFile(String filePath, Path boundary, PresenceGuard guard, WriterFence writerFence) {
+    Objects.requireNonNull(guard, "guard");
+    Objects.requireNonNull(writerFence, "writerFence");
+    Path file;
+    try {
+      file = Path.of(filePath);
+    } catch (InvalidPathException unparseable) {
+      return 0;
+    }
+    LifecycleSnapshot snap = session.snapshot;
+    SearcherManager mgr = snap != null ? snap.searcherManager() : null;
+    if (mgr == null) {
+      throw new IllegalStateException("SearcherManager not available (runtime closed?)");
+    }
+    Batch batch = new Batch(guard, ignored -> {}, writerFence, mgr, filePath,
+        session.fieldMapper.idField(), boundary);
+    batch.candidates.add(new Candidate(filePath, filePath, file));
+    try {
+      batch.flush();
+    } catch (IOException e) {
+      throw new IndexRuntimeIOException(classifyIOException(e), "Prune of a file failed", e);
+    }
+    return batch.pruned;
+  }
+
+  private record Candidate(String docId, String filePath, Path file) {}
+
+  /** One indexed row, the backing path that decides it, and the stored fields the scan matches. */
+  private record Row(
+      String docId, String filePath, String path, String parentDocId, boolean chunk) {
+    /** Whether the scan's query, for {@code prefix}, matches this row. */
+    boolean inScan(String prefix) {
+      return startsWith(path, prefix) || startsWith(docId, prefix)
+          || (chunk && startsWith(parentDocId, prefix));
+    }
+
+    private static boolean startsWith(String value, String prefix) {
+      return value != null && value.startsWith(prefix);
+    }
+
+    /**
+     * Reads {@code doc}'s id and backing path, or {@code null} for a row without an id. Explicit
+     * paths take precedence. For a pathless chunk, the exact owner's stored path is resolved
+     * before falling back to its legacy filesystem ID if no path is available.
+     */
+    static Row read(IndexSearcher searcher, StoredFields storedFields, int doc, String idField)
+        throws IOException {
+      // Avoid decoding large stored fields (content).
+      Map<String, String> fields = SearchResultFormatter.extractFromStoredFields(
+          storedFields, doc, false,
+          Set.of(idField, SchemaFields.PATH, SchemaFields.PARENT_DOC_ID, SchemaFields.IS_CHUNK));
+      String docId = fields.get(idField);
+      if (docId == null || docId.isBlank()) {
+        return null;
+      }
+      String path = fields.get(SchemaFields.PATH);
+      String parentDocId = fields.get(SchemaFields.PARENT_DOC_ID);
+      boolean chunk = "true".equals(fields.get(SchemaFields.IS_CHUNK));
+      String filePath = path;
+      if (filePath == null || filePath.isBlank()) {
+        filePath = docId;
+        if (chunk && parentDocId != null && !parentDocId.isBlank()) {
+          filePath = parentDocId;
+          var ownerDocs = searcher.search(new TermQuery(new Term(idField, parentDocId)), 1);
+          if (ownerDocs.scoreDocs.length > 0) {
+            String ownerPath = SearchResultFormatter.extractFromStoredFields(
+                storedFields, ownerDocs.scoreDocs[0].doc, false, Set.of(SchemaFields.PATH))
+                .get(SchemaFields.PATH);
+            if (ownerPath != null && !ownerPath.isBlank()) {
+              filePath = ownerPath;
+            }
+          }
+        }
+      }
+      return new Row(docId, filePath, path, parentDocId, chunk);
+    }
+  }
 
   /** Absent candidates observed since the last root check. */
   private final class Batch {
     private final PresenceGuard guard;
     private final Consumer<String> sink;
+    private final WriterFence fence;
+    private final SearcherManager mgr;
+    private final String prefix;
+    private final String idField;
+    private final Path boundary;
     private final List<Candidate> candidates = new ArrayList<>();
     private int pruned;
     private int keptUnknown;
     /** Whether the root was re-checked after an undecidable document in the current batch. */
     private boolean rootCheckedSinceUncertain;
-    /** Whether the most recent flush asked the root (it had candidates to apply). */
-    private boolean lastFlushAskedRoot;
+    private long fenceNanos;
+    private long longestFenceNanos;
+    private int fencedBatches;
 
-    Batch(PresenceGuard guard, Consumer<String> sink) {
+    Batch(PresenceGuard guard, Consumer<String> sink, WriterFence fence, SearcherManager mgr,
+        String prefix, String idField, Path boundary) {
       this.guard = guard;
       this.sink = sink;
+      this.fence = fence;
+      this.mgr = mgr;
+      this.prefix = prefix;
+      this.idField = idField;
+      this.boundary = boundary;
     }
 
     /**
-     * Removes the batch's candidates if the root still vouches for their absence, asking it right
-     * before they are applied. A batch without candidates asks nothing: nothing is removed on its
-     * strength.
+     * Removes the files of the batch's candidates if the root still vouches for their absence,
+     * asking it before the batch's rows are gathered and once more after each file is checked
+     * again, right before the rows are removed. A batch without candidates asks nothing: nothing
+     * is removed on its strength. The whole application runs inside the writer fence, and its
+     * removals are visible to the next holder of the fence.
      *
      * @return false when the root check failed; the candidates are discarded, nothing is removed
      */
-    boolean flush() {
+    boolean flush() throws IOException {
+      return flush(null);
+    }
+
+    /**
+     * The prune's last batch: inside the fence, so after every writer that checked its file before
+     * it, the files {@code late} recorded under the prefix join the batch's candidates and are
+     * judged like them. The fence is taken even when nothing is pending: a writer still holding
+     * it may be about to publish a file's first rows.
+     */
+    boolean flushLate(Publications late) throws IOException {
+      return flush(Objects.requireNonNull(late, "late"));
+    }
+
+    private boolean flush(Publications late) throws IOException {
       rootCheckedSinceUncertain = false;
-      lastFlushAskedRoot = !candidates.isEmpty();
-      if (candidates.isEmpty()) {
+      if (candidates.isEmpty() && late == null) {
         return true;
       }
+      try {
+        return fence.hold(() -> {
+          if (late != null) {
+            nominate(late.take());
+          }
+          if (candidates.isEmpty()) {
+            return true;
+          }
+          long start = System.nanoTime();
+          try {
+            return applyFenced();
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
+          } finally {
+            long held = System.nanoTime() - start;
+            fenceNanos += held;
+            longestFenceNanos = Math.max(longestFenceNanos, held);
+            fencedBatches++;
+          }
+        });
+      } catch (UncheckedIOException e) {
+        throw e.getCause();
+      } finally {
+        candidates.clear();
+      }
+    }
+
+    /**
+     * Makes each of {@code paths} under the prefix a candidate, by the rule the scan applies to
+     * a row's stored path; its absence is judged later.
+     */
+    private void nominate(Set<String> paths) {
+      for (String filePath : paths) {
+        if (filePath == null || !normalizePathPrefix(filePath).startsWith(prefix)) {
+          continue;
+        }
+        try {
+          candidates.add(new Candidate(filePath, filePath, Path.of(filePath)));
+        } catch (InvalidPathException unparseable) {
+          // Neither confirmed absent nor found: kept, as in the scan.
+        }
+      }
+    }
+
+    private boolean applyFenced() throws IOException {
       if (!guard.rootCurrent()) {
         log.warn(
             "pruneByPathPrefix: root unavailable or changed mid-prune; {} unconfirmed candidates"
                 + " kept",
             candidates.size());
-        candidates.clear();
         return false;
       }
+      // Each nominated file is judged again now: one that came back, or can no longer be judged,
+      // keeps its rows and gets no deletion mark.
+      Map<String, Path> files = new LinkedHashMap<>();
+      Map<String, Integer> nominatedRows = new java.util.HashMap<>();
       for (Candidate candidate : candidates) {
-        indexingCoordinator.deleteById(candidate.docId());
-        pruned++;
-        sink.accept(candidate.filePath());
-        log.debug("pruneByPathPrefix: deleted orphan document: {}", candidate.docId());
+        files.putIfAbsent(candidate.filePath(), candidate.file());
+        nominatedRows.merge(candidate.filePath(), 1, Integer::sum);
       }
-      candidates.clear();
+      // Rows are taken from a view refreshed inside the fence, so a file's rows are all there,
+      // including chunks written since the scan; nothing of it can be published until we leave.
+      Map<String, List<String>> rows = new LinkedHashMap<>();
+      mgr.maybeRefreshBlocking();
+      IndexSearcher current = mgr.acquire();
+      try {
+        StoredFields storedFields = current.storedFields();
+        for (String filePath : files.keySet()) {
+          rows.put(filePath, rowsOf(current, storedFields, filePath));
+        }
+      } finally {
+        mgr.release(current);
+      }
+      // The last checks come after every slow step, right before the removal: each file's absence,
+      // then the root that vouches for it. A file that came back, or can no longer be judged, keeps
+      // its rows and gets no deletion mark. A file recreated after these checks still loses its
+      // rows; the walk that follows the prune finds it on disk and queues it again.
+      Map<Path, PathPresence> folderVerdicts = new java.util.HashMap<>();
+      for (var file : files.entrySet()) {
+        PathPresence presence = guard.presence(file.getValue());
+        if (presence == PathPresence.ABSENT) {
+          presence =
+              PathPresence.absentBeneathListableFolder(file.getValue(), boundary, folderVerdicts);
+        }
+        if (presence == PathPresence.UNKNOWN) {
+          keptUnknown += nominatedRows.get(file.getKey());
+        } else if (presence != PathPresence.ABSENT) {
+          log.debug("pruneByPathPrefix: kept a file that is present again: {}", file.getKey());
+        }
+        if (presence != PathPresence.ABSENT) {
+          rows.remove(file.getKey());
+        }
+      }
+      if (!guard.rootCurrent()) {
+        log.warn(
+            "pruneByPathPrefix: root changed while the batch was checked; {} files kept",
+            rows.size());
+        return false;
+      }
+      for (var file : rows.entrySet()) {
+        for (String docId : file.getValue()) {
+          indexingCoordinator.deleteById(docId);
+          pruned++;
+          sink.accept(file.getKey());
+          log.debug("pruneByPathPrefix: deleted orphan document: {}", docId);
+        }
+      }
+      if (rows.values().stream().anyMatch(ids -> !ids.isEmpty())) {
+        // Publish the removals before leaving the fence: the next writer reads its parent from
+        // this view, and must not rebuild children of a parent that is already gone.
+        mgr.maybeRefreshBlocking();
+      }
       return true;
     }
+
+    /**
+     * The ids of the rows in {@code searcher} whose own backing path is {@code filePath}, selected
+     * by the scan's rules: matched by the scan's query, with an explicit path taking precedence
+     * over ownership. A row of another file is never selected through its parent. The scan's
+     * prefix queries are applied to each row's stored fields rather than run again: expanding them
+     * per file would cost a pass over every term of the root.
+     */
+    private List<String> rowsOf(IndexSearcher searcher, StoredFields storedFields, String filePath)
+        throws IOException {
+      // A pathless chunk is backed by its owner's path: find the owners stored under this path.
+      Query withPath = new TermQuery(new Term(SchemaFields.PATH, filePath));
+      List<BytesRef> owners = new ArrayList<>();
+      owners.add(new BytesRef(filePath));
+      for (var hit : allHits(searcher, withPath)) {
+        String ownerId = SearchResultFormatter.extractFromStoredFields(
+            storedFields, hit.doc, false, Set.of(idField)).get(idField);
+        if (ownerId != null && !ownerId.isBlank()) {
+          owners.add(new BytesRef(ownerId));
+        }
+      }
+      Query sameFile = new BooleanQuery.Builder()
+          .add(withPath, BooleanClause.Occur.SHOULD)
+          .add(new TermQuery(new Term(idField, filePath)), BooleanClause.Occur.SHOULD)
+          .add(new TermInSetQuery(SchemaFields.PARENT_DOC_ID, owners), BooleanClause.Occur.SHOULD)
+          .setMinimumNumberShouldMatch(1)
+          .build();
+      List<String> ids = new ArrayList<>();
+      for (var hit : allHits(searcher, sameFile)) {
+        Row row = Row.read(searcher, storedFields, hit.doc, idField);
+        if (row != null && row.filePath().equals(filePath) && row.inScan(prefix)) {
+          ids.add(row.docId());
+        }
+      }
+      return ids;
+    }
+  }
+
+  /** Every hit of {@code query}, however many there are. */
+  private static org.apache.lucene.search.ScoreDoc[] allHits(IndexSearcher searcher, Query query)
+      throws IOException {
+    int count = searcher.count(query);
+    return count == 0
+        ? new org.apache.lucene.search.ScoreDoc[0]
+        : searcher.search(query, count).scoreDocs;
   }
 }

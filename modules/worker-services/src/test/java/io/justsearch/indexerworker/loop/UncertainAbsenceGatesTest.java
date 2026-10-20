@@ -36,6 +36,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
@@ -53,6 +54,7 @@ import org.mockito.ArgumentCaptor;
  * check all decide through {@link StaleSnapshotResolver#tryHandleStale}, which is driven directly
  * with its collaborators mocked so the deletion and the queue transition are observable.
  */
+@Tag("cross-platform")
 final class UncertainAbsenceGatesTest {
   private static final boolean WINDOWS =
       System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");

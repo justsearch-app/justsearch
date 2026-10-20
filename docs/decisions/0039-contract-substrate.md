@@ -2,7 +2,7 @@
 title: "ADR-0039: Contract substrate — every published contract is a first-class artifact"
 type: decision
 status: accepted - format superseded by tempdoc 564
-description: "Generalizes ADR-0038 into a contract substrate: one authority per Category, projected per-target from a single spec. Narrowed 2026-09-02 to the one Category that exists (wire); plugin-SDK, catalog and registry-serialization Categories were never registered and are not decided here."
+description: "One authority per contract Category, projected per target; only wire is registered. Tempdoc 564 supersedes the proto-as-source realization for frontend wire types: Java records drive JSON Schema and TS/Zod projection."
 date: 2026-06-09
 probes:
   - adr-0039-one-contract-category

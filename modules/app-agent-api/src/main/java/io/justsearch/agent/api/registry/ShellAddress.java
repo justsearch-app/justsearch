@@ -30,8 +30,7 @@ import java.util.Optional;
  *       {@code OperationInvocationRequest}).
  * </ul>
  *
- * <p>The grammar (slice 489 §7.1, lifted from
- * {@code scripts/ci/agent-battery-url-scorer.mjs} round-2 §7 finding):
+ * <p>The shell-address grammar (slice 489 §7.1):
  *
  * <pre>
  *   justsearch://surface/&lt;surfaceId&gt;[?k=v&amp;...]    → Navigation
@@ -55,7 +54,7 @@ import java.util.Optional;
  * Navigation is forwarded.
  *
  * <p>This Java record is the canonical model for tests + future server-side
- * validation. The FE TS counterpart in {@code modules/ui-web/src/api/url-router/}
+ * validation. The FE TS URL parser in {@code modules/ui-web/src/shell-v0/router/parser.ts}
  * shares the grammar by hand — the wire-contract pipeline integration
  * ({@code contracts/wire/}) is a follow-up if the grammar grows.
  */

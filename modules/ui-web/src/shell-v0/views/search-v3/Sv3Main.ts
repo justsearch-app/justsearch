@@ -9,13 +9,9 @@
  *
  * The region is EMPTY in the composer's hero state (slice 3): nothing has been asked yet, so the
  * hero composer is the region's only subject. Once docked it holds the active session's TRANSCRIPT
- * (Phase F1) — and, when that session has no turns, the window's read of the shared search store
- * (`sv3-results.ts`, now the secondary axis). The region owns no store subscription and no client of
- * its own, so it cannot render anything the window did not hand it.
- *
- * The count line is computed HERE, off the same array the rows are mapped from, because that is the
- * only construction in which the number cannot come to describe a different set than the one on
- * screen. It is the shipped `matchCountLabel`, not a second count authority.
+ * (Phase F1) — or, while the window is showing Search mode's result list (WP1.1), that list
+ * (`Sv3Results.ts`, the shared results card inside this one scroller). The region owns no store
+ * subscription and no client of its own, so it cannot render anything the window did not hand it.
  *
  * Side-effect registers <jf-sv3-main>.
  */
@@ -35,7 +31,6 @@ import {
   shouldIgnoreKeyEvent,
 } from '../../utils/keyboardHandler.js';
 import { modalOwnsFocus } from '../../primitives/modality.js';
-import { matchCountLabel } from '../../components/searchResults/matchCountLabel.js';
 import { sv3Shared } from './sv3-shared-styles.js';
 import './Sv3Empty.js';
 // The product's ONE tool-call primitive (`governance/run-renderers.v1.json` — this file is a
@@ -105,8 +100,6 @@ import {
   CONTEXT_SUMMARY_SHOW,
   HISTORY_LOCKED_HELP,
   HISTORY_LOCKED_REFUSED,
-  MAIN_EMPTY,
-  MAIN_UNREACHABLE,
   RECORD_UNREACHABLE,
   REWRITE_NOTE_LABEL,
   RUN_DISPATCHING,
@@ -124,7 +117,14 @@ import {
   versionPagerCount,
 } from './fixtures.js';
 import type { Sv3ComposerState } from './fixtures.js';
-import { SV3_RESULTS_IDLE, type Sv3ResultsView } from './sv3-results.js';
+import {
+  SV3_RESULTS_IDLE,
+  sv3ResendScopeNote,
+  sv3ScopeLabel,
+  type Sv3AskScope,
+  type Sv3ResultsView,
+} from './sv3-search.js';
+import './Sv3Results.js';
 import { sv3TurnSourceCount, type Sv3Turn } from './sv3-sessions.js';
 import {
   SV3_CONTEXT_ACTION,
@@ -208,9 +208,6 @@ export type Sv3RunDecision =
       readonly autoContinue?: boolean;
     }
   | { readonly kind: 'context'; readonly decision: 'continue' | 'summarize' | 'stop' };
-
-/** Enough bars to fill the region's first screen without claiming a result count it cannot know. */
-const SKELETON_ROWS = 6;
 
 /**
  * How close to the end counts as "at the end" for the follow re-arm below. The design spec's own
@@ -348,59 +345,6 @@ export class Sv3Main extends JfElement {
         flex-direction: column;
         gap: var(--space-1);
       }
-      h2 {
-        margin: 0 0 var(--space-2);
-        font-size: var(--font-size-sv3-sm);
-        font-weight: 600;
-      }
-      .row {
-        display: flex;
-        align-items: baseline;
-        gap: var(--space-2);
-        padding: var(--space-2) var(--space-3);
-        border-radius: var(--radius-md);
-        font-size: var(--font-size-sv3-sm);
-        /* A long list stays cheap: the browser skips rendering work for rows outside the
-           viewport, and the intrinsic size keeps the scrollbar honest while they are skipped. */
-        content-visibility: auto;
-        contain-intrinsic-size: auto 36px;
-      }
-      .row-title {
-        font-weight: 500;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .row-path {
-        margin-left: auto;
-        flex-shrink: 0;
-        font-size: var(--font-size-sv3-xs);
-        color: var(--secondary-label);
-        font-family: var(--font-mono);
-      }
-
-      /* The pending state is the row rhythm with the content withheld — same height, same radius,
-         same gap — so the list does not jump when the answer replaces it. The sweep is the shared
-         sheet's duty-cycled keyframe (transform-only, long hold), not a continuous shimmer. */
-      .skeleton-row {
-        position: relative;
-        overflow: hidden;
-        height: var(--space-9);
-        border-radius: var(--radius-md);
-        background: var(--muted);
-      }
-      .skeleton-sheen {
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(
-          90deg,
-          transparent,
-          color-mix(in srgb, var(--foreground) 8%, transparent),
-          transparent
-        );
-      }
-
       /* ── The transcript ────────────────────────────────────────────────────
          One measure for the whole conversation, centred, matching the composer's own box: the
          design spec gives the timeline root the same 'max-w-3xl' its composer uses, so a turn and
@@ -525,6 +469,13 @@ export class Sv3Main extends JfElement {
         flex-direction: column;
         align-items: flex-end;
         gap: var(--space-1);
+      }
+      /* WP1.1 — what the question was limited to, and what a re-send will search. A fact about
+         the question, so it sits with it, one step below the bubble's own text. */
+      .ask-scope {
+        margin: 0;
+        color: var(--secondary-label);
+        font-size: var(--font-size-sv3-xs);
       }
       /* Per the design spec: 'max-w-[80%] rounded-2xl bg-message p-3 text-message-foreground'.
          The fill is the ONE surface in the transcript. */
@@ -1312,14 +1263,6 @@ export class Sv3Main extends JfElement {
         min-height: 24px;
       }
 
-      /* The store's own failure text, kept at diagnostic altitude: the state is said in words above
-         it, and this is the detail that makes the words checkable. */
-      .failure-detail {
-        color: var(--secondary-label);
-        font-family: var(--font-mono);
-        font-size: var(--font-size-sv3-xs);
-      }
-
       /* ── The record could not be read (Phase F6 / inventory D2) ────────────
          In FLOW at the top of the transcript, not floating over it: it qualifies everything below,
          so it has to be the first thing read and it has to scroll away with the content it qualifies.
@@ -1348,8 +1291,10 @@ export class Sv3Main extends JfElement {
     state: { type: String, reflect: true },
     view: { attribute: false },
     turns: { attribute: false },
+    turnScopes: { attribute: false },
     run: { attribute: false },
     liveEvidencePaths: { attribute: false },
+    unconfirmedSteerNotes: { attribute: false },
     recordNotice: { type: Boolean, attribute: 'record-notice' },
     historyLocked: { type: Boolean, attribute: 'history-locked' },
     lockedRefusal: { type: Boolean, attribute: 'locked-refusal' },
@@ -1378,9 +1323,15 @@ export class Sv3Main extends JfElement {
   };
 
   declare state: Sv3ComposerState;
+  /** Search mode's result list (WP1.1); `idle` whenever the window is not showing it. */
   declare view: Sv3ResultsView;
   /** The ACTIVE session's turns, oldest first. Handed down; the region holds no session list. */
   declare turns: readonly Sv3Turn[];
+  /**
+   * WP1.1 S1.7 — which turns this window limited to chosen files. Window-local: a reloaded turn is
+   * not in it, and its Edit then says it searches all files, which is what it will do.
+   */
+  declare turnScopes: ReadonlyMap<string, Sv3AskScope>;
   /**
    * The ONE live agent run, or null. Rendered against `run.turnId` and no other turn, so the feed
    * cannot appear under a turn that did not open it (tempdoc 822 Phase F2).
@@ -1395,6 +1346,11 @@ export class Sv3Main extends JfElement {
    * (or an older caller not yet passing it) renders every hit as not-yet-in-evidence rather than throw.
    */
   declare liveEvidencePaths: ReadonlySet<string>;
+  /**
+   * WP6.2 S8.2 — per turn id, the window's notes for steer sends whose outcome is unconfirmed. The
+   * record does not carry them, so a settled turn draws them after its recorded activity.
+   */
+  declare unconfirmedSteerNotes: ReadonlyMap<string, readonly Sv3RunFeedItem[]>;
   /**
    * The claimed conversation's canonical record could not be read, so what is on screen may be
    * incomplete (tempdoc 822 Phase F6 / inventory D2). A BOOLEAN, not a message: the copy is fixed
@@ -1609,6 +1565,7 @@ export class Sv3Main extends JfElement {
    * by re-adding the gate.
    */
   private get transcriptArmRendered(): boolean {
+    if (this.resultsArmRendered) return false;
     if (this.locksTranscript) return false;
     return (this.turns ?? []).length > 0 || this.recordNotice;
   }
@@ -1618,8 +1575,10 @@ export class Sv3Main extends JfElement {
     this.state = COMPOSER_STATE_DEFAULT;
     this.view = SV3_RESULTS_IDLE;
     this.turns = [];
+    this.turnScopes = new Map();
     this.run = null;
     this.liveEvidencePaths = new Set();
+    this.unconfirmedSteerNotes = new Map();
     this.recordNotice = false;
     this.historyLocked = false;
     this.lockedRefusal = false;
@@ -1819,9 +1778,22 @@ export class Sv3Main extends JfElement {
     this.editingDraft = '';
   }
 
+  /** WP1.1 — the window is showing Search mode's result list, which then owns the region. */
+  private get resultsArmRendered(): boolean {
+    return this.state === 'docked' && (this.view ?? SV3_RESULTS_IDLE).status !== 'idle';
+  }
+
   render(): TemplateResult {
     const view = this.view ?? SV3_RESULTS_IDLE;
     const turns = this.turns ?? [];
+    // The result list is a different, unencrypted store's (the lock below gates the CONVERSATION
+    // record only), and the window shows it only with no conversation claimed — so it comes first.
+    // Same scroller, same occlusion padding: its last row clears the floating composer (S1.12).
+    if (this.resultsArmRendered) {
+      return html`<div class="scroller sv3-scroller" data-testid="sv3-main-scroller">
+        <jf-sv3-results .view=${view}></jf-sv3-results>
+      </div>`;
+    }
     // THE LOCK COMES FIRST, and it replaces the transcript rather than covering it (inventory E4):
     // a store that refuses to be read must not leave a readable copy of what it holds on screen. Only
     // the CONVERSATION is gated — the search projection below is a different, unencrypted store, and
@@ -1831,40 +1803,9 @@ export class Sv3Main extends JfElement {
     // below is the SECONDARY axis now (822 §4b course correction) and speaks only for a session that
     // has asked nothing — it is reached from the palette, never from a plain submit.
     if (this.transcriptArmRendered) return this.transcript(turns);
-    // Nothing but the hero composer belongs in the region until the window has docked: an untouched
-    // window's emptiness is the composer's to speak for, not a state to announce.
-    if (this.state !== 'docked' || view.status === 'idle') {
-      return html`<div class="scroller sv3-scroller" data-testid="sv3-main-scroller"></div>`;
-    }
-    if (view.status === 'loading') return this.pending();
-    if (view.status === 'unreachable') return this.unreachable(view.failure);
-    if (view.status === 'empty') {
-      return html`
-        <jf-sv3-empty
-          roomy
-          data-testid="sv3-main-empty"
-          glyph="&#9634;"
-          heading=${MAIN_EMPTY.title}
-          description=${MAIN_EMPTY.description}
-        ></jf-sv3-empty>
-      `;
-    }
-    const rows = view.rows;
-    return html`
-      <div class="scroller sv3-scroller" data-testid="sv3-main-scroller">
-        <h2 data-testid="sv3-main-count">
-          ${matchCountLabel(view.matched, rows.length, false, view.ranked, view.truncated)}
-        </h2>
-        ${rows.map(
-          (row) => html`
-            <div class="row" data-testid="sv3-main-row">
-              <span class="row-title">${row.title}</span>
-              <span class="row-path">${row.path}</span>
-            </div>
-          `,
-        )}
-      </div>
-    `;
+    // Nothing but the composer belongs in the region otherwise: an untouched window's emptiness is
+    // the composer's to speak for, not a state to announce.
+    return html`<div class="scroller sv3-scroller" data-testid="sv3-main-scroller"></div>`;
   }
 
   /**
@@ -2087,6 +2028,7 @@ export class Sv3Main extends JfElement {
       <!-- 857 PR-A — a J/K landmark. The :q suffix keeps the turn's anchors out of the run feed's
            id space by construction (feed ids are the controller's entry/call ids). -->
       <div class="ask-bubble" data-testid="sv3-turn-question" data-item-id=${`${turn.id}:q`}>${turn.question}</div>
+      ${this.scopeLine(turn)}
       ${canEdit && !this.streaming
         ? html`<jf-control
             class="ask-edit"
@@ -2101,6 +2043,13 @@ export class Sv3Main extends JfElement {
           >`
         : nothing}
     </div>`;
+  }
+
+  /** WP1.1 S1.6 — the files this question was limited to, said under it; nothing when unlimited. */
+  private scopeLine(turn: Sv3Turn): TemplateResult | typeof nothing {
+    const scope = this.turnScopes?.get(turn.id) ?? null;
+    if (scope === null) return nothing;
+    return html`<p class="ask-scope" data-testid="sv3-turn-scope">Limited to ${sv3ScopeLabel(scope)}</p>`;
   }
 
   /**
@@ -2139,6 +2088,9 @@ export class Sv3Main extends JfElement {
           }
         }}
       ></textarea>
+      <p class="ask-scope" data-testid="sv3-turn-edit-scope">
+        ${sv3ResendScopeNote(this.turnScopes?.get(turn.id) ?? null)}
+      </p>
       <div class="ask-edit-acts">
         <jf-control
           class="ask-edit-act"
@@ -2659,14 +2611,18 @@ export class Sv3Main extends JfElement {
    * window could refresh looks like — the receipt line below still says what it was.
    */
   private recordedActivity(turn: Sv3Turn): TemplateResult | typeof nothing {
-    if (turn.activity.length === 0) return nothing;
+    // WP6.2 S8.2 — the window's own unconfirmed-send notes, which the record does not carry.
+    const notes = this.unconfirmedSteerNotes.get(turn.id) ?? [];
+    if (turn.activity.length === 0 && notes.length === 0) return nothing;
     const terminalId = terminalTextItemId(turn.activity);
     // Tempdoc 867 — this turn's OWN evidence-path set (`sv3-record.ts`'s projection), not the live
     // prop: a settled turn has no controller left to ask, and `turn.evidencePaths` is what it wrote
     // down instead.
     const evidencePaths = new Set(turn.evidencePaths ?? []);
     return html`<div class="run-feed" data-testid="sv3-record-activity">
-      ${turn.activity.map((item) => this.runItem(item, turn, item.id === terminalId, evidencePaths))}
+      ${[...turn.activity, ...notes].map((item) =>
+        this.runItem(item, turn, item.id === terminalId, evidencePaths),
+      )}
     </div>`;
   }
 
@@ -3111,48 +3067,6 @@ export class Sv3Main extends JfElement {
       data-broken=${String(broken)}
       >${note}</span
     >`;
-  }
-
-  private pending(): TemplateResult {
-    return html`
-      <div
-        class="scroller sv3-scroller"
-        data-testid="sv3-main-scroller"
-        aria-busy="true"
-        aria-label="Searching"
-      >
-        ${Array.from(
-          { length: SKELETON_ROWS },
-          () => html`
-            <div class="skeleton-row" data-testid="sv3-main-skeleton" aria-hidden="true">
-              <span class="skeleton-sheen sv3-anim-skeleton"></span>
-            </div>
-          `,
-        )}
-      </div>
-    `;
-  }
-
-  /**
-   * A failed request (including typed backend rejections) is distinct from a successful empty search.
-   */
-  private unreachable(failure: string): TemplateResult {
-    return html`
-      <jf-sv3-empty
-        roomy
-        data-testid="sv3-main-unreachable"
-        role="alert"
-        glyph="&#9634;"
-        heading=${MAIN_UNREACHABLE.title}
-        description=${MAIN_UNREACHABLE.description}
-      >
-        ${failure === ''
-          ? nothing
-          : html`<span class="failure-detail" data-testid="sv3-main-failure-detail"
-              >${failure}</span
-            >`}
-      </jf-sv3-empty>
-    `;
   }
 }
 

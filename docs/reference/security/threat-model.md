@@ -2,25 +2,26 @@
 title: Threat Model
 type: reference
 status: stable
-description: "STRIDE threat model for the local-first, loopback-only architecture; the provable-privacy story and its mechanical anchors."
+description: "STRIDE threat model for local processing, outbound connections, update trust, and the loopback API boundary."
 ---
 
 # Threat Model
 
 This doc answers: *"What is JustSearch's attack surface, what is the privacy guarantee, and what
 mechanically enforces it?"* It is a STRIDE-style threat model over the local-first architecture and the
-basis for the README's **"nothing leaves your machine"** claim. It is an NLnet-M2 deliverable.
+basis for the README's privacy description. It is an NLnet-M2 deliverable.
 
 > **Scope.** JustSearch runs entirely on the user's machine: a desktop shell (Tauri webview), a loopback
 > HTTP API, one Engine JVM whose index half owns Lucene, and a local inference server (`llama-server`). There is no
 > server-side component, no account, and no cloud processing of user documents. The guarantee here is
-> **privacy** (your files and queries stay local), **not** infallibility of AI answers — always check a
-> citation. See the project's `NON-GOALS` (at the repository root in the public release).
+> local processing for search and built-in inference. Update checks, AI downloads, optional trace export,
+> and user-selected integrations cross the device boundary as described below.
+> AI answers can be wrong — always check a citation. See the project's `NON-GOALS` at the repository root.
 
 ## Assets
 
-1. **The user's documents** (indexed content, snippets, embeddings) — the primary asset; JustSearch never sends it off the device. (An MCP client the user connects receives passages as tool results — see [what this model does not claim](#what-this-model-deliberately-does-not-claim).)
-2. **Search queries and AI conversations** — reveal user intent; local-only.
+1. **The user's documents** (indexed content, snippets, embeddings) — processed locally. Connected MCP clients and tools receive the data passed to them; enabled trace export can carry paths and excerpts (see below).
+2. **Search queries and AI conversations** — reveal user intent; handled locally by the built-in assistant. Connected external clients and tools receive the inputs passed to them.
 3. **The local API** — the control surface for retrieval, ingest, and RAG (`modules/ui`).
 4. **The model files** — integrity matters (a tampered model could degrade or mislead); see [first-run](#first-run-and-supply-chain).
 
@@ -31,35 +32,47 @@ basis for the README's **"nothing leaves your machine"** claim. It is an NLnet-M
 | **Webview ↔ Head** | The Tauri webview talks to the loopback HTTP API. Confined by CSP + Host/Origin/token checks. |
 | **Other local processes ↔ Head** | Any process (or a malicious web page the user visits) can attempt to reach `127.0.0.1:<port>`. The key inbound boundary. The decision of *where* that boundary is drawn — and what is deliberately inside it — is [ADR-0046: Local API trust boundary](../../decisions/0046-local-api-trust-boundary.md); this document is its threat analysis. |
 | **Head <-> index half / Inference** | The Head and the index half share one Engine JVM and meet at direct in-process calls - no socket, no listener, no IPC (ADR-0049; the retired gRPC channel and MMF bus no longer exist). `llama-server` remains a separate process on loopback. Not network-exposed. |
-| **Device ↔ Internet** | The only intended egress is the one-time model download. Everything else stays local. |
+| **Device ↔ Internet** | AI downloads, launch-time update checks in desktop builds with an embedded release URL, optional OTLP trace export, and user-selected integrations. The webview CSP does not constrain native Rust or Engine HTTP clients. |
 
 ## The privacy guarantee and its mechanical anchors
 
-The "nothing leaves your machine" claim rests on three enforced properties, each with a source-of-truth
-anchor (so the claim is *checkable*, not promised):
+Local indexing, retrieval, and built-in inference are anchored in the Engine and local
+`llama-server`. The following controls and exceptions define the network boundary:
 
-1. **The webview cannot egress to the public internet.** The Content-Security-Policy pins
-   `connect-src` to loopback only — `connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:*`,
-   with `script-src 'self'` and no external `img-src`/`script-src` origins
-   (`modules/shell/src-tauri/tauri.conf.json`, the `csp` field). A compromised or buggy frontend cannot
-   `fetch`/`XHR`/`WebSocket` to an external host. *(Drift guard: `scripts/docs/check-privacy-claims.mjs`
-   fails the build if the CSP stops pinning loopback.)*
-2. **No product telemetry exporter exists.** The shipped code contains no analytics/telemetry SDK
-   (no PostHog/Segment/Sentry/Mixpanel/Amplitude). The only "telemetry" in the codebase is **internal**
-   Lucene/runtime metrics that are never exported off-device. **Do not confuse** this with the
-   *development-time* agent-analytics OTLP sink (`scripts/agent-analytics/otlp-sink.py`) — that is a
-   dev-only tool, binds `127.0.0.1:4318`, writes under `tmp/`, and is **not part of the shipped app**.
-3. **The only intended egress is the one-time model download** (from GitHub Releases + Hugging Face).
-   After first run, the app operates fully offline; a user can confirm with a network monitor. See
-   [First-run and supply chain](#first-run-and-supply-chain).
+1. **Frontend request confinement.** The desktop Content-Security-Policy pins `connect-src` to
+   `'self' ipc: http://ipc.localhost http://127.0.0.1:*`, with `script-src 'self'`
+   (`modules/shell/src-tauri/tauri.conf.json`). Frontend `fetch`/XHR/WebSocket cannot target public
+   hosts. `scripts/docs/check-privacy-claims.mjs` checks this directive and the absence of common
+   analytics SDKs; it does not prove the entire application has no egress.
+2. **No built-in usage analytics service; tracing is opt-in.** API and index tracing both default to
+   `none`. Enabling either writes `<data>/telemetry/traces.ndjson`. Only when tracing is enabled **and**
+   `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` or `OTEL_EXPORTER_OTLP_ENDPOINT` is configured does the Engine
+   also export OTLP/HTTP spans. The endpoint is not restricted to loopback or HTTPS. Spans can contain
+   paths and bounded document excerpts (up to 16 documents × 1024 characters on search spans).
+   See `TracingBootstrap`, the initialization gates in `HeadlessApp` and `KnowledgeServer`, and
+   [trace configuration](../configuration/environment-variables.md#trace-output-and-optional-otlp-export).
+   An OTLP endpoint alone does not enable tracing. The development agent-analytics sink under
+   `scripts/agent-analytics/` is a separate tool.
+3. **AI downloads and automatic update checks.** Install AI downloads from `github.com` and
+   `huggingface.co` with consent; repair and upgrades can download again. On Windows with supported
+   NVIDIA hardware it also downloads a CUDA `llama-server` build and selects it automatically unless
+   the user configured an executable. Desktop builds with an embedded release URL check it on launch,
+   after about 30 seconds. CI-built installers embed the repository's configured GitHub release URL,
+   including branch candidates and pre-releases. There is **no off switch yet**. GitHub receives the
+   request IP and time; document content and queries are not sent by this check. Builds without a
+   pinned URL do not contact an update server; debug builds can use a runtime-provided URL.
+   See `startAppUpdateMonitor`, `updater.rs::check_release`, and [supply chain](#first-run-and-supply-chain).
+4. **Connected clients and tools.** MCP clients receive retrieved paths and passages. The optional
+   MCP host (`JUSTSEARCH_MCP_HOST_CONFIG` / `justsearch.mcp.host.config`) launches user-chosen programs;
+   their network behavior is outside this boundary. Links opened in the system browser also leave
+   this application's request boundary.
 
 ## STRIDE analysis
 
 ### Spoofing / Tampering / Information disclosure — the inbound loopback surface ★
 
-The most important threat is **not** outbound egress (the CSP confines that) but **inbound** access to
-the loopback API by software other than the legitimate webview. "Loopback-only" means *private from the
-internet*; it does **not** by itself mean *isolated from other local software*.
+The main inbound threat is access to the loopback API by software other than the legitimate webview.
+"Loopback-only" means *private from the internet*; it does **not** by itself mean *isolated from other local software*.
 
 - **DNS rebinding.** A malicious web page the user visits can, after a short DNS TTL, re-resolve its own
   domain to `127.0.0.1` and issue requests to the local API from the user's browser. This is the dominant
@@ -156,18 +169,28 @@ amplification, no shared service). Deny logging is rate-limited (`maybeRecordHos
 to avoid log floods during a probe.
 
 ### Elevation of privilege
-The API delegates index IO to the Worker over IPC (Hard Invariant #1 — Head never touches Lucene), so a
-compromised Head cannot directly corrupt the index. The MCP tool surface follows least-privilege in
-spirit: read tools (`justsearch_search`/`answer`/`browse`/`status`) vs. the privileged write tool
-(`justsearch_ingest`), with mutations gated by the session token.
+The API and index half run in **one Engine JVM**, joined through in-process ports (ADR-0049).
+These module boundaries provide no process isolation: a compromised API shares the index owner's
+address space and can read or corrupt its data. The separate `llama-server` and extraction children
+remain process boundaries; they do not isolate the index from the API. The MCP tool surface separates
+read tools (`justsearch_search`/`answer`/`browse`/`status`) from the privileged write tool
+(`justsearch_ingest`), with mutations gated by the session token in production mode.
 
 ## First-run and supply chain
 
-First run downloads models once. Integrity + availability considerations:
+Install AI downloads models and runtimes with consent; repair and upgrades can download them again.
+The desktop updater is another supply-chain path. Integrity + availability considerations:
 
 - **Integrity.** Each model package pins a `sha256` in `model-registry.v2.json`; a tampered download
   fails verification. Every model/runtime `downloadUrl` must use HTTPS and resolve from an allowlisted
   public host.
+- **Update authenticity and rollback protection.** The shell fetches `release.v1.json` and its
+  signature over HTTPS, verifies the descriptor against the build's pinned metadata root, rejects
+  a sequence below its persisted highest accepted sequence, and checks that Tauri's `latest.json`
+  names the same artifact and signature. The artifact digest and signature are verified before
+  installation. See `updater.rs::check_release`, `verify_metadata_signature`, and
+  `require_closed_set`. GitHub availability and the release-signing keys are part of
+  this trust chain.
 - **Availability / single points of failure.** Project-controlled model assets resolve from the
   project's own releases repo. The packaged chat GGUF and mmproj currently resolve from
   `huggingface.co/bartowski/...`, and the `llama.cpp` binaries resolve from `github.com/ggml-org/...`;
@@ -178,15 +201,16 @@ First run downloads models once. Integrity + availability considerations:
 
 ## What this model deliberately does not claim
 
-- **Not** that the app makes zero network connections — it downloads models on first run, and runs a
-  local `llama-server`. The claim is that **your documents and queries never leave the device**.
+- **Not** that the app makes zero network connections. Downloads, launch-time update checks,
+  and optional trace export are described above. Local inference does not
+  require cloud processing; enabling off-device trace export can send paths and excerpts.
 - **Not** that a connected MCP client keeps the data local. `justsearch_search` and `justsearch_answer`
   return file paths and passage text as tool results to whichever client the user connected (see
   [`mcp-production-server.md`](../mcp-production-server.md) § Data exposure). A client running a
   cloud-hosted model forwards those results to its provider; that egress is the client's, chosen by the
   user, and outside this model's boundary. The built-in assistant and a local-model client keep the
   loop on-device.
-- **Not** infallibility — AI answers can be wrong; the guarantee is privacy, not correctness.
+- **Not** infallibility — AI answers can be wrong; verify their citations.
 - **Not** protection against a fully compromised host OS or a malicious local user with disk access.
 
 ## See also

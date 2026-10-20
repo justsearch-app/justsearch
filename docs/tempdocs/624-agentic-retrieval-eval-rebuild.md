@@ -4291,7 +4291,7 @@ corpora — keep it as a standing generation-time check rather than a one-off.
   `mcp_call_share` 0.0.** Zero `mcp__justsearch*` calls across 10 cells / 174 tool calls. Every cell
   ran pure Bash/Grep/Read (8–31 calls each), 9/10 correct — consistent with the certified A-arm
   envelope (0.815 ± seed noise).
-- Operator-config recording (§M.8 item 2): user-scope MCP servers (context7, claude.ai
+- Operator-config recording (§M.8 item 2): user-scope MCP servers (a library-docs server, claude.ai
   Drive/Gmail/Calendar) appear as *pending* servers in cells even from isolated cwd; none corpus-capable;
   battlefield facts are fabricated so external channels cannot contain answers. Recorded, not blocking.
 

@@ -112,6 +112,7 @@ import {
 } from './Sv3Composer.js';
 import {
   SV3_DELEGATE_SEND_HINT,
+  SV3_SEARCH_SEND_HINT,
   SV3_SEND_HINT,
   SV3_TIER_DEFAULT,
   SV3_TIER_MENU_LABEL,
@@ -148,6 +149,9 @@ function aiOnlineWithoutDocuments(): void {
 
 const askDispatches = (): unknown[][] =>
   fetchMock.mock.calls.filter((call) => String(call[0]).includes('/api/chat/dispatch'));
+
+const searchRequests = (): unknown[][] =>
+  fetchMock.mock.calls.filter((call) => String(call[0]).includes('/api/knowledge/search'));
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -363,9 +367,19 @@ describe('the control and the chord are the same act', () => {
     expect(askDispatches()).toHaveLength(0);
   });
 
-  it('still asks — and never reaches the controller — on the default tier', async () => {
+  it('searches on the default tier — no ask, no agent — and asks on the ask tier', async () => {
+    // WP1.1: the default tier is Search, which lists documents and creates no turn.
     aiOnline();
     const el = await mount();
+    await type(el, 'what is in the corpus');
+    await pressSend(el);
+    await settle(el);
+
+    expect(searchRequests().length).toBeGreaterThan(0);
+    expect(askDispatches()).toHaveLength(0);
+    expect(ctrl.send).not.toHaveBeenCalled();
+
+    await chooseTier(el, 'ask');
     await type(el, 'what is in the corpus');
     await pressSend(el);
 
@@ -403,7 +417,14 @@ describe('the accelerator keeps its meaning', () => {
 
   it('sends plain Enter at the CHOSEN tier — the mode governs the default key', async () => {
     aiOnline();
+    const search = await mount();
+    const searched = recordSubmits(search);
+    await type(search, 'plain enter searches');
+    await pressEnter(search);
+    expect(searched).toEqual([{ query: 'plain enter searches', tier: 'search' }]);
+
     const ask = await mount();
+    await chooseTier(ask, 'ask');
     const asked = recordSubmits(ask);
     await type(ask, 'plain enter asks');
     await pressEnter(ask);
@@ -421,13 +442,17 @@ describe('the accelerator keeps its meaning', () => {
 /* ── 4. What the send control says it will do ────────────────────────────────────────────────── */
 
 describe('the routing explanation follows the mode', () => {
-  it('names the key that now runs, in both modes', async () => {
+  it('names the key that now runs, in every mode', async () => {
     aiOnline();
     const el = await mount();
     await type(el, 'anything');
     const composer = await region(el, 'jf-sv3-composer');
     const send = () => q<HTMLButtonElement>(composer, 'sv3-composer-send');
 
+    expect(send()?.getAttribute('aria-label')).toContain(SV3_SEARCH_SEND_HINT);
+
+    await chooseTier(el, 'ask');
+    await composer.updateComplete;
     expect(send()?.getAttribute('aria-label')).toContain(SV3_SEND_HINT);
 
     await chooseTier(el, 'delegate');
@@ -449,6 +474,11 @@ describe('the notice states the CHOSEN tier availability', () => {
     const el = await mount();
     const composer = await region(el, 'jf-sv3-composer');
     const notice = () => q(composer, 'sv3-composer-notice');
+    // Search, the default, refuses nothing here: the ask tier's reason is not its to state.
+    expect(notice()).toBeNull();
+
+    await chooseTier(el, 'ask');
+    await composer.updateComplete;
     const askReason = notice()?.textContent?.trim() ?? '';
     expect(askReason).not.toBe('');
 

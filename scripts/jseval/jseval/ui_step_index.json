@@ -11,7 +11,8 @@
     "search-results", "command-mode", "zero-results", "input-focus",
     "filters-chips", "search-simple-mode", "search-advanced-mode",
     "multi-select", "row-hover", "snippets-expanded", "selection-preserved",
-    "search-results-light", "search-results-compact", "search-results-rich"
+    "search-results-light", "search-results-compact", "search-results-rich",
+    "sv3-search-results"
   ],
   "shell-v0/views/searchResultViewModel.ts": [
     "search-results", "search-results-rich", "snippets-expanded"
@@ -29,17 +30,22 @@
   "shell-v0/components/chat/CitationsPanel.ts": ["sv3-citation-selected", "sv3-citation-dropped"],
   "shell-v0/state/selectedSource.ts": ["sv3-citation-selected", "citation-highlight"],
   "shell-v0/views/search-v3/Sv3Main.ts": [
-    "sv3-citation-selected", "sv3-citation-dropped", "sv3-composer-occlusion"
+    "sv3-citation-selected", "sv3-citation-dropped", "sv3-composer-occlusion",
+    "sv3-search-results"
   ],
+  "shell-v0/views/search-v3/Sv3Results.ts": ["sv3-search-results"],
+  "shell-v0/views/search-v3/sv3-search.ts": ["sv3-search-results"],
   "shell-v0/views/search-v3/sv3-tokens.css.ts": [
     "sv3-citation-selected", "sv3-composer-occlusion",
-    "sv3-hero-forced-colors", "sv3-docked-forced-colors", "sv3-palette-forced-colors"
+    "sv3-hero-forced-colors", "sv3-docked-forced-colors", "sv3-palette-forced-colors",
+    "sv3-search-results"
   ],
   "shell-v0/views/search-v3/Sv3Pane.ts": ["sv3-citation-selected", "sv3-citation-dropped"],
   "shell-v0/views/search-v3/SearchV3View.ts": [
-    "sv3-citation-selected", "sv3-citation-dropped", "sv3-composer-occlusion"
+    "sv3-citation-selected", "sv3-citation-dropped", "sv3-composer-occlusion",
+    "sv3-search-results"
   ],
-  "shell-v0/views/search-v3/Sv3Composer.ts": ["sv3-composer-occlusion"],
+  "shell-v0/views/search-v3/Sv3Composer.ts": ["sv3-composer-occlusion", "sv3-search-results"],
   "shell-v0/views/search-v3/Sv3ContextBar.ts": ["sv3-composer-occlusion"],
   "shell-v0/components/chat/evidenceProjection.ts": ["sv3-citation-selected", "sv3-citation-dropped"],
   "shell-v0/views/UnifiedChatView.ts": [
@@ -75,7 +81,7 @@
   "shell-v0/views/LibrarySurface.ts": ["library", "library-light", "skeleton-library", "library-enriching", "library-ingestion", "library-gap-decision"],
   "shell-v0/components/IngestionSummary.ts": ["library-ingestion"],
   "shell-v0/components/ingestionSummaryPresentation.ts": ["library-ingestion"],
-  "shell-v0/state/searchState.ts": ["search-failure"],
+  "shell-v0/state/searchState.ts": ["search-failure", "sv3-search-results"],
   "shell-v0/state/folderStatus.ts": ["library-enriching"],
   "shell-v0/state/uiModeState.ts": [
     "home", "library", "ai-brain", "health", "settings", "security", "help",

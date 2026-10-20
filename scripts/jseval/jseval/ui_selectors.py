@@ -66,15 +66,14 @@ CSS_SETTINGS_WINDOW_CONTENT = 'jf-settings-window jf-settings-surface'
 CSS_SETTINGS_WINDOW_SECURITY_CONTENT = 'jf-settings-window jf-settings-surface jf-security-surface'
 # The unified-chat composer remains the correct hook for chat-surface steps.
 CSS_COMPOSER_TEXTAREA = 'jf-composer textarea'
-# Search v3 has its own composer and explicit command-palette transition into retrieval. The retired
-# standalone `search-input` testid above is retained only for old, independently-owned steps; current
-# search setup must enter through this textarea and choose "Search this text" from the palette.
+# Search v3 has its own composer, which opens in Search mode: Enter in this textarea searches. The
+# retired standalone `search-input` testid above is retained only for old, independently-owned steps.
 CSS_SV3_WINDOW = 'jf-sv3-window'
 CSS_SV3_COMPOSER_TEXTAREA = 'jf-sv3-window jf-sv3-composer textarea'
 CSS_SV3_PALETTE = 'jf-sv3-window jf-sv3-palette'
-# Search v3 projects lightweight rows from `Sv3Main`; it does not mount the older
-# `<jf-results-card>` rows carrying `search-result-row`.
-CSS_SV3_RESULT_ROW = '[data-testid="sv3-main-row"]'
+# Search v3's Search mode renders its results on the shared `<jf-results-card>`, inside its own
+# results region, so the row is the card's `search-result-row` scoped to that region.
+CSS_SV3_RESULT_ROW = 'jf-sv3-window jf-sv3-results [data-testid="search-result-row"]'
 # Settings owns Density as a native range inside the discrete-slider atom. Its selected user-facing
 # stop is exposed by `aria-valuetext`; the setting is FE-local and does not issue `/api/settings/v2`.
 CSS_DENSITY_SLIDER = (
