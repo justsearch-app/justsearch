@@ -1858,3 +1858,14 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
   "note": "Entry 30 leaves the JVM-wide ConfigStore changed after teardown, violating the new-test isolation requirement; all other entries and the merged frontend reruns passed review."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a159c1-9d74-7c13-9386-c1552f8397e4",
+  "verdict": "accept",
+  "digest": "sha256:ce561ddeb315b91265582250972e20d4ce506a1cb2412edfcfb720656508d8d5",
+  "note": "All 34 entries preserve or explicitly supersede agreed intent, current receipts are valid, merged frontend claims fail before and pass after, and ConfigStore cleanup passes injected shutdown failures."
+}
+```
