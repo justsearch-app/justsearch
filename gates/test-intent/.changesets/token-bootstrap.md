@@ -631,3 +631,25 @@ like acceptance, must come from another session. No author approval is supplied.
   "note": "The McpOriginValidationTest Adaptation changes a precondition, not just instrumentation: it moves the live /mcp Origin cases from dev to production mode, which the change did not force (my rerun with the dev-mode fixture passes 19/19 on the candidate), and leaves no live test of the guard in dev mode, where ADR-0046 says it applies regardless of mode and where it is the only barrier because no token is required; keep the dev-mode cases (add the production run alongside) or cite a source for dropping them."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "870966bc-b6a6-40df-b8e1-01d50f08b2f8",
+  "verdict": "accept",
+  "digest": "sha256:3c4cfc3d6dbe8201f250db2adc33417919cf5974038d56c647ecff475a528573",
+  "note": "All 15 entries hold against T1-T19 with owner-adopted sources; reran Java and web fail-before on the merge-base (assertion failures for the reason under test) and candidate passes, McpOriginValidationTest keeps all dev-mode cases; minor: E5/E10 delegated-choice text reads as brief wording and the launcher mode assertion has no cited source."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "6b4a638d-8764-4777-b299-fbdb6811912c",
+  "verdict": "accept",
+  "digest": "sha256:3c4cfc3d6dbe8201f250db2adc33417919cf5974038d56c647ecff475a528573",
+  "note": "All 15 entries match their class and T1-T19 sources, and both delegated choices stay inside 'resume with remaining work autonomously' with no stronger conflict (ADR-0046 at base is replaced by the later T1/T2); my reruns show the Java and web new checks fail on c00a0cb24 by assertion for the reason under test and pass on e1a09d099, and the unmodified base McpOriginValidationTest and LocalApiUiTokenPolicyTest pass on the candidate except the T1-retired token-route cases, so the dev-mode Origin cases are kept; notes: the launcher delegated-choice text is a brief line rather than a stated choice, and the launcher and installed-route-walk receipts were made with JAVA_TOOL_OPTIONS (not rerun by me)."
+}
+```
