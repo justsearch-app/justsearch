@@ -1025,11 +1025,6 @@ final class EngineSupervisedRecoveryE2ETest {
     runScenario(scenario);
   }
 
-  @Test
-  void initialBootstrapSurvivesHostileLocks() throws Exception {
-    runScenario("lock-boot");
-  }
-
   static void runScenario(String scenario) throws Exception {
     boolean processingFamily = "processing".equals(scenario) || "operation".equals(scenario);
     boolean operationFault = scenario.startsWith("ingest-") || scenario.startsWith("settings-")
@@ -1074,7 +1069,7 @@ final class EngineSupervisedRecoveryE2ETest {
       Files.writeString(childArgs, "-Xmx128m\n-Dfile.encoding=UTF-8\n-cp\n\""
           + System.getProperty("java.class.path").replace("\\", "\\\\") + "\"\n"
           + io.justsearch.indexerworker.fixtures.ChaosExtractionSandboxChild.class.getName() + "\n");
-      String javaExe = Path.of(System.getProperty("java.home"), "bin", "java.exe").toString();
+      String javaExe = ProcessHandle.current().info().command().orElseThrow();
       builder.environment().put("JUSTSEARCH_EXTRACTION_SANDBOX_MODE", "process");
       builder.environment().put("JUSTSEARCH_EXTRACTION_SANDBOX_POOL", "1");
       builder.environment().put("JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND",

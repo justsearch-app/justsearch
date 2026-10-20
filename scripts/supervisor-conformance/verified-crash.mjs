@@ -8,7 +8,14 @@ export function verifyOwned(record, expectedData, table = identity.readProcessTa
 }
 export function killOwned(record, expectedData, { table, kill = process.kill, now = Date.now } = {}) {
   verifyOwned(record, expectedData, table);
-  const issuedAtMs = now(); kill(record.pid, 'SIGKILL');
+  const issuedAtMs = now();
+  if (record.processIdentity?.kind === 'linux-proc-v1') {
+    const result = identity.signalLinuxProcess(record.processIdentity, 'SIGKILL');
+    if (!result.ok) throw new Error(`Refusing identity-bound crash: ${result.outcome}`);
+  } else {
+    kill(record.pid, 'SIGKILL');
+  }
   return { pid: record.pid, creationFileTimeUtc: record.creationFileTimeUtc, issuedAtMs,
+    ...(record.processIdentity ? { processIdentity: record.processIdentity } : {}),
     issuedAt: new Date(issuedAtMs).toISOString(), signal: 'SIGKILL' };
 }

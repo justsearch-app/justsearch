@@ -8,9 +8,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 @Timeout(7 * 60)
 class GenerationPointerPublicationE2ETest {
   @ParameterizedTest
-  @CsvSource({"first,before-backup", "first,after-backup", "first,after-publication",
-      "replacement,before-backup", "replacement,after-backup", "replacement,after-publication",
-      "recovery,before-backup", "recovery,after-backup", "recovery,after-publication"})
+  @CsvSource({"replacement,after-backup", "recovery,before-backup"})
   void killedWorkerCanRestartAtEachPointerPublicationCut(String mode, String point) throws Exception {
     EngineSupervisedRecoveryE2ETest.runScenario("pointer-" + mode + "-" + point);
   }

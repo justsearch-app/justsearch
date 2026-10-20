@@ -252,12 +252,11 @@ The scenarios are delegated orchestrator choices, not owner words. Linux and Win
     },
     {
       "items": [
-        "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/EngineSupervisedRecoveryE2ETest.java",
         "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/GenerationPointerPublicationE2ETest.java",
         "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/MigrationJournalLossE2ETest.java"
       ],
       "class": "New",
-      "behaviour": "Installed Engine checks use identity-bound barriers and process-kill cuts for first publication, replacement and recovery. Real worker API calls delete a file, prefix, collection and projection during migration; HTTP search must return 503 before readiness and after the restarted worker refuses the damaged journal, with queue evidence unchanged.",
+      "behaviour": "Installed R1 repair checks kill replacement publication after backup and a recovery write before backup, then require an authoritative pointer and completion of the original recorded migration. R9 checks issue real file, prefix, collection and projection deletions during migration; HTTP search must return 503 before readiness and after the restarted worker refuses the damaged journal, with queue evidence unchanged. Passing-before pointer cuts and ordinary supervised recovery are recorded separately as preservation.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -294,7 +293,53 @@ The scenarios are delegated orchestrator choices, not owner words. Linux and Win
         "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/GenerationPointerPublicationE2ETest.java",
         "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/MigrationJournalLossE2ETest.java"
       ],
-      "repaired": true
+      "repaired": true,
+      "unresolvedRisks": "Replacement pointer fixtures explicitly ingest indexed content once without registering a persisted watched root: a persisted watched root during a crashed migration makes cutover refuse; tracked separately. The original watched-root after-publication reproduction is retained uncommitted under tmp/restart/a5fbcb/ and compared with f9bd104d2. All R1 assertions and timeouts, including recorded-owner completion within 120 seconds, remain unchanged."
+    },
+    {
+      "items": [
+        "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/EngineSupervisedRecoveryE2ETest.java",
+        "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/GenerationPointerPublicationPreservationE2ETest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preservation: all seven pointer cuts that pass on f9bd104d2 retain their original scenario calls, assertions and timeouts. Writer, migration, lock-ingest and PROCESSING replay plus deterministic intruder cleanup also pass on both product versions with the same complete harness. Separate baseline evidence is gates/test-intent/evidence/restart-worker-installed-preservation-before.json.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "R1: a killed pointer publication leaves the old or new valid authority, including first publication, replacement, recovery writes and stale temporary files. R2: repair a missing current pointer only when operation, source, target and generation metadata match recorded receipts; conflicting receipts, orphan generations or missing metadata keep the refusal. R3: retain ordinary .prev recovery and strict recorded fencing.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Cases expected to pass before, if any, go in a preservation file instead.",
+          "location": "task t-20261019-91c3ab request (Builder A, run 8, decision 3)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/restart-worker-installed-preservation.json",
+      "newChecks": [
+        "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/GenerationPointerPublicationPreservationE2ETest.java",
+        "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/EngineSupervisedRecoveryE2ETest.java"
+      ],
+      "repaired": false,
+      "unresolvedRisks": "initialBootstrapSurvivesHostileLocks is moved unchanged to EngineBootstrapWindowsLocksE2ETest so its Windows-only skip is outside the portable evidence; it is not counted as passed. The original Linux comparison skipped it on both states. Replacement pointer fixtures explicitly ingest indexed content once without registering a persisted watched root: a persisted watched root during a crashed migration makes cutover refuse; tracked separately. The original watched-root after-publication reproduction is retained uncommitted under tmp/restart/a5fbcb/ and compared with f9bd104d2. All R1 assertions and timeouts, including recorded-owner completion within 120 seconds, remain unchanged."
+    },
+    {
+      "items": [
+        "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/EngineBootstrapWindowsLocksE2ETest.java"
+      ],
+      "class": "Structural rule kept",
+      "rule": "Mandatory bootstrap file-lock contention is exercised only on Windows, with the original 420-second class bound.",
+      "whySurvives": "Pure move of initialBootstrapSurvivesHostileLocks from EngineSupervisedRecoveryE2ETest: same runScenario(\"lock-boot\") call, platform assumption, assertions, fault/cleanup paths and timeout. The new class remains discovered by integrationTest; no repository runner filters on the old class. Linux evidence reports the earlier skip as unverified, separate from the portable passing cases.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Cases expected to pass before, if any, go in a preservation file instead.",
+          "location": "task t-20261019-91c3ab request (Builder A, run 8, decision 3)"
+        }
+      ]
     },
     {
       "items": [

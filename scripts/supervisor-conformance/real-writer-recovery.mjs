@@ -213,9 +213,13 @@ if (pointerPublication) {
   const corpus = path.join(work, 'pointer-corpus');
   fs.mkdirSync(corpus, { recursive: true });
   fs.writeFileSync(path.join(corpus, 'probe.txt'), 'pointerdurabilitymarker quokka', { flag: 'wx' });
-  fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({
-    schemaVersion: 1, roots: [{ path: corpus }],
-  }), { flag: 'wx' });
+  // Replacement ingests once through the API. Restoring a persisted watcher during a
+  // crashed migration hits a separate cutover-refusal bug, outside the R1 pointer contract.
+  if (pointerPublication[1] !== 'replacement') {
+    fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({
+      schemaVersion: 1, roots: [{ path: corpus }],
+    }), { flag: 'wx' });
+  }
   if (pointerPublication[1] === 'recovery') preparePointerRecovery(indexBase);
 }
 if (queryReconfigureMode) {

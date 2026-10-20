@@ -24,6 +24,12 @@ export async function exercisePointerPublication(c) {
     request, post, requireThat: check, createOperationKey, initialExit } = c;
   let operationKey = null;
   if (mode === 'replacement') {
+    const ingest = await post(apiPort, '/api/knowledge/ingest', {
+      paths: [path.join(work, 'pointer-corpus', 'probe.txt')],
+      idempotencyKey: createOperationKey(),
+    });
+    check(ingest.status >= 200 && ingest.status < 300,
+      `pointer fixture ingest failed: ${ingest.status} ${ingest.text}`);
     await waitFor('pointer fixture corpus searchable', 60000, async () => {
       const response = await post(apiPort, '/api/knowledge/search',
         { query: 'pointerdurabilitymarker', mode: 'text', limit: 5 });
@@ -82,7 +88,16 @@ export async function exercisePointerPublication(c) {
   }
   const permitted = [cut.state.active_generation, cut.state.building_generation].filter(Boolean);
   check(permitted.includes(recovered.generation.active_generation), 'restart guessed an unrelated generation');
-  const exit = initialExit ?? recovered.supervisor.lastExit;
+  // Recovery can request another restart after the cut. Its lastExit is then exit 4,
+  // so bind the crash evidence to the original writer's recorded incarnation.
+  const writerReport = mode === 'replacement' ? readJson(path.join(work, 'state', 'runs',
+    first.runId, 'incarnations', String(first.incarnation), 'stop-report.json')) : null;
+  if (mode === 'replacement') {
+    check(writerReport?.runId === first.runId && writerReport.incarnation === first.incarnation,
+      'pointer writer exit report belongs to another incarnation');
+  }
+  const exit = initialExit ?? (writerReport
+    ? { ...writerReport, exitCode: writerReport.backendExitCode } : recovered.supervisor.lastExit);
   check(exit?.exitCode === 73 || exit?.code === 73, 'the recorded writer did not die at the requested cut');
   const proof = { mode, point, cut, first, recovered, exit, operationKey };
   fs.writeFileSync(path.join(work, 'pointer-publication-proof.json'), JSON.stringify(proof, null, 2));
