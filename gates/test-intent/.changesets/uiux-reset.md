@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: agent-session-dt68x6bo
+author-session: agent-session-hy95yalb
 ---
 
 # Test-intent entries
@@ -97,6 +97,23 @@ with its temporary before checkouts and a separate Cargo cache under the session
 temporary directory; logs remain under tmp/wp51-ci-fixes in this worktree.
 Windows junction execution remains unverified on this Linux host.
 
+Review history: 2026-10-20 — builder agent-session-hy95yalb implemented agreed RA6:
+versioned reset intent/receipt writes, legacy reads and future-version refusal with
+an unchanged marker, visible reason and working Cancel. The store row now describes
+READ_IN_PLACE version 1 and the actual Settings/Engine timing. Existing acceptance
+records and evidence are retained; no acceptance record is written this round.
+
+RA6 evidence: uiux-reset-version-ra6.json uses --before 7252f42c7. The future-version
+and versioned-write checks must fail before with assertions; the legacy preservation
+check passes before. Aggregate producer exit 1 reflects that preservation pass.
+uiux-reset-version-original-shell.json, uiux-reset-version-links.json and
+uiux-reset-version-root-retry.json refresh whole-source digests for existing checks
+against their unchanged baselines and compatibility seam. The producer runs in a
+shared clone with before worktrees under the session temporary directory, a shared
+Cargo cache, two Cargo jobs, a short socket TMPDIR and source-only frontend assets.
+Logs stay in tmp/wp51-version. No frontend code or checks change; packaged desktop
+and Windows behavior remain unverified on this Linux host.
+
 ```json
 {
   "entries": [
@@ -143,7 +160,7 @@ Windows junction execution remains unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage"
       ],
@@ -178,7 +195,7 @@ Windows junction execution remains unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry"
       ],
@@ -213,7 +230,7 @@ Windows junction execution remains unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data"
       ],
@@ -248,7 +265,7 @@ Windows junction execution remains unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work"
       ],
@@ -283,7 +300,7 @@ Windows junction execution remains unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data"
       ],
@@ -311,7 +328,7 @@ Windows junction execution remains unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_models_and_runtime_keep_their_bytes"
       ]
@@ -331,7 +348,7 @@ Windows junction execution remains unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn3_normal_start_does_not_enumerate_or_modify_stores"
       ]
@@ -351,7 +368,7 @@ Windows junction execution remains unverified on this Linux host.
         }
       ],
       "behaviour": "A linked native-bin parent is retained as it is; its external runtime and other-application sentinel remain untouched.",
-      "evidence": "gates/test-intent/evidence/uiux-reset-ci-links.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-links.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target"
       ],
@@ -372,7 +389,7 @@ Windows junction execution remains unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_nested_links_leave_indexed_files_and_other_applications_untouched"
       ]
@@ -406,7 +423,7 @@ Windows junction execution remains unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart"
       ],
@@ -796,7 +813,7 @@ Windows junction execution remains unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ci-links.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-links.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets"
       ],
@@ -817,7 +834,7 @@ Windows junction execution remains unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ci-links.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-links.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart"
       ],
@@ -859,7 +876,7 @@ Windows junction execution remains unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ci-root-retry.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-root-retry.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra2_linked_data_root_is_cleared_without_following_internal_links"
       ],
@@ -880,7 +897,7 @@ Windows junction execution remains unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ci-root-retry.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-root-retry.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra3_retries_storage_recreated_by_a_previous_session_process"
       ],
@@ -913,6 +930,68 @@ Windows junction execution remains unverified on this Linux host.
         "modules/ui-web/src/boot/boot-lockdown.test.ts#RN3 Engine recovery Retry and both desktop event reloads mount under real lockdown",
         "modules/ui-web/src/boot/boot-lockdown.test.ts#RN3 normal desktop and browser starts and debug routes mount after lockdown"
       ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "Future-version reset markers are kept unchanged and never clean up processes, data or staging files; status explains that a newer version requested the reset, blocks the backend and still permits cancellation to a durable idle marker. Startup, retry, request, storage acknowledgement and dismissal cannot act on the future marker.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RA6",
+          "quote": "The reset request and receipt file carries a format version. A file written before this change (the one-line form or unversioned JSON) is read exactly as before. A file from a newer version is never acted on: it is kept, the app says plainly that a newer version requested the reset, and Cancel still works. The store register row describes the file truthfully (read in place with a version, written from Settings while the Engine runs).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-ra6.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "Legacy one-line intent and unversioned JSON with or without kept_links retain reset and receipt behavior: pending/incomplete resumes; idle, awaiting-storage and complete never wipe again, and kept-link receipts survive acknowledgement.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RA6",
+          "quote": "The reset request and receipt file carries a format version. A file written before this change (the one-line form or unversioned JSON) is read exactly as before. A file from a newer version is never acted on: it is kept, the app says plainly that a newer version requested the reset, and Cancel still works. The store register row describes the file truthfully (read in place with a version, written from Settings while the Engine runs).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-ra6.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_legacy_forms_resume_with_the_same_phases_and_receipts"
+      ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "Every marker write carries format_version 1: request, incomplete, cancellation tombstone, disk-cleaned receipt and storage-cleared receipt.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RA6",
+          "quote": "The reset request and receipt file carries a format version. A file written before this change (the one-line form or unversioned JSON) is read exactly as before. A file from a newer version is never acted on: it is kept, the app says plainly that a newer version requested the reset, and Cancel still works. The store register row describes the file truthfully (read in place with a version, written from Settings while the Engine runs).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-version-ra6.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_every_marker_write_carries_format_version_one"
+      ],
+      "repaired": true
     }
   ]
 }

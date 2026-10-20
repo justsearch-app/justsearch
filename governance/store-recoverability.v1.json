@@ -1172,7 +1172,7 @@
       "id": "shell-factory-reset",
       "pathVerification": "LITERAL",
       "encryption": "UNSEALED_NO_JVM_CIPHER",
-      "encryptionNote": "Shell-owned reset intent and receipt: phase, remaining failure paths/errors and kept-link paths. Written before the Engine or JVM StoreCipher is available; no document contents are stored.",
+      "encryptionNote": "Shell-owned reset intent and receipt: format version, phase, remaining failure paths/errors and kept-link paths; no document contents. Settings writes the request while the Engine runs. The Shell reads and rewrites it before starting the Engine and during recovery, without JVM StoreCipher access.",
       "owner": "SHELL",
       "root": "DATA_DIR",
       "ownedPaths": [
@@ -1180,16 +1180,18 @@
         ".justsearch-reset-status.tmp"
       ],
       "recoverability": "AUTHORED",
-      "upgradeHandling": "PRESERVE_EXTERNAL",
-      "format": "Unversioned JSON reset phase, remaining failures and optional kept_links; legacy reset newline intent is also readable",
-      "currentVersion": 0,
-      "readableLegacyVersions": [],
+      "upgradeHandling": "READ_IN_PLACE",
+      "format": "JSON reset intent/receipt v1 (format_version); unversioned JSON and legacy reset newline intent remain readable as version 0",
+      "currentVersion": 1,
+      "readableLegacyVersions": [0],
+      "versionAuthority": "modules/shell/src-tauri/src/factory_reset.rs",
+      "futureVersionRefusalTest": "modules/shell/src-tauri/src/factory_reset.rs",
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
       "corruptionPolicy": "FAIL_CLOSED_REPAIR_REQUIRED",
-      "corruptionNote": "Unreadable or non-regular marker bytes are preserved and reported as incomplete, blocking the backend. Explicit cancellation atomically replaces intent with an idle tombstone; automatic recovery never guesses destructive intent. Stale staging bytes are unlinked before a new exclusive staging write.",
+      "corruptionNote": "Future-version, unreadable or non-regular marker bytes are preserved and reported as incomplete, blocking the backend. Explicit cancellation atomically replaces intent with an idle tombstone; automatic recovery never guesses destructive intent. Stale staging bytes are unlinked before a new exclusive staging write.",
       "reconciliation": "PRESERVE_RESET_INTENT_AND_RESUME_BEFORE_BACKEND_START",
-      "reconciliationNote": "PRESERVE_EXTERNAL preserves the user's unversioned reset request and receipt across upgrades, rather than rebuilding or resetting them; the Shell owns their lifecycle. Resume requested/incomplete disk cleanup before opening stores, retain awaiting-storage until acknowledgement, and retain a complete receipt until dismissal. Cancellation persists idle intent so a later launch cannot resume the wipe.",
+      "reconciliationNote": "Resume requested/incomplete disk cleanup before opening stores, retain awaiting-storage until acknowledgement, and retain a complete receipt until dismissal. Future versions are kept and refused with an incomplete status explaining that a newer version requested the reset; cancellation remains available. Cancellation persists versioned idle intent so a later launch cannot resume the wipe.",
       "status": "READY",
       "implementationSources": [
         "modules/shell/src-tauri/src/factory_reset.rs"

@@ -5,6 +5,21 @@ use std::path::Path;
 
 pub(crate) const MARKER: &str = ".justsearch-reset-requested";
 const STAGING: &str = ".justsearch-reset-status.tmp";
+const FORMAT_VERSION: u64 = 1;
+
+#[derive(serde::Deserialize)]
+struct MarkerVersion {
+    // Unversioned JSON is the legacy format, version 0.
+    #[serde(default)]
+    format_version: u64,
+}
+
+#[derive(serde::Serialize)]
+struct VersionedStatus<'a> {
+    format_version: u64,
+    #[serde(flatten)]
+    status: &'a Status,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -99,6 +114,12 @@ fn load(dir: &Path) -> Result<Status, String> {
     if bytes == b"reset\n" {
         return Ok(Status::new(Phase::Requested));
     }
+    // Inspect the version before interpreting any phase or future status fields.
+    let version: MarkerVersion =
+        serde_json::from_slice(&bytes).map_err(|e| format!("Cannot read reset state: {e}"))?;
+    if version.format_version > FORMAT_VERSION {
+        return Err("A newer version of JustSearch requested this reset. Update JustSearch or cancel reset.".into());
+    }
     let status: Status =
         serde_json::from_slice(&bytes).map_err(|e| format!("Cannot read reset state: {e}"))?;
     Ok(status)
@@ -132,7 +153,11 @@ fn save(dir: &Path, status: &Status) -> Result<(), String> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => return Err(e.to_string()),
     }
-    let bytes = serde_json::to_vec(status).map_err(|e| e.to_string())?;
+    let bytes = serde_json::to_vec(&VersionedStatus {
+        format_version: FORMAT_VERSION,
+        status,
+    })
+    .map_err(|e| e.to_string())?;
     let mut file = fs::OpenOptions::new()
         .create_new(true)
         .write(true)
@@ -381,6 +406,177 @@ mod tests {
         let path = dir.join(name);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, bytes).unwrap();
+    }
+
+    #[test]
+    fn ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled() {
+        for phase in [
+            "requested",
+            "incomplete",
+            "awaiting_storage",
+            "complete",
+            "idle",
+            "future_phase",
+        ] {
+            let dir = temp();
+            let marker = format!(
+                r#"{{"format_version":2,"phase":"{phase}","remaining":[],"kept_links":[]}}"#
+            );
+            seed(dir.path(), MARKER, marker.as_bytes());
+            seed(dir.path(), "conversations/private", b"keep conversation");
+            seed(dir.path(), "settings.json", b"keep settings");
+            seed(
+                dir.path(),
+                ".justsearch-reset-status.tmp",
+                b"keep staging until explicit cancel",
+            );
+            // The status command, startup and retries must all refuse this marker.
+            let initial = read_status(dir.path());
+            assert_eq!(
+                initial.phase,
+                Phase::Incomplete,
+                "future marker must be refused"
+            );
+            for status in [
+                initial,
+                run_pending(dir.path(), || {
+                    panic!("future reset must not clean up processes")
+                }),
+                run_pending(dir.path(), || panic!("retry must not act on future reset")),
+            ] {
+                assert_eq!(status.phase, Phase::Incomplete, "future phase: {phase}");
+                assert!(status.blocks_backend());
+                assert_eq!(status.remaining.len(), 1);
+                assert_eq!(
+                    status.remaining[0].path,
+                    dir.path().join(MARKER).to_string_lossy()
+                );
+                assert_eq!(status.remaining[0].error, "A newer version of JustSearch requested this reset. Update JustSearch or cancel reset.");
+                // This is the same serialized error the recovery UI displays.
+                let ui_status = serde_json::to_value(&status).unwrap();
+                assert_eq!(
+                    ui_status["remaining"][0]["error"],
+                    status.remaining[0].error
+                );
+            }
+            assert!(request(dir.path()).is_err());
+            assert!(storage_cleared(dir.path()).is_err());
+            assert!(dismiss(dir.path()).is_err());
+            assert_eq!(
+                fs::read(dir.path().join(MARKER)).unwrap(),
+                marker.as_bytes()
+            );
+            assert_eq!(
+                fs::read(dir.path().join(".justsearch-reset-status.tmp")).unwrap(),
+                b"keep staging until explicit cancel"
+            );
+            assert_eq!(
+                fs::read(dir.path().join("conversations/private")).unwrap(),
+                b"keep conversation"
+            );
+            assert_eq!(
+                fs::read(dir.path().join("settings.json")).unwrap(),
+                b"keep settings"
+            );
+            cancel(dir.path()).unwrap();
+            assert_eq!(read_status(dir.path()).phase, Phase::Idle);
+            assert_eq!(
+                run_pending(dir.path(), || panic!("cancelled reset must not resume")).phase,
+                Phase::Idle
+            );
+            assert_eq!(
+                fs::read(dir.path().join("conversations/private")).unwrap(),
+                b"keep conversation"
+            );
+            assert_eq!(
+                fs::read(dir.path().join("settings.json")).unwrap(),
+                b"keep settings"
+            );
+        }
+    }
+
+    #[test]
+    fn ra6_legacy_forms_resume_with_the_same_phases_and_receipts() {
+        for marker in [
+            "reset\n",
+            r#"{"phase":"requested","remaining":[]}"#,
+            r#"{"phase":"incomplete","remaining":[{"path":"old","error":"held"}]}"#,
+            r#"{"phase":"requested","remaining":[],"kept_links":[]}"#,
+            r#"{"phase":"incomplete","remaining":[],"kept_links":[]}"#,
+        ] {
+            let dir = temp();
+            seed(dir.path(), MARKER, marker.as_bytes());
+            seed(dir.path(), "conversations/private", b"delete");
+            let mut cleaned = false;
+            let result = run_pending(dir.path(), || {
+                cleaned = true;
+                Ok(())
+            });
+            assert!(cleaned, "legacy reset must resume: {marker}");
+            assert_eq!(result.phase, Phase::AwaitingStorage);
+            assert!(!dir.path().join("conversations").exists());
+            storage_cleared(dir.path()).unwrap();
+            assert_eq!(read_status(dir.path()).phase, Phase::Complete);
+        }
+        for phase in ["idle", "awaiting_storage", "complete"] {
+            for links in ["", r#", "kept_links":["/kept/link"]"#] {
+                let dir = temp();
+                let marker = format!(r#"{{"phase":"{phase}","remaining":[]{links}}}"#);
+                seed(dir.path(), MARKER, marker.as_bytes());
+                seed(dir.path(), "sentinel", b"keep");
+                let result =
+                    run_pending(dir.path(), || panic!("legacy receipt must not wipe again"));
+                let receipt = serde_json::to_value(&result).unwrap();
+                assert_eq!(receipt["phase"], phase);
+                assert_eq!(
+                    receipt["kept_links"],
+                    serde_json::json!(if links.is_empty() {
+                        vec![]
+                    } else {
+                        vec!["/kept/link"]
+                    })
+                );
+                assert_eq!(fs::read(dir.path().join("sentinel")).unwrap(), b"keep");
+                assert_eq!(
+                    fs::read(dir.path().join(MARKER)).unwrap(),
+                    marker.as_bytes()
+                );
+                if phase == "awaiting_storage" {
+                    storage_cleared(dir.path()).unwrap();
+                    assert_eq!(
+                        serde_json::to_value(read_status(dir.path())).unwrap()["kept_links"],
+                        receipt["kept_links"]
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn ra6_every_marker_write_carries_format_version_one() {
+        let dir = temp();
+        let assert_version = |phase: &str| {
+            let value: serde_json::Value =
+                serde_json::from_slice(&fs::read(dir.path().join(MARKER)).unwrap()).unwrap();
+            assert_eq!(
+                value["format_version"], 1,
+                "written {phase} marker must carry its format version"
+            );
+            assert_eq!(value["phase"], phase);
+            assert!(!dir.path().join(".justsearch-reset-status.tmp").exists());
+        };
+        request(dir.path()).unwrap();
+        assert_version("requested");
+        run_pending(dir.path(), || Err("owned process still running".into()));
+        assert_version("incomplete");
+        cancel(dir.path()).unwrap();
+        assert_version("idle");
+        request(dir.path()).unwrap();
+        assert_version("requested");
+        run_pending(dir.path(), || Ok(()));
+        assert_version("awaiting_storage");
+        storage_cleared(dir.path()).unwrap();
+        assert_version("complete");
     }
 
     #[cfg(unix)]
