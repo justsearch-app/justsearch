@@ -1,8 +1,8 @@
 ---
 title: "ADR-0026: Manual-Only CI Triggering"
 type: decision
-status: accepted - narrowed by ADR-0044
-description: "Manual-only workflow policy for the former self-hosted/local-runner model; ADR-0044 now narrows this for the public hosted CI lane."
+status: accepted - narrowed by ADR-0044 and ADR-0052
+description: "Manual-only workflow policy for the former self-hosted/local-runner model; ADR-0044 narrows it for public hosted CI and ADR-0052 schedules CodeQL weekly while keeping manual dispatch."
 date: 2026-04-22
 probes:
   - adr-0026-workflow-triggers-checked
@@ -12,7 +12,9 @@ last_reviewed: 2026-09-05
 # ADR-0026: Manual-Only CI Triggering
 
 ## Status
-Accepted, narrowed by [ADR-0044](0044-public-hosted-ci-fact-lanes.md).
+Accepted, narrowed by [ADR-0044](0044-public-hosted-ci-fact-lanes.md) and
+[ADR-0052](0052-weekly-codeql-on-hosted-runners.md). CodeQL now runs weekly on Mondays at
+04:17 UTC and remains manually dispatchable; the manual-only security statement below is historical.
 
 ADR-0044 supersedes this ADR for the public repository's standard GitHub-hosted
 `CI` lane: that workflow may run on `pull_request`, `push`, and

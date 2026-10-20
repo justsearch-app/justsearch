@@ -1246,47 +1246,54 @@ class AgentLoopServiceTest {
   }
 
   @Test
-  void agentSession_drainInterject_isExactlyOnce() {
-    var session = new AgentSession(List.of(), 8000, EngineContextTestFixtures.AGENT_LOOP);
-    assertNull(session.drainInterject(), "no directive queued initially");
-    session.setInterject("steer me");
-    assertEquals("steer me", session.drainInterject(), "drain returns the queued directive");
-    assertNull(session.drainInterject(), "a drained directive is consumed exactly once");
-    session.setInterject("   ");
-    assertNull(session.drainInterject(), "blank directives are ignored");
+  void steeringDirective_blankIsIgnored() {
+    var ai = new ScriptedAiService(List.of(ScriptedResponse.textOnly("ok")));
+    var service = buildService(ai, new StubTool("search", RiskTier.LOW, "r"));
+    var acks = new ArrayList<AgentEvent>();
+    service.runAgent(new AgentRequest(userMessage("hi"), List.of(), 3), event -> {
+      if (event instanceof AgentEvent.SessionStarted s) {
+        assertTrue(service.injectSteeringDirective(s.sessionId(), "   "), "a blank direction is ignored, not refused");
+      }
+      if (event instanceof AgentEvent.DirectiveAcknowledged) acks.add(event);
+    }, EngineContextTestFixtures.AGENT_LOOP);
+    assertEquals(List.of(), acks, "a blank direction is neither queued nor reported");
+    assertEquals(2, ai.recordedMessages.get(0).size(), "only the system prompt and the user turn reach the model");
   }
 
-  // Tempdoc 565 §33 — a steer queued AFTER the last step boundary (here: during the final answer of a
-  // single-LLM-call run, with no next iteration to drain at) is still recorded via the end-of-run drain.
+  // Tempdoc 565 §33 / WP6.2 S8.2 — a steer queued AFTER the last step boundary (here: during the final
+  // answer of a single-LLM-call run, with no next iteration to drain at) never reaches the model, so the
+  // run reports it as NOT applied, with why, instead of acknowledging it like an applied direction.
   @Test
-  void steeringDirective_afterLastBoundary_drainedAtRunEnd() {
+  void steeringDirective_afterLastBoundary_reportedNotApplied() {
     var ai = new ScriptedAiService(List.of(ScriptedResponse.textOnly("the answer")));
     var service = buildService(ai, new StubTool("search", RiskTier.LOW, "r"));
 
     var sessionId = new java.util.concurrent.atomic.AtomicReference<String>();
     var injected = new java.util.concurrent.atomic.AtomicBoolean(false);
-    var acked = new java.util.concurrent.atomic.AtomicReference<String>();
+    var reports = new ArrayList<Map<String, Object>>();
     Consumer<AgentEvent> sink = event -> {
       if (event instanceof AgentEvent.SessionStarted s) {
         sessionId.set(s.sessionId());
       }
       // Inject on the FIRST text chunk — this fires AFTER iteration 0's boundary drain (the drain ran at
       // the start of executeIteration, before the LLM call), and the run is single-iteration, so no later
-      // boundary drains it. Only the end-of-run (finally) drain can catch it.
+      // boundary drains it.
       if (event instanceof AgentEvent.TextChunk && !injected.get() && sessionId.get() != null) {
         injected.set(true);
-        service.injectSteeringDirective(sessionId.get(), "too late to change the answer");
+        assertTrue(service.injectSteeringDirective(sessionId.get(), "too late to change the answer"));
       }
       if (event instanceof AgentEvent.DirectiveAcknowledged d) {
-        acked.set(d.directiveText());
+        reports.add(AgentEventPayloads.base(d));
       }
     };
 
     service.runAgent(new AgentRequest(userMessage("hi"), List.of(), 3), sink, EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(injected.get(), "the directive was injected after iteration 0's boundary drain");
-    assertEquals("too late to change the answer", acked.get(),
-        "the end-of-run drain emits DirectiveAcknowledged so a late steer is recorded, not silently lost");
+    assertEquals(List.of("queued", "not_applied"), reports.stream().map(r -> r.get("outcome")).toList(),
+        "a late steer is recorded, and recorded as not applied");
+    assertEquals("run_finished", reports.getLast().get("reason"));
+    assertEquals("too late to change the answer", reports.getLast().get("directiveText"));
   }
 
   @Test

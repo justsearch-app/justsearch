@@ -8,11 +8,13 @@ import java.util.Map;
 import java.util.Optional;
 import io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter.EngineIdentity;
 import io.justsearch.app.api.runtime.ledger.LedgerRecordType;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 
 @EnabledOnOs(OS.WINDOWS)
+@Tag("windows")
 final class WindowsJobWitnessReserveTest {
   @Test void anAppendInFlightAtTheDrainDeadlineCanFinishWithinTheFenceReserve() throws Throwable {
     var kernel = SymbolLookup.libraryLookup("kernel32", Arena.global());

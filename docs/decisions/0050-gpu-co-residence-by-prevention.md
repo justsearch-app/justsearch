@@ -18,7 +18,7 @@ last_reviewed: 2026-10-05
 
 Accepted by the owner on 2026-10-05 (decisions D1-D10 of the co-residence design).
 - It replaces the 2026-10-02 interim policy recorded in ADR-0004's amendment: "match shipped behaviour; chat going Online never yields the encoders". It is the "budget-aware policy" follow-up that amendment names.
-- The implementation is not yet built. Until it is, the shipped behaviour is the one in ADR-0004's amendment.
+- Implemented in #759 (`1d272de4b`); ADR-0004's interim amendment no longer describes the shipped policy. ADR-specific probes are not registered in `governance/adr-probes.v1.json`.
 
 ## Context
 

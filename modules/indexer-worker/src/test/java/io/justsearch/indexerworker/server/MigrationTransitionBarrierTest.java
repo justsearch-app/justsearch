@@ -52,6 +52,25 @@ final class MigrationTransitionBarrierTest {
   }
 
   @Test
+  void pruneReplayCutRequiresAnInstalledHarnessSelfExit() {
+    // Task t-20261019-24fb14, RP8: a stop point at a replayed prune's first removal, before
+    // anything of it is committed. Like the projection cut, only a process halt there is a state.
+    String point = "migration-after-first-prune-removal";
+    var installed = org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+        () -> MigrationTransitionBarrier.fromEnvironment(data,
+            Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
+                "JUSTSEARCH_MIGRATION_BARRIER_POINT", point,
+                "JUSTSEARCH_MIGRATION_BARRIER_SELF_EXIT", "1")::get),
+        "the prune stop point is a known harness point");
+    assertFalse(installed == MigrationTransitionBarrier.NO_HOOK);
+    assertThrows(IllegalArgumentException.class, () -> MigrationTransitionBarrier.fromEnvironment(
+        data, Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
+            "JUSTSEARCH_MIGRATION_BARRIER_POINT", point)::get));
+    assertThrows(IllegalArgumentException.class,
+        () -> new MigrationTransitionBarrier.Controlled(point));
+  }
+
+  @Test
   void installedHandshakeReportsExactGenerationAndDoesNotRetrigger() throws Exception {
     var hook = MigrationTransitionBarrier.fromEnvironment(data,
         Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",

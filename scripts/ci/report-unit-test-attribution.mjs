@@ -2,8 +2,8 @@
 /**
  * Summarize Gradle/JUnit unit-test XML for the public CI Unit tests lane.
  *
- * This is attribution only: it reports timing, skips, failures, and runner
- * identity without changing the Gradle test result.
+ * Reports timing, skips, failures, and runner identity. The opt-in Windows
+ * coverage check additionally fails if policy classes did not execute.
  */
 
 import fs from 'node:fs';
@@ -40,6 +40,7 @@ function usage() {
     '  --json                    Print JSON to stdout',
     '  --md                      Print Markdown to stdout',
     '  --allow-empty             Exit 0 when no JUnit XML files are found',
+    '  --require-windows-classes Check execution of the Windows policy classes',
     '  -h, --help',
   ].join('\n');
 }
@@ -55,6 +56,7 @@ function parseArgs(argv) {
     json: false,
     md: false,
     allowEmpty: false,
+    requireWindowsClasses: false,
     help: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -68,6 +70,7 @@ function parseArgs(argv) {
     else if (arg === '--json') out.json = true;
     else if (arg === '--md') out.md = true;
     else if (arg === '--allow-empty') out.allowEmpty = true;
+    else if (arg === '--require-windows-classes') out.requireWindowsClasses = true;
     else if (arg === '--help' || arg === '-h') out.help = true;
     else throw new Error(`Unknown or incomplete argument: ${arg}`);
   }
@@ -157,6 +160,7 @@ function parseTestcases(text) {
     const attrs = attrsFrom(match[1]);
     const body = match[2] || '';
     const failureTagMatch = /<(failure|error)\b([^>]*)>/.exec(body);
+    const skipTagMatch = /<skipped\b([^>]*)/.exec(body);
     let failureMessage = null;
     if (failureTagMatch) {
       const tagAttrs = attrsFrom(failureTagMatch[2]);
@@ -167,6 +171,8 @@ function parseTestcases(text) {
       name: attrs.name || '',
       failed: failureTagMatch !== null,
       failureMessage,
+      skipped: skipTagMatch !== null,
+      skipMessage: skipTagMatch ? attrsFrom(skipTagMatch[1]).message || '' : null,
     });
   }
   return testcases;
@@ -243,7 +249,7 @@ function round3(n) {
   return Math.round(n * 1000) / 1000;
 }
 
-export function buildReport({ root, lane = null, top = 20, runner = runnerInfo({}) }) {
+export function buildReport({ root, lane = null, top = 20, runner = runnerInfo({}), requiredClasses = [] }) {
   const rawSuites = walk(root)
     .map((filePath) => parseSuite(root, filePath))
     .filter(Boolean);
@@ -298,6 +304,23 @@ export function buildReport({ root, lane = null, top = 20, runner = runnerInfo({
       .sort((a, b) => b.timeSeconds - a.timeSeconds || a.name.localeCompare(b.name))
       .slice(0, top),
     flakyTests,
+    ...(requiredClasses.length ? {
+      requiredClassCoverage: requiredClasses.map((required) => {
+        const cases = rawSuites.flatMap((suite) => suite.testcases)
+          .filter((testcase) => testcase.classname === required.name);
+        const executed = cases.filter((testcase) => !testcase.skipped).length;
+        const skipped = cases.filter((testcase) => testcase.skipped)
+          .map((testcase) => ({ name: testcase.name, message: testcase.skipMessage }));
+        const issues = executed ? [] : ['no tests executed'];
+        for (const skip of skipped) {
+          if (!(required.allowedSkips ?? []).some((allowed) =>
+            allowed.name === skip.name && skip.message.includes(allowed.messageIncludes))) {
+            issues.push(`unexpected skip: ${skip.name}: ${skip.message}`);
+          }
+        }
+        return { name: required.name, executed, skipped, issues };
+      }),
+    } : {}),
   };
 }
 
@@ -354,6 +377,17 @@ export function renderMarkdown(report) {
     }
   }
   lines.push('');
+  if (report.requiredClassCoverage) {
+    lines.push('Windows required class execution:', '', '| Class | Executed | Skipped | Result |',
+      '|---|---:|---:|---|');
+    for (const entry of report.requiredClassCoverage) {
+      lines.push(`| ${entry.name} | ${entry.executed} | ${entry.skipped.length} | ${entry.issues.join('; ') || 'pass'} |`);
+    }
+    lines.push('');
+    for (const entry of report.requiredClassCoverage) {
+      for (const skip of entry.skipped) lines.push(`Skipped ${entry.name}.${skip.name}: ${skip.message}`, '');
+    }
+  }
   return `${lines.join('\n')}\n`;
 }
 
@@ -370,13 +404,25 @@ function main() {
       return;
     }
     const root = path.resolve(opts.resultsRoot || repoRootFromCwd());
-    const report = buildReport({ root, lane: opts.lane, top: opts.top, runner: runnerInfo(opts) });
+    let requiredClasses = [];
+    if (opts.requireWindowsClasses) {
+      const policy = JSON.parse(fs.readFileSync(new URL('./unit-test-shard-policy.v1.json', import.meta.url), 'utf8'));
+      requiredClasses = policy.windowsParts.find((part) => part.jobId === 'windows-native-contracts')?.requiredClasses;
+      if (!Array.isArray(requiredClasses) || !requiredClasses.length) throw new Error('Windows requiredClasses policy is empty');
+    }
+    const report = buildReport({ root, lane: opts.lane, top: opts.top, runner: runnerInfo(opts), requiredClasses });
     const json = `${JSON.stringify(report, null, 2)}\n`;
     const md = renderMarkdown(report);
 
     if (report.totals.suites === 0 && !opts.allowEmpty) {
       console.error(`report-unit-test-attribution: no JUnit XML files found under ${root}`);
       process.exitCode = 1;
+    }
+    for (const entry of report.requiredClassCoverage || []) {
+      for (const issue of entry.issues) {
+        console.error(`report-unit-test-attribution: ${entry.name}: ${issue}`);
+        process.exitCode = 1;
+      }
     }
     if (opts.outJson) writeText(path.resolve(opts.outJson), json);
     if (opts.outMd) writeText(path.resolve(opts.outMd), md);
