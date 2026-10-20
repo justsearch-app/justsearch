@@ -23,11 +23,13 @@ export class Switch extends JfElement {
   static properties = {
     checked: { type: Boolean },
     label: { type: String },
+    description: { type: String },
     disabled: { type: Boolean },
   };
 
   declare checked: boolean;
   declare label?: string;
+  declare description?: string;
   declare disabled: boolean;
 
   constructor() {
@@ -111,6 +113,7 @@ export class Switch extends JfElement {
         aria-checked=${this.checked ? 'true' : 'false'}
         aria-disabled=${this.disabled ? 'true' : nothing}
         aria-label=${this.label ?? nothing}
+        aria-description=${this.description ?? nothing}
         tabindex=${this.disabled ? '-1' : '0'}
         @click=${this.toggle}
         @keydown=${(e: KeyboardEvent) => {

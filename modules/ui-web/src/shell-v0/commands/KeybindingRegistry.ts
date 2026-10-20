@@ -59,7 +59,7 @@ function parseKey(combo: string): ParsedKey {
     else if (p === 'cmd' || p === 'meta' || p === 'command') out.meta = true;
     else if (p === 'alt' || p === 'option') out.alt = true;
     else if (p === 'shift') out.shift = true;
-    else out.key = p;
+    else out.key = p === 'space' ? ' ' : p;
   }
   return out;
 }
@@ -92,6 +92,12 @@ const listeners = new Set<() => void>();
 let invokeHandler: ((commandId: string) => void) | null = null;
 let attached = false;
 let keydownHandler: ((e: KeyboardEvent) => void) | null = null;
+let nativeSearchShortcutActive = false;
+
+/** Native registration wins over an overlapping binding without rewriting the saved binding. */
+export function setNativeSearchShortcutActive(active: boolean): void {
+  nativeSearchShortcutActive = active;
+}
 
 function bindingKey(entry: KeybindingEntry): string {
   return `${entry.key}::${entry.commandId}`;
@@ -150,6 +156,12 @@ export function attachKeybindingDispatcher(invoke: (commandId: string) => void):
   attached = true;
   keydownHandler = (e: KeyboardEvent) => {
     if (!invokeHandler) return;
+    if (nativeSearchShortcutActive && e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey
+      && (e.code === 'Space' || e.key === ' ')) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return;
+    }
     // Tempdoc 864 Layer 2(b) — IME composition and auto-repeat, by the app's ONE definition, shared
     // verbatim with the two raw window/document listeners that are NOT registered bindings.
     if (shouldIgnoreKeyEvent(e)) return;

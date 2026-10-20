@@ -1,0 +1,193 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T23:19:41.649Z",
+  "revision": "c00a0cb24b4c6000e090d5d09054c1e7e1d24e2f",
+  "tree": "05e29242422ffc0af00fdfe746b678d03f560bbd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc8_reads_off_before_registration_and_preserves_future_or_corrupt_bytes\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1282
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc9_focus_flag_beats_minimized_and_deep_links_keep_their_destination\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1298
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sn1_sn3_plain_launch_and_minimized_arguments_keep_their_behavior\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1165
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc5_sc6_pending_requests_coalesce_and_a_consumed_request_cannot_replay\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1184
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc10_wayland_detection_fails_closed_even_with_xwayland_display\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1154
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc7_sc8_registration_conflict_and_off_switch_report_real_state\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1181
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc8_failed_save_restores_the_choice_and_registration\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1176
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc8_unavailable_sessions_persist_the_choice_without_attempting_registration\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1223
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc8_reads_off_before_registration_and_preserves_future_or_corrupt_bytes",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:852cfe4aadaef1a09d5391b074204911bcd7b42f9a631d4e100b4bbeae27a370",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc8_reads_off_before_registration_and_preserves_future_or_corrupt_bytes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc9_focus_flag_beats_minimized_and_deep_links_keep_their_destination",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:852cfe4aadaef1a09d5391b074204911bcd7b42f9a631d4e100b4bbeae27a370",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc9_focus_flag_beats_minimized_and_deep_links_keep_their_destination",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sn1_sn3_plain_launch_and_minimized_arguments_keep_their_behavior",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:852cfe4aadaef1a09d5391b074204911bcd7b42f9a631d4e100b4bbeae27a370",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sn1_sn3_plain_launch_and_minimized_arguments_keep_their_behavior",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc5_sc6_pending_requests_coalesce_and_a_consumed_request_cannot_replay",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:852cfe4aadaef1a09d5391b074204911bcd7b42f9a631d4e100b4bbeae27a370",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc5_sc6_pending_requests_coalesce_and_a_consumed_request_cannot_replay",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc10_wayland_detection_fails_closed_even_with_xwayland_display",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:852cfe4aadaef1a09d5391b074204911bcd7b42f9a631d4e100b4bbeae27a370",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc10_wayland_detection_fails_closed_even_with_xwayland_display",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc7_sc8_registration_conflict_and_off_switch_report_real_state",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:852cfe4aadaef1a09d5391b074204911bcd7b42f9a631d4e100b4bbeae27a370",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc7_sc8_registration_conflict_and_off_switch_report_real_state",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc8_failed_save_restores_the_choice_and_registration",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:852cfe4aadaef1a09d5391b074204911bcd7b42f9a631d4e100b4bbeae27a370",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc8_failed_save_restores_the_choice_and_registration",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc8_unavailable_sessions_persist_the_choice_without_attempting_registration",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:852cfe4aadaef1a09d5391b074204911bcd7b42f9a631d4e100b4bbeae27a370",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc8_unavailable_sessions_persist_the_choice_without_attempting_registration",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2454d69e3e89209f2bfb1b55cdeba962be39e48ec66256c56f56b12d1444c84b"
+}

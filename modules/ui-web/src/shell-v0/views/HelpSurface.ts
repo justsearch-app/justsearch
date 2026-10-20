@@ -71,6 +71,7 @@ const FAQ: FaqItem[] = [
 // (the standalone agent surface was retired into the unified chat window). Listing shortcuts that
 // don't work is worse than a short list, so the table now mirrors the real bindings.
 const SHORTCUTS: ShortcutRow[] = [
+  { keys: 'Alt + Shift + Space', desc: 'Show JustSearch and focus the default search bar (desktop shortcut; leaves Settings, dialogs, palettes, renaming and other text edits focused). Alternatively run JustSearch with --focus-search. Turn the shortcut on or off in Settings → Desktop; if not active, use the command line.' },
   { keys: 'Ctrl / ⌘ + K', desc: 'Open the command palette' },
   { keys: 'Ctrl / ⌘ + Z', desc: 'Undo' },
   { keys: 'Ctrl / ⌘ + Shift + Z', desc: 'Redo' },

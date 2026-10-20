@@ -14,6 +14,7 @@ mod linux_process;
 // function over the register the dev-runner also reads; only the actuator lives in this file.
 mod quit;
 mod session_window;
+mod search_shortcut;
 mod shell_actuator;
 mod supervisor;
 mod updater;
@@ -1517,6 +1518,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(state.clone())
         .manage(update_coordinator.clone())
+        .manage(search_shortcut::SearchShortcut::default())
         .invoke_handler(tauri::generate_handler![
             supervisor_state,
             api_port,
@@ -1533,7 +1535,10 @@ pub fn run() {
             read_plugin_source,
             updater::app_update_status,
             updater::check_for_app_update,
-            updater::install_app_update
+            updater::install_app_update,
+            search_shortcut::search_shortcut_status,
+            search_shortcut::set_search_shortcut_enabled,
+            search_shortcut::take_search_summon
         ])
         .setup(move |app| {
             let session_app = app.handle().clone();
@@ -1545,6 +1550,7 @@ pub fn run() {
             if let Err(err) = maybe_run_factory_reset(app.handle()) {
                 eprintln!("Factory reset failed: {err}");
             }
+            search_shortcut::initialize(app.handle());
             if let Err(err) = start_supervision(app.handle(), state.clone()) {
                 {
                     state.host.record_spawn_error(err.clone());
@@ -1643,8 +1649,14 @@ pub fn run() {
             // Show the main window unless launched with --minimized (autostart).
             // Window-state plugin restores position/size but not visibility (VISIBLE
             // flag is excluded), so we control show/hide here.
-            let start_minimized = std::env::args().any(|a| a == "--minimized");
-            if !start_minimized {
+            let launch = search_shortcut::LaunchRequest::from_args(&std::env::args().collect::<Vec<_>>());
+            if app.state::<search_shortcut::SearchShortcut>().has_pending() {
+                search_shortcut::foreground(app.handle());
+            } else if launch.focus_search {
+                search_shortcut::summon(app.handle());
+            } else if std::env::args().any(|arg| arg == "--focus-search") && !launch.deep_links.is_empty() {
+                search_shortcut::summon_deep_link(app.handle(), launch.deep_links[0].clone());
+            } else if launch.show_window {
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.show();
                     let _ = w.set_focus();
@@ -1670,6 +1682,15 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            let launch = search_shortcut::LaunchRequest::from_args(&argv);
+            if launch.focus_search {
+                search_shortcut::summon(app);
+                return;
+            }
+            if argv.iter().any(|arg| arg == "--focus-search") && !launch.deep_links.is_empty() {
+                search_shortcut::summon_deep_link(app, launch.deep_links[0].clone());
+                return;
+            }
             // Second launch should deterministically focus the existing instance and exit.
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -1736,6 +1757,7 @@ pub fn run() {
         // This fires when app.exit() is called (e.g., from tray menu "Quit").
         .run(move |app, event| {
             if let tauri::RunEvent::Exit = event {
+                search_shortcut::release(app);
                 state_for_close.kill_child();
                 if let Ok(data_dir) = resolve_app_data_dir(app) {
                     cleanup_registered_children_for_terminal(&data_dir);
