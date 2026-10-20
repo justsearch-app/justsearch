@@ -1,5 +1,6 @@
 package io.justsearch.app.services.bootstrap.phases;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -156,10 +157,10 @@ final class IndexingJobsBridgeWiringTest {
               .setState("DONE").setLastUpdatedMs(i).setScanId("scan-outside-window");
           var frame = io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(i)
               .setDelta(io.justsearch.ipc.IndexingJobsDelta.newBuilder().setUpdate(row)).build();
-          java.util.concurrent.CompletableFuture.runAsync(() -> sink.get().accept(frame),
+          assertDoesNotThrow(() -> java.util.concurrent.CompletableFuture.runAsync(() -> sink.get().accept(frame),
               executors.register(io.justsearch.core.execution.EngineExecutorSpec.virtual("test.commit-" + seq,
                   io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, 1)).openVirtual())
-              .get(1, java.util.concurrent.TimeUnit.SECONDS);
+              .get(250, java.util.concurrent.TimeUnit.MILLISECONDS));
           assertTrue(entered.await(1, java.util.concurrent.TimeUnit.SECONDS));
         }
         assertEquals(2, ledger.store().recent().size());

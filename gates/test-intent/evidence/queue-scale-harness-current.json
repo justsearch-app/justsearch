@@ -1,0 +1,103 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T09:51:46.844Z",
+  "revision": "436bd744ac8b65a657d3d4217615a9e6a38cea3e",
+  "tree": "0438977ba2ed9d02196c3924aa28c3099b4d68ac",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/test-intent",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.JobCountsMigrationTest\" --tests \"io.justsearch.indexerworker.queue.JobCountsTest\" --tests \"io.justsearch.indexerworker.queue.QueueScaleEvidenceTest.q12CurrentMillionRowOpenDetectsAndRepairsDrift\" --tests \"io.justsearch.indexerworker.queue.QueueScaleEvidenceTest.q12MigrationTimeSavedFieldsCountsAndRollback\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 97775
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7a2bb2c0be22cc5e2a4a819b5c94f71a68c2c49d9caf35134185f059a87b81e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedV23MigrationRollsBackTableTriggersIndexesCountsAndVersion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:28d39591a1a90745a9f1448e9fffbd9ca70dbafee7da4a888a8c93deda22fe36",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "randomOperationsPreserveExactCountsBytesAndSavedRows()",
+          "status": "passed"
+        },
+        {
+          "name": "reAdmissionResetsOnlyTheFieldsFormerReplaceReset()",
+          "status": "passed"
+        },
+        {
+          "name": "reopenRepairsCountDriftWithoutChangingJobs()",
+          "status": "passed"
+        },
+        {
+          "name": "q9HundredThousandRandomOperations()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueScaleEvidenceTest.java#q12CurrentMillionRowOpenDetectsAndRepairsDrift",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueScaleEvidenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:96b495ba62cf4635250bd8852a15d75fc2f763df8e08031d8698189b20709fed",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "q12CurrentMillionRowOpenDetectsAndRepairsDrift()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueScaleEvidenceTest.java#q12MigrationTimeSavedFieldsCountsAndRollback",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueScaleEvidenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:96b495ba62cf4635250bd8852a15d75fc2f763df8e08031d8698189b20709fed",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "q12MigrationTimeSavedFieldsCountsAndRollback()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:e4d38c3871ba2a03ae7caf0bb97b6e7aa7b971d8854f000c260314b96d7edb8b"
+}

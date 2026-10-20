@@ -1,5 +1,6 @@
 package io.justsearch.indexerworker.queue;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -250,7 +251,8 @@ final class IndexingJobsChangeStreamTest {
     try (var threads = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
       lock.lock();
       try {
-        threads.submit(snapshot.subscription()::close).get(1, java.util.concurrent.TimeUnit.SECONDS);
+        assertDoesNotThrow(() -> threads.submit(snapshot.subscription()::close)
+            .get(1, java.util.concurrent.TimeUnit.SECONDS));
       } finally {
         lock.unlock();
       }
