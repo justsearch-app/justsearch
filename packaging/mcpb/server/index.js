@@ -84,8 +84,9 @@ function healthy(port) {
  * Fetch the desktop session token (GET /api/mcp/token) of a manifest Engine. In prod mode the API
  * requires it on non-GET requests (X-JustSearch-Session); GETs are always
  * allowed, which is exactly what lets a local MCP client bootstrap. Returns
- * null when absent/empty (dev mode / enforcement disabled), and for a pin no manifest names,
- * whose connections each fetch their own.
+ * '' for dev mode's empty token (no enforcement: no header is sent), null when the Engine offers
+ * none (then nothing that needs one is sent), and null for a pin no manifest names, whose
+ * connections each fetch their own.
  */
 function fetchSessionToken(found) {
   if (!found.engine) return Promise.resolve(null);
@@ -100,7 +101,7 @@ function fetchSessionToken(found) {
         res.on('end', () => {
           try {
             const token = JSON.parse(raw).token;
-            resolve(typeof token === 'string' && token.length > 0 ? token : null);
+            resolve(typeof token === 'string' ? token : null); // '' is dev mode's token: none enforced
           } catch {
             resolve(null);
           }

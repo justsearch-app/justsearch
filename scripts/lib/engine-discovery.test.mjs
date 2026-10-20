@@ -695,6 +695,19 @@ test('D1/D2/D3: the extracted MCPB bundle connects to the desktop Engine and a m
   assertConnectedTo(await bridgeSession(m, entry), engine);
 });
 
+test('P6 (bundle): a manifest Engine in dev mode offers an empty session token — initialize and a mutating call succeed, with no token header', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t, { token: '' });
+  writeManifest(m.desktop, manifestFor(engine));
+  const session = await bridgeSession(m, bundle(root));
+  const init = session.messages.find((x) => x.id === 1);
+  assert.equal(init?.result?.serverInfo?.name, `engine ${engine.instanceId}`, `${JSON.stringify(init)}\n${session.stderr}`);
+  const call = session.messages.find((x) => x.id === 2);
+  assert.equal(call?.result?.content?.[0]?.text, `tools/call by ${engine.instanceId}`, session.stderr);
+  assert.ok(engine.requests.every((r) => r.headers['x-justsearch-session'] === undefined), 'no token header');
+});
+
 test('D2: Linux XDG_DATA_HOME absolute is used; relative or empty falls back to ~/.local/share', { skip: !IS_LINUX && 'Linux XDG rules' }, async (t) => {
   for (const xdgKind of ['absolute', 'relative', 'empty']) {
     const root = tempRoot(t);
@@ -1822,6 +1835,28 @@ test('P5 (bundle): the client initializes again while a call is in flight and th
   const four = run.messages.filter((x) => x.id === 4);
   assert.equal(four.length, 1, 'one answer for the call');
   assert.match(four[0].error?.message ?? '', /outcome is unknown/, JSON.stringify(four));
+  run.child.stdin.end();
+  await within(run.exited, 7000, 'the bridge exits once stdin closes');
+});
+
+test('P5 (bundle): a client initialize superseded by the next one while unanswered fails as superseded — it is not sent again, so the newer session stays', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t, { mcpSessions: true, stream: true });
+  const run = startPinnedClient('bundle', m, root, engine.port);
+  await untilMessage(run, (x) => x.id === 1, 'initialize');
+  run.child.stdin.write(INITIALIZED_LINE);
+  await handshakeDone(engine, { stream: true });
+  const held = engine.hold('/mcp', { rpc: 'initialize' });
+  run.child.stdin.write(INIT_LINE.replace('"id":1', '"id":5'));
+  await within(held.arrived, 10000, 'initialize 5 at the Engine');
+  run.child.stdin.write(INIT_LINE.replace('"id":1', '"id":6'));
+  await untilMessage(run, (x) => x.id === 6, 'initialize 6');
+  await untilMessage(run, (x) => x.id === 5, 'initialize 5 ends');
+  await pause(300);
+  assert.match(run.messages.find((x) => x.id === 5).error?.message ?? '', /superseded/, run.stderr);
+  assert.ok(run.messages.find((x) => x.id === 6).result, run.stderr);
+  assert.deepEqual(mcpPosts(engine, 'initialize').map((r) => JSON.parse(r.body).id), [1, 5, 6], 'nothing is initialized again after 6');
   run.child.stdin.end();
   await within(run.exited, 7000, 'the bridge exits once stdin closes');
 });
