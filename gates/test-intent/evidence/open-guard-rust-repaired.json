@@ -1,0 +1,571 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T05:28:47.046Z",
+  "revision": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
+  "tree": "281e6dba59c8031c568696fc967082e06a3a8b65",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_unlisted_types_and_names_each_type\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1764
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_extensionless_files\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 156
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_missing_paths\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 155
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_empty_and_control_local_paths\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 155
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_other_url_schemes_in_every_case\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 161
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_malformed_and_control_urls\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 155
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_urls_on_local_path\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 159
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::symlinks_use_resolved_type_and_target\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 156
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_allowed_name_symlink_to_launcher\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 170
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_dangling_and_looping_links\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 152
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::linux_colons_are_kept_and_trailing_suffixes_refused\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 155
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::reveal_returns_existing_directory_for_files_and_folders\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 168
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_reveal_under_file_or_missing_item\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 158
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::linux_commands_refuse_launchers_without_dispatch\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 173
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 164
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 183
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_unlisted_types_and_names_each_type",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::refuses_unlisted_types_and_names_each_type",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_extensionless_files",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::refuses_extensionless_files",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_missing_paths",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::refuses_missing_paths",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_empty_and_control_local_paths",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::refuses_empty_and_control_local_paths",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_other_url_schemes_in_every_case",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::refuses_other_url_schemes_in_every_case",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_malformed_and_control_urls",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::refuses_malformed_and_control_urls",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_urls_on_local_path",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::refuses_urls_on_local_path",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::symlinks_use_resolved_type_and_target",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::symlinks_use_resolved_type_and_target",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_allowed_name_symlink_to_launcher",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::refuses_allowed_name_symlink_to_launcher",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_dangling_and_looping_links",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::refuses_dangling_and_looping_links",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::linux_colons_are_kept_and_trailing_suffixes_refused",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::linux_colons_are_kept_and_trailing_suffixes_refused",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::reveal_returns_existing_directory_for_files_and_folders",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::reveal_returns_existing_directory_for_files_and_folders",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_reveal_under_file_or_missing_item",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::refuses_reveal_under_file_or_missing_item",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::linux_commands_refuse_launchers_without_dispatch",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::linux_commands_refuse_launchers_without_dispatch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9c0938690cb4c8a989002c14d8e9d109a94965db2d3785edaed7aa8dd6b9b04b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
+    "revision": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
+    "overlays": [
+      "modules/shell/src-tauri/Cargo.toml",
+      "modules/ui/build/install/ui/native/linux-x86_64/justsearch-bound-exec",
+      "modules/shell/src-tauri/resources/headless/.ci-placeholder"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/open-guard-before-interface.patch",
+        "contentDigest": "sha256:92b8820d2fb6bc7df4b445ed93646571c8e24c4a4ed1fec8ce1fe3e2f2edc805"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_unlisted_types_and_names_each_type\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5244,
+        "output": "\nrunning 1 test\ntest open_guard_tests::refuses_unlisted_types_and_names_each_type ... FAILED\n\nfailures:\n\n---- open_guard_tests::refuses_unlisted_types_and_names_each_type stdout ----\n\nthread 'open_guard_tests::refuses_unlisted_types_and_names_each_type' (2893214) panicked at src/lib.rs:2274:9:\nassertion `left == right` failed: unrefused or unnamed types\n  left: [\".hta: Ok(\\\"/tmp/.tmpeATrpO/launcher.hta\\\")\", \".HTA: Ok(\\\"/tmp/.tmpeATrpO/launcher.HTA\\\")\", \".js: Ok(\\\"/tmp/.tmpeATrpO/launcher.js\\\")\", \".JS: Ok(\\\"/tmp/.tmpeATrpO/launcher.JS\\\")\", \".jse: Ok(\\\"/tmp/.tmpeATrpO/launcher.jse\\\")\", \".JSE: Ok(\\\"/tmp/.tmpeATrpO/launcher.JSE\\\")\", \".vbe: Ok(\\\"/tmp/.tmpeATrpO/launcher.vbe\\\")\", \".VBE: Ok(\\\"/tmp/.tmpeATrpO/launcher.VBE\\\")\", \".wsc: Ok(\\\"/tmp/.tmpeATrpO/launcher.wsc\\\")\", \".WSC: Ok(\\\"/tmp/.tmpeATrpO/launcher.WSC\\\")\", \".cpl: Ok(\\\"/tmp/.tmpeATrpO/launcher.cpl\\\")\", \".CPL: Ok(\\\"/tmp/.tmpeATrpO/launcher.CPL\\\")\", \".msc: Ok(\\\"/tmp/.tmpeATrpO/launcher.msc\\\")\", \".MSC: Ok(\\\"/tmp/.tmpeATrpO/launcher.MSC\\\")\", \".msp: Ok(\\\"/tmp/.tmpeATrpO/launcher.msp\\\")\", \".MSP: Ok(\\\"/tmp/.tmpeATrpO/launcher.MSP\\\")\", \".mst: Ok(\\\"/tmp/.tmpeATrpO/launcher.mst\\\")\", \".MST: Ok(\\\"/tmp/.tmpeATrpO/launcher.MST\\\")\", \".reg: Ok(\\\"/tmp/.tmpeATrpO/launcher.reg\\\")\", \".REG: Ok(\\\"/tmp/.tmpeATrpO/launcher.REG\\\")\", \".inf: Ok(\\\"/tmp/.tmpeATrpO/launcher.inf\\\")\", \".INF: Ok(\\\"/tmp/.tmpeATrpO/launcher.INF\\\")\", \".url: Ok(\\\"/tmp/.tmpeATrpO/launcher.url\\\")\", \".URL: Ok(\\\"/tmp/.tmpeATrpO/launcher.URL\\\")\", \".scf: Ok(\\\"/tmp/.tmpeATrpO/launcher.scf\\\")\", \".SCF: Ok(\\\"/tmp/.tmpeATrpO/launcher.SCF\\\")\", \".chm: Ok(\\\"/tmp/.tmpeATrpO/launcher.chm\\\")\", \".CHM: Ok(\\\"/tmp/.tmpeATrpO/launcher.CHM\\\")\", \".jar: Ok(\\\"/tmp/.tmpeATrpO/launcher.jar\\\")\", \".JAR: Ok(\\\"/tmp/.tmpeATrpO/launcher.JAR\\\")\", \".appref-ms: Ok(\\\"/tmp/.tmpeATrpO/launcher.appref-ms\\\")\", \".APPREF-MS: Ok(\\\"/tmp/.tmpeATrpO/launcher.APPREF-MS\\\")\", \".application: Ok(\\\"/tmp/.tmpeATrpO/launcher.application\\\")\", \".APPLICATION: Ok(\\\"/tmp/.tmpeATrpO/launcher.APPLICATION\\\")\", \".settingcontent-ms: Ok(\\\"/tmp/.tmpeATrpO/launcher.settingcontent-ms\\\")\", \".SETTINGCONTENT-MS: Ok(\\\"/tmp/.tmpeATrpO/launcher.SETTINGCONTENT-MS\\\")\", \".library-ms: Ok(\\\"/tmp/.tmpeATrpO/launcher.library-ms\\\")\", \".LIBRARY-MS: Ok(\\\"/tmp/.tmpeATrpO/launcher.LIBRARY-MS\\\")\", \".appx: Ok(\\\"/tmp/.tmpeATrpO/launcher.appx\\\")\", \".APPX: Ok(\\\"/tmp/.tmpeATrpO/launcher.APPX\\\")\", \".msix: Ok(\\\"/tmp/.tmpeATrpO/launcher.msix\\\")\", \".MSIX: Ok(\\\"/tmp/.tmpeATrpO/launcher.MSIX\\\")\", \".desktop: Ok(\\\"/tmp/.tmpeATrpO/launcher.desktop\\\")\", \".DESKTOP: Ok(\\\"/tmp/.tmpeATrpO/launcher.DESKTOP\\\")\", \".kdelnk: Ok(\\\"/tmp/.tmpeATrpO/launcher.kdelnk\\\")\", \".KDELNK: Ok(\\\"/tmp/.tmpeATrpO/launcher.KDELNK\\\")\", \".sh: Ok(\\\"/tmp/.tmpeATrpO/launcher.sh\\\")\", \".SH: Ok(\\\"/tmp/.tmpeATrpO/launcher.SH\\\")\", \".run: Ok(\\\"/tmp/.tmpeATrpO/launcher.run\\\")\", \".RUN: Ok(\\\"/tmp/.tmpeATrpO/launcher.RUN\\\")\", \".AppImage: Ok(\\\"/tmp/.tmpeATrpO/launcher.AppImage\\\")\", \".APPIMAGE: Ok(\\\"/tmp/.tmpeATrpO/launcher.APPIMAGE\\\")\", \".docm: Ok(\\\"/tmp/.tmpeATrpO/launcher.docm\\\")\", \".DOCM: Ok(\\\"/tmp/.tmpeATrpO/launcher.DOCM\\\")\", \".xlsm: Ok(\\\"/tmp/.tmpeATrpO/launcher.xlsm\\\")\", \".XLSM: Ok(\\\"/tmp/.tmpeATrpO/launcher.XLSM\\\")\", \".pptm: Ok(\\\"/tmp/.tmpeATrpO/launcher.pptm\\\")\", \".PPTM: Ok(\\\"/tmp/.tmpeATrpO/launcher.PPTM\\\")\", \".mht: Ok(\\\"/tmp/.tmpeATrpO/launcher.mht\\\")\", \".MHT: Ok(\\\"/tmp/.tmpeATrpO/launcher.MHT\\\")\", \".mhtml: Ok(\\\"/tmp/.tmpeATrpO/launcher.mhtml\\\")\", \".MHTML: Ok(\\\"/tmp/.tmpeATrpO/launcher.MHTML\\\")\", \".py: Ok(\\\"/tmp/.tmpeATrpO/launcher.py\\\")\", \".PY: Ok(\\\"/tmp/.tmpeATrpO/launcher.PY\\\")\", \".rs: Ok(\\\"/tmp/.tmpeATrpO/launcher.rs\\\")\", \".RS: Ok(\\\"/tmp/.tmpeATrpO/launcher.RS\\\")\", \".unknown: Ok(\\\"/tmp/.tmpeATrpO/launcher.unknown\\\")\", \".UNKNOWN: Ok(\\\"/tmp/.tmpeATrpO/launcher.UNKNOWN\\\")\"]\n right: []\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::refuses_unlisted_types_and_names_each_type\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/tmp/test-intent-before-EA5LBn/modules/shell/src-tauri)\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.20s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_extensionless_files\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 153,
+        "output": "\nrunning 1 test\ntest open_guard_tests::refuses_extensionless_files ... FAILED\n\nfailures:\n\n---- open_guard_tests::refuses_extensionless_files stdout ----\n\nthread 'open_guard_tests::refuses_extensionless_files' (2893235) panicked at src/lib.rs:2281:9:\nassertion failed: matches!(local_open_target(&path), Err(e) if e.contains(\"no extension\"))\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::refuses_extensionless_files\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.00s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_missing_paths\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 164,
+        "output": "\nrunning 1 test\ntest open_guard_tests::refuses_missing_paths ... FAILED\n\nfailures:\n\n---- open_guard_tests::refuses_missing_paths stdout ----\n\nthread 'open_guard_tests::refuses_missing_paths' (2893279) panicked at src/lib.rs:2287:9:\nassertion failed: matches!(local_open_target(dir.path().join(\"missing.pdf\").to_str().unwrap()),\n    Err(e) if e.contains(\"resolve\"))\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::refuses_missing_paths\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.00s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_empty_and_control_local_paths\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 161,
+        "output": "\nrunning 1 test\ntest open_guard_tests::refuses_empty_and_control_local_paths ... FAILED\n\nfailures:\n\n---- open_guard_tests::refuses_empty_and_control_local_paths stdout ----\n\nthread 'open_guard_tests::refuses_empty_and_control_local_paths' (2893312) panicked at src/lib.rs:2829:9:\nassertion `left == right` failed: [Ok(\"\"), Ok(\"\\0\"), Ok(\"/tmp/document.pdf\\n\"), Ok(\"/tmp/doc\\tument.pdf\"), Ok(\"/tmp/document.pdf\\r\")]\n  left: 5\n right: 0\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::refuses_empty_and_control_local_paths\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.00s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_other_url_schemes_in_every_case\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 163,
+        "output": "\nrunning 1 test\ntest open_guard_tests::refuses_other_url_schemes_in_every_case ... FAILED\n\nfailures:\n\n---- open_guard_tests::refuses_other_url_schemes_in_every_case stdout ----\n\nthread 'open_guard_tests::refuses_other_url_schemes_in_every_case' (2893374) panicked at src/lib.rs:2330:9:\nassertion `left == right` failed: accepted schemes\n  left: [\"file:payload\", \"FILE:payload\", \"javascript:payload\", \"JAVASCRIPT:payload\", \"vbscript:payload\", \"VBSCRIPT:payload\", \"data:payload\", \"DATA:payload\", \"ms-settings:payload\", \"MS-SETTINGS:payload\", \"ms-msdt:payload\", \"MS-MSDT:payload\", \"search-ms:payload\", \"SEARCH-MS:payload\", \"shell:payload\", \"SHELL:payload\", \"tel:payload\", \"TEL:payload\", \"ftp:payload\", \"FTP:payload\", \"custom:payload\", \"CUSTOM:payload\"]\n right: []\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::refuses_other_url_schemes_in_every_case\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.00s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_malformed_and_control_urls\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 154,
+        "output": "\nrunning 1 test\ntest open_guard_tests::refuses_malformed_and_control_urls ... FAILED\n\nfailures:\n\n---- open_guard_tests::refuses_malformed_and_control_urls stdout ----\n\nthread 'open_guard_tests::refuses_malformed_and_control_urls' (2893391) panicked at src/lib.rs:2352:9:\nassertion `left == right` failed: accepted malformed/control URLs\n  left: [\"\", \"not a URL\", \"https://\", \"http://[\", \"mailto:\", \"https://example.com\\n\", \"https://example.com/\\0x\", \"mailto:u@example.com\\r?subject=x\"]\n right: []\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::refuses_malformed_and_control_urls\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.00s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_urls_on_local_path\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 161,
+        "output": "\nrunning 1 test\ntest open_guard_tests::refuses_urls_on_local_path ... FAILED\n\nfailures:\n\n---- open_guard_tests::refuses_urls_on_local_path stdout ----\n\nthread 'open_guard_tests::refuses_urls_on_local_path' (2893441) panicked at src/lib.rs:2380:9:\nassertion `left == right` failed: local path accepted URLs\n  left: [\"http://example.com/a.pdf\", \"https://example.com/a.pdf\", \"mailto:a.pdf\", \"file:///tmp/a.pdf\", \"javascript:a.pdf\", \"vbscript:a.pdf\", \"ms-msdt:a.pdf\", \"search-ms:a.pdf\", \"shell:a.pdf\", \"TEL:a.pdf\", \"ms-settings:a.pdf\", \"data:a.pdf\"]\n right: []\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::refuses_urls_on_local_path\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.00s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::symlinks_use_resolved_type_and_target\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 156,
+        "output": "\nrunning 1 test\ntest open_guard_tests::symlinks_use_resolved_type_and_target ... FAILED\n\nfailures:\n\n---- open_guard_tests::symlinks_use_resolved_type_and_target stdout ----\n\nthread 'open_guard_tests::symlinks_use_resolved_type_and_target' (2893463) panicked at src/lib.rs:2391:9:\nassertion `left == right` failed\n  left: \"/tmp/.tmp2iyBuJ/alias.pdf\"\n right: \"/tmp/.tmp2iyBuJ/document.odt\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::symlinks_use_resolved_type_and_target\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.00s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_allowed_name_symlink_to_launcher\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 160,
+        "output": "\nrunning 1 test\ntest open_guard_tests::refuses_allowed_name_symlink_to_launcher ... FAILED\n\nfailures:\n\n---- open_guard_tests::refuses_allowed_name_symlink_to_launcher stdout ----\n\nthread 'open_guard_tests::refuses_allowed_name_symlink_to_launcher' (2893484) panicked at src/lib.rs:2405:9:\nassertion failed: matches!(local_open_target(alias.to_str().unwrap()), Err(e) if\n    e.contains(\".desktop\"))\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::refuses_allowed_name_symlink_to_launcher\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.00s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_dangling_and_looping_links\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 166,
+        "output": "\nrunning 1 test\ntest open_guard_tests::refuses_dangling_and_looping_links ... FAILED\n\nfailures:\n\n---- open_guard_tests::refuses_dangling_and_looping_links stdout ----\n\nthread 'open_guard_tests::refuses_dangling_and_looping_links' (2893503) panicked at src/lib.rs:2423:9:\nassertion `left == right` failed: [Ok(\"/tmp/.tmp3Ca9J9/dangling.pdf\"), Ok(\"/tmp/.tmp3Ca9J9/loop.pdf\")]\n  left: 2\n right: 0\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::refuses_dangling_and_looping_links\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.00s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::linux_colons_are_kept_and_trailing_suffixes_refused\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 162,
+        "output": "\nrunning 1 test\ntest open_guard_tests::linux_colons_are_kept_and_trailing_suffixes_refused ... FAILED\n\nfailures:\n\n---- open_guard_tests::linux_colons_are_kept_and_trailing_suffixes_refused stdout ----\n\nthread 'open_guard_tests::linux_colons_are_kept_and_trailing_suffixes_refused' (2893544) panicked at src/lib.rs:2448:9:\nassertion `left == right` failed: [Ok(\"/tmp/.tmpvxlKey/launcher.exe.\"), Ok(\"/tmp/.tmpvxlKey/launcher.EXE \"), Ok(\"/tmp/.tmpvxlKey/launcher.desktop..\"), Ok(\"/tmp/.tmpvxlKey/launcher.sh \")]\n  left: 4\n right: 0\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::linux_colons_are_kept_and_trailing_suffixes_refused\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.00s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::reveal_returns_existing_directory_for_files_and_folders\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 157,
+        "output": "\nrunning 1 test\ntest open_guard_tests::reveal_returns_existing_directory_for_files_and_folders ... FAILED\n\nfailures:\n\n---- open_guard_tests::reveal_returns_existing_directory_for_files_and_folders stdout ----\n\nthread 'open_guard_tests::reveal_returns_existing_directory_for_files_and_folders' (2893562) panicked at src/lib.rs:2463:9:\nassertion `left == right` failed\n  left: \"/tmp/.tmpmK3Dwc\"\n right: \"/tmp\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::reveal_returns_existing_directory_for_files_and_folders\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.00s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::refuses_reveal_under_file_or_missing_item\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 159,
+        "output": "\nrunning 1 test\ntest open_guard_tests::refuses_reveal_under_file_or_missing_item ... FAILED\n\nfailures:\n\n---- open_guard_tests::refuses_reveal_under_file_or_missing_item stdout ----\n\nthread 'open_guard_tests::refuses_reveal_under_file_or_missing_item' (2893593) panicked at src/lib.rs:2475:9:\nassertion `left == right` failed: [Ok((\"/tmp/.tmp49smwG/launcher.desktop/child\", \"/tmp/.tmp49smwG/launcher.desktop\")), Ok((\"/tmp/.tmp49smwG/absent.pdf\", \"/tmp/.tmp49smwG\"))]\n  left: 2\n right: 0\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::refuses_reveal_under_file_or_missing_item\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.00s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::linux_commands_refuse_launchers_without_dispatch\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 176,
+        "output": "\nrunning 1 test\ntest open_guard_tests::linux_commands_refuse_launchers_without_dispatch ... FAILED\n\nfailures:\n\n---- open_guard_tests::linux_commands_refuse_launchers_without_dispatch stdout ----\n\nthread 'open_guard_tests::linux_commands_refuse_launchers_without_dispatch' (2893643) panicked at src/lib.rs:2518:9:\nassertion `left == right` failed: actual command dispatch case refuse:\n\nrunning 1 test\ntest open_guard_tests::linux_commands_refuse_launchers_without_dispatch ... FAILED\n\nfailures:\n\nfailures:\n    open_guard_tests::linux_commands_refuse_launchers_without_dispatch\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.01s\n\n\n\nthread 'open_guard_tests::linux_commands_refuse_launchers_without_dispatch' (2893646) panicked at src/lib.rs:2567:17:\nrefusals: [Ok(()), Ok(()), Err(\"Opening .exe files is not allowed\"), Ok(()), Ok(()), Ok(()), Ok(())]; dispatched: Ok(\"/tmp/.tmpq40t4x/crafted.desktop\\n/tmp/.tmpq40t4x/crafted.sh\\njavascript:alert(1)\\nFILE:///tmp/launcher.desktop\\ntel:123\\n/tmp/.tmpq40t4x/parent.desktop\\n\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  left: Some(101)\n right: Some(0)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::linux_commands_refuse_launchers_without_dispatch\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.01s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 177,
+        "output": "\nrunning 1 test\ntest open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory ... FAILED\n\nfailures:\n\n---- open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory stdout ----\n\nthread 'open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory' (2893734) panicked at src/lib.rs:2518:9:\nassertion `left == right` failed: actual command dispatch case preserve:\n\nrunning 1 test\ntest open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory ... FAILED\n\nfailures:\n\nfailures:\n    open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.01s\n\n\n\nthread 'open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory' (2893736) panicked at src/lib.rs:2595:17:\nassertion `left == right` failed\n  left: \"/tmp/.tmppPXaM1/alias.txt\\n/tmp/.tmppPXaM1\\n/tmp\\nhttp://example.com/?q=1#f\\nhttps://example.com/?q=1#f\\nmailto:user@example.com?subject=Hi\\n\"\n right: \"/tmp/.tmppPXaM1/real.pdf\\n/tmp/.tmppPXaM1\\n/tmp/.tmppPXaM1\\nhttp://example.com/?q=1#f\\nhttps://example.com/?q=1#f\\nmailto:user@example.com?subject=Hi\\n\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  left: Some(101)\n right: Some(0)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.01s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 173,
+        "output": "\nrunning 1 test\ntest open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel ... FAILED\n\nfailures:\n\n---- open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel stdout ----\n\nthread 'open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel' (2893778) panicked at src/lib.rs:2518:9:\nassertion `left == right` failed: actual command dispatch case plugin:\n\nrunning 1 test\ntest open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel ... FAILED\n\nfailures:\n\nfailures:\n    open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.01s\n\n\n\nthread 'open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel' (2893780) panicked at src/lib.rs:2646:17:\nplugin accepted [\"open_path: Err(String(\\\"Not allowed to open path /tmp/.tmpfkNGlu/crafted.desktop\\\"))\", \"reveal_item_in_dir: Err(String(\\\"I/O error: No such file or directory (os error 2)\\\"))\", \"open_url: Ok(Json(\\\"null\\\"))\"]; dispatch: Err(Os { code: 2, kind: NotFound, message: \"No such file or directory\" })\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  left: Some(101)\n right: Some(0)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.01s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_unlisted_types_and_names_each_type",
+        "classification": "assertion",
+        "detail": "open_guard_tests::refuses_unlisted_types_and_names_each_type:  ---- open_guard_tests::refuses_unlisted_types_and_names_each_type stdout ----\n\nthread 'open_guard_tests::refuses_unlisted_types_and_names_each_type' (2893214) panicked at src/lib.rs:2274:9:\nassertion `left == right` failed: unrefused or unnamed types\n  left: [\".hta: Ok(\\\"/tmp/.tmpeATrpO/launcher.hta\\\")\", \".HTA: Ok(\\\"/tmp/.tmpeATrpO/launcher.HTA\\\")\", \".js: Ok(\\\"/tmp/.tmpeATrpO/launcher.js\\\")\", \".JS: Ok(\\\"/tmp/.tmpeATrpO/launcher.JS\\\")"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_extensionless_files",
+        "classification": "assertion",
+        "detail": "open_guard_tests::refuses_extensionless_files:  ---- open_guard_tests::refuses_extensionless_files stdout ----\n\nthread 'open_guard_tests::refuses_extensionless_files' (2893235) panicked at src/lib.rs:2281:9:\nassertion failed: matches!(local_open_target(&path), Err(e) if e.contains(\"no extension\"))\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::refuses_extensionless_files\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measur"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_missing_paths",
+        "classification": "assertion",
+        "detail": "open_guard_tests::refuses_missing_paths:  ---- open_guard_tests::refuses_missing_paths stdout ----\n\nthread 'open_guard_tests::refuses_missing_paths' (2893279) panicked at src/lib.rs:2287:9:\nassertion failed: matches!(local_open_target(dir.path().join(\"missing.pdf\").to_str().unwrap()),\n    Err(e) if e.contains(\"resolve\"))\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::refuses_missing_paths\n\ntest result: FAILED. 0 passed; 1 failed; 0"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_empty_and_control_local_paths",
+        "classification": "assertion",
+        "detail": "open_guard_tests::refuses_empty_and_control_local_paths:  ---- open_guard_tests::refuses_empty_and_control_local_paths stdout ----\n\nthread 'open_guard_tests::refuses_empty_and_control_local_paths' (2893312) panicked at src/lib.rs:2829:9:\nassertion `left == right` failed: [Ok(\"\"), Ok(\"\\0\"), Ok(\"/tmp/document.pdf\\n\"), Ok(\"/tmp/doc\\tument.pdf\"), Ok(\"/tmp/document.pdf\\r\")]\n  left: 5\n right: 0\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tes"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_other_url_schemes_in_every_case",
+        "classification": "assertion",
+        "detail": "open_guard_tests::refuses_other_url_schemes_in_every_case:  ---- open_guard_tests::refuses_other_url_schemes_in_every_case stdout ----\n\nthread 'open_guard_tests::refuses_other_url_schemes_in_every_case' (2893374) panicked at src/lib.rs:2330:9:\nassertion `left == right` failed: accepted schemes\n  left: [\"file:payload\", \"FILE:payload\", \"javascript:payload\", \"JAVASCRIPT:payload\", \"vbscript:payload\", \"VBSCRIPT:payload\", \"data:payload\", \"DATA:payload\", \"ms-settings:payload\", \"MS-SETTINGS:payload\", \"m"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_malformed_and_control_urls",
+        "classification": "assertion",
+        "detail": "open_guard_tests::refuses_malformed_and_control_urls:  ---- open_guard_tests::refuses_malformed_and_control_urls stdout ----\n\nthread 'open_guard_tests::refuses_malformed_and_control_urls' (2893391) panicked at src/lib.rs:2352:9:\nassertion `left == right` failed: accepted malformed/control URLs\n  left: [\"\", \"not a URL\", \"https://\", \"http://[\", \"mailto:\", \"https://example.com\\n\", \"https://example.com/\\0x\", \"mailto:u@example.com\\r?subject=x\"]\n right: []\nnote: run with `RUST_BACKTRACE=1` environment"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_urls_on_local_path",
+        "classification": "assertion",
+        "detail": "open_guard_tests::refuses_urls_on_local_path:  ---- open_guard_tests::refuses_urls_on_local_path stdout ----\n\nthread 'open_guard_tests::refuses_urls_on_local_path' (2893441) panicked at src/lib.rs:2380:9:\nassertion `left == right` failed: local path accepted URLs\n  left: [\"http://example.com/a.pdf\", \"https://example.com/a.pdf\", \"mailto:a.pdf\", \"file:///tmp/a.pdf\", \"javascript:a.pdf\", \"vbscript:a.pdf\", \"ms-msdt:a.pdf\", \"search-ms:a.pdf\", \"shell:a.pdf\", \"TEL:a.pdf\", \"ms-settings:a.pdf\", \"data:a.pd"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::symlinks_use_resolved_type_and_target",
+        "classification": "assertion",
+        "detail": "open_guard_tests::symlinks_use_resolved_type_and_target:  ---- open_guard_tests::symlinks_use_resolved_type_and_target stdout ----\n\nthread 'open_guard_tests::symlinks_use_resolved_type_and_target' (2893463) panicked at src/lib.rs:2391:9:\nassertion `left == right` failed\n  left: \"/tmp/.tmp2iyBuJ/alias.pdf\"\n right: \"/tmp/.tmp2iyBuJ/document.odt\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::symlinks_use_resolved_type_and_target\n\ntes"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_allowed_name_symlink_to_launcher",
+        "classification": "assertion",
+        "detail": "open_guard_tests::refuses_allowed_name_symlink_to_launcher:  ---- open_guard_tests::refuses_allowed_name_symlink_to_launcher stdout ----\n\nthread 'open_guard_tests::refuses_allowed_name_symlink_to_launcher' (2893484) panicked at src/lib.rs:2405:9:\nassertion failed: matches!(local_open_target(alias.to_str().unwrap()), Err(e) if\n    e.contains(\".desktop\"))\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::refuses_allowed_name_symlink_to_"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_dangling_and_looping_links",
+        "classification": "assertion",
+        "detail": "open_guard_tests::refuses_dangling_and_looping_links:  ---- open_guard_tests::refuses_dangling_and_looping_links stdout ----\n\nthread 'open_guard_tests::refuses_dangling_and_looping_links' (2893503) panicked at src/lib.rs:2423:9:\nassertion `left == right` failed: [Ok(\"/tmp/.tmp3Ca9J9/dangling.pdf\"), Ok(\"/tmp/.tmp3Ca9J9/loop.pdf\")]\n  left: 2\n right: 0\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::refuses_dangling_and_looping_links\n\n"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::linux_colons_are_kept_and_trailing_suffixes_refused",
+        "classification": "assertion",
+        "detail": "open_guard_tests::linux_colons_are_kept_and_trailing_suffixes_refused:  ---- open_guard_tests::linux_colons_are_kept_and_trailing_suffixes_refused stdout ----\n\nthread 'open_guard_tests::linux_colons_are_kept_and_trailing_suffixes_refused' (2893544) panicked at src/lib.rs:2448:9:\nassertion `left == right` failed: [Ok(\"/tmp/.tmpvxlKey/launcher.exe.\"), Ok(\"/tmp/.tmpvxlKey/launcher.EXE \"), Ok(\"/tmp/.tmpvxlKey/launcher.desktop..\"), Ok(\"/tmp/.tmpvxlKey/launcher.sh \")]\n  left: 4\n right: 0\nnote: run wit"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::reveal_returns_existing_directory_for_files_and_folders",
+        "classification": "assertion",
+        "detail": "open_guard_tests::reveal_returns_existing_directory_for_files_and_folders:  ---- open_guard_tests::reveal_returns_existing_directory_for_files_and_folders stdout ----\n\nthread 'open_guard_tests::reveal_returns_existing_directory_for_files_and_folders' (2893562) panicked at src/lib.rs:2463:9:\nassertion `left == right` failed\n  left: \"/tmp/.tmpmK3Dwc\"\n right: \"/tmp\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::reveal_returns_existin"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::refuses_reveal_under_file_or_missing_item",
+        "classification": "assertion",
+        "detail": "open_guard_tests::refuses_reveal_under_file_or_missing_item:  ---- open_guard_tests::refuses_reveal_under_file_or_missing_item stdout ----\n\nthread 'open_guard_tests::refuses_reveal_under_file_or_missing_item' (2893593) panicked at src/lib.rs:2475:9:\nassertion `left == right` failed: [Ok((\"/tmp/.tmp49smwG/launcher.desktop/child\", \"/tmp/.tmp49smwG/launcher.desktop\")), Ok((\"/tmp/.tmp49smwG/absent.pdf\", \"/tmp/.tmp49smwG\"))]\n  left: 2\n right: 0\nnote: run with `RUST_BACKTRACE=1` environment variable t"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::linux_commands_refuse_launchers_without_dispatch",
+        "classification": "assertion",
+        "detail": "open_guard_tests::linux_commands_refuse_launchers_without_dispatch:  ---- open_guard_tests::linux_commands_refuse_launchers_without_dispatch stdout ----\n\nthread 'open_guard_tests::linux_commands_refuse_launchers_without_dispatch' (2893643) panicked at src/lib.rs:2518:9:\nassertion `left == right` failed: actual command dispatch case refuse:\n\nrunning 1 test\ntest open_guard_tests::linux_commands_refuse_launchers_without_dispatch ... FAILED\n\nfailures:\n\nfailures:\n    open_guard_tests::linux_commands_"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory",
+        "classification": "assertion",
+        "detail": "open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory:  ---- open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory stdout ----\n\nthread 'open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory' (2893734) panicked at src/lib.rs:2518:9:\nassertion `left == right` failed: actual command dispatch case preserve:\n\nrunning 1 test\ntest open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory ... FAILED\n\nfailures:\n\nfailures:"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel",
+        "classification": "assertion",
+        "detail": "open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel:  ---- open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel stdout ----\n\nthread 'open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel' (2893778) panicked at src/lib.rs:2518:9:\nassertion `left == right` failed: actual command dispatch case plugin:\n\nrunning 1 test\ntest open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel ... FAILED\n\nfailures:\n\nfailures:\n    open_guard_tests::direct_plugin_ipc_refus"
+      }
+    ]
+  },
+  "digest": "sha256:afa3b845a87cbb1982aafde1ed0c1e6c47a7dd9a68f406106926f310a4b3a677"
+}

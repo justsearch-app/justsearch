@@ -1,0 +1,40 @@
+--- a/modules/shell/src-tauri/src/lib.rs
++++ b/modules/shell/src-tauri/src/lib.rs
+@@ -2144,3 +2144,37 @@
+         assert!(res.is_err());
+     }
+ }
++
++// Compatibility only: expose origin/main's existing decisions to the new test interfaces.
++// No resolution, allow list, URL filtering, or reveal guard is added to the before-state.
++const OPEN_DOCUMENT_EXTENSIONS: &[&str] = &[
++    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf", "epub", "txt",
++    "md", "csv", "tsv", "log", "json", "xml", "html", "htm", "eml", "msg", "png", "jpg", "jpeg",
++    "gif", "bmp", "webp", "tif", "tiff", "svg", "mp3", "wav", "m4a", "flac", "mp4", "mov", "mkv",
++    "webm",
++];
++
++fn is_windows_drive_path(path: &str) -> bool {
++    let bytes = path.as_bytes();
++    bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':'
++}
++fn local_open_target(path: &str) -> Result<PathBuf, String> {
++    validate_user_path(path, true)?;
++    Ok(PathBuf::from(path))
++}
++fn reveal_target(path: &str) -> Result<(PathBuf, PathBuf), String> {
++    validate_user_path(path, false)?;
++    let item = PathBuf::from(path);
++    let directory = if cfg!(windows) && item.is_dir() { item.clone() }
++        else { item.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| item.clone()) };
++    Ok((item, directory))
++}
++fn validate_external_url(input: &str) -> Result<reqwest::Url, String> {
++    // Before this change URLs rode open_file, whose only check was validate_user_path.
++    validate_user_path(input, true)?;
++    // The new helper's return type needs a URL; old dispatch passed raw input unchanged.
++    Ok(reqwest::Url::parse(input).unwrap_or_else(|_| reqwest::Url::parse("https://before.invalid").unwrap()))
++}
++async fn open_external_url(url: String) -> Result<(), String> {
++    open_file(url).await
++}

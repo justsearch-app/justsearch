@@ -295,19 +295,108 @@ fn validate_user_path(path: &str, block_executables: bool) -> Result<(), String>
         }
     }
 
-    // Block executable extensions (open_file only — prevents launching malware via XSS)
     if block_executables {
-        if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
-            const BLOCKED: &[&str] = &[
-                "exe", "bat", "cmd", "ps1", "vbs", "msi", "scr", "com", "lnk", "pif", "wsh", "wsf",
-            ];
-            if BLOCKED.iter().any(|b| ext.eq_ignore_ascii_case(b)) {
-                return Err(format!("Opening .{ext} files is not allowed"));
-            }
-        }
+        validate_document_type(p)?;
     }
 
     Ok(())
+}
+
+// One local-document policy, shared by validation and resolved-target dispatch.
+const OPEN_DOCUMENT_EXTENSIONS: &[&str] = &[
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf", "epub", "txt",
+    "md", "csv", "tsv", "log", "json", "xml", "html", "htm", "eml", "msg", "png", "jpg", "jpeg",
+    "gif", "bmp", "webp", "tif", "tiff", "svg", "mp3", "wav", "m4a", "flac", "mp4", "mov", "mkv",
+    "webm",
+];
+
+fn validate_document_type(path: &std::path::Path) -> Result<(), String> {
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    if OPEN_DOCUMENT_EXTENSIONS
+        .iter()
+        .any(|allowed| ext.eq_ignore_ascii_case(allowed))
+    {
+        Ok(())
+    } else {
+        let kind = if ext.is_empty() {
+            "files with no extension".to_string()
+        } else {
+            format!(".{ext} files")
+        };
+        Err(format!(
+            "Opening {kind} is not allowed. Use Show in folder instead."
+        ))
+    }
+}
+
+fn is_windows_drive_path(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':'
+}
+
+fn resolve_local_path(path: &str) -> Result<PathBuf, String> {
+    if path.is_empty() || path.chars().any(char::is_control) {
+        return Err("A nonempty local path without control characters is required".into());
+    }
+    validate_user_path(path, false)?;
+    if !is_windows_drive_path(path) && reqwest::Url::parse(path).is_ok() {
+        return Err("URLs cannot be opened as local files".into());
+    }
+    #[cfg(windows)]
+    {
+        // Reject network/device forms BEFORE canonicalize adds its own trusted \\?\ prefix.
+        let normalized = path.replace('\\', "/");
+        if normalized.starts_with("//") {
+            return Err("Network and device paths are not allowed".into());
+        }
+        let rest = if is_windows_drive_path(path) {
+            &path[2..]
+        } else {
+            path
+        };
+        if rest.contains(':') {
+            return Err("Alternate data streams are not allowed".into());
+        }
+    }
+    std::fs::canonicalize(path).map_err(|e| format!("Cannot resolve local path '{path}': {e}"))
+}
+
+fn local_open_target(path: &str) -> Result<PathBuf, String> {
+    let resolved = resolve_local_path(path)?;
+    if !resolved.is_file() {
+        return Err("Only document files can be opened. Use Show in folder instead.".into());
+    }
+    validate_document_type(&resolved)?;
+    // Residual: the target can still be replaced between this check and OS dispatch.
+    Ok(resolved)
+}
+
+fn reveal_target(path: &str) -> Result<(PathBuf, PathBuf), String> {
+    let resolved = resolve_local_path(path)?;
+    let directory = if resolved.is_dir() {
+        resolved.clone()
+    } else {
+        resolved
+            .parent()
+            .ok_or("The item has no parent directory")?
+            .to_path_buf()
+    };
+    if !directory.is_dir() {
+        return Err("Show in folder requires an existing directory".into());
+    }
+    Ok((resolved, directory))
+}
+
+fn validate_external_url(input: &str) -> Result<reqwest::Url, String> {
+    if input.is_empty() || input.chars().any(char::is_control) || input.trim() != input {
+        return Err("A nonempty URL without whitespace or control characters is required".into());
+    }
+    let url = reqwest::Url::parse(input).map_err(|e| format!("Invalid external URL: {e}"))?;
+    match url.scheme() {
+        "http" | "https" if url.host_str().is_some() => Ok(url),
+        "mailto" if !url.path().is_empty() => Ok(url),
+        scheme => Err(format!("Opening URL scheme '{scheme}' is not allowed")),
+    }
 }
 
 fn classpath_sep() -> &'static str {
@@ -1272,38 +1361,30 @@ async fn get_file_metadata(path: String) -> Result<FileMetadata, String> {
 
 #[tauri::command]
 async fn open_file(path: String) -> Result<(), String> {
-    validate_user_path(&path, true)?;
-    open::that(&path).map_err(|e| format!("Failed to open path '{path}': {e}"))?;
-    Ok(())
+    let target = local_open_target(&path)?;
+    open::that(&target).map_err(|e| format!("Failed to open '{}': {e}", target.display()))
+}
+
+#[tauri::command]
+async fn open_external_url(url: String) -> Result<(), String> {
+    let target = validate_external_url(&url)?;
+    open::that(target.as_str()).map_err(|e| format!("Failed to open URL: {e}"))
 }
 
 #[tauri::command]
 async fn reveal_in_explorer(path: String) -> Result<(), String> {
-    validate_user_path(&path, false)?;
-    let p = PathBuf::from(&path);
-
+    let (_item, directory) = reveal_target(&path)?;
     #[cfg(windows)]
     {
-        if p.is_dir() {
-            open::that(&path).map_err(|e| format!("Failed to open folder '{path}': {e}"))?;
+        if _item.is_file() {
+            Command::new("explorer")
+                .arg(format!("/select,{}", _item.to_string_lossy()))
+                .status()
+                .map_err(|e| format!("Failed to reveal '{path}' in Explorer: {e}"))?;
             return Ok(());
         }
-        // Explorer supports: explorer.exe /select,<path>
-        let arg = format!("/select,{}", p.to_string_lossy());
-        Command::new("explorer")
-            .arg(arg)
-            .status()
-            .map_err(|e| format!("Failed to reveal '{path}' in Explorer: {e}"))?;
-        return Ok(());
     }
-
-    #[cfg(not(windows))]
-    {
-        // Best-effort: open the parent directory.
-        let parent = p.parent().map(|pp| pp.to_path_buf()).unwrap_or(p);
-        open::that(parent).map_err(|e| format!("Failed to reveal '{path}': {e}"))?;
-        Ok(())
-    }
+    open::that(directory).map_err(|e| format!("Failed to reveal '{path}': {e}"))
 }
 
 /// Phase 1: Generate a single-use token for confirming factory reset.
@@ -1524,6 +1605,7 @@ pub fn run() {
             smoke_run_id,
             get_file_metadata,
             open_file,
+            open_external_url,
             reveal_in_explorer,
             prepare_delete_data,
             confirm_delete_data,
@@ -2142,5 +2224,659 @@ mod tests {
         let path = dir.path().join("missing.txt");
         let res = read_capped(&path, 1024);
         assert!(res.is_err());
+    }
+}
+
+#[cfg(test)]
+mod open_guard_tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    fn fixture(dir: &std::path::Path, name: &str) -> String {
+        let path = dir.join(name);
+        fs::write(&path, "fixture").unwrap();
+        path.to_str().unwrap().to_owned()
+    }
+
+    #[test]
+    fn documents_allow_exact_d1_formats() {
+        let dir = tempdir().unwrap();
+        let expected = [
+            "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf", "epub",
+            "txt", "md", "csv", "tsv", "log", "json", "xml", "html", "htm", "eml", "msg", "png",
+            "jpg", "jpeg", "gif", "bmp", "webp", "tif", "tiff", "svg", "mp3", "wav", "m4a", "flac",
+            "mp4", "mov", "mkv", "webm",
+        ];
+        assert_eq!(OPEN_DOCUMENT_EXTENSIONS, expected);
+        for ext in expected {
+            for case in [ext.to_string(), ext.to_ascii_uppercase()] {
+                let path = fixture(dir.path(), &format!("document.{case}"));
+                assert!(local_open_target(&path).is_ok(), "document .{case}");
+            }
+        }
+    }
+
+    #[test]
+    fn refuses_unlisted_types_and_names_each_type() {
+        let dir = tempdir().unwrap();
+        let mut failures = Vec::new();
+        for ext in [
+            "hta",
+            "js",
+            "jse",
+            "vbs",
+            "vbe",
+            "wsf",
+            "wsh",
+            "wsc",
+            "cpl",
+            "msc",
+            "msi",
+            "msp",
+            "mst",
+            "scr",
+            "pif",
+            "com",
+            "exe",
+            "bat",
+            "cmd",
+            "ps1",
+            "reg",
+            "inf",
+            "lnk",
+            "url",
+            "scf",
+            "chm",
+            "jar",
+            "appref-ms",
+            "application",
+            "settingcontent-ms",
+            "library-ms",
+            "appx",
+            "msix",
+            "desktop",
+            "kdelnk",
+            "sh",
+            "run",
+            "AppImage",
+            "docm",
+            "xlsm",
+            "pptm",
+            "mht",
+            "mhtml",
+            "py",
+            "rs",
+            "unknown",
+        ] {
+            for case in [ext.to_string(), ext.to_ascii_uppercase()] {
+                let path = fixture(dir.path(), &format!("launcher.{case}"));
+                let result = local_open_target(&path);
+                if !matches!(&result, Err(message) if message.to_ascii_lowercase().contains(&format!(".{}", case.to_ascii_lowercase())))
+                {
+                    failures.push(format!(".{case}: {result:?}"));
+                }
+            }
+        }
+        assert_eq!(failures, Vec::<String>::new(), "unrefused or unnamed types");
+    }
+
+    #[test]
+    fn refuses_extensionless_files() {
+        let dir = tempdir().unwrap();
+        let path = fixture(dir.path(), "launcher");
+        assert!(matches!(local_open_target(&path), Err(e) if e.contains("no extension")));
+    }
+
+    #[test]
+    fn refuses_missing_paths() {
+        let dir = tempdir().unwrap();
+        assert!(
+            matches!(local_open_target(dir.path().join("missing.pdf").to_str().unwrap()), Err(e) if e.contains("resolve"))
+        );
+    }
+
+    #[test]
+    fn urls_accept_only_web_and_mail() {
+        for url in [
+            "http://example.com/a?q=1#fragment",
+            "HTTPS://example.com/?q=1#f",
+            "MAILTO:user@example.com?subject=Hi#f",
+        ] {
+            assert!(validate_external_url(url).is_ok(), "{url}");
+        }
+        // A drive letter is never classified as a URL scheme, on either build host.
+        assert!(is_windows_drive_path("C:\\docs\\report.pdf"));
+        assert!(is_windows_drive_path("c:/docs/report.pdf"));
+        assert!(!is_windows_drive_path("https://example.com"));
+    }
+
+    #[test]
+    fn refuses_other_url_schemes_in_every_case() {
+        let mut failures = Vec::new();
+        for scheme in [
+            "file",
+            "javascript",
+            "vbscript",
+            "data",
+            "ms-settings",
+            "ms-msdt",
+            "search-ms",
+            "shell",
+            "tel",
+            "ftp",
+            "custom",
+        ] {
+            for case in [scheme.to_string(), scheme.to_ascii_uppercase()] {
+                let url = format!("{case}:payload");
+                if validate_external_url(&url).is_ok() {
+                    failures.push(url);
+                }
+            }
+        }
+        assert_eq!(failures, Vec::<String>::new(), "accepted schemes");
+    }
+
+    #[test]
+    fn refuses_malformed_and_control_urls() {
+        let mut failures = Vec::new();
+        for input in [
+            "",
+            "not a URL",
+            "https://",
+            "http://[",
+            "mailto:",
+            " https://example.com",
+            "https://example.com\n",
+            "https://exam\tple.com",
+            "https://example.com/\0x",
+            "mailto:u@example.com\r?subject=x",
+        ] {
+            if validate_external_url(input).is_ok() {
+                failures.push(input);
+            }
+        }
+        assert_eq!(
+            failures,
+            Vec::<&str>::new(),
+            "accepted malformed/control URLs"
+        );
+    }
+
+    #[test]
+    fn refuses_urls_on_local_path() {
+        let mut failures = Vec::new();
+        for input in [
+            "http://example.com/a.pdf",
+            "https://example.com/a.pdf",
+            "mailto:a.pdf",
+            "file:///tmp/a.pdf",
+            "javascript:a.pdf",
+            "vbscript:a.pdf",
+            "ms-msdt:a.pdf",
+            "search-ms:a.pdf",
+            "shell:a.pdf",
+            "TEL:a.pdf",
+            "ms-settings:a.pdf",
+            "data:a.pdf",
+        ] {
+            if local_open_target(input).is_ok() {
+                failures.push(input);
+            }
+        }
+        assert_eq!(failures, Vec::<&str>::new(), "local path accepted URLs");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinks_use_resolved_type_and_target() {
+        use std::os::unix::fs::symlink;
+        let dir = tempdir().unwrap();
+        let document = fixture(dir.path(), "document.odt");
+        let alias = dir.path().join("alias.pdf");
+        symlink(&document, &alias).unwrap();
+        assert_eq!(
+            local_open_target(alias.to_str().unwrap()).unwrap(),
+            fs::canonicalize(&document).unwrap()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_allowed_name_symlink_to_launcher() {
+        use std::os::unix::fs::symlink;
+        let dir = tempdir().unwrap();
+        let launcher = fixture(dir.path(), "launcher.desktop");
+        let alias = dir.path().join("document.pdf");
+        symlink(&launcher, &alias).unwrap();
+        assert!(
+            matches!(local_open_target(alias.to_str().unwrap()), Err(e) if e.contains(".desktop"))
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_dangling_and_looping_links() {
+        use std::os::unix::fs::symlink;
+        let dir = tempdir().unwrap();
+        let dangling = dir.path().join("dangling.pdf");
+        let looping = dir.path().join("loop.pdf");
+        symlink(dir.path().join("absent.pdf"), &dangling).unwrap();
+        symlink(&looping, &looping).unwrap();
+        let outcomes = [
+            local_open_target(dangling.to_str().unwrap()),
+            local_open_target(looping.to_str().unwrap()),
+        ];
+        assert_eq!(
+            outcomes.iter().filter(|r| r.is_ok()).count(),
+            0,
+            "{outcomes:?}"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_colons_are_kept_and_trailing_suffixes_refused() {
+        let dir = tempdir().unwrap();
+        let path = fixture(dir.path(), "report:2026.pdf");
+        assert_eq!(
+            local_open_target(&path).unwrap(),
+            fs::canonicalize(path).unwrap()
+        );
+        let outcomes: Vec<_> = [
+            "launcher.exe.",
+            "launcher.EXE ",
+            "launcher.desktop..",
+            "launcher.sh ",
+        ]
+        .iter()
+        .map(|name| local_open_target(&fixture(dir.path(), name)))
+        .collect();
+        assert_eq!(
+            outcomes.iter().filter(|r| r.is_ok()).count(),
+            0,
+            "{outcomes:?}"
+        );
+    }
+
+    #[test]
+    fn reveal_returns_existing_directory_for_files_and_folders() {
+        let dir = tempdir().unwrap();
+        let path = fixture(dir.path(), "launcher.desktop");
+        let (item, folder) = reveal_target(&path).unwrap();
+        assert_eq!(item, fs::canonicalize(path).unwrap());
+        assert_eq!(folder, fs::canonicalize(dir.path()).unwrap());
+        let (item, folder) = reveal_target(dir.path().to_str().unwrap()).unwrap();
+        assert_eq!(item, folder);
+        assert!(folder.is_dir());
+    }
+
+    #[test]
+    fn refuses_reveal_under_file_or_missing_item() {
+        let dir = tempdir().unwrap();
+        let path = fixture(dir.path(), "launcher.desktop");
+        let outcomes = [
+            reveal_target(&format!("{path}/child")),
+            reveal_target(dir.path().join("absent.pdf").to_str().unwrap()),
+        ];
+        assert_eq!(
+            outcomes.iter().filter(|r| r.is_ok()).count(),
+            0,
+            "{outcomes:?}"
+        );
+    }
+
+    // Each subprocess has its own PATH and marker; parallel tests cannot affect the OS opener.
+    #[cfg(target_os = "linux")]
+    fn run_dispatch_case(case: &str) {
+        if std::env::var_os("OPEN_GUARD_CASE").is_some() {
+            linux_dispatch_worker();
+            return;
+        }
+        let name = match case {
+            "refuse" => "open_guard_tests::linux_commands_refuse_launchers_without_dispatch",
+            "preserve" => {
+                "open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory"
+            }
+            "plugin" => "open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel",
+            _ => unreachable!(),
+        };
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempdir().unwrap();
+        let opener = dir.path().join("xdg-open");
+        fs::write(
+            &opener,
+            "#!/bin/sh\nprintf '%s\\n' \"$1\" >> \"$OPEN_GUARD_MARKER\"\n",
+        )
+        .unwrap();
+        fs::set_permissions(&opener, fs::Permissions::from_mode(0o755)).unwrap();
+        let result = Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", name, "--nocapture"])
+            .env("OPEN_GUARD_CASE", case)
+            .env(
+                "DBUS_SESSION_BUS_ADDRESS",
+                "unix:path=/nonexistent-open-guard-session-bus",
+            )
+            .env("OPEN_GUARD_DIR", dir.path())
+            .env("OPEN_GUARD_MARKER", dir.path().join("marker"))
+            .env("PATH", dir.path())
+            .output()
+            .unwrap();
+        assert_eq!(
+            result.status.code(),
+            Some(0),
+            "actual command dispatch case {case}:\n{}\n{}",
+            String::from_utf8_lossy(&result.stdout),
+            String::from_utf8_lossy(&result.stderr)
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_commands_refuse_launchers_without_dispatch() {
+        run_dispatch_case("refuse");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_commands_dispatch_resolved_pdf_and_reveal_directory() {
+        run_dispatch_case("preserve");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn direct_plugin_ipc_refuses_paths_reveal_and_tel() {
+        run_dispatch_case("plugin");
+    }
+
+    #[cfg(target_os = "linux")]
+    fn linux_dispatch_worker() {
+        let case = std::env::var("OPEN_GUARD_CASE").unwrap();
+        let dir = PathBuf::from(std::env::var("OPEN_GUARD_DIR").unwrap());
+        let marker = dir.join("marker");
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        match case.as_str() {
+            "refuse" => {
+                let mut results = Vec::new();
+                for name in ["crafted.desktop", "crafted.sh", "crafted.pdf.exe"] {
+                    let path = fixture(&dir, name);
+                    results.push(runtime.block_on(open_file(path)));
+                }
+                for url in [
+                    "javascript:alert(1)",
+                    "FILE:///tmp/launcher.desktop",
+                    "tel:123",
+                ] {
+                    results.push(runtime.block_on(open_external_url(url.into())));
+                }
+                let launcher = fixture(&dir, "parent.desktop");
+                results.push(runtime.block_on(reveal_in_explorer(format!("{launcher}/child"))));
+                assert!(
+                    results.iter().all(Result::is_err) && !marker.exists(),
+                    "refusals: {results:?}; dispatched: {:?}",
+                    fs::read_to_string(&marker)
+                );
+            }
+            "preserve" => {
+                use std::os::unix::fs::symlink;
+                let document = fixture(&dir, "real.pdf");
+                let alias = dir.join("alias.txt");
+                symlink(&document, &alias).unwrap();
+                assert!(runtime
+                    .block_on(open_file(alias.to_string_lossy().into_owned()))
+                    .is_ok());
+                assert!(runtime
+                    .block_on(reveal_in_explorer(document.clone()))
+                    .is_ok());
+                assert!(runtime
+                    .block_on(reveal_in_explorer(dir.to_string_lossy().into_owned()))
+                    .is_ok());
+                for url in [
+                    "http://example.com/?q=1#f",
+                    "https://example.com/?q=1#f",
+                    "mailto:user@example.com?subject=Hi",
+                ] {
+                    assert!(runtime.block_on(open_external_url(url.into())).is_ok());
+                }
+                let expected = format!("{document}\n{}\n{}\nhttp://example.com/?q=1#f\nhttps://example.com/?q=1#f\nmailto:user@example.com?subject=Hi\n", dir.display(), dir.display());
+                assert_eq!(fs::read_to_string(marker).unwrap(), expected);
+            }
+            "plugin" => {
+                let app = tauri::test::mock_builder()
+                    .plugin(tauri_plugin_opener::init())
+                    .build(tauri::generate_context!())
+                    .unwrap();
+                let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
+                    .build()
+                    .unwrap();
+                let launcher = fixture(&dir, "crafted.desktop");
+                let mut failures = Vec::new();
+                for (cmd, body) in [
+                    ("open_path", serde_json::json!({"path": launcher})),
+                    (
+                        "reveal_item_in_dir",
+                        serde_json::json!({"paths": [launcher]}),
+                    ),
+                    ("open_url", serde_json::json!({"url": "tel:123"})),
+                    ("open_url", serde_json::json!({"url": "file:///tmp/a.pdf"})),
+                    (
+                        "open_url",
+                        serde_json::json!({"url": "https://example.com", "with": "/bin/sh"}),
+                    ),
+                ] {
+                    let result = tauri::test::get_ipc_response(
+                        &webview,
+                        tauri::webview::InvokeRequest {
+                            cmd: format!("plugin:opener|{cmd}"),
+                            callback: tauri::ipc::CallbackFn(0),
+                            error: tauri::ipc::CallbackFn(1),
+                            url: "tauri://localhost".parse().unwrap(),
+                            body: tauri::ipc::InvokeBody::Json(body),
+                            headers: Default::default(),
+                            invoke_key: tauri::test::INVOKE_KEY.into(),
+                        },
+                    );
+                    let message = result
+                        .as_ref()
+                        .err()
+                        .and_then(|error| error.as_str())
+                        .unwrap_or("");
+                    let expected = if cmd == "open_url" {
+                        "Not allowed to open url ".to_string()
+                    } else {
+                        format!("opener.{cmd} not allowed")
+                    };
+                    if !message.starts_with(&expected) {
+                        failures.push(format!("{cmd}: {result:?}"));
+                    }
+                }
+                assert!(
+                    failures.is_empty() && !marker.exists(),
+                    "plugin accepted {failures:?}; dispatch: {:?}",
+                    fs::read_to_string(&marker)
+                );
+                // The injected link handler still has a usable command and URL scope.
+                for url in [
+                    "http://example.com/?q=1#f",
+                    "https://example.com",
+                    "mailto:user@example.com",
+                ] {
+                    let result = tauri::test::get_ipc_response(
+                        &webview,
+                        tauri::webview::InvokeRequest {
+                            cmd: "plugin:opener|open_url".into(),
+                            callback: tauri::ipc::CallbackFn(0),
+                            error: tauri::ipc::CallbackFn(1),
+                            url: "tauri://localhost".parse().unwrap(),
+                            body: tauri::ipc::InvokeBody::Json(serde_json::json!({"url": url})),
+                            headers: Default::default(),
+                            invoke_key: tauri::test::INVOKE_KEY.into(),
+                        },
+                    );
+                    assert!(result.is_ok(), "allowed plugin link {url}: {result:?}");
+                }
+                let deadline = std::time::Instant::now() + Duration::from_secs(2);
+                loop {
+                    let contents = fs::read_to_string(&marker).unwrap_or_default();
+                    if contents.lines().count() == 3 {
+                        break;
+                    }
+                    assert!(
+                        std::time::Instant::now() < deadline,
+                        "plugin dispatches: {contents:?}"
+                    );
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+            }
+            other => panic!("unknown dispatch case: {other}"),
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_ntfs_short_names_trailing_dots_ads_and_junctions() {
+        use std::os::windows::ffi::OsStrExt;
+        use windows_sys::Win32::Storage::FileSystem::{GetShortPathNameW, GetVolumeInformationW};
+        let dir = tempdir().unwrap();
+        let root: Vec<u16> = format!(
+            "{}\\",
+            dir.path()
+                .components()
+                .next()
+                .unwrap()
+                .as_os_str()
+                .to_string_lossy()
+        )
+        .encode_utf16()
+        .chain(Some(0))
+        .collect();
+        let mut filesystem = [0u16; 32];
+        assert_ne!(
+            unsafe {
+                GetVolumeInformationW(
+                    root.as_ptr(),
+                    std::ptr::null_mut(),
+                    0,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    filesystem.as_mut_ptr(),
+                    filesystem.len() as u32,
+                )
+            },
+            0,
+            "real filesystem query"
+        );
+        assert_eq!(
+            String::from_utf16_lossy(&filesystem).trim_end_matches('\0'),
+            "NTFS",
+            "requires real NTFS"
+        );
+        let launcher = fixture(dir.path(), "long-launcher-name.application");
+        let wide: Vec<u16> = std::ffi::OsStr::new(&launcher)
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        let mut short = vec![0u16; 32768];
+        let len =
+            unsafe { GetShortPathNameW(wide.as_ptr(), short.as_mut_ptr(), short.len() as u32) };
+        assert!(len > 0 && (len as usize) < short.len(), "GetShortPathNameW");
+        let short = String::from_utf16(&short[..len as usize]).unwrap();
+        assert!(
+            short.contains('~'),
+            "8.3 generation must be enabled for this check: {short}"
+        );
+        let mut results = vec![local_open_target(&short)];
+        for suffix in [".", " ", ". "] {
+            results.push(local_open_target(&format!("{launcher}{suffix}")));
+        }
+        let pdf = fixture(dir.path(), "report.pdf");
+        let stream = format!("{pdf}:payload.exe");
+        fs::write(&stream, "stream fixture").unwrap();
+        results.push(local_open_target(&stream));
+        let target_dir = dir.path().join("target");
+        fs::create_dir(&target_dir).unwrap();
+        fixture(&target_dir, "launcher.hta");
+        let junction = dir.path().join("junction");
+        let output = Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&junction)
+            .arg(&target_dir)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        results.push(local_open_target(
+            junction.join("launcher.hta").to_str().unwrap(),
+        ));
+        assert_eq!(
+            results.iter().filter(|r| r.is_ok()).count(),
+            0,
+            "{results:?}"
+        );
+        assert_eq!(
+            local_open_target(&pdf).unwrap(),
+            fs::canonicalize(pdf).unwrap()
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_refuses_mixed_network_device_and_ads_inputs() {
+        let outcomes: Vec<_> = [
+            "/\\server/share/file.pdf",
+            "\\/server/share/file.pdf",
+            "\\\\?\\C:\\file.pdf",
+            "\\\\.\\C:\\file.pdf",
+            "C:\\file.pdf:stream",
+        ]
+        .iter()
+        .map(|path| local_open_target(path))
+        .collect();
+        assert_eq!(
+            outcomes.iter().filter(|r| r.is_ok()).count(),
+            0,
+            "{outcomes:?}"
+        );
+    }
+    #[cfg(windows)]
+    #[test]
+    fn windows_symlinks_resolve_document_and_refuse_disguised_launcher() {
+        use std::os::windows::fs::symlink_file;
+        let dir = tempdir().unwrap();
+        let document = fixture(dir.path(), "document.odt");
+        let document_alias = dir.path().join("document-alias.pdf");
+        symlink_file(&document, &document_alias).unwrap();
+        assert_eq!(
+            local_open_target(document_alias.to_str().unwrap()).unwrap(),
+            fs::canonicalize(document).unwrap()
+        );
+        let launcher = fixture(dir.path(), "launcher.exe");
+        let disguised = dir.path().join("disguised.pdf");
+        symlink_file(&launcher, &disguised).unwrap();
+        assert!(
+            matches!(local_open_target(disguised.to_str().unwrap()), Err(e) if e.contains(".exe"))
+        );
+    }
+    #[test]
+    fn refuses_empty_and_control_local_paths() {
+        let outcomes: Vec<_> = [
+            "",
+            "\0",
+            "/tmp/document.pdf\n",
+            "/tmp/doc\tument.pdf",
+            "/tmp/document.pdf\r",
+        ]
+        .iter()
+        .map(|input| local_open_target(input))
+        .collect();
+        assert_eq!(
+            outcomes.iter().filter(|r| r.is_ok()).count(),
+            0,
+            "{outcomes:?}"
+        );
     }
 }

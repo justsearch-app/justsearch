@@ -74,4 +74,5 @@ opt-level = "s"    # Optimize for size — Tauri shell is a thin wrapper, not co
 strip = true       # Remove symbol tables from binary
 
 [dev-dependencies]
+tauri = { version = "2", features = ["test"] }
 tempfile = "3"
