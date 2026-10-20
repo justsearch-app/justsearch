@@ -36,12 +36,18 @@ final class IndexingJobsBridgeWiringTest {
     try (var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
       var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
       var sink = new java.util.concurrent.atomic.AtomicReference<java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame>>();
-      org.mockito.Mockito.doAnswer(call -> {
-        sink.set(call.getArgument(0));
-        sink.get().accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(1)
+      var sinks = new java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame>>();
+      sink.set(frame -> sinks.forEach(consumer -> consumer.accept(frame)));
+      org.mockito.stubbing.Answer<io.justsearch.app.services.worker.KnowledgeClient.IndexingJobsStream> stream = call -> {
+        java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame> consumer = call.getArgument(0);
+        sinks.add(consumer);
+        consumer.accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(1)
             .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.getDefaultInstance()).build());
-        return (io.justsearch.app.services.worker.KnowledgeClient.IndexingJobsStream) () -> {};
-      }).when(client).subscribeIndexingJobs(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+        return () -> sinks.remove(consumer);
+      };
+      org.mockito.Mockito.doAnswer(stream).when(client).subscribeIndexingJobOutcomes(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+      org.mockito.Mockito.doAnswer(stream).when(client).subscribeIndexingJobs(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
           org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
       var ledger = new io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry(
           io.justsearch.app.observability.ledger.ActionEventJournal.disabled(),
@@ -129,12 +135,18 @@ final class IndexingJobsBridgeWiringTest {
     try (var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
       var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
       var sink = new java.util.concurrent.atomic.AtomicReference<java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame>>();
-      org.mockito.Mockito.doAnswer(call -> {
-        sink.set(call.getArgument(0));
-        sink.get().accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(1)
+      var sinks = new java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame>>();
+      sink.set(frame -> sinks.forEach(consumer -> consumer.accept(frame)));
+      org.mockito.stubbing.Answer<io.justsearch.app.services.worker.KnowledgeClient.IndexingJobsStream> stream = call -> {
+        java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame> consumer = call.getArgument(0);
+        sinks.add(consumer);
+        consumer.accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(1)
             .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.getDefaultInstance()).build());
-        return (io.justsearch.app.services.worker.KnowledgeClient.IndexingJobsStream) () -> {};
-      }).when(client).subscribeIndexingJobs(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+        return () -> sinks.remove(consumer);
+      };
+      org.mockito.Mockito.doAnswer(stream).when(client).subscribeIndexingJobOutcomes(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+      org.mockito.Mockito.doAnswer(stream).when(client).subscribeIndexingJobs(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
           org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
       var ledger = new io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry(
           io.justsearch.app.observability.ledger.ActionEventJournal.disabled(), testChannel(executors,

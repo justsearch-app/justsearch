@@ -655,11 +655,10 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
     },
     {
       "items": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/IndexingJobsRecoveryTest.java",
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsSseIsolationTest.java"
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/IndexingJobsRecoveryTest.java"
       ],
       "class": "New",
-      "behaviour": "Successful snapshots reset delay/log attempts; typed overflow first retry immediate (including negative monotonic clock), repeated loops paced; stalled SSE observer cannot overflow 2000-row handoff and executes off drainer; FAIL_FAST cause typed.",
+      "behaviour": "Successful snapshots reset delay/log attempts; typed overflow first retry immediate (including negative monotonic clock), repeated loops paced. The SSE-isolation checks now have a separate entry with refreshed execution evidence.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -679,7 +678,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "kind": "owner-adopted-scenario",
           "task": "t-20261020-540095",
           "scenario": "Q27",
-          "quote": "SSE serialization and sending do not run on the thread that drains the handoff: a slow or stalled SSE observer does not make the handoff overflow during a 2000-row enqueue burst. Fails today.",
+          "quote": "SSE serialization and sending do not run on the thread that drains the handoff: a slow or stalled SSE observer does not make the handoff overflow during a 2000-row enqueue burst.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -693,8 +692,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
       ],
       "evidence": "gates/test-intent/evidence/queue-scale-repairs-e890.json",
       "newChecks": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/IndexingJobsRecoveryTest.java",
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsSseIsolationTest.java"
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/IndexingJobsRecoveryTest.java"
       ],
       "repaired": true
     },
@@ -1013,7 +1011,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
         "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/IndexingJobsBridgeWiringTest.java"
       ],
       "class": "New",
-      "behaviour": "New liveTerminalOutcomesOutsideWindowKeepScanAttributionWithoutSnapshotReplay: four later terminal outcomes after retry/re-enqueue retain scan-42 even outside view; reconnect snapshot does not replay. Existing terminal classification assertions untouched. Owner-supplied channel fixture only supports async delivery. Preservation, already passed old synchronous path.",
+      "behaviour": "New liveTerminalOutcomesOutsideWindowKeepScanAttributionWithoutSnapshotReplay: four later terminal outcomes after retry/re-enqueue retain scan-42 even outside view; reconnect snapshot does not replay. Existing terminal classification assertions untouched. Owner-supplied channel fixture only supports async delivery. Preservation, already passed old synchronous path. Fixture adaptation: identical frames fan out to the registered row-view and terminal-outcome streams; all original assertions and fault injection are unchanged.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1030,7 +1028,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/queue-scale-repairs-e890.json",
+      "evidence": "gates/test-intent/evidence/queue-scale-terminal-fixtures.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/IndexingJobsBridgeWiringTest.java#liveTerminalOutcomesOutsideWindowKeepScanAttributionWithoutSnapshotReplay"
       ],
@@ -1041,7 +1039,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
         "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/IndexingJobsBridgeWiringTest.java"
       ],
       "class": "New",
-      "behaviour": "New terminalLedgerObserversCannotBlockJobDeliveryAndSnapshotsNeverReplayThem: blocked ledger SSE observer cannot stall terminal acceptance, both scan-tagged outcomes stored once, snapshot no replay. Future.get1s is wrapped in assertDoesNotThrow and strengthened to250ms below the old synchronous1s delivery bound to avoid a race and classify timeout as assertion; release/scan/no-replay assertions unchanged.",
+      "behaviour": "New terminalLedgerObserversCannotBlockJobDeliveryAndSnapshotsNeverReplayThem: blocked ledger SSE observer cannot stall terminal acceptance, both scan-tagged outcomes stored once, snapshot no replay. Future.get1s is wrapped in assertDoesNotThrow and strengthened to250ms below the old synchronous1s delivery bound to avoid a race and classify timeout as assertion; release/scan/no-replay assertions unchanged. Fixture adaptation: identical frames fan out to the registered row-view and terminal-outcome streams; all original assertions and fault injection are unchanged.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1054,7 +1052,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "kind": "owner-adopted-scenario",
           "task": "t-20261020-540095",
           "scenario": "Q27",
-          "quote": "SSE serialization and sending do not run on the thread that drains the handoff: a slow or stalled SSE observer does not make the handoff overflow during a 2000-row enqueue burst. Fails today.",
+          "quote": "SSE serialization and sending do not run on the thread that drains the handoff: a slow or stalled SSE observer does not make the handoff overflow during a 2000-row enqueue burst.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -1066,7 +1064,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/queue-scale-repairs-e890.json",
+      "evidence": "gates/test-intent/evidence/queue-scale-terminal-fixtures.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/IndexingJobsBridgeWiringTest.java#terminalLedgerObserversCannotBlockJobDeliveryAndSnapshotsNeverReplayThem"
       ],
@@ -1590,7 +1588,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
         "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsResponsiveness.test.ts"
       ],
       "class": "New",
-      "behaviour": "Retain all 216 externally mirrored processing/failure rows, publish reconciliation once, and suppress all listener churn across 100 identical projections. Reconcile only the indexing task namespace even with 10,000 unrelated live tasks; preserve remount cleanup. This proves the task-store mechanism, not the outstanding five-minute production responsiveness check. No pre-existing test is rewritten.",
+      "behaviour": "Retain all 216 externally mirrored processing/failure rows, publish reconciliation once, and suppress all listener churn across 100 identical projections. Reconcile only the indexing task namespace even with 10,000 unrelated live tasks; preserve remount cleanup. The unchanged deterministic oracle is supplemented by the five-minute installed production Engine/Chrome probe in queue-scale-terminal-continuity.md. No pre-existing test is rewritten.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1619,13 +1617,13 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
         "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsEnqueueBurstTest.java"
       ],
       "class": "New",
-      "behaviour": "Hold a real Engine subscription delivery and submit 2,005 actual files through the real ingest client. Invisible newly inserted PENDING rows must not fill the handoff. This repairs the enqueue portion only: installed Engine DONE bursts still overflow, so Q27 remains incomplete. No pre-existing test or 256-slot capacity changes.",
+      "behaviour": "Hold a real Engine subscription delivery and submit 2,005 actual files through the real ingest client. Invisible newly inserted PENDING rows must not fill the handoff. Installed no-observer and stalled-socket-reader probes separately measure submission through all rows PENDING: zero enqueue overflows in both. Later DONE-phase overflows fall under Q26; terminal continuity across them is checked independently under Q17. All original assertions and the 256-slot capacity remain unchanged.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261020-540095",
           "scenario": "Q27",
-          "quote": "SSE serialization and sending do not run on the thread that drains the handoff: a slow or stalled SSE observer does not make the handoff overflow during a 2000-row enqueue burst. Fails today.",
+          "quote": "SSE serialization and sending do not run on the thread that drains the handoff: a slow or stalled SSE observer does not make the handoff overflow during a 2000-row enqueue burst.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -1643,6 +1641,14 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
           "choice": "a larger buffer alone is not a fix",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "zero overflows during the enqueue burst, with no observer and with a stalled observer",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/queue-scale-browser-drain.json",
@@ -1650,6 +1656,85 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
         "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsEnqueueBurstTest.java"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsTerminalOverflowTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Hold one actual DONE delivery, commit 399 further outcomes, force the 256-frame view handoff to overflow and resubscribe, then assert all 400 expected hashes/scan attributions reach activity exactly once and the persisted ingestion outcome rollups count 400. A later failure after re-enqueue reaches both once (401); reconnect snapshots never replay events. Uses the real EngineKnowledgeClient, worker service and SQLite feed. Historical ScanRollup has no live producer; current rollups read the persisted worker ledger.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q17",
+          "quote": "The activity ledger and scan rollups keep today's terminal-event semantics (including later outcomes after retry or re-enqueue), also for rows never in the view, with no replay on reconnect.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Accept committed terminal outcomes independently of the recoverable row-view handoff, with an empty registration barrier and no snapshot replay; keep SSE observer delivery asynchronous.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/queue-scale-terminal-overflow.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsTerminalOverflowTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsSseIsolationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preserve the existing stalled-observer 2000-row handoff isolation and typed FAIL_FAST assertions. The mock additionally supplies an empty terminal-source registration barrier so the independent lifecycle can start; the original five assertions, burst pacing, blocked observer, sequence and thread checks are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q27",
+          "quote": "SSE serialization and sending do not run on the thread that drains the handoff: a slow or stalled SSE observer does not make the handoff overflow during a 2000-row enqueue burst.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q17",
+          "quote": "The activity ledger and scan rollups keep today's terminal-event semantics (including later outcomes after retry or re-enqueue), also for rows never in the view, with no replay on reconnect.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/queue-scale-terminal-fixtures.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsSseIsolationTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/IndexingJobsBridgeWiringTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsSseIsolationTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/TestKnowledgeClient.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "split",
+        "signature"
+      ],
+      "whatMoved": "Fixture transport only: the two Wiring tests broadcast the same input frames to whichever of the window/outcome streams registered; the SSE isolation mock supplies an empty terminal registration; TestKnowledgeClient implements the new abstract outcome port with the same explicit unsupported-stream fixture policy. All 24 Wiring assertion calls and all 5 SSE-isolation assertion calls match checkpoint 8eb70d443 ignoring whitespace; inputs, expected counts, scan IDs, timing bounds, fault injection and test selection remain unchanged. Old-to-new inventory and normalized assertion proof are in queue-scale-terminal-continuity.md.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q17",
+          "quote": "The activity ledger and scan rollups keep today's terminal-event semantics (including later outcomes after retry or re-enqueue), also for rows never in the view, with no replay on reconnect.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
     }
   ]
 }

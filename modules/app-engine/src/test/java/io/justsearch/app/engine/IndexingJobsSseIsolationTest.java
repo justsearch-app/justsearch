@@ -47,6 +47,12 @@ class IndexingJobsSseIsolationTest {
             .setSnapshot(IndexingJobsSnapshot.getDefaultInstance()).build());
         return (KnowledgeClient.IndexingJobsStream) handoff::close;
       }).when(client).subscribeIndexingJobs(any(), any(), any(), any());
+      doAnswer(call -> {
+        java.util.function.Consumer<IndexingJobsFrame> onFrame = call.getArgument(0);
+        onFrame.accept(IndexingJobsFrame.newBuilder().setSeq(1)
+            .setSnapshot(IndexingJobsSnapshot.getDefaultInstance()).build());
+        return (KnowledgeClient.IndexingJobsStream) () -> {};
+      }).when(client).subscribeIndexingJobOutcomes(any(), any(), any(), any());
       // A single owned executor instance is enough; handoff shares its virtual owner above.
       var wired = IndexingJobsBridgeWiring.wire(owners, () -> client, jobs, new ActionLedgerChangeRegistry());
       wired.bridge().start().get(1, TimeUnit.SECONDS);

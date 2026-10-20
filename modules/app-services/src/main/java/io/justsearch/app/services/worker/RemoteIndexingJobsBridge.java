@@ -164,6 +164,18 @@ public final class RemoteIndexingJobsBridge {
   RemoteIndexingJobsBridge(
       EngineExecutorRegistry processExecutors, Supplier<IndexingJobsSource> sourceSupplier,
       LongSupplier reconnectClock) {
+    this(processExecutors, sourceSupplier, reconnectClock, "head.indexing-jobs-bridge");
+  }
+
+  /** Independent sources need independently owned reconnect executors. */
+  public RemoteIndexingJobsBridge(EngineExecutorRegistry processExecutors,
+      Supplier<IndexingJobsSource> sourceSupplier, String ownerName) {
+    this(processExecutors, sourceSupplier,
+        () -> java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime()), ownerName);
+  }
+
+  private RemoteIndexingJobsBridge(EngineExecutorRegistry processExecutors,
+      Supplier<IndexingJobsSource> sourceSupplier, LongSupplier reconnectClock, String ownerName) {
     this.sourceSupplier = Objects.requireNonNull(sourceSupplier, "sourceSupplier");
     this.reconnectClock = Objects.requireNonNull(reconnectClock, "reconnectClock");
     Objects.requireNonNull(processExecutors, "processExecutors");
@@ -172,7 +184,7 @@ public final class RemoteIndexingJobsBridge {
     EngineExecutorRegistry.Registration registration =
         processExecutors.register(
             new EngineExecutorSpec(
-                "head.indexing-jobs-bridge-reconnect",
+                ownerName + "-reconnect",
                 EngineExecutorSpec.Kind.BACKGROUND,
                 EngineExecutorSpec.Mode.SCHEDULED,
                 1,
@@ -198,7 +210,7 @@ public final class RemoteIndexingJobsBridge {
     EngineExecutorRegistry.Registration retries = null;
     try {
       retries = processExecutors.register(new EngineExecutorSpec(
-          "head.indexing-jobs-bridge-reconnect-retry", EngineExecutorSpec.Kind.BACKGROUND,
+          ownerName + "-reconnect-retry", EngineExecutorSpec.Kind.BACKGROUND,
           EngineExecutorSpec.Mode.PLATFORM, 1, Math.min(1, background.maxQueue()), 1));
       this.reconnectRetryRegistration = retries;
       this.reconnectRetries = retries.open(runnable -> {

@@ -25,16 +25,13 @@ import java.util.function.Supplier;
  * <p>Subscription bridges the worker's typed Delta events into the
  * {@link IndexingJobsChangeRegistry}'s flat broadcast feed consumed by the SSE controller.
  *
- * <p><b>Tempdoc 550 thesis I (system-operation contributor).</b> The same subscription is the
- * Head-side observation point that feeds the indexing job lifecycle into the ONE action-event log:
- * a job's TERMINAL transition (state ∈ {@code DONE | FAILED}) is projected to an
- * {@link ActionLedgerProjection#projectIndex} event and broadcast to the
- * {@link ActionLedgerChangeRegistry}, so the Activity surface shows indexing happened. In-flight
- * states (PENDING/PROCESSING) are deliberately NOT emitted here — that live state is the rail's
- * Resource projection (the second governed projection of the same job lifecycle), and emitting
- * per-transition would flood the bounded action-event ring and evict agent actions. Snapshot
- * frames are also skipped so a worker reconnect cannot re-flood the (session-scoped) ledger with
- * historical DONE rows.
+ * <p>Terminal activity is accepted through an independent committed-outcomes subscription,
+ * before the row view's recoverable handoff. A view overflow can replace rows from a snapshot;
+ * it must not lose activity. Both subscriptions use the existing bridge lifecycle and fences,
+ * with independently owned executors. The outcome source starts with an empty registration
+ * barrier, never historical rows. SSE delivery remains asynchronous, and snapshots never replay
+ * terminal activity. Current ingestion rollups read the worker's persisted outcome ledger;
+ * the historical ScanRollup event has no live producer.
  */
 public final class IndexingJobsBridgeWiring {
 
@@ -48,16 +45,36 @@ public final class IndexingJobsBridgeWiring {
       Supplier<KnowledgeClient> knowledgeClientSupplier,
       IndexingJobsChangeRegistry indexingJobsChangeRegistry,
       ActionLedgerChangeRegistry actionLedgerChangeRegistry) {
+    // A view can recover from a snapshot; terminal activity cannot. Keep its subscription
+    // independent and accept outcomes synchronously before the lossy view handoff.
+    var outcomes = new RemoteIndexingJobsBridge(executors, () -> {
+      KnowledgeClient kc = knowledgeClientSupplier.get();
+      return kc == null ? null : (onFrame, onError, onCompleted) -> kc.subscribeIndexingJobOutcomes(
+          onFrame, onError, onCompleted, io.justsearch.app.services.intent.EngineProvenance.internal(
+              "indexing-job-outcomes", io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+              io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
+    }, "head.indexing-job-outcomes");
+    var outcomeSubscription = outcomes.subscribe(delta -> {
+      switch (delta) {
+        case RemoteIndexingJobsBridge.Delta.Insert insert -> emitTerminalOutcome(actionLedgerChangeRegistry, insert.row());
+        case RemoteIndexingJobsBridge.Delta.Update update -> emitTerminalOutcome(actionLedgerChangeRegistry, update.row());
+        default -> {} // Snapshots, including reconnects, never replay activity.
+      }
+    });
+    try {
     RemoteIndexingJobsBridge bridge =
         new RemoteIndexingJobsBridge(
             executors,
             () -> {
               KnowledgeClient kc = knowledgeClientSupplier.get();
-              return kc == null ? null : (IndexingJobsSource) (onFrame, onError, onCompleted) ->
-                  kc.subscribeIndexingJobs(onFrame, onError, onCompleted,
-                      io.justsearch.app.services.intent.EngineProvenance.internal(
-                          "indexing-jobs-bridge", io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
-                          io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
+              return kc == null ? null : (IndexingJobsSource) (onFrame, onError, onCompleted) -> {
+                // Establish terminal registration before opening the view to callers.
+                outcomes.start().join();
+                return kc.subscribeIndexingJobs(onFrame, onError, onCompleted,
+                    io.justsearch.app.services.intent.EngineProvenance.internal(
+                        "indexing-jobs-bridge", io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+                        io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
+              };
             });
     RemoteIndexingJobsBridge.Subscription subscription =
         bridge.subscribe(delta -> {
@@ -68,19 +85,29 @@ public final class IndexingJobsBridgeWiring {
             case RemoteIndexingJobsBridge.Delta.Insert ins -> {
               indexingJobsChangeRegistry.broadcastAsync(
                   new IndexingJobsChangeRegistry.Delta.Insert(ins.row()));
-              emitTerminalOutcome(actionLedgerChangeRegistry, ins.row());
             }
             case RemoteIndexingJobsBridge.Delta.Update upd -> {
               indexingJobsChangeRegistry.broadcastAsync(
                   new IndexingJobsChangeRegistry.Delta.Update(upd.row()));
-              emitTerminalOutcome(actionLedgerChangeRegistry, upd.row());
             }
             case RemoteIndexingJobsBridge.Delta.Delete del ->
                 indexingJobsChangeRegistry.broadcastAsync(
                     new IndexingJobsChangeRegistry.Delta.Delete(del.pathHash()));
           }
         });
-    return new Output(bridge, subscription);
+    return new Output(bridge, () -> {
+      try { subscription.close(); }
+      finally {
+        try { outcomeSubscription.close(); }
+        finally { outcomes.stop(); }
+      }
+    });
+    } catch (RuntimeException | Error failure) {
+      outcomeSubscription.close();
+      try { outcomes.stop(); }
+      catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
   }
 
   private static void emitTerminalOutcome(ActionLedgerChangeRegistry registry, IndexingJobView row) {
@@ -116,9 +143,8 @@ public final class IndexingJobsBridgeWiring {
             row.attempts(),
             row.errorMessage(),
             Instant.ofEpochMilli(row.lastUpdatedMs()),
-            // Tempdoc 812 D2 — the scan that enqueued this job (empty for non-scan jobs). The
-            // rollup aggregator counts these terminal outcomes per scanId; the FE groups the
-            // surviving per-doc rows under their scan's rollup by the same key.
+            // Retain the scan that enqueued this job (empty for non-scan jobs), including
+            // outcomes that never belonged to the live row window.
             row.scanId()));
   }
 }
