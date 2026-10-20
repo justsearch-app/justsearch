@@ -14,6 +14,15 @@ const harnessOverrides = {
 };
 const io = {
   repoRoot, fakeEngine: FAKE_ENGINE, harnessOverrides, sleep,
+  async waitFor(predicate, { timeoutMs = 10000, what } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const value = await predicate();
+      if (value) return value;
+      if (Date.now() >= deadline) throw new Error(`timed out waiting for ${what}`);
+      await sleep(25);
+    }
+  },
   isAlive(pid) {
     if (process.platform === 'linux') {
       const observed = readLinuxProcess(pid);
@@ -36,6 +45,37 @@ const io = {
   },
 };
 const policy = loadPolicy({ env: harnessOverrides });
+
+test('owner death survives delayed fixture startup and an installed shutdown handler', { timeout: 60000 }, async () => {
+  const ownerDied = allCases().find(c => c.id === 'owner-died-recorded-after-supervisor-kill');
+  assert.ok(ownerDied, 'the owner death contract case exists');
+  let firstRunId;
+  let runningLease;
+  const result = await runCase({
+    testCase: { ...ownerDied, enginePlan: [
+      { mode: 'slow-start', slowStartMs: 1000 }, { mode: 'slow-start', slowStartMs: 1000 },
+    ] },
+    policy,
+    io: {
+      ...io,
+      harnessOverrides: { ...harnessOverrides, JUSTSEARCH_DEV_LEASE_RENEW_MS: '100' },
+      readJsonIfPresent(file) {
+        const state = io.readJsonIfPresent(file);
+        if (state?.state !== 'running') return state;
+        firstRunId ??= state.runId;
+        if (state.runId !== firstRunId) return state;
+        const active = io.readJsonIfPresent(path.resolve(path.dirname(file), '../../state/active.json'));
+        if (active?.phase !== 'running' || active.runId !== firstRunId) return null;
+        // RUNNING precedes handler installation. A subsequent running lease renewal only happens
+        // after the handlers are installed, so the kill cannot win that race even on a fast host.
+        runningLease ??= active.lease.sequence;
+        return active.lease.sequence > runningLease ? state : null;
+      },
+    },
+  });
+  assert.ok(runningLease, 'the first runner settled before it was killed');
+  assert.deepEqual(result.problems, []);
+});
 
 test('probe waits for delayed fixture startup before cooperative quit', { timeout: 180000 }, async () => {
   const cooperativeQuit = allCases().find(c => c.id === 'quit-cooperative-records-requested-quit');

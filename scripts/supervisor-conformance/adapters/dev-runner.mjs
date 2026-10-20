@@ -622,8 +622,8 @@ async function runLifecycleCase({ testCase, policy, io }) {
   const runs = [];
   try {
     if (expect.killSupervisor) {
-      // The supervisor is killed outright (TerminateProcess, no handler runs); its Engine dies with
-      // the runner's job and nobody records the exit.
+      // Kill outright: TerminateProcess on Windows, SIGKILL elsewhere so no shutdown handler runs.
+      // Its Engine dies with the runner's job and nobody records the exit.
       const first = await driveCase({ testCase, policy, io, workDir, keepWorkDir: true });
       runs.push(first);
       const up = await watchSupervisor({ statePath: first.statePath, predicate: (s) => s.state === 'running',
@@ -638,7 +638,7 @@ async function runLifecycleCase({ testCase, policy, io }) {
         .some((r) => r.type === 'engine-start' && r.incarnation?.session === previousRunId), { timeoutMs: 10_000,
         what: 'the first run\'s engine-start' }).catch(() => false);
       if (!opened) problems.push('the first run never wrote its engine-start');
-      first.child.kill();
+      first.child.kill(process.platform === 'win32' ? undefined : 'SIGKILL');
       await Promise.race([first.exited, io.sleep(5000)]);
       const enginePid = up.pid;
       await io.waitFor(() => { try { process.kill(enginePid, 0); return false; } catch { return true; } },
