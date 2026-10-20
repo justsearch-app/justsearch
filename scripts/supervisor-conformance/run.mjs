@@ -20,6 +20,8 @@
  */
 
 import fs from 'node:fs';
+import { caseTimings } from './timings.mjs';
+import { removeFixtureDirectory } from './fixture-cleanup.mjs';
 import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -505,10 +507,24 @@ async function runAdapter(name) {
   const repeat = Number(process.argv[process.argv.indexOf('--repeat') + 1]) || 1;
   if (process.argv.includes('--repeat') && (!only || repeat < 1 || repeat > 50)) throw new Error('--repeat requires --case and 1..50');
   for (const testCase of cases.flatMap(c => Array.from({ length: repeat }, () => c))) {
+    const timings = caseTimings({ adapter: name, testCase, policy,
+      root: path.join(repoRoot, 'tmp/supervisor-conformance/records') });
+    const caseIo = { ...io, timings,
+      makeWorkDir(label) { const dir = io.makeWorkDir(label); timings.addWorkDir(dir); return dir; },
+      readJsonIfPresent(file) {
+        const value = io.readJsonIfPresent(file);
+        if (value && path.basename(file) === 'supervisor.v1.json') timings.state(value, file);
+        return value;
+      },
+      async waitFor(predicate, options = {}) {
+        const end = timings.wait(options.what ?? 'condition', options.timeoutMs ?? 10000);
+        try { return await io.waitFor(predicate, options); } finally { end(); }
+      },
+    };
     let problems;
     try {
       // eslint-disable-next-line no-await-in-loop
-      const outcome = await adapter.runCase({ testCase, policy, io });
+      const outcome = await adapter.runCase({ testCase, policy, io: caseIo });
       if (!outcome || !Array.isArray(outcome.problems)) {
         problems = ['adapter returned no result for this case — a skipped case fails the harness'];
       } else {
@@ -517,7 +533,12 @@ async function runAdapter(name) {
     } catch (err) {
       problems = [`adapter threw: ${err?.stack ?? err}`];
     }
+    const timingRecord = timings.finish(problems);
     record(`adapter:${name}`, testCase.id, problems);
+    if (problems.length) process.stdout.write(`        timing record: ${timings.file}\n${JSON.stringify(timingRecord)}\n`);
+    else if (process.env.SUPERVISOR_CONFORMANCE_KEEP !== '1') {
+      for (const dir of timingRecord.workDirs) removeFixtureDirectory(dir);
+    }
   }
 }
 

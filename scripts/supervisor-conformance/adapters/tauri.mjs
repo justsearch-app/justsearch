@@ -67,6 +67,7 @@ const RESTART_CASES = new Set([
 ]);
 
 export function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncarnation, requestReason }) {
+  io.timings?.launch(workDir);
   const child = spawn(
     binary,
     [
@@ -89,7 +90,9 @@ export function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAft
   child.stderr.on('data', (b) => { output.stderr += b.toString(); });
   const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
   child.on('error', (err) => { output.stderr += `[spawn error] ${err.message}\n`; });
-  return { child, output, exited };
+  const run = { child, output, exited, workDir };
+  io.timings?.attach(run);
+  return run;
 }
 
 export async function runCase({ testCase, policy, io }) {
@@ -351,8 +354,8 @@ export async function runCase({ testCase, policy, io }) {
   } finally {
     try { run.child.kill(); } catch { /* already gone */ }
     await io.sleep(150);
-    if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {
-      process.stderr.write(`[keep] ${workDir}\n`);
+    if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1' || io.timings) {
+      if (!io.timings) process.stderr.write(`[keep] ${workDir}\n`);
     } else {
       try { fs.rmSync(workDir, { recursive: true, force: true, maxRetries: 5 }); } catch { /* windows handles */ }
     }

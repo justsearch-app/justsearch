@@ -23,7 +23,7 @@ export function workflowJobs(text) {
     const field = /^    (name|runs-on|continue-on-error|if|timeout-minutes|needs):\s*(.*)$/.exec(line);
     if (field) job[field[1]] = field[2];
     if (/^      - /.test(line)) step = {};
-    const stepField = /^        (if|continue-on-error):\s*(.*)$/.exec(line);
+    const stepField = /^        (id|if|continue-on-error):\s*(.*)$/.exec(line);
     if (step && stepField) step[stepField[1]] = stepField[2];
     const command = /^(\s*)(?:-\s+)?run:\s*(.*)$/.exec(line);
     if (command) {

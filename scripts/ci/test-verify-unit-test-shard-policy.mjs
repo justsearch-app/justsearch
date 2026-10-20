@@ -187,6 +187,11 @@ console.log('test-verify-unit-test-shard-policy: PASS');
       assert.equal(check(altered).ok, false, command);
     }
   }
+  for (const altered of [
+    original.replace(" || steps.windows-coverage.outcome == 'failure'", ''),
+    original.replace('id: windows-coverage', 'id: unrelated-step'),
+    original.replace('id: windows-coverage', 'id: windows-coverage\n        if: false'),
+  ]) assert.equal(check(altered).ok, false, 'coverage guard must reference an unconditional Gradle execution and include failures');
   const windowsTask = original.indexOf('      - name: Windows coverage');
   const omitted = original.slice(0, windowsTask) + original.slice(windowsTask).replace(':modules:app-api:test ', '');
   assert.equal(check(omitted).ok, false, 'omitting a Windows module must fail ownership');

@@ -159,7 +159,7 @@ export async function runUpdaterHold({ testCase, io }) {
       const pids = new Set([enginePid, io.readJsonIfPresent(statePath)?.pid]);
       for (const pid of pids) if (Number.isInteger(pid) && alive(pid)) process.kill(pid);
     }
-    if (process.env.SUPERVISOR_CONFORMANCE_KEEP !== '1') {
+    if (process.env.SUPERVISOR_CONFORMANCE_KEEP !== '1' && !io.timings) {
       // A cleanup handle race must not replace the scenario's original failure.
       try { fs.rmSync(workDir, { recursive: true, force: true, maxRetries: 5 }); }
       catch (err) { process.stderr.write(`fixture cleanup retained ${workDir}: ${err.code}\n`); }

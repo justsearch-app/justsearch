@@ -31,6 +31,7 @@ export async function runLifecycle({ name, testCase, policy, io }) {
     if(name==='tauri') fs.writeFileSync(path.join(run.dataDir,'shell-control.json'),JSON.stringify({action,reason}));
     else {
       const state=io.readJsonIfPresent(run.statePath);const dir=path.join(run.stateRoot,'runs',state.runId,'control');fs.mkdirSync(dir,{recursive:true});
+      if(reason==='quit') io.timings?.quitRequested(state,run.workDir);
       fs.writeFileSync(path.join(dir,'stop-request.json'),JSON.stringify({requestId:crypto.randomUUID(),reason,actor:'supervisor-conformance'}));
     }
   }
@@ -111,6 +112,7 @@ export async function runLifecycle({ name, testCase, policy, io }) {
         if(probe==='forced'||probe==='deadline') {
           assert.equal(exits[0].forced,true);
           assert(exits[0].code===1246953474 || ((name==='dev-runner'||linuxForced)&&exits[0].codeDistinctive===false));
+          io.timings?.measure('quitToStopped', started, policy.quitDeadlineMs+2000);
           assert(Date.now()-started<=policy.quitDeadlineMs+2000,'quit finishes within the contract bound');
         }
         if(probe==='deadline') {
@@ -118,7 +120,7 @@ export async function runLifecycle({ name, testCase, policy, io }) {
           assert(Math.abs(elapsed-(policy.quitDeadlineMs-policy.quitForceMarginMs))<250,`force issued at the contract deadline: ${elapsed}`);
         }
       }
-      if(probe==='stream') { assert(Date.now()-started<=policy.quitDeadlineMs+policy.quitForceMarginMs,'streaming quit deadline');assert(!alive(helper.pid),'extraction ended with Engine'); }
+      if(probe==='stream') { io.timings?.measure('quitToStopped',started,policy.quitDeadlineMs+policy.quitForceMarginMs);assert(Date.now()-started<=policy.quitDeadlineMs+policy.quitForceMarginMs,'streaming quit deadline');assert(!alive(helper.pid),'extraction ended with Engine'); }
       for(const record of records.filter(r=>r.type==='engine-start')) assert(!alive(record.pid),'no Engine survives quit');
       return {problems:[]};
     }
@@ -142,6 +144,6 @@ export async function runLifecycle({ name, testCase, policy, io }) {
         if(run.child.exitCode===null&&run.child.signalCode===null) { run.child.kill(); await run.exited; }
       }
     }
-    if(process.env.SUPERVISOR_CONFORMANCE_KEEP!=='1')fs.rmSync(workDir,{recursive:true,force:true,maxRetries:5});
+    if(process.env.SUPERVISOR_CONFORMANCE_KEEP!=='1'&&!io.timings)fs.rmSync(workDir,{recursive:true,force:true,maxRetries:5});
   }
 }
