@@ -2,21 +2,12 @@
 title: Developing the UI
 type: how-to
 status: stable
-description: "Demo mode (no backend), real backend mode, and frontend verification."
+description: "Layout work without a backend, deterministic fixture captures, real backend development, and frontend verification."
 ---
 
 # Developing the UI
 
-> **⚠️ Correction (2026-06, tempdoc 615): `?demo=true` no longer supplies data to the live Lit `shell-v0`.**
-> The production `<jf-shell>` boot resolves its API base via `resolveApiEndpoint()` (`src/api/http.ts`), which
-> has **no `?demo`→`'demo'` path** — so the demo handling in `src/api/domains/*` / `src/api/streams.ts` (and
-> `src/mocks/fixtures.mjs`) is **orphaned from the retired React app** and never fires for the current shell.
-> In practice: **view/chrome work needs only a served frontend (no backend); search/inspector/AI need the dev
-> stack running** (AI also needs `ai_activate`). Re-wiring `?demo=true` into `resolveApiEndpoint` to restore a
-> no-backend data mode is a worthwhile follow-up, but it does NOT work today. The demo-mode sections below are
-> kept as the (currently non-functional) spec. For live verification, see [Capture UI Evidence](capture-ui-evidence.md).
-
-## Quick start — no backend needed (CHROME/LAYOUT ONLY — demo DATA is orphaned, see notice above)
+## Quick start — layout without a backend
 
 ```bash
 cd modules/ui-web
@@ -24,77 +15,25 @@ npm install          # first time only
 npm run dev          # starts Vite
 ```
 
-Open `http://127.0.0.1:5173/`. The live Lit shell renders its chrome, rail, and surfaces with no backend
-(empty/`Connecting…` data). `?demo=true` is inert for the shell-v0 boot — it does **not** load fixture data
-(see the correction notice above). For real data, run the dev stack.
+Open `http://127.0.0.1:5173/`. The Lit shell renders its chrome, rail, and surfaces with no backend,
+but data views remain empty or show `Connecting…`. `?demo=true` does not supply data to the current
+shell. For deterministic browser captures with data, use `jseval ui-shot --fixtures`; for real
+search, indexing, and AI behavior, run a backend.
 
 ## When to use each mode
 
 | Mode | Command | Backend needed? | Use for |
 |------|---------|----------------|---------|
-| Demo | `npm run dev` + `?demo=true` on the URL | No | Component work, styling, layout, accessibility, quick visual check, SSE simulation |
-| Real backend | `npm run dev` (no `?demo`) | Yes (port 33221) | Integration testing, real search results |
-| Worktree FE | `node scripts/dev/serve-worktree-fe.cjs` | Borrows a running stack (read-only) | Validating **this worktree's** FE in a browser without starting/owning a stack — picks a free port and auto-detects the running backend (tempdoc 618 §7) |
+| Layout | `npm run dev` in `modules/ui-web` | No | Chrome, styling, and layout without data |
+| Fixture capture | `python -m jseval ui-shot search-results --fixtures` from `scripts/jseval` | No; the harness serves Vite and intercepts API requests | Deterministic visual and accessibility checks |
+| Real backend | `npm --prefix modules/ui-web run dev:all` from repo root | Starts one; the UI receives its port | Real search and integration work |
+| Worktree FE | `node scripts/dev/serve-worktree-fe.cjs` from repo root | Borrows a running stack (read-only) | Validating this worktree's frontend without starting another backend |
 
-## Demo mode
-
-`?demo=true` switches the app's API base to a virtual `demo/` origin, so every
-fetch is served from in-repo fixtures instead of a backend. The app code is
-unchanged — `src/api/streams.ts` and `src/api/domains/inference.ts` detect the
-`demo/` base (and the `?demo_*` overrides below) and return fixture data. There is
-no service worker.
-
-**Fixtures:** `src/mocks/fixtures.mjs` (also exercised by `fixtures.test.ts`)
-**Activation:** `?demo=true` on the dev URL — this is what `jseval ui-shot` uses by default
-**Overrides:** `?demo_ai=true` (force demo AI streaming even against a real backend),
-`?demo_error=<code>` (simulate an error), `?demo_truncated=1`, `?demo_rag=fallback`,
-`?demo_stream_delay_ms=<n>` (streaming cadence)
-
-The demo fixtures cover:
-- `/api/status` — reports Ready, 500 indexed documents. Fixture includes `gpu` (GpuStatusView with VRAM, utilization, driver), `meta` (StatusMeta with RPC timestamps), `encoderProfiles` (Map of per-encoder ORT timing), and flat search config fields (matching backend `@JsonUnwrapped` `SearchConfigView`)
-- `/api/knowledge/search` — returns 3 fixture results. Each hit includes `meta_source`, `meta_author`, `meta_category` in the `fields` map, and `provenance` (per-hit scoring breakdown with BM25/vector/fusion scores). Response includes `pipelineExecution` (timing and component status) and `indexCapabilities` (available features)
-- `/api/preview` — mock preview content
-- `/api/settings/v2` — default settings (dark theme, includes `vimMode`)
-- `/api/inference/status` — offline AI
-- `/api/indexing/roots` — empty roots
-- `POST /api/ui/ready` — boot handshake
-
-### Mock fixture shapes
-
-**Status fixture** (`/api/status`):
-
-```text
-{
-  gpu: { available, utilization, vramTotal, vramUsed, vramFree, driverVersion, deviceCount },
-  meta: { workerRpcAtMs, workerRpcStale },
-  encoderProfiles: { "<name>": { calls, phaseTotalUs: {}, ortMinUs, ortMaxUs, ortP50Us, ortP95Us, ortP99Us } },
-  // flat search config fields (from @JsonUnwrapped SearchConfigView):
-  hybridAlpha, bm25Boost, vectorBoost, freshnessBoost, spladeBoost, ...
-}
-```
-
-**Search hit shape**:
-
-```text
-{
-  fields: {
-    title, file_path, file_kind, content_preview, language,
-    meta_source?, meta_author?, meta_category?, meta_published_at?, ...
-  },
-  provenance?: {
-    bm25Score, vectorScore, fusionScore, crossEncoderScore?,
-    crossEncoderApplied, spladeScore?, spladeApplied, ...
-  }
-}
-```
-
-### Adding demo data for a new endpoint
-
-Add the fixture to `src/mocks/fixtures.mjs` and return it from the demo branch of
-the relevant `src/api/` domain module (e.g. `domains/<name>.ts`, or the demo path
-in `streams.ts` for SSE). Demo mode handles streaming (SSE simulation), delays
-(`?demo_stream_delay_ms`), and error simulation (`?demo_error=<code>`) directly in
-`src/api/streams.ts` — no service worker involved.
+When running Vite separately, set `VITE_JUSTSEARCH_API_PORT` (legacy alias `VITE_API_PORT`) to the backend's
+port, or export the same absolute `JUSTSEARCH_DATA_DIR` in both terminals before startup. Vite's manifest
+discovery does not search the separate backend's default `modules/ui/build/applauncher-data` folder. See
+[Using the UI](use-ui.md) for split-terminal and desktop workflows, and
+[Capture UI Evidence](capture-ui-evidence.md) for the fixture capture commands.
 
 ## Visual verification with Chrome
 
@@ -115,11 +54,10 @@ the page context, and verify that UI changes look correct.
 | `npm run typecheck` | TypeScript compilation (no emit) |
 | `npm run test:unit:run` | Vitest unit tests (single run) |
 | `npm run lint` | ESLint rules |
-| `npm run test:gate` | Playwright gate smoke test (needs backend) |
-| `npm run test` | Full Playwright E2E suite (needs backend) |
 
-**Minimum for a UI PR:** `typecheck` + `test:unit:run`. Add `test:gate` if
-the change affects search or navigation flows.
+**Minimum for a UI PR:** `typecheck` + `test:unit:run`. Use `jseval ui-shot` or
+`jseval ui-check` for browser checks of affected search or navigation flows
+(see [Capture UI Evidence](capture-ui-evidence.md)).
 
 ## Architecture overview
 
@@ -143,11 +81,9 @@ top of that file).
 
 The UI talks to the Engine via REST (`/api/*`). The API layer routes to the
 index half through in-process port calls (ADR-0049 — one JVM, no IPC). When the
-index half is busy (indexing), search API responses slow down — that's why MSW
-mock mode exists for UI development.
+index half is busy (indexing), search API responses can slow down. Use fixture
+captures for deterministic frontend checks and a running dev stack for integration checks.
 
 ```text
 Browser → Vite proxy → Engine (Javalin) → index-half port call → Lucene
-                ↑
-         MSW intercepts here in mock mode
 ```

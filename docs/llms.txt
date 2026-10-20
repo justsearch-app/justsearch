@@ -60,7 +60,7 @@ halves share objects.
 
 ### How-To (Specific Tasks)
 - [Capture UI Evidence](how-to/capture-ui-evidence.md): Screenshot capture for UI verification and agent visual feedback.
-- [Developing the UI](how-to/develop-ui.md): Demo mode (no backend), real backend mode, and frontend verification.
+- [Developing the UI](how-to/develop-ui.md): Layout work without a backend, deterministic fixture captures, real backend development, and frontend verification.
 - [Interpret `jseval bisect` Output (LR5-d)](how-to/interpret-bisect-output.md): Reading the manifest-hash bisection report — single-axis, multi-axis, MULTI_AXIS_INTERACTION, no-cached-run, and identical-cohort paths.
 - [Prevent public credential and email exposure](how-to/prevent-public-credential-and-email-exposure.md): Signing diagnostics, secret-scan coverage, commit identity checks, and historical cleanup limits.
 - [Spawn an Isolated Test Backend](how-to/spawn-isolated-test-backend.md): Lite mode env flag (JUSTSEARCH_LITE_MODE) and the per-class IsolatedBackendFixture pattern for integration tests that need a clean backend per test class without paying the 3-8s cost of loading the AI stack.
@@ -113,7 +113,7 @@ halves share objects.
 - [Search Quality Register](reference/search-quality-register.md): Shared decision register for search quality. Read before starting search work. Update before finishing.
 - [Search UI Behavioral Reference](reference/search-ui-behavior.md): Search UI behavioral specification (zones, filters, selection, status deck).
 - [Secondary Views Behavioral Reference](reference/secondary-views-behavior.md): Secondary view behavioral specification (Library, Brain, Health, Settings, Help).
-- [Threat Model](reference/security/threat-model.md): STRIDE threat model for the local-first, loopback-only architecture; the provable-privacy story and its mechanical anchors.
+- [Threat Model](reference/security/threat-model.md): STRIDE threat model for local processing, outbound connections, update trust, and the loopback API boundary.
 - [Test Intent Rules](reference/testing/test-intent.md): Agent-facing rules for the test-intent gate: what it flags, the entry classes, sources of intent, execution evidence and the acceptance record.
 - [UI user readiness verification (web UI)](reference/ui-user-readiness.md): Workflow checklist and known issues for web UI readiness.
 - [Extension Substrate Conventions](reference/ui/extension-substrate-conventions.md): Parameter-level conventions of the extension substrate: profile-fork-from-active, selection-clears-on-surface-change, WhenExpression grammar, virtual-operation audience validation, template slot caps + trust attenuation, host.ai error discriminants, plugin file-size caps. The model behind these is in explanation/26.

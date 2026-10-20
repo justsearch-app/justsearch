@@ -42,7 +42,11 @@ To restore settings after installing an older build:
 2. In the settings directory, copy `settings.v<old>.bak.json` over `settings.json`.
 3. Start JustSearch.
 
-The settings file is `$JUSTSEARCH_HOME/ui/settings.json` when `JUSTSEARCH_HOME` is set. Otherwise,
+The desktop app sets `JUSTSEARCH_HOME` to its data folder, so settings are at
+`%APPDATA%\io.justsearch.shell\ui\settings.json` on Windows or
+`~/.local/share/io.justsearch.shell/ui/settings.json` on Linux
+(`$XDG_DATA_HOME/io.justsearch.shell/ui/settings.json` if set).
+For headless/dev launches, the file is `$JUSTSEARCH_HOME/ui/settings.json` when set. Otherwise,
 it is `%USERPROFILE%/AppData/Roaming/justsearch/ui/settings.json` on Windows,
 `~/Library/Application Support/justsearch/ui/settings.json` on macOS, or
 `~/.config/justsearch/ui/settings.json` on Linux. These locations follow
@@ -358,8 +362,7 @@ Owner-only steps (require repo permissions):
    (see `docs/m1-operator-checklist.md`).
 8. **Post-cut — update the README to the published asset.** `README.md`'s installer size + SHA-256
    line and the `v<version>` download link describe the *published* release asset, which is why
-   they deliberately still read the previous release's figures (853 MB, the v0.1.0 SHA) until a cut
-   lands. After the Release exists, bump the size, the `SHA256SUMS` value, and the
+   they retain the previous published release's figures until a cut lands. After the Release exists, bump the size, the `SHA256SUMS` value, and the
    `releases/download/v<version>/…` link together to the new asset.
 
 > Do **not** advertise MCP against a release whose installer predates the `/mcp` endpoint. The
@@ -393,8 +396,9 @@ share, ending in a literal `PASS`/`FAIL`. `-GenerateOnly` prepares the `.wsb` wi
 
 ## Pre-release verification (update preserves models)
 
-Run this **before publishing**, once a candidate installer exists. Tempdoc 617 D2 allows
-monolithic full-installer updates only because the user's models — up to ~9 GB — are reused in
+Run this **before publishing**, using the unpublished branch candidate from **release-loop step 1**.
+The tag dispatch in operator step 6 publishes in the same job and cannot supply a pre-publication gate. Tempdoc 617 D2 allows
+monolithic full-installer updates only because the user's downloaded models are reused in
 place, and a monolithic update runs uninstall-then-install over the existing install. The
 `check-update-preserves-models` script only checks the *declared* packaging surface; this lane
 checks a built one.
@@ -404,7 +408,7 @@ checks a built one.
 gh workflow run update-preserves-models.yml \
   -f base_release_tag=<previous vX.Y.Z> \
   -f candidate_source=run-artifact \
-  -f candidate_run_id=<the build-installer.yml run id from step 6>
+  -f candidate_run_id=<the branch build-installer.yml run id from release-loop step 1>
 ```
 
 It installs the previous release silently, seeds model files under
@@ -565,9 +569,12 @@ speed). When bumping the ORT version, all of the following must move together:
       ```bash
       node scripts/release/check-ort-native-asset.mjs <path-to>/ort-native-cuda12-v<ver>.zip
       ```
-      It fails (exit 1) listing any of `OrtCudaHelper.ORT_NATIVE_DLL_SET` the archive lacks —
-      `onnxruntime.dll`, `onnxruntime4j_jni.dll`, `onnxruntime_providers_shared.dll`,
-      `onnxruntime_providers_cuda.dll` — read from the Java authority, not a second list. A pack
+      **Known script failure:** this command still parses the retired `ORT_NATIVE_DLL_SET`
+      constant and currently stops with `could not parse ORT_NATIVE_DLL_SET`. The restaging tool
+      (`node scripts/dev/restage-ort-pack.mjs`) has the same stale parser. Both await a separate
+      script fix; do not treat an unrun archive check as verified. The current Java authority is
+      `OrtCudaHelper.ortNativeDllSet()`, which resolves platform-specific names through
+      `NativeTargets`. A pack
       missing one does **not** fail loudly at runtime: ORT falls back to CPU and every ONNX encoder
       runs at CPU speed while the status surfaces still report a GPU variant (tempdoc 734 R11-F3).
       The registry pin then makes the verified bytes the only accepted bytes, so this is the one
@@ -589,6 +596,7 @@ each release's convergence tempdoc + its GitHub Release):
 |---|---|---|---|---|
 | v0.1.0 | 2026-06-25 | (pre-pipeline) | Prerelease/alpha. **No MCP endpoint.** Installer built locally, not via CI. | [release](https://github.com/justsearch-app/justsearch/releases/tag/v0.1.0) |
 | v0.2.0 | 2026-08-13 | published after the 0.2.0 convergence campaign; tempdoc 617's exact updater N→N+1 lanes remain open | First stable cut with the MCP endpoint, authenticated update assets, and Authenticode-signed installer (publisher Elias Justus). | [release](https://github.com/justsearch-app/justsearch/releases/tag/v0.2.0), tempdoc 734, tempdoc 823, tempdoc 617 |
+| v0.3.0 | 2026-09-07 | No additional Sandbox verdict recorded here | Published release; in-place update from 0.2.0 remains unverified in its changelog. | [release](https://github.com/justsearch-app/justsearch/releases/tag/v0.3.0), [changelog](../../CHANGELOG.md#030---2026-09-07) |
 
 ## See also
 
