@@ -1,42 +1,9 @@
-// Slice 466 — SES lockdown at boot (OPT-IN gated for V1.5 alpha).
-//
-// Per slices/470-v1-5-user-ui-authorship-substrate.md §B.C.5
-// (live-smoke verified 2026-05-07): lockdown() is compatible with
-// Lit + Vite + the V1.5 PluginLoader in the validated environment
-// (Vite dev server, mock backend, Chromium WebView). It is NOT yet
-// verified across:
-//   - Real backend traffic through the capability handshake
-//   - Tauri WebView2 / WKWebView / WebKitGTK production builds
-//   - All seven core surfaces under load
-// Until V1.5.1 polish runs that verification, lockdown() is
-// opt-in via either:
-//   - URL parameter `?lockdown=1` (per-session, dev/QA)
-//   - Build-time env `VITE_SES_LOCKDOWN=1` (CI / production opt-in)
-// Default boot remains the un-frozen realm; the SES Compartment
-// factory still ships and can be used per-plugin without lockdown.
-//
-// Compiled-code `import()` continues to function post-lockdown —
-// verified end-to-end with the PluginLoader loading a `data:` URL
-// plugin. Only arbitrarily-eval'd code's `import()` is rejected
-// (SES_IMPORT_REJECTED) — desired behavior since that's the
-// capability-leak vector SES exists to close.
-//
-// Conservative taming options preserve common patterns:
-//   - errorTaming: 'unsafe'  → keep Error.captureStackTrace etc.
-//   - consoleTaming: 'unsafe' → don't replace console (Vite HMR uses it)
-//   - domainTaming: 'unsafe' → don't fight Node's deprecated `domain`
-//   - overrideTaming: 'severe' → tolerate prototype-property assignments
-// Slice 477 H2.6 — SES bundle code-splitting.
-// SES is no longer eagerly imported here. The PluginLoader
-// dynamically imports it on first plugin load. Users who never
-// load a plugin don't pay the ~80 kB SES cost on cold start.
-//
-// Tempdoc 560 Fix C: SES lockdown is ON BY DEFAULT — the §4.4 / P2 isolation end-state. Untrusted
-// plugins must run in a realm with frozen intrinsics, otherwise prototype pollution defeats the
-// capability attenuation (and the removed `document` endowment). The only escape hatch is an explicit
-// opt-OUT (`?lockdown=0` URL or VITE_SES_LOCKDOWN=0 env) for debugging a lockdown-incompatibility
-// regression. The dynamic import inside the function is well-supported (esbuild rejects only top-level
-// `await`).
+// Lit initializes built-in metadata during module evaluation. Load the library before
+// SES freezes intrinsics, without registering surfaces or opening application state.
+import 'lit'
+
+// SES lockdown is on by default. Debug builds can explicitly opt out with
+// ?lockdown=0 or VITE_SES_LOCKDOWN=0.
 const __sesLockdownDisabled =
   (typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).get('lockdown') === '0') ||
@@ -53,9 +20,6 @@ async function __maybeLockdown() {
     overrideTaming: 'severe',
   })
 }
-// Fire-and-forget — bootstrap below runs in parallel. The SES fetch adds a tiny startup latency;
-// the security benefit (frozen intrinsics for every plugin realm) dwarfs it.
-void __maybeLockdown()
 
 import './styles/tokens.css'
 // Register local strategies immediately; catalog requests start after API discovery.
@@ -86,6 +50,9 @@ window.onerror = (message, source, lineno, colno, error) => {
 };
 
 async function bootstrap() {
+  // Finish lockdown before any asynchronous reset or normal boot path. Neither a
+  // cold fetch nor a cached reload can race Lit initialization against freezing.
+  await __maybeLockdown()
   const params = new URLSearchParams(window.location.search);
 
   // Reset recovery precedes surface registration and every persistent state singleton.

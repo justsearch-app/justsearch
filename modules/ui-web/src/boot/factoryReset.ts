@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 interface ResetStatus {
   phase: 'idle' | 'requested' | 'incomplete' | 'awaiting_storage' | 'complete';
   remaining: { path: string; error: string }[];
+  kept_links?: string[];
 }
 
 /** This surface deliberately needs neither an Engine nor hydrated application state. */
@@ -66,6 +67,9 @@ class FactoryResetRecovery extends LitElement {
         ${this.status?.remaining.length ? html`<ul aria-label="What could not be removed">
           ${this.status.remaining.map((failure) => html`<li><strong>${failure.path}</strong>: ${failure.error}</li>`)}
         </ul>` : nothing}
+        ${this.status?.kept_links?.length ? html`<ul aria-label="Links kept outside the app data">
+          ${this.status.kept_links.map((path) => html`<li><strong>${path}</strong>: Kept as a link to a folder outside the app data.</li>`)}
+        </ul>` : nothing}
         ${this.error ? html`<p role="alert">${this.error}</p>` : nothing}
         ${phase === 'incomplete' ? html`<p>Cancel reset keeps the remaining data as ordinary data.
           Data already deleted cannot be recovered.</p>` : nothing}
@@ -88,7 +92,9 @@ export async function gateFactoryReset(root: HTMLElement): Promise<boolean> {
   try {
     const status = await invoke<ResetStatus>('factory_reset_status');
     if (!status || !['idle', 'requested', 'incomplete', 'awaiting_storage', 'complete'].includes(status.phase)
-        || !Array.isArray(status.remaining)) throw new Error('Unable to read the data reset status. Try again.');
+        || !Array.isArray(status.remaining)
+        || (status.kept_links !== undefined && (!Array.isArray(status.kept_links)
+          || !status.kept_links.every((path) => typeof path === 'string')))) throw new Error('Unable to read the data reset status. Try again.');
     if (status.phase === 'idle') return true;
     recovery = new FactoryResetRecovery();
     recovery.status = status;

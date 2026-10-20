@@ -122,6 +122,22 @@ describe('WP5.1 reset boot gate', () => {
     expect(mocks.endpoint).not.toHaveBeenCalled();
   });
 
+  it('RN1 the receipt names kept links outside app data separately from failures', async () => {
+    for (const phase of ['incomplete', 'complete']) {
+      mocks.invoke.mockResolvedValue({ phase, remaining: [], kept_links: ['app-data/native-bin', 'app-data/models'] });
+      expect(await resolveBootWithRecovery(root())).toBeNull();
+      await settle();
+      const shadow = root().querySelector('jf-factory-reset-recovery')!.shadowRoot!;
+      const kept = shadow.querySelector('ul[aria-label="Links kept outside the app data"]');
+      expect(kept, 'the receipt must list preserved links').not.toBeNull();
+      expect(kept?.textContent).toContain('app-data/native-bin');
+      expect(kept?.textContent).toContain('app-data/models');
+      expect(kept?.textContent).toContain('Kept as a link to a folder outside the app data');
+      expect(shadow.querySelector('ul[aria-label="What could not be removed"]')).toBeNull();
+      expect(mocks.endpoint).not.toHaveBeenCalled();
+    }
+  });
+
   it('RN3 no pending reset preserves window storage and resolves the backend normally', async () => {
     status('idle');
     localStorage.setItem('justsearch.draft.search-v3.composer', 'keep');

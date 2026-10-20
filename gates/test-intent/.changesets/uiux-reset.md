@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: agent-session-nxw19h73
+author-session: agent-session-_sq_p_57
 ---
 
 # Test-intent entries
@@ -31,6 +31,32 @@ Windows restart/uninstall, Windows held-file/reparse behavior, actual power-loss
 durability, model inference, whole-app absence, timing, real assistive-technology or
 visual theme/narrow-layout behavior. Those remain unverified. Existing token checks
 also run before and after, with their assertions unchanged. No acceptance is written.
+
+Review history: 2026-10-20 — builder agent-session-91l8ise0 repaired the independently
+reported reload failure and added kept-link coverage. Previous acceptance is retained;
+this round requires independent acceptance on the final digest.
+
+Round 2 evidence: uiux-reset-boot-repair.json uses --before 97dc55c62 with no
+compatibility patch. Boot tests build the production frontend in a subprocess, run
+headless Chromium with real SES, and delay the reset module until Symbol is frozen.
+Only native IPC and HTTP responses are doubles. The browser tests run separately via
+`npx playwright-core install chromium` then `npm run test:unit:lockdown -- --maxWorkers=4`;
+browser installation and this check are not currently wired in CI. The new shell
+check exercises real Unix symlinks (including dangling targets); its Windows junction
+branch is unverified here. Runtime inference and real Windows desktop reloads remain
+unverified. uiux-reset-shell-recheck.json refreshes source digests for the original
+Rust checks using their original c00a0cb24 compatibility seam; original evidence is
+retained unchanged. TMPDIR and --before-root stay under tmp/wp51-repair, npx appends
+--maxWorkers=4, and Cargo uses two build jobs and the existing source-only asset fixture.
+
+Review history: 2026-10-20 — builder agent-session-_sq_p_57 applied the continuation
+decision to linked ancestors of kept assets, adapted the old parent-link expectation
+as explicitly requested, and added a persisted/displayed kept-link receipt with
+assertion fail-before checks on 97dc55c62. The prior acceptance remains unchanged.
+Round 3 refreshes the new-check evidence and the original checks for modified source
+files. The c00a0cb24 compatibility seam is unchanged. The renamed parent-link check
+is included in 97dc55c62 evidence and is no longer claimed against the legacy seam.
+No Java files were changed. Actual Windows junction/WebView checks remain unverified.
 
 ```json
 {
@@ -78,7 +104,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage"
       ],
@@ -113,7 +139,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry"
       ],
@@ -148,7 +174,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data"
       ],
@@ -183,7 +209,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work"
       ],
@@ -218,7 +244,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data"
       ],
@@ -239,7 +265,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_models_and_runtime_keep_their_bytes"
       ]
@@ -259,7 +285,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn3_normal_start_does_not_enumerate_or_modify_stores"
       ]
@@ -268,22 +294,20 @@ also run before and after, with their assertions unchanged. No acceptance is wri
       "items": [
         "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
       ],
-      "class": "New",
-      "behaviour": "Removing a top-level native-bin symlink never traverses the external target or its runtime directory.",
+      "class": "Adaptation",
+      "moved": [
+        "rename"
+      ],
+      "whatMoved": "Explicit owner-directed adaptation: rename rs7_native_bin_link_is_removed_without_traversing_its_target to rs7_native_bin_link_is_kept_without_traversing_its_target and change the link-entry expectation from deleted to preserved. The owner decision supersedes the old oracle; the external runtime and sentinel preservation assertions, filesystem setup and reset call are unchanged. This is an oracle change, classified Adaptation as explicitly required by the continuation brief. New parent-link/receipt regression coverage below separately supplies assertion fail-before evidence against 97dc55c62.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
           "scenario": "RS7",
-          "quote": "Nothing outside the app's data folder is touched: not the user's indexed files, not folders the user picked, not other applications. A link or junction inside the data folder is removed as a link; its target is untouched.",
+          "quote": "Decision (orchestrator): a link or junction anywhere on the path to a kept item (for example native-bin itself, not only native-bin/llama-server or models) is kept as it is: never deleted, never traversed. What sits behind it is outside the data folder, so the reset neither deletes it nor counts it as remaining; the receipt names it as kept (a link to a folder outside the app data) so the outcome stays honest.",
           "label": "agent-drafted, owner-adopted"
         }
-      ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
-      "newChecks": [
-        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_native_bin_link_is_removed_without_traversing_its_target"
-      ],
-      "repaired": true
+      ]
     },
     {
       "items": [
@@ -300,7 +324,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_nested_links_leave_indexed_files_and_other_applications_untouched"
       ]
@@ -334,7 +358,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart"
       ],
@@ -362,7 +386,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/ui-web/src/boot/factoryReset.test.ts#RS4 incomplete reset blocks API discovery and offers retry with each remaining path"
       ],
@@ -397,7 +421,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/ui-web/src/boot/factoryReset.test.ts#RS5 Cancel reset keeps remaining data and restarts without opening ordinary stores"
       ],
@@ -418,7 +442,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/ui-web/src/boot/factoryReset.test.ts#RS6 clears drafts, recents, titles and per-window pointers before acknowledging cleanup"
       ],
@@ -439,7 +463,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/ui-web/src/boot/factoryReset.test.ts#RS6 a storage-cleanup failure stays visible and is never acknowledged as complete"
       ],
@@ -467,7 +491,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/ui-web/src/boot/factoryReset.test.ts#RS4 completion is announced on the first screen and dismissed only by Continue"
       ],
@@ -495,7 +519,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/ui-web/src/boot/factoryReset.test.ts#RS5 an unavailable reset-status channel blocks startup with a visible error"
       ],
@@ -516,7 +540,7 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-shell-recheck.json",
       "newChecks": [
         "modules/ui-web/src/boot/factoryReset.test.ts#RN3 no pending reset preserves window storage and resolves the backend normally"
       ]
@@ -679,6 +703,100 @@ also run before and after, with their assertions unchanged. No acceptance is wri
           "label": "agent-drafted, owner-adopted"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/boot/boot-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The real production boot and SES lockdown mount reset/recovery/normal/debug surfaces on cold starts and actual page reloads. Reset completion Continue, status error Try again, Engine recovery Retry, supervisor recovery and backend-restart events all reload to a mounted surface; incomplete reset and storage cleanup block normal UI/API discovery.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RS4",
+          "quote": "Repair the defect at its cause: the boot order must not depend on timing between the lockdown and the reset gate's await. Keep the reset gate's guarantee that no normal UI or backend starts before the reset state is known. Find every reload and start path that goes through this boot (the verifier lists the ones it saw) and prove each mounts.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RN3",
+          "quote": "A normal start with no pending reset deletes nothing and starts as quickly as before.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-boot-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/boot/boot-lockdown.test.ts#RS4 reset Continue and Try again reload into a mounted app under real lockdown",
+        "modules/ui-web/src/boot/boot-lockdown.test.ts#RN3 Engine recovery Retry and both desktop event reloads mount under real lockdown",
+        "modules/ui-web/src/boot/boot-lockdown.test.ts#RS4 incomplete and storage-cleanup starts stay gated under real lockdown",
+        "modules/ui-web/src/boot/boot-lockdown.test.ts#RN3 normal desktop and browser starts and debug routes mount after lockdown"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "Kept models and native-bin/llama-server links retain their original directory entries and targets while authored stores are removed. Unix also covers dangling links; the Windows junction branch requires Windows execution.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RN1",
+          "quote": "Decision (orchestrator): a kept path (models, native-bin/llama-server) that is itself a link or junction is kept as it is: never deleted, never traversed. Today the candidate removes it, which cuts the app off from the runtime (verifier case p5). Add a check.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-boot-repair.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "A linked native-bin parent is preserved without traversing it, its contents are outside reset scope rather than remaining app data, and its kept-link receipt survives storage completion and restart.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RN1",
+          "quote": "Decision (orchestrator): a link or junction anywhere on the path to a kept item (for example native-bin itself, not only native-bin/llama-server or models) is kept as it is: never deleted, never traversed. What sits behind it is outside the data folder, so the reset neither deletes it nor counts it as remaining; the receipt names it as kept (a link to a folder outside the app data) so the outcome stays honest.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-boot-repair.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/boot/factoryReset.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Incomplete and complete reset receipts visibly identify kept native-bin and models links as links to folders outside app data, separately from failures; backend discovery remains blocked.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RN1",
+          "quote": "Decision (orchestrator): a link or junction anywhere on the path to a kept item (for example native-bin itself, not only native-bin/llama-server or models) is kept as it is: never deleted, never traversed. What sits behind it is outside the data folder, so the reset neither deletes it nor counts it as remaining; the receipt names it as kept (a link to a folder outside the app data) so the outcome stays honest.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-boot-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/boot/factoryReset.test.ts#RN1 the receipt names kept links outside app data separately from failures"
+      ],
+      "repaired": true
     }
   ]
 }

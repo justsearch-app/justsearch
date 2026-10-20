@@ -26,6 +26,9 @@ pub(crate) struct Failure {
 pub(crate) struct Status {
     pub phase: Phase,
     pub remaining: Vec<Failure>,
+    // Old pending-reset markers predate link receipts.
+    #[serde(default)]
+    pub kept_links: Vec<String>,
 }
 
 impl Status {
@@ -33,12 +36,14 @@ impl Status {
         Self {
             phase,
             remaining: vec![],
+            kept_links: vec![],
         }
     }
     fn failed(path: &Path, error: impl ToString) -> Self {
         Self {
             phase: Phase::Incomplete,
             remaining: vec![failure(path, error)],
+            kept_links: vec![],
         }
     }
     pub(crate) fn blocks_backend(&self) -> bool {
@@ -196,7 +201,13 @@ fn remove_entry(path: &Path, metadata: &fs::Metadata) -> std::io::Result<()> {
     }
 }
 
-fn visit(dir: &Path, native_bin: bool, remove: bool, failures: &mut Vec<Failure>) {
+fn visit(
+    dir: &Path,
+    native_bin: bool,
+    remove: bool,
+    failures: &mut Vec<Failure>,
+    kept_links: &mut Vec<String>,
+) {
     let entries = match fs::read_dir(dir) {
         Ok(value) => value,
         Err(e) => {
@@ -225,12 +236,20 @@ fn visit(dir: &Path, native_bin: bool, remove: bool, failures: &mut Vec<Failure>
                 continue;
             }
         };
-        if metadata.is_dir() && !is_link(&metadata) {
-            if (native_bin && name == "llama-server") || (!native_bin && name == "models") {
-                continue;
+        // Kept assets retain their directory entry even when it is a link or
+        // junction. Never traverse their targets, including during verification.
+        if ((metadata.is_dir() || is_link(&metadata))
+            && ((native_bin && name == "llama-server") || (!native_bin && name == "models")))
+            || (!native_bin && name == "native-bin" && is_link(&metadata))
+        {
+            if remove && is_link(&metadata) {
+                kept_links.push(path.to_string_lossy().into_owned());
             }
+            continue;
+        }
+        if metadata.is_dir() && !is_link(&metadata) {
             if !native_bin && name == "native-bin" {
-                visit(&path, true, remove, failures);
+                visit(&path, true, remove, failures, kept_links);
                 if remove {
                     if let Err(e) = sync_directory(&path) {
                         failures.push(failure(&path, e));
@@ -265,8 +284,20 @@ pub(crate) fn run_pending(dir: &Path, cleanup: impl FnOnce() -> Result<(), Strin
     if let Err(e) = cleanup() {
         result.remaining.push(failure(&dir.join("runtime"), e));
     } else {
-        visit(dir, false, true, &mut result.remaining);
-        visit(dir, false, false, &mut result.remaining);
+        visit(
+            dir,
+            false,
+            true,
+            &mut result.remaining,
+            &mut result.kept_links,
+        );
+        visit(
+            dir,
+            false,
+            false,
+            &mut result.remaining,
+            &mut result.kept_links,
+        );
     }
     if !result.remaining.is_empty() {
         result.phase = Phase::Incomplete;
@@ -279,10 +310,12 @@ pub(crate) fn run_pending(dir: &Path, cleanup: impl FnOnce() -> Result<(), Strin
 }
 
 pub(crate) fn storage_cleared(dir: &Path) -> Result<(), String> {
-    if load(dir)?.phase != Phase::AwaitingStorage {
+    let mut status = load(dir)?;
+    if status.phase != Phase::AwaitingStorage {
         return Err("Reset is not awaiting window storage cleanup".into());
     }
-    save(dir, &Status::new(Phase::Complete))
+    status.phase = Phase::Complete;
+    save(dir, &status)
 }
 
 fn clear_marker(dir: &Path) -> Result<(), String> {
@@ -503,6 +536,64 @@ mod tests {
         assert!(!dir.path().join("native-bin/tesseract").exists());
     }
 
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn rn1_kept_links_are_retained_without_traversing_targets() {
+        let external = temp();
+        seed(external.path(), "model.gguf", b"kept model");
+        seed(external.path(), "runtime", b"kept runtime");
+        seed(external.path(), "other-app/sentinel", b"untouched");
+        // Include dangling symlinks on Unix. Junction creation needs a real target.
+        let targets = [
+            Some(external.path().to_path_buf()),
+            cfg!(unix).then(|| external.path().join("missing")),
+        ];
+        for target in targets.into_iter().flatten() {
+            let dir = temp();
+            fs::create_dir_all(dir.path().join("native-bin")).unwrap();
+            let links = ["models", "native-bin/llama-server"].map(|name| {
+                let link = dir.path().join(name);
+                #[cfg(unix)]
+                std::os::unix::fs::symlink(&target, &link).unwrap();
+                #[cfg(windows)]
+                {
+                    let result = std::process::Command::new("cmd")
+                        .args(["/C", "mklink", "/J"])
+                        .arg(&link)
+                        .arg(&target)
+                        .output()
+                        .unwrap();
+                    assert!(
+                        result.status.success(),
+                        "junction creation failed: {result:?}"
+                    );
+                }
+                // Preserve the platform's original link representation, including
+                // the verbatim path prefix returned for Windows junctions.
+                (name, fs::read_link(link).unwrap())
+            });
+            seed(dir.path(), "conversations/private", b"delete");
+            request(dir.path()).unwrap();
+            let status = run_pending(dir.path(), || Ok(()));
+            for (name, original) in links {
+                assert_eq!(
+                    fs::read_link(dir.path().join(name)).ok(),
+                    Some(original),
+                    "kept link must remain as it is: {name}"
+                );
+            }
+            assert_eq!(status.phase, Phase::AwaitingStorage);
+            assert!(!dir.path().join("conversations").exists());
+            for (name, bytes) in [
+                ("model.gguf", b"kept model".as_slice()),
+                ("runtime", b"kept runtime".as_slice()),
+                ("other-app/sentinel", b"untouched".as_slice()),
+            ] {
+                assert_eq!(fs::read(external.path().join(name)).unwrap(), bytes);
+            }
+        }
+    }
+
     #[test]
     fn rn3_normal_start_does_not_enumerate_or_modify_stores() {
         let dir = temp();
@@ -525,7 +616,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn rs7_native_bin_link_is_removed_without_traversing_its_target() {
+    fn rs7_native_bin_link_is_kept_without_traversing_its_target() {
         let dir = temp();
         let external = temp();
         seed(external.path(), "other-app/sentinel", b"untouched");
@@ -544,7 +635,72 @@ mod tests {
             fs::read(external.path().join("llama-server/runtime")).unwrap(),
             b"external runtime"
         );
-        assert!(fs::symlink_metadata(dir.path().join("native-bin")).is_err());
+        assert_eq!(
+            fs::read_link(dir.path().join("native-bin")).ok(),
+            Some(external.path().to_path_buf()),
+            "a link on the path to a kept runtime must remain as it is"
+        );
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn rn1_kept_parent_link_is_reported_through_storage_completion_and_restart() {
+        let external = temp();
+        seed(external.path(), "llama-server/runtime", b"runtime");
+        seed(external.path(), "other-app/sentinel", b"untouched");
+        let dir = temp();
+        let link = dir.path().join("native-bin");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(external.path(), &link).unwrap();
+        #[cfg(windows)]
+        {
+            let result = std::process::Command::new("cmd")
+                .args(["/C", "mklink", "/J"])
+                .arg(&link)
+                .arg(external.path())
+                .output()
+                .unwrap();
+            assert!(
+                result.status.success(),
+                "junction creation failed: {result:?}"
+            );
+        }
+        let original = fs::read_link(&link).unwrap();
+        seed(dir.path(), "conversations/private", b"delete");
+        request(dir.path()).unwrap();
+        let status = run_pending(dir.path(), || Ok(()));
+        assert_eq!(
+            fs::read_link(&link).ok(),
+            Some(original),
+            "a linked parent of a kept asset must remain as it is"
+        );
+        assert_eq!(status.phase, Phase::AwaitingStorage);
+        assert!(
+            status.remaining.is_empty(),
+            "external contents are not remaining app data"
+        );
+        assert!(!dir.path().join("conversations").exists());
+        let expected = serde_json::json!([link.to_string_lossy()]);
+        assert_eq!(
+            serde_json::to_value(&status).unwrap()["kept_links"],
+            expected
+        );
+        storage_cleared(dir.path()).unwrap();
+        let restarted = run_pending(dir.path(), || panic!("a receipt must not repeat deletion"));
+        assert_eq!(restarted.phase, Phase::Complete);
+        assert!(restarted.remaining.is_empty());
+        assert_eq!(
+            serde_json::to_value(restarted).unwrap()["kept_links"],
+            expected
+        );
+        assert_eq!(
+            fs::read(external.path().join("llama-server/runtime")).unwrap(),
+            b"runtime"
+        );
+        assert_eq!(
+            fs::read(external.path().join("other-app/sentinel")).unwrap(),
+            b"untouched"
+        );
     }
 
     #[cfg(unix)]
