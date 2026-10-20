@@ -90,3 +90,14 @@ Baseline signature preservation is also run on the unchanged production sources 
   "note": "Sources and fail-before reproduced (no-op initializer: No provider set -> assertion); delegation quote taken from brief; child-name vacuity noted in report"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "95ce653e-7b14-4df7-a4ee-2f112179ce76",
+  "verdict": "accept",
+  "digest": "sha256:10f3850a986cdfebc2ad71f33307cd89ba8ec0314398a404d44fe545c4905add",
+  "note": "Helper now fails an unmatched child name (0 tests) and a no-op TLS install in lib and conformance; a name of another existing test still passes vacuously"
+}
+```
