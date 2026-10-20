@@ -533,6 +533,12 @@ final class SyncDirectoryOps {
    */
   SyncDirectoryResponse execute(String rootPath, boolean force,
       JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled) {
+    return execute(rootPath, force, provenance, cancelled, null);
+  }
+
+  SyncDirectoryResponse execute(String rootPath, boolean force,
+      JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
+      String collection) {
     if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse("Cancelled");
     Path root = resolveSyncRoot(rootPath);
     if (root == null) {
@@ -573,7 +579,7 @@ final class SyncDirectoryOps {
 
       // STEP 3: Walk disk and find missing files
       SyncWalkPhaseResult walk =
-          walkAndEnqueueMissingFiles(root, force, indexedPaths, provenance, cancelled);
+          walkAndEnqueueMissingFiles(root, force, indexedPaths, provenance, cancelled, collection);
       filesAdded = walk.filesAdded();
 
       if (cancelled.getAsBoolean()) {
@@ -700,8 +706,8 @@ final class SyncDirectoryOps {
   @SuppressWarnings("PMD.CognitiveComplexity")
   private SyncWalkPhaseResult walkAndEnqueueMissingFiles(
       Path root, boolean force, Set<String> indexedPaths,
-      JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled)
-      throws IOException {
+      JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled,
+      String collection) throws IOException {
     // Preserve globally deterministic enqueue order without retaining the root in shared heap.
     // The spool maintains its ordering index on disk while the walk streams one path at a time.
     try (var spool = new ReconciliationSpool()) {
@@ -794,7 +800,8 @@ final class SyncDirectoryOps {
                 .filter(entry -> !IngestionSkipPolicy.shouldSkipWithinRoot(entry.path(), root))
                 .map(entry -> entry.withinRoot(root))
                 .toList();
-            return admitted.isEmpty() ? 0 : jobQueue.enqueueEntries(admitted);
+            return admitted.isEmpty() ? 0 : collection == null
+                ? jobQueue.enqueueEntries(admitted) : jobQueue.enqueueEntries(admitted, collection);
           });
       walkInterrupted[0] |= Thread.currentThread().isInterrupted();
       if (!walkInterrupted[0] && !cancelled.getAsBoolean() && filesAdded > 0) {

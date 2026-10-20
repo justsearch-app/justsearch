@@ -293,7 +293,6 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     private void delete(String path) {
       try (RoutedTarget routed = acquireTarget()) {
         Target selected = routed.target();
-        if (selected.runtime() == null) return;
         deleteAt(selected, path);
       }
     }
@@ -303,14 +302,15 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         String path) {
       try (RoutedTarget routed = acquireTarget()) {
         Target selected = routed.target();
-        if (selected.runtime() == null) return;
         deleteAt(selected, witness, path);
       }
     }
 
     private static void deleteAt(Target selected, String path) {
       selected.ingest().acceptWatcherDelete(path, () -> {
-        if (!selected.runtime().isAcceptingWrites()) return;
+        if (selected.runtime() == null || !selected.runtime().isAcceptingWrites()) {
+          throw new IllegalStateException("Watcher deletion lost its writable runtime");
+        }
         selected.runtime().indexingCoordinator().deleteByIdAndChunks(path);
         selected.deletionMarker().markIfAbsent(path);
       });
@@ -321,7 +321,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         io.justsearch.indexerworker.services.RootWatcherRegistry.Subscription witness,
         String path) {
       selected.ingest().acceptWatcherDelete(witness, path, () -> {
-        if (!selected.runtime().isAcceptingWrites()) return;
+        if (selected.runtime() == null || !selected.runtime().isAcceptingWrites()) {
+          throw new IllegalStateException("Watcher deletion lost its writable runtime");
+        }
         selected.runtime().indexingCoordinator().deleteByIdAndChunks(path);
         selected.deletionMarker().markIfAbsent(path);
       });
@@ -1267,6 +1269,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void startIndexingLoop() {
+    ingestService.reconcilePendingWatcherRoots();
     if (indexingLoop != null) {
       indexingLoop.start();
     }

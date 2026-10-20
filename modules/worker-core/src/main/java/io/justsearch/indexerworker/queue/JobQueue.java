@@ -565,6 +565,11 @@ public interface JobQueue extends Closeable {
     return enqueueEntries(entries, null);
   }
 
+  /** Ensures recreated-file work exists without replacing an already pending/issued revision. */
+  default boolean enqueueReappearedFile(EnqueueEntry entry, String collection) {
+    throw new UnsupportedOperationException("Recreated-file admission is unavailable");
+  }
+
   /**
    * Outcome of {@link #reenqueue(EnqueueEntry)} (tempdoc 885 §UD open item 1).
    *

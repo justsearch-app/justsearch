@@ -3450,6 +3450,9 @@ public final class KnowledgeServer implements Closeable {
    * registered wrapper — see {@code EngineKnowledgeClient}, which holds a supplier for exactly this
    * reason. Mirrors {@code DevReloadManager.performReload}'s swap.
    */
+  // A failed opener/reconstruction must not discard the retiring watcher's root authority.
+  private io.justsearch.indexerworker.services.WorkerIngestService reloadRootAuthority;
+
   private void reconstructAppServicesAfterDeferredUpgrade() {
     log.info("Reconstructing appServices after DeferredRuntime.prepareWriterUpgrade()");
     closePendingAppServices();
@@ -3464,9 +3467,13 @@ public final class KnowledgeServer implements Closeable {
       }
       if (oldServices != null) oldServices.close();
       this.appServices = null; // The incumbent has actually closed; callers see unavailability.
+      if (reloadRootAuthority != null) {
+        newServices.ingestService().reconcileReloadedWatcherRootsFrom(reloadRootAuthority);
+      }
       newServices.startIndexingLoop();
       publishServingView(newServices);
       pendingAppServices = null;
+      reloadRootAuthority = null;
     } catch (Exception | Error failure) {
       try { closePendingAppServices(); }
       catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
@@ -3609,6 +3616,9 @@ public final class KnowledgeServer implements Closeable {
         throw new IllegalStateException("Runtime reload retains active serving holders", refusal);
       }
       long startNanos = System.nanoTime();
+      if (reloadRootAuthority == null && appServices instanceof DefaultWorkerAppServices current) {
+        reloadRootAuthority = current.ingestService();
+      }
       LuceneRuntime old = this.ingestLifecycle;
       if (old instanceof RunningRuntime running) {
         running.drainAndClose(drainTimeout, reason);

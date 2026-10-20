@@ -700,7 +700,7 @@
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
       "format": "SQLite WAL schema v22",
-      "currentVersion": 22,
+      "currentVersion": 23,
       "readableLegacyVersions": [
         0,
         1,

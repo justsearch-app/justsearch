@@ -1297,6 +1297,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           if ("DELETE_COLLECTION".equals(op)) {
             deletedCollections.add(payload);
           } else if (("path:" + path).equals(row.getString("key"))) {
+            if ("DELETE".equals(op)) {
+              // The enumerator already read these source bytes. Only an explicit deletion may
+              // suppress that observed recreation; watcher and originless receipts are conditional.
+              if (SwitchBufferDelete.decode(payload).origin() == SwitchBufferDelete.Origin.EXPLICIT) return true;
+              continue;
+            }
             if (!"UPSERT".equals(op)) return true;
             var prior = SwitchBufferUpsert.decode(payload);
             if ((prior.provenance() == null
@@ -3486,6 +3492,32 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     } catch (SQLException e) {
       log.error("Failed to count jobs by path prefix: {}", pathPrefix, e);
       return new JobQueue.JobStateCounts(0L, 0L, 0L, 0L, 0L);
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
+  @Override
+  public boolean enqueueReappearedFile(JobQueue.EnqueueEntry entry, String collection) {
+    lock.lock();
+    try {
+      ensureOpen();
+      String path = PathNormalizer.normalizePath(entry.path().toAbsolutePath().toString());
+      return inTransaction(() -> {
+        try (PreparedStatement query = connection.prepareStatement(
+            "SELECT state FROM jobs WHERE path = ?")) {
+          query.setString(1, path);
+          try (ResultSet row = query.executeQuery()) {
+            if (row.next() && ("PENDING".equals(row.getString(1))
+                || "PROCESSING".equals(row.getString(1)))) return true;
+          }
+        }
+        return enqueueEntriesInTransaction(List.of(entry), collection, null,
+            System.currentTimeMillis(), false) == 1;
+      });
+    } catch (SQLException failure) {
+      log.warn("Cannot admit recreated file {}", entry.path(), failure);
+      return false;
     } finally {
       unlockAfterChanges();
     }

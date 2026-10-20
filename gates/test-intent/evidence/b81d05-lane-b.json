@@ -1,0 +1,503 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T15:22:24.296Z",
+  "revision": "f6a14b5a66e7b879c711ef9ca54280723de2c242",
+  "tree": "5addc91f261bb5a29e3c50af0e8a9fbccd6e29b6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.recreatedBeforeSwitchingAdmissionPreservesExactUpsertReceipt\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.legacyDeleteOfRecreatedFilePreservesRowsAndQueuedRevisionAfterReopen\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.watcherReplayDeletesOnlyExactAbsentFileAndRetiresItsReceipt\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.unavailableRootRetainsLegacyRowsAndExactReceipt\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.promotedPointerRecoverySkipsRecreatedLegacyFile\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.drainedRuntimeRetainsDeleteUntilSuccessorReconcilesRoot\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.watcherReceiptPreservesRecreationAcrossEveryReplayRoute\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.recreationAfterFinalAbsenceProbeKeepsNewerQueuedRevision\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.reloadReconciliationKeepsCollectionAndConsecutiveDeletes\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.removedRootNeverRevivesDuringReloadReconciliation\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.versionedWatcherReceiptSurvivesReopenWithoutLosingRecreation\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.linuxUnreadableRootKeepsExactDeleteReceiptAndRows\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.linuxUnreadableSourceKeepsRowsAndRefreshWork\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.watcherReceiptRejectsReboundDirectoryIncarnation\" --tests \"io.justsearch.indexerworker.queue.JobQueueMigrationTest.migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteCrashRecoveryTest.recreatedSourceAndNewerQueueRevisionSurviveProcessDeath\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteCrashRecoveryTest.reloadDebtSurvivesProcessDeathBeforeReconciliation\" --tests \"io.justsearch.indexerworker.server.WatcherReloadRetryTest.failedOpenerThenFailedReconstructionRetainsDeleteUntilRetry\" --tests \"io.justsearch.indexerworker.queue.WatcherJournalFormatTest.populatedLegacyDatabasePreservesReceiptsAndRequiresNewReaderAfterUpgrade\" --tests \"io.justsearch.indexerworker.queue.WatcherJournalFormatTest.baselineEnumerationCannotSuppressARecreatedLegacyWatcherFile\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17306
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#recreatedBeforeSwitchingAdmissionPreservesExactUpsertReceipt",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recreatedBeforeSwitchingAdmissionPreservesExactUpsertReceipt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#legacyDeleteOfRecreatedFilePreservesRowsAndQueuedRevisionAfterReopen",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacyDeleteOfRecreatedFilePreservesRowsAndQueuedRevisionAfterReopen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#watcherReplayDeletesOnlyExactAbsentFileAndRetiresItsReceipt",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "watcherReplayDeletesOnlyExactAbsentFileAndRetiresItsReceipt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#unavailableRootRetainsLegacyRowsAndExactReceipt",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unavailableRootRetainsLegacyRowsAndExactReceipt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#promotedPointerRecoverySkipsRecreatedLegacyFile",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "promotedPointerRecoverySkipsRecreatedLegacyFile()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#drainedRuntimeRetainsDeleteUntilSuccessorReconcilesRoot",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "drainedRuntimeRetainsDeleteUntilSuccessorReconcilesRoot()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#watcherReceiptPreservesRecreationAcrossEveryReplayRoute",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "watcherReceiptPreservesRecreationAcrossEveryReplayRoute(ordinary)",
+          "status": "passed"
+        },
+        {
+          "name": "watcherReceiptPreservesRecreationAcrossEveryReplayRoute(refusal)",
+          "status": "passed"
+        },
+        {
+          "name": "watcherReceiptPreservesRecreationAcrossEveryReplayRoute(promoted)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute(ordinary)",
+          "status": "passed"
+        },
+        {
+          "name": "watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute(refusal)",
+          "status": "passed"
+        },
+        {
+          "name": "watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute(promoted)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#recreationAfterFinalAbsenceProbeKeepsNewerQueuedRevision",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recreationAfterFinalAbsenceProbeKeepsNewerQueuedRevision()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#reloadReconciliationKeepsCollectionAndConsecutiveDeletes",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reloadReconciliationKeepsCollectionAndConsecutiveDeletes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#removedRootNeverRevivesDuringReloadReconciliation",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "removedRootNeverRevivesDuringReloadReconciliation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#versionedWatcherReceiptSurvivesReopenWithoutLosingRecreation",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "versionedWatcherReceiptSurvivesReopenWithoutLosingRecreation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#linuxUnreadableRootKeepsExactDeleteReceiptAndRows",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linuxUnreadableRootKeepsExactDeleteReceiptAndRows()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#linuxUnreadableSourceKeepsRowsAndRefreshWork",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linuxUnreadableSourceKeepsRowsAndRefreshWork()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#watcherReceiptRejectsReboundDirectoryIncarnation",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6267abf6f2df650767be05b618921375bfbb3cb25879f638bdfc471b6aca3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "watcherReceiptRejectsReboundDirectoryIncarnation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java#migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:972dfa681f619f2472e7c0821a6b0abbd8be28d5492086ec9e56fb0d5d1f4471",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteCrashRecoveryTest.java#recreatedSourceAndNewerQueueRevisionSurviveProcessDeath",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteCrashRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:109d9068cab4ac96ce55075d3d273f62f61144f6da184870866ac4cb30777e8a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(buffered)",
+          "status": "passed"
+        },
+        {
+          "name": "recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(lucene-delete)",
+          "status": "passed"
+        },
+        {
+          "name": "recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(commit)",
+          "status": "passed"
+        },
+        {
+          "name": "recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(before-cleanup)",
+          "status": "passed"
+        },
+        {
+          "name": "recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(after-cleanup)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteCrashRecoveryTest.java#reloadDebtSurvivesProcessDeathBeforeReconciliation",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteCrashRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:109d9068cab4ac96ce55075d3d273f62f61144f6da184870866ac4cb30777e8a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reloadDebtSurvivesProcessDeathBeforeReconciliation(reload-debt)",
+          "status": "passed"
+        },
+        {
+          "name": "reloadDebtSurvivesProcessDeathBeforeReconciliation(reload-during-reconcile)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/WatcherReloadRetryTest.java#failedOpenerThenFailedReconstructionRetainsDeleteUntilRetry",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/WatcherReloadRetryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7f672325a4b2e3c5b9193cbaa0e1290a7a23ebf5dfe6445901481480c8ea886d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedOpenerThenFailedReconstructionRetainsDeleteUntilRetry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/WatcherJournalFormatTest.java#populatedLegacyDatabasePreservesReceiptsAndRequiresNewReaderAfterUpgrade",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/WatcherJournalFormatTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:97ebbe781c81fe7d0001b98d0eacad3ee53825b8486ebfcd924ba00f665cd76c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "populatedLegacyDatabasePreservesReceiptsAndRequiresNewReaderAfterUpgrade()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/WatcherJournalFormatTest.java#baselineEnumerationCannotSuppressARecreatedLegacyWatcherFile",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/WatcherJournalFormatTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:97ebbe781c81fe7d0001b98d0eacad3ee53825b8486ebfcd924ba00f665cd76c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "baselineEnumerationCannotSuppressARecreatedLegacyWatcherFile()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f6a14b5a66e7b879c711ef9ca54280723de2c242",
+    "revision": "f6a14b5a66e7b879c711ef9ca54280723de2c242",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.recreatedBeforeSwitchingAdmissionPreservesExactUpsertReceipt\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.legacyDeleteOfRecreatedFilePreservesRowsAndQueuedRevisionAfterReopen\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.watcherReplayDeletesOnlyExactAbsentFileAndRetiresItsReceipt\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.unavailableRootRetainsLegacyRowsAndExactReceipt\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.promotedPointerRecoverySkipsRecreatedLegacyFile\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.drainedRuntimeRetainsDeleteUntilSuccessorReconcilesRoot\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.watcherReceiptPreservesRecreationAcrossEveryReplayRoute\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.recreationAfterFinalAbsenceProbeKeepsNewerQueuedRevision\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.reloadReconciliationKeepsCollectionAndConsecutiveDeletes\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.removedRootNeverRevivesDuringReloadReconciliation\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.versionedWatcherReceiptSurvivesReopenWithoutLosingRecreation\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.linuxUnreadableRootKeepsExactDeleteReceiptAndRows\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.linuxUnreadableSourceKeepsRowsAndRefreshWork\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.watcherReceiptRejectsReboundDirectoryIncarnation\" --tests \"io.justsearch.indexerworker.queue.JobQueueMigrationTest.migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteCrashRecoveryTest.recreatedSourceAndNewerQueueRevisionSurviveProcessDeath\" --tests \"io.justsearch.indexerworker.services.WatcherDeleteCrashRecoveryTest.reloadDebtSurvivesProcessDeathBeforeReconciliation\" --tests \"io.justsearch.indexerworker.server.WatcherReloadRetryTest.failedOpenerThenFailedReconstructionRetainsDeleteUntilRetry\" --tests \"io.justsearch.indexerworker.queue.WatcherJournalFormatTest.populatedLegacyDatabasePreservesReceiptsAndRequiresNewReaderAfterUpgrade\" --tests \"io.justsearch.indexerworker.queue.WatcherJournalFormatTest.baselineEnumerationCannotSuppressARecreatedLegacyWatcherFile\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 27436,
+        "output": "Calculating task graph as no cached configuration is available for tasks: :modules:indexer-worker:test --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.recreatedBeforeSwitchingAdmissionPreservesExactUpsertReceipt --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.legacyDeleteOfRecreatedFilePreservesRowsAndQueuedRevisionAfterReopen --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.watcherReplayDeletesOnlyExactAbsentFileAndRetiresItsReceipt --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.unavailableRootRetainsLegacyRowsAndExactReceipt --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.promotedPointerRecoverySkipsRecreatedLegacyFile --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.drainedRuntimeRetainsDeleteUntilSuccessorReconcilesRoot --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.watcherReceiptPreservesRecreationAcrossEveryReplayRoute --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.recreationAfterFinalAbsenceProbeKeepsNewerQueuedRevision --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.reloadReconciliationKeepsCollectionAndConsecutiveDeletes --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.removedRootNeverRevivesDuringReloadReconciliation --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.versionedWatcherReceiptSurvivesReopenWithoutLosingRecreation --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.linuxUnreadableRootKeepsExactDeleteReceiptAndRows --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.linuxUnreadableSourceKeepsRowsAndRefreshWork --tests io.justsearch.indexerworker.services.WatcherDeleteSafetyTest.watcherReceiptRejectsReboundDirectoryIncarnation --tests io.justsearch.indexerworker.queue.JobQueueMigrationTest.migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion --tests io.justsearch.indexerworker.services.WatcherDeleteCrashRecoveryTest.recreatedSourceAndNewerQueueRevisionSurviveProcessDeath --tests io.justsearch.indexerworker.services.WatcherDeleteCrashRecoveryTest.reloadDebtSurvivesProcessDeathBeforeReconciliation --tests io.justsearch.indexerworker.server.WatcherReloadRetryTest.failedOpenerThenFailedReconstructionRetainsDeleteUntilRetry --tests io.justsearch.indexerworker.queue.WatcherJournalFormatTest.populatedLegacyDatabasePreservesReceiptsAndRequiresNewReaderAfterUpgrade --tests io.justsearch.indexerworker.queue.WatcherJournalFormatTest.baselineEnumerationCannotSuppressARecreatedLegacyWatcherFile --rerun\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :build-logic:compileKotlin FROM-CACHE\n> Task :build-logic:compileJava NO-SOURCE\n> Task :build-logic:pluginDescriptors\n> Task :build-logic:processResources\n> Task :build-logic:classes\n> Task :build-logic:jar\n\n> Configure project :\nThe com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.\nThe 'val name by creating { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = create(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:180)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:adapters-lucene\nThe Configuration.setVisible(boolean) method has been deprecated. This is scheduled to be removed in Gradle 11. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#deprecate-visible-property\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:48)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:88)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ai-backend\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:27)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:40)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:22)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:39)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:141)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api-tck\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:34)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-config\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:15)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-engine\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:86)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-inference\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:31)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-launcher\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$12$1.execute(build.gradle.kts:189)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-observability\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:59)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:103)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-util\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:17)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:dead-code-audit\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:58)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:gpu-bridge\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:16)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexer-worker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:137)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexing\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:52)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:infra-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:24)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ort-common\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:prompt-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:18)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:reranker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ssot-tools\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:system-tests\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:119)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:123)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:131)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:telemetry\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:42)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:test-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$8$1.execute(build.gradle.kts:377)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ui\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:94)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:196)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:217)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:225)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:240)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:265)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:314)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:345)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:366)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:471)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:488)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:543)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:625)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:690)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:741)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:839)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:880)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:953)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:972)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1036)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1082)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1148)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1203)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1269)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1356)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1417)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1541)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1566)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:191)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:extension-substrate:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:extractProto\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos\n> Task :modules:core-contracts:compileJava FROM-CACHE\n> Task :modules:configuration:processResources\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:api-contract-projection-java:processProtoResources\n> Task :modules:core:compileJava FROM-CACHE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:api-contract-projection-java:processResources\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:ipc-common:extractProto\n> Task :modules:api-contract-projection-java:extractIncludeProto\n> Task :modules:configuration:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:generateProto FROM-CACHE\n> Task :modules:app-api:buildLinuxBoundExec\n> Task :modules:indexing:compileJava FROM-CACHE\n> Task :modules:telemetry:compileJava FROM-CACHE\n> Task :modules:indexer-worker:processResources NO-SOURCE\n> Task :modules:adapters-lucene:syncSsotCatalogs\n> Task :modules:app-api:processResources\n> Task :modules:adapters-lucene:processResources\n> Task :modules:core:compileTestFixturesJava FROM-CACHE\n> Task :modules:adapters-lucene:processTestFixturesResources NO-SOURCE\n> Task :modules:ai-backend:processResources\n> Task :modules:app-agent:processResources NO-SOURCE\n> Task :modules:app-config:compileJava FROM-CACHE\n> Task :modules:app-config:processResources NO-SOURCE\n> Task :modules:app-config:classes UP-TO-DATE\n> Task :modules:ort-common:compileJava FROM-CACHE\n> Task :modules:app-config:jar\n> Task :modules:app-agent-api:compileJava FROM-CACHE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:app-inference:processResources NO-SOURCE\n> Task :modules:app-util:compileJava FROM-CACHE\n> Task :modules:adapters-lucene:compileJava FROM-CACHE\n> Task :modules:adapters-lucene:classes\n> Task :modules:infra-core:compileJava FROM-CACHE\n> Task :modules:app-agent-api:jar\n> Task :modules:ipc-common:extractIncludeProto\n> Task :modules:prompt-support:compileJava FROM-CACHE\n> Task :modules:app-observability:processResources\n> Task :modules:adapters-lucene:jar\n> Task :modules:app-services:processResources\n> Task :modules:configuration:classes\n> Task :modules:app-util:processResources NO-SOURCE\n> Task :modules:app-util:classes UP-TO-DATE\n> Task :modules:app-util:jar\n> Task :modules:ipc-common:generateProto FROM-CACHE\n> Task :modules:reranker:compileJava FROM-CACHE\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:configuration:processTestFixturesResources NO-SOURCE\n> Task :modules:configuration:compileTestFixturesJava FROM-CACHE\n> Task :modules:configuration:testFixturesClasses UP-TO-DATE\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:configuration:testFixturesJar\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:core:testFixturesJar\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:extension-substrate:jar\n> Task :modules:core-contracts:jar\n> Task :modules:adapters-lucene:compileTestFixturesJava FROM-CACHE\n> Task :modules:adapters-lucene:testFixturesClasses UP-TO-DATE\n> Task :modules:gpu-bridge:processResources NO-SOURCE\n> Task :modules:configuration:jar\n> Task :modules:core:jar\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:adapters-lucene:testFixturesJar\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:indexer-worker:processTestResources\n> Task :modules:infra-core:processResources NO-SOURCE\n> Task :modules:infra-core:classes UP-TO-DATE\n> Task :modules:ort-common:processResources NO-SOURCE\n> Task :modules:ort-common:classes UP-TO-DATE\n> Task :modules:ort-common:compileTestFixturesJava FROM-CACHE\n> Task :modules:ipc-common:processProtoResources\n> Task :modules:ort-common:processTestFixturesResources NO-SOURCE\n> Task :modules:ort-common:testFixturesClasses UP-TO-DATE\n> Task :modules:indexing:jar\n> Task :modules:prompt-support:processResources NO-SOURCE\n> Task :modules:prompt-support:classes UP-TO-DATE\n> Task :modules:infra-core:jar\n> Task :modules:ipc-common:processResources\n> Task :modules:reranker:processResources NO-SOURCE\n> Task :modules:reranker:classes UP-TO-DATE\n> Task :modules:ort-common:testFixturesJar\n> Task :modules:worker-core:processResources NO-SOURCE\n> Task :modules:worker-services:processResources NO-SOURCE\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:reranker:jar\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:ort-common:jar\n> Task :modules:prompt-support:jar\n> Task :modules:telemetry:jar\n> Task :modules:api-contract-projection-java:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:classes\n> Task :modules:api-contract-projection-java:jar\n> Task :modules:app-api:compileJava FROM-CACHE\n> Task :modules:app-api:classes\n> Task :modules:app-api:jar\n> Task :modules:ai-backend:compileJava FROM-CACHE\n> Task :modules:ai-backend:classes\n> Task :modules:gpu-bridge:compileJava FROM-CACHE\n> Task :modules:gpu-bridge:classes UP-TO-DATE\n> Task :modules:app-agent:compileJava FROM-CACHE\n> Task :modules:app-agent:classes UP-TO-DATE\n> Task :modules:gpu-bridge:jar\n> Task :modules:ai-backend:jar\n> Task :modules:app-agent:jar\n> Task :modules:app-inference:compileJava FROM-CACHE\n> Task :modules:app-inference:classes UP-TO-DATE\n> Task :modules:worker-core:compileJava FROM-CACHE\n> Task :modules:worker-core:classes UP-TO-DATE\n> Task :modules:app-inference:jar\n> Task :modules:worker-core:jar\n> Task :modules:ipc-common:compileJava FROM-CACHE\n> Task :modules:ipc-common:classes\n> Task :modules:ipc-common:jar\n> Task :modules:app-observability:compileJava FROM-CACHE\n> Task :modules:app-observability:classes\n> Task :modules:app-observability:jar\n> Task :modules:worker-services:compileJava FROM-CACHE\n> Task :modules:worker-services:classes UP-TO-DATE\n> Task :modules:worker-services:jar\n> Task :modules:indexer-worker:compileJava FROM-CACHE\n> Task :modules:indexer-worker:classes UP-TO-DATE\n> Task :modules:indexer-worker:jar\n> Task :modules:app-services:compileJava FROM-CACHE\n> Task :modules:app-services:classes\n> Task :modules:app-services:jar\n\n> Task :modules:indexer-worker:compileTestJava\n\n> Task :modules:indexer-worker:testClasses\n\n> Task :modules:indexer-worker:test\n\nJobQueueMigrationTest > migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion() FAILED\n    org.opentest4j.AssertionFailedError at JobQueueMigrationTest.java:994\n\nWatcherJournalFormatTest > populatedLegacyDatabasePreservesReceiptsAndRequiresNewReaderAfterUpgrade() FAILED\n    org.opentest4j.AssertionFailedError at WatcherJournalFormatTest.java:50\n\nWatcherJournalFormatTest > baselineEnumerationCannotSuppressARecreatedLegacyWatcherFile() FAILED\n    org.opentest4j.AssertionFailedError at WatcherJournalFormatTest.java:84\n\n\n> Task :modules:indexer-worker:test\n\nWatcherDeleteCrashRecoveryTest > reloadDebtSurvivesProcessDeathBeforeReconciliation(String) > reloadDebtSurvivesProcessDeathBeforeReconciliation(reload-debt) FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteCrashRecoveryTest.java:82\n\nWatcherReloadRetryTest > failedOpenerThenFailedReconstructionRetainsDeleteUntilRetry() FAILED\n    org.opentest4j.AssertionFailedError at WatcherReloadRetryTest.java:68\n\nWatcherDeleteSafetyTest > unavailableRootRetainsLegacyRowsAndExactReceipt() FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:166\n\nWatcherDeleteSafetyTest > recreatedBeforeSwitchingAdmissionPreservesExactUpsertReceipt() FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:119\n\nWatcherDeleteSafetyTest > removedRootNeverRevivesDuringReloadReconciliation() FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:345\n\nWatcherDeleteSafetyTest > versionedWatcherReceiptSurvivesReopenWithoutLosingRecreation() FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:368\n\nWatcherDeleteSafetyTest > drainedRuntimeRetainsDeleteUntilSuccessorReconcilesRoot() FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:203\n\nWatcherDeleteSafetyTest > recreationAfterFinalAbsenceProbeKeepsNewerQueuedRevision() FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:280\n\nWatcherDeleteSafetyTest > linuxUnreadableRootKeepsExactDeleteReceiptAndRows() FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:382\n\nWatcherDeleteSafetyTest > watcherReceiptPreservesRecreationAcrossEveryReplayRoute(String) > watcherReceiptPreservesRecreationAcrossEveryReplayRoute(ordinary) FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:239\n\nWatcherDeleteSafetyTest > watcherReceiptPreservesRecreationAcrossEveryReplayRoute(String) > watcherReceiptPreservesRecreationAcrossEveryReplayRoute(refusal) FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:239\n\nWatcherDeleteSafetyTest > watcherReceiptPreservesRecreationAcrossEveryReplayRoute(String) > watcherReceiptPreservesRecreationAcrossEveryReplayRoute(promoted) FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:239\n\nWatcherDeleteSafetyTest > watcherReplayDeletesOnlyExactAbsentFileAndRetiresItsReceipt() FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:152\n\nWatcherDeleteSafetyTest > watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute(String) > watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute(ordinary) FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:252\n\nWatcherDeleteSafetyTest > watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute(String) > watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute(refusal) FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:252\n\nWatcherDeleteSafetyTest > watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute(String) > watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute(promoted) FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:252\n\nWatcherDeleteSafetyTest > reloadReconciliationKeepsCollectionAndConsecutiveDeletes() FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:320\n\nWatcherDeleteSafetyTest > watcherReceiptRejectsReboundDirectoryIncarnation() FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:409\n\nWatcherDeleteSafetyTest > legacyDeleteOfRecreatedFilePreservesRowsAndQueuedRevisionAfterReopen() FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:138\n\nWatcherDeleteSafetyTest > promotedPointerRecoverySkipsRecreatedLegacyFile() FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:176\n\nWatcherDeleteSafetyTest > linuxUnreadableSourceKeepsRowsAndRefreshWork() FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteSafetyTest.java:397\n\nWatcherDeleteCrashRecoveryTest > reloadDebtSurvivesProcessDeathBeforeReconciliation(String) > reloadDebtSurvivesProcessDeathBeforeReconciliation(reload-during-reconcile) FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteCrashRecoveryTest.java:137\n\nWatcherDeleteCrashRecoveryTest > recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(String) > recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(buffered) FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteCrashRecoveryTest.java:56\n\nWatcherDeleteCrashRecoveryTest > recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(String) > recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(lucene-delete) FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteCrashRecoveryTest.java:56\n\nWatcherDeleteCrashRecoveryTest > recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(String) > recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(commit) FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteCrashRecoveryTest.java:56\n\nWatcherDeleteCrashRecoveryTest > recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(String) > recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(before-cleanup) FAILED\n    org.opentest4j.AssertionFailedError at WatcherDeleteCrashRecoveryTest.java:56\n\n> Task :modules:indexer-worker:test FAILED\n> Task :modules:indexer-worker:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///tmp/test-intent-before-Zu3GRT/build/reports/problems/problems-report.html\n86 actionable tasks: 53 executed, 33 from cache\nConfiguration cache entry stored.\n\nNote: Some input files use or override a deprecated API.\nNote: Recompile with -Xlint:deprecation for details.\nNote: Some input files use unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\n\n30 tests completed, 29 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:indexer-worker:test'.\n> There were failing tests. See the report at: file:///tmp/test-intent-before-Zu3GRT/modules/indexer-worker/build/reports/tests/test/index.html\n\nBUILD FAILED in 27s\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#recreatedBeforeSwitchingAdmissionPreservesExactUpsertReceipt",
+        "classification": "assertion",
+        "detail": "recreatedBeforeSwitchingAdmissionPreservesExactUpsertReceipt(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: delayed watcher DELETE must not replace the recreated file's exact UPSERT receipt ==> expected: <[SwitchBufferOp[generation=g-test, key=path:/tmp/test-intent-before-Zu3GRT/modules/indexer-worker/build/tmp/test-jvm/test/junit-8054142231878980704/files/recreated.tx"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#legacyDeleteOfRecreatedFilePreservesRowsAndQueuedRevisionAfterReopen",
+        "classification": "assertion",
+        "detail": "legacyDeleteOfRecreatedFilePreservesRowsAndQueuedRevisionAfterReopen(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: originless DELETE cannot remove a recreated file ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#watcherReplayDeletesOnlyExactAbsentFileAndRetiresItsReceipt",
+        "classification": "assertion",
+        "detail": "watcherReplayDeletesOnlyExactAbsentFileAndRetiresItsReceipt(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: versioned watcher receipt must delete the exact absent file ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#unavailableRootRetainsLegacyRowsAndExactReceipt",
+        "classification": "assertion",
+        "detail": "unavailableRootRetainsLegacyRowsAndExactReceipt(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: root uncertainty cannot certify replay ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#promotedPointerRecoverySkipsRecreatedLegacyFile",
+        "classification": "assertion",
+        "detail": "promotedPointerRecoverySkipsRecreatedLegacyFile(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: pointer recovery must use the same recreated-file protection ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#drainedRuntimeRetainsDeleteUntilSuccessorReconcilesRoot",
+        "classification": "assertion",
+        "detail": "drainedRuntimeRetainsDeleteUntilSuccessorReconcilesRoot(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a settled delete needs a durable effect obligation before it is acknowledged ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#watcherReceiptPreservesRecreationAcrossEveryReplayRoute",
+        "classification": "assertion",
+        "detail": "watcherReceiptPreservesRecreationAcrossEveryReplayRoute(ordinary): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <0> | watcherReceiptPreservesRecreationAcrossEveryReplayRoute(refusal): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <0> | watcherReceiptPreservesRecreationAcrossEveryReplayRoute(promoted): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: "
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute",
+        "classification": "assertion",
+        "detail": "watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute(ordinary): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a missing root cannot prove source deletion ==> expected: <false> but was: <true> | watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute(refusal): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a missing root cannot prove source deletion ==> expected: <false> but was: <true> | watcherReceiptRetainsUnavailableRootAcrossEvery"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#recreationAfterFinalAbsenceProbeKeepsNewerQueuedRevision",
+        "classification": "assertion",
+        "detail": "recreationAfterFinalAbsenceProbeKeepsNewerQueuedRevision(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: stale delete cannot remove the recreated file's queued update ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#reloadReconciliationKeepsCollectionAndConsecutiveDeletes",
+        "classification": "assertion",
+        "detail": "reloadReconciliationKeepsCollectionAndConsecutiveDeletes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#removedRootNeverRevivesDuringReloadReconciliation",
+        "classification": "assertion",
+        "detail": "removedRootNeverRevivesDuringReloadReconciliation(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#versionedWatcherReceiptSurvivesReopenWithoutLosingRecreation",
+        "classification": "assertion",
+        "detail": "versionedWatcherReceiptSurvivesReopenWithoutLosingRecreation(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a recreated source needs its refresh retained before receipt cleanup ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#linuxUnreadableRootKeepsExactDeleteReceiptAndRows",
+        "classification": "assertion",
+        "detail": "linuxUnreadableRootKeepsExactDeleteReceiptAndRows(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: unreadable roots cannot prove absence ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#linuxUnreadableSourceKeepsRowsAndRefreshWork",
+        "classification": "assertion",
+        "detail": "linuxUnreadableSourceKeepsRowsAndRefreshWork(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: unreadable source bytes are not deletion authority ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#watcherReceiptRejectsReboundDirectoryIncarnation",
+        "classification": "assertion",
+        "detail": "watcherReceiptRejectsReboundDirectoryIncarnation(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a different directory on the same volume cannot vouch for the original source ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java#migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion",
+        "classification": "assertion",
+        "detail": "migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <23> but was: <22>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteCrashRecoveryTest.java#recreatedSourceAndNewerQueueRevisionSurviveProcessDeath",
+        "classification": "assertion",
+        "detail": "recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(buffered): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: replaying a stale delete must preserve the newer queued source ==> expected: <1> but was: <0> | recreatedSourceAndNewerQueueRevisionSurviveProcessDeath(lucene-delete): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: replaying a stale delete must preserve the newer queued source ==> expected: <1> but was: <0> | recreatedSourceAndNewer"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteCrashRecoveryTest.java#reloadDebtSurvivesProcessDeathBeforeReconciliation",
+        "classification": "assertion",
+        "detail": "reloadDebtSurvivesProcessDeathBeforeReconciliation(reload-debt): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: reload debt must be durable before acknowledgement ==> expected: <false> but was: <true> | reloadDebtSurvivesProcessDeathBeforeReconciliation(reload-during-reconcile): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: crash point not reached: 17:22:12.621 [main] INFO  i.j.c.JustSearchConfigurationLoader - Using SSOT from repo layout: /tm"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/WatcherReloadRetryTest.java#failedOpenerThenFailedReconstructionRetainsDeleteUntilRetry",
+        "classification": "assertion",
+        "detail": "failedOpenerThenFailedReconstructionRetainsDeleteUntilRetry(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a failed opener cannot discard a settled watcher obligation ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/WatcherJournalFormatTest.java#populatedLegacyDatabasePreservesReceiptsAndRequiresNewReaderAfterUpgrade",
+        "classification": "assertion",
+        "detail": "populatedLegacyDatabasePreservesReceiptsAndRequiresNewReaderAfterUpgrade(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: old readers must refuse new DELETE/root-reconciliation formats before any database write ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/WatcherJournalFormatTest.java#baselineEnumerationCannotSuppressARecreatedLegacyWatcherFile",
+        "classification": "assertion",
+        "detail": "baselineEnumerationCannotSuppressARecreatedLegacyWatcherFile(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a real source snapshot must replace a stale conditional delete rather than suppress the recreated file ==> expected: <UPSERT> but was: <DELETE>"
+      }
+    ]
+  },
+  "digest": "sha256:bab0cbc24b1acb9fc11f534051d0051ce95a375c15de09d71e1c8809820c4cee"
+}

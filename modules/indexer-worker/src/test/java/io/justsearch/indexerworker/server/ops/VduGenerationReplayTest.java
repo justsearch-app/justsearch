@@ -72,7 +72,8 @@ final class VduGenerationReplayTest extends LuceneExecutorTestBase {
 
     try (SqliteJobQueue queue = openQueue(dbPath)) {
       put(queue, "vdu_update:" + DOC_ID, "VDU_UPDATE", vduPayload);
-      put(queue, "delete:" + DELETE_PATH, "DELETE", DELETE_PATH);
+      put(queue, "path:" + DELETE_PATH, "DELETE", new io.justsearch.indexerworker.queue.SwitchBufferDelete(
+          DELETE_PATH, io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.EXPLICIT, null).encode());
       deferred = find(queue, "vdu_update:" + DOC_ID);
 
       drain(queue, runtime, () -> false);

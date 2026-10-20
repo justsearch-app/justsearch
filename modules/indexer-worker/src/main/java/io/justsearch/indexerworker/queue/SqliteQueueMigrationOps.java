@@ -364,6 +364,12 @@ final class SqliteQueueMigrationOps {
         addColumnIfMissing(conn, "ingestion_root", SqliteSchema.MIGRATE_V21_TO_V22_INGESTION_ROOT);
         log.info("V21 to V22: Persisted root-relative ingestion policy boundaries");
       }
+      case 23 -> {
+        // Payload semantics changed without a table-layout change. Publishing this version in
+        // the same transaction prevents an older reader from treating JSON DELETE as a path or
+        // acknowledging a root-reconciliation obligation it cannot apply.
+        log.info("V22 to V23: Required origin-aware DELETE and watcher-reconciliation readers");
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
   }
