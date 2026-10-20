@@ -528,3 +528,23 @@ describe('the primary slot is a STRICT priority machine', () => {
     }
   });
 });
+
+// WP6.2 S8.2 — a direction is labelled by what happened to it, not "Steered" whatever happened.
+describe('a direction reads as what happened to it', () => {
+  it('labels applied, queued and not-applied directions differently', () => {
+    const conversation = [
+      entry({ id: 'd1', type: 'steer-directive', content: 'Focus on Q3.', directiveOutcome: 'applied' }),
+      entry({ id: 'd2', type: 'steer-directive', content: 'Skip drafts.', directiveOutcome: 'queued' }),
+      entry({
+        id: 'd3', type: 'steer-directive', content: 'Answer in French.',
+        directiveOutcome: 'not_applied', directiveReason: 'run_finished',
+      }),
+    ];
+    const notes = projectSv3RunFeed(source({ conversation }), 0).items;
+    expect(notes.map((n) => (n.kind === 'note' ? [n.label, n.text] : n.kind))).toEqual([
+      ['Steered', 'Focus on Q3.'],
+      ['Direction queued', "Skip drafts. (applies at the agent's next step)"],
+      ['Not applied', 'Answer in French. (the run finished before the agent\'s next step)'],
+    ]);
+  });
+});

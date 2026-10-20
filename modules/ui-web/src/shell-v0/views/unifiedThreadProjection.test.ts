@@ -403,6 +403,21 @@ describe('assignRunSegments (565 §26.A/§26.B — the run-structure authority)'
     expect(steer!.content).toBe('Focus only on Q3.');
   });
 
+  it('WP6.2 — a live direction carries its outcome to the spine, like a reloaded one', () => {
+    const out = projectLiveAgentActivity(
+      [
+        {
+          id: 's1', type: 'steer-directive', content: 'Too late.', timestamp: 2,
+          directiveOutcome: 'not_applied', directiveReason: 'run_stopped',
+        },
+      ] as LiveConversationEntry[],
+      {},
+    );
+    expect(out[0]!.attributes).toEqual({
+      steer: true, directiveOutcome: 'not_applied', directiveReason: 'run_stopped',
+    });
+  });
+
   it('projectLiveAgentActivity brackets a run-node entry pair into a segment', () => {
     const out = projectLiveAgentActivity(
       [

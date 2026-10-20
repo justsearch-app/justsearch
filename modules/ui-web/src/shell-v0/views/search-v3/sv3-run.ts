@@ -42,17 +42,19 @@
  * cards on screen — the same construction the retired search-v2 window used for its receipt,
  * expressed as a projection both halves read.
  */
-import type {
-  AgentSessionController,
-  ConversationEntry,
-  ToolCall,
-  ToolRisk,
+import {
+  UNCONFIRMED_STEER_PHASE,
+  type AgentSessionController,
+  type ConversationEntry,
+  type ToolCall,
+  type ToolRisk,
 } from '../../controllers/AgentSessionController.js';
 import type { Sv3TurnStatus } from './sv3-sessions.js';
 // Tempdoc 859 §D §2.6 — the ONE cut-short authority. Imported, never re-derived: a second copy of
 // "which dispositions count as truncated" could disagree with the notice line's copy, which is the
 // divergence the shared authority exists to prevent.
 import { sv3WasCutShort, SV3_CUT_SHORT_BADGE } from './sv3-honesty.js';
+import { directionNote } from '../unifiedThreadProjection.js';
 // Tempdoc 859 §D §2.4/§2.5 — the SHARED budget-readout authority, already the source of both
 // windows' budget bar and context horizon. The gate's facts and its ladder are derivations of the
 // same numbers, so they belong beside those and not in a second module that could disagree.
@@ -214,8 +216,25 @@ const RUN_NOTE_LABEL: Partial<Record<ConversationEntry['type'], string>> = {
   progress: 'Progress',
   handoff: 'Handoff',
   'run-node': 'Node',
-  'steer-directive': 'Steered',
 };
+
+/**
+ * WP6.2 S8.2 — the feed's notes for this run's steer sends whose outcome is still unconfirmed. The
+ * record never carries them (they are window-local), so a settled turn keeps them beside its recorded
+ * activity; the controller removes one when the run reports the direction that send produced.
+ */
+export function sv3UnconfirmedSteerNotes(
+  source: Sv3RunSource,
+  from: number,
+  feed: Sv3RunFeed,
+): readonly Sv3RunFeedItem[] {
+  const unconfirmed = new Set(
+    source.conversation
+      .slice(Math.max(0, from))
+      .flatMap((e) => (e.phase === UNCONFIRMED_STEER_PHASE ? [e.id] : [])),
+  );
+  return unconfirmed.size === 0 ? [] : feed.items.filter((i) => i.kind === 'note' && unconfirmed.has(i.id));
+}
 
 /**
  * Project the run's own slice of the shared conversation into the feed.
@@ -268,6 +287,15 @@ export function projectSv3RunFeed(source: Sv3RunSource, from: number): Sv3RunFee
       continue;
     }
     if (entry.type === 'error') errored = true;
+    if (entry.type === 'steer-directive') {
+      // WP6.2 — named by what happened to the direction, the same way the record names it.
+      items.push({
+        kind: 'note',
+        id: entry.id,
+        ...directionNote(entry.content, entry.directiveOutcome, entry.directiveReason),
+      });
+      continue;
+    }
     items.push({
       kind: 'note',
       id: entry.id,
