@@ -937,3 +937,14 @@ not require new fail-before evidence for preservation. Acceptance records are un
   "note": "Reject for one omission. Entry 6 (New, factory_reset::tests::rn1_models_and_runtime_keep_their_bytes): its behaviour and check assert that the OCR runtime native-bin/tesseract is removed ('while removing the rebuildable OCR runtime'), but its only source, RN1 'Models and the AI runtime are kept and keep working (Option A).', states only what is kept; no agreed scenario says the OCR runtime is deleted, and S51.1 lists what is deleted without it. Cite a source for that expectation or drop the tesseract assertion. Everything else checked: other entries' quotes match area5.md (S51.x, RS/RN, RA1-RA4, Pass-2 amendment); entry 24 Adaptation keeps the oracle (adds only an idle factory_reset_status mock); all evidence re-run to scratch on the candidate (c00a0cb24 with the seam patch, 97dc55c62, 769eb6ec6), with every check passing and fail-before classes matching the committed files. Note, not a rejection reason: entry 25 marks 'RN3 Engine recovery Retry...' and 'RN3 normal desktop ... debug routes mount' repaired against intermediate commit 97dc55c62; against c00a0cb24 they guard preserved behaviour."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-w4ojmkpw",
+  "verdict": "accept",
+  "digest": "sha256:32f80bce345ce0111aaad7f51fed3f9b5631d3262b449eef4e5864cbce7f87b4",
+  "note": "Accept. Read area5.md WP5.1, pass-2 and RA1-RA5, the c00a0cb24 boot/recovery tests and the lib.rs Option A wipe before the diff. All 31 entries' quotes match area5.md verbatim. Prior omission resolved: entry 6 now cites RA5 for removing native-bin/tesseract; RA5 is agreed amendment text, lib.rs restores the bundled OCR runtime at start, and decision records searched for a conflict: none. Re-ran to scratch: rn1, rn3, rs7_nested, rs3, rs4_actual on candidate and c00a0cb24+seam patch (rn1/rn3/rs7 pass before = preservation, as classed; rs3/rs4 assertion fail-before); boot-lockdown all four checks on candidate and plain c00a0cb24: both RN3 checks pass before, so entry 31 New-without-repaired is correct, and both RS4 checks fail before with an assertion, so entry 25 repaired holds against the base, not only 97dc55c62; ra2/ra3 vs 769eb6ec6 assertion fail-before; RS1/RN2 settings checks pass. Content digests match the committed evidence. Minor, not blocking: entry 31's debug-route reload expectation rests on RA4 ('every reload ... none leaves an empty window') rather than RN3; the pass-2 Finding-1 quote is filed under RS4; the lockdown lane is not wired in CI; Windows junction branches are unverified."
+}
+```
