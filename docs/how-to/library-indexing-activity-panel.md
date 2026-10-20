@@ -34,12 +34,10 @@ design, copy decisions beyond the rules below.
 
 ## Why this exists
 
-Today the Library tab shows watched roots and lets the user trigger a
-reindex. It does NOT show what *happened* — which files succeeded,
-skipped, or failed; how recent activity went; or what's currently
-being scanned. The substrate to answer those questions exists
-(diagnostic ledger endpoints, the scan-progress stream, scoped
-path-resolution); this panel is where the user finally sees it.
+The Library tab shows watched roots, reindex actions, and a retained-outcome summary of
+indexing events. The summary reports what succeeded, was skipped, or failed. A recent-event
+drawer and filename resolution remain planned. Current operation progress is read by operation
+key from the durable operations owner; the retired scan-progress stream is not part of that contract.
 
 ## Endpoints to consume
 
@@ -131,11 +129,15 @@ export async function resolveHash(
 }
 ```
 
-### Zod schemas
+### Wire-schema types
 
-Add to `modules/ui-web/src/api/schemas/` (see existing `IndexedRootsResponseSchema`
-for the pattern). Define `IngestionEventViewSchema` matching the 14
-pinned fields, plus `IngestionRollupSchema` and `ResolvePathResultSchema`.
+Update the wire record and its schema projection under `SSOT/schemas/`; register any new
+projection in the `TARGETS` list of `scripts/codegen/gen-wire-schema-types.mjs`. Regenerate with
+`node scripts/codegen/gen-wire-schema-types.mjs` from repo root (or `npm run gen:wire-schema-types`
+in `modules/ui-web`). Generated TypeScript types and Zod schemas live under
+`modules/ui-web/src/api/generated/schema-types/`; do not edit generated files by hand.
+For the parsing pattern, see `parseWireContract` and `failedJobsResponseSchema` in
+`src/api/domains/indexing.ts`. There is a `src/api/schemas.ts` helper, not a `src/api/schemas/` directory.
 
 ### SSE consumption
 
@@ -143,10 +145,10 @@ Reuse existing infrastructure (do not invent a new pattern):
 
 - `modules/ui-web/src/api/sse.ts` — `parseSseBufferJson(buffer, callback)`
   is the canonical WHATWG-spec SSE buffer parser.
-- `modules/ui-web/src/stores/useAgentStore.ts` — multi-event-type
-  subscription pattern. Mirror the structure: `fetch` with
-  `Accept: text/event-stream`, accumulate from `ReadableStream`, feed
-  to `parseSseBufferJson` line-by-line, dispatch by event name.
+- `modules/ui-web/src/api/streams.ts` — existing stream consumers using `fetch` with
+  `Accept: text/event-stream`, `ReadableStream` buffering, and `parseSseBufferJson`.
+  Use these when consuming an actual SSE endpoint. The retired React/Zustand `useAgentStore.ts`
+  is no longer present.
 
 For operation progress, use the keyed history read and keep the operation key
 with the initiating activity. A normal running ingestion has no phase. Render a
@@ -250,9 +252,11 @@ export const REASON_CODE_LABELS: Record<string, { label: string; explanation: st
 };
 ```
 
-When `IngestionReasonCodes` adds a new constant, add it here too.
-There is no automated regen; future tempdocs may surface a typed
-schema export to close the gap.
+The table above is illustrative. Maintain the complete mapping in
+`modules/ui-web/src/shell-v0/components/ingestionSummaryPresentation.ts`.
+`IngestionSummary.test.ts` compares its keys against all Java reason constants and verifies the
+rendered labels. When `IngestionReasonCodes` adds a constant, update that maintained mapping;
+the test guards coverage, while the wording is still authored by hand.
 
 ## Privacy contract
 
@@ -335,5 +339,4 @@ SHA-256 hex. If frontend changes break that, the test fails.
 - Contract refinement (the resolver): `docs/decisions/0028-scoped-reverse-path-lookup.md`
   (added by T5.0).
 - Field pin: `JobQueueTest.ingestionEventViewExportContractIsPinned`.
-- SSE patterns: `SseWriter.java`, `parseSseBufferJson` in `sse.ts`,
-  `useAgentStore.ts`.
+- SSE patterns: `SseWriter.java`, `parseSseBufferJson` in `sse.ts`, and `src/api/streams.ts`.

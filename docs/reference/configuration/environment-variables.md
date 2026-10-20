@@ -40,7 +40,7 @@ Scope:
 | **API & Runtime** | | | |
 | `JUSTSEARCH_API_PORT` | `justsearch.api.port` | Int | Port for the local loopback API. `0` means “ephemeral”. |
 | `JUSTSEARCH_PROD` | `justsearch.prod` | Bool | Enables desktop/prod posture (e.g., session token enforcement for non-GET endpoints). |
-| `JUSTSEARCH_EGRESS_BLOCK_ALL` | `egress.block_all` | Bool | Blocks outgoing network calls (tests/air-gapped posture). |
+| `JUSTSEARCH_EGRESS_BLOCK_ALL` | `egress.block_all` | Bool | Isolated-test configuration flag checked by the launcher smoke driver. It is not a network firewall and does not disable the desktop update check or OTLP export. |
 | **Telemetry** | | | |
 | `JUSTSEARCH_TELEMETRY_FLUSH_MS` | `justsearch.telemetry.flushMs` | Long | Telemetry flush interval in milliseconds (NDJSON exporter). |
 | **Indexing & Search** | | | |
@@ -227,6 +227,30 @@ and VDU still use zero when an override is supplied. The bound is captured when 
 configuration is created; mode changes, profile changes, crash recovery, and VDU exit preserve it.
 Restart the head to change the development override. This is host RAM, separate from the GPU
 KV-cache memory plan.
+
+## Trace output and optional OTLP export
+
+Tracing is off by default: `JUSTSEARCH_HEAD_TRACING_LEVEL` and
+`JUSTSEARCH_INDEX_TRACING_LEVEL` both default to `none`. Set either to `sample` or `detailed`
+(and restart the Engine) to write spans to `<data>/telemetry/traces.ndjson`.
+
+If tracing is enabled, these environment variables also enable OTLP/HTTP export:
+
+| Variable | Behavior |
+|---|---|
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Full trace endpoint URL; takes precedence over the generic endpoint. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Base URL; `/v1/traces` is appended unless already present. |
+| `OTEL_EXPORTER_OTLP_TRACES_HEADERS` / `OTEL_EXPORTER_OTLP_HEADERS` | Comma-separated `key=value` headers; the trace-specific variable takes precedence. |
+| `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` / `OTEL_EXPORTER_OTLP_TIMEOUT` | Export timeout in milliseconds; the trace-specific variable takes precedence. |
+
+An endpoint alone does not enable tracing. Endpoints may be off-device and are not restricted to
+HTTPS or loopback. Spans can include file paths and document excerpts (search spans
+are bounded to 16 documents × 1024 characters). The desktop shell passes the Engine its environment,
+so check inherited `OTEL_*` values before enabling tracing. Leave both levels at `none` to disable
+tracing, or unset both endpoint variables to keep enabled traces on disk only.
+
+These `OTEL_*` values are read directly from the environment by `TracingBootstrap`; the general
+system-property precedence rule above does not apply to them.
 
 ## Additional Runtime Keys (Selected)
 

@@ -29,7 +29,11 @@ import type { HealthEvent } from '../../api/domains/health.js';
 
 let streams: ReturnType<typeof fetchSseHarness>;
 beforeEach(() => {
-  streams = fetchSseHarness();
+  // Keep main's unavailable-backend behavior for incidental requests; SSE uses
+  // the authenticated fetch transport with controlled streaming responses.
+  streams = fetchSseHarness(async () => {
+    throw new TypeError('Test backend unavailable');
+  });
   vi.stubGlobal('fetch', streams.fetch);
 });
 afterEach(() => {

@@ -31,8 +31,10 @@ public final class MigrationTransitionBarrier {
       "migration-green-drained", "migration-before-switching", "migration-switching-entered",
       "migration-before-pointer-commit", "migration-after-pointer-commit",
       "migration-before-live-activation", "migration-after-live-activation",
-      "migration-after-first-projection-replay");
-  private static final String REPLAY_HALT_POINT = "migration-after-first-projection-replay";
+      "migration-after-first-projection-replay", "migration-after-first-prune-removal");
+  /** Points inside an ordered replay: only a process halt there leaves a meaningful state. */
+  private static final Set<String> REPLAY_HALT_POINTS = Set.of(
+      "migration-after-first-projection-replay", "migration-after-first-prune-removal");
 
   public static Hook fromEnvironment(Path dataDir, Function<String, String> env) {
     String point = env.apply("JUSTSEARCH_MIGRATION_BARRIER_POINT");
@@ -67,8 +69,8 @@ public final class MigrationTransitionBarrier {
     if (refuse && (selfExit || !"migration-before-live-green-open".equals(point))) {
       throw new IllegalArgumentException("Live start refusal requires its pre-open barrier");
     }
-    if (REPLAY_HALT_POINT.equals(point) && !selfExit) {
-      throw new IllegalArgumentException("Projection replay barrier requires a harness self-exit");
+    if (REPLAY_HALT_POINTS.contains(point) && !selfExit) {
+      throw new IllegalArgumentException("A replay barrier requires a harness self-exit");
     }
     Path reached = HarnessBarrierProtocol.reached(dataDir, "migration-barrier");
     AtomicBoolean claimed = new AtomicBoolean();
@@ -96,8 +98,8 @@ public final class MigrationTransitionBarrier {
 
     public Controlled(String point) {
       if (!POINTS.contains(point)) throw new IllegalArgumentException("Unknown migration point");
-      if (REPLAY_HALT_POINT.equals(point)) {
-        throw new IllegalArgumentException("Projection replay cut requires a process halt");
+      if (REPLAY_HALT_POINTS.contains(point)) {
+        throw new IllegalArgumentException("A replay cut requires a process halt");
       }
       this.point = point;
     }
