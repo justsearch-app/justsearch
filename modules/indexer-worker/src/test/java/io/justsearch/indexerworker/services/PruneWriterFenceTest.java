@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -80,7 +81,9 @@ final class PruneWriterFenceTest extends LuceneExecutorTestBase {
     jobQueue = new SqliteJobQueue(tempDir.resolve("jobs.db"));
     jobQueue.open();
     layout = new IndexGenerationManager(tempDir.resolve("indexBase")).initializeOrLoad();
-    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTestingWithVduRetryCount(0))
+    var fields=new java.util.ArrayList<>(FieldCatalogDef.forChunkTestingWithVduRetryCount(0).fields());
+    fields.add(new FieldCatalogDef.FieldDef(SchemaFields.SOURCE_SHA256,"keyword",true,false,List.of(),null,null,false));
+    runtime = IndexSchema.fromCatalog(new FieldCatalogDef("prune-vdu-proof",fields))
         .atPath(layout.activeGenerationPath())
         .withExecutorRegistrations(testLuceneExecutors())
         .open();
@@ -149,6 +152,7 @@ final class PruneWriterFenceTest extends LuceneExecutorTestBase {
     fields.put(SchemaFields.CONTENT, content);
     fields.put(SchemaFields.MIME, "application/pdf");
     fields.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING);
+    fields.put(SchemaFields.SOURCE_SHA256,"a".repeat(64));
     runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
   }
 
@@ -293,12 +297,15 @@ final class PruneWriterFenceTest extends LuceneExecutorTestBase {
     var service = service(loopWithFence(), ingest);
     addRoot(service);
     String content = "Recognised text with enough words for several chunks. ".repeat(400);
+    var base=CallContext.none();var ctx=new CallContext(null,null,null,base.engineContext().withWorkId(java.util.UUID.randomUUID()),base.provenance(),base.childLifetime());
+    String attempt=java.util.UUID.randomUUID().toString();
+    assertTrue(service.markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest.newBuilder().setDocId(path).setAttemptId(attempt).build(),ctx).getSuccess());
 
     Thread[] vduThread = new Thread[1];
     FutureTask<Boolean> vdu = start("held-vdu-result", () -> service.updateVduResult(
-        UpdateVduResultRequest.newBuilder().setDocId(path)
+        UpdateVduResultRequest.newBuilder().setDocId(path).setAttemptId(attempt)
             .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
-            .setExtractedContent(content).build(), CallContext.none()).getSuccess(), vduThread);
+            .setExtractedContent(content).build(), ctx).getSuccess(), vduThread);
     assertTrue(firstChunkWritten.await(10, TimeUnit.SECONDS));
     Files.delete(file);
     Thread[] syncThread = new Thread[1];

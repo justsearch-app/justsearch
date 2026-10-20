@@ -263,6 +263,80 @@ public final class DocumentFieldOps {
     }
   }
 
+  /** One immutable reader's text, identity and stage state, including a chunk's parent. */
+  public record EnrichmentInput(
+      String content, Map<String, String> fields,
+      String parentId, Map<String, String> parentFields) {}
+
+  static final Set<String> ENRICHMENT_FIELDS = Set.of(
+      SchemaFields.CONTENT, SchemaFields.CONTENT_SHA256, SchemaFields.SOURCE_SHA256,
+      SchemaFields.DOC_UID, SchemaFields.IS_CHUNK, SchemaFields.PARENT_DOC_ID,
+      SchemaFields.CHUNK_START_CHAR, SchemaFields.CHUNK_END_CHAR,
+      SchemaFields.CHUNK_PARENT_CONTENT_SHA256,
+      SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_RETRY_COUNT,
+      SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT,
+      SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_RETRY_COUNT,
+      SchemaFields.NER_STATUS, SchemaFields.NER_RETRY_COUNT,
+      SchemaFields.VDU_STATUS, SchemaFields.VDU_RETRY_COUNT, SchemaFields.COLLECTION);
+
+  static final Set<String> PARENT_REVISION_FIELDS = Set.of(
+      SchemaFields.CONTENT, SchemaFields.CONTENT_SHA256, SchemaFields.SOURCE_SHA256,
+      SchemaFields.DOC_UID);
+
+  /** Reads text and comparison proof together; an I/O failure never becomes a blank-content retry. */
+  public Map<String, EnrichmentInput> getEnrichmentInputs(List<String> docIds) throws IOException {
+    return getEnrichmentInputs(docIds, Long.MAX_VALUE);
+  }
+
+  /** Retains at most the parent text budget; admits one oversized first parent whole. */
+  public Map<String, EnrichmentInput> getEnrichmentInputs(List<String> docIds, long maxContentChars)
+      throws IOException {
+    if (docIds == null || docIds.isEmpty()) return Map.of();
+    maybeRefreshBlockingIfCommittedSinceRefresh();
+    return bridge.withSearcher(searcher -> {
+      Map<String, EnrichmentInput> inputs = new LinkedHashMap<>();
+      Map<String, Map<String, String>> parents = new HashMap<>();
+      var storedFields = searcher.storedFields();
+      var revisionGuard = new ChunkReadRevisionGuard();
+      long retainedChars = 0;
+      for (String docId : docIds) {
+        Map<String, String> fields = enrichmentFields(searcher, storedFields, docId, ENRICHMENT_FIELDS);
+        if (fields == null) continue;
+        String parentId = fields.get(SchemaFields.PARENT_DOC_ID);
+        Map<String, String> parent = Map.of();
+        String content = fields.get(SchemaFields.CONTENT);
+        if (parentId != null && !parentId.isBlank()) {
+          if (!parents.containsKey(parentId)) {
+            parents.put(parentId, enrichmentFields(searcher, storedFields, parentId, PARENT_REVISION_FIELDS));
+          }
+          parent = parents.get(parentId);
+          ChunkSlice slice = chunkSliceFrom(fields);
+          content = slice == null || parent == null ? null
+              : revisionGuard.slice(docId, slice, parentRevisionFrom(parent)).orElse(null);
+        }
+        long chars = content == null ? 0 : content.length();
+        if (retainedChars > 0 && retainedChars + chars > maxContentChars) break;
+        inputs.put(docId, new EnrichmentInput(content, fields, parentId, parent));
+        retainedChars += chars;
+        if (retainedChars >= maxContentChars) break;
+      }
+      return Collections.unmodifiableMap(inputs);
+    });
+  }
+
+  Map<String, String> enrichmentFields(
+      org.apache.lucene.search.IndexSearcher searcher, org.apache.lucene.index.StoredFields storedFields,
+      String docId, Set<String> names) throws IOException {
+    var hits = searcher.search(new TermQuery(new Term(idField, docId)), 1);
+    if (hits.scoreDocs.length == 0) return null;
+    int docNum = hits.scoreDocs[0].doc;
+    Map<String, String> fields = new HashMap<>(SearchResultFormatter.extractFromStoredFields(
+        storedFields, docNum, true, names));
+    // The projector already skips stored values and fields without DocValues.
+    readPathOps.projectDocValues(searcher, docNum, names, fields);
+    return Collections.unmodifiableMap(fields);
+  }
+
   static ChunkSlice chunkSliceFrom(Map<String, String> fields) {
     if (fields == null) return null;
     String parentDocId = fields.get(SchemaFields.PARENT_DOC_ID);

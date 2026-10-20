@@ -38,6 +38,10 @@ import org.slf4j.LoggerFactory;
 @ExtendWith(MockitoExtension.class)
 class BgeM3BackfillOpsTest {
 
+  @org.junit.jupiter.api.BeforeEach void snapshots() throws Exception {
+    BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, false, java.util.Set.of(SchemaFields.IS_CHUNK));
+  }
+
   @Mock DocumentFieldOps documentFieldOps;
   @Mock IndexingCoordinator indexingCoordinator;
   @Mock CommitOps commitOps;
@@ -196,7 +200,7 @@ class BgeM3BackfillOpsTest {
     when(encoder.encode(eq("poison chunk text"), any(InferenceRequest.class))).thenThrow(new OrtException("per-doc encode boom"));
     when(encoder.encode(eq("good chunk text"), any(InferenceRequest.class)))
         .thenReturn(new BgeM3Output(new float[] {1f, 2f}, Map.of("tok", 1.0f)));
-    when(documentFieldOps.getDocumentField(
+    lenient().when(documentFieldOps.getDocumentField(
             "chunk-bad", SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT))
         .thenReturn("0");
 
@@ -233,7 +237,7 @@ class BgeM3BackfillOpsTest {
         .thenThrow(new OrtException("per-doc encode boom"));
     when(encoder.encode(eq("good parent text"), any(InferenceRequest.class)))
         .thenReturn(new BgeM3Output(new float[] {3f, 4f}, Map.of("tok", 2.0f)));
-    when(documentFieldOps.getDocumentField("parent-bad", SchemaFields.EMBEDDING_RETRY_COUNT))
+    lenient().when(documentFieldOps.getDocumentField("parent-bad", SchemaFields.EMBEDDING_RETRY_COUNT))
         .thenReturn("0");
 
     boolean result = BgeM3BackfillOps.processBgeM3Backfill(context()).success();

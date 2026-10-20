@@ -104,7 +104,9 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
   }
 
   private RunningRuntime open(Path index) {
-    RunningRuntime opened = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTestingWithVduRetryCount(0))
+    var fields=new java.util.ArrayList<>(FieldCatalogDef.forChunkTestingWithVduRetryCount(0).fields());
+    fields.add(new FieldCatalogDef.FieldDef(SchemaFields.SOURCE_SHA256,"keyword",true,false,List.of(),null,null,false));
+    RunningRuntime opened = IndexSchema.fromCatalog(new FieldCatalogDef("prune-vdu-proof",fields))
         .atPath(index)
         .withExecutorRegistrations(testLuceneExecutors())
         .open();
@@ -182,6 +184,7 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
     fields.put(SchemaFields.DOC_UID, path + "#uid");
     fields.put(SchemaFields.PATH, path);
     fields.put(SchemaFields.CONTENT, "scanned page");
+    fields.put(SchemaFields.SOURCE_SHA256,"a".repeat(64));
     fields.put(SchemaFields.MIME, "application/pdf");
     fields.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING);
     target.indexingCoordinator().indexSingle(new IndexDocument(fields));
@@ -309,11 +312,16 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
     var publisher = publisher(ingest, () -> {});
     bufferPrune(null);
     String content = "Recognised text with enough words for several chunks. ".repeat(400);
+    var base=CallContext.none();
+    var ctx=new CallContext(null,null,null,base.engineContext().withWorkId(UUID.randomUUID()),base.provenance(),base.childLifetime());
+    String attempt=UUID.randomUUID().toString();
+    assertTrue(publisher.markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest.newBuilder()
+        .setDocId(path).setAttemptId(attempt).build(),ctx).getSuccess());
 
     var vdu = FenceRace.start("held-vdu-result", () -> publisher.updateVduResult(
-        UpdateVduResultRequest.newBuilder().setDocId(path)
+        UpdateVduResultRequest.newBuilder().setDocId(path).setAttemptId(attempt)
             .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
-            .setExtractedContent(content).build(), CallContext.none()).getSuccess());
+            .setExtractedContent(content).build(), ctx).getSuccess());
     assertTrue(firstChunkWritten.await(30, TimeUnit.SECONDS));
     Files.delete(file);
     var replaying = FenceRace.start("replay-under-test", () -> {
@@ -375,22 +383,17 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
     Path file = Files.writeString(root.resolve("buffered-vdu.pdf"), "scan");
     String path = key(file);
     indexed(runtime, path, 0);
-    IndexingCoordinator coordinator = spy(runtime.indexingCoordinator());
-    CountDownLatch firstChunk = new CountDownLatch(1);
-    CountDownLatch finish = new CountDownLatch(1);
-    AtomicInteger chunksWritten = new AtomicInteger();
-    doAnswer(call -> {
-      IndexDocument document = call.getArgument(0);
-      if ("true".equals(document.fields().get(SchemaFields.IS_CHUNK))
-          && chunksWritten.incrementAndGet() == 1) {
-        firstChunk.countDown();
-        assertTrue(finish.await(30, TimeUnit.SECONDS));
-      }
-      return call.callRealMethod();
-    }).when(coordinator).indexSingle(any());
+    IndexingCoordinator coordinator=spy(runtime.indexingCoordinator());
+    var fields=spy(runtime.documentFieldOps());
+    CountDownLatch firstChunk=new CountDownLatch(1);
+    CountDownLatch finish=new CountDownLatch(1);
+    doAnswer(call->{
+      Object captured=call.callRealMethod();firstChunk.countDown();
+      assertTrue(finish.await(30,TimeUnit.SECONDS));return captured;
+    }).when(fields).getEnrichmentInputs(List.of(path));
     RunningRuntime ingest = mock(RunningRuntime.class);
     when(ingest.indexingCoordinator()).thenReturn(coordinator);
-    when(ingest.documentFieldOps()).thenReturn(runtime.documentFieldOps());
+    when(ingest.documentFieldOps()).thenReturn(fields);
     when(ingest.commitOps()).thenReturn(runtime.commitOps());
     when(ingest.pruneOps()).thenReturn(runtime.pruneOps());
     when(ingest.readPathOps()).thenReturn(runtime.readPathOps());
@@ -404,7 +407,7 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
     });
     try {
       assertTrue(firstChunk.await(30, TimeUnit.SECONDS),
-          "precondition: the replayed VDU result read its parent and reached its first chunk");
+          "precondition: legacy replay read its parent under the live file fence");
       Files.delete(file);
       var pruning = FenceRace.start("prune-under-test", () -> sync
           ? publisher.syncDirectory(io.justsearch.ipc.SyncDirectoryRequest.newBuilder()
@@ -418,7 +421,7 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
       finish.countDown();
     }
 
-    assertTrue(chunksWritten.get() > 1, "precondition: the VDU result wrote several chunks");
+    org.mockito.Mockito.verify(coordinator,org.mockito.Mockito.never()).indexSingle(any());
     assertEquals(0, committedRows(path),
         "no chunk a replayed VDU result writes may outlive its file's removal");
   }
@@ -691,7 +694,7 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
   }
 
   @Test
-  void vduUpdatesAroundThePruneKeepTheirOrderAndAMissedOneKeepsEveryReceipt() throws Exception {
+  void unverifiableVduUpdatesAroundThePruneRetireWithoutReplacingLiveContent() throws Exception {
     // RP7, preserve: a VDU result before the prune applies to its live file; one after the prune
     // for the removed file finds no document, does not bring it back, and the drain keeps every
     // receipt for a later retry.
@@ -711,9 +714,9 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
 
     KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(bestEffort(runtime, publisher));
 
-    assertTrue(committedRows(key(live)) > 1, "the earlier VDU result gave the live file chunks");
+    assertEquals(1,committedRows(key(live)),"unverifiable legacy results cannot add chunks to the live file");
     assertEquals(0, committedRows(key(gone)), "a later VDU result does not bring a file back");
-    assertEquals(before, buffered(), "a drain that missed an operation keeps every receipt");
+    assertTrue(buffered().isEmpty(),"obsolete legacy VDU rows do not block exact receipt cleanup");
   }
 
   private static String vduPayload(String docId, String content) throws Exception {

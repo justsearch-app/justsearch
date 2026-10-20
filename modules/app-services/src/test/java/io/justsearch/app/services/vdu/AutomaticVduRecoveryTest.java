@@ -97,7 +97,7 @@ final class AutomaticVduRecoveryTest {
     service = new OnlineAiServiceImpl(admission, manager);
     var processor = new VduProcessor(service, manager.chatHolds(), service,
         new TempFileManager(directory.resolve("images")), new ImagePreparer(), VduMetricCatalog.noop());
-    index = mock(KnowledgeClient.class, call -> {
+    index = VduAttemptTestSupport.client( call -> {
       if ("recoverVduProcessingForOwner".equals(call.getMethod().getName()))
         return index.recoverVduProcessing(call.getArgument(0));
       if ("recoverVduProcessingForRetainedOwner".equals(call.getMethod().getName())) {

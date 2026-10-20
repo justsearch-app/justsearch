@@ -56,8 +56,8 @@ final class VduResultReplayParityTest extends LuceneExecutorTestBase {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("outcomeCases")
-  @DisplayName("live and replay apply the same committed parent and chunk state")
-  void liveAndReplayProduceIdenticalCommittedState(OutcomeCase scenario) throws Exception {
+  @DisplayName("unverifiable live and legacy results keep baseline state and queue a targeted refresh")
+  void unverifiableLiveAndReplayKeepBaselineAndRetireExactRows(OutcomeCase scenario) throws Exception {
     Path liveIndex = tempDir.resolve("live-" + scenario.name());
     Path replayIndex = tempDir.resolve("replay-" + scenario.name());
     Path queueDb = tempDir.resolve("queue-" + scenario.name() + ".db");
@@ -69,7 +69,7 @@ final class VduResultReplayParityTest extends LuceneExecutorTestBase {
       UpdateVduResultRequest request = request(scenario);
 
       UpdateVduResultResponse liveResult = service(live).updateVduResult(request, CallContext.none());
-      assertTrue(liveResult.getSuccess(), liveResult.getError());
+      assertFalse(liveResult.getSuccess(), "unverifiable results must be rejected");
 
       try (SqliteJobQueue queue = openQueue(queueDb)) {
         assertTrue(
@@ -360,23 +360,16 @@ final class VduResultReplayParityTest extends LuceneExecutorTestBase {
 
   private void assertExpected(OutcomeCase scenario, ParentSnapshot snapshot) {
     assertEquals(PARENT_UID, snapshot.docUid());
-    assertEquals(scenario.expectedStatus(), snapshot.vduStatus());
-    assertEquals("1", snapshot.vduProcessed()); // FieldMapper stores booleans as numeric 0/1.
-    assertEquals(scenario.expectedContent(), snapshot.content());
-    assertEquals(ChunkParentRevision.sha256Hex(scenario.expectedContent()), snapshot.contentSha256());
-    assertEquals(scenario.expectedExtractionMethod(), snapshot.extractionMethod());
-    assertEquals(scenario.expectedReasonCode(), snapshot.extractionReasonCode());
-    assertEquals(ENRICHMENT, snapshot.vduEnrichment());
-    assertEquals("9", snapshot.vduPageCount());
-    if (scenario.expectedContent().equals(VDU_CONTENT)) {
-      assertTrue(snapshot.chunkCount() > 1);
-      assertTrue(
-          snapshot.chunkRevisions().stream()
-              .allMatch(ChunkParentRevision.sha256Hex(VDU_CONTENT)::equals));
-    } else {
-      assertEquals(0, snapshot.chunkCount());
-      assertTrue(snapshot.chunkRevisions().isEmpty());
-    }
+    assertEquals(SchemaFields.VDU_STATUS_PENDING,snapshot.vduStatus());
+    assertEquals("0",snapshot.vduProcessed());
+    assertEquals(BASELINE_CONTENT,snapshot.content());
+    assertEquals(ChunkParentRevision.sha256Hex(BASELINE_CONTENT),snapshot.contentSha256());
+    assertEquals("TIKA_STRUCTURED",snapshot.extractionMethod());
+    assertEquals(IngestionReasonCodes.EXTRACTION_DROPOUT_PENDING_FALLBACK,snapshot.extractionReasonCode());
+    assertEquals("baseline-enrichment",snapshot.vduEnrichment());
+    assertEquals("1",snapshot.vduPageCount());
+    assertEquals(0,snapshot.chunkCount());
+    assertTrue(snapshot.chunkRevisions().isEmpty());
   }
 
   private static FieldCatalogDef parityCatalog() {

@@ -74,8 +74,8 @@ final class VduReplayFailureRetentionTest {
   }
 
   @Test
-  @DisplayName("a missing parent retains the same VDU update across queue reopen")
-  void missingParentRetainsSamePayloadAcrossQueueReopen() throws Exception {
+  @DisplayName("an unverifiable missing-parent result is retired across queue reopen")
+  void unverifiableMissingParentResultRetiresAcrossQueueReopen() throws Exception {
     Path dbPath = tempDir.resolve("missing-parent.db");
     String payload = vduUpdatePayload(DOC_ID, CONTENT);
     persist(dbPath, payload);
@@ -87,22 +87,15 @@ final class VduReplayFailureRetentionTest {
 
     try (SqliteJobQueue queue = openQueue(dbPath)) {
       drain(queue, runtime);
-      assertBuffered(queue, payload);
-      verify(indexingCoordinator).updateDocument(DOC_ID, chunkDeclaration());
-      verify(indexingCoordinator).updateDocument(DOC_ID, terminalParentUpdate());
-      verify(indexingCoordinator, never())
-          .updateDocument(eq(DOC_ID), argThat(updates ->
-              !updates.equals(chunkDeclaration()) && !updates.equals(terminalParentUpdate())));
+      assertEquals(0,queue.switchBufferDepth());
+      verifyNoMoreInteractions(indexingCoordinator);
     }
-
-    try (SqliteJobQueue queue = openQueue(dbPath)) {
-      assertBuffered(queue, payload);
-    }
+    try(SqliteJobQueue queue=openQueue(dbPath)) { assertEquals(0,queue.switchBufferDepth()); }
   }
 
   @Test
-  @DisplayName("chunk deletion failure retains the VDU update and prevents terminal parent write")
-  void chunkDeletionFailureRetainsPayloadAndPreventsTerminalParentWrite() throws Exception {
+  @DisplayName("an unverifiable legacy result is retired before chunk deletion")
+  void unverifiableResultNeverReachesChunkDeletion() throws Exception {
     assertTrue(ChunkSplitter.splitWithMetadata(CONTENT).size() > 1);
     Path dbPath = tempDir.resolve("delete-failure.db");
     String payload = vduUpdatePayload(DOC_ID, CONTENT);
@@ -118,16 +111,16 @@ final class VduReplayFailureRetentionTest {
 
     try (SqliteJobQueue queue = openQueue(dbPath)) {
       drain(queue, runtime);
-      assertBuffered(queue, payload);
-      verify(indexingCoordinator).deleteChunksForParentDocId(DOC_ID);
-      verify(indexingCoordinator, never()).indexSingle(any(IndexDocument.class));
-      verify(indexingCoordinator, never()).updateDocument(anyString(), anyMap());
+      assertEquals(0,queue.switchBufferDepth());
+      verify(indexingCoordinator,never()).deleteChunksForParentDocId(DOC_ID);
+      verify(indexingCoordinator,never()).indexSingle(any(IndexDocument.class));
+      verify(indexingCoordinator,never()).updateDocument(anyString(),anyMap());
     }
   }
 
   @Test
-  @DisplayName("a later chunk insertion failure retains the VDU update and prevents terminal parent write")
-  void laterChunkInsertionFailureRetainsPayloadAndPreventsTerminalParentWrite() throws Exception {
+  @DisplayName("an unverifiable legacy result is retired before chunk insertion")
+  void unverifiableResultNeverReachesChunkInsertion() throws Exception {
     assertTrue(ChunkSplitter.splitWithMetadata(CONTENT).size() > 1);
     Path dbPath = tempDir.resolve("insert-failure.db");
     String payload = vduUpdatePayload(DOC_ID, CONTENT);
@@ -146,13 +139,7 @@ final class VduReplayFailureRetentionTest {
 
     try (SqliteJobQueue queue = openQueue(dbPath)) {
       drain(queue, runtime);
-      assertBuffered(queue, payload);
-      verify(indexingCoordinator).deleteChunksForParentDocId(DOC_ID);
-      verify(indexingCoordinator, times(2)).indexSingle(any(IndexDocument.class));
-      // The declaration is recoverable metadata, never a terminal VDU/content update.
-      verify(indexingCoordinator).updateDocument(DOC_ID, chunkDeclaration());
-      verify(indexingCoordinator, never())
-          .updateDocument(anyString(), argThat(updates -> !updates.equals(chunkDeclaration())));
+      assertEquals(0,queue.switchBufferDepth());
       verifyNoMoreInteractions(indexingCoordinator);
     }
   }
