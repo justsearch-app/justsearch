@@ -70,6 +70,8 @@ export class MemorySurface extends JfElement {
   declare loadError: string;
   declare loading: boolean;
 
+  private loadVersion = 0;
+
   constructor() {
     super();
     this.apiBase = '';
@@ -95,28 +97,38 @@ export class MemorySurface extends JfElement {
    *  navigation that ended it (a stale "nothing was saved" beside a list that has since reloaded). */
   static override transientState = { busy: false, mutationError: '', loading: false, loadError: '' };
 
+  protected override settleTransients(): void {
+    ++this.loadVersion;
+    super.settleTransients();
+  }
+
   private base(): string {
     return this.apiBase || '';
   }
 
   private async loadMemories(): Promise<void> {
+    const version = ++this.loadVersion;
     this.loading = true;
     try {
       const r = await authorizedFetch(`${this.base()}/api/memory`);
+      if (version !== this.loadVersion) return;
       if (!r.ok) {
         this.loadError = 'Memories are unavailable. Try opening Memory again after the stored memories can be read.';
         return;
       }
       const j = (await r.json()) as { memories?: MemoryItem[]; locked?: boolean };
+      if (version !== this.loadVersion) return;
       this.memories = Array.isArray(j.memories) ? j.memories : [];
       // Tempdoc 806 W1: the wire distinguishes "cannot read" from "nothing learned" — carry it, so the
       // render can. An older backend omits the field ⇒ `false` (readable), the pre-806 behaviour.
       this.locked = j.locked === true;
       this.loadError = '';
     } catch {
-      this.loadError = 'Memories are unavailable. Could not reach the backend.';
+      if (version === this.loadVersion) {
+        this.loadError = 'Memories are unavailable. Could not reach the backend.';
+      }
     } finally {
-      this.loading = false;
+      if (version === this.loadVersion) this.loading = false;
     }
   }
 

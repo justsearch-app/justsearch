@@ -371,6 +371,27 @@ production-code overlays and no source-repository worktree metadata writes.
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/MemoryControllerTest.java#healthyHttpRoundTripReplacesIdAndSurvivesRestart"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/MemorySurface.retention.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Only the latest visible load may settle the Memory surface. An old HTTP failure after fresh success preserves the rendered memories and enabled Remember control; an old network rejection during a fresh load preserves the spinner and loading reason; an old success whose body finishes after a fresh failure preserves the error and Remember refusal.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "a load started before the user left, or superseded by a newer load, must not change loading, loadError or the memory list when it settles, whether it succeeds or fails;",
+          "location": "task t-20261019-f0a7d3 user turn (Memory load #812, round 3 builder assignment)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/memory-load-superseded.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/MemorySurface.retention.test.ts#keeps fresh memories and Remember enabled after a stale failure",
+        "modules/ui-web/src/shell-v0/views/MemorySurface.retention.test.ts#keeps the spinner and Remember loading reason after a stale rejection during a fresh load",
+        "modules/ui-web/src/shell-v0/views/MemorySurface.retention.test.ts#keeps the fresh error and Remember refusal after a stale success finishes reading its body"
+      ],
+      "repaired": true
     }
   ]
 }
