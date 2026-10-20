@@ -446,7 +446,7 @@ final class EngineKnowledgeClientExecutorTest {
     // workers so the successor can run while the expired old-view worker still owns its lease.
     try (var registry = registry(4, 2, 1, 4);
         var client = new EngineKnowledgeClient(registry, () -> newServices,
-            new ForegroundLoadGate(new ForegroundLoad()), 250, 100,
+            new ForegroundLoadGate(new ForegroundLoad()), 1_000, 100,
             IpcTelemetry.noop(), () -> {}, admission,
             io.justsearch.app.services.worker.WatchedRootsState.inMemory(), selected::get)) {
       var caller = new java.util.concurrent.FutureTask<>(
@@ -508,7 +508,7 @@ final class EngineKnowledgeClientExecutorTest {
     var admission = new EngineAdmissionController(8, 8, 1);
     try (var registry = registry(1, 1, 1, 4);
         var client = new EngineKnowledgeClient(registry, () -> services,
-            new ForegroundLoadGate(new ForegroundLoad()), 250, 100,
+            new ForegroundLoadGate(new ForegroundLoad()), 1_000, 100,
             IpcTelemetry.noop(), () -> {}, admission,
             io.justsearch.app.services.worker.WatchedRootsState.inMemory(), () -> lease)) {
       var caller = new java.util.concurrent.FutureTask<>(
@@ -655,7 +655,7 @@ final class EngineKnowledgeClientExecutorTest {
         return observed;
       }).when(registry).register(any());
       try (var client = new EngineKnowledgeClient(registry, () -> services,
-          new ForegroundLoadGate(new ForegroundLoad()), 250, 100, IpcTelemetry.noop(),
+          new ForegroundLoadGate(new ForegroundLoad()), 1_000, 100, IpcTelemetry.noop(),
           () -> {}, admission)) {
         var caller = new java.util.concurrent.FutureTask<>(
             () -> client.search("late", 10, TestEngineContexts.FOREGROUND));
@@ -755,7 +755,7 @@ final class EngineKnowledgeClientExecutorTest {
     var admission = new EngineAdmissionController(8, 8, 1);
     try (var registry = registry(1, 1, 1, 4);
         var client = new EngineKnowledgeClient(registry, () -> services,
-            new ForegroundLoadGate(new ForegroundLoad()), 250, 100, IpcTelemetry.noop(),
+            new ForegroundLoadGate(new ForegroundLoad()), 1_000, 100, IpcTelemetry.noop(),
             () -> {}, admission)) {
       try {
         var request = inferenceRequest(variant);
@@ -880,7 +880,7 @@ final class EngineKnowledgeClientExecutorTest {
     var admission = new EngineAdmissionController(16, 8, 1);
     try (var registry = registry(16, 16, 16, 16);
         var client = new EngineKnowledgeClient(registry, () -> services,
-            new ForegroundLoadGate(new ForegroundLoad()), 500, 100, IpcTelemetry.noop(),
+            new ForegroundLoadGate(new ForegroundLoad()), 1_000, 100, IpcTelemetry.noop(),
             () -> {}, admission)) {
       try {
         var callers = new java.util.ArrayList<java.util.concurrent.FutureTask<String>>();

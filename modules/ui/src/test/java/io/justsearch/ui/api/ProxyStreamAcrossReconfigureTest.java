@@ -8,9 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.javalin.Javalin;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.app.api.runtime.child.StopReason;
 import io.justsearch.app.inference.InferenceConfig;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
+import io.justsearch.app.inference.chat.ChatDrainPolicy;
 import io.justsearch.app.services.bootstrap.BootstrapInferenceFactory;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -108,8 +110,12 @@ final class ProxyStreamAcrossReconfigureTest {
     drainBound.setAccessible(true);
     assertEquals(Duration.ofSeconds(30), ChatActuationRouter.DRAIN_BOUND,
         "the chat drain policy allows thirty seconds");
-    assertEquals(ChatActuationRouter.DRAIN_BOUND, drainBound.get(controller),
+    Duration configuredBound = (Duration) drainBound.get(controller);
+    assertEquals(ChatActuationRouter.DRAIN_BOUND, configuredBound,
         "the controller built by production wiring uses the policy's drain limit");
+    assertEquals(configuredBound,
+        ChatDrainPolicy.forReason(StopReason.RECONFIGURE, configuredBound).bound(),
+        "the reconfiguration policy retains the configured drain limit");
     manager.switchToOnlineMode();
     assertEquals(List.of("model.gguf"), launchedModels(), "chat starts once");
     String first = launches().get(0);
@@ -158,11 +164,16 @@ final class ProxyStreamAcrossReconfigureTest {
           }
         }
         assertTrue(draining, "reconfiguration entered its drain and closed admission");
-        assertEquals(1, manager.generationActivity().inFlight(),
-            "the drain is held by the proxied stream's generation lease");
-        assertEquals(List.of("model.gguf"), launchedModels(),
-            "no relaunch while the proxied reply is open");
-        assertFalse(reconfigure.isDone(), "the reconfigure waits for the proxied reply");
+        long observationEnd = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+        while (true) {
+          assertEquals(1, manager.generationActivity().inFlight(),
+              "the drain is held by the proxied stream's generation lease");
+          assertEquals(List.of("model.gguf"), launchedModels(),
+              "no relaunch while the proxied reply is open");
+          assertFalse(reconfigure.isDone(), "the reconfigure waits for the proxied reply");
+          if (System.nanoTime() >= observationEnd) break;
+          Thread.sleep(5);
+        }
 
         StreamingFakeLlamaServer.release(home);
         String rest = new String(body.readAllBytes(), StandardCharsets.UTF_8);

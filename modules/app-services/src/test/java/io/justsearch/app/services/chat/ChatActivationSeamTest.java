@@ -94,9 +94,9 @@ final class ChatActivationSeamTest {
       assertEquals(i, deliveredUnloads.get(), "the manager delivered the unload edge");
       assertTrue(reconciler.awaitQuiescent(30_000));
       // A manager can reload after forwarding has settled, outside the reconciler's clock or
-      // executors. Observe the whole absence window, failing as soon as a reload starts. 400 ms
-      // catches the independent 300-ms reload counterexample without the former one-second wait.
-      assertNull(unexpectedReloads.poll(400, TimeUnit.MILLISECONDS),
+      // executors. Preserve at least the base's one-second absence window after every unload;
+      // the extra 100 ms also covers the earlier one-second reload fault with a margin.
+      assertNull(unexpectedReloads.poll(1_100, TimeUnit.MILLISECONDS),
           "a foreign unload stays unloaded without a delayed manager reload");
       assertEquals(1, activations.size(), "a settled unload forwards no activation");
       assertEquals(Mode.INDEXING, manager.getCurrentMode(), "a foreign unload stays unloaded");

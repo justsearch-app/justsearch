@@ -160,19 +160,43 @@ final class RichDocumentInProcessTest {
   private static void awaitFilesReleased(Path directory) throws IOException, InterruptedException {
     List<Path> paths;
     try (var walk = Files.walk(directory)) {
-      paths = walk.sorted(java.util.Comparator.reverseOrder()).toList();
+      paths = walk.filter(path -> !path.equals(directory))
+          .sorted(java.util.Comparator.reverseOrder()).toList();
     }
     long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
     for (Path path : paths) {
       Path probe = path.resolveSibling(path.getFileName() + ".release-probe");
-      while (true) {
+      awaitMove(path, probe, deadline);
+      try {
+        awaitMove(probe, path, deadline);
+      } catch (IOException | InterruptedException failure) {
         try {
-          Files.move(path, probe);
           Files.move(probe, path);
-          break;
-        } catch (IOException stillShared) {
-          if (System.nanoTime() >= deadline) throw stillShared;
+        } catch (IOException restoreFailure) {
+          failure.addSuppressed(new IOException(
+              "could not restore original name from " + probe + " to " + path, restoreFailure));
+        }
+        if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
+        throw failure;
+      }
+    }
+  }
+
+  private static void awaitMove(Path source, Path target, long deadline)
+      throws IOException, InterruptedException {
+    while (true) {
+      try {
+        Files.move(source, target);
+        return;
+      } catch (IOException stillShared) {
+        if (System.nanoTime() >= deadline) {
+          throw new IOException("timed out moving " + source + " to " + target, stillShared);
+        }
+        try {
           Thread.sleep(5);
+        } catch (InterruptedException interrupted) {
+          interrupted.addSuppressed(stillShared);
+          throw interrupted;
         }
       }
     }
