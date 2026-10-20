@@ -405,3 +405,15 @@ Independent verification remains outstanding. No acceptance record is authored h
   "digest": "sha256:c6f381b4e8f7cb32b6dcfd5a99f4d4e63cd3e86e37381f22b8d7a3d778afd4fa"
 }
 ```
+
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "auditor-ci-coverage-cc6d91b2",
+  "verdict": "accept",
+  "digest": "sha256:c6f381b4e8f7cb32b6dcfd5a99f4d4e63cd3e86e37381f22b8d7a3d778afd4fa",
+  "note": "Merge-only re-audit d34bb0ff0: all 41 flagged files equal replay of main 44fc19e38 to 88907dc8c; the original UnifiedChatView PR patch on new main reproduces the candidate exactly; requested Vitest file passes all 234 tests."
+}
+```
