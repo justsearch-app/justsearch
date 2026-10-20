@@ -694,8 +694,14 @@ mod tests {
         for target in targets.into_iter().flatten() {
             let dir = temp();
             fs::create_dir_all(dir.path().join("native-bin")).unwrap();
-            let links = ["models", "native-bin/llama-server"].map(|name| {
-                let link = dir.path().join(name);
+            let links = [
+                ("models", dir.path().join("models")),
+                (
+                    "native-bin/llama-server",
+                    dir.path().join("native-bin").join("llama-server"),
+                ),
+            ]
+            .map(|(name, link)| {
                 #[cfg(unix)]
                 std::os::unix::fs::symlink(&target, &link).unwrap();
                 #[cfg(windows)]

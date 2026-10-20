@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: agent-session-06wpvp_0
+author-session: agent-session-dt68x6bo
 ---
 
 # Test-intent entries
@@ -82,6 +82,21 @@ checks against c00a0cb24, without repaired: true; the two RS4 checks remain repa
 Existing candidate evidence remains valid and is retained unchanged; the gate does
 not require new fail-before evidence for preservation. Acceptance records are unchanged.
 
+Review history: 2026-10-20 — builder agent-session-dt68x6bo fixed Windows
+junction setup in RN1 by joining native-bin and llama-server separately. Inputs,
+assertions and expected behavior are unchanged. The reset implementation is unchanged.
+The durable reset intent/receipt and staging file are now classified in the store
+register. Prior evidence and acceptance records are retained; independent acceptance
+is required on the final digest. No acceptance record is written in this round.
+
+CI refresh: uiux-reset-ci-original-shell.json, uiux-reset-ci-links.json and
+uiux-reset-ci-root-retry.json refresh all checks whose whole Rust source digest
+changed. They use the same c00a0cb24 compatibility seam, 97dc55c62 and 769eb6ec6
+baselines respectively. The official evidence producer runs in a shared clone,
+with its temporary before checkouts and a separate Cargo cache under the session
+temporary directory; logs remain under tmp/wp51-ci-fixes in this worktree.
+Windows junction execution remains unverified on this Linux host.
+
 ```json
 {
   "entries": [
@@ -128,7 +143,7 @@ not require new fail-before evidence for preservation. Acceptance records are un
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage"
       ],
@@ -163,7 +178,7 @@ not require new fail-before evidence for preservation. Acceptance records are un
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry"
       ],
@@ -198,7 +213,7 @@ not require new fail-before evidence for preservation. Acceptance records are un
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data"
       ],
@@ -233,7 +248,7 @@ not require new fail-before evidence for preservation. Acceptance records are un
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work"
       ],
@@ -268,7 +283,7 @@ not require new fail-before evidence for preservation. Acceptance records are un
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data"
       ],
@@ -296,7 +311,7 @@ not require new fail-before evidence for preservation. Acceptance records are un
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_models_and_runtime_keep_their_bytes"
       ]
@@ -316,7 +331,7 @@ not require new fail-before evidence for preservation. Acceptance records are un
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn3_normal_start_does_not_enumerate_or_modify_stores"
       ]
@@ -336,7 +351,7 @@ not require new fail-before evidence for preservation. Acceptance records are un
         }
       ],
       "behaviour": "A linked native-bin parent is retained as it is; its external runtime and other-application sentinel remain untouched.",
-      "evidence": "gates/test-intent/evidence/uiux-reset-links-refresh.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ci-links.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target"
       ],
@@ -357,7 +372,7 @@ not require new fail-before evidence for preservation. Acceptance records are un
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_nested_links_leave_indexed_files_and_other_applications_untouched"
       ]
@@ -391,7 +406,7 @@ not require new fail-before evidence for preservation. Acceptance records are un
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-original-shell-refresh.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ci-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart"
       ],
@@ -781,7 +796,7 @@ not require new fail-before evidence for preservation. Acceptance records are un
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-links-refresh.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ci-links.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets"
       ],
@@ -802,7 +817,7 @@ not require new fail-before evidence for preservation. Acceptance records are un
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-links-refresh.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ci-links.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart"
       ],
@@ -844,7 +859,7 @@ not require new fail-before evidence for preservation. Acceptance records are un
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-root-retry.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ci-root-retry.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra2_linked_data_root_is_cleared_without_following_internal_links"
       ],
@@ -865,7 +880,7 @@ not require new fail-before evidence for preservation. Acceptance records are un
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-root-retry.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ci-root-retry.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra3_retries_storage_recreated_by_a_previous_session_process"
       ],
