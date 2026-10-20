@@ -135,6 +135,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         return null;
       });
       issued.forEach(this::releaseClaim);
+      // Returning an obsolete owner can also expose its already-PENDING replacement.
+      if (!issued.isEmpty()) {
+        claimCursor = null;
+        claimOrderVersion++;
+      }
     } catch (SQLException failure) {
       throw new OutcomeWriteException("Could not return unfinished processing claims", failure);
     } finally {
@@ -475,6 +480,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   static final int CLAIM_SKIP_BUDGET = 256;
   private volatile boolean claimBudgetExhausted;
   private ClaimKey claimCursor;
+  private long claimOrderVersion;
   private long claimWalkVersion;
   private Long claimRetryDeadline;
 
@@ -682,6 +688,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         stmt.execute("PRAGMA busy_timeout = " + BUSY_TIMEOUT_MS);
         stmt.execute("PRAGMA journal_mode = WAL");
         stmt.execute("PRAGMA synchronous = NORMAL");
+        // REPLACE must fire the implicit DELETE's count triggers, including for plain SQL.
+        stmt.execute("PRAGMA recursive_triggers = ON");
         // Enable incremental auto-vacuum. On new databases this takes effect immediately.
         // On existing databases with auto_vacuum=0, this has no effect until a full VACUUM.
         stmt.execute("PRAGMA auto_vacuum = 2");
@@ -697,6 +705,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // Attach the bounded change stream after the schema is ready.
       changeStream = new IndexingJobsChangeStream(connection, lock, this::ensureOpen);
       walkChanges = new SqliteRecordedWalkChanges(connection);
+      installClaimCursorInvalidation();
 
       log.info("SqliteJobQueue opened: {}", dbPath);
     } catch (SQLException | IOException | RuntimeException | Error failure) {
@@ -1630,6 +1639,34 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     return candidates;
   }
 
+  /** Observe every admission/retry write, including SQL helpers, without retaining job identities. */
+  private void installClaimCursorInvalidation() throws SQLException {
+    org.sqlite.Function.create(connection, "jobs_claim_order_changed", new org.sqlite.Function() {
+      @Override protected void xFunc() throws SQLException {
+        claimOrderVersion++;
+        if (claimCursor != null && new ClaimKey(value_long(0), value_text(1)).compareTo(claimCursor) <= 0) {
+          claimCursor = null;
+        }
+        result();
+      }
+    });
+    try (var stmt = connection.createStatement()) {
+      stmt.execute("""
+          CREATE TEMP TRIGGER jobs_claim_insert AFTER INSERT ON main.jobs
+          WHEN NEW.state='PENDING'
+          BEGIN SELECT jobs_claim_order_changed(NEW.last_updated,NEW.path); END
+          """);
+      stmt.execute("""
+          CREATE TEMP TRIGGER jobs_claim_update AFTER UPDATE ON main.jobs
+          WHEN NEW.state='PENDING' AND (OLD.state IS NOT NEW.state OR OLD.last_updated IS NOT NEW.last_updated
+            OR OLD.path IS NOT NEW.path OR OLD.retry_after IS NOT NEW.retry_after OR OLD.scan_id IS NOT NEW.scan_id
+            OR OLD.walk_seen_epoch IS NOT NEW.walk_seen_epoch OR OLD.unit_revision IS NOT NEW.unit_revision
+            OR OLD.planned_source_sha256 IS NOT NEW.planned_source_sha256)
+          BEGIN SELECT jobs_claim_order_changed(NEW.last_updated,NEW.path); END
+          """);
+    }
+  }
+
   @Override
   public List<IndexJob> pollPending(int limit) {
     claimBudgetExhausted = false;
@@ -1655,6 +1692,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       }
       var nextCursor = new ClaimKey[1];
       var budgetStopped = new boolean[1];
+      long orderVersion = claimOrderVersion;
 
       // Local carrier for a candidate row selected before any mutation happens.
       record ClaimedRow(String path, String collection, JobQueue.EnqueueProvenance provenance,
@@ -1771,7 +1809,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 return claimed;
               });
 
-      claimCursor = nextCursor[0];
+      // A reentrant authority callback may have admitted earlier work during this poll.
+      claimCursor = orderVersion == claimOrderVersion ? nextCursor[0] : null;
       claimBudgetExhausted = budgetStopped[0];
       for (IndexJob claim : result) activeClaims.put(normalizePath(claim.path()), claim);
       if (!result.isEmpty()) {
@@ -1835,6 +1874,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       if (!isIssuedClaim(claim)) return false;
       if (!ownsClaim(claim)) {
         if (claim.walkEpoch() != null) inTransaction(superseded);
+        claimCursor = null;
+        claimOrderVersion++;
         releaseClaim(claim);
         return false;
       }
@@ -2151,6 +2192,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                       stmt.setString(1, transition.committedContentHash());
                       bindOutcomeUpdate(stmt, 2, now, outcome, normalizedPath);
                       rows = executeMutation(stmt::executeUpdate);
+                    } else {
+                      claimCursor = null;
+                      claimOrderVersion++;
                     }
                     rowCounts.add(rows);
                     if (rows > 0 || transition.claim() != null) {

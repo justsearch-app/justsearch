@@ -480,6 +480,33 @@ final class QueueScaleEvidenceTest {
   }
 
   @Test
+  void q12CurrentMillionRowOpenDetectsAndRepairsDrift() throws Exception {
+    Path file = freshCopy(backlog, "q12-current-drift");
+    List<String> savedColumns;
+    String before;
+    try (var queue = new SqliteJobQueue(file)) {
+      queue.open();
+      var conn = (Connection) field(queue, "connection");
+      savedColumns = columns(conn); before = digest(conn, savedColumns);
+      try (var stmt = conn.createStatement()) {
+        stmt.executeUpdate("UPDATE job_counts SET n=n+1,known_bytes=known_bytes+123,unknown_size=unknown_size+1 WHERE state='PENDING'");
+      }
+    }
+    long start = System.nanoTime();
+    try (var queue = new SqliteJobQueue(file)) {
+      queue.open();
+      double seconds = (System.nanoTime() - start) / 1e9;
+      var conn = (Connection) field(queue, "connection");
+      assertEquals(before, digest(conn, savedColumns), "reconciliation changes no saved job fields");
+      assertEquals(directCounts(conn), queue.jobStateCountsStrict());
+      assertEquals(directBytes(conn), queue.pendingBytes());
+      JobCountsTest.assertExact(queue, conn);
+      System.out.printf("Q12 current v23 1M-row open/drift repair=%.3fs, counts/bytes/fields exact%n", seconds);
+      assertTrue(seconds < 60, "current-schema reconciliation exceeds the migration/open budget");
+    }
+  }
+
+  @Test
   void q12MigrationTimeSavedFieldsCountsAndRollback() throws Exception {
     Path legacy = output.resolve("F1-v13.db");
     Files.deleteIfExists(legacy);
