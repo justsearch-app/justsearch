@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-20T13:11:30.153Z",
-  "revision": "7ecbb9a2daaf8f16f7d4bb094da164ce5e6e85ca",
-  "tree": "91558496b01f19b8c4055830873ea7841cf3855c",
+  "createdAt": "2026-10-20T15:12:33.937Z",
+  "revision": "6f3d7280d5052539dac7bb70a90bf0af14127b21",
+  "tree": "f9239bf83bf95db4ec09deb3f75b402474d57f5a",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,43 +21,43 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::urls_accept_only_web_and_mail\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5358
+      "durationMs": 6020
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_rejects_traversal\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 175
+      "durationMs": 186
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_rejects_unc\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 164
+      "durationMs": 189
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_rejects_executables\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 171
+      "durationMs": 189
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_allows_normal_files\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 173
+      "durationMs": 195
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_allows_exe_when_not_blocked\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 168
+      "durationMs": 182
     },
     {
-      "command": "npx vitest run \"src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts\" \"src/shell-v0/commands/searchResultActions.test.ts\" \"src/shell-v0/components/chat/CitationsPanel.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-vitest-2533167-1792501888338.json\"",
+      "command": "npx vitest run \"src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts\" \"src/shell-v0/commands/searchResultActions.test.ts\" \"src/shell-v0/components/chat/CitationsPanel.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-vitest-4025915-1792509152343.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1810
+      "durationMs": 1590
     }
   ],
   "checks": [
@@ -382,5 +382,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:1dd07755cd5e05c8d9ac9f77f50405c3719e7d29fc24efd7fdaaa9754cec9c09"
+  "digest": "sha256:0258e75cd8e538274551a8a486f2c255ffc2c92f27a6206169a423d5c47e5a05"
 }

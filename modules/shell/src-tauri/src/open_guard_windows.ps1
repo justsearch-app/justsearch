@@ -33,12 +33,31 @@ function Observation($entries) {
     Write-Output $json
 }
 if ($Mode -eq 'observe') {
+    # TEMP can contain an 8.3 ancestor (RUNNER~1) while Explorer reports the long name.
+    # Expand BOTH complete paths with Win32; an expansion failure is never a match.
+    Add-Type -TypeDefinition @'
+using System.Runtime.InteropServices;
+using System.Text;
+public static class OpenGuardPaths {
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern uint GetLongPathNameW(string path, StringBuilder result, uint capacity);
+    public static string Expand(string path) {
+        if (string.IsNullOrEmpty(path)) return null;
+        var result = new StringBuilder(32768);
+        uint size = GetLongPathNameW(path, result, (uint)result.Capacity);
+        return size > 0 && size < result.Capacity ? result.ToString() : null;
+    }
+}
+'@
+    $expected = [OpenGuardPaths]::Expand($env:OPEN_GUARD_EXPECTED)
+    if (!$expected) { throw "Cannot expand expected folder '$env:OPEN_GUARD_EXPECTED'" }
     $last = @()
     $deadline = [DateTime]::UtcNow.AddSeconds(15)
     do {
         $last = @(Windows)
         foreach ($entry in $last) {
-            if ($entry.Path -ieq $env:OPEN_GUARD_EXPECTED) {
+            $actual = [OpenGuardPaths]::Expand($entry.Path)
+            if ($actual -and [string]::Equals($actual, $expected, [StringComparison]::OrdinalIgnoreCase)) {
                 # SelectedItems returns a FolderItems collection. Read its documented Count/Item
                 # interface explicitly, retaining the old pipeline result only as a diagnostic.
                 # Never call SelectItem here: that would repair the product's result in the test.
