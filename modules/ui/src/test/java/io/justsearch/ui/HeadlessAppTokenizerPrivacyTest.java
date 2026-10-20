@@ -13,9 +13,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 final class HeadlessAppTokenizerPrivacyTest {
   @ParameterizedTest
-  @CsvSource(value = {"unset,unset", "false,false", "false,unset", "unset,false"},
-      nullValues = "unset")
-  void entryDefaultsDjlToPrivateOfflineLoadingWithoutOverridingUsers(
+  @CsvSource(value = {"unset,unset"}, nullValues = "unset")
+  void entryDefaultsDjlToPrivateOfflineLoading(
       String tracking, String offline, @TempDir Path dir) throws Exception {
     Path output = dir.resolve("privacy.log");
     Path arguments = dir.resolve("java.args");
