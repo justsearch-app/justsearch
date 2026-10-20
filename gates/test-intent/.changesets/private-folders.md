@@ -276,3 +276,14 @@ The rejection below is preserved byte-for-byte. The author supplies no new revie
   "note": "Delegated choices quote words the owner did not write instead of 'resume with remaining work autonomously', and the link and Windows-descriptor fail-before claims run against intermediate commit bc2a09ede (one with a hand-written patch) although at the before-state 4975ceedf a linked folder already worked."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "f20f1489-121b-409d-b017-07a36f5b198a",
+  "verdict": "accept",
+  "digest": "sha256:76342878bfb28711157e92630e3070e411a2855a6199d1ebc23d6c1e648974e9",
+  "note": "Entries match P1-P9 and the delegated choices; at 4975ceedf the 13 repair checks fail by assertion, the four link and keystore preservation checks pass on both, and the live Linux Engine plus shell ledger checks agree."
+}
+```
