@@ -1612,3 +1612,14 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
   "note": "Test-intent classifications, sources and receipts are valid; candidate delivery separately fails Q15/Q26 in the independent installed-Engine probe."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15932-243c-7282-8d8a-c468f484ff60",
+  "verdict": "accept",
+  "digest": "sha256:55de4183e60c1c92e9e837fcd8a676c29f03b69c7dc705cc4e5f07c4b23e18df",
+  "note": "All 28 entries preserve or explicitly supersede baseline intent under Q1–Q27 and the quoted delegation; two repair claims independently fail before and pass after, while installed-system limitations remain separately reported."
+}
+```
