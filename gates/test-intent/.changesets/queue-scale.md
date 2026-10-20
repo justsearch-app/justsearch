@@ -1774,3 +1774,14 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
   "note": "All 28 entries preserve or explicitly supersede baseline intent under Q1–Q27 and the quoted delegation; two repair claims independently fail before and pass after, while installed-system limitations remain separately reported."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15999-0c3d-79a3-b61e-29399505e62a",
+  "verdict": "accept",
+  "digest": "sha256:ffe6dbfd39a1b82f27b1328c0f75cc16dc4e432375eee52a294f7b61406b31d3",
+  "note": "All 33 entries preserve or explicitly supersede baseline intent under Q1–Q27 and the quoted delegation, with terminal-overflow and rail-responsiveness claims independently failing before and passing after."
+}
+```
