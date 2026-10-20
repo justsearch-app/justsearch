@@ -81,14 +81,6 @@ public class LocalApiServer {
    */
   public static final String MCP_ENDPOINT_PATH = "/mcp";
 
-  /**
-   * The MCP session-token bootstrap path. Shared with {@link
-   * ApiSecurityFilters#setupMcpOriginValidation} for the same reason as {@link #MCP_ENDPOINT_PATH}:
-   * this route hands out the credential that gates every mutating call, so the guarded path and the
-   * routed path must not be able to drift apart.
-   */
-  public static final String MCP_TOKEN_PATH = "/api/mcp/token";
-
   // Tempdoc 374 alpha.21 Bug O: not final because the explicit-port-bind-failure
   // fallback rebuilds a fresh Javalin instance — Javalin/Jetty's lifecycle prohibits
   // re-starting a failed instance. Volatile for safe publication after constructor
@@ -692,7 +684,6 @@ public class LocalApiServer {
     if (convApi.resolveAddressController() != null) {
       app.post("/api/document/{id}/resolve-address", convApi.resolveAddressController()::handle, ActivityRole.USER_ACTION);
     }
-    app.get(MCP_TOKEN_PATH, this::handleMcpToken, ActivityRole.OBSERVATION);
     if (convApi.mcpProtocolHandler() != null) {
       app.post(MCP_ENDPOINT_PATH, convApi.mcpProtocolHandler()::handlePost, ActivityRole.PROTOCOL);
       app.delete(MCP_ENDPOINT_PATH, convApi.mcpProtocolHandler()::handleDelete, ActivityRole.PROTOCOL);
@@ -799,10 +790,6 @@ public class LocalApiServer {
     if (port > 0) return port;
     int apiPort = rc.ports().apiPort();
     return apiPort > 0 && apiPort != 8081 ? 8081 : 8082;
-  }
-
-  private void handleMcpToken(Context ctx) {
-    ctx.json(Map.of("token", sessionToken != null ? sessionToken : ""));
   }
 
   private void handleDebugDashboard(Context ctx) {
@@ -963,7 +950,7 @@ public class LocalApiServer {
   }
 
   /**
-   * Returns the session token used for non-GET request authentication.
+   * Returns the session token used for non-public request authentication.
    * This is exposed so the desktop host (Tauri) can deliver it to the UI.
    * Returns null if token enforcement is not enabled.
    */

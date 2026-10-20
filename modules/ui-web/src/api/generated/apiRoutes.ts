@@ -94,7 +94,6 @@ export const API_ROUTES = {
   "GET /api/knowledge/search": { method: "GET", path: "/api/knowledge/search", cohort: "knowledge", requiredCapabilities: [] },
   "GET /api/knowledge/status": { method: "GET", path: "/api/knowledge/status", cohort: "knowledge", requiredCapabilities: [] },
   "GET /api/knowledge/suggest": { method: "GET", path: "/api/knowledge/suggest", cohort: "knowledge", requiredCapabilities: [] },
-  "GET /api/mcp/token": { method: "GET", path: "/api/mcp/token", cohort: "mcp", requiredCapabilities: [] },
   "GET /api/memory": { method: "GET", path: "/api/memory", cohort: "interaction", requiredCapabilities: [] },
   "GET /api/messages/errors/{locale}": { method: "GET", path: "/api/messages/errors/{locale}", cohort: "i18n", requiredCapabilities: [] },
   "GET /api/messages/health-events/{locale}": { method: "GET", path: "/api/messages/health-events/{locale}", cohort: "i18n", requiredCapabilities: [] },

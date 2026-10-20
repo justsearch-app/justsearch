@@ -86,6 +86,10 @@ document with these fields:
   entries; the filesystem transport carries both. The publisher reads
   the list from `RuntimeTransportRegistry` populated at
   `LocalApiServer` route-registration time — single source of truth.
+- `mode` — configured `intent` (`full-desktop` | `headless` | `mcp-lite`)
+  and capability-derived `realized` (`full` | `retrieval-only` | `degraded`).
+  Omitted until the first mode publication. See
+  [ModeInfo](../../modules/app-api/src/main/java/io/justsearch/app/api/runtime/RuntimeManifest.java#L294).
 - `runtimeContract` — the JustSearch Runtime Contract descriptor (tempdoc
   654): the coarse `version` plus a `constituents` block pinning the
   manifest-schema / lifecycle-schema / MCP-protocol / MCP-tool-surface
@@ -96,6 +100,19 @@ document with these fields:
   stability policy, and surface classification:
   [The Runtime Contract](28-runtime-contract.md) +
   [Runtime Contract reference](../reference/runtime-contract.md).
+- `chat` — realized chat-model identity: `profileId` (null means no profile
+  claim), `modelFile` (bare file name), and `mmprojActive` (true/false when
+  known, null when unknown). Omitted before the first chat publication or
+  without an inference runtime. See
+  [ChatInfo](../../modules/app-api/src/main/java/io/justsearch/app/api/runtime/RuntimeManifest.java#L317).
+- `containment` — Engine process-containment `status` (`CONTAINED` |
+  `UNAVAILABLE` | `NOT_APPLICABLE`); `reason` names the failed Windows call
+  and error as `<call>:<error>` only when unavailable. See
+  [ContainmentInfo](../../modules/app-api/src/main/java/io/justsearch/app/api/runtime/RuntimeManifest.java#L348).
+- `incarnation` — supervisor `session` and Engine-start count `n`, starting
+  at 1. Parsed from `JUSTSEARCH_ENGINE_INCARNATION=<session>/<n>`; omitted
+  when absent or malformed. See
+  [IncarnationInfo](../../modules/app-api/src/main/java/io/justsearch/app/api/runtime/RuntimeManifest.java#L362).
 
 History per instance lands at `<dataDir>/runtime/instances/<instanceId>/`
 (tempdoc 501 §13.4.4 / Phase 24-25):
@@ -123,12 +140,18 @@ state of its own.
 
 ### HTTP transport
 
-`GET /api/runtime/manifest` returns the same JSON document, with one
-explicit redaction: `head.sessionToken` is stripped. The filesystem
-manifest is gated by filesystem permissions; the HTTP endpoint is
-reachable by anything that can resolve the loopback port. Tools that
-need the token use the existing `/api/mcp/token` endpoint (in-process)
-or stdout drain (the Tauri sidecar's redaction-aware reader).
+`GET /api/runtime/manifest` returns the public projection with `head.sessionToken` stripped.
+The canonical `runtime/manifest.json` is the credential's only published home: POSIX mode 0600,
+or a Windows ACL granting access only to the owner and SYSTEM. Temporary files receive these
+permissions before the token is written, and replacement repairs earlier readable manifests.
+Native clients read `head.sessionToken` from this file; no HTTP endpoint or stdout line provides it.
+New instance snapshots and publish logs omit the token. Existing history is left on disk and
+redacted when served.
+
+In production every request requires `X-JustSearch-Session`, including streams, except `OPTIONS`
+and `GET`/`HEAD` on `/api/health`, `/api/runtime/live`, `/api/runtime/ready`, `/api/status`,
+`/api/runtime/manifest`, and `/.well-known/justsearch/manifest.json`. Public responses never include
+the credential. The desktop stream transport uses fetch headers, with no token in the URL.
 
 Change notification rides a dedicated SSE stream:
 `GET /api/runtime/manifest/stream` with `streamId
@@ -187,7 +210,7 @@ site, not at a single static helper.
 actual process-start metadata (when available). Metadata is diagnostic only; OS
 locks release on process exit and refusal never deletes the lock file. Same-JVM
 contenders are refused before a second channel can disturb the native lock. Held by HeadlessApp for
-the life of the process; a second Head against the same dataDir exits
+the life of the process; a second Engine against the same dataDir exits
 with a structured diagnostic and code 2.
 
 ## What stays unchanged

@@ -614,8 +614,11 @@ async function waitUntil(label, deadline, probe) {
   return waitFor(label, Math.max(1, deadline - Date.now()), probe);
 }
 async function request(apiPort, endpoint, options = {}, timeoutMs = 5000) {
+  const manifest = readJson(path.join(data, 'runtime', 'manifest.json'));
+  const headers = { ...(options.headers ?? {}) };
+  if (manifest?.head?.sessionToken) headers['X-JustSearch-Session'] = manifest.head.sessionToken;
   const response = await fetch(`http://127.0.0.1:${apiPort}${endpoint}`, {
-    ...options,
+    ...options, headers,
     signal: AbortSignal.timeout(timeoutMs),
   });
   const text = await response.text();

@@ -200,12 +200,12 @@ mutating route, and a plain `npx @modelcontextprotocol/inspector --cli
 `WWW-Authenticate` header — the Inspector CLI infers OAuth from the bare 401 and
 demands an interactive TTY it cannot get in a round. **Verify reachability with a
 raw `POST /mcp` JSON-RPC `tools/list` call carrying the session token instead**
-(fetch it from `GET /api/mcp/token` — see *Key API endpoints* below for the
+(read it from the owner-only runtime manifest — see *Key API endpoints* below for the
 token-fetch pattern):
 
 ```powershell
 $port = (Get-Content "$env:APPDATA\io.justsearch.shell\runtime\manifest.json" | ConvertFrom-Json).head.apiPort
-$token = (Invoke-RestMethod -UseBasicParsing "http://127.0.0.1:$port/api/mcp/token").token
+$token = [string](Get-Content "$env:APPDATA\io.justsearch.shell\runtime\manifest.json" -Raw | ConvertFrom-Json).head.sessionToken
 Invoke-RestMethod -UseBasicParsing -Method Post -Uri "http://127.0.0.1:$port/mcp" `
   -Headers @{ "X-JustSearch-Session" = $token } -ContentType "application/json" `
   -Body '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
@@ -639,25 +639,24 @@ request shapes against a server that was telling it exactly what was wrong
 the whole time. Wrap mutating calls in `try/catch` and print the body on
 failure before concluding the endpoint is broken.
 
-**The packaged candidate boots `prod=true` — every mutating call needs the session
-token.** This is NOT the dev stack: a Sandbox candidate is the SHIPPED package,
-and `ApiSecurityFilters` enforces the session token on every `POST`/`PUT`/`DELETE`
-globally, with no path exemption (it applies to `/mcp` too). `GET`/`OPTIONS` need
-no token. Fetch the token once from `GET /api/mcp/token` (itself unauthenticated by
-design — the desktop UI/shipped MCPB bridge use exactly this pattern) and attach it
-as the `X-JustSearch-Session` header on every mutating call; omit it and you get a
-`401` with `{"error":"Missing or invalid session token","errorCode":"UI_TOKEN_REQUIRED"}`,
+**The packaged candidate boots `prod=true` — every non-public request needs the session token.**
+Read `head.sessionToken` from the owner-only canonical runtime manifest and attach it as
+`X-JustSearch-Session`, including GETs and streams. Only OPTIONS and GET/HEAD on `/api/health`,
+`/api/runtime/live`, `/api/runtime/ready`, `/api/status`, `/api/runtime/manifest`, and
+`/.well-known/justsearch/manifest.json` are public. The removed `/api/mcp/token` returns 401
+without a token and 404 with a valid one. Neither HTTP nor stdout provides the credential.
+Missing or wrong tokens get 401 with `UI_TOKEN_REQUIRED`,
 not the endpoint's normal response. Worked example:
 
 ```powershell
 $port = (Get-Content "$env:APPDATA\io.justsearch.shell\runtime\manifest.json" | ConvertFrom-Json).head.apiPort
-$token = (Invoke-RestMethod -UseBasicParsing "http://127.0.0.1:$port/api/mcp/token").token
+$token = [string](Get-Content "$env:APPDATA\io.justsearch.shell\runtime\manifest.json" -Raw | ConvertFrom-Json).head.sessionToken
 $headers = @{ "X-JustSearch-Session" = $token }
 Invoke-RestMethod -UseBasicParsing -Method Post -Uri "http://127.0.0.1:$port/api/knowledge/search" `
   -Headers $headers -ContentType "application/json" -Body '{"query":"test","limit":5}'
 ```
 
-Key API endpoints (`GET` needs no token; every other method needs the
+Key API endpoints (non-public reads and all writes need the
 `X-JustSearch-Session` header above):
 
 | Endpoint | Method | Purpose |
@@ -675,7 +674,6 @@ Key API endpoints (`GET` needs no token; every other method needs the
 | `/api/ai/runtime/status` | GET | Per-feature runtime status (NVML VRAM, ONNX `modelActive` flags) |
 | `/api/inference/status` | GET | LLM runtime state |
 | `POST /mcp` | POST | **Production MCP endpoint** (Streamable HTTP) — the agent-facing retrieval backend. Needs the session token like any other POST; see *The `/mcp` product endpoint* above for the current verification procedure. |
-| `/api/mcp/token` | GET | Session-token issuance (unauthenticated by design — this is how a legitimate client gets the token in the first place) |
 
 Full body shapes for every endpoint live in `docs/reference/api-contract-map.md` (staged under `docs/`).
 

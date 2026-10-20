@@ -76,9 +76,8 @@ This dev task stays in development mode and does not require a session token.
 ## Authenticate API requests
 
 The packaged headless launchers and the Linux production command above require a
-per-boot session token on every POST, PUT and DELETE request, including search and
-the MCP endpoint. Read `head.sessionToken` from the local
-`<data>/runtime/manifest.json` file, where `<data>` is the Engine data directory
+per-boot session token for every non-public API request. Read `head.sessionToken` from the local
+`<data>/runtime/manifest.json` file (POSIX 0600; Windows owner and SYSTEM only), where `<data>` is the Engine data directory
 (or `JUSTSEARCH_DATA_DIR` when set), and send it in the `X-JustSearch-Session` header:
 
 ```bash
@@ -88,6 +87,12 @@ curl -s -X POST http://127.0.0.1:33221/api/knowledge/search \
   -H 'Content-Type: application/json' \
   -d '{"query":"example"}'
 ```
+
+No HTTP endpoint or stdout line provides this token. `OPTIONS` and `GET`/`HEAD` on
+`/api/health`, `/api/runtime/live`, `/api/runtime/ready`, `/api/status`,
+`/api/runtime/manifest`, and `/.well-known/justsearch/manifest.json` remain public.
+All other requests, including streams, require the header. An MCP bridge with an explicit
+`--port` or `JUSTSEARCH_API_PORT` override also requires `JUSTSEARCH_SESSION_TOKEN`.
 
 Use the Engine's actual API port in place of `33221` if different. The token changes
 on each boot; missing or incorrect tokens receive HTTP `401` on protected requests.
@@ -110,15 +115,15 @@ curl -s http://127.0.0.1:33221/api/runtime/manifest | jq '.mode'
 To see the download weight a mode implies before installing:
 
 ```bash
-curl -s http://127.0.0.1:33221/api/ai/install/plan-preview | jq '.tiers'
+curl -s -H "X-JustSearch-Session: $SESSION_TOKEN" http://127.0.0.1:33221/api/ai/install/plan-preview | jq '.tiers'
 ```
 
 ## Notes
 
-- The service binds only to loopback (`127.0.0.1`); production POST, PUT and DELETE
-  requests, including `POST /mcp`, also require the per-boot session token.
-- Agent clients connect over the production MCP endpoint (`POST /mcp`) and must send
-  the token in the `X-JustSearch-Session` header (the production MCP server discovers
-  the Engine through the manifest and fetches the token from `/api/mcp/token`); which tools a lite
+- The service binds only to loopback (`127.0.0.1`); production non-public requests also
+  require the per-boot session token.
+- Agent clients connect over the production MCP endpoint (`POST /mcp`) and send the token
+  in the `X-JustSearch-Session` header (the production MCP server reads it from the
+  manifest it validated); which tools a lite
   deployment exposes is governed separately (see the MCP production server reference).
 - This is a launch mode, not a separate build — the same `ui-headless.jar` runs every mode.

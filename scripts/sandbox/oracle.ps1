@@ -11,10 +11,10 @@
   candidate installer runs and again with -Label post-upgrade afterward, so
   the two summaries can be diffed directly.
 
-  Port and session token are discovered from the runtime manifest and
-  GET /api/mcp/token at run time (never hardcoded), so this works
+  Port and session token are read from the owner-only canonical runtime manifest
+  at run time (never hardcoded), so this works
   unmodified against any instance/port. See CLAUDE.md's session-token
-  section: every mutating call needs X-JustSearch-Session or it 401s,
+  section: every non-public call needs X-JustSearch-Session or it 401s,
   which without this script's explicit status-code reporting can render as
   a false "index emptied" finding (round 10 nearly filed exactly that).
 
@@ -41,7 +41,7 @@ param([string]$Label = "unlabeled", [string]$EvidenceDir = ".\evidence")
 $mf = "$env:APPDATA\io.justsearch.shell\runtime\manifest.json"
 $port = (Get-Content $mf -Raw | ConvertFrom-Json).head.apiPort
 $base = "http://127.0.0.1:$port"
-$tok = (Invoke-RestMethod -UseBasicParsing "$base/api/mcp/token").token
+$tok = [string](Get-Content -LiteralPath $mf -Raw | ConvertFrom-Json).head.sessionToken
 $H = @{ "X-JustSearch-Session" = $tok }
 
 $queries = @(

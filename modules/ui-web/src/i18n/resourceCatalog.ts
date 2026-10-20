@@ -21,6 +21,7 @@
  * conditional GET on subsequent boots, graceful degradation if storage
  * is unavailable. Cache keys are namespace-scoped to avoid pollution.
  */
+import { authorizedFetch } from '../shell-v0/api/authorizedFetch.js';
 
 /**
  * 478 §4.F refactor (slice 477 follow-on): owner-scoped resource
@@ -36,13 +37,6 @@
  * `installedTranslationKeys: string[]` array per plugin to support
  * removal-by-key-list. Removal is now a single namespace delete.
  */
-
-// This module is deliberately import-free (foundational i18n layer; shell-v0 imports FROM
-// it, per the FSD-style boundary in eslint.config.js — see the 9 shell-v0 consumers).
-// Importing `authorizedFetch` from shell-v0/api would invert that dependency direction.
-// Both catalog fetches below are GETs (TOKEN_FREE_METHODS in authorizedFetch.ts exempts GET
-// from session-token attachment), so the two are behaviorally identical here regardless.
-/* eslint-disable no-restricted-globals -- see note above; GET-only boot fetches, no token needed */
 
 let coreCatalog: Record<string, string> = {};
 const pluginCatalogs = new Map<string, Record<string, string>>();
@@ -171,7 +165,7 @@ async function fetchResourceCatalog(baseUrl: string): Promise<void> {
     if (cached?.etag) {
       headers['If-None-Match'] = cached.etag;
     }
-    const response = await fetch(`${baseUrl}/api/messages/registry-resource/en`, { headers });
+    const response = await authorizedFetch(`${baseUrl}/api/messages/registry-resource/en`, { headers });
 
     if (response.status === 304) {
       // The backend answered: the seeded body is current, and the boot is closed (941).
@@ -242,7 +236,7 @@ async function fetchCatalogMessages(
   baseUrl: string,
   namespace: string,
 ): Promise<Record<string, string> | null> {
-  const response = await fetch(`${baseUrl}/api/messages/${namespace}/en`, { cache: 'no-cache' });
+  const response = await authorizedFetch(`${baseUrl}/api/messages/${namespace}/en`, { cache: 'no-cache' });
   if (!response.ok) return null;
   const body = (await response.json()) as ResourceCatalogResponse;
   if (body?.messages && typeof body.messages === 'object') return body.messages;

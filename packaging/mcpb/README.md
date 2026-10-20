@@ -35,17 +35,18 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    follows the `discovery.desktopAppDataDir` entry of `contracts/platform-paths/spec.v1.json`.
 2. If no running JustSearch is found, it exits with an actionable message that
    names every location it tried (install + launch the desktop app).
-3. It also fetches the desktop session token (`GET /api/mcp/token`) and sends
-   it as `X-JustSearch-Session` on every POST, so the bridge keeps working if
-   the packaged app enforces the token on non-GET requests
-   (`ApiSecurityFilters.setupSessionTokenEnforcement`). Every request to the Engine
-   (probes, token, each message's POST, the GET stream) goes through one function
+3. After proving the Engine, it takes `head.sessionToken` from that validated owner-only
+   runtime manifest and sends `X-JustSearch-Session` on requests, including the GET stream.
+   Discovery probes remain unauthenticated. Every request to the Engine
+   (public probes, each message's POST, the GET stream) goes through one function
    (`engineRequest` in `server/engine-discovery.cjs`) whose keep-alive connections carry
    nothing until the manifest still names the same Engine and the OS reports that pid as the
    owner of the server end of that very connection; a reused connection needs no new proof.
    If a proof fails, nothing is sent: the bridge drops the token and re-runs discovery, so a
    token never reaches whatever took the port (a `JUSTSEARCH_API_PORT` pin is the operator's
    choice and is used as given).
+   An explicit `JUSTSEARCH_API_PORT` requires `JUSTSEARCH_SESSION_TOKEN`; the bridge fails
+   with a message naming the variable if absent. No token HTTP endpoint or stdout line is used.
 4. Otherwise it forwards newline-delimited JSON-RPC from stdin to
    `http://127.0.0.1:<port>/mcp` (JSON and SSE response bodies both handled)
    and relays server messages back on stdout. If the app restarts on a
@@ -156,3 +157,6 @@ curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.jus
 Note the registry is in preview (breaking changes / data resets possible).
 MCP clients validate `fileSha256` before installing — a wrong hash breaks
 installs even though the registry itself does not check it.
+
+MCPB 0.3.1 works with the previous Engine release and the new file-based credential boundary.
+Older bundles fail with HTTP 401 against the new Engine; install the updated bundle.

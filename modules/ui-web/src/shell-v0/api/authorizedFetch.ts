@@ -1,19 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-/**
- * The one authorized-request seam for shell-v0 (tempdoc 804 B3).
- *
- * The packaged shell boots the backend with `prod=true`, where
- * `ApiSecurityFilters` requires the session-token header on POST/PUT/DELETE
- * (GET/OPTIONS are exempt, and there are no path exemptions). shell-v0 issued
- * bare `fetch` from every mutating call site, so every write 401'd in the
- * shipped app while dev/test tiers (no `prod=true`) stayed green.
- *
- * This helper is deliberately NOT a second token authority: the resolver
- * (`resolveSessionTokenFromTauri`), the cache reader (`getSessionToken`) and the
- * header constant (`SESSION_TOKEN_HEADER`) all stay in `api/http`. It only
- * decides WHEN to attach — awaiting resolution before headers are built, the
- * same ordering `api/streams.ts` uses for its stream POSTs.
- */
+/** Authenticated Engine requests, with one token refresh after a pre-execution rejection. */
 
 import {
   SESSION_TOKEN_HEADER,
@@ -23,9 +9,6 @@ import {
 } from '../../api/http.js';
 import { fetchWithAdmissionWait } from '../../api/admissionFetch.js';
 import { observeStatusResponse } from '../../api/statusInvalidation.js';
-
-/** Methods the backend exempts from token enforcement (ApiSecurityFilters). */
-const TOKEN_FREE_METHODS = new Set(['GET', 'HEAD']);
 
 /** The backend's error code for "this request needs a session token it did not carry". */
 const TOKEN_REQUIRED_CODE = 'UI_TOKEN_REQUIRED';
@@ -60,21 +43,7 @@ function withToken(headers: HeadersInit | undefined, token: string): HeadersInit
   return { ...(headers ?? {}), [SESSION_TOKEN_HEADER]: token } as Record<string, string>;
 }
 
-function resolveMethod(input: RequestInfo | URL, init?: RequestInit): string {
-  if (init?.method) return init.method.toUpperCase();
-  if (typeof Request !== 'undefined' && input instanceof Request) {
-    return input.method.toUpperCase();
-  }
-  return 'GET';
-}
-
-/**
- * `fetch` with the desktop session token attached to mutating requests.
- *
- * Signature-compatible with the global `fetch`, so it can be dropped in as a
- * `fetchImpl` default. GET/HEAD pass straight through. An explicit
- * `X-JustSearch-Session` header set by the caller always wins.
- */
+/** Adds the desktop token on every method; an explicit caller header wins. */
 export async function authorizedFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
@@ -85,11 +54,6 @@ export async function authorizedFetch(
 }
 
 async function sendAuthorized(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const method = resolveMethod(input, init);
-  if (TOKEN_FREE_METHODS.has(method)) {
-    return globalFetch(input, init);
-  }
-
   // A Request body is single-use, so the retry needs its own copy taken BEFORE the first send.
   const retryInput =
     typeof Request !== 'undefined' && input instanceof Request ? input.clone() : input;
