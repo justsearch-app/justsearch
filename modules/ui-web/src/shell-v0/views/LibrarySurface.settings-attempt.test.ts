@@ -178,4 +178,32 @@ describe('Library retained-base exclusions', () => {
     expect(library.excludesLoaded).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  for (const [kind, count, makePattern, message] of [
+    ['input', 513, (i: number) => `file${i}.txt`, 'Invalid settings request'],
+    ['expanded', 257, (i: number) => `directory${i}`, 'Invalid settings request'],
+  ] as const) {
+    it(`EX4 editor reports ${kind} limit refusal without applying or discarding the draft`, async () => {
+      const { library, send, invoke } = fixture();
+      send.mockResolvedValueOnce(json({ ui: { excludePatterns: ['saved'] }, witness: observed }))
+        .mockResolvedValueOnce(json({ errorCode: 'INVALID_REQUEST', error: message }, 400));
+      await library.loadExcludes();
+      const patterns = Array.from({ length: count }, (_, index) => makePattern(index));
+      const draft = patterns.join('\n');
+      library.excludesText = draft;
+      await library.handlePreviewExcludes();
+      expect(JSON.parse(String(send.mock.calls[1]?.[1]?.body)).ui.excludePatterns).toEqual(patterns);
+      expect(invoke).not.toHaveBeenCalled();
+      expect(library.excludesText).toBe(draft);
+      expect(library.error).toBe(message);
+      expect(library.excludesBusy).toBe(false);
+      document.body.appendChild(library);
+      await library.updateComplete;
+      expect(library.shadowRoot?.querySelector('.error-banner')?.textContent).toContain(message);
+      library.remove();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  }
+
 });
