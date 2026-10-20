@@ -147,6 +147,13 @@ export interface ConversationEntry {
   nodeLabel?: string;
   /** Tempdoc 859 §A — a `reasoning` entry's measured duration (first token → first output). */
   durationMs?: number;
+  /** WP6.2 — a `steer-directive` entry's id and what became of it ('queued'|'applied'|'not_applied'). */
+  directiveId?: string;
+  directiveOutcome?: string;
+  /** WP6.2 — the request id of the steer send that produced a `steer-directive`, as its queued report echoes it. */
+  clientRequestId?: string;
+  /** WP6.2 — why a direction was not applied ('run_finished', 'run_stopped', …). */
+  directiveReason?: string;
   timestamp: number;
 }
 
@@ -175,6 +182,12 @@ import type {
   AgentSentenceCite,
 } from '../../api/generated/shape-handlers/shared.js';
 export type { AgentSource, AgentSentenceCite };
+
+/**
+ * WP6.2 S8.2 — the `phase` of a steer send's note while that send's outcome is unconfirmed. The note
+ * is window-local (never saved) and stays until the run's report of that send's own direction removes it.
+ */
+export const UNCONFIRMED_STEER_PHASE = 'steer-unconfirmed';
 
 /**
  * Tempdoc 577 §2.14 Root III — one agent tool as the authority-space projection reads it (the rich
@@ -615,6 +628,9 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   // user-initiated cancel (just end). Set right before the watchdog aborts; consumed in the catch.
   private liveWatchdogFired = false;
   private pendingAutoApprovals: string[] = [];
+  // WP6.2 S8.2 — steer sends whose outcome is unknown (answer lost or a status that can follow the run
+  // queueing the direction): the note shown for each, until the run reports the direction that send produced.
+  private unconfirmedSteers: Array<{ clientRequestId: string; noteId: string }> = [];
   // 543-fwd #6 — causation: the previous agent tool-call's journal entry id in
   // the CURRENT turn. The bridge chains each tool-call to it so the journal
   // records a per-turn causation chain (real-agent causation was empty before —
@@ -687,35 +703,74 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    */
   async steer(text: string): Promise<boolean> {
     const trimmed = text.trim();
-    if (!trimmed || !this.sessionId) return false;
+    if (!trimmed) return false;
+    if (!this.sessionId) {
+      this.steerFailureNote('Could not send your direction — the run has not started yet. Try again in a moment.');
+      return false;
+    }
+    // WP6.2 — this send's own id: the run echoes it in the queued report of the direction it produces,
+    // so two sends with the same words, or another client's, are told apart.
+    const clientRequestId = crypto.randomUUID();
+    let failure: string;
     try {
       const res = await authorizedFetch(`${this.apiBase}/api/chat/agent/steer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: this.sessionId, text: trimmed }),
+        body: JSON.stringify({ sessionId: this.sessionId, text: trimmed, clientRequestId }),
       });
-      if (!res.ok) {
-        // Tempdoc 565 §33 — a failed steer (404: the run finished between render and submit) must NOT be
-        // silent. Surface a one-line system note so the user knows their direction didn't land.
-        this.steerFailureNote();
+      if (res.ok) return true;
+      // Tempdoc 565 §33 — a failed steer must NOT be silent. WP6.2 — and must not claim more than it
+      // knows: the steer handler answers 404 only when no live run took the direction
+      // (AgentController.handleSteeringDirective → AgentSession.submitDirection refused it), so 404
+      // alone means it was not applied.
+      if (res.status === 404) {
+        this.steerFailureNote('Could not steer — the run already finished.');
         return false;
       }
-      return true;
+      failure = `Could not confirm your direction reached the run (HTTP ${res.status}).`;
     } catch {
-      this.steerFailureNote();
-      return false;
+      failure = 'Could not confirm your direction reached the run — the connection to JustSearch failed.';
     }
+    // WP6.2 S8.2 — any other failure can follow the run queueing it (the handler maps a failure after
+    // queueing to 400; a proxy can answer 5xx; the answer itself can be lost), so the outcome is unknown
+    // and the run's own reports for this direction decide what is shown. One that already arrived
+    // (the report can come over the stream before the answer) settles it now; otherwise the note says
+    // the outcome is unconfirmed until a report removes it. The text is not handed back to re-send: the
+    // run may already have applied it.
+    if (this.reportedFor(clientRequestId)) return false;
+    this.steerFailureNote(`${failure} If it did, it shows here as your direction.`, UNCONFIRMED_STEER_PHASE);
+    this.unconfirmedSteers.push({ clientRequestId, noteId: this.conversation[this.conversation.length - 1]!.id });
+    return false;
   }
 
-  /** Tempdoc 565 §33 — a one-line system note when a steer couldn't be delivered (the run finished). */
-  private steerFailureNote(): void {
+  /**
+   * WP6.2 — whether the run reported the direction a send produced: only the report that echoes the
+   * send's own request id. A report that echoes none is another send's (another client's, or from a
+   * server before the echo), whatever its words.
+   */
+  private reportedFor(clientRequestId: string): boolean {
+    return this.conversation.some((e) => e.type === 'steer-directive' && e.clientRequestId === clientRequestId);
+  }
+
+  /** WP6.2 — a run report for a direction whose send was unconfirmed replaces the unconfirmed note. */
+  private settleUnconfirmedSteers(): void {
+    const settled = this.unconfirmedSteers.filter((u) => this.reportedFor(u.clientRequestId));
+    if (settled.length === 0) return;
+    this.unconfirmedSteers = this.unconfirmedSteers.filter((u) => !settled.includes(u));
+    const notes = new Set(settled.map((u) => u.noteId));
+    this.conversation = this.conversation.filter((e) => !notes.has(e.id));
+  }
+
+  /** Tempdoc 565 §33 — a one-line system note when a steer couldn't be delivered. */
+  private steerFailureNote(content: string, phase?: string): void {
     this.conversation = [
       ...this.conversation,
       {
         id: this.nextEntryId(),
         type: 'progress',
-        content: 'Could not steer — the run already finished.',
+        content,
         severity: 'warn',
+        ...(phase ? { phase } : {}),
         timestamp: Date.now(),
       },
     ];
@@ -852,6 +907,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   /** Clears the run-observable state (NOT the roster/tools) so a replay seek re-applies from scratch. */
   private resetRunState(): void {
     this.conversation = [];
+    this.unconfirmedSteers = [];
     this.toolCalls = {};
     this.streamingText = '';
     this.lastStreamedAnswer = '';
@@ -1769,19 +1825,52 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   /**
-   * Tempdoc 565 §30 — the agent loop drained a human steering directive at a step boundary; append it
-   * as a `steer-directive` entry. The live projection renders it as a human-origin run-spine landmark
-   * + a "Your direction: …" body chip, so the user sees their interject land in the run.
+   * Tempdoc 565 §30 — a human steering directive was acknowledged; show it as a `steer-directive`
+   * entry. The live projection renders it as a human-origin run-spine landmark + a "Your direction: …"
+   * body chip, so the user sees their interject land in the run. WP6.2 — each direction is reported
+   * queued, then applied or not applied: a later report updates the entry with the same
+   * `directiveId` in place, and a late "queued" never undoes a final outcome. An acknowledgement
+   * without an id (written before directions had outcomes, e.g. in a replayed transcript) never proved
+   * the direction reached the model, so it shows nothing, as in the canonical thread record.
    */
   onDirectiveAcknowledged(payload: unknown): void {
-    this.commitStreamingText();
     const d = (payload ?? {}) as Record<string, unknown>;
     const text = typeof d.directiveText === 'string' ? d.directiveText : '';
-    if (!text) return;
+    const directiveId = typeof d.directiveId === 'string' ? d.directiveId : undefined;
+    if (!text || !directiveId) return;
+    const outcome = typeof d.outcome === 'string' ? d.outcome : undefined;
+    const reason = typeof d.reason === 'string' ? d.reason : undefined;
+    const clientRequestId = typeof d.clientRequestId === 'string' ? d.clientRequestId : undefined;
+    const shown = this.conversation.findIndex((e) => e.type === 'steer-directive' && e.directiveId === directiveId);
+    if (shown >= 0) {
+      const conversation = [...this.conversation];
+      if (outcome === 'queued') {
+        // A queued report after the final one only adds the request id it echoes.
+        if (!clientRequestId || conversation[shown]!.clientRequestId) return;
+        conversation[shown] = { ...conversation[shown]!, clientRequestId };
+      } else {
+        conversation[shown] = { ...conversation[shown]!, directiveOutcome: outcome, directiveReason: reason };
+      }
+      this.conversation = conversation;
+      this.settleUnconfirmedSteers();
+      this.notify();
+      return;
+    }
+    this.commitStreamingText();
     this.conversation = [
       ...this.conversation,
-      { id: this.nextEntryId(), type: 'steer-directive', content: text, timestamp: Date.now() },
+      {
+        id: this.nextEntryId(),
+        type: 'steer-directive',
+        content: text,
+        directiveId,
+        ...(outcome ? { directiveOutcome: outcome } : {}),
+        ...(reason ? { directiveReason: reason } : {}),
+        ...(clientRequestId ? { clientRequestId } : {}),
+        timestamp: Date.now(),
+      },
     ];
+    this.settleUnconfirmedSteers();
     this.notify();
   }
 
@@ -1861,7 +1950,10 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   private dispatchStreamEvent(stream: AbortController, event: string, payload: unknown): void {
-    if (this.abortController !== stream || stream.signal.aborted || !this.isStreaming || this.replayMode) return;
+    if (this.abortController !== stream || stream.signal.aborted || this.replayMode) return;
+    // WP6.2 — a run reports the directions it never sent once it has stopped, so after `done` (or an
+    // error) the same stream still carries their final outcome; nothing else changes a finished run.
+    if (!this.isStreaming && event !== 'directive_acknowledged') return;
     this.dispatchEvent(event, payload);
   }
 

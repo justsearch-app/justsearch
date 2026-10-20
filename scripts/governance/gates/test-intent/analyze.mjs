@@ -20,7 +20,8 @@
  *      the current content, plus the audit record on audit-selected PRs.
  */
 
-import { relative } from 'node:path';
+import { lstatSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
 
 import { loadChangesets } from '../../lib/changeset-loader.mjs';
 import { TEST_EFFICACY_CLASSIFICATIONS } from '../test-efficacy/classifications.mjs';
@@ -39,6 +40,7 @@ import { computeDigest, entryItems, normalizeText, parseChangeset, sha256 } from
 import { validateEvidence } from './evidence.mjs';
 import { BaseResolutionError, diffWorkingTree, git, readAtRef, readWorking, resolveBase } from './git-diff.mjs';
 import { RustScanError, extractTestItems, testModuleFiles } from './rust-tests.mjs';
+import { isIsolatedJvmTestSource, mayDeclareJvmType } from './jvm-test-source.mjs';
 import {
   LOGIC_SEAMS_ITEM,
   LOGIC_SEAMS_PATH,
@@ -49,6 +51,7 @@ import {
   executionContext,
   isOutOfScopeTestLike,
   isRustSource,
+  isStandaloneTestSource,
 } from './scope.mjs';
 import { buildConfigChange, buildConfigKind } from './build-config.mjs';
 import { validateSource } from './sources.mjs';
@@ -60,6 +63,7 @@ const RUST_ITEM_SUFFIX = '#cfg(test)';
 const TEST_EFFICACY_CHANGESETS = 'gates/test-efficacy/.changesets/';
 const nonEmpty = (v) => typeof v === 'string' && v.trim().length > 0;
 const hashText = (t) => (t === null ? null : sha256(normalizeText(t)));
+const pathCollisionKey = (p) => p.normalize('NFC').toLowerCase();
 
 function finding(rule, level, message, uri) {
   return { ruleId: `test-intent/${rule}`, level, message, ...(uri ? { uri } : {}) };
@@ -104,14 +108,72 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
   } catch (e) {
     if (!(e instanceof BaseResolutionError)) throw e;
     findings.push(finding('base-unresolved', 'error', `${e.message} The gate fails closed.`));
-    return { verdict: 'fail', findings, base: null, flagged: [], moves: [], outOfScope: [], changesets: [], uncovered: [] };
+    return { verdict: 'fail', findings, base: null, flagged: [], exempt: [], moves: [], outOfScope: [], changesets: [], uncovered: [] };
   }
 
   const { changes, baseBlobs } = diffWorkingTree(base.ref, repoRoot);
   const changedPaths = new Set(changes.map((c) => c.path));
+  // Check the base as well as the diff: case-only or Unicode-normalization-only additions can
+  // replace existing files on some filesystems, even when the base path is deleted in this change.
+  const casePaths = new Map();
+  const allPaths = new Set([...baseBlobs.keys(), ...changedPaths]);
+  const prefixes = new Map();
+  const folders = new Set();
+  for (const p of allPaths) {
+    const key = pathCollisionKey(p);
+    casePaths.set(key, (casePaths.get(key) ?? 0) + 1);
+    const parts = p.split('/');
+    for (let i = 1; i <= parts.length; i++) {
+      const prefix = parts.slice(0, i).join('/');
+      const key = pathCollisionKey(prefix);
+      if (!prefixes.has(key)) prefixes.set(key, new Set());
+      prefixes.get(key).add(prefix);
+      if (i < parts.length) folders.add(prefix);
+    }
+  }
+  // Lowercasing cannot prove arbitrary Unicode names safe across filesystems (for example long
+  // s versus ASCII s). Exempt only plain ASCII components, with no file/folder or spelling
+  // collision at any prefix. Identically spelled shared folders are legitimate.
+  const isolatedPath = (rel) => {
+    const parts = rel.split('/');
+    if (parts.some((part) => !/^[A-Za-z0-9._-]+$/.test(part))) return false;
+    for (let i = 1; i <= parts.length; i++) {
+      const prefix = parts.slice(0, i).join('/');
+      const matches = prefixes.get(pathCollisionKey(prefix));
+      if (matches.size !== 1 || !matches.has(prefix)) return false;
+      if (i < parts.length ? allPaths.has(prefix) : folders.has(prefix)) return false;
+    }
+    return true;
+  };
   const changeStatus = new Map(changes.map((c) => [c.path, c.status]));
   const readBase = (rel) => readAtRef(base.ref, rel, repoRoot);
   const readNow = (rel) => readWorking(rel, repoRoot);
+
+  // Check index mode as well as the filesystem: core.symlinks=false may materialize a link as a
+  // regular file. Untracked links are caught by lstat. Unreadable/non-regular entries fail closed.
+  const indexedSymlinks = new Set(git(['ls-files', '--stage', '-z'], repoRoot).split('\0')
+    .filter((r) => r.startsWith('120000 ')).map((r) => r.slice(r.indexOf('\t') + 1)));
+  const regularSource = (rel) => {
+    if (indexedSymlinks.has(rel)) return false;
+    try { return lstatSync(resolve(repoRoot, rel)).isFile(); } catch { return false; }
+  };
+  let jvmSources;
+  const uniqueJvmType = (rel) => {
+    if (!isIsolatedJvmTestSource(rel, readNow(rel))) return false;
+    // Include all source sets/modules and checked-in generated sources, not only test scope.
+    // Deleted and modified base declarations still count, as do added/untracked declarations.
+    if (!jvmSources) {
+      const isJvmSource = (p) => /^modules\/.*\.(java|kt)$/i.test(p);
+      jvmSources = [...baseBlobs.keys()].filter(isJvmSource).map((p) => ({
+        path: p, text: changedPaths.has(p) ? readBase(p) : readNow(p),
+      }));
+      for (const c of changes) {
+        if (c.status !== 'D' && isJvmSource(c.path)) jvmSources.push({ path: c.path, text: readNow(c.path) });
+      }
+    }
+    const name = rel.split('/').slice(5).join('.').replace(/\.(java|kt)$/, '');
+    return !jvmSources.some((s) => s.path !== rel && mayDeclareJvmType(s.text, name));
+  };
 
   // Rust: files a test-only `mod` declaration loads are test code as a whole.
   const rustTestFiles = new Set();
@@ -165,6 +227,7 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
   // ---- 1. flag ----------------------------------------------------------------------------------
   const wholeFile = [];
   const flagged = [];
+  const exempt = [];
   const outOfScope = [];
   for (const c of changes) {
     if (c.path === LOGIC_SEAMS_PATH) {
@@ -232,7 +295,8 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
   const paired = new Set();
   for (const d of wholeFile.filter((c) => c.status === 'D')) {
     const from = executionContext(d.path);
-    const same = added.filter((a) => !paired.has(a.path) && a.after === d.before);
+    const same = added.filter((a) => !paired.has(a.path) && a.after === d.before
+      && casePaths.get(pathCollisionKey(a.path)) === 1);
     const match = from === null ? undefined : same.find((a) => executionContext(a.path) === from);
     if (match) {
       paired.add(match.path).add(d.path);
@@ -245,8 +309,24 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
       findings.push(finding('move-changes-execution', 'note', `${note}; both sides need an entry`, to.path));
     }
   }
+  // An edited move is indistinguishable from a deletion plus an unrelated addition. Keep all
+  // additions gated if test scope loses a file, even when byte-identical move pairing succeeded.
+  // Also reject exact copies of deleted files outside test scope as exemption candidates.
+  const deleted = changes.filter((c) => c.status === 'D');
+  const deletedTest = deleted.some((c) => isTestPath(c.path) || rustTestFiles.has(c.path) || isRustSource(c.path));
   for (const c of wholeFile) {
     if (paired.has(c.path)) continue;
+    if (c.status === 'A' && c.before === null && c.kind === 'test-code'
+      && !deletedTest && !deleted.some((d) => d.before === c.after)
+      && !contextMoves.has(c.path) && !testSupport.has(c.path) && !rustTestFiles.has(c.path)
+      && isolatedPath(c.path)
+      && regularSource(c.path)
+      && !buildConfigKind(c.path) && isStandaloneTestSource(c.path)
+      && (!/\.(java|kt)$/.test(c.path) || uniqueJvmType(c.path))) {
+      exempt.push(c.path);
+      findings.push(finding('isolated-new-test', 'note', `${c.path}: isolated new test source; no entry needed`, c.path));
+      continue;
+    }
     const reason = contextMoves.has(c.path) ? `${c.reason}; ${contextMoves.get(c.path)}` : c.reason;
     flagged.push({ id: c.path, path: c.path, status: c.status, kind: c.kind, before: c.before, after: c.after, reason });
   }
@@ -364,7 +444,7 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
   findings.push(finding('out-of-scope', 'note',
     `${OUT_OF_SCOPE_STATEMENT}${outOfScope.length ? ` Changed here and not flagged: ${outOfScope.length} file(s).` : ''}`));
   if (flagged.length === 0) {
-    findings.push(finding('no-flagged-items', 'note', 'Nothing in the product test scope changed; no test-intent entry is needed.'));
+    findings.push(finding('no-flagged-items', 'note', 'No product test changes need a test-intent entry.'));
   }
   for (const item of flagged) {
     findings.push(finding('flagged-item', 'note', `${item.id} (${item.status}, ${item.reason}) — ${item.coverage}`, item.path));
@@ -394,6 +474,7 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
     findings,
     base,
     flagged,
+    exempt,
     moves,
     outOfScope,
     changesets,
@@ -524,6 +605,7 @@ export function formatReport(result) {
     for (const f of result.flagged) lines.push(`  [${f.coverage ?? '?'}] ${f.status} ${f.id} — ${f.reason}`);
   }
   for (const m of result.moves) lines.push(`  [move] ${m.from} -> ${m.to} (byte-identical, no entry needed)`);
+  for (const p of result.exempt) lines.push(`  [exempt] ${p} (isolated new test source, no entry needed)`);
   const errors = result.findings.filter((f) => f.level === 'error');
   if (errors.length) {
     lines.push(`Problems (${errors.length}):`);
