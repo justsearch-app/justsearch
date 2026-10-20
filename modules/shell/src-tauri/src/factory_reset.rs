@@ -38,8 +38,17 @@ pub(crate) struct Failure {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum Reason {
+    NewerVersion,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Status {
     pub phase: Phase,
+    // Computed from the marker version, never trusted from saved status fields.
+    #[serde(skip_deserializing, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<Reason>,
     pub remaining: Vec<Failure>,
     // Old pending-reset markers predate link receipts.
     #[serde(default)]
@@ -50,6 +59,7 @@ impl Status {
     fn new(phase: Phase) -> Self {
         Self {
             phase,
+            reason: None,
             remaining: vec![],
             kept_links: vec![],
         }
@@ -57,6 +67,7 @@ impl Status {
     fn failed(path: &Path, error: impl ToString) -> Self {
         Self {
             phase: Phase::Incomplete,
+            reason: None,
             remaining: vec![failure(path, error)],
             kept_links: vec![],
         }
@@ -118,7 +129,9 @@ fn load(dir: &Path) -> Result<Status, String> {
     let version: MarkerVersion =
         serde_json::from_slice(&bytes).map_err(|e| format!("Cannot read reset state: {e}"))?;
     if version.format_version > FORMAT_VERSION {
-        return Err("A newer version of JustSearch requested this reset. Update JustSearch or cancel reset.".into());
+        let mut status = Status::failed(&dir.join(MARKER), "Nothing was deleted. A newer version of JustSearch left a reset request this version cannot read. Update JustSearch to finish it or cancel reset to keep using this version.");
+        status.reason = Some(Reason::NewerVersion);
+        return Ok(status);
     }
     let status: Status =
         serde_json::from_slice(&bytes).map_err(|e| format!("Cannot read reset state: {e}"))?;
@@ -298,7 +311,7 @@ pub(crate) fn run_pending(dir: &Path, cleanup: impl FnOnce() -> Result<(), Strin
         Ok(value) => value,
         Err(e) => return Status::failed(&dir.join(MARKER), e),
     };
-    if !matches!(status.phase, Phase::Requested | Phase::Incomplete) {
+    if status.reason.is_some() || !matches!(status.phase, Phase::Requested | Phase::Incomplete) {
         return status;
     }
     if let Err(e) = check_root(dir) {
@@ -409,6 +422,53 @@ mod tests {
     }
 
     #[test]
+    fn ra7_future_requested_and_cancelled_files_expose_a_reason_without_deleting() {
+        for phase in ["requested", "idle"] {
+            let dir = temp();
+            let marker = format!(r#"{{"format_version":2,"phase":"{phase}"}}"#);
+            seed(dir.path(), MARKER, marker.as_bytes());
+            seed(dir.path(), "conversations/private", b"keep");
+            for status in [
+                read_status(dir.path()),
+                run_pending(dir.path(), || {
+                    panic!("must not clean up a newer reset file")
+                }),
+            ] {
+                assert_eq!(status.phase, Phase::Incomplete);
+                assert!(status.blocks_backend());
+                assert_eq!(
+                    serde_json::to_value(&status).unwrap()["reason"],
+                    "newer_version"
+                );
+            }
+            assert_eq!(
+                fs::read(dir.path().join(MARKER)).unwrap(),
+                marker.as_bytes()
+            );
+            assert_eq!(
+                fs::read(dir.path().join("conversations/private")).unwrap(),
+                b"keep"
+            );
+            cancel(dir.path()).unwrap();
+            assert_eq!(read_status(dir.path()).phase, Phase::Idle);
+        }
+    }
+
+    #[test]
+    fn ra7_future_requested_and_cancelled_files_have_the_same_neutral_message() {
+        for phase in ["requested", "idle"] {
+            let dir = temp();
+            seed(
+                dir.path(),
+                MARKER,
+                format!(r#"{{"format_version":2,"phase":"{phase}"}}"#).as_bytes(),
+            );
+            assert_eq!(read_status(dir.path()).remaining[0].error,
+                "Nothing was deleted. A newer version of JustSearch left a reset request this version cannot read. Update JustSearch to finish it or cancel reset to keep using this version.");
+        }
+    }
+
+    #[test]
     fn ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled() {
         for phase in [
             "requested",
@@ -451,7 +511,7 @@ mod tests {
                     status.remaining[0].path,
                     dir.path().join(MARKER).to_string_lossy()
                 );
-                assert_eq!(status.remaining[0].error, "A newer version of JustSearch requested this reset. Update JustSearch or cancel reset.");
+                assert_eq!(status.remaining[0].error, "Nothing was deleted. A newer version of JustSearch left a reset request this version cannot read. Update JustSearch to finish it or cancel reset to keep using this version.");
                 // This is the same serialized error the recovery UI displays.
                 let ui_status = serde_json::to_value(&status).unwrap();
                 assert_eq!(

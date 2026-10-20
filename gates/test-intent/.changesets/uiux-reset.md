@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: agent-session-hy95yalb
+author-session: agent-session-iil745mt
 ---
 
 # Test-intent entries
@@ -114,6 +114,21 @@ Cargo cache, two Cargo jobs, a short socket TMPDIR and source-only frontend asse
 Logs stay in tmp/wp51-version. No frontend code or checks change; packaged desktop
 and Windows behavior remain unverified on this Linux host.
 
+Review history: 2026-10-20 — builder agent-session-iil745mt implemented RA7:
+a computed newer-version reason, neutral wording for requested/cancelled newer files,
+no misleading deletion claims or Retry, and working Cancel. Settings has no reset-status
+view. The RA6 message assertion now cites RA7. Existing acceptance records are retained;
+no acceptance record is written this round.
+
+RA7 evidence: uiux-reset-ra7.json runs the two Rust checks and frontend check
+against 5737dd426; each must fail before with an assertion. The four
+uiux-reset-ra7-refresh-* files refresh whole-source Rust digests against their
+unchanged baselines and compatibility seam. Preservation checks pass before and
+therefore cause producer exit 1 in those files. Producers run in a shared clone,
+with before checkouts under the session temporary directory, two Cargo jobs,
+source-only frontend assets, and vitest limited to two workers. Logs remain in
+tmp/wp51-ra7. Real packaged Windows behavior remains unverified.
+
 ```json
 {
   "entries": [
@@ -160,7 +175,7 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage"
       ],
@@ -195,7 +210,7 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry"
       ],
@@ -230,7 +245,7 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data"
       ],
@@ -265,7 +280,7 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work"
       ],
@@ -300,7 +315,7 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data"
       ],
@@ -328,7 +343,7 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_models_and_runtime_keep_their_bytes"
       ]
@@ -348,7 +363,7 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn3_normal_start_does_not_enumerate_or_modify_stores"
       ]
@@ -368,7 +383,7 @@ and Windows behavior remain unverified on this Linux host.
         }
       ],
       "behaviour": "A linked native-bin parent is retained as it is; its external runtime and other-application sentinel remain untouched.",
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-links.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-links.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target"
       ],
@@ -389,7 +404,7 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_nested_links_leave_indexed_files_and_other_applications_untouched"
       ]
@@ -423,7 +438,7 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart"
       ],
@@ -813,7 +828,7 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-links.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-links.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets"
       ],
@@ -834,7 +849,7 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-links.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-links.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart"
       ],
@@ -876,7 +891,7 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-root-retry.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-root-retry.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra2_linked_data_root_is_cleared_without_following_internal_links"
       ],
@@ -897,7 +912,7 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-root-retry.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-root-retry.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra3_retries_storage_recreated_by_a_previous_session_process"
       ],
@@ -936,7 +951,7 @@ and Windows behavior remain unverified on this Linux host.
         "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Future-version reset markers are kept unchanged and never clean up processes, data or staging files; status explains that a newer version requested the reset, blocks the backend and still permits cancellation to a durable idle marker. Startup, retry, request, storage acknowledgement and dismissal cannot act on the future marker.",
+      "behaviour": "Future-version reset markers are kept unchanged and never clean up processes, data or staging files; status explains that a newer version requested the reset, blocks the backend and still permits cancellation to a durable idle marker. Startup, retry, request, storage acknowledgement and dismissal cannot act on the future marker. RA7 replaces the requested-only message with neutral unreadable-file guidance.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -944,9 +959,16 @@ and Windows behavior remain unverified on this Linux host.
           "scenario": "RA6",
           "quote": "The reset request and receipt file carries a format version. A file written before this change (the one-line form or unversioned JSON) is read exactly as before. A file from a newer version is never acted on: it is kept, the app says plainly that a newer version requested the reset, and Cancel still works. The store register row describes the file truthfully (read in place with a version, written from Settings while the Engine runs).",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RA7",
+          "quote": "When the only reason the app is held is a reset file from a newer version (requested or cancelled there), the screen says only what is true: nothing was deleted, a newer version of JustSearch left a reset request this version cannot read, update JustSearch to finish it or cancel it to keep using this version. It does not say data could not be removed or that deleted data cannot be recovered, and it offers no Retry.",
+          "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-ra6.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-ra6.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled"
       ],
@@ -967,7 +989,7 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-ra6.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-ra6.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_legacy_forms_resume_with_the_same_phases_and_receipts"
       ]
@@ -987,9 +1009,72 @@ and Windows behavior remain unverified on this Linux host.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-version-ra6.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-ra6.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_every_marker_write_carries_format_version_one"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "Newer requested and cancelled reset files expose an explicit newer_version reason through status and startup, preserve files, and allow Cancel.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RA7",
+          "quote": "When the only reason the app is held is a reset file from a newer version (requested or cancelled there), the screen says only what is true: nothing was deleted, a newer version of JustSearch left a reset request this version cannot read, update JustSearch to finish it or cancel it to keep using this version. It does not say data could not be removed or that deleted data cannot be recovered, and it offers no Retry.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra7_future_requested_and_cancelled_files_expose_a_reason_without_deleting"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "Newer requested and cancelled reset files use the same neutral RA7 message, stating nothing was deleted and update or cancel options.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RA7",
+          "quote": "When the only reason the app is held is a reset file from a newer version (requested or cancelled there), the screen says only what is true: nothing was deleted, a newer version of JustSearch left a reset request this version cannot read, update JustSearch to finish it or cancel it to keep using this version. It does not say data could not be removed or that deleted data cannot be recovered, and it offers no Retry.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra7_future_requested_and_cancelled_files_have_the_same_neutral_message"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/boot/factoryReset.newerVersion.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "RA7 recovery guidance replaces incomplete-deletion claims and Retry; Cancel remains functional and window data is preserved.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RA7",
+          "quote": "When the only reason the app is held is a reset file from a newer version (requested or cancelled there), the screen says only what is true: nothing was deleted, a newer version of JustSearch left a reset request this version cannot read, update JustSearch to finish it or cancel it to keep using this version. It does not say data could not be removed or that deleted data cannot be recovered, and it offers no Retry.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-ra7.json",
+      "newChecks": [
+        "modules/ui-web/src/boot/factoryReset.newerVersion.test.ts#RA7 a newer reset file shows honest guidance and only Cancel, preserving window data"
       ],
       "repaired": true
     }

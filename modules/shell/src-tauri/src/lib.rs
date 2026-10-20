@@ -109,7 +109,12 @@ impl Default for BackendState {
             port_ready: Arc::default(),
             session_token_ready: Arc::default(),
             delete_token: Mutex::default(),
-            reset_status: Mutex::new(factory_reset::Status { phase: factory_reset::Phase::Idle, remaining: vec![], kept_links: vec![] }),
+            reset_status: Mutex::new(factory_reset::Status {
+                phase: factory_reset::Phase::Idle,
+                reason: None,
+                remaining: vec![],
+                kept_links: vec![],
+            }),
             tray_id: Mutex::default(),
         }
     }
@@ -406,7 +411,11 @@ fn maybe_run_factory_reset<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> fact
         }),
         Err(error) => factory_reset::Status {
             phase: factory_reset::Phase::Incomplete,
-            remaining: vec![factory_reset::Failure { path: "App data directory".into(), error }],
+            reason: None,
+            remaining: vec![factory_reset::Failure {
+                path: "App data directory".into(),
+                error,
+            }],
             kept_links: vec![],
         },
     }

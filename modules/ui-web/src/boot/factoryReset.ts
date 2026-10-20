@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 interface ResetStatus {
   phase: 'idle' | 'requested' | 'incomplete' | 'awaiting_storage' | 'complete';
+  reason?: 'newer_version';
   remaining: { path: string; error: string }[];
   kept_links?: string[];
 }
@@ -56,26 +57,29 @@ class FactoryResetRecovery extends LitElement {
 
   override render() {
     const phase = this.status?.phase;
+    const newerVersion = phase === 'incomplete' && this.status?.reason === 'newer_version';
     return html`
       <section aria-labelledby="reset-title">
         <h1 id="reset-title" tabindex="-1">${phase === 'complete' ? 'Reset complete'
-          : phase === 'incomplete' ? 'Reset incomplete' : 'Finishing data reset'}</h1>
+          : newerVersion ? 'Update JustSearch or cancel reset'
+            : phase === 'incomplete' ? 'Reset incomplete' : 'Finishing data reset'}</h1>
         <p role="status" aria-live="polite">${this.busy ? 'Restarting JustSearch automatically…'
           : phase === 'complete' ? 'Reset complete. Your local data and window storage were deleted. AI models and AI runtime were kept.'
-            : phase === 'incomplete' ? 'Some data could not be removed. Normal use is paused until you retry or cancel this reset.'
+            : newerVersion ? 'Nothing was deleted. A newer version of JustSearch left a reset request this version cannot read. Update JustSearch to finish it or cancel reset to keep using this version.'
+              : phase === 'incomplete' ? 'Some data could not be removed. Normal use is paused until you retry or cancel this reset.'
               : 'Checking and clearing local window storage before JustSearch can start.'}</p>
-        ${this.status?.remaining.length ? html`<ul aria-label="What could not be removed">
+        ${!newerVersion && this.status?.remaining.length ? html`<ul aria-label="What could not be removed">
           ${this.status.remaining.map((failure) => html`<li><strong>${failure.path}</strong>: ${failure.error}</li>`)}
         </ul>` : nothing}
         ${this.status?.kept_links?.length ? html`<ul aria-label="Links kept outside the app data">
           ${this.status.kept_links.map((path) => html`<li><strong>${path}</strong>: Kept as a link to a folder outside the app data.</li>`)}
         </ul>` : nothing}
         ${this.error ? html`<p role="alert">${this.error}</p>` : nothing}
-        ${phase === 'incomplete' ? html`<p>Cancel reset keeps the remaining data as ordinary data.
+        ${phase === 'incomplete' && !newerVersion ? html`<p>Cancel reset keeps the remaining data as ordinary data.
           Data already deleted cannot be recovered.</p>` : nothing}
         <div class="actions">
           ${phase === 'incomplete' ? html`
-            <button ?disabled=${this.busy} @click=${() => void this.run('retry_factory_reset')}>Retry reset</button>
+            ${!newerVersion ? html`<button ?disabled=${this.busy} @click=${() => void this.run('retry_factory_reset')}>Retry reset</button>` : nothing}
             <button ?disabled=${this.busy} @click=${() => void this.run('cancel_factory_reset')}>Cancel reset</button>
           ` : phase === 'complete' ? html`
             <button ?disabled=${this.busy} @click=${() => void this.run('acknowledge_factory_reset')}>Continue</button>
