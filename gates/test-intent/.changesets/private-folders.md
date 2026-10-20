@@ -290,3 +290,14 @@ vocabulary; it does not replace or repair the old Engine's runtime path. Neither
 real Windows account-level access. Their exact bytes/digests are recorded by the evidence runner.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "bcf1b113-48d6-447b-9022-7d1f51ea26fb",
+  "verdict": "reject",
+  "digest": "sha256:335e8254068c6eeab34d170fcc4b62dec19d4775511e6943e3fe42507fe65ef4",
+  "note": "Delegated choices quote words the owner did not write instead of 'resume with remaining work autonomously', and the link and Windows-descriptor fail-before claims run against intermediate commit bc2a09ede (one with a hand-written patch) although at the before-state 4975ceedf a linked folder already worked."
+}
+```
