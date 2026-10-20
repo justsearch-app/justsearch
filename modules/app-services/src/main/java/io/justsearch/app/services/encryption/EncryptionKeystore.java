@@ -30,10 +30,12 @@ public final class EncryptionKeystore {
   }
 
   public boolean exists() {
+    prepareDirectory();
     return Files.exists(file);
   }
 
   public Optional<KeystoreRecord> load() {
+    prepareDirectory();
     if (!Files.exists(file)) {
       return Optional.empty();
     }
@@ -46,9 +48,19 @@ public final class EncryptionKeystore {
     return Optional.of(record);
   }
 
+  private void prepareDirectory() {
+    try {
+      Files.createDirectories(file.toAbsolutePath().getParent().getParent());
+      io.justsearch.configuration.persistence.OwnerOnlyDirectory.ensureOwnerOnlyDirectory(file.getParent());
+    } catch (IOException e) {
+      throw new UncheckedIOException("Cannot prepare encryption directory", e);
+    }
+  }
+
   public void save(KeystoreRecord record) {
     try {
-      AtomicFileWrites.replace(file, MAPPER.writeValueAsBytes(record));
+      prepareDirectory();
+      AtomicFileWrites.replaceStrict(file, MAPPER.writeValueAsBytes(record));
     } catch (IOException e) {
       throw new UncheckedIOException("failed to write encryption keystore", e);
     }

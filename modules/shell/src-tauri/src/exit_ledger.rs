@@ -413,7 +413,9 @@ fn retain_and_rename(
         let mut added = Vec::new();
         for row in &rows {
             if row["pid"].as_u64().is_none()
-                || (row["creationFileTime"].as_str().is_none() && row["processIdentity"]["kind"] != "linux-proc-v1") {
+                || (row["creationFileTime"].as_str().is_none()
+                    && row["processIdentity"]["kind"] != "linux-proc-v1")
+            {
                 continue;
             }
             let mut loss = json!({"schemaVersion":1,"type":"ledger-gap","seq":row["seq"],"at":row["at"],
@@ -492,6 +494,158 @@ fn retain_and_rename(
         size -= bytes;
     }
     Ok(())
+}
+
+/// Create with private permissions, then repair existing directories without following links.
+/// Permission failures are reported once per path; unsafe paths and creation failures are refused.
+pub(crate) fn ensure_owner_only_directory(path: &Path) -> io::Result<()> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => {
+            #[cfg(windows)]
+            {
+                use std::os::windows::fs::MetadataExt;
+                if metadata.file_attributes() & 0x400 != 0 {
+                    warn_owner_only_directory(path, "refusing directory reparse point");
+                    return Err(io::Error::other("refusing directory reparse point"));
+                }
+            }
+            if metadata.file_type().is_symlink() || !metadata.is_dir() {
+                warn_owner_only_directory(path, "refusing linked or non-directory runtime path");
+                return Err(io::Error::other(
+                    "refusing linked or non-directory runtime path",
+                ));
+            }
+        }
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            #[cfg(unix)]
+            let creation = {
+                use std::os::unix::fs::DirBuilderExt;
+                fs::DirBuilder::new().mode(0o700).create(path)
+            };
+            #[cfg(windows)]
+            let creation = private_windows_directory(path, true);
+            match creation {
+                Ok(()) => {}
+                Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
+                Err(e) => {
+                    fs::create_dir(path)?;
+                    warn_owner_only_directory(path, &e.to_string());
+                }
+            }
+            return ensure_owner_only_directory(path);
+        }
+        Err(e) => return Err(e),
+    }
+    #[cfg(unix)]
+    let result = {
+        use std::os::unix::ffi::OsStrExt;
+        let directory = std::ffi::CString::new(path.as_os_str().as_bytes())
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "directory contains NUL"))?;
+        // The mutation itself must not follow a link swapped in after symlink_metadata.
+        let changed = unsafe {
+            libc::fchmodat(
+                libc::AT_FDCWD,
+                directory.as_ptr(),
+                0o700,
+                libc::AT_SYMLINK_NOFOLLOW,
+            )
+        };
+        if changed == 0 {
+            Ok(())
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    };
+    #[cfg(windows)]
+    let result = private_windows_directory(path, false);
+    if let Err(error) = result {
+        warn_owner_only_directory(path, &error.to_string());
+    }
+    Ok(())
+}
+
+fn warn_owner_only_directory(path: &Path, error: &str) {
+    static WARNED: std::sync::OnceLock<std::sync::Mutex<std::collections::HashSet<PathBuf>>> =
+        std::sync::OnceLock::new();
+    if WARNED
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap()
+        .insert(path.to_path_buf())
+    {
+        eprintln!(
+            "Could not protect owner-only directory {}: {error}",
+            path.display()
+        );
+    }
+}
+
+#[cfg(windows)]
+fn private_windows_directory(path: &Path, create: bool) -> io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::{
+        Foundation::LocalFree,
+        Security::{
+            Authorization::ConvertStringSecurityDescriptorToSecurityDescriptorW, SetFileSecurityW,
+            DACL_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, SECURITY_ATTRIBUTES,
+        },
+        Storage::FileSystem::CreateDirectoryW,
+    };
+    let path: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    // OW is the object's owner; protect the DACL against later changes to the data parent's ACL.
+    let sddl: Vec<u16> = "D:P(A;OICI;FA;;;OW)(A;OICI;FA;;;SY)"
+        .encode_utf16()
+        .chain(Some(0))
+        .collect();
+    unsafe {
+        let mut descriptor = std::ptr::null_mut();
+        if ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            sddl.as_ptr(),
+            1,
+            &mut descriptor,
+            std::ptr::null_mut(),
+        ) == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        let attributes = SECURITY_ATTRIBUTES {
+            nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+            lpSecurityDescriptor: descriptor,
+            bInheritHandle: 0,
+        };
+        let ok = if create {
+            CreateDirectoryW(path.as_ptr(), &attributes)
+        } else {
+            SetFileSecurityW(
+                path.as_ptr(),
+                DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+                descriptor,
+            )
+        };
+        let result = if ok == 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(())
+        };
+        LocalFree(descriptor);
+        result
+    }
+}
+
+fn ensure_ledger_directory(dir: &Path) -> io::Result<()> {
+    if let Some(parent) = dir.parent() {
+        if dir.file_name().is_some_and(|name| name == "exit-ledger")
+            && parent.file_name().is_some_and(|name| name == "runtime")
+        {
+            if let Some(data) = parent.parent() {
+                fs::create_dir_all(data)?;
+            }
+            ensure_owner_only_directory(parent)?;
+        } else {
+            fs::create_dir_all(parent)?;
+        }
+    }
+    ensure_owner_only_directory(dir)
 }
 
 pub(crate) fn read_ledger(dir: &Path, family: Family) -> io::Result<LedgerRead> {
@@ -585,6 +739,8 @@ impl LedgerWriter {
         {
             return Err("invalid writer identity".into());
         }
+        // Opening a writer must remain nonfatal; failed writes become ledger gaps.
+        let _ = ensure_ledger_directory(&dir);
         let writer = json!({"role":writer["role"],"pid":writer["pid"],
             "startedAt":normalized_timestamp(&writer["startedAt"])});
         Ok(Self {
@@ -635,7 +791,7 @@ impl LedgerWriter {
         }
     }
     fn write_line(&self, bytes: &[u8]) -> io::Result<()> {
-        fs::create_dir_all(&self.dir)?;
+        ensure_ledger_directory(&self.dir)?;
         let (current, _) = self.family.paths(&self.dir);
         // Rust std's Windows open defaults include FILE_SHARE_DELETE; the whole record is one
         // append-mode write, followed by sync_data before the caller takes its action.
@@ -660,6 +816,10 @@ impl LedgerWriter {
         self.start_session_at(now_ms());
     }
     fn start_session_at(&mut self, at: i64) {
+        if ensure_ledger_directory(&self.dir).is_err() {
+            self.healthy = false;
+            return;
+        }
         if self.torn() && self.write_line(b"\n").is_err() {
             self.healthy = false;
         }
@@ -756,6 +916,76 @@ mod tests {
     fn fields(v: Value) -> Map<String, Value> {
         v.as_object().unwrap().clone()
     }
+    #[cfg(unix)]
+    #[test]
+    fn shell_first_ledger_and_recreation_are_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let data = tempfile::tempdir().unwrap();
+        fs::set_permissions(data.path(), fs::Permissions::from_mode(0o775)).unwrap();
+        let parent_mode = fs::metadata(data.path()).unwrap().permissions().mode() & 0o777;
+        let engine_data = data.path().join("new-data");
+        let dir = ledger_directory(&engine_data);
+        let mut ledger = writer(&dir, true);
+        ledger.write_line(b"{}\n").unwrap();
+        assert_eq!(
+            fs::metadata(engine_data.join("runtime"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+        assert_eq!(
+            fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        fs::set_permissions(
+            engine_data.join("runtime"),
+            fs::Permissions::from_mode(0o775),
+        )
+        .unwrap();
+        ledger.start_session();
+        assert_eq!(
+            fs::metadata(engine_data.join("runtime"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+        fs::remove_dir_all(engine_data.join("runtime")).unwrap();
+        ledger.write_line(b"{}\n").unwrap();
+        assert_eq!(
+            fs::metadata(engine_data.join("runtime"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+        assert_eq!(
+            fs::metadata(data.path()).unwrap().permissions().mode() & 0o777,
+            parent_mode
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn shell_refuses_linked_runtime_without_touching_target() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let data = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        fs::set_permissions(outside.path(), fs::Permissions::from_mode(0o775)).unwrap();
+        symlink(outside.path(), data.path().join("runtime")).unwrap();
+        let ledger = writer(&ledger_directory(data.path()), true);
+        assert!(ledger.write_line(b"{}\n").is_err());
+        assert_eq!(
+            fs::metadata(outside.path()).unwrap().permissions().mode() & 0o777,
+            0o775
+        );
+        assert_eq!(fs::read_dir(outside.path()).unwrap().count(), 0);
+    }
+
     #[test]
     fn t15_every_shared_fixture_has_the_java_and_node_summary() {
         for dir in fs::read_dir(fixtures().join("cases")).unwrap() {
