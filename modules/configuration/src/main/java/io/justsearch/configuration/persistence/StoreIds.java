@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 /** Portable names for conversation, session and run files, checked without filesystem access. */
 public final class StoreIds {
   private static final Pattern WINDOWS_DEVICE_NAME =
-      Pattern.compile("(?i:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\\..*)?", Pattern.DOTALL);
+      Pattern.compile("(?i:CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³]|CONIN\\$|CONOUT\\$) *(?:\\..*)?", Pattern.DOTALL);
 
   private StoreIds() {}
 

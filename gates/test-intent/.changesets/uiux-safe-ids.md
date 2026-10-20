@@ -2,14 +2,14 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: agent-session-bnf3_hc0
+author-session: agent-session-eplotgqg
 ---
 
 # Test-intent entries
 
 Gate-compatible aliases preserve the brief's scenario ids: PS1–PS3 mean S9.1–S9.3;
 PN1–PN3 mean N9.1–N9.3. PS1b and PS1w name the batch-id and Windows amendments;
-PA4 names assignment (4), the explicit choice to retain the safe search-event no-op.
+PS1l names the adopted invalid-folder listing amendment.
 The gate schema accepts letters/digits, without dots or hyphens; all quotes remain verbatim.
 
 Review history: verifier-1 rejected the removed blank-id no-op expectation. AgentRunStoreTest
@@ -21,6 +21,14 @@ are repaired against b359747af in separate evidence. Earlier regression and pres
 are rerun with the final test files. A later regression covers Unicode line separators
 in reserved-device extensions; the shared pattern uses DOTALL so its extension match is
 complete. The rejection record below is retained unchanged.
+
+Review history: verifier-2 rejected two repaired classifications that already pass on
+117e89be9. They are now preservation checks with evidence without --before; the search-event
+entry cites PS1 only. PN3 describes normalization, including the old dispatch discrepancy,
+without claiming identical historical storage behavior. The Unicode-extension entry records
+its base compile limitation. Uncited repair/preserve evidence was removed. New regressions
+cover generic undo before confirmation, invalid legacy-folder listings and additional Windows
+aliases, with assertion fail-before evidence against bcbbb6e5c. Acceptance records remain unchanged.
 
 ```json
 {
@@ -324,7 +332,7 @@ complete. The rejection record below is retained unchanged.
         "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java"
       ],
       "class": "New",
-      "behaviour": "Accept optional blank body ids as absent, including dispatch and optional approval session ids.",
+      "behaviour": "Normalize optional blank body ids to absence before dispatch and approval; pin that behavior even where the old dispatch path used blank sessionId as a store key.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -336,8 +344,7 @@ complete. The rejection record below is retained unchanged.
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-amendments.json",
       "newChecks": [
-        "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java#optionalBlankBodyIdsDispatchAsAbsent",
-        "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java#blankConversationIdRetainsLegacyHttpResponse"
+        "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java#optionalBlankBodyIdsDispatchAsAbsent"
       ],
       "repaired": true
     },
@@ -351,23 +358,15 @@ complete. The rejection record below is retained unchanged.
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
-          "scenario": "PA4",
-          "quote": "(4) rework the changeset for the verifier's rejection (keep AgentRunStore's earlier blank-id behaviour if it can return nothing safely without touching disk, else an Obsolete entry with its source).",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
           "scenario": "PS1",
           "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-safe-ids-amendments.json",
+      "evidence": "gates/test-intent/evidence/uiux-safe-ids-review-preserve.json",
       "newChecks": [
         "modules/app-agent/src/test/java/io/justsearch/agent/RunStoresSafeIdsTest.java#appendSearchEventWithoutConversationCreatesNoFiles"
-      ],
-      "repaired": true
+      ]
     },
     {
       "items": [
@@ -394,7 +393,7 @@ complete. The rejection record below is retained unchanged.
         "modules/configuration/src/test/java/io/justsearch/configuration/persistence/StoreIdsUnicodeExtensionsTest.java"
       ],
       "class": "New",
-      "behaviour": "Refuse Windows reserved devices with Unicode line separators in extensions.",
+      "behaviour": "Refuse Windows reserved devices with Unicode line separators in extensions. This test cannot compile on base 117e89be9 because StoreIds was introduced in this branch; its assertion fail-before uses b359747af.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -409,6 +408,127 @@ complete. The rejection record below is retained unchanged.
         "modules/configuration/src/test/java/io/justsearch/configuration/persistence/StoreIdsUnicodeExtensionsTest.java#refusesDeviceNamesWithUnicodeLineSeparatorExtensions"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preserve the HTTP status and body for optional blank conversationId compared with an absent field.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN3",
+          "quote": "An optional id field in a request body that is empty or blank is treated as absent, exactly as before (not refused); stores still refuse a blank id.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-safe-ids-review-preserve.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java#blankConversationIdRetainsLegacyHttpResponse"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdReviewHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Reject unsafe execution ids before the generic undo dispatcher can request approval or touch a store, with or without a supplied confirmation token.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS2",
+          "quote": "Every HTTP route that takes such an id answers an unsafe id with a client error (4xx) and touches no store, including percent-encoded and mixed forms (%2F, %5C, %2E%2E, ..%5C.., %00), under both Windows and Linux path rules.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-safe-ids-review-repair.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdReviewHttpTest.java#genericUndoRefusesUnsafeIdsBeforeApprovalOrDispatchEvenWithConfirmation"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/configuration/src/test/java/io/justsearch/configuration/persistence/StoreIdsWindowsAliasesTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationInvalidFoldersTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdReviewHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Refuse superscript Windows device names, console devices, and reserved device names with spaces before an extension through the shared resolver, conversation store and decoded HTTP route.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1w",
+          "quote": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS2",
+          "quote": "Every HTTP route that takes such an id answers an unsafe id with a client error (4xx) and touches no store, including percent-encoded and mixed forms (%2F, %5C, %2E%2E, ..%5C.., %00), under both Windows and Linux path rules.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-safe-ids-review-repair.json",
+      "newChecks": [
+        "modules/configuration/src/test/java/io/justsearch/configuration/persistence/StoreIdsWindowsAliasesTest.java#refusesAdditionalWindowsDevicesBeforeResolving",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationInvalidFoldersTest.java#refusesAdditionalWindowsDevicesAtConversationStore",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdReviewHttpTest.java#historyRefusesAdditionalWindowsDevicesBeforeStoreQuery"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationInvalidFoldersTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Omit invalid legacy conversation folders before metadata reads, preserve their exact file bytes, keep valid rows and list filters, and warn once per skipped folder across repeated listings.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1l",
+          "quote": "The conversation list leaves out folders whose names are not valid ids (they cannot be addressed safely); their files stay on disk untouched (a data reset still removes them). Log one line per skipped folder at most once per start.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-safe-ids-review-repair.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationInvalidFoldersTest.java#omitsInvalidLegacyFoldersWithoutReadingOrChangingTheirFilesAndWarnsOnce"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/configuration/src/test/java/io/justsearch/configuration/persistence/StoreIdsWindowsAliasesTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preserve ordinary names that resemble Windows reserved names.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1",
+          "quote": "Every id format the app creates or has created (UUIDs, the throwaway title-session prefix, branch ids, run ids, ids in saved data from earlier versions) keeps working for every operation; saved data from before the change loads unchanged.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-safe-ids-review-preserve.json",
+      "newChecks": [
+        "modules/configuration/src/test/java/io/justsearch/configuration/persistence/StoreIdsWindowsAliasesTest.java#preservesOrdinaryNamesNearWindowsDevices"
+      ]
     }
   ]
 }

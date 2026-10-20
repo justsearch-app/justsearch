@@ -47,6 +47,8 @@ public final class FileConversationStore implements ConversationStore {
 
   public static final int CURRENT_SCHEMA_VERSION = 1;
   private static final Logger LOG = LoggerFactory.getLogger(FileConversationStore.class);
+  private static final java.util.Set<Path> SKIPPED_INVALID_FOLDERS =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
   private final Path rootDir;
@@ -268,6 +270,15 @@ public final class FileConversationStore implements ConversationStore {
     try (DirectoryStream<Path> dirs = Files.newDirectoryStream(rootDir)) {
       for (Path sessionDir : dirs) {
         if (!Files.isDirectory(sessionDir)) continue;
+        String sessionId = sessionDir.getFileName().toString();
+        try {
+          StoreIds.requireValid(sessionId);
+        } catch (IllegalArgumentException invalid) {
+          if (SKIPPED_INVALID_FOLDERS.add(sessionDir.toAbsolutePath().normalize())) {
+            LOG.warn("Skipping conversation folder with invalid id: {}", sessionDir.toUri().toASCIIString());
+          }
+          continue;
+        }
         Path metaFile = sessionDir.resolve("meta.json");
         if (!Files.exists(metaFile)) continue;
         {
@@ -296,7 +307,7 @@ public final class FileConversationStore implements ConversationStore {
             title = null;
           }
           summaries.add(new SessionSummary(
-              sessionDir.getFileName().toString(),
+              sessionId,
               metaShape,
               ((Number) meta.getOrDefault("createdAtMs", 0L)).longValue(),
               ((Number) meta.getOrDefault("lastActiveAtMs", 0L)).longValue(),
