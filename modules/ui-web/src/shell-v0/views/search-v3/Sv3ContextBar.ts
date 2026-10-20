@@ -205,6 +205,7 @@ export class Sv3ContextBar extends JfElement {
   ];
 
   static properties = {
+    notice: { attribute: false },
     usage: { attribute: false },
     contextWindow: { attribute: false },
     hiddenTurns: { type: Number, attribute: 'hidden-turns' },
@@ -217,6 +218,7 @@ export class Sv3ContextBar extends JfElement {
   };
 
   /** The last completed turn's own report, or null while this conversation has reported none. */
+  declare notice: string;
   declare usage: Sv3ContextUsage | null;
   /** The runtime's `n_ctx`, or null when the observed state has not named one. */
   declare contextWindow: number | null;
@@ -236,6 +238,7 @@ export class Sv3ContextBar extends JfElement {
 
   constructor() {
     super();
+    this.notice = '';
     this.usage = null;
     this.contextWindow = null;
     this.hiddenTurns = 0;
@@ -277,10 +280,11 @@ export class Sv3ContextBar extends JfElement {
 
   render(): TemplateResult | typeof nothing {
     const meter = this.meter();
-    if (meter === nothing && this.hiddenTurns === 0 && this.unseenHidden === 0 && !this.floorUnseen) {
+    if (!this.notice && meter === nothing && this.hiddenTurns === 0 && this.unseenHidden === 0 && !this.floorUnseen) {
       return nothing;
     }
     return html`<div class="bar" data-testid="sv3-context-bar">
+      ${this.notice ? html`<span role="status">${this.notice}</span>` : nothing}
       ${meter}${this.hiddenTurnsSummary()}${this.unseenFloor()}
     </div>`;
   }

@@ -145,7 +145,6 @@ import {
   sv3FollowUpContext,
   sv3TurnContextFor,
   sv3UnseenExcludedIds,
-  sv3WithExclusions,
   type Sv3ContextAction,
   type Sv3ContextActionId,
   type Sv3ContextMenuRequest,
@@ -344,12 +343,6 @@ import './Sv3Palette.js';
 // The window's citation-inspection region (tempdoc 822 Phase F8). It mounts the product's ONE reading
 // surface by its own side-effect import; this host owns only where it sits and how wide it may be.
 import './Sv3Pane.js';
-
-/** The snapshot and identity captured BEFORE a context write starts, never when it responds. */
-interface Sv3ContextWrite {
-  readonly sessionId: string;
-  readonly history: Sv3SessionHistory | null;
-}
 
 const COMPOSER_STATE_ATTR = 'composer-state';
 
@@ -841,22 +834,14 @@ export class SearchV3View extends JfElement {
   private convListUnsubscribe: (() => void) | null = null;
   /** The in-flight record fetch, so a claim that supersedes another cannot land out of order. */
   private recordAbort: AbortController | null = null;
-  /**
-   * The `/history` companion load's generation token (852 S3, closing S2's F5) — the record half's
-   * {@link recordAbort} discipline applied to the other half of the same open.
-   */
-  private historyAbort: AbortController | null = null;
-  /** Which conversation the newest `/history` load is for. */
-  private historyLoadFor: string | null = null;
-  /**
-   * The newest context intent per conversation. A late response is not a newer write (S2.10).
-   */
-  private contextWrites = new Map<string, Sv3ContextWrite>();
-  /** Confirmed changes may only amend their original snapshot while their write is still newest. */
-  private contextConfirms: {
-    readonly write: Sv3ContextWrite;
-    readonly confirmed: (history: Sv3SessionHistory) => Sv3SessionHistory;
-  }[] = [];
+  /** Reads are ordered within each conversation without cancelling another conversation's read. */
+  private historyReads = new Map<string, AbortController>();
+  /** A write includes its response AND saved-history refresh; later controls queue behind it. */
+  private contextWrites = new Map<string, Promise<void>>();
+  private contextNotices = new Map<string, string>();
+  private contextRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private contextRetryDelay = 1000;
+  private contextAskPending = false;
   /**
    * One-shot, mirroring the shipped window's `reattachChecked` (`views/UnifiedChatView.ts:3496`): a
    * cold load asks the shared controller to reattach to a live run ONCE. Re-asking on every render
@@ -983,8 +968,10 @@ export class SearchV3View extends JfElement {
     this.observeWindowBox();
     setSearchApiBase(this.apiBase || '');
     this.aiUnsubscribe = subscribeAiState((snapshot) => {
+      const reconnected = this.aiSnapshot?.connection.reachable === false && snapshot.connection.reachable;
       this.aiSnapshot = snapshot;
       this.applyLockState(snapshot);
+      if (reconnected) this.retryContextOnReconnect();
     });
     // Inventory E3 — the app-wide Simple/Detailed authority. Nothing is COPIED into this element:
     // every render site reads `isAdvancedMode()` live, so the subscription's only job is to ask for
@@ -1043,6 +1030,8 @@ export class SearchV3View extends JfElement {
     // every other entry path below, not a second focus mechanism — its refusal set (renaming,
     // palette open, already typing elsewhere) applies here exactly as it does on mount.
     window.addEventListener('jf-focus-composer', this.onFocusComposerEvent);
+    window.addEventListener('online', this.retryContextOnReconnect);
+    this.scheduleContextRetry();
     // Tempdoc 864 Layer 1(a) — ARRIVING AT THIS WINDOW PUTS THE READER IN THE COMPOSER. Activation is
     // an entry path like the other two ({@link onSessionSelect}, {@link onSessionNew}), and it is the
     // one that covers both a fresh hero and the restored record `restoreLastViewed` just claimed:
@@ -1106,8 +1095,9 @@ export class SearchV3View extends JfElement {
     this.convListUnsubscribe = null;
     this.recordAbort?.abort();
     this.recordAbort = null;
-    this.historyAbort?.abort();
-    this.historyAbort = null;
+    for (const read of this.historyReads.values()) read.abort();
+    this.historyReads.clear();
+    this.clearContextRetry();
     this.aiUnsubscribe?.();
     this.aiUnsubscribe = null;
     this.uiModeUnsubscribe?.();
@@ -1135,6 +1125,7 @@ export class SearchV3View extends JfElement {
     this.removeEventListener('keydown', this.onHostKeydown, true);
     this.removeEventListener('focusout', this.onHostFocusOut);
     window.removeEventListener('jf-focus-composer', this.onFocusComposerEvent);
+    window.removeEventListener('online', this.retryContextOnReconnect);
     // Tempdoc 864 PR E — LAST, so a re-parent is recorded however the teardown above went. See
     // {@link movedRatherThanEntered}.
     this.markPossibleMove();
@@ -1430,89 +1421,63 @@ export class SearchV3View extends JfElement {
   }
 
   /**
-   * The `/history` COMPANION load (tempdoc 852 §2.3c). The shipped window reads both records at
-   * adjacent lines (`views/UnifiedChatView.ts:2048-2049`); this one read only the thread, so a
-   * conversation's branch lineage, its effective-context floor and its two exclusion ledgers were
-   * never on the wire it listened to. Nothing renders them yet — S2/S3 do — but a window that cannot
-   * ask for them cannot grow an affordance that needs them.
-   *
-   * On CLAIM, not per turn: these are properties of a conversation, and re-asking at every terminal
-   * would spend a round trip per answer to re-read facts that a turn does not change.
-   *
-   * `claim: false`, and the pointer is never touched here. `resumeConversation` claims the app-wide
-   * active conversation as a side effect of a successful read, which is right for the shipped
-   * window's open path and wrong for a companion load: a slow read landing after the reader moved on
-   * — to another v3 conversation, to New session, or into the OTHER window, which claims the same
-   * shared pointer — would re-point the product at the conversation they walked away from. Reading
-   * without claiming removes the race rather than compensating for it afterwards; this window
-   * already claims at open ({@link claimConversation}).
-   *
-   * TWO GUARDS, because there are two ways an answer can be stale (852 S3, closing S2's F5).
-   *
-   *  - **Session** — the reader moved on, and these fields belong to a conversation that is no longer
-   *    the one on screen. That guard shipped with S1.
-   *  - **ORDER** — two reloads of the SAME conversation can land out of order, and the older answer
-   *    would then stand. S2 recorded this as F5 and named the fix: the record half's generation
-   *    token. Branch and edit multiply the reload rate (every act is a write followed by a reload,
-   *    and an edit is two acts in a row), so the same discipline applies here: each load supersedes
-   *    the one before it, and a superseded load's answer is DROPPED however late it arrives.
-   *
-   * HONEST LIMIT on the order guard: `resumeConversation` accepts no signal, so the superseded
-   * REQUEST is not cancelled — only its answer is discarded. That is what F5 named (ordering), and
-   * the request that is still in flight costs a round trip and changes nothing.
-   *
-   * A FAILED read (`resumeConversation`'s `failed`, a server error or no answer) changes nothing:
-   * the window keeps what it last read rather than taking the empty result for "no floor, nothing
-   * hidden" (S2.10). A write's confirmation may amend only the snapshot it started from, and only
-   * while no newer context write has started. A successful read replaces that snapshot, invalidating
-   * even confirmations whose write responses have not arrived yet. A load superseded by a newer
-   * load of the SAME conversation applies nothing and leaves confirmations to the newer read.
-   *
-   * A reload for a conversation that is NOT the active one is not run at all — it would only be
-   * dropped on landing, and starting it would supersede (and so discard) the active conversation's
-   * own load in flight. The next open reads it afresh.
-   *
-   * OBLIGATION ON S2/S3: every one of these fields is mutable by an affordance those slices ship —
-   * setting or clearing a floor, compacting, excluding a message or a source. Each must re-run this
-   * load after the write lands, or the window renders a floor the backend no longer holds.
+   * Read saved context without claiming the shared pointer. A later read of this conversation
+   * supersedes an earlier one. Writes may refresh their own session after navigation; ordinary
+   * opens only apply to the active session. Failed reads never invent a floor or exclusions.
    */
-  private async refreshHistory(conversationId: string): Promise<void> {
-    if (this.sessions.activeId !== conversationId) {
-      this.settleContextConfirms(conversationId, false);
-      return;
-    }
-    this.historyAbort?.abort();
+  private async refreshHistory(conversationId: string, forWrite = false): Promise<boolean> {
+    if (!this.isConnected || (!forWrite && this.sessions.activeId !== conversationId)) return false;
+    this.historyReads.get(conversationId)?.abort();
     const abort = new AbortController();
-    this.historyAbort = abort;
-    this.historyLoadFor = conversationId;
+    this.historyReads.set(conversationId, abort);
     const history = await resumeConversation(conversationId, SV3_ASK_SHAPE_ID, { claim: false });
-    if (abort.signal.aborted) {
-      if (this.historyLoadFor !== conversationId) this.settleContextConfirms(conversationId, false);
-      return;
-    }
-    if (this.historyAbort === abort) this.historyAbort = null;
-    const landed = this.sessions.activeId === conversationId && history.failed !== true;
+    if (abort.signal.aborted) return false;
+    this.historyReads.delete(conversationId);
+    const landed = (forWrite || this.sessions.activeId === conversationId)
+      && history.failed !== true && history.locked !== true;
     if (landed) {
       this.sessions = applySv3History(this.sessions, conversationId, sv3HistoryOf(history));
+      // A read during a pending write cannot confirm that write's eventual result.
+      if (!this.contextWrites.has(conversationId)) this.confirmContext(conversationId);
     }
-    this.settleContextConfirms(conversationId, landed);
+    this.scheduleContextRetry();
+    return landed;
   }
 
-  /** A fresh reading wins; a failed one can use only an unsuperseded write's confirmation. */
-  private settleContextConfirms(conversationId: string, read: boolean): void {
-    const pending = this.contextConfirms.filter((entry) => entry.write.sessionId === conversationId);
-    if (pending.length === 0) return;
-    this.contextConfirms = this.contextConfirms.filter((entry) => entry.write.sessionId !== conversationId);
-    if (read) return;
-    const history = sessionById(this.sessions, conversationId)?.history ?? null;
-    if (history === null) return;
-    const current = pending.filter(
-      (entry) => this.contextWrites.get(conversationId) === entry.write && entry.write.history === history,
-    );
-    if (current.length === 0) return;
-    const confirmed = current.reduce((held, entry) => entry.confirmed(held), history);
-    this.sessions = applySv3History(this.sessions, conversationId, confirmed);
+  private confirmContext(sessionId: string): void {
+    this.contextNotices.delete(sessionId);
+    this.contextRetryDelay = 1000;
+    this.clearContextRetry();
+    this.requestUpdate();
+    this.scheduleContextRetry();
   }
+
+  private clearContextRetry(): void {
+    if (this.contextRetryTimer !== null) clearTimeout(this.contextRetryTimer);
+    this.contextRetryTimer = null;
+  }
+
+  /** Only the shown conversation needs background retries; opening another reads it afresh. */
+  private scheduleContextRetry(): void {
+    const id = this.sessions.activeId;
+    if (this.contextRetryTimer !== null || !this.isConnected || id === null
+      || !this.contextNotices.has(id) || this.contextWrites.has(id)) return;
+    this.contextRetryTimer = setTimeout(() => {
+      this.contextRetryTimer = null;
+      this.contextRetryDelay = Math.min(this.contextRetryDelay * 2, 30000);
+      if (this.sessions.activeId === id && !this.contextWrites.has(id)) void this.refreshHistory(id);
+      else this.scheduleContextRetry();
+    }, this.contextRetryDelay);
+  }
+
+  private retryContextOnReconnect = (): void => {
+    this.clearContextRetry();
+    this.contextRetryDelay = 1000;
+    const id = this.sessions.activeId;
+    if (id !== null && this.contextNotices.has(id) && !this.contextWrites.has(id)) {
+      void this.refreshHistory(id);
+    }
+  };
 
   /* ── The effective context (tempdoc 610, ported by 852 S2) ────────────────────────────────── */
 
@@ -1596,61 +1561,49 @@ export class SearchV3View extends JfElement {
     void this.runContextAction(detail);
   }
 
-  /**
-   * The five acts of tempdoc 610, and the two reads beside them. Each write goes through the SHARED
-   * store function that owns its endpoint (this window mints no request), and — the obligation 852
-   * S1 recorded when it loaded `/history` without rendering it — **every write is followed by a
-   * re-load of that record**. The backend is the authority on the floor and the exclusions; a
-   * window that patched its own copy instead would keep rendering a floor a failed or partial write
-   * never established, and would drift from the other client the moment there is one.
-   */
-  private async runContextAction(detail: Sv3ContextAction): Promise<void> {
+  /** Keep controls usable: capture their targets now, then send each act in selection order. */
+  private runContextAction(detail: Sv3ContextAction): Promise<void> {
     const session = this.activeSession;
-    if (session === null) return;
-    const sessionId = session.id;
+    if (session === null) return Promise.resolve();
     if (detail.action === 'inspect') {
       this.openContextInspector();
-      return;
+      return Promise.resolve();
     }
-    const contexts = this.turnContexts();
-    const turn = detail.turnId === undefined ? null : sv3TurnContextFor(contexts, detail.turnId);
-    const write: Sv3ContextWrite = { sessionId, history: session.history };
-    this.contextWrites.set(sessionId, write);
+    const turn = detail.turnId === undefined ? null : sv3TurnContextFor(this.turnContexts(), detail.turnId);
+    const previous = this.contextWrites.get(session.id) ?? Promise.resolve();
+    const pending = previous.then(() => this.writeContext(session.id, detail, turn)).finally(() => {
+      if (this.contextWrites.get(session.id) === pending) this.contextWrites.delete(session.id);
+      this.requestUpdate();
+      this.scheduleContextRetry();
+    });
+    this.contextWrites.set(session.id, pending);
+    this.clearContextRetry();
+    this.requestUpdate();
+    return pending;
+  }
+
+  private async writeContext(
+    sessionId: string,
+    detail: Sv3ContextAction,
+    turn: Sv3TurnContext | null,
+  ): Promise<void> {
     switch (detail.action) {
       case 'floor': {
         const messageId = turn?.floorMessageId ?? null;
         if (messageId === null) return;
-        await this.settleContextWrite(
-          write,
-          await setContextFloor(sessionId, messageId),
-          CONTEXT_FLOOR_FAILED,
-        );
+        await this.settleContextWrite(sessionId, await setContextFloor(sessionId, messageId), CONTEXT_FLOOR_FAILED);
         return;
       }
-      case 'restore': {
-        // Restore clears the floor and its summary — and only those: what the reader hid message by
-        // message stays hidden. Only a Restore the store ACCEPTED is applied to the window's copy
-        // when the reload fails; a refused one changed nothing, so the bar keeps the saved floor.
-        const cleared = await clearContextFloor(sessionId);
-        await this.settleContextWrite(
-          write,
-          cleared,
-          CONTEXT_RESTORE_FAILED,
-          cleared
-            ? (history) => ({ ...history, contextFloor: undefined, contextFloorSummary: undefined })
-            : undefined,
-        );
+      case 'restore':
+        await this.settleContextWrite(sessionId, await clearContextFloor(sessionId), CONTEXT_RESTORE_FAILED);
         return;
-      }
       case 'compact': {
         const messageId = turn?.floorMessageId ?? null;
-        if (messageId === null || this.compacting) return;
+        if (messageId === null) return;
         this.compacting = true;
         try {
-          // The summary comes back on the response, and is then re-read from `/history` like every
-          // other field: one place decides what the floor currently says.
           const summary = await compactContext(sessionId, messageId);
-          await this.settleContextWrite(write, summary !== null, CONTEXT_COMPACT_FAILED);
+          await this.settleContextWrite(sessionId, summary !== null, CONTEXT_COMPACT_FAILED);
         } finally {
           this.compacting = false;
         }
@@ -1658,40 +1611,32 @@ export class SearchV3View extends JfElement {
       }
       case 'summary':
         if (detail.text === undefined) return;
-        await this.settleContextWrite(
-          write,
-          await editContextFloorSummary(sessionId, detail.text),
-          CONTEXT_SUMMARY_FAILED,
-        );
+        await this.settleContextWrite(sessionId, await editContextFloorSummary(sessionId, detail.text), CONTEXT_SUMMARY_FAILED);
         return;
       case 'exclude':
       case 'include': {
         const ids = turn?.messageIds ?? [];
         if (ids.length === 0) return;
         const excluded = detail.action === 'exclude';
-        // Both of a turn's messages, because the reader hid a TURN: leaving the question in the
-        // prompt while dropping the answer would send the model a question it never answered.
         const landed = await this.excludeInTurn(sessionId, ids, excluded);
-        await this.settleContextWrite(
-          write,
-          landed.length === ids.length,
-          excluded ? CONTEXT_EXCLUDE_FAILED : CONTEXT_INCLUDE_FAILED,
-          (history) => sv3WithExclusions(history, landed, excluded),
-        );
+        await this.settleContextWrite(sessionId, landed.length === ids.length,
+          excluded ? CONTEXT_EXCLUDE_FAILED : CONTEXT_INCLUDE_FAILED);
         return;
       }
       case 'include-all': {
-        // Every id the record hides, ONCE each — on screen and off (S2.7). Only message exclusions:
-        // the floor, its summary and the hidden sources are other acts' to undo.
-        const ids = sv3ExcludedMessageIds(session.history);
+        // Derive the WHOLE saved ledger when this queued action runs, including prior exclusions.
+        // If the previous refresh failed we must read it first, rather than omit unknown ids.
+        if (this.contextNotices.has(sessionId)) {
+          if (!await this.refreshHistory(sessionId, true)) {
+            emitEphemeralToast({ message: CONTEXT_INCLUDE_ALL_FAILED, severity: 'warning' });
+            return;
+          }
+          this.confirmContext(sessionId);
+        }
+        const ids = sv3ExcludedMessageIds(sessionById(this.sessions, sessionId)?.history ?? null);
         if (ids.length === 0) return;
         const landed = await this.excludeInTurn(sessionId, ids, false);
-        await this.settleContextWrite(
-          write,
-          landed.length === ids.length,
-          CONTEXT_INCLUDE_ALL_FAILED,
-          (history) => sv3WithExclusions(history, landed, false),
-        );
+        await this.settleContextWrite(sessionId, landed.length === ids.length, CONTEXT_INCLUDE_ALL_FAILED);
         return;
       }
       default:
@@ -1714,8 +1659,7 @@ export class SearchV3View extends JfElement {
    * removes the race rather than detecting it afterwards, and it is what the shipped window already
    * does (`views/UnifiedChatView.ts:1767-1776`, a sequential `for`-await).
    *
-   * Returns the ids whose toggle LANDED — all of them, some, or none; the caller reloads `/history`
-   * either way, and falls back to exactly these if that reload fails.
+   * Returns the successful ids to report partial refusal; only a saved-history read confirms state.
    */
   private async excludeInTurn(
     sessionId: string,
@@ -1729,28 +1673,30 @@ export class SearchV3View extends JfElement {
     return landed;
   }
 
-  /**
-   * The tail every context write shares: RELOAD, then report a refusal. The reload runs whether or
-   * not the write landed — a partially-applied bulk exclusion is exactly the case where the window's
-   * own idea of the ledger is least trustworthy — and the toast names the act, because the remedies
-   * differ (a refused floor is the store; a compaction that returned nothing is usually the model).
-   *
-   * When no reload lands after it (it failed, or the reader has moved to another conversation),
-   * `confirmed` applies only while this write and its starting snapshot have not been superseded:
-   * a newer write or saved snapshot makes the response's assumed result unsafe (S2.10). Refused
-   * toggles are never included. A reload overtaken by a newer one of the same conversation leaves
-   * the confirmation to it ({@link refreshHistory}).
-   */
-  private async settleContextWrite(
-    write: Sv3ContextWrite,
-    ok: boolean,
-    failure: string,
-    confirmed?: (history: Sv3SessionHistory) => Sv3SessionHistory,
-  ): Promise<void> {
-    if (confirmed !== undefined) this.contextConfirms.push({ write, confirmed });
-    await this.refreshHistory(write.sessionId);
-    if (ok) return;
-    emitEphemeralToast({ message: failure, severity: 'warning' });
+  /** A write's response alone cannot confirm saved context, including a lost or partial response. */
+  private async settleContextWrite(sessionId: string, ok: boolean, failure: string): Promise<void> {
+    if (await this.refreshHistory(sessionId, true)) {
+      this.confirmContext(sessionId);
+    } else {
+      this.contextNotices.set(sessionId, 'Saved context could not be confirmed. Retrying…');
+      this.requestUpdate();
+    }
+    if (!ok) emitEphemeralToast({ message: failure, severity: 'warning' });
+  }
+
+  /** Wait for queued actions, then confirm uncertainty before a question can consume this state. */
+  private async confirmContextForAsk(sessionId: string): Promise<boolean> {
+    while (this.contextWrites.has(sessionId)) await this.contextWrites.get(sessionId);
+    if (!this.contextNotices.has(sessionId)) return true;
+    const read = await this.refreshHistory(sessionId);
+    // A control used during that read must also settle before this question is sent.
+    if (this.contextWrites.has(sessionId)) return this.confirmContextForAsk(sessionId);
+    if (read) return true;
+    this.contextNotices.set(sessionId,
+      'Saved context could not be confirmed. Question not sent. Your draft is kept. Retrying…');
+    this.requestUpdate();
+    this.scheduleContextRetry();
+    return false;
   }
 
   /* ── Branch, edit / retry and the version pager (852 S3) ──────────────────────────────────── */
@@ -2856,6 +2802,18 @@ export class SearchV3View extends JfElement {
   private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null): Promise<void> {
     const question = rawQuestion.trim();
     if (question === '') return;
+    const sessionId = this.sessions.activeId;
+    if (this.contextAskPending) return;
+    if (sessionId !== null && (this.contextWrites.has(sessionId) || this.contextNotices.has(sessionId))) {
+      this.contextAskPending = true;
+      let confirmed: boolean;
+      try {
+        confirmed = await this.confirmContextForAsk(sessionId);
+      } finally {
+        this.contextAskPending = false;
+      }
+      if (!confirmed || !this.isConnected || this.sessions.activeId !== sessionId) return;
+    }
     this.leaveResultsBySending();
     this.sessions = submitInSession(this.sessions, question, Date.now(), 'ask', createConversationId());
     const ref = latestTurnRef(this.sessions);
@@ -4044,6 +4002,8 @@ export class SearchV3View extends JfElement {
              box and the transcript scrolls beneath it rather than being cut off above it. -->
         <div class="dock" data-testid="sv3-dock">
         <jf-sv3-context-bar
+          .notice=${session === null ? '' : this.contextNotices.get(session.id)
+            ?? (this.contextWrites.has(session.id) ? 'Saving context… Later changes will follow in order.' : '')}
           .usage=${session?.contextUsage ?? null}
           .contextWindow=${this.aiSnapshot?.runtime.contextWindow ?? null}
           hidden-turns=${sv3ExcludedTurnCount(contexts)}

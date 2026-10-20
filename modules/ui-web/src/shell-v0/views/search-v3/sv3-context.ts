@@ -273,22 +273,6 @@ export const sv3ExcludedMessageIds = (history: Sv3SessionHistory | null): readon
   ...new Set(history?.excludedMessageIds ?? []),
 ];
 
-/**
- * The record with `ids` hidden (or put back) — what a set of exclusion toggles that LANDED confirms,
- * applied to the window's copy when the reload after them did not land.
- */
-export const sv3WithExclusions = (
-  history: Sv3SessionHistory,
-  ids: readonly string[],
-  excluded: boolean,
-): Sv3SessionHistory => {
-  const current = history.excludedMessageIds ?? [];
-  const next = excluded
-    ? [...current, ...ids.filter((id) => !current.includes(id))]
-    : current.filter((id) => !ids.includes(id));
-  return { ...history, excludedMessageIds: next };
-};
-
 /** The hidden message ids no turn on screen names, once each — what the bar counts as "not shown here". */
 export const sv3UnseenExcludedIds = (
   contexts: readonly Sv3TurnContext[],
