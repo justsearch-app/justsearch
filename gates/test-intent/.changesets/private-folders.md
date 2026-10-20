@@ -12,8 +12,8 @@ P1–P9 were adopted by the owner on 2026-10-20: "i agree, proceed accordingly"
 The Windows distinct-account scenario remains unverified without a Windows host. The delegated
 residual leaves explicit ACLs on copied-in files unchanged. No acceptance record is authored here.
 
-The earlier authentication warrants are pending clarification. Entries mark that gap explicitly;
-changed policy documents in this branch are not cited as circular sources.
+This changeset covers the folder-permission checks. Items owned by the accepted
+`token-bootstrap.md` changeset and their overlapping evidence are excluded.
 
 ```json
 {
@@ -46,6 +46,13 @@ changed policy documents in this branch are not cited as circular sources.
           "task": "t-20261019-5ec1a1",
           "scenario": "P3",
           "quote": "The keystore stays owner-only after setup, passphrase change and recovery-key regeneration (atomic replacement), and still unlocks after restart; a replacement interrupted midway (kill, or denied write) leaves the last usable keystore and its recovery material intact.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-5ec1a1",
+          "scenario": "P4",
+          "quote": "The manifest keeps its owner-only file and temporary-file guarantee from item 2; a kill between temp write and move leaves nothing readable to others and the next start is normal.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -210,35 +217,6 @@ changed policy documents in this branch are not cited as circular sources.
     },
     {
       "items": [
-        "modules/ui-web/src/activity/idleSurfaces.test.ts",
-        "modules/ui-web/src/shell-v0/components/ResourceView.history-reconnect.test.ts",
-        "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts",
-        "modules/ui-web/src/shell-v0/components/advisory/AdvisoryStore.test.ts",
-        "modules/ui-web/src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts",
-        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts",
-        "modules/ui-web/src/shell-v0/views/HealthLitView.test.ts"
-      ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation",
-        "input re-encoding"
-      ],
-      "whatMoved": "Replace EventSource-only fakes with controlled HTTP SSE byte streams consumed by the product fetch transport. Keep fixture payloads, event order, reduction/rendering/lifecycle outcomes, tags and conditions. Await asynchronous token resolution/parser work before the original observations. The assertion comparison accounts for all 182 original expect calls: only stream collection/listener observation renames and two equivalent closed-state observations move; the additional pending-fetch wait establishes the original reattach precondition. aiInstallPoll only drains time-zero token work before its unchanged call-count/cancellation assertions. See gates/test-intent/evidence/private-folders-adapted-assertions.json for every before/after assertion and the explicit observation mappings.",
-      "assertionEvidence": "gates/test-intent/evidence/private-folders-adapted-assertions.json",
-      "oracleReview": "The idle-surfaces connect-burst loop now selects connections that are still open. The old EventSource fake retained callbacks even after close and the old loop visited those closed fakes too. The asserted scenario/comment is about every stream the shell holds open; this transport-validity difference is explicit for the acceptor to review, rather than being hidden by the unchanged-assertion comparison."
-    },
-    {
-      "items": [
-        "modules/ui/src/integrationTest/java/io/justsearch/ui/api/LocalApiIntegrationTestBase.java"
-      ],
-      "class": "Adaptation",
-      "moved": [
-        "signature"
-      ],
-      "whatMoved": "Add getJson(path, headers) overload and delegate the original getJson(path) to it with an empty map. For every existing no-header caller, method, URI, timeout, response decoding and assertions are unchanged; explicit headers are forwarded only by callers that request them. No test assertion is added or removed in this abstract fixture."
-    },
-    {
-      "items": [
         "modules/configuration/src/test/java/io/justsearch/configuration/persistence/WindowsOwnerOnlyDirectoryTest.java"
       ],
       "class": "New",
@@ -267,7 +245,7 @@ changed policy documents in this branch are not cited as circular sources.
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/private-folders-policy-preservation.json",
+      "evidence": "gates/test-intent/evidence/private-folders-policy.json",
       "newChecks": [
         "modules/configuration/src/test/java/io/justsearch/configuration/persistence/WindowsOwnerOnlyDirectoryTest.java"
       ],
@@ -288,140 +266,21 @@ changed policy documents in this branch are not cited as circular sources.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/private-folders-policy-preservation.json",
+      "evidence": "gates/test-intent/evidence/private-folders-policy.json",
       "newChecks": [
         "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::windows_directory_descriptor_is_protected_and_only_owner_and_system_inherit_full_control"
       ],
       "repaired": false
-    },
-    {
-      "items": [
-        "modules/ui/src/integrationTest/java/io/justsearch/ui/api/ProdModeSettingsPersistenceIntegrationTest.java"
-      ],
-      "class": "Adaptation",
-      "moved": [
-        "input re-encoding"
-      ],
-      "whatMoved": "Encode the same authorized settings/activation observations with the current session header on the two GET requests, preserving fixtures, operations, persisted-value assertions and activation outcomes. The added polling status assertion enforces the existing successful-response precondition before reading activation JSON. Four consumer tests execute in private-folders-policy-preservation.json.",
-      "executionEvidence": "gates/test-intent/evidence/private-folders-policy-preservation.json"
-    },
-    {
-      "items": [
-        "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatControllerTest.java"
-      ],
-      "class": "Adaptation",
-      "moved": [
-        "input re-encoding"
-      ],
-      "whatMoved": "Encode the existing authenticated-owner production GET with the session header so the CORS observation remains reachable after non-public reads require authentication. Status 200, exact response body and foreign-versus-shell CORS outcomes remain unchanged; only the assertion message names authentication. Eleven tests execute in private-folders-policy-preservation.json.",
-      "executionEvidence": "gates/test-intent/evidence/private-folders-policy-preservation.json"
-    },
-    {
-      "items": [
-        "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts"
-      ],
-      "class": "Structural rule kept",
-      "rule": "Without a usable default stream transport, headless bridge startup is a no-op: no tasks and no pooled stream.",
-      "whySurvives": "The missing-capability fixture follows the default transport rename from EventSource to fetch. The original zero-tasks assertion and stop call stay; the new zero-pool assertion is a stricter observation of the same no-op rule. All 23 tests execute in private-folders-policy-preservation.json.",
-      "executionEvidence": "gates/test-intent/evidence/private-folders-policy-preservation.json"
-    },
-    {
-      "items": [
-        "modules/ui-web/src/api/http.test.ts"
-      ],
-      "class": "New",
-      "behaviour": "Non-public desktop GET attaches the owner session token; a 401 resolves the new boot token and retries exactly once. Browser/dev reads without a desktop token remain token-free. Tagged success/failure outcomes preserve the successful-result oracle while making the old rejected request fail an assertion.",
-      "sources": [],
-      "evidence": "gates/test-intent/evidence/private-folders-http-retry.json",
-      "newChecks": [
-        "modules/ui-web/src/api/http.test.ts"
-      ],
-      "repaired": true,
-      "pendingWarrant": "Owner words or adopted scenarios for the earlier authentication work requested asynchronously; P1\u2013P9 do not establish this complete expectation."
-    },
-    {
-      "items": [
-        "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java"
-      ],
-      "class": "New",
-      "behaviour": "The removed credential bootstrap has no route for any Origin. Existing MCP Origin/Host checks keep their outcomes while their fixture/callers supply a production token. The new absence check uses a fixture without that endpoint; real removal is pinned by ProductionRouteTokenBoundaryTest.",
-      "sources": [],
-      "evidence": "gates/test-intent/evidence/private-folders-policy-preservation.json",
-      "newChecks": [
-        "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java"
-      ],
-      "repaired": false,
-      "pendingWarrant": "Owner words or adopted scenarios for the earlier authentication work requested asynchronously; P1\u2013P9 do not establish this complete expectation."
-    },
-    {
-      "items": [
-        "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestCredentialBoundaryTest.java"
-      ],
-      "class": "New",
-      "behaviour": "Every canonical manifest publish replaces readable manifest and leftover temporary files with owner-only files before writing credentials; newly written historical manifests/logs omit session credentials. P4 warrants the file/temp guarantee; the earlier new-history credential-omission warrant is still missing.",
-      "sources": [
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-5ec1a1",
-          "scenario": "P4",
-          "quote": "The manifest keeps its owner-only file and temporary-file guarantee from item 2; a kill between temp write and move leaves nothing readable to others and the next start is normal.",
-          "label": "agent-drafted, owner-adopted"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/private-folders-auth-repairs.json",
-      "newChecks": [
-        "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestCredentialBoundaryTest.java"
-      ],
-      "repaired": true,
-      "pendingWarrant": "Owner words or adopted scenarios for the earlier authentication work requested asynchronously; P1\u2013P9 do not establish this complete expectation.",
-      "expectationSources": {
-        "everyPublishReplacesReadableManifestAndLeftoverTempWithOwnerOnlyFile": [
-          "P4"
-        ],
-        "newInstanceHistoryContainsNoCredentialAcrossPublishes": []
-      }
-    },
-    {
-      "items": [
-        "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/ProductionRouteTokenWalkTest.java",
-        "modules/ui-web/src/api/registry/AuthenticatedCatalogs.test.ts",
-        "modules/ui-web/src/shell-v0/api/authorizedFetch.test.ts",
-        "modules/ui-web/src/shell-v0/streaming/AuthenticatedStream.test.ts",
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessLauncherProductionModeTest.java",
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessTokenOutputTest.java",
-        "modules/ui/src/test/java/io/justsearch/ui/api/LocalApiUiTokenPolicyTest.java",
-        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionRouteTokenBoundaryTest.java"
-      ],
-      "class": "New",
-      "behaviour": "Earlier authentication changes: shipped headless launchers enable production and preserve the selected mode; stdout never prints the token; production non-public routes (including reads/SSE/MCP and future routes) require the per-boot owner token, with only the six public read paths and OPTIONS exempt; the HTTP bootstrap is removed; dev remains token-free; default desktop catalog/canonical-schema reads attach the token while external schemas do not; streams use a header, parse chunked SSE, resume after EOF, refresh stale tokens and retry cold-start discovery without credentials in URLs. Each named class has script-produced candidate and assertion fail-before evidence.",
-      "sources": [],
-      "evidence": "gates/test-intent/evidence/private-folders-auth-repairs.json",
-      "newChecks": [
-        "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/ProductionRouteTokenWalkTest.java",
-        "modules/ui-web/src/api/registry/AuthenticatedCatalogs.test.ts",
-        "modules/ui-web/src/shell-v0/api/authorizedFetch.test.ts",
-        "modules/ui-web/src/shell-v0/streaming/AuthenticatedStream.test.ts",
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessLauncherProductionModeTest.java",
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessTokenOutputTest.java",
-        "modules/ui/src/test/java/io/justsearch/ui/api/LocalApiUiTokenPolicyTest.java",
-        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionRouteTokenBoundaryTest.java"
-      ],
-      "repaired": true,
-      "pendingWarrant": "The first builder brief supplies folder scenarios only. The changed ADR-0046 and threat-model document cannot serve as sources because they change in this branch. Awaiting the earlier owner words/adopted scenarios, rather than inventing a delegation scope or citing the implementation."
     }
   ]
 }
 ```
 
-The D4 assertion-only fail-before requirement required four durable test adaptations:
+The D4 assertion-only fail-before requirement required three durable test adaptations:
 `OwnerOnlyDirectoryTest` wraps the prior bare `OwnerOnlyDirectory.ensure(...)` link call;
 `EncryptionKeystorePermissionsTest` wraps the prior bare `restart()` calls;
 `RuntimeDirectoryPermissionsTest` wraps the prior bare publisher constructors and the prior
 `Mockito.verify(warning, Mockito.times(1)).warn(...)` call in `assertDoesNotThrow`.
-The old HTTP assertion was
-`await expect(request('http://127.0.0.1:33221', '/api/preview')).resolves.toEqual({ recovered: true });`.
-It now compares tagged success/failure outcomes against `{ value: { recovered: true } }`;
-a rejection still fails, but the runner can classify the failure as an assertion.
 No original expected permission, content, count, status, recovery result or lifecycle outcome was removed.
 
 The two compatibility patches are evidence scaffolding only. The Rust patch supplies unused
