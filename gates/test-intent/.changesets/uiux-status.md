@@ -632,3 +632,14 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
   "note": "Expectations follow the supplied agreed scenarios and compatibility obligation. Independent UI evidence rerun passed; transplanted tests fail by assertion on f6a14b5a6, and serialization compatibility fails by assertion on 8237e63d9 while passing both original and candidate. Fixture changes only active observation timestamps; registered assertions and baselines are identical. Acceptance concerns test intent only: product verification fails for uncaveated stale Health index-state values and Brain animating energy-deferred idle enrichment."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp33-verifier-g2c532fw",
+  "verdict": "accept",
+  "digest": "sha256:53a37d76e86eaa6961853fa3e43ccf99f4c6648f303cea5b78355183051ecf5e",
+  "note": "Expectations follow the agreed scenarios and delegated compatibility decision. Independent UI/Java evidence reruns passed; 53 baseline assertions fail and 300 adapted-fixture checks pass. Compatibility fails on 8237e63d9 and passes before/after. Test intent only: product fails stale diagnostic, migration, animation and announcement cases."
+}
+```
