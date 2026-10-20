@@ -1515,3 +1515,14 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a158c2-d82e-7711-ac4d-057b42b2a387",
+  "verdict": "reject",
+  "digest": "sha256:470304e07197d7c6f630f9068e83bc4d10b1c271afb1b814eb2bfc9838929a68",
+  "note": "Entry 22 allows a 20 ms whole poll under a Q6 amendment absent from the supplied complete agreement, which requires under 10 ms p95."
+}
+```
