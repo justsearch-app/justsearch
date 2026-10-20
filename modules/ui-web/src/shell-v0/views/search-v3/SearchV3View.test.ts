@@ -306,6 +306,35 @@ describe('the composer has two anatomies and one way between them', () => {
  * good intentions — is what keeps this hidden dev surface from changing how the shipped app animates.
  */
 describe('the document-level morph sheet lives exactly as long as the window does', () => {
+  it.each([
+    ['Linux Tauri shell', 'X11; Linux x86_64', true, true, false, false],
+    ['Windows Tauri shell', 'Windows NT 10.0; Win64; x64', true, true, false, true],
+    ['macOS Tauri shell', 'Macintosh; Intel Mac OS X 10_15_7', true, true, false, true],
+    ['Linux browser', 'X11; Linux x86_64', false, true, false, true],
+    ['API absent', 'Windows NT 10.0; Win64; x64', true, false, false, false],
+    ['reduced motion', 'Macintosh; Intel Mac OS X 10_15_7', true, true, true, false],
+  ])('applies composer state once and clears morph flags in a %s', async (
+    _label, platform, tauri, api, reduce, enabled,
+  ) => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(`Mozilla/5.0 (${platform})`);
+    vi.stubGlobal('__TAURI_INTERNALS__', tauri ? {} : undefined);
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: reduce } as MediaQueryList);
+    const el = await mount() as SearchV3View;
+    const composer = await region(el, 'jf-sv3-composer');
+    const apply = vi.spyOn(el, 'composerState', 'set');
+    const start = vi.fn((cb: () => Promise<void> | void) => ({ finished: Promise.resolve(cb()) }));
+    if (api) stubViewTransition(start);
+
+    await el.setComposerState('docked');
+
+    expect(start).toHaveBeenCalledTimes(enabled ? 1 : 0);
+    expect(apply).toHaveBeenCalledExactlyOnceWith('docked');
+    expect(el.composerState).toBe('docked');
+    expect(composer.getAttribute('state')).toBe('docked');
+    expect(document.documentElement.hasAttribute(SV3_MORPH_ROOT_ATTR)).toBe(false);
+    expect(composer.hasAttribute('morphing')).toBe(false);
+  });
+
   it('adopts on connect and removes on the last disconnect', async () => {
     expect(sv3MorphSheetAdopted()).toBe(false);
     const first = await mount();
