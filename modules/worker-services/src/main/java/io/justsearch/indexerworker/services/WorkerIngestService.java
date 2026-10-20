@@ -211,8 +211,8 @@ public final class WorkerIngestService {
     this.rootVolumes = RootVolumeLedger.under(indexBasePath);
     this.rootWitness = RootWitness.of(rootVolumes, this::registeredRootIdentity,
         folder -> rootWatcherRegistry.declaresRootCovering(folder));
-    if (ingestLifecycle != null && ingestLifecycle.documentFieldOps() != null) {
-      ingestLifecycle.documentFieldOps().useSourceProcessingPolicy(this::sourceProcessingAllowed);
+    if (ingestLifecycle != null) {
+      ingestLifecycle.useSourceProcessingPolicy(this::sourceProcessingAllowed);
     }
     this.migrationOps = new MigrationControlOps(this.indexGenerationManager);
     this.upgradeQuiescence =

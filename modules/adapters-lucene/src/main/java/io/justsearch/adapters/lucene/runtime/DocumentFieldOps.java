@@ -41,16 +41,10 @@ public final class DocumentFieldOps {
   private final String idField;
   private final RuntimeSession session;
   private final ReadPathOps readPathOps;
-  private volatile java.util.function.Predicate<String> sourceProcessingPolicy;
-
-  /** The Worker supplies current file policy; query/content reads remain available. */
-  public void useSourceProcessingPolicy(java.util.function.Predicate<String> allows) {
-    sourceProcessingPolicy = java.util.Objects.requireNonNull(allows, "allows");
-  }
 
   /** Recheck IDs retained by a backfill cache before starting another batch. */
   public Set<String> excludedProcessingIds(List<String> docIds) {
-    var allows = sourceProcessingPolicy;
+    var allows = session.sourceProcessingPolicy;
     if (allows == null || docIds.isEmpty()
         || io.justsearch.configuration.excludes.ExclusionPatterns.current().isEmpty()) return Set.of();
     try {
@@ -625,7 +619,7 @@ public final class DocumentFieldOps {
                         BooleanClause.Occur.MUST_NOT)
                     .build()
                 : valueQuery;
-        var allows = sourceProcessingPolicy;
+        var allows = session.sourceProcessingPolicy;
         if (allows != null && processingSelection(field, value)
             && !io.justsearch.configuration.excludes.ExclusionPatterns.current().isEmpty()) {
           // Stream eligible IDs so excluded heads neither starve later files nor require

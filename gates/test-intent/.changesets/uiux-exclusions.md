@@ -448,6 +448,8 @@ No frontend edit is required by D4/D5.
 
 ## Review history
 
+- 2026-10-20: Reworked after verifier rejection 9bbd732cc: bind the source-processing policy on the runtime session rather than DocumentFieldOps, keeping all 14 generation-refusal cases unchanged and binding policy before admission. Existing rejection records retained byte-identical; no acceptance record authored.
+
 - 2026-10-20: Reworked after verifier rejection 8cf789758. Removed finding-8 claims from both EX4 entries (AX3); added before-version-written upgrade data and EN1/AX1 admission, replay, Preview/Apply and editor checks, plus AX2 pattern help. Existing rejection record retained below. Builder session agent-session-2xmru_je.
 
 - 2026-10-20: Reworked after verifier rejection 47e8d1e79 under agent-adopted D1-D5: restore malformed operator override fallback with a once-per-policy warning (EN1 evidence); retain omitted empty diagnostics and the original projection oracle; replace recorded invalid-glob refusal under AX1 with real-base fail-before evidence; document the D4/D5 conditional no-change findings. Both rejection records retained byte-identical. Builder session 01a15819-2a8c-73e1-84af-4f19e90308d0.
