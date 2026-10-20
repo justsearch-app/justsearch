@@ -1,4 +1,6 @@
 mod binding;
+#[cfg(windows)]
+mod windows_reveal;
 // Spec F §2: one kill-on-close job per Engine incarnation; the shell itself never joins one.
 mod containment;
 // Reader/writer enabler; lifecycle callers land in Spec F step 6.
@@ -1507,9 +1509,8 @@ fn windows_shell_item(target: &Path, select: bool) -> Result<(), String> {
         COINIT_DISABLE_OLE1DDE,
     };
     use windows_sys::Win32::UI::Shell::{
-        ILClone, ILFindLastID, ILFree, ILRemoveLastID, SHOpenFolderAndSelectItems,
-        SHParseDisplayName, ShellExecuteExW, SEE_MASK_FLAG_NO_UI, SEE_MASK_IDLIST,
-        SEE_MASK_NOASYNC, SHELLEXECUTEINFOW,
+        SHOpenFolderAndSelectItems, SHParseDisplayName, ShellExecuteExW, SEE_MASK_FLAG_NO_UI,
+        SEE_MASK_IDLIST, SEE_MASK_NOASYNC, SHELLEXECUTEINFOW,
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
@@ -1541,21 +1542,11 @@ fn windows_shell_item(target: &Path, select: bool) -> Result<(), String> {
             target.display()
         ))
     } else if select {
-        // Derive both parts from the item's own PIDL, keeping the selected child relative to
-        // precisely that parent. Neither a comma nor a neighboring PATHEXT name is parsed again.
-        let parent = unsafe { ILClone(item) };
-        if parent.is_null() {
-            Err("Could not allocate the parent shell item".into())
-        } else {
-            let result = if unsafe { ILRemoveLastID(parent) } == 0 {
-                Err(format!(
-                    "Could not identify the parent of '{}'",
-                    target.display()
-                ))
-            } else {
-                let child = unsafe { ILFindLastID(item) };
-                let children = [child.cast_const()];
-                let opened = unsafe { SHOpenFolderAndSelectItems(parent, 1, children.as_ptr(), 0) };
+        // Preparation and the exact native parent/count/children arguments are shared with
+        // the item-ID test, independently of Explorer's hosted focus/selection behavior.
+        unsafe {
+            windows_reveal::with_item_ids(item, |parent, count, children| {
+                let opened = SHOpenFolderAndSelectItems(parent, count, children, 0);
                 if opened < 0 {
                     Err(format!(
                         "Could not reveal '{}': {opened:#x}",
@@ -1564,11 +1555,7 @@ fn windows_shell_item(target: &Path, select: bool) -> Result<(), String> {
                 } else {
                     Ok(())
                 }
-            };
-            unsafe {
-                ILFree(parent);
-            }
-            result
+            })
         }
     } else {
         let verb: Vec<u16> = "open".encode_utf16().chain(Some(0)).collect();
@@ -3443,7 +3430,7 @@ mod open_guard_tests {
     #[cfg(windows)]
     fn windows_observe_reveal(name: &str) {
         let dir = tempdir().unwrap();
-        // A parent-only open must not pass by incidentally focusing its sole/first file.
+        // Retain a decoy: hosted focus can land here even when a different item was revealed.
         fixture(dir.path(), "000-unrelated.txt");
         let file = PathBuf::from(fixture(dir.path(), name));
         let gui = windows_probe::WindowsProbe::new(dir.path(), &[&file]);
@@ -3462,6 +3449,95 @@ mod open_guard_tests {
     #[test]
     fn windows_comma_reveal_window_and_selection() {
         windows_observe_reveal("a,b2.txt");
+    }
+
+    #[cfg(windows)]
+    fn windows_pidl_path(
+        item: *const windows_sys::Win32::UI::Shell::Common::ITEMIDLIST,
+    ) -> Result<PathBuf, String> {
+        use std::os::windows::ffi::OsStringExt;
+        use windows_sys::Win32::UI::Shell::SHGetPathFromIDListEx;
+        let mut path = vec![0u16; 32768];
+        if unsafe { SHGetPathFromIDListEx(item, path.as_mut_ptr(), path.len() as u32, 0) } == 0 {
+            return Err("SHGetPathFromIDListEx could not resolve the PIDL".into());
+        }
+        let end = path.iter().position(|unit| *unit == 0).unwrap();
+        Ok(PathBuf::from(std::ffi::OsString::from_wide(&path[..end])))
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_reveal_item_ids_identify_exact_target() {
+        use std::os::windows::ffi::OsStrExt;
+        use windows_sys::Win32::Foundation::RPC_E_CHANGED_MODE;
+        use windows_sys::Win32::System::Com::{
+            CoInitializeEx, CoTaskMemFree, CoUninitialize, COINIT_APARTMENTTHREADED,
+        };
+        use windows_sys::Win32::UI::Shell::{ILCombine, ILFree, SHParseDisplayName};
+        let dir = tempdir().unwrap();
+        let targets: Vec<_> = ["a,b2.txt", "Q3 [draft].txt", "plain.txt"]
+            .iter()
+            .map(|name| {
+                let path = fixture(dir.path(), name);
+                dunce::simplified(&fs::canonicalize(path).unwrap()).to_path_buf()
+            })
+            .collect();
+        let initialized = unsafe { CoInitializeEx(std::ptr::null(), COINIT_APARTMENTTHREADED as u32) };
+        assert!(
+            initialized >= 0 || initialized == RPC_E_CHANGED_MODE,
+            "COM: {initialized:#x}"
+        );
+        let results: Vec<_> = targets
+            .iter()
+            .map(|target| {
+                let wide: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
+                let mut item = std::ptr::null_mut();
+                let parsed = unsafe {
+                    SHParseDisplayName(
+                        wide.as_ptr(),
+                        std::ptr::null_mut(),
+                        &mut item,
+                        0,
+                        std::ptr::null_mut(),
+                    )
+                };
+                let mut paths = None;
+                let result = if parsed < 0 || item.is_null() {
+                    Err(format!("SHParseDisplayName: {parsed:#x}"))
+                } else {
+                    unsafe {
+                        windows_reveal::with_item_ids(item, |parent, count, children| {
+                            if count != 1 || children.is_null() {
+                                return Err(format!("Expected one reveal child, got {count}"));
+                            }
+                            let combined = ILCombine(parent, *children);
+                            if combined.is_null() {
+                                return Err("ILCombine could not reconstruct the reveal target".into());
+                            }
+                            let parent_path = windows_pidl_path(parent);
+                            let target_path = windows_pidl_path(combined);
+                            ILFree(combined);
+                            paths = Some((parent_path?, target_path?));
+                            Ok(())
+                        })
+                    }
+                };
+                unsafe { CoTaskMemFree(item.cast()) };
+                result.and_then(|()| paths.ok_or_else(|| "No reveal arguments observed".to_string()))
+            })
+            .collect();
+        if initialized >= 0 {
+            unsafe { CoUninitialize() };
+        }
+        // Assert only after COM/PIDL cleanup, including when a mutation supplied bad arguments.
+        for (target, result) in targets.iter().zip(results) {
+            assert_eq!(
+                result,
+                Ok((target.parent().unwrap().to_path_buf(), target.clone())),
+                "native reveal IDs for {}",
+                target.display()
+            );
+        }
     }
 
 }

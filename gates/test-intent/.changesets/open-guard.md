@@ -9,13 +9,15 @@ author-session: open-guard-builder
 
 All eleven earlier Windows checks **passed on hosted Windows at `e22910c2de10eb90232fff11cc9c3248f454a23c`**: [original refusals](../evidence/open-guard-windows-repaired.json), [round-3 dispatch](../evidence/open-guard-windows-round3-repaired.json), [round-4 repairs](../evidence/open-guard-windows-round4-repaired.json), and [round-4 preservation](../evidence/open-guard-windows-round4-preserved.json). Those committed results cover Invoice/PATHEXT, mapped UNC documents and folders, and document/bracket-folder markers. Their source-file digests are stale after round 5; all four reruns are in `tmp/open-guard/windows-evidence-command.txt`.
 
-Round 8 corrects the earlier interpretation of SelectionCount=0. The supplied hosted probe `tmp/open-guard/round8/selection-probe.ps1` and `selection-probe-118625766112.log:113-114` show classic `explorer /select` on plain.txt still has Count=0 after 10 seconds, but FocusedItem is the exact file. Calling SelectItem through the view immediately gives Count=1, so the selection observer works; hosted Explorer reveals by focusing without selecting. This supersedes the round-7 claim that an empty selection alone established a product failure. The earlier independent probe log `selection-probe-118625002298.log:113` also records Count=1 after SelectItem. These are supplied observations, not executions by this Linux builder.
+Round 9 supersedes the round-8 focus-or-selection interpretation. The supplied hosted round-8 log `tmp/open-guard/round9/hosted-round8-job.log:580,700,828` records the correct parent with SelectionCount=0 and Focused=000-unrelated.txt for both legacy Explorer /select and the candidate. The earlier single-file probe could not distinguish incidental focus from reveal targeting. Hosted Explorer therefore provides no reliable observable selection or focus for a reveal. These are supplied Windows observations, not executions by this Linux builder.
 
-The owner reports hosted [run 39418755265](https://github.com/justsearch-app/justsearch/actions/runs/39418755265) on `def3b2144` passed every other round-7 check, including neighbor launchers, mapped paths, NTFS, symlink/verbatim checks and comma folders; only the selection-only reveal assertion failed. The named `hosted-round7-job.log` is absent from the supplied round8 directory, so those suite results are attributed to the owner's report rather than a local log inspection.
+The GUI checks now require the **exact parent folder window** for both plain and comma reveals, recording Selected, SelectionCount, Focused and pipeline values as observations only. They still poll for the exact unique fixture parent. The plain reveal control must pass before/after 143fd387b; the comma reveal must assertion-fail before (Desktop) and pass after. Every other check and cleanup remains unchanged.
 
-The round-8 reveal contract requires **the exact parent folder AND the exact target focused OR selected in that view**. Parent-only and unrelated-window observations fail. The observer retains the 15-second poll and records Selected, SelectionCount, Focused and the old pipeline projection for pass and timeout. It never changes focus or selection. The new plain.txt reveal control must pass on both 143fd387b's Explorer /select and the candidate. The comma reveal must still assertion-fail on 143fd387b (Desktop) and pass after. It stays in the original comma fail-before group; it is removed from the df947d57e fail-before group because the new focus-or-selection contract can already pass there. The Invoice/bracket security checks remain in that group unchanged.
+Item targeting is independently checked at the native item-ID level. Production and the new Windows test use the same `windows_reveal::with_item_ids` function, including the exact parent/count/children arguments handed to SHOpenFolderAndSelectItems. For a,b2.txt, Q3 [draft].txt and plain.txt, SHGetPathFromIDListEx must resolve the parent to the exact parent and ILCombine(parent, child) to the exact file. The test requires exactly one child. The hosted command runs two production-helper mutations: passing the parent alone (count=0) and passing the parent's own last child instead of the file's. Both must produce executed assertion failures; a compile error or unavailable runner does not count. The mutation patches are `open-guard-round9-parent-only.patch` and `open-guard-round9-wrong-child.patch`; their native runtime results, like the new PIDL and amended GUI checks, remain **unverified until hosted**. Linux applied and Windows-target typechecked the candidate and both mutations, but cannot execute Windows shell APIs.
 
-Production item-ID dispatch and every other test/cleanup check are unchanged from round 7: folders use SEE_MASK_IDLIST/lpIDList with lpFile NULL, and file reveal uses parent plus relative child PIDLs; document/URL dispatch stays as before. The command adds the plain reveal control before/after and retains all other evidence groups and run-everything-then-fail behavior. Current **Windows results remain unverified until hosted**. The job owns 8.3/long-path setup. macOS is out of scope.
+Linux mutation reasoning, after applying and typechecking both patches (`tmp/open-guard/round9/validate-windows.log`): parent-only passes count=0, so the shared-argument test returns Err before reading children and fails its outer assert_eq against Ok. Wrong-child appends the parent folder's own final ID to that parent, which cannot equal any of the three requested file names; resolution either errors or yields a different target, and the same assertion rejects it. This is reasoning over the patched code, not a claimed native Windows mutation pass. The hosted script requires the actual assertion failures and preserves their evidence.
+
+Production PIDL semantics stay as in round 7: folders use SEE_MASK_IDLIST/lpIDList with lpFile NULL; reveal uses the resolved parent plus relative child. Documents and URLs retain their dispatch. The command attempts every evidence group, including both mutation controls, then exits nonzero if any unexpected result occurred. Each GUI test's cleanup finishes before the next call. The job owns 8.3/long-path setup. macOS is out of scope.
 
 D4 was generated in a shared scratch clone using `run-evidence.mjs --before` and an interface-only before patch. The patches expose old decisions and raw dispatch bodies under the new helper signatures; they add no validation, resolution or path simplification. Round-7 neighbor regressions use df947d57e, while comma reveal/routing repairs and both plain controls use 143fd387b with unchanged dispatch signatures; round-4 repairs use c87d00139, round-3 repairs use d6b269468, and original repairs retain origin/main. The round-4 before patch only adapts dispatch return ownership; it preserves the original PowerShell/PATHEXT lookup and VerbatimUNC refusal. Every run sets TMPDIR to this worktree's tmp/ and keeps fixtures there. Cargo output stays in this worktree's target directory. The lower Linux layer is the actual command function with PATH-isolated, marker-writing xdg-open; plugin calls go through Tauri's IPC dispatcher and real ACLs on a mock webview. This does not claim a graphical shell run.
 
@@ -289,7 +291,7 @@ The author has not accepted these entries; independent acceptance remains for th
         "modules/shell/src-tauri/src/open_guard_windows.ps1"
       ],
       "class": "New",
-      "behaviour": "Comma folders reach the exact folder; comma-file reveal reaches the exact parent with the target focused or selected. The hosted probe explains why selection-only was incorrect. The amended reveal check must still assertion-fail on 143fd387b (Desktop) and pass after; current Windows results are unverified.",
+      "behaviour": "Comma folders reach the exact folder; comma-file reveal reaches its exact parent. Focused/Selected are diagnostics only because the hosted round-8 log disproves their reliability. The amended comma checks must assertion-fail on 143fd387b and pass after; current Windows execution is unverified.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -314,6 +316,14 @@ The author has not accepted these entries; independent acceptance remains for th
           "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
           "choice": "F4 round 8: the hosted probe establishes that Explorer focuses reveal targets without selecting them, including classic /select on plain.txt, while SelectItem proves native selection can be observed. Require the exact parent view AND the exact target focused or selected; record both values and keep polling. Add a plain-name reveal control that passes on 143fd387b and after; the comma reveal must still fail on 143fd387b (Desktop) and pass after. Keep every other check and production dispatch unchanged. Do not require the amended reveal assertion to fail on df947d57e, where focus may already satisfy the corrected contract; retain its fail-before on 143fd387b. Retain run-everything-then-fail and cleanup between Windows evidence calls. All current Windows results remain unverified until hosted.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "F4 round 9: hosted Explorer gives no reliable reveal selection or focus even with classic /select and a decoy file. GUI checks require the exact parent only and retain Focused and Selected diagnostics. Plain reveal must pass before/after 143fd387b; comma reveal must fail before (Desktop) and pass after. Independently resolve production-built parent and relative-child PIDLs to the exact parent and target for a,b2.txt, Q3 [draft].txt and plain.txt. Mutation controls must reject parent-only and wrong-child production arguments by assertion. Keep every other check, cleanup and run-everything-then-fail command behavior. Current Windows results remain unverified until hosted.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/open-guard-windows-round5-repaired.json",
@@ -331,7 +341,7 @@ The author has not accepted these entries; independent acceptance remains for th
         "modules/shell/src-tauri/src/open_guard_windows.ps1"
       ],
       "class": "New",
-      "behaviour": "The plain-folder control and new plain.txt reveal control must pass both on 143fd387b and the candidate. Reveal requires the exact parent AND the exact file focused or selected. The probe supports the contract; current Windows execution remains unverified.",
+      "behaviour": "The plain-folder control and plain.txt reveal control require the exact folder/parent and must pass on 143fd387b and the candidate. Focused/Selected are diagnostic only. Current Windows execution is unverified.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -347,6 +357,14 @@ The author has not accepted these entries; independent acceptance remains for th
           "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
           "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
           "choice": "F4 round 8: the hosted probe establishes that Explorer focuses reveal targets without selecting them, including classic /select on plain.txt, while SelectItem proves native selection can be observed. Require the exact parent view AND the exact target focused or selected; record both values and keep polling. Add a plain-name reveal control that passes on 143fd387b and after; the comma reveal must still fail on 143fd387b (Desktop) and pass after. Keep every other check and production dispatch unchanged. Do not require the amended reveal assertion to fail on df947d57e, where focus may already satisfy the corrected contract; retain its fail-before on 143fd387b. Retain run-everything-then-fail and cleanup between Windows evidence calls. All current Windows results remain unverified until hosted.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "F4 round 9: hosted Explorer gives no reliable reveal selection or focus even with classic /select and a decoy file. GUI checks require the exact parent only and retain Focused and Selected diagnostics. Plain reveal must pass before/after 143fd387b; comma reveal must fail before (Desktop) and pass after. Independently resolve production-built parent and relative-child PIDLs to the exact parent and target for a,b2.txt, Q3 [draft].txt and plain.txt. Mutation controls must reject parent-only and wrong-child production arguments by assertion. Keep every other check, cleanup and run-everything-then-fail command behavior. Current Windows results remain unverified until hosted.",
           "label": "agent choice"
         }
       ],
@@ -369,7 +387,7 @@ The author has not accepted these entries; independent acceptance remains for th
         "modules/shell/src-tauri/src/lib.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Invoice and Q3 [draft] opening/reveal never run adjacent .cmd files and reach their actual folders. Both must assertion-fail on df947d57e and pass with PIDL dispatch. The owner reports round-7 passes; current reruns remain unverified. Comma reveal is covered separately against 143fd387b under the corrected focus-or-selection contract.",
+      "behaviour": "Invoice and Q3 [draft] opening/reveal never run adjacent .cmd files and reach their actual folders. Both must assertion-fail on df947d57e and pass with PIDL dispatch. Other checks are unchanged; comma reveal is covered separately against 143fd387b with the exact-parent GUI assertion. Current reruns remain unverified.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -377,6 +395,14 @@ The author has not accepted these entries; independent acceptance remains for th
           "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
           "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
           "choice": "F4 round 8: the hosted probe establishes that Explorer focuses reveal targets without selecting them, including classic /select on plain.txt, while SelectItem proves native selection can be observed. Require the exact parent view AND the exact target focused or selected; record both values and keep polling. Add a plain-name reveal control that passes on 143fd387b and after; the comma reveal must still fail on 143fd387b (Desktop) and pass after. Keep every other check and production dispatch unchanged. Do not require the amended reveal assertion to fail on df947d57e, where focus may already satisfy the corrected contract; retain its fail-before on 143fd387b. Retain run-everything-then-fail and cleanup between Windows evidence calls. All current Windows results remain unverified until hosted.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "F4 round 9: hosted Explorer gives no reliable reveal selection or focus even with classic /select and a decoy file. GUI checks require the exact parent only and retain Focused and Selected diagnostics. Plain reveal must pass before/after 143fd387b; comma reveal must fail before (Desktop) and pass after. Independently resolve production-built parent and relative-child PIDLs to the exact parent and target for a,b2.txt, Q3 [draft].txt and plain.txt. Mutation controls must reject parent-only and wrong-child production arguments by assertion. Keep every other check, cleanup and run-everything-then-fail command behavior. Current Windows results remain unverified until hosted.",
           "label": "agent choice"
         }
       ],
@@ -386,6 +412,27 @@ The author has not accepted these entries; independent acceptance remains for th
         "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/lib.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "Resolve the exact production reveal parent and relative child PIDLs to the intended parent/file for comma, bracket and plain names. Require one child and exact combined target; hosted parent-only/wrong-child mutations must assertion-fail. Current native Windows results are unverified. Expected-failure artifacts: open-guard-windows-round9-parent-only.json and open-guard-windows-round9-wrong-child.json.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "F4 round 9: hosted Explorer gives no reliable reveal selection or focus even with classic /select and a decoy file. GUI checks require the exact parent only and retain Focused and Selected diagnostics. Plain reveal must pass before/after 143fd387b; comma reveal must fail before (Desktop) and pass after. Independently resolve production-built parent and relative-child PIDLs to the exact parent and target for a,b2.txt, Q3 [draft].txt and plain.txt. Mutation controls must reject parent-only and wrong-child production arguments by assertion. Keep every other check, cleanup and run-everything-then-fail command behavior. Current Windows results remain unverified until hosted.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/open-guard-windows-round9-item-ids.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_reveal_item_ids_identify_exact_target"
+      ]
     }
   ]
 }

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-20T12:31:31.169Z",
-  "revision": "def3b21443e9d85af6f028266daa04d2694cdb82",
-  "tree": "c1644d14b0cccbba38016dfcf32edf743940038d",
+  "createdAt": "2026-10-20T13:11:20.340Z",
+  "revision": "7ecbb9a2daaf8f16f7d4bb094da164ce5e6e85ca",
+  "tree": "47816bafaf6bbae05560459190eba664c70a0dfa",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-vitest-2179427-1792499486749.json\"",
+      "command": "npx vitest run \"src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-vitest-2532243-1792501875529.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1775
+      "durationMs": 1926
     }
   ],
   "checks": [
@@ -117,11 +117,12 @@
     }
   ],
   "failBefore": {
-    "ref": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
-    "revision": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
+    "ref": "f6a14b5a66e7b879c711ef9ca54280723de2c242",
+    "revision": "f6a14b5a66e7b879c711ef9ca54280723de2c242",
     "overlays": [
       "modules/shell/src-tauri/Cargo.toml",
       "modules/shell/src-tauri/Cargo.lock",
+      "modules/shell/src-tauri/src/windows_reveal.rs",
       "modules/shell/src-tauri/src/open_guard_windows.rs",
       "modules/shell/src-tauri/src/open_guard_windows.ps1",
       "modules/ui/build/install/ui/native/linux-x86_64/justsearch-bound-exec",
@@ -129,29 +130,33 @@
     ],
     "patches": [
       {
+        "path": "gates/test-intent/evidence/open-guard-round9-before-interface.patch",
+        "contentDigest": "sha256:eea35fc2dffadc4c50f41018a1414e8d3804f215043fd88c55c89421ddbfd836"
+      },
+      {
         "path": "gates/test-intent/evidence/open-guard-before-interface.patch",
         "contentDigest": "sha256:86c0db2868310cde4aa17244ddba09c352c811d7e06382081236ef6c5edf1e79"
       }
     ],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-vitest-2179427-1792499489422.json\"",
+        "command": "npx vitest run \"src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-vitest-2532243-1792501878373.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1607,
-        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-vitest-2179427-1792499489422.json\n\n"
+        "durationMs": 1802,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-vitest-2532243-1792501878373.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts#local refusal rejects once, renders feedback, and offers Show in folder",
         "classification": "assertion",
-        "detail": "desktop opening guard local refusal rejects once, renders feedback, and offers Show in folder:  AssertionError: expected 'resolved' to be 'Opening .desktop files is not allowed…' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-before-GLslIM/modules/ui-web/src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts:69:20\n    at processTi"
+        "detail": "desktop opening guard local refusal rejects once, renders feedback, and offers Show in folder:  AssertionError: expected 'resolved' to be 'Opening .desktop files is not allowed…' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-before-DlCPnw/modules/ui-web/src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts:69:20\n    at processTi"
       },
       {
         "id": "modules/ui-web/src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts#external refusal rejects once and renders feedback without a browser fallback",
         "classification": "assertion",
-        "detail": "desktop opening guard external refusal rejects once and renders feedback without a browser fallback:  AssertionError: expected 'resolved' to be 'Opening .desktop files is not allowed…' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-before-GLslIM/modules/ui-web/src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts:81:20\n    at file:///h"
+        "detail": "desktop opening guard external refusal rejects once and renders feedback without a browser fallback:  AssertionError: expected 'resolved' to be 'Opening .desktop files is not allowed…' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-before-DlCPnw/modules/ui-web/src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts:81:20\n    at file:///h"
       },
       {
         "id": "modules/ui-web/src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts#routes BrowseSurface file activation through the local command with visible refusal",
@@ -171,9 +176,9 @@
       {
         "id": "modules/ui-web/src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts#keeps successful local and external calls on their respective native routes",
         "classification": "assertion",
-        "detail": "desktop opening guard keeps successful local and external calls on their respective native routes:  AssertionError: expected [ [ 'open_file', …(1) ], …(1) ] to deeply equal [ [ 'open_file', …(1) ], …(1) ]\n    at /home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-before-GLslIM/modules/ui-web/src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts:132:38\n    at file:///"
+        "detail": "desktop opening guard keeps successful local and external calls on their respective native routes:  AssertionError: expected [ [ 'open_file', …(1) ], …(1) ] to deeply equal [ [ 'open_file', …(1) ], …(1) ]\n    at /home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-before-DlCPnw/modules/ui-web/src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts:132:38\n    at file:///"
       }
     ]
   },
-  "digest": "sha256:b0f9d81609833a9087533dc6f040790a7fcac5f0b31ed9751c686f8ab91c764a"
+  "digest": "sha256:a89a665c3efd033b11e5b597596cb4afca51f8952edfd10f2df81f26a7ccfe56"
 }

@@ -52,18 +52,17 @@ if ($Mode -eq 'observe') {
                 $entry | Add-Member -NotePropertyName Selected -NotePropertyValue $selected
                 $entry | Add-Member -NotePropertyName Focused -NotePropertyValue $focused
                 $entry | Add-Member -NotePropertyName PipelineSelected -NotePropertyValue $pipeline
-                # Hosted Explorer focuses /select targets without selecting them. Still require
-                # this exact folder AND this exact focused/selected target; never the folder alone.
-                if (!$env:OPEN_GUARD_SELECTED -or $focused -ieq $env:OPEN_GUARD_SELECTED -or $selected -icontains $env:OPEN_GUARD_SELECTED) {
-                    Observation @($entry)
-                    exit 0
-                }
+                # Hosted /select exposes neither reliable focus nor selection. Target identity
+                # is verified separately using the production PIDLs; GUI checks require this
+                # exact parent and retain item state strictly as observations.
+                Observation @($entry)
+                exit 0
             }
         }
         Start-Sleep -Milliseconds 200
     } while ([DateTime]::UtcNow -lt $deadline)
     Observation $last
-    [Console]::Error.WriteLine("No actual Explorer window at '$env:OPEN_GUARD_EXPECTED' with focused or selected item '$env:OPEN_GUARD_SELECTED'")
+    [Console]::Error.WriteLine("No actual Explorer window at '$env:OPEN_GUARD_EXPECTED' (item '$env:OPEN_GUARD_SELECTED' is diagnostic only)")
     exit 1
 }
 # Every test holds the same Rust mutex. Record new window HWND/location pairs, including wrong

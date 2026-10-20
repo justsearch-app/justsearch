@@ -75,7 +75,7 @@ impl WindowsProbe {
         assert_eq!(
             output.status.code(),
             Some(0),
-            "actual Explorer folder/focused or selected item: {} {}",
+            "actual Explorer parent folder (item state is diagnostic): {} {}",
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
