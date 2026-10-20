@@ -17,8 +17,7 @@
  * search-surface schema has 3 string-typed fields per the wire shape — the
  * declared types in the schema name `number` for the filter bounds, but the
  * URL carries them as strings). If surface schemas grow nested or
- * polymorphic, upgrade to ajv (already on the path via
- * {@code scripts/ci/agent-battery-url-scorer.mjs}).
+ * polymorphic, use a full JSON Schema validator.
  *
  * Per slice 489 §7: the validator is pure. Caller decides what to do with
  * the result — NavigationHandler (slice 492) logs + skips state restore on

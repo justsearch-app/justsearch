@@ -52,8 +52,8 @@ python -m jseval --help
 | Directory | Purpose |
 |-----------|---------|
 | `jseval/` | Canonical benchmark + eval CLI (Python, Click-based, 45+ subcommands). Supersedes the prior `scripts/bench/` + `scripts/eval/` + `scripts/perf/` infrastructure deleted by commit `a9c484f59` (2026-03-16). |
-| `bench/` | Manual hardware-perf utilities (`passmark-*`, `run-B1.ps1`, `ort-perf-probe.py`, etc.) — independent of jseval. |
-| `search/` | Data-conversion utilities for BEIR / known-item datasets (the produced corpus files are committed; these scripts run rarely). |
+| `bench/` | Hardware-perf launch scripts and fixtures: dev-runner tests cover `run-B1.ps1`, which calls `lhm-log.ps1` and uses `passmark-b1.ptscript`. |
+| `search/` | Search evaluation helpers and weight sweeps. |
 
 ### Quality & Validation
 
@@ -62,7 +62,7 @@ python -m jseval --help
 | `governance/` | Unified discipline-gate kernel (tempdoc 530): registry-driven gate runner, SARIF emitter, per-gate enforcers under `gates/<id>/`. Wire-evolution lives at `gates/wire/` (migrated from the prior `contract-governance/` kernel in Phase F). |
 | `docs/` | Documentation validation, linting, transformation. |
 | `evidence/` | EvidenceBundle validation and determinism checks. |
-| `architecture/` | Dependency analysis (`module-deps.mjs`), IPC usage snapshot (`ipc-usage.mjs`). |
+| `architecture/` | Dependency analysis (`module-deps.mjs`). |
 | `wire-contract/` | Buf workspace + npm-pinned buf binary for the wire protocol (slice 3a-1-8). |
 | `agent-analytics/` | Maintainer session telemetry and analytics, session-to-merge links (`Session-Id`), merge recording, the `world-state.mjs` orientation command, and the dev-tool tests. |
 
@@ -86,7 +86,6 @@ python -m jseval --help
 
 | Script | Purpose |
 |--------|---------|
-| `run-ui-local-llm.ps1` | Run UI with local LLM backend. |
 | `verify-prerequisites.mjs` | Verify AI prerequisites (models, VRAM). |
 
 There is no single "canonical gate" wrapper (slice 3a-1-8f §B.12 + §B.14, 2026-05-12). Pre-merge verification is per-subject — see [Pre-merge Checks](../docs/reference/contributing/pre-merge-checks.md).

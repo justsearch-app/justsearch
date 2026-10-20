@@ -1195,6 +1195,9 @@ test('T12: a concurrent call during reconnect retains the last proven target', a
   writeManifest(m.desktop, manifestFor(first));
   let seen;
   const session = await bridgeInteractive(m, bundle(root), async ({ send, reply }) => {
+    // The initialize reply can precede the notification/GET socket proofs (netstat on Windows).
+    // Finish that handshake before restarting, so this test races only the two tool calls.
+    await handshakeDone(first, { stream: true });
     await first.close();
     const impostor = await startImpostor(t, { port: first.port, pid: first.pid, instanceId: first.instanceId });
     const second = await startService(t, { holdUrl: '/api/health' });

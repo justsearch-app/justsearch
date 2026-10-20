@@ -312,24 +312,95 @@ final class AgentSession {
   }
 
   /**
-   * Tempdoc 565 §30 — the human's mid-run STEERING directive (the DIRECTION authority's
-   * {@code interject} value). An external {@code POST /api/chat/agent/steer} queues it; the loop
-   * DRAINS it (read-and-clear, exactly-once) at the next step boundary and folds the text into the
-   * next LLM call as a steering note. Mirrors {@link #autonomyLevel} (the {@code set-posture}
-   * directive) — both are per-run control inputs an external thread writes and the loop reads
-   * between steps; an {@link AtomicReference} gives the drain its exactly-once semantics.
+   * Tempdoc 565 §30 / WP6.2 — the human's mid-run STEERING directions (the DIRECTION authority's
+   * {@code interject} value). An external {@code POST /api/chat/agent/steer} queues each one in
+   * submission order; the loop drains all of them at the next step boundary into the history, and a
+   * drained direction counts as applied only once the model accepts a request carrying it. Every
+   * accepted direction is reported exactly once more as applied or not applied: {@link
+   * #closeDirections} hands the run's terminal path every direction not yet applied, and refuses
+   * every later submission, so nothing can be accepted after that and silently dropped.
    */
-  private final AtomicReference<String> pendingInterject = new AtomicReference<>(null);
+  record Direction(String id, String text) {}
 
-  /** Read-and-clear the pending steering directive; {@code null} if none queued. */
-  String drainInterject() {
-    return pendingInterject.getAndSet(null);
+  private final Object directionsLock = new Object();
+  private final java.util.ArrayDeque<Direction> queuedDirections = new java.util.ArrayDeque<>();
+  private final List<Direction> unsentDirections = new ArrayList<>();
+  private boolean directionsClosed;
+  private volatile Consumer<AgentEvent> eventSink;
+
+  /** The run's published event stream, so a direction can be reported when it is accepted. */
+  void eventSink(Consumer<AgentEvent> sink) {
+    this.eventSink = sink;
   }
 
-  /** Queue a mid-run steering directive (no-op on blank). */
-  void setInterject(String text) {
-    if (text != null && !text.isBlank()) {
-      pendingInterject.set(text.trim());
+  /**
+   * The run's one publish lock: the event sink publishes under it, and a direction is queued and
+   * reported queued under it, so "queued" is published before the loop can drain the direction and
+   * report its outcome.
+   */
+  Object publishLock() {
+    return directionsLock;
+  }
+
+  /**
+   * Queue a direction and report it queued, echoing the sender's {@code clientRequestId} (null when
+   * it sent none) so the sender can tell its own direction from another with the same text. False
+   * once the run has stopped taking directions (the caller reports the run as finished); a blank text
+   * is ignored but not refused.
+   */
+  boolean submitDirection(String text, String clientRequestId) {
+    if (text == null || text.isBlank()) {
+      return true;
+    }
+    Direction direction = new Direction(java.util.UUID.randomUUID().toString(), text.trim());
+    synchronized (directionsLock) {
+      if (directionsClosed) {
+        return false;
+      }
+      queuedDirections.add(direction);
+      Consumer<AgentEvent> sink = eventSink;
+      if (sink != null) {
+        sink.accept(
+            new AgentEvent.DirectiveAcknowledged(
+                direction.text(),
+                direction.id(),
+                AgentEvent.DirectiveAcknowledged.QUEUED,
+                null,
+                clientRequestId,
+                io.justsearch.agent.api.TraceContext.none()));
+      }
+    }
+    return true;
+  }
+
+  /** Take every queued direction, oldest first; they now await the request that carries them. */
+  List<Direction> drainDirections() {
+    synchronized (directionsLock) {
+      var drained = new ArrayList<>(queuedDirections);
+      queuedDirections.clear();
+      unsentDirections.addAll(drained);
+      return drained;
+    }
+  }
+
+  /** Called when the model accepts a request: the drained directions it carries are now applied. */
+  List<Direction> directionsSent() {
+    synchronized (directionsLock) {
+      var sent = List.copyOf(unsentDirections);
+      unsentDirections.clear();
+      return sent;
+    }
+  }
+
+  /** Stop taking directions and return every one not yet applied, oldest first. */
+  List<Direction> closeDirections() {
+    synchronized (directionsLock) {
+      directionsClosed = true;
+      var notApplied = new ArrayList<>(unsentDirections);
+      notApplied.addAll(queuedDirections);
+      unsentDirections.clear();
+      queuedDirections.clear();
+      return notApplied;
     }
   }
 
@@ -1026,6 +1097,8 @@ final class AgentSession {
    *       whose parent assistant {@code tool_calls} message was dropped is an orphan — a malformed
    *       conversation for the provider. The drop boundary is pushed forward past any leading tool
    *       messages so a group leaves together.
+   *   <li><b>The user's directions and the resume warning survive (WP6.2).</b> They govern the
+   *       remaining steps, so they stay, in order, at the head of what is kept.
    * </ol>
    */
   synchronized int compactOlderTurns(int keepRecent) {
@@ -1048,7 +1121,16 @@ final class AgentSession {
     while (dropEnd < size && "tool".equals(messages.get(dropEnd).get("role"))) {
       dropEnd++;
     }
-    int dropped = dropEnd - start;
+    List<Map<String, Object>> kept = new ArrayList<>();
+    for (Map<String, Object> message : messages.subList(start, dropEnd)) {
+      if (AgentModelMessages.isUserControlNote(message)) {
+        kept.add(message);
+      }
+    }
+    int dropped = dropEnd - start - kept.size();
+    if (dropped == 0) {
+      return 0;
+    }
     // Tempdoc 878 §D.3 — REPORT what leaves. `inclusionFor`'s contract already said a source is
     // dropped when every carrier "has lost its Excerpt: lines (or has left the prompt entirely)",
     // but only the compressor ever wrote to the ledger, so a source whose carrier was DELETED here
@@ -1071,6 +1153,7 @@ final class AgentSession {
       compressionObserved = true;
     }
     messages.subList(start, dropEnd).clear();
+    messages.addAll(start, kept);
     return dropped;
   }
 

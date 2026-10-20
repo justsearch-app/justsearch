@@ -86,7 +86,10 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {
   beforeEach(() => {
     resetResourceCatalog();
     resetSchemaFetcher();
-    streams = fetchSseHarness(async () => Response.json({ type: 'object', properties: {} }));
+    // Incidental requests stay isolated from the real backend, as on main.
+    streams = fetchSseHarness(async () => {
+      throw new TypeError('Test backend unavailable');
+    });
     vi.stubGlobal('fetch', streams.fetch);
   });
   afterEach(() => {

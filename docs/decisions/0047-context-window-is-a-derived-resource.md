@@ -17,7 +17,9 @@ last_reviewed: 2026-09-02
 
 ## Status
 
-Accepted (2026-09-02).
+Accepted (2026-09-02). Amended by
+[ADR-0050](0050-gpu-co-residence-by-prevention.md): the per-card GPU profile may lower the
+ladder's top rung.
 
 Implemented across tempdoc 883 PR 1 (the window itself) and PR 2 (the budgets derived from it).
 This record is written after the fact but before the lane closes, because the live measurements

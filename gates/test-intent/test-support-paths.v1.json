@@ -12,6 +12,7 @@
     "modules/ui-web/src/shell-v0/themes/surfaceComposition.ts",
     "modules/ui-web/src/shell-v0/themes/token-names.generated.ts",
     "modules/ui-web/src/shell-v0/themes/token.ts",
-    "modules/ui-web/src/shell-v0/views/retrievalSignals.ts"
+    "modules/ui-web/src/shell-v0/views/retrievalSignals.ts",
+    "modules/ui-web/src/test/fetchSse.ts"
   ]
 }
