@@ -22,8 +22,8 @@ Incidental preservation evidence is under ignored `tmp/f5-deps/`; no new checks 
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "dependencies JustSearch declares but never uses leave the build, so every consumer's classpath, every install and every audit shrinks, and nothing that works today stops working.",
-          "location": "task upkeep-unused-deps request"
+          "quote": "Find and remove what JustSearch carries that is not product and does not pay for itself.",
+          "location": "task t-20261019-9d870e request"
         }
       ],
       "rule": "The dead-code ratchet rejects measured unused counts above the pinned per-path baseline and rejects undeclared upward baseline shifts.",
@@ -37,8 +37,8 @@ Incidental preservation evidence is under ignored `tmp/f5-deps/`; no new checks 
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "dependencies JustSearch declares but never uses leave the build, so every consumer's classpath, every install and every audit shrinks, and nothing that works today stops working.",
-          "location": "task upkeep-unused-deps request"
+          "quote": "Find and remove what JustSearch carries that is not product and does not pay for itself.",
+          "location": "task t-20261019-9d870e request"
         }
       ],
       "assessment": {
@@ -57,8 +57,8 @@ Incidental preservation evidence is under ignored `tmp/f5-deps/`; no new checks 
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "dependencies JustSearch declares but never uses leave the build, so every consumer's classpath, every install and every audit shrinks, and nothing that works today stops working.",
-          "location": "task upkeep-unused-deps request"
+          "quote": "Find and remove what JustSearch carries that is not product and does not pay for itself.",
+          "location": "task t-20261019-9d870e request"
         }
       ],
       "assessment": {
@@ -77,8 +77,8 @@ Incidental preservation evidence is under ignored `tmp/f5-deps/`; no new checks 
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "dependencies JustSearch declares but never uses leave the build, so every consumer's classpath, every install and every audit shrinks, and nothing that works today stops working.",
-          "location": "task upkeep-unused-deps request"
+          "quote": "Find and remove what JustSearch carries that is not product and does not pay for itself.",
+          "location": "task t-20261019-9d870e request"
         }
       ],
       "assessment": {
