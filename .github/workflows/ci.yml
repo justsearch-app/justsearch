@@ -294,6 +294,9 @@ jobs:
       - name: Store-recoverability register agrees with the code
         run: node scripts/ci/check-store-recoverability.mjs
 
+      - name: Windows Tauri conformance step fails on either run
+        run: node --test scripts/ci/check-supervisor-conformance-step.test.mjs
+
       - name: Test dead-config scanner (config-surface gate)
         run: node scripts/ci/test-config-surface-dead-config.mjs
 
