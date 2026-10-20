@@ -9,9 +9,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /** The shipped child argv (tempdoc 885 item 14) — the piece tempdoc 410 left to the operator. */
+@Tag("cross-platform")
 final class ExtractionSandboxCommandTest {
 
   private static final String CHILD_MAIN =

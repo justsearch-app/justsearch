@@ -146,22 +146,13 @@ final class AgentStepRunner {
           return cancelledIteration(session, sessionId, sink);
         }
 
-        // Tempdoc 565 §30 — DIRECTION authority: drain a queued human STEERING directive at the
-        // step boundary (exactly-once) and fold it into the next LLM call as a system steering note
-        // (mirrors the handoff system-message `appendMessage` pattern). The FE captured the user's intent;
-        // here it enters the agent's context so the NEXT step honors it, and a DirectiveAcknowledged
-        // event lets the FE render it as a human-origin run-spine landmark.
-        String steeringDirective = session.drainInterject();
-        if (steeringDirective != null && !steeringDirective.isBlank()) {
-          session.appendMessage(
-              Map.of(
-                  "role",
-                  "system",
-                  "content",
-                  "Mid-run steering directive from the user: "
-                      + steeringDirective
-                      + " Adjust your plan accordingly for the remaining steps."));
-          sink.accept(new AgentEvent.DirectiveAcknowledged(steeringDirective));
+        // Tempdoc 565 §30 — DIRECTION authority: drain every queued human STEERING direction at the
+        // step boundary, in submission order, into the history as system steering notes, so this
+        // step's prompt (counted and sent alike) carries them. They are reported applied only when
+        // the model accepts that request (AgentLlmCaller); a step that ends the run first leaves them
+        // to the run's terminal report as not applied.
+        for (var direction : session.drainDirections()) {
+          session.appendMessage(AgentModelMessages.steeringNote(direction.text()));
         }
 
         session.incrementIterations();
@@ -242,7 +233,8 @@ final class AgentStepRunner {
         // tool schemas this iteration will pass. The chat template renders those schemas into the
         // prompt, so counting messages alone measured a different prompt, not an approximation of
         // this one. `tools` is the list built a few lines above and handed to the LLM call below.
-        var projectedTokens = onlineAiService.countPromptTokens(session.messages(), tools, session.engineContext());
+        var projectedTokens = onlineAiService.countPromptTokens(
+            AgentModelMessages.forModel(session.messages()), tools, session.engineContext());
         if (projectedTokens.isPresent()) {
           int tokens = projectedTokens.get();
           int budgetSnapshot;
@@ -440,7 +432,8 @@ final class AgentStepRunner {
               // check below against the now-shorter message history so it reflects reality.
               // Same tool list as the projection above (878 §D.6): a recompute that measured a
               // different prompt than the check it is correcting would be its own defect.
-              var recomputed = onlineAiService.countPromptTokens(session.messages(), tools, session.engineContext());
+              var recomputed = onlineAiService.countPromptTokens(
+                  AgentModelMessages.forModel(session.messages()), tools, session.engineContext());
               if (recomputed.isPresent()) {
                 tokens = recomputed.get();
                 synchronized (session) {
@@ -811,9 +804,13 @@ final class AgentStepRunner {
             // Qwen3.5 jinja) enforce "system message must be at the beginning" — any
             // mid-conversation system message causes llama-server HTTP 500. Merging into
             // position 0 produces a clean [system, user, assistant, tool] structure.
+            // WP6.2 — the user's directions and the resume warning stay separate messages (sent as
+            // user turns at their place), so the next profile switch, which replaces position 0,
+            // keeps them.
             List<Map<String, Object>> postHandoffMsgs = session.messages();
             for (int i = 1; i < postHandoffMsgs.size(); /* no increment */) {
-              if ("system".equals(postHandoffMsgs.get(i).get("role"))) {
+              if ("system".equals(postHandoffMsgs.get(i).get("role"))
+                  && !AgentModelMessages.isUserControlNote(postHandoffMsgs.get(i))) {
                 String content = String.valueOf(postHandoffMsgs.get(i).get("content"));
                 postHandoffMsgs.remove(i);
                 String sysContent = String.valueOf(postHandoffMsgs.get(0).get("content"));

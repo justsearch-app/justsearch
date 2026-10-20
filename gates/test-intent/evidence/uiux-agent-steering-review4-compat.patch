@@ -1,0 +1,16 @@
+diff --git a/modules/app-agent-api/src/main/java/io/justsearch/agent/api/AgentService.java b/modules/app-agent-api/src/main/java/io/justsearch/agent/api/AgentService.java
+index a563a4d54..2f3fd7496 100644
+--- a/modules/app-agent-api/src/main/java/io/justsearch/agent/api/AgentService.java
++++ b/modules/app-agent-api/src/main/java/io/justsearch/agent/api/AgentService.java
+@@ -76,6 +76,11 @@ public interface AgentService extends AgentRunQueries {
+     return false;
+   }
+ 
++  /** Test-intent compatibility only: the request-id overload, which this before-state ignores. */
++  default boolean injectSteeringDirective(String sessionId, String text, String clientRequestId) {
++    return injectSteeringDirective(sessionId, text);
++  }
++
+   /**
+    * Tempdoc 577 Ext III — the over-budget remedy: grant a running session additional tokens (POST
+    * /api/chat/agent/budget). Returns true when the session was found and the budget raised; false

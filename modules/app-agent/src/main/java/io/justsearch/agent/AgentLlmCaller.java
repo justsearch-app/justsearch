@@ -354,21 +354,37 @@ final class AgentLlmCaller {
     var finishReasonHolder = new java.util.concurrent.atomic.AtomicReference<String>();
 
     try {
+    var request = new OnlineAiService.StreamRequest(AgentModelMessages.forModel(session.messages()),
+        completionTokens(), tools, sampling, true, session.work());
+    // WP6.2 — a drained direction is applied once the model accepts a request carrying it: at its
+    // first response, not when the request is sent (a template the request breaks refuses it).
+    var accepted = new java.util.concurrent.atomic.AtomicBoolean();
+    Runnable onAccepted = () -> {
+      if (accepted.compareAndSet(false, true)) {
+        for (var direction : session.directionsSent()) {
+          eventConsumer.accept(new AgentEvent.DirectiveAcknowledged(
+              direction.text(), direction.id(), AgentEvent.DirectiveAcknowledged.APPLIED, null));
+        }
+      }
+    };
     onlineAiService.stream(
-        new OnlineAiService.StreamRequest(session.messages(), completionTokens(), tools, sampling, true, session.work()),
+        request,
         new OnlineAiService.StreamSink(
             chunk -> {
               if (session.isCancelled()) return;
+              onAccepted.run();
               textBuilder.append(chunk);
               eventConsumer.accept(new AgentEvent.TextChunk(chunk));
             },
             reasoning -> {
               if (session.isCancelled()) return;
+              onAccepted.run();
               reasoningBuilder.append(reasoning);
               eventConsumer.accept(new AgentEvent.ReasoningChunk(reasoning));
             },
             toolCallDeltaJson -> {
               if (session.isCancelled()) return;
+              onAccepted.run();
               try {
                 JsonNode node = MAPPER.readTree(toolCallDeltaJson);
                 parser.accumulateChunk(node);
@@ -377,6 +393,7 @@ final class AgentLlmCaller {
               }
             },
             usage -> {
+              if (!session.isCancelled()) onAccepted.run();
               // Track token usage from LLM response
               if (usage != null) {
                 session.recordUsage(usage.promptTokens(), usage.completionTokens());
@@ -415,6 +432,7 @@ final class AgentLlmCaller {
             fr -> {
               // Tempdoc 881 §B.3 — KEEP the runtime's terminal reason. This callback used to
               // discard it, which is why the empty-response terminal had to guess at a cause.
+              if (!session.isCancelled()) onAccepted.run();
               finishReasonHolder.set(fr);
               latch.countDown();
             },

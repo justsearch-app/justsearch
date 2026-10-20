@@ -46,7 +46,7 @@ run('Claude: WebFetch/WebSearch -> web', () => {
 });
 run('Claude: any mcp__* tool -> other', () => {
   assert.equal(roleFor('claude-code', 'mcp__justsearch-dev__justsearch_dev_start'), 'other');
-  assert.equal(roleFor('claude-code', 'mcp__context7__resolve-library-id'), 'other');
+  assert.equal(roleFor('claude-code', 'mcp__docs__resolve-library-id'), 'other');
 });
 run('Claude: an unknown tool name -> other', () => {
   assert.equal(roleFor('claude-code', 'SomeFutureTool'), 'other');

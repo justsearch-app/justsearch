@@ -1,8 +1,8 @@
 ---
 title: "ADR-0008: Settings Are Ephemeral, Defaults Are Safe"
 type: decision
-status: stable
-description: "User settings (settings.json) are not migration-protected. An incompatible settings file is preserved as a timestamped .corrupt- sibling, replaced with defaults, and the reset is surfaced as a lifecycle condition."
+status: accepted - implementation diverged; owner review open
+description: "Settings are versioned and forward-migrated. An unreadable file is preserved as a timestamped .corrupt- sibling, replaced with defaults, and surfaced as a lifecycle condition; a newer schemaVersion refuses to load. Owner review of the original ephemeral-settings decision remains open."
 date: 2026-02-10
 probes:
   - adr-0008-settings-reset-surfaced
@@ -14,7 +14,9 @@ last_reviewed: 2026-09-02
 
 ## Status
 
-Accepted
+Historically accepted; owner review remains open. The implementation now versions and
+forward-migrates settings, preserving legacy backups and refusing newer schema versions.
+The original no-migration premise below no longer describes the code.
 
 Amended 2026-09-01 (tempdoc 882 item 24): the implementation had drifted to fail-loud-and-exit (register policy `FAIL_LOUD_AND_PRESERVE`, tempdoc 617); restored to preserve-then-default with a visible condition.
 

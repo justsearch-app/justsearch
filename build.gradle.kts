@@ -13,26 +13,12 @@ plugins {
   id("conventions.coverage") apply false
   id("conventions.locking")
   id("conventions.build-attribution")
-  id("org.openrewrite.rewrite") version "7.37.0"
 }
 
 // Note: PMD toolVersion is configured in JvmBaseConventionsPlugin (currently 7.16.0).
 // The root `pmd` block above is applied because root build files were once
 // PMD-scanned, but root has no Java sources and the root extension has no
 // effect — version drift here was tempdoc 516 Slice 0 cleanup.
-
-rewrite {
-  activeRecipe(
-    "org.openrewrite.java.jackson.UpgradeJackson_2_3",
-    "org.openrewrite.java.logging.slf4j.CompleteExceptionLogging",
-  )
-}
-
-
-dependencies {
-  rewrite("org.openrewrite.recipe:rewrite-jackson:1.19.0")
-  rewrite("org.openrewrite.recipe:rewrite-logging-frameworks:3.26.0")
-}
 
 jacoco {
   toolVersion = "0.8.14"
@@ -570,7 +556,7 @@ tasks.named("check") {
 // (reverted) buildscript locking removed
 
 // Dependency locking is enabled and managed via the `conventions.locking` plugin.
-// Strict enforcement is handled in CI via lockfile drift checks.
+// CI does not regenerate Gradle lockfiles or check their freshness by diffing them.
 
 // Note: Source artifact verification is handled via trusted-artifacts in verification-metadata.xml
 

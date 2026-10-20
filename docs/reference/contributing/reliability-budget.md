@@ -2,12 +2,15 @@
 title: Reliability Budget
 type: reference
 status: stable
-description: "Warn-only reliability hotspot report generated from local gate summaries."
+description: "Dormant reliability hotspot report: no repository producer currently writes its local gate summary inputs."
 ---
 
 # Reliability Budget
 
-The reliability budget report tracks gate-impacting failures by frequency so work can prioritize the most disruptive breakpoints first.
+The reliability budget report is **dormant**: no current repository command produces its
+`local-agent-gate-*.json` inputs. Without externally supplied summaries, it analyzes an empty
+window; that is not evidence of a reliable run. The command remains available to analyze
+compatible historical or externally supplied summaries by failure frequency.
 
 ## What It Uses
 
@@ -62,11 +65,8 @@ Prioritize fixes in this order:
 
 This keeps the reliability ratchet focused on recurring breakpoints rather than one-off noise.
 
-## Warn-only Policy (Phase 1.1)
+## Default exit policy
 
-Current default behavior is warn-only:
-
-- report generation does not fail the local gate
-- reliability hotspots are surfaced for prioritization, not blocking
-
-Blocking thresholds are reserved for a later phase after baseline stability is established.
+The standalone report is warn-only by default: hotspots do not cause a nonzero exit unless
+`--fail-on-threshold` is supplied. It is not wired into a local gate or CI. Any future enforcement
+would require a summary producer and an explicit policy decision.

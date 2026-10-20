@@ -17,7 +17,7 @@ Accepted
 > The historical gRPC channel was deleted at A9-A11; A14 removed the remaining service blocks,
 > infra-health service and code generator. Two type families, proto-aligned `core` DTOs on the inside and
 > JSON-aligned `app-api` records on the outside, with field-by-field translation in
-> `DefaultAppFacade` and `KnowledgeClient` — that is unchanged, and the reasoning below is still
+> `SearchServiceImpl` and `KnowledgeClient` — the layering is unchanged, and the reasoning below is still
 > the reasoning. See [ADR-0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md).
 
 ## Context

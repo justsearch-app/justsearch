@@ -42,17 +42,19 @@
  * cards on screen — the same construction the retired search-v2 window used for its receipt,
  * expressed as a projection both halves read.
  */
-import type {
-  AgentSessionController,
-  ConversationEntry,
-  ToolCall,
-  ToolRisk,
+import {
+  UNCONFIRMED_STEER_PHASE,
+  type AgentSessionController,
+  type ConversationEntry,
+  type ToolCall,
+  type ToolRisk,
 } from '../../controllers/AgentSessionController.js';
 import type { Sv3TurnStatus } from './sv3-sessions.js';
 // Tempdoc 859 §D §2.6 — the ONE cut-short authority. Imported, never re-derived: a second copy of
 // "which dispositions count as truncated" could disagree with the notice line's copy, which is the
 // divergence the shared authority exists to prevent.
 import { sv3WasCutShort, SV3_CUT_SHORT_BADGE } from './sv3-honesty.js';
+import { directionNote } from '../unifiedThreadProjection.js';
 // Tempdoc 859 §D §2.4/§2.5 — the SHARED budget-readout authority, already the source of both
 // windows' budget bar and context horizon. The gate's facts and its ladder are derivations of the
 // same numbers, so they belong beside those and not in a second module that could disagree.
@@ -214,8 +216,25 @@ const RUN_NOTE_LABEL: Partial<Record<ConversationEntry['type'], string>> = {
   progress: 'Progress',
   handoff: 'Handoff',
   'run-node': 'Node',
-  'steer-directive': 'Steered',
 };
+
+/**
+ * WP6.2 S8.2 — the feed's notes for this run's steer sends whose outcome is still unconfirmed. The
+ * record never carries them (they are window-local), so a settled turn keeps them beside its recorded
+ * activity; the controller removes one when the run reports the direction that send produced.
+ */
+export function sv3UnconfirmedSteerNotes(
+  source: Sv3RunSource,
+  from: number,
+  feed: Sv3RunFeed,
+): readonly Sv3RunFeedItem[] {
+  const unconfirmed = new Set(
+    source.conversation
+      .slice(Math.max(0, from))
+      .flatMap((e) => (e.phase === UNCONFIRMED_STEER_PHASE ? [e.id] : [])),
+  );
+  return unconfirmed.size === 0 ? [] : feed.items.filter((i) => i.kind === 'note' && unconfirmed.has(i.id));
+}
 
 /**
  * Project the run's own slice of the shared conversation into the feed.
@@ -268,6 +287,15 @@ export function projectSv3RunFeed(source: Sv3RunSource, from: number): Sv3RunFee
       continue;
     }
     if (entry.type === 'error') errored = true;
+    if (entry.type === 'steer-directive') {
+      // WP6.2 — named by what happened to the direction, the same way the record names it.
+      items.push({
+        kind: 'note',
+        id: entry.id,
+        ...directionNote(entry.content, entry.directiveOutcome, entry.directiveReason),
+      });
+      continue;
+    }
     items.push({
       kind: 'note',
       id: entry.id,
@@ -675,7 +703,7 @@ export type Sv3SlotKind = 'answer' | 'stop' | 'follow-up' | 'send';
  * builder, `delegate` goes through the shared agent controller. What S4 adds is the AFFORDANCE — the
  * routing was reachable only by chord until then.
  */
-export type Sv3ComposerTier = 'ask' | 'delegate';
+export type Sv3ComposerTier = 'search' | 'ask' | 'delegate';
 
 export interface Sv3TierOption {
   readonly id: Sv3ComposerTier;
@@ -691,11 +719,21 @@ export interface Sv3TierOption {
 export const SV3_TIER_MENU_LABEL = 'Mode';
 
 export const SV3_TIER_OPTIONS: readonly Sv3TierOption[] = [
+  // WP1.1 — Search is first and the default: a window without a chat model (no supported GPU) can
+  // do nothing else, and for everyone it is the cheapest thing a keystroke can mean. Worded by what
+  // it does and by nothing it lacks — the refined pass runs the backend's default pipeline, which
+  // may expand the query with the model when one is on, so "no AI" would be a false claim.
+  {
+    id: 'search',
+    label: 'Search',
+    description: 'Lists matching documents as you type.',
+    isDefault: true,
+  },
   {
     id: 'ask',
     label: 'Ask',
     description: 'Answers from your documents, in this conversation.',
-    isDefault: true,
+    isDefault: false,
   },
   {
     id: 'delegate',
@@ -705,7 +743,7 @@ export const SV3_TIER_OPTIONS: readonly Sv3TierOption[] = [
   },
 ];
 
-export const SV3_TIER_DEFAULT: Sv3ComposerTier = 'ask';
+export const SV3_TIER_DEFAULT: Sv3ComposerTier = 'search';
 
 export const isSv3Tier = (value: unknown): value is Sv3ComposerTier =>
   SV3_TIER_OPTIONS.some((option) => option.id === value);
@@ -726,6 +764,15 @@ export interface Sv3SlotInput {
    * slot worded before the control existed.
    */
   readonly tier?: Sv3ComposerTier;
+  /**
+   * WP1.1 — the live run takes a steer, so Ctrl+Enter would JOIN it. Read only by the search tier,
+   * whose Enter never reaches the run and whose hint therefore has to say what the chord does.
+   */
+  readonly steerable?: boolean;
+  /** WP1.1 — the delegate tier is open, so the search tier's hint may offer its chord. */
+  readonly delegateReady?: boolean;
+  /** WP1.1 — the next Ask is limited to files the reader chose from a result list. */
+  readonly scoped?: boolean;
 }
 
 export interface Sv3Slot {
@@ -779,15 +826,49 @@ export const SV3_DELEGATE_SEND_HINT = 'Enter delegates to the agent';
 /** Mid-run, a submit JOINS the live turn instead of starting a second one — it is not an interrupt. */
 export const SV3_STEER_HINT = 'Enter steers the running agent';
 
-export function sv3PrimaryAction({
+/** WP1.1 — what Enter does in Search mode. Ctrl+Enter's clause is added only when it is true. */
+export const SV3_SEARCH_SEND_HINT = 'Enter searches';
+
+/**
+ * WP1.1 — a scoped Ask. The chord still delegates, and says so with its one difference: a delegated
+ * task is not limited to the chosen files, and a hint that let a reader assume it was would lie.
+ */
+const SV3_SCOPED_SEND_HINT =
+  'Enter asks about the chosen files · Ctrl+Enter delegates to the agent, without them';
+
+/**
+ * WP1.1 — the search tier's one control. A search never joins, answers or stops a run, so it takes
+ * none of the run rungs: it is always Send, with the standing stop beside it while something runs.
+ * The Ctrl+Enter clause names what the chord would REALLY do now — steer the live agent, delegate,
+ * or (busy, held, or no agent) nothing, in which case it is not mentioned.
+ */
+function searchSlot({
   pendingPrompt,
   running,
-  followUp,
-  tier = SV3_TIER_DEFAULT,
+  steerable = false,
+  delegateReady = true,
 }: Sv3SlotInput): Sv3Slot {
+  let chord = '';
+  if (!pendingPrompt) {
+    if (running) chord = steerable ? ` · Ctrl+${SV3_STEER_HINT}` : '';
+    else if (delegateReady) chord = ' · Ctrl+Enter delegates to the agent';
+  }
+  return {
+    kind: 'send',
+    reason: `Search · ${SV3_SEARCH_SEND_HINT}${chord}`,
+    haltReason: running ? SV3_STANDING_STOP_REASON : '',
+  };
+}
+
+export function sv3PrimaryAction(input: Sv3SlotInput): Sv3Slot {
+  // An omitted tier words exactly the sentence the slot worded before the control existed — the
+  // ask tier's — whatever the window's default is now.
+  const { pendingPrompt, running, followUp, tier = 'ask', scoped = false } = input;
+  if (tier === 'search') return searchSlot(input);
   // The routing explanation lives on the send control and nowhere else, so it has to follow the
   // chosen tier: a send that delegates while its own label says "Enter asks" is chrome that lies.
-  const hint = tier === 'delegate' ? SV3_DELEGATE_SEND_HINT : SV3_SEND_HINT;
+  const hint =
+    tier === 'delegate' ? SV3_DELEGATE_SEND_HINT : scoped ? SV3_SCOPED_SEND_HINT : SV3_SEND_HINT;
   if (pendingPrompt) {
     return {
       kind: 'answer',

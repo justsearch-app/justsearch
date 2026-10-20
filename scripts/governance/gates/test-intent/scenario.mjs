@@ -17,11 +17,12 @@
  *   afterAccept: [ step ]                                  commits after acceptance
  *   acceptAgain: [ record ]                                records on the digest after afterAccept
  *   mainMoves:   [ step ]                                  commits on main after the branch
+ *   rebase:      true                                      rebase the PR onto the moved main
  *   uncommitted: step                                      working-tree edits (local event only)
- *   event:       { name: local|pull_request|merge_group|push, pr?, fork? }
+ *   event:       { name: local|pull_request|merge_group|push|workflow_dispatch, pr?, fork? }
  *   shallow:     true                                      run in a depth-1 clone
  *   step:        { write?: {path: content}, delete?: [path], move?: [[from, to]],
- *                  replaceIn?: {path: [from, to]}, message? }
+ *                  replaceIn?: {path: [from, to]}, symlink?: {path: target}, message? }
  */
 
 import { execFileSync } from 'node:child_process';
@@ -60,6 +61,11 @@ function applyStep(root, step) {
     const abs = path.join(root, rel);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, content, 'utf8');
+  }
+  for (const [rel, target] of Object.entries(step.symlink ?? {})) {
+    const abs = path.join(root, rel);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.symlinkSync(target, abs);
   }
   for (const [rel, [from, to]] of Object.entries(step.replaceIn ?? {})) {
     const abs = path.join(root, rel);
@@ -132,14 +138,20 @@ export function runScenario(scenario) {
 
   gitIn(root, 'checkout', '-q', 'main');
   (scenario.mainMoves ?? []).forEach((s, i) => commitStep(root, s, `main: moves ${i + 1}`));
+  if (scenario.rebase) {
+    gitIn(root, 'checkout', '-q', 'pr');
+    gitIn(root, 'rebase', 'main');
+    gitIn(root, 'checkout', '-q', 'main');
+  }
 
   const ev = scenario.event ?? { name: 'local' };
   const pr = ev.pr ?? 7;
   const env = {};
   const payloadPath = path.join(tmp, 'event.json');
-  if (ev.name === 'local') {
+  if (ev.name === 'local' || ev.name === 'workflow_dispatch') {
     gitIn(root, 'checkout', '-q', 'pr');
     if (scenario.uncommitted) applyStep(root, scenario.uncommitted);
+    if (ev.name === 'workflow_dispatch') env.GITHUB_EVENT_NAME = ev.name;
   } else if (ev.name === 'pull_request') {
     gitIn(root, 'checkout', '-q', '--detach', 'main');
     gitIn(root, 'merge', '-q', '--no-ff', '-m', `Merge pr into main`, 'pr');

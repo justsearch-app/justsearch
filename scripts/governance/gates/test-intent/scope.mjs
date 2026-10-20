@@ -148,6 +148,24 @@ function uiWebSelection(rest) {
 }
 
 /**
+ * Recognised standalone test sources eligible for the isolated-addition exemption. This is a
+ * positive list: support, resources and unknown source sets/selections stay gated. Rust tests can
+ * be imported with `mod`, `#[path]` or `include!`, so their location alone cannot prove isolation.
+ * The caller also checks base absence, deletions/moves, build configuration and the support list.
+ */
+export function isStandaloneTestSource(rel) {
+  const p = rel.replaceAll('\\', '/');
+  if (classifyPath(p)?.kind !== 'test-code') return false;
+  const parts = p.split('/');
+  const module = parts[1];
+  if (['test-support', 'app-api-tck', 'system-tests'].includes(module)) return false;
+  if (parts.some((part) => ['resources', 'testFixtures', 'mocks', '__test-setup__'].includes(part))) return false;
+  if (module === 'ui-web') return uiWebSelection(parts.slice(2).join('/')) !== null;
+  if (NON_JVM_MODULES.has(module)) return false;
+  return /^modules\/[^/]+\/src\/(test|integrationTest|systemTest)\/(?:java\/(?:[^/]+\/)*[^/]*(?:Test|Tests|IT)\.java|kotlin\/(?:[^/]+\/)*[^/]*(?:Test|Tests|IT)\.kt)$/.test(p);
+}
+
+/**
  * The execution context a flagged file runs in, or null when a move cannot be shown to keep it.
  * A byte-identical move passes without an entry only when both sides have the same non-null context:
  *
