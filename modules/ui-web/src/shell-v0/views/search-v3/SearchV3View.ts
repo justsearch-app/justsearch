@@ -839,6 +839,8 @@ export class SearchV3View extends JfElement {
   /** A write includes its response AND saved-history refresh; later controls queue behind it. */
   private contextWrites = new Map<string, Promise<void>>();
   private contextNotices = new Map<string, string>();
+  /** A refused send outlives context recovery: the reader may have typed a different draft. */
+  private refusedQuestions = new Map<string, string>();
   private contextRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private contextRetryDelay = 1000;
   private contextAskPending = false;
@@ -1031,7 +1033,7 @@ export class SearchV3View extends JfElement {
     // palette open, already typing elsewhere) applies here exactly as it does on mount.
     window.addEventListener('jf-focus-composer', this.onFocusComposerEvent);
     window.addEventListener('online', this.retryContextOnReconnect);
-    this.scheduleContextRetry();
+    this.retryContextOnReconnect();
     // Tempdoc 864 Layer 1(a) — ARRIVING AT THIS WINDOW PUTS THE READER IN THE COMPOSER. Activation is
     // an entry path like the other two ({@link onSessionSelect}, {@link onSessionNew}), and it is the
     // one that covers both a fresh hero and the restored record `restoreLastViewed` just claimed:
@@ -1095,7 +1097,10 @@ export class SearchV3View extends JfElement {
     this.convListUnsubscribe = null;
     this.recordAbort?.abort();
     this.recordAbort = null;
-    for (const read of this.historyReads.values()) read.abort();
+    for (const [id, read] of this.historyReads) {
+      this.markContextUnconfirmed(id);
+      read.abort();
+    }
     this.historyReads.clear();
     this.clearContextRetry();
     this.aiUnsubscribe?.();
@@ -1440,11 +1445,26 @@ export class SearchV3View extends JfElement {
       // A read during a pending write cannot confirm that write's eventual result.
       if (!this.contextWrites.has(conversationId)) this.confirmContext(conversationId);
     } else {
-      this.contextNotices.set(conversationId, 'Saved context could not be confirmed. Retrying…');
-      this.requestUpdate();
+      this.markContextUnconfirmed(conversationId);
     }
     this.scheduleContextRetry();
     return landed;
+  }
+
+  private markContextUnconfirmed(sessionId: string): void {
+    this.contextNotices.set(sessionId, 'Saved context could not be confirmed. Retrying…');
+    this.requestUpdate();
+  }
+
+  private contextNotice(sessionId: string): string {
+    const context = this.contextNotices.get(sessionId)
+      ?? (this.contextWrites.has(sessionId) ? 'Saving context… Later changes will follow in order.' : '');
+    const question = this.refusedQuestions.get(sessionId);
+    // Keep the exact submitted text selectable even after a retry confirms context. Never replace
+    // newer input to recover it; the reader can copy these words back when ready to try again.
+    return [context, question === undefined ? ''
+      : `Question not sent. Your draft is kept. Unsent question (copy to reuse): “${question}”`]
+      .filter(Boolean).join(' ');
   }
 
   private confirmContext(sessionId: string): void {
@@ -1681,8 +1701,7 @@ export class SearchV3View extends JfElement {
     if (await this.refreshHistory(sessionId, true)) {
       this.confirmContext(sessionId);
     } else {
-      this.contextNotices.set(sessionId, 'Saved context could not be confirmed. Retrying…');
-      this.requestUpdate();
+      this.markContextUnconfirmed(sessionId);
     }
     if (!ok) emitEphemeralToast({ message: failure, severity: 'warning' });
   }
@@ -1690,14 +1709,13 @@ export class SearchV3View extends JfElement {
   /** Wait for queued actions, then confirm uncertainty before a question can consume this state. */
   private async confirmContextForAsk(sessionId: string): Promise<boolean> {
     while (this.contextWrites.has(sessionId)) await this.contextWrites.get(sessionId);
-    if (!this.contextNotices.has(sessionId) && sessionById(this.sessions, sessionId)?.history !== null) return true;
+    if (!this.contextNotices.has(sessionId) && !this.historyReads.has(sessionId)
+      && sessionById(this.sessions, sessionId)?.history != null) return true;
     const read = await this.refreshHistory(sessionId);
     // A control used during that read must also settle before this question is sent.
     if (this.contextWrites.has(sessionId)) return this.confirmContextForAsk(sessionId);
     if (read) return true;
-    this.contextNotices.set(sessionId,
-      'Saved context could not be confirmed. Question not sent. Your draft is kept. Retrying…');
-    this.requestUpdate();
+    this.markContextUnconfirmed(sessionId);
     this.scheduleContextRetry();
     return false;
   }
@@ -2770,31 +2788,15 @@ export class SearchV3View extends JfElement {
     return availability.kind === 'unavailable' ? availability.reason : '';
   }
 
-  /**
-   * The conversation a follow-up in `sessionId` carries — its turns before `turnId`, through the
-   * conversation's own `/history` (floor, exclusions, summary). Empty for a conversation's first
-   * question.
-   *
-   * Only ever under the SAVED settings (S2.0): while the window holds no `/history` for the
-   * conversation — its read is still in flight, or it failed — the settings are read now, before
-   * anything is sent. A follow-up whose settings cannot be read carries no earlier turns: sending
-   * them unfiltered could send what the reader hid.
-   */
+  /** Resolve saved context before opening a turn. Null refuses; [] means confirmed empty context. */
   private async followUpContext(
     sessionId: string,
-    turnId: string,
-  ): Promise<ReturnType<typeof sv3FollowUpContext>> {
+  ): Promise<ReturnType<typeof sv3FollowUpContext> | null> {
+    if (!await this.confirmContextForAsk(sessionId)
+      || !this.isConnected || this.sessions.activeId !== sessionId) return null;
     const session = sessionById(this.sessions, sessionId);
-    if (session === null) return [];
-    const earlier = session.turns.filter((turn) => turn.id !== turnId);
-    if (earlier.length === 0) return [];
-    let history = session.history;
-    if (history === null) {
-      const read = await resumeConversation(sessionId, SV3_ASK_SHAPE_ID, { claim: false });
-      if (read.failed === true || read.locked === true) return [];
-      history = sv3HistoryOf(read);
-    }
-    return sv3FollowUpContext(earlier, projectSv3TurnContexts(earlier, history), history);
+    if (session?.history == null) return null;
+    return sv3FollowUpContext(session.turns, projectSv3TurnContexts(session.turns, session.history), session.history);
   }
 
   /**
@@ -2809,16 +2811,21 @@ export class SearchV3View extends JfElement {
     const draftRevision = composer?.draftRevision;
     const sessionId = this.sessions.activeId;
     if (this.contextAskPending) return;
-    if (sessionId !== null && (this.contextWrites.has(sessionId) || this.contextNotices.has(sessionId)
-      || this.historyReads.has(sessionId))) {
+    let context: ReturnType<typeof sv3FollowUpContext> = [];
+    if (sessionId !== null) {
       this.contextAskPending = true;
-      let confirmed: boolean;
       try {
-        confirmed = await this.confirmContextForAsk(sessionId);
+        const resolved = await this.followUpContext(sessionId);
+        if (resolved === null || !this.isConnected || this.sessions.activeId !== sessionId) {
+          this.refusedQuestions.set(sessionId, question);
+          this.requestUpdate();
+          return;
+        }
+        context = resolved;
+        this.refusedQuestions.delete(sessionId);
       } finally {
         this.contextAskPending = false;
       }
-      if (!confirmed || !this.isConnected || this.sessions.activeId !== sessionId) return;
     }
     this.leaveResultsBySending();
     this.sessions = submitInSession(this.sessions, question, Date.now(), 'ask', createConversationId());
@@ -2827,10 +2834,6 @@ export class SearchV3View extends JfElement {
     // WP1.1 S1.7 — remembered by turn so its Retry/Edit can keep the same files. Window-local: the
     // store keeps no scope with a turn, so after a reload the turn is honestly an unscoped one.
     if (scope !== null) this.search.recordTurnScope(ref.turnId, scope);
-    // The follow-up's conversation (S2.0), taken as of THIS send: every earlier turn of the
-    // conversation the question went into, through the same floor, exclusions and summary the
-    // transcript and the bar draw. The new turn itself is the question, not context.
-    const pendingContext = this.followUpContext(ref.sessionId, ref.turnId);
     this.claimConversation(ref.sessionId);
     // The submitted question is fixed; input typed while confirmation waited belongs to the reader.
     if (this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
@@ -2916,8 +2919,6 @@ export class SearchV3View extends JfElement {
         this.settleAiActivity();
       }
     };
-    // Usually at once; when the conversation's settings had not been read yet, after they are.
-    const context = await pendingContext;
     await sv3Ask(
       {
         apiBase: this.apiBase,
@@ -4009,8 +4010,7 @@ export class SearchV3View extends JfElement {
              box and the transcript scrolls beneath it rather than being cut off above it. -->
         <div class="dock" data-testid="sv3-dock">
         <jf-sv3-context-bar
-          .notice=${session === null ? '' : this.contextNotices.get(session.id)
-            ?? (this.contextWrites.has(session.id) ? 'Saving context… Later changes will follow in order.' : '')}
+          .notice=${session === null ? '' : this.contextNotice(session.id)}
           .usage=${session?.contextUsage ?? null}
           .contextWindow=${this.aiSnapshot?.runtime.contextWindow ?? null}
           hidden-turns=${sv3ExcludedTurnCount(contexts)}

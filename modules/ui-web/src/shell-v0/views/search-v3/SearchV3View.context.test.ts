@@ -1647,6 +1647,125 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
     },
   );
 
+  it('keeps the refused-send reason through failed background retries (X19)', async () => {
+    twoTurnConversation();
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    vi.useFakeTimers();
+    try {
+      backend.failHistoryFor.add('uc-ctx');
+      contextAction(el, 'restore');
+      await settle(el);
+      await ask(el, 'My refused question');
+      expect(await contextNotice(el)).toContain('Question not sent');
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle(el);
+      expect(await contextNotice(el)).toContain('Question not sent');
+      expect(backend.dispatches).toHaveLength(0);
+    } finally {
+      el.remove();
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps a refused question visible beside newer input through retry and recovery (X15)', async () => {
+    twoTurnConversation();
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    const release = holdWriteResponse('/context-floor');
+    contextAction(el, 'floor', 1);
+    await settle(el);
+    await ask(el, 'The submitted question to recover');
+    const composer = await region(el, 'jf-sv3-composer');
+    const field = composer.shadowRoot!.querySelector<HTMLTextAreaElement>('textarea')!;
+    field.value = 'My newer draft';
+    field.dispatchEvent(new Event('input'));
+    await composer.updateComplete;
+    vi.useFakeTimers();
+    try {
+      backend.failHistoryFor.add('uc-ctx');
+      release();
+      await settle(el);
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle(el);
+      expect(backend.dispatches).toHaveLength(0);
+      expect(field.value).toBe('My newer draft');
+      expect(await contextNotice(el)).toContain('Question not sent');
+      expect(await contextNotice(el)).toContain('The submitted question to recover');
+      backend.failHistoryFor.clear();
+      window.dispatchEvent(new Event('online'));
+      await settle(el);
+      expect(await contextNotice(el)).toContain('The submitted question to recover');
+      expect(await contextNotice(el)).not.toContain('could not be confirmed');
+      expect(field.value).toBe('My newer draft');
+      await nextContext(el);
+      expect(await contextNotice(el)).toBe('');
+    } finally {
+      release();
+      el.remove();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(['screen switch', 'reparent'] as const)(
+    're-reads interrupted first history on reattach after %s and retries failures (X14a)', async (move) => {
+      twoTurnConversation();
+      backend.histories['uc-ctx']!.excludedMessageIds = [storedId(0), storedId(1)];
+      const el = await mount();
+      backend.holdHistoryFor.add('uc-ctx');
+      await openTheOnlyConversation(el);
+      vi.useFakeTimers();
+      try {
+        el.remove();
+        if (move === 'screen switch') await Promise.resolve();
+        backend.failHistoryFor.add('uc-ctx');
+        document.body.appendChild(el);
+        await settle(el);
+        backend.heldHistories.get('uc-ctx')?.();
+        await settle(el);
+        expect(await contextNotice(el)).toContain('Saved context could not be confirmed');
+        const reads = backend.historyReads.length;
+        backend.failHistoryFor.clear();
+        await vi.advanceTimersByTimeAsync(1000);
+        await settle(el);
+        expect(backend.historyReads.length).toBeGreaterThan(reads);
+        expect(el.sessions.sessions[0]?.history?.excludedMessageIds).toEqual([storedId(0), storedId(1)]);
+        expect(await contextNotice(el)).toBe('');
+      } finally {
+        backend.heldHistories.get('uc-ctx')?.();
+        await settle(el);
+        el.remove();
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it('refuses follow-up after an interrupted first history read and a failed re-read (X14b)', async () => {
+    twoTurnConversation();
+    const el = await mount();
+    backend.holdHistoryFor.add('uc-ctx');
+    await openTheOnlyConversation(el);
+    try {
+      el.remove();
+      await Promise.resolve();
+      backend.failHistoryFor.add('uc-ctx');
+      document.body.appendChild(el);
+      await settle(el);
+      await ask(el, 'Do not send without saved context');
+      expect(backend.dispatches).toHaveLength(0);
+      expect(el.sessions.sessions[0]?.turns).toHaveLength(2);
+      expect(await contextNotice(el)).toContain('Question not sent');
+      const composer = await region(el, 'jf-sv3-composer');
+      expect(composer.shadowRoot?.querySelector<HTMLTextAreaElement>('textarea')?.value)
+        .toBe('Do not send without saved context');
+    } finally {
+      backend.heldHistories.get('uc-ctx')?.();
+      stream.emit('done', {});
+      stream.end();
+      await settle(el);
+    }
+  });
+
   it('confirms a lost write response by reading history before sending Ask', async () => {
     twoTurnConversation();
     const el = await mount();

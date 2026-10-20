@@ -42,6 +42,8 @@ No live Engine/browser run is claimed for this round: the dev stack is unavailab
 
 Review history. Load/draft repair (2026-10-20): verifier-5 rejected X10 (history unreadable after reload) and X13 (input edited while Ask waits was cleared), and the intent citations for the serialized-context entries. Those entries now cite agreed FA1–FA3, FS0 and FS10 rather than the orchestrator's brief. New checks cite FA2–FA4 and fail by assertion on 11c359f49. FA3 also supersedes the existing check that expected sending without earlier context after a failed history read; its replacement asserts refusal, reason and draft retention. All acceptance/rejection records below remain unchanged. Separate producer evidence: uiux-v3-followups-context-load-draft.json (--before 11c359f49); unchanged checks receive refreshed content digests in uiux-v3-followups-context-load-draft-preservation.json (--before 117e89be9) and uiux-v3-followups-context-load-draft-queue-preservation.json (--before 1f1f9bfad). No acceptance record is written by the builder.
 
+Review history. Interrupted-read/refusal repair (2026-10-20): verifier-6 rejected X14a/b (an interrupted first history read leaves no notice or retry and a failed follow-up read sends empty context), X19 (retry erases the refused-send reason), and X15 (submitted text disappears when the reader typed meanwhile). Context resolution now confirms saved history before creating a turn and returns a refusal separately from confirmed empty context. Disconnect marks interrupted reads unconfirmed; reattach reads them again. A refused question is shown as selectable text in the status notice, independently of context uncertainty, until another accepted send; newer input stays in the composer. Five durable component checks cite FA2–FA4, FS0 and FS10 and fail by assertion on e45e0b1e2. Evidence: uiux-v3-followups-context-interruption.json (--before e45e0b1e2). Prior evidence and acceptance/rejection records remain unchanged; refreshed context-file digests are in separate interruption preservation evidence files. No builder acceptance record is written.
+
 No acceptance record is supplied by the builder.
 
 ```json
@@ -346,7 +348,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-load-draft-preservation.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-interruption-preserved-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends the earlier turns as context, oldest first, on the conversation’s own id",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#leaves out excluded messages and everything above the floor, and leads with the summary",
@@ -389,7 +391,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-load-draft-preservation.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-interruption-preserved-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends no context with the first question of a new conversation"
       ]
@@ -416,7 +418,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-load-draft-preservation.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-interruption-preserved-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows each note on its own turn live, after the record refresh, and after a reload"
       ],
@@ -444,7 +446,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-load-draft-preservation.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-interruption-preserved-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#counts unique hidden messages not shown here beside the hidden turns on screen",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows and undoes exclusions that are ALL off screen, without inventing a turn count",
@@ -468,7 +470,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-load-draft-preservation.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-interruption-preserved-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#reports a PARTIALLY refused Include all as a failure and shows what was really saved",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#does not wipe the bar when the reload after Include all fails",
@@ -1174,7 +1176,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-load-draft-queue-preservation.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-interruption-preserved-queue-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks Include all unconfirmed when its reload failed",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks Restore unconfirmed when its reload failed",
@@ -1275,7 +1277,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-load-draft.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-interruption-preserved.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#refuses the follow-up when the conversation’s context settings cannot be read",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends the submitted question after a context wait and keeps later input: A newer unsent question",
@@ -1284,6 +1286,59 @@ No acceptance record is supplied by the builder.
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#warns after a failed history read on reload and refuses Ask with its draft kept",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#recovers a failed load history read on backoff without another action",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#refuses Ask when a load read is still pending and its confirmation read fails"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "FA2–FA4, X14a/b, X15, X19: interrupted first saved-history reads are re-read on screen return or synchronous reparent, failures stay unconfirmed and retry to restore saved exclusions, and a failed follow-up confirmation dispatches nothing or adds no turn. A refused-send reason survives failed background retries. If the reader typed while waiting, the submitted question remains visible and copyable through failure and successful context recovery, without replacing the newer draft; an accepted later send clears that notice. All five checks fail by assertion on e45e0b1e2.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA2",
+          "quote": "When the saved context cannot be confirmed (a write's outcome or refresh is unknown, or the saved history cannot be read, including on load or reload), the context bar says so plainly and keeps trying; it never shows a guessed state as saved.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA3",
+          "quote": "A question sent while the saved context is unconfirmed is sent only after the saved history has been read again; if that read fails, it is not sent, the reason is shown and the draft stays.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA4",
+          "quote": "A question that waits before sending sends the text the user submitted; anything typed into the composer meanwhile stays in the composer.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS0",
+          "quote": "A follow-up Ask in Search v3 is answered in the light of the conversation, as in the current window: retrieval runs on the rewritten standalone question (a real second question produces the rewrite), and the answer can refer to the earlier turn. Messages excluded from context and messages before the context starting point are not sent with the follow-up; the context bar's numbers match what was sent.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS10",
+          "quote": "A failed or partially refused Include all / Restore does not announce success; a failed refresh, out-of-order responses or navigating away during the undo never leave the bar showing a state that is not the saved one.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-interruption.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the refused-send reason through failed background retries (X19)",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps a refused question visible beside newer input through retry and recovery (X15)",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#re-reads interrupted first history on reattach after screen switch and retries failures (X14a)",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#re-reads interrupted first history on reattach after reparent and retries failures (X14a)",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#refuses follow-up after an interrupted first history read and a failed re-read (X14b)"
       ],
       "repaired": true
     }
