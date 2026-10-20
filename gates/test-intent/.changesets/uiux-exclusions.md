@@ -635,3 +635,14 @@ Affected fixture evidence is refreshed separately by the evidence runner; unrela
   "note": "Accept on 56a3c58c5. Reviewed before-state tests, sources, then diff; Obsolete conflict search repeated (none). All 10 evidence files re-run to scratch: every attached check passes; fail-befores are assertions (f9bd104d2 or named intermediates); preserved checks also pass on f9bd104d2 (engine fixtures with the no-op compatibility patch). The 14 generation-boundary cases pass unchanged on both. R1 fixed live (in-process Engine): 9982cb522 fails 6 checks after legacy SYNC_ROOT replay; candidate passes all 67. Finding: EX5LegacySyncReplayKeepsServingPolicyAfterLiveCutover failed 1 of 7 runs under load with SQLITE_BUSY at line 81 (second SqliteJobQueue.open() schema write against the running Engine's jobs.db): fixture race, not product behaviour. EX5 replay quote not checked against the task record (no access); its expectation also follows from EX5 'not re-processed or re-enriched by later checks'."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-exkc0u6f",
+  "verdict": "reject",
+  "digest": "sha256:a62cb24488e979ca0dc89adeabb3b9bcc529fa9eb1ecc56f6dc55fadb5e072c8",
+  "note": "Verification blocked on required load criterion: load Gradle task exited 75 (no slot in 60s); no retry per machine rule. Five consecutive replay runs passed, not ten with verified parallel load. Diff preserves all 19 assertion calls and changes no product code. Same check fails on 9982cb522 by five post-cutover policy assertions; fresh run-evidence matches committed outcomes and source digest. Ordinary live cutover passes both. Evidence: /home/elias/.cache/am/exkc0u6f/evidence. Reject acceptance pending the required ten-run load evidence; no product defect found."
+}
+```
