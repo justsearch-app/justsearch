@@ -12,6 +12,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 import {
   AgentSessionController,
   interruptedRunNotice,
@@ -2032,6 +2033,13 @@ describe('keyed background scheduling', () => {
   afterEach(() => { ctrl.destroy(); vi.useRealTimers(); });
 
   it('captures one key and conversation across a token retry; a new action has a new key', async () => {
+    vi.spyOn(await import('../../utils/tauriRuntime'), 'isTauriRuntime').mockReturnValue(true);
+    const { invoke } = await import('@tauri-apps/api/core');
+    vi.mocked(invoke).mockResolvedValue({ origin: 'http://127.0.0.1:33221', token: 'fixture-token' });
+    const { invalidateSessionToken } = await import('../../api/http.js');
+    invalidateSessionToken();
+    ctrl.destroy();
+    ctrl = new AgentSessionController('http://127.0.0.1:33221', () => { notifyCount++; });
     const bodies: string[] = [];
     globalThis.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       bodies.push(String(init?.body));

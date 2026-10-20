@@ -199,6 +199,7 @@ export const SESSION_TOKEN_HEADER = 'X-JustSearch-Session';
  */
 interface SessionTokenBinding {
   token: string | null;
+  origin: string | null;
   resolved: boolean;
   inFlight: Promise<string | null> | null;
   /** Bumped by every invalidation, so a resolution in flight across one knows it is obsolete. */
@@ -207,6 +208,7 @@ interface SessionTokenBinding {
 
 const sessionBinding: SessionTokenBinding = {
   token: null,
+  origin: null,
   resolved: false,
   inFlight: null,
   generation: 0,
@@ -221,6 +223,7 @@ const sessionBinding: SessionTokenBinding = {
  */
 export function invalidateSessionToken(): void {
   sessionBinding.token = null;
+  sessionBinding.origin = null;
   sessionBinding.resolved = false;
   sessionBinding.inFlight = null;
   sessionBinding.generation += 1;
@@ -284,15 +287,20 @@ export async function resolveSessionTokenFromTauri(): Promise<string | null> {
   const pending = (async (): Promise<string | null> => {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const token = await invoke('session_token');
-      const normalized = normalizeNonBlankString(token);
+      const credential = await invoke<{ origin?: unknown; token?: unknown } | null>('session_token');
+      const normalized = normalizeNonBlankString(credential?.token);
+      const origin = normalizeNonBlankString(credential?.origin);
+      // Only the exact loopback origin issued by the shell is a credential binding.
+      if (!origin || !/^http:\/\/127\.0\.0\.1:[1-9][0-9]*$/.test(origin)
+        || new URL(origin).origin !== origin) return null;
       // An invalidate() mid-flight bumped the generation: this answer describes the DEAD
-      // instance, so it is returned to the caller that asked but never cached.
+      // instance, so it is neither returned nor cached.
       if (normalized !== null && sessionBinding.generation === generation) {
         sessionBinding.token = normalized;
+        sessionBinding.origin = origin;
         sessionBinding.resolved = true;
       }
-      return normalized;
+      return sessionBinding.generation === generation ? normalized : null;
     } catch (err) {
       // Best-effort: token may not be available yet (or at all) — retryable.
       console.debug('tauri session_token invoke failed (expected in dev mode)', err);
@@ -314,6 +322,11 @@ export async function resolveSessionTokenFromTauri(): Promise<string | null> {
  */
 export function getSessionToken(): string | null {
   return sessionBinding.token;
+}
+
+/** Exact origin issued with the cached credential, or null while unresolved. */
+export function getSessionOrigin(): string | null {
+  return sessionBinding.origin;
 }
 
 export async function resolveSmokeRunId(): Promise<string | null> {
@@ -358,15 +371,7 @@ export async function request<T>(
   const { method = 'GET', body, signal, retries = MAX_RETRIES } = options;
   const url = `${baseUrl}${path}`;
 
-  // Resolve the per-boot token before every request.
-  // This makes token correctness a property of the helper, not each callsite.
-  let tokenForRequest = sessionBinding.token;
-  if (!sessionBinding.resolved) {
-    tokenForRequest = await resolveSessionTokenFromTauri();
-  }
-
   let lastError: ApiError | null = null;
-  let tokenRefreshed = false;
 
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
@@ -375,11 +380,6 @@ export async function request<T>(
       // Add Content-Type for JSON body
       if (body) {
         headers['Content-Type'] = 'application/json';
-      }
-
-      // Authenticate reads, writes and streams in production.
-      if (tokenForRequest) {
-        headers[SESSION_TOKEN_HEADER] = tokenForRequest;
       }
 
       const fetchInit: RequestInit = { method };
@@ -392,7 +392,7 @@ export async function request<T>(
       if (signal) {
         fetchInit.signal = signal;
       }
-      const response = await fetchWithAdmissionWait(fetch, url, fetchInit);
+      const response = await fetchWithAdmissionWait(fetchWithSessionToken, url, fetchInit);
       await observeStatusResponse(url, response);
 
       if (!response.ok) {
@@ -412,13 +412,6 @@ export async function request<T>(
           // Not JSON
         }
 
-        if (response.status === 401 && errorData?.errorCode === 'UI_TOKEN_REQUIRED' && !tokenRefreshed) {
-          tokenRefreshed = true;
-          invalidateSessionToken();
-          tokenForRequest = await resolveSessionTokenFromTauri();
-          attempt -= 1; // Authentication refresh is independent of the network retry budget.
-          continue;
-        }
 
         throw createApiError(
           errorData?.error || text || `Request failed: ${response.statusText}`,
@@ -569,4 +562,102 @@ export async function resolveApiEndpoint(): Promise<ApiEndpoint> {
     }
   }
   return resolved;
+}
+
+
+/** The webview cannot prove socket ownership; bodies sent during port takeover remain a residual. */
+function requestOrigin(input: RequestInfo | URL): string | null {
+  try {
+    const url = typeof Request !== 'undefined' && input instanceof Request ? input.url : String(input);
+    return new URL(url, globalThis.location?.href).origin;
+  } catch { return null; }
+}
+
+function getSessionTokenFor(input: RequestInfo | URL): string | null {
+  return requestOrigin(input) === sessionBinding.origin ? sessionBinding.token : null;
+}
+
+function globalFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  // eslint-disable-next-line no-restricted-syntax
+  return globalThis.fetch(input, init);
+}
+
+const TOKEN_REQUIRED_CODE = 'UI_TOKEN_REQUIRED';
+
+function headerAlreadySet(headers: HeadersInit | undefined): boolean {
+  if (!headers) return false;
+  const key = SESSION_TOKEN_HEADER.toLowerCase();
+  if (headers instanceof Headers) return headers.has(SESSION_TOKEN_HEADER);
+  if (Array.isArray(headers)) return headers.some(([k]) => k.toLowerCase() === key);
+  return Object.keys(headers).some((k) => k.toLowerCase() === key);
+}
+
+function withToken(headers: HeadersInit | undefined, token: string): HeadersInit {
+  if (headers instanceof Headers) {
+    const merged = new Headers(headers);
+    merged.set(SESSION_TOKEN_HEADER, token);
+    return merged;
+  }
+  if (Array.isArray(headers)) {
+    return [...headers, [SESSION_TOKEN_HEADER, token]];
+  }
+  // Plain-record shape is preserved (call sites and their tests read it back as one).
+  return { ...(headers ?? {}), [SESSION_TOKEN_HEADER]: token } as Record<string, string>;
+}
+
+export async function fetchWithSessionToken(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  // A Request body is single-use, so the retry needs its own copy taken BEFORE the first send.
+  const retryInput =
+    typeof Request !== 'undefined' && input instanceof Request ? input.clone() : input;
+
+  const response = await sendWithToken(input, init);
+  if (!(await isStaleTokenRejection(response))) {
+    return response;
+  }
+
+  // Tempdoc 805 G.1: the backend says this token is not the live one — the binding died under us
+  // (a restart the shell's event has not delivered yet). Drop it, re-resolve, retry EXACTLY once;
+  // a second rejection is the answer, not a loop.
+  invalidateSessionToken();
+  await resolveSessionTokenFromTauri();
+  // An old port's 401 cannot ask us to send a new incarnation's token to that port.
+  if (!getSessionTokenFor(input)) return response;
+  return sendWithToken(retryInput, init);
+}
+
+async function sendWithToken(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  // Ordering matters: resolve BEFORE building headers, so a request issued
+  // during cold start blocks on the token instead of racing past it.
+  await resolveSessionTokenFromTauri();
+  const token = getSessionTokenFor(input);
+  const callerHeaders = init?.headers ??
+    (typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined);
+  if (!token) {
+    if (!headerAlreadySet(callerHeaders)) return globalFetch(input, init);
+    const headers = new Headers(callerHeaders);
+    headers.delete(SESSION_TOKEN_HEADER);
+    return globalFetch(input, { ...init, headers });
+  }
+  return globalFetch(input, {
+    ...init,
+    headers: headerAlreadySet(callerHeaders) ? callerHeaders : withToken(callerHeaders, token),
+    // Fetch must never forward a credential or its request body through a redirect.
+    redirect: 'error',
+  });
+}
+
+/**
+ * True only for a 401 whose body names {@link TOKEN_REQUIRED_CODE}. Every other 401 (and every
+ * other status) is the caller's answer — re-resolving would not change it.
+ *
+ * Reads a CLONE so the caller still gets an unconsumed body.
+ */
+async function isStaleTokenRejection(response: Response): Promise<boolean> {
+  if (response.status !== 401) return false;
+  try {
+    const body = (await response.clone().json()) as { errorCode?: unknown };
+    return body?.errorCode === TOKEN_REQUIRED_CODE;
+  } catch {
+    return false; // unparseable body — not a claim we can act on
+  }
 }

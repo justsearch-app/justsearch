@@ -1542,38 +1542,19 @@ async fn post_head<T: for<'de> Deserialize<'de>>(
     path: &str,
     body: Option<serde_json::Value>,
 ) -> Result<T, String> {
-    let port = backend
-        .get_port()
-        .ok_or_else(|| "Backend is unavailable".to_string())?;
-    let token = backend
-        .get_session_token()
-        .ok_or_else(|| "Backend session token is unavailable".to_string())?;
-    let client = reqwest::Client::builder()
-        .timeout(HEAD_TIMEOUT)
-        .build()
-        .map_err(|error| format!("Failed to create backend client: {error}"))?;
-    let mut request = client
-        .post(format!("http://127.0.0.1:{port}{path}"))
-        .header("X-JustSearch-Session", token);
-    if let Some(body) = body {
-        request = request.json(&body);
-    }
-    let response = request
-        .send()
-        .await
-        .map_err(|error| format!("Backend upgrade handshake failed: {error}"))?;
-    let status = response.status();
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|error| format!("Backend upgrade response failed: {error}"))?;
-    if !status.is_success() {
-        return Err(format!(
-            "Backend rejected upgrade handshake with {status}: {}",
-            String::from_utf8_lossy(&bytes)
-        ));
-    }
-    serde_json::from_slice(&bytes)
+    let host = backend.host.clone();
+    let path = path.to_owned();
+    let response = tokio::task::spawn_blocking(move || {
+        crate::shell_actuator::post(
+            &host,
+            &path,
+            &body.unwrap_or_else(|| serde_json::json!({})),
+            HEAD_TIMEOUT.as_millis() as u64,
+        )
+    })
+    .await
+    .map_err(|error| format!("Backend upgrade task failed: {error}"))??;
+    serde_json::from_value(response)
         .map_err(|error| format!("Backend upgrade response was invalid: {error}"))
 }
 
@@ -2983,3 +2964,7 @@ mod commit_delivery_tests;
 #[cfg(test)]
 #[path = "updater_actor_hold_witness_tests.rs"]
 mod actor_hold_witness_tests;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "updater_connection_tests.rs"]
+mod connection_tests;

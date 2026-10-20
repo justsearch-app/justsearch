@@ -55,7 +55,7 @@ describe('http module', () => {
   describe('request function', () => {
     it('authenticates GET and retries once with the newly resolved token after a restart', async () => {
       mocks.isTauriRuntime.mockReturnValue(true);
-      mocks.invoke.mockResolvedValueOnce('old-token').mockResolvedValueOnce('new-token');
+      mocks.invoke.mockResolvedValueOnce({ origin: 'http://127.0.0.1:33221', token: 'old-token' }).mockResolvedValueOnce({ origin: 'http://127.0.0.1:33221', token: 'new-token' });
       const send = vi.fn()
         .mockResolvedValueOnce(new Response(JSON.stringify({ errorCode: 'UI_TOKEN_REQUIRED' }), { status: 401 }))
         .mockResolvedValueOnce(Response.json({ recovered: true }));
