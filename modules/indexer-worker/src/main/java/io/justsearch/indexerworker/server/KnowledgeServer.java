@@ -8136,8 +8136,17 @@ public final class KnowledgeServer implements Closeable {
   }
 
   private void migrationReplayCut() {
+    migrationHaltCut("migration-after-first-projection-replay");
+  }
+
+  /** A replayed prune's first removal, before anything of it is committed. */
+  private void migrationPruneReplayCut() {
+    migrationHaltCut("migration-after-first-prune-removal");
+  }
+
+  private void migrationHaltCut(String point) {
     try {
-      migrationTransitionForPublication("migration-after-first-projection-replay");
+      migrationTransitionForPublication(point);
     } catch (IOException barrierFailure) {
       // This cut is only selected for a harness self-exit. If its reached marker cannot be
       // written, abort the whole promotion attempt rather than treating it as a replay gap.
@@ -8820,7 +8829,8 @@ public final class KnowledgeServer implements Closeable {
                       jobQueue, source, signalBus, indexingPacing, indexBasePath, activeIndexPath,
                       JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log,
                       System.nanoTime() + TimeUnit.SECONDS.toNanos(10),
-                      state.building_generation(), ignored -> true))) {
+                      state.building_generation(), ignored -> true)
+                      .withPublisher(producer.ingestService()))) {
                 throw new IOException("Refused candidate still has unproved source mutations");
               }
               // Producer close joins the actual Green writer before its B model lease can leave.
@@ -8959,8 +8969,10 @@ public final class KnowledgeServer implements Closeable {
             new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
                 jobQueue, green, signalBus, indexingPacing, indexBasePath, buildingIndexPath,
                 JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log, deadline,
-                buildingGeneration, this::projectionSourceReady, approvedGapVersions),
-            this::migrationReplayCut);
+                buildingGeneration, this::projectionSourceReady, approvedGapVersions)
+                // Green's loop is still writing: replayed prunes take its fence.
+                .withPublisher(current.ingestService()),
+            this::migrationReplayCut, this::migrationPruneReplayCut);
         if (replay.isEmpty()) {
           if (recorded != null) {
             // A partial pass may have committed projection revisions after an incomplete source
@@ -9363,7 +9375,19 @@ public final class KnowledgeServer implements Closeable {
             log,
             Long.MAX_VALUE,
             buildingIndexPath == null ? null : buildingIndexPath.getFileName().toString(),
-            this::projectionSourceReady));
+            this::projectionSourceReady)
+            .withPublisher(replayPublisher()));
+  }
+
+  /**
+   * The live Worker whose indexing loop may write while a best-effort replay runs: the services
+   * whose loop a deferred upgrade has just activated, or the migrating Worker after a failed
+   * cutover. None exists during the synchronous boot replay, which runs before any application
+   * service, and so any indexing loop, is built.
+   */
+  private io.justsearch.indexerworker.services.WorkerIngestService replayPublisher() {
+    WorkerAppServices services = appServices;
+    return services == null ? null : services.ingestService();
   }
 
 

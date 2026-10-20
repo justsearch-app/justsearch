@@ -15,6 +15,14 @@
  */
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Incidental requests are outside these render/event scenarios. Keep their
+// unavailable-backend behavior explicit, without contacting a real server.
+const originalFetch = globalThis.fetch;
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Test backend unavailable')));
+});
+afterEach(() => { globalThis.fetch = originalFetch; });
 import './ResourceView.js';
 
 // Stub EventSource at module level to a no-op that drops connections

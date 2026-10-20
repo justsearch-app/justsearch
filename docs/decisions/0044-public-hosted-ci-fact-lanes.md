@@ -15,6 +15,10 @@ last_reviewed: 2026-09-05
 ## Status
 
 Accepted. Narrows ADR-0026 for the public repository's standard GitHub-hosted CI lane.
+Amended by [ADR-0052](0052-weekly-codeql-on-hosted-runners.md): CodeQL runs weekly on Mondays
+and remains manually dispatchable. The no-model build and unit lanes now use hosted Linux
+runners; separate Windows-native test lanes run on Windows. The Windows-only build
+description below is historical.
 
 ## Context
 

@@ -19,7 +19,15 @@
  *  - reset frame clears the local state.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+
+// Incidental requests are outside these render/event scenarios. Keep their
+// unavailable-backend behavior explicit, without contacting a real server.
+const originalFetch = globalThis.fetch;
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Test backend unavailable')));
+});
+afterEach(() => { globalThis.fetch = originalFetch; });
 import './HealthLitView.js';
 // Side-effect: register <jf-status-card> so the dispatched child mounts.
 import '../components/StatusCard.js';

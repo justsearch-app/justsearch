@@ -359,9 +359,161 @@ public final class WorkerIngestService {
         ? mutation.get() : indexingLoop.withFileMutationFence(mutation);
   }
 
-  /** A prune applies each batch of deletions inside the same fence as the file writers. */
+  /**
+   * A prune applies each batch of deletions inside the same fence as the file writers, and judges
+   * again the files the loop's writers published while it scanned.
+   */
   private final io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence pruneWriterFence =
-      batch -> withFileMutationFence(batch::getAsBoolean);
+      new io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence() {
+        @Override
+        public boolean hold(java.util.function.BooleanSupplier batch) {
+          return withFileMutationFence(batch::getAsBoolean);
+        }
+
+        @Override
+        public io.justsearch.adapters.lucene.runtime.PruneOps.Publications watch() {
+          io.justsearch.indexerworker.loop.FileMutationFence fence = fileMutationFence();
+          // No loop, or one without a fence of its own (a test double), records nothing.
+          return fence == null
+              ? io.justsearch.adapters.lucene.runtime.PruneOps.Publications.NONE : fence.watch();
+        }
+      };
+
+  private io.justsearch.indexerworker.loop.FileMutationFence fileMutationFence() {
+    return mutationAdmission == null || indexingLoop == null
+        ? null : indexingLoop.fileMutationFence();
+  }
+
+  /**
+   * Tells a running prune that rows of {@code path} were published, as the loop's writers do; call
+   * it inside the fence, before it is released. A prune whose scan ran before these rows existed
+   * judges {@code path} in its last pass.
+   */
+  private void publishedUnderFence(String path) {
+    io.justsearch.indexerworker.loop.FileMutationFence fence = fileMutationFence();
+    if (fence != null) {
+      fence.published(path);
+    }
+  }
+
+  /**
+   * Runs {@code mutation} inside this Worker's file-mutation fence, the one its indexing loop's
+   * writers and its prunes hold: for a replayed write that must not interleave with a prune. The
+   * mutation checks, inside the fence, that what it writes for still exists.
+   */
+  public <T> T underFileMutationFence(Supplier<T> mutation) {
+    return withFileMutationFence(mutation);
+  }
+
+  /** {@link #confirmedAbsent} under the root that holds the path; an invalid path is not. */
+  private boolean confirmedGone(String normalizedPath) {
+    try {
+      return confirmedAbsent(normalizedPath, pruneRootFor(normalizedPath));
+    } catch (InvalidPathException invalid) {
+      return false;
+    }
+  }
+
+  /**
+   * A rename's Lucene half, inside the fence (the caller holds it, so the cleanup below takes no
+   * fence of its own). A destination confirmed absent here was deleted after the move, possibly
+   * after a prune already judged it: no row is moved, and the old path's rows are removed as a
+   * prune removes them, each only when its own backing file is confirmed absent. Otherwise the rows
+   * move, and the new path is reported to a running prune even when the move fails part way,
+   * because rows it wrote before failing still reach a commit.
+   *
+   * @return whether the rename is settled in Lucene: rows moved, or the file is gone from both
+   *     paths and rows of it were removed
+   */
+  private boolean moveRowsUnderFence(String oldPath, String newPath) {
+    if (confirmedGone(newPath)) {
+      // Renames are refused during a candidate build, so there is no serving copy to project to.
+      // Each row of the old path is judged as a prune judges it, by its own backing path: a
+      // chunk whose explicit path names a live file keeps its row.
+      Path oldRoot;
+      try {
+        oldRoot = pruneRootFor(oldPath);
+      } catch (InvalidPathException invalid) {
+        return false;
+      }
+      int removed = ingestLifecycle.pruneOps().pruneFile(
+          oldPath, oldRoot, pruneGuard(oldRoot),
+          io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence.NONE);
+      log.info("updateDocumentPaths: {} is gone; rows of {} are not moved, {} removed",
+          newPath, oldPath, removed);
+      return removed > 0;
+    }
+    try {
+      return ingestLifecycle.indexingCoordinator().updateDocumentPaths(oldPath, newPath) > 0;
+    } finally {
+      publishedUnderFence(newPath);
+    }
+  }
+
+  /**
+   * For a replay service that stands in for {@code publisher}, the live Worker whose indexing loop
+   * writes while the replay runs: its prunes are vouched for by {@code publisher}'s root authority
+   * (the identity a watch registered, the recorded volume) and applied inside {@code publisher}'s
+   * file-mutation fence.
+   */
+  public void prunesUnder(WorkerIngestService publisher) {
+    java.util.Objects.requireNonNull(publisher, "publisher");
+    syncOps.setPruneGuardFactory(publisher::pruneGuard);
+    syncOps.setPruneWriterFence(publisher.pruneWriterFence);
+  }
+
+  /**
+   * Replays a buffered prune of {@code pathPrefix} into {@code target}: vouched for by the root
+   * that holds the prefix, as this service's own prunes are (present, listable, the identity a
+   * watch registered, the volume recorded when the person added it), and applied inside this
+   * service's file-mutation fence, the one its indexing loop's writers hold. A file the prune
+   * removed that is present again once the removal is committed is queued for indexing before
+   * this returns: it was recreated after its last absence check.
+   *
+   * @return the prune's result and how many recreated files were queued again
+   * @param firstRemoval runs once, at the prune's first removal, before anything is committed
+   *     (the harness stop point); ordinary replays pass a no-op
+   */
+  public ReplayedPrune replayBufferedPrune(
+      io.justsearch.adapters.lucene.runtime.RunningRuntime target, String pathPrefix,
+      Runnable firstRemoval) {
+    java.util.Objects.requireNonNull(target, "target");
+    java.util.Objects.requireNonNull(firstRemoval, "firstRemoval");
+    Path pruneRoot = pruneRootFor(pathPrefix);
+    Set<String> removed = new java.util.LinkedHashSet<>();
+    var result = target.pruneOps().pruneByPathPrefix(
+        pathPrefix,
+        () -> false,
+        100,
+        pruneGuard(pruneRoot),
+        path -> {
+          if (removed.isEmpty()) firstRemoval.run();
+          removed.add(path);
+        },
+        pruneWriterFence);
+    List<JobQueue.EnqueueEntry> reappeared = new ArrayList<>();
+    for (String path : removed) {
+      Path file = Path.of(path);
+      if (io.justsearch.adapters.lucene.runtime.PathPresence.probe(file)
+              == io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT
+          && file.toAbsolutePath().normalize().startsWith(pruneRoot)
+          && !io.justsearch.indexerworker.ingest.IngestionSkipPolicy
+              .shouldSkipWithinRoot(file, pruneRoot)) {
+        reappeared.add(JobQueue.EnqueueEntry.stat(file).withinRoot(pruneRoot));
+      }
+    }
+    int queued = 0;
+    if (!reappeared.isEmpty()) {
+      queued = jobQueue.enqueueEntries(reappeared);
+      log.info("Replayed prune of {}: {} removed files were present again, {} queued for indexing",
+          pathPrefix, reappeared.size(), queued);
+    }
+    return new ReplayedPrune(result, queued);
+  }
+
+  /** A replayed prune's result, and the number of files it removed that were queued again. */
+  public record ReplayedPrune(
+      io.justsearch.adapters.lucene.runtime.PruneOps.PruneResult result, int requeued) {}
 
   private boolean hasDistinctWritableServingTarget() {
     return searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active
@@ -2561,15 +2713,14 @@ public final class WorkerIngestService {
             documentIdentityStore.rekey(oldPathHash, newPathHash, System.currentTimeMillis());
 
         // Inside the file-mutation fence: a prune applying a batch never sees a rename half done.
-        int count = withFileMutationFence(
-            () -> ingestLifecycle.indexingCoordinator().updateDocumentPaths(oldPath, newPath));
+        boolean settled = withFileMutationFence(() -> moveRowsUnderFence(oldPath, newPath));
         // Green may not contain the document yet while Blue still serves it. Moving the durable
         // identity is therefore a successful rename even when this generation has no Lucene row.
         // Store-first is deliberate: if Lucene throws after the move, the RPC fails and retry or
         // boot reconciliation converges from the store-authoritative uid without ever re-minting.
         if (identityRekey
                 != io.justsearch.indexerworker.identity.DocumentIdentityStore.RekeyResult.NOT_FOUND
-            || count > 0) {
+            || settled) {
           updatedCount++;
         } else {
           failedPaths.add(mapping.getOldPath());

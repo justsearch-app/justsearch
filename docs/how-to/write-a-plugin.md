@@ -226,13 +226,16 @@ V1.5.1 alpha ships two channel implementations:
 - **`StubTrustChannel`** — always returns `UNTRUSTED_PLUGIN`. Used
   as the loader's default in V1.5.1 (no signed plugins exist yet).
 - **`RemoteTrustChannel`** — calls `POST /api/plugins/verify` on the
-  Java backend. The backend stub returns `verified: false` for
-  V1.5.1; V1.5.2 swaps in real Sigstore chain verification.
+  Java backend. It returns `verified: true` for SHA-256 artifacts on the operator's
+  persistent allowlist, and `verified: false` otherwise. The operator manages entries through
+  `POST`/`GET /api/plugins/allowlist` and `DELETE /api/plugins/allowlist/{sha}`.
+  This is an explicit operator trust decision; Sigstore chain verification is not implemented.
 
-If your plugin needs `TRUSTED_PLUGIN` capabilities (raw
-localStorage, unrestricted custom-element names), V1.5.1 has no
-production path. Wait for V1.5.2's Sigstore integration, or use
-`tier: 'CORE'` for compiled-in plugins (host-shipped, not user-loadable).
+When a host uses `RemoteTrustChannel`, an operator-allowlisted artifact can receive
+`TRUSTED_PLUGIN` capabilities (raw localStorage, unrestricted custom-element names).
+The default `StubTrustChannel` still yields `UNTRUSTED_PLUGIN`; adding an allowlist entry
+alone does not change a loader that uses the stub. `CORE` is reserved for host-shipped,
+compiled-in plugins.
 
 ## Common pitfalls
 
