@@ -44,6 +44,7 @@ import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferDelete;
 import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
 import io.justsearch.indexerworker.identity.DocumentIdentityStore;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps;
@@ -8376,9 +8377,10 @@ public final class KnowledgeServer implements Closeable {
           covered.add(unit);
         }
       } else if ("DELETE".equals(op.op())) {
-        String unit = DocumentIdentityStore.pathHash(op.payload());
+        String path = SwitchBufferDelete.decode(op.payload()).path();
+        String unit = DocumentIdentityStore.pathHash(path);
         if (ingestLifecycle.documentFieldOps()
-            .getDocumentField(op.payload(), SchemaFields.DOC_ID) != null) {
+            .getDocumentField(path, SchemaFields.DOC_ID) != null) {
           addCandidateGap(gaps, rowGaps, op, unit, "DELETE_NOT_APPLIED");
         } else {
           covered.add(unit);
