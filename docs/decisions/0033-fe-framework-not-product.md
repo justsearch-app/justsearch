@@ -2,7 +2,7 @@
 title: "ADR-0033: Frontend as a framework, not a product"
 type: decision
 status: accepted
-description: "The frontend is a framework whose surfaces are projected from declarations, so users/plugins can author presentation without forking the shell."
+description: "The frontend kernel docs define a framework, not the final product UX; product UX commitments stay out of docs/reference/ui/frontend-kernel/kernel/."
 date: 2026-06-09
 probes: none - "framework, not product" is an architectural stance; its violations look like new hard-coded surfaces, which the surface-altitude gate judges case by case.
 last_reviewed: 2026-09-02

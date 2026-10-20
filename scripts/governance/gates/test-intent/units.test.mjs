@@ -20,11 +20,12 @@ import {
   selectVitestCases, summarize,
 } from './evidence-runners.mjs';
 import { RustScanError, extractTestItems, testModuleFiles } from './rust-tests.mjs';
+import { isIsolatedJvmTestSource, mayDeclareJvmType } from './jvm-test-source.mjs';
 import {
   buildConfigChange, buildConfigKind, changedLineIndices, identifierParts, packageTestProjection, rootScriptResolver, scanBlocks,
   scanWorkflow, workflowLineRunsTests,
 } from './build-config.mjs';
-import { classifyPath, executionContext, isOutOfScopeTestLike, UI_WEB_VITEST_SELECTIONS } from './scope.mjs';
+import { classifyPath, executionContext, isOutOfScopeTestLike, isStandaloneTestSource, UI_WEB_VITEST_SELECTIONS } from './scope.mjs';
 import { validateSource } from './sources.mjs';
 import {
   TEST_SUPPORT_PATHS_FILE, globToRegExp, importSpecifiers, parseTestSupportList, renderTestSupportList,
@@ -90,6 +91,133 @@ test('scope: out of scope paths', () => {
   assert.ok(!isOutOfScopeTestLike('modules/ui-web/src/a.test.ts'));
 });
 
+test('scope: standalone test sources use known names and execution contexts', () => {
+  for (const p of [
+    'modules/core/src/test/java/io/x/CalcTest.java',
+    'modules/core/src/integrationTest/java/io/x/CalcIT.java',
+    'modules/core/src/systemTest/java/io/x/CalcTests.java',
+    'modules/core/src/test/kotlin/io/x/CalcTest.kt',
+    'modules/core/src/integrationTest/kotlin/io/x/CalcIT.kt',
+    'modules/core/src/test/kotlin/io/x/CalcTests.kt',
+    'modules/ui-web/src/a.test.ts',
+    'modules/ui-web/src/views/a.spec.tsx',
+    'modules/ui-web/src/a-lockdown.test.ts',
+  ]) assert.ok(isStandaloneTestSource(p), p);
+  for (const p of [
+    'modules/core/src/test/java/io/x/Helper.java',
+    'modules/core/src/test/resources/CalcTest.java',
+    'modules/core/src/testFixtures/java/io/x/HelperTest.java',
+    'modules/core/src/unknown/java/io/x/CalcTest.java',
+    'modules/core/src/main/java/io/x/CalcTest.java',
+    'modules/test-support/src/test/java/io/x/HelperTest.java',
+    'modules/app-api-tck/src/test/java/io/x/HelperTest.java',
+    'modules/system-tests/src/test/java/io/x/JudgeTest.java',
+    'modules/ui-web/src/__fixtures__/a.test.ts',
+    'modules/ui-web/src/__snapshots__/a.test.ts',
+    'modules/ui-web/src/mocks/a.test.ts',
+    'modules/ui-web/src/__test-setup__/a.test.ts',
+    'modules/ui-web/src/a.test.jsx',
+    'modules/ui-web/e2e/a.test.ts',
+    'modules/shell/src/a.test.ts',
+    'modules/shell/src-tauri/tests/a.rs',
+    'modules/shell/src-tauri/tests/common/mod.rs',
+    'modules/shell/src-tauri/src/a.rs',
+  ]) assert.equal(isStandaloneTestSource(p), false, p);
+});
+
+test('isolated JVM source: single named class, matching package, comments and literals', () => {
+  const java = 'modules/core/src/test/java/io/justsearch/x/CalcTest.java';
+  const kotlin = 'modules/core/src/test/kotlin/io/justsearch/x/CalcTest.kt';
+  for (const src of [
+    'package io.justsearch.x; class CalcTest {}',
+    'package io.justsearch.x; import static org.junit.jupiter.api.Assertions.*; @Tag("a") public final class CalcTest { @Test void check() {} }',
+    'package io.justsearch.x; /* class Calc {} static {} */ class CalcTest { String s = "class Calc {} static {"; char c = \'}\'; static int helper() { return 1; } class Nested {} }',
+    'package io.justsearch.x; @Tags({@Tag("a"), @Tag("b")}) class CalcTest {}',
+  ]) assert.ok(isIsolatedJvmTestSource(java, src), src);
+  for (const src of [
+    'package io.justsearch.x\nclass CalcTest {}',
+    'package io.justsearch.x; import org.junit.jupiter.api.Test as Check\ninternal class CalcTest { @Check fun check() {} }',
+    'package io.justsearch.x\n/* nested /* class Bad {} */ comment */ class CalcTest { val message = "init { class Bad" }',
+  ]) assert.ok(isIsolatedJvmTestSource(kotlin, src), src);
+});
+
+test('isolated JVM source: only the exact project namespace is eligible', () => {
+  for (const pkg of ['org.junit.jupiter.api', 'io.justsearching', 'io.Justsearch', 'io.x']) {
+    for (const [lang, ext] of [['java', 'java'], ['kotlin', 'kt']]) {
+      const rel = `modules/core/src/test/${lang}/${pkg.replaceAll('.', '/')}/CalcTest.${ext}`;
+      assert.equal(isIsolatedJvmTestSource(rel, `package ${pkg}; class CalcTest {}`), false, rel);
+    }
+  }
+  assert.ok(isIsolatedJvmTestSource('modules/core/src/test/java/io/justsearch/CalcTest.java',
+    'package io.justsearch; class CalcTest {}'));
+});
+
+test('JVM collisions: arbitrary source forms and case-insensitive names stay gated', () => {
+  for (const src of [
+    'package io.justsearch.x; class CalcTest {}',
+    'package IO.JUSTSEARCH.X; interface calctest {}',
+    'package io.justsearch.x; class Helper {} class CalcTest {}',
+    'package io.justsearch.x; record CalcTest(int value) {}',
+    'package io.justsearch.x; enum CalcTest { ONE }',
+    'package `io`.`justsearch`.`x`; object `CalcTest` {}',
+    'package io.justsearch.x\nclass CalcTest { val text = """arbitrary""" }',
+    '@file:JvmName("CalcTest")\npackage io.justsearch.x\nfun helper() = 1',
+    'package /* comment */ io . justsearch . x; class CalcTest {}',
+    'package io /* nested /* comment */ rest */ . justsearch . x; class CalcTest {}',
+    'package io.// comment\rjustsearch.x; class CalcTest {}',
+    String.raw`package io.justsearch.x; class \u0043alcTest {}`,
+    String.raw`package \u0069o.justsearch.x; class CalcTest {}`,
+    null,
+  ]) assert.ok(mayDeclareJvmType(src, 'io.justsearch.x.CalcTest'), src);
+  assert.equal(mayDeclareJvmType('package io.justsearch.other; class CalcTest {}', 'io.justsearch.x.CalcTest'), false);
+  assert.equal(mayDeclareJvmType('package io.justsearch.x; class OtherTest {}', 'io.justsearch.x.CalcTest'), false);
+  assert.equal(mayDeclareJvmType('package io.justsearch.x; class CalcTestExtra {}', 'io.justsearch.x.CalcTest'), false);
+});
+
+test('isolated JVM source: missing/mismatched declarations and extra top-level code stay gated', () => {
+  const java = 'modules/core/src/test/java/io/justsearch/x/CalcTest.java';
+  for (const src of [
+    '', 'class CalcTest {}', 'package io.y; class CalcTest {}',
+    'package io.justsearch.x; class Calc {}', 'package io.justsearch.x; class CalcTest {} class Calc {}',
+    'package io.justsearch.x; class Calc {} class CalcTest {}', 'package io.justsearch.x; interface CalcTest {}',
+  ]) assert.equal(isIsolatedJvmTestSource(java, src), false, src);
+  const kotlin = 'modules/core/src/test/kotlin/io/justsearch/x/CalcTest.kt';
+  for (const extra of ['class Calc {}', 'fun helper() = 3', 'val state = 3', 'object Calc {}', 'typealias Calc = CalcTest']) {
+    assert.equal(isIsolatedJvmTestSource(kotlin, `package io.justsearch.x\nclass CalcTest {}\n${extra}`), false, extra);
+    assert.equal(isIsolatedJvmTestSource(kotlin, `package io.justsearch.x\n${extra}\nclass CalcTest {}`), false, extra);
+  }
+  assert.equal(isIsolatedJvmTestSource('modules/core/src/test/java/CalcTest.java', 'class CalcTest {}'), false);
+  assert.equal(isIsolatedJvmTestSource('modules/core/src/test/java/io/justsearch/x/CalcTest.kt', 'package io.justsearch.x; class CalcTest {}'), false);
+});
+
+test('isolated JVM source: static and companion initializers stay gated through trivia and nesting', () => {
+  const java = 'modules/core/src/test/java/io/justsearch/x/CalcTest.java';
+  for (const body of [
+    'static { System.setProperty("mode", "test"); }',
+    'static /* comment */\n { java.util.Locale.setDefault(java.util.Locale.US); }',
+    'class Nested { static { java.util.TimeZone.setDefault(null); } }',
+  ]) assert.equal(isIsolatedJvmTestSource(java, `package io.justsearch.x; class CalcTest { ${body} }`), false, body);
+  const kotlin = 'modules/core/src/test/kotlin/io/justsearch/x/CalcTest.kt';
+  for (const body of ['companion object { init { System.setProperty("mode", "test") } }', 'companion object Named { init /* comment */\n {} }', 'init {}']) {
+    assert.equal(isIsolatedJvmTestSource(kotlin, `package io.justsearch.x\nclass CalcTest { ${body} }`), false, body);
+  }
+});
+
+test('isolated JVM source: uncertain lexical forms and unbalanced input stay gated', () => {
+  const java = 'modules/core/src/test/java/io/justsearch/x/CalcTest.java';
+  for (const src of [
+    'package io.justsearch.x; class CalcTest {', 'package io.justsearch.x; class CalcTest { void check(] {} }',
+    'package io.justsearch.x; class CalcTest {} /*', 'package io.justsearch.x; class CalcTest { String x = "unterminated; }',
+    'package io.justsearch.x; class CalcTest { String x = """\ntext\n"""; }',
+    'package io.justsearch.x; class CalcTest {} // comment\rclass Calc {}',
+    String.raw`package io.justsearch.x; class CalcTest {} // \u000a class Calc {}`,
+  ]) assert.equal(isIsolatedJvmTestSource(java, src), false, src);
+  const kotlin = 'modules/core/src/test/kotlin/io/justsearch/x/CalcTest.kt';
+  assert.equal(isIsolatedJvmTestSource(kotlin, 'package io.justsearch.x\nclass CalcTest { val x = "${call("nested")}" }'), false);
+  assert.equal(isIsolatedJvmTestSource(kotlin, 'package io.justsearch.x\nclass `CalcTest` {}'), false);
+  assert.equal(isIsolatedJvmTestSource(kotlin, null), false);
+});
+
 // ---- Rust ----------------------------------------------------------------------------------------
 test('rust: cfg(test) items are extracted; production is not', () => {
   const src = 'fn a() { let s = "#[cfg(test)] {"; }\n// #[test] in a comment\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() { assert!(true); }\n}\nfn b() {}\n';
@@ -98,6 +226,31 @@ test('rust: cfg(test) items are extracted; production is not', () => {
   assert.ok(out.text.startsWith('#[cfg(test)]\nmod tests {'));
   assert.ok(out.text.endsWith('}'));
   assert.ok(!out.text.includes('fn b'));
+});
+
+test('rust: function-local cfg(test) stays inside its enclosing function', () => {
+  const nested = '#[cfg(test)] mod nested_tests { #[test] fn nested() {} }';
+  const top = '#[cfg(test)] mod tests { #[test] fn top() {} }';
+  const src = `
+struct Callback { call: fn() }
+pub(crate) fn bound_exec() {
+    #[cfg(test)]
+    set_bundle_dir();
+}
+mod production {
+    fn helper() { #[cfg(test)] let value = 1; }
+    ${nested}
+}
+${top}
+`;
+  const out = extractTestItems(src);
+  assert.deepEqual(out.items.map(item => item.text), [nested, top]);
+  let retained = src;
+  for (const item of [...out.items].reverse()) {
+    retained = retained.slice(0, item.start) + retained.slice(item.end);
+  }
+  assert.ok(retained.includes('#[cfg(test)]\n    set_bundle_dir();'));
+  assert.ok(retained.includes('fn helper() { #[cfg(test)] let value = 1; }'));
 });
 
 test('rust: free #[test] fns, #[tokio::test] and #![cfg(test)] files', () => {

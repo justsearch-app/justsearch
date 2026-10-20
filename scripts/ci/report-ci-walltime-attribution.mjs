@@ -364,7 +364,7 @@ function splitJsonDocuments(text) {
 
 // Merge `gh api .../jobs --paginate` output into a single { jobs: [...] }. Pure +
 // exported so the paging logic is unit-tested while the gh shell-out stays thin,
-// untested I/O (mirrors workflow-signal-health.mjs).
+// untested I/O.
 export function mergePaginatedJobs(text) {
   const jobs = [];
   for (const doc of splitJsonDocuments(String(text || ''))) {

@@ -4,7 +4,8 @@
  */
 
 export const TEST_INTENT_RULE_DESCRIPTIONS = {
-  'test-intent/no-flagged-items': 'Nothing in the product test scope changed; no entry is needed',
+  'test-intent/no-flagged-items': 'No product test changes need a test-intent entry',
+  'test-intent/isolated-new-test': 'An isolated new test source needs no entry; the independent verifier checks its expectations and execution evidence',
   'test-intent/flagged-item':
     'A test file, test-owned data file, frontend helper only tests import, watched baseline, or build or CI configuration that selects or runs tests (or the environment they run in) changed and needs a test-intent entry',
   'test-intent/byte-identical-move': 'A test file moved without a byte of change and runs in the same execution context; it needs no entry',
