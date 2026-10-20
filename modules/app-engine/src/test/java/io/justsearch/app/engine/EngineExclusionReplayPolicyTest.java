@@ -6,10 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
-import io.justsearch.indexerworker.queue.SqliteJobQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferSyncRoot;
 import io.justsearch.indexerworker.server.MigrationTransitionBarrier;
 import io.justsearch.indexerworker.services.CallContext;
+import io.justsearch.indexerworker.services.WorkerIngestService;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.ipc.WatchRootRequest;
@@ -39,7 +40,9 @@ final class EngineExclusionReplayPolicyTest {
     var barrier = new MigrationTransitionBarrier.Controlled("migration-before-switching");
     try (var engine = EngineTestHarness.start(data, barrier)) {
       try {
+        SwitchBufferCapableQueue queue;
         try (var view = engine.captureServingView()) {
+          queue = switchBuffer(view.services().ingestService());
           assertTrue(view.services().ingestService().watchRoot(WatchRootRequest.newBuilder()
               .setRootPath(root.toString()).setRootAdded(true).build(),
               CallContext.none()).getWatching());
@@ -56,14 +59,11 @@ final class EngineExclusionReplayPolicyTest {
               Map.of("justsearch.ui.exclude_patterns", "[\"private/**\"]"));
           assertProcessingPolicy((RunningRuntime) view.ingestRuntime(), excluded, allowed);
         }
-        try (var queue = new SqliteJobQueue(data.resolve("jobs.db"))) {
-          queue.open();
-          assertTrue(queue.putSyncRootForGeneration(migration.buildingGenerationId(), "sync_root:" + root,
-              new SwitchBufferSyncRoot(root.toString(), false, null)));
-          assertTrue(queue.listSwitchBufferOpsStrictForGeneration(migration.buildingGenerationId()).stream()
-              .anyMatch(op -> op.key().equals("sync_root:" + root) && op.op().equals("SYNC_ROOT")),
-              "a persisted legacy SYNC_ROOT must actually be replayed");
-        }
+        assertTrue(queue.putSyncRootForGeneration(migration.buildingGenerationId(), "sync_root:" + root,
+            new SwitchBufferSyncRoot(root.toString(), false, null)));
+        assertTrue(queue.listSwitchBufferOpsStrictForGeneration(migration.buildingGenerationId()).stream()
+            .anyMatch(op -> op.key().equals("sync_root:" + root) && op.op().equals("SYNC_ROOT")),
+            "a persisted legacy SYNC_ROOT must actually be replayed");
         assertTrue(engine.client().requestCutover(true, TestEngineContexts.FOREGROUND).accepted());
         barrier.release();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(120);
@@ -77,10 +77,7 @@ final class EngineExclusionReplayPolicyTest {
           Thread.sleep(50);
         }
         assertTrue(promoted, "Green must be serving without a restart");
-        try (var queue = new SqliteJobQueue(data.resolve("jobs.db"))) {
-          queue.open();
-          assertEquals(0, queue.switchBufferDepth(), "the replay must have committed and settled");
-        }
+        assertEquals(0, queue.switchBufferDepth(), "the replay must have committed and settled");
         try (var view = engine.captureServingView()) {
           var runtime = (RunningRuntime) view.ingestRuntime();
           // Seed deterministic pending states without loading enrichment models.
@@ -96,6 +93,14 @@ final class EngineExclusionReplayPolicyTest {
         barrier.release();
       }
     }
+  }
+
+  /** Use the Engine-owned connection and lock; opening a second queue also writes schema. */
+  private static SwitchBufferCapableQueue switchBuffer(WorkerIngestService ingest)
+      throws ReflectiveOperationException {
+    var field = WorkerIngestService.class.getDeclaredField("jobQueue");
+    field.setAccessible(true);
+    return (SwitchBufferCapableQueue) field.get(ingest);
   }
 
   private static void seedPending(RunningRuntime runtime, Path excluded, Path allowed) throws Exception {

@@ -571,6 +571,10 @@ persists a generation-scoped legacy SYNC_ROOT, completes live cutover and verifi
 processing selections, the cache recheck, retained text and the KnowledgeClient selection. Pending
 status seeding uses the real runtime coordinator to avoid requiring model files.
 
+The replay fixture seeds and inspects the persisted journal through the Engine-owned queue.
+It shares the queue connection and lock instead of opening a second connection whose schema
+initialization could race the running Engine. All replay and policy assertions are retained.
+
 The before-version compatibility patch only supplies the missing roots-wiring method as a no-op
 for the existing direct service fixtures on f9bd104d2. It installs no policy or repaired behavior.
 Affected fixture evidence is refreshed separately by the evidence runner; unrelated evidence and historical acceptance records are retained.
