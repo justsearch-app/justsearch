@@ -1473,3 +1473,14 @@ No acceptance record is supplied by the builder.
   "note": "Reviewed agreed FS0/FS10 and FA1-FA4 (agreed WP1.2 text), the a3bc6335e/117e89be9 tests, then the diff. Re-ran all six evidence files to scratch: 125 checks identical to committed (3 new fail by assertion on a3bc6335e; 18+22+7+5 refreshed fail by assertion on their bases, 1 passes on 117e89be9 as declared; uiux-v3-followups.json 57 assertion/12 passed on 117e89be9 with the compat patch, incl. the Engine system-summary fold checks). The 23 dropped records: 19 are cited from preserved-1.json (own fail-before), 4 no longer exist in the test file (retired by Obsolete 36/38); no cited check lost evidence. Entry 41 (markdown fake answers non-dispatch reads with empty history) is a faithful instrumentation Adaptation. Real-HTTP browser runs confirm X20/X28 fail on 636f4d792 and pass on the candidate. Reject for one omission: entry 42 cites an owner-words source located at 'task t-20261019-bd718f request' ('once the saved context is confirmed again, the refusal notice no longer claims something untrue ... Simplest honest form.'). That is not the user's request (which is 'proceed with designing and implementing the remaining work you mentioned' and 'just actually think for yourself ...') nor agreed scenario text; it is an orchestrator instruction, the same defect agent-session-g_qc62cs rejected. Without it, nothing cited supports the X20 expectation that the notice must not say 'Your draft is kept' (FA3 says the draft stays in the composer, not what the notice says). Remedy: cite it as delegated-choice (delegationQuote 'you dont need to wait for my opinion regarding the designs, i agree with you on them', 2026-10-20, scope: designs, choice: the refusal notice keeps the copyable question and drops the draft-kept claim), or record it as agreed amendment text and cite that. Nothing else is missing."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-9cqtq00u",
+  "verdict": "accept",
+  "digest": "sha256:e65afead61e41f0c77a2f74dadaf68e8d67701dcd4c42a8e573b9bdeccba25b0",
+  "note": "Test-intent-only review of f0b2f1d83 (session snapshot abc1f4be4 has the identical tree), base 0b423f9685b6. FA5 matches the agreed WP1.2 file verbatim and supports the honest, copyable refusal notice. All cited source quotes match their named agreed scenarios; no brief/orchestrator instruction remains as owner words. Only the final source and Review history changed since 05400f38e. Re-ran all 3 changed-entry checks against a3bc6335e: assertion failures for the stated reasons, then candidate passes. Re-ran one sample from each of the other 5 evidence files: all outcomes/classifications match committed evidence. Own preservation case: unchanged second-turn markdown/source-count expectation passes on the gate base and candidate. Accept; no test-intent omissions found. Product behaviour was verified separately and is not re-certified here."
+}
+```
