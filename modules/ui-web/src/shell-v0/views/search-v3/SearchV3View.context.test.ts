@@ -1248,7 +1248,7 @@ describe('a follow-up ask is sent WITH the conversation (S2.0)', () => {
     ]);
   });
 
-  it('sends no older turns when the conversation’s context settings cannot be read', async () => {
+  it('refuses the follow-up when the conversation’s context settings cannot be read', async () => {
     twoTurnConversation();
     backend.histories['uc-ctx']!.excludedMessageIds = [storedId(1)];
     backend.failHistoryFor.add('uc-ctx');
@@ -1257,9 +1257,10 @@ describe('a follow-up ask is sent WITH the conversation (S2.0)', () => {
 
     await ask(el, 'and the third?');
 
-    expect(backend.dispatches).toHaveLength(1);
-    expect(backend.dispatches[0]?.question).toBe('and the third?');
-    expect(backend.dispatches[0]?.context).toBeUndefined();
+    expect(backend.dispatches).toHaveLength(0);
+    expect(await contextNotice(el)).toContain('Question not sent');
+    const composer = await region(el, 'jf-sv3-composer');
+    expect(composer.shadowRoot?.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('and the third?');
   });
 
   it('shows in the inspector exactly the messages it sends — one hidden answer, not its turn', async () => {
@@ -1697,6 +1698,117 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
       await vi.advanceTimersByTimeAsync(60000);
       expect(backend.historyReads).toHaveLength(final);
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(['A newer unsent question', 'Submitted question'])(
+    'sends the submitted question after a context wait and keeps later input: %s', async (later) => {
+      twoTurnConversation();
+      const el = await mount();
+      await openTheOnlyConversation(el);
+      const release = holdWriteResponse('/context-floor');
+      contextAction(el, 'floor', 1);
+      await settle(el);
+      try {
+        await ask(el, 'Submitted question');
+        expect(backend.dispatches).toHaveLength(0);
+        const composer = await region(el, 'jf-sv3-composer');
+        const field = composer.shadowRoot!.querySelector<HTMLTextAreaElement>('textarea')!;
+        // Editing back to the submitted words is still a new draft, owned by the reader.
+        field.value = 'An intermediate edit';
+        field.dispatchEvent(new Event('input'));
+        field.value = later;
+        field.dispatchEvent(new Event('input'));
+        await composer.updateComplete;
+      } finally {
+        release();
+        await settle(el);
+      }
+      expect(backend.dispatches).toHaveLength(1);
+      expect(backend.dispatches[0]?.question).toBe('Submitted question');
+      expect(backend.dispatches[0]?.context).toEqual([
+        { role: 'user', content: 'and the second one?' },
+        { role: 'assistant', content: 'The same lock.' },
+      ]);
+      const composer = await region(el, 'jf-sv3-composer');
+      expect(composer.shadowRoot?.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe(later);
+      stream.emit('done', {});
+      stream.end();
+      await settle(el);
+    },
+  );
+
+  it.each(['load', 'reload'] as const)(
+    'warns after a failed history read on %s and refuses Ask with its draft kept', async (entry) => {
+      twoTurnConversation();
+      backend.histories['uc-ctx']!.excludedMessageIds = [storedId(0), storedId(1)];
+      let el = await mount();
+      if (entry === 'reload') {
+        await openTheOnlyConversation(el);
+        el.remove();
+      }
+      backend.failHistoryFor.add('uc-ctx');
+      if (entry === 'reload') el = await mount();
+      else await openTheOnlyConversation(el);
+      expect(await contextNotice(el)).toContain('Saved context could not be confirmed');
+      const reads = backend.historyReads.length;
+      await ask(el, 'Keep this follow-up');
+      expect(backend.historyReads.length).toBeGreaterThan(reads);
+      expect(backend.dispatches).toHaveLength(0);
+      expect(el.sessions.sessions[0]?.turns).toHaveLength(2);
+      expect(await contextNotice(el)).toContain('Question not sent');
+      const composer = await region(el, 'jf-sv3-composer');
+      expect(composer.shadowRoot?.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('Keep this follow-up');
+      backend.failHistoryFor.clear();
+      expect(await nextContext(el)).toEqual([
+        { role: 'user', content: 'and the second one?' },
+        { role: 'assistant', content: 'The same lock.' },
+      ]);
+      expect(await contextNotice(el)).toBe('');
+    },
+  );
+
+  it('refuses Ask when a load read is still pending and its confirmation read fails', async () => {
+    twoTurnConversation();
+    const el = await mount();
+    backend.holdHistoryFor.add('uc-ctx');
+    await openTheOnlyConversation(el);
+    expect(el.sessions.sessions[0]?.history ?? null).toBeNull();
+    backend.failHistoryFor.add('uc-ctx');
+    try {
+      await ask(el, 'Keep the pending follow-up');
+      expect(backend.dispatches).toHaveLength(0);
+      expect(el.sessions.sessions[0]?.turns).toHaveLength(2);
+      expect(await contextNotice(el)).toContain('Question not sent');
+      const composer = await region(el, 'jf-sv3-composer');
+      expect(composer.shadowRoot?.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('Keep the pending follow-up');
+    } finally {
+      backend.heldHistories.get('uc-ctx')?.();
+      await settle(el);
+    }
+  });
+
+  it('recovers a failed load history read on backoff without another action', async () => {
+    twoTurnConversation();
+    backend.histories['uc-ctx']!.contextFloor = storedId(3);
+    const el = await mount();
+    vi.useFakeTimers();
+    try {
+      backend.failHistoryFor.add('uc-ctx');
+      await openTheOnlyConversation(el);
+      expect(await contextNotice(el)).toContain('Saved context could not be confirmed');
+      const reads = backend.historyReads.length;
+      backend.failHistoryFor.clear();
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle(el);
+      expect(backend.historyReads).toHaveLength(reads + 1);
+      expect(await contextNotice(el)).toBe('');
+      expect(el.sessions.sessions[0]?.history?.contextFloor).toBe(storedId(3));
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(backend.historyReads).toHaveLength(reads + 1);
+    } finally {
+      el.remove();
       vi.useRealTimers();
     }
   });

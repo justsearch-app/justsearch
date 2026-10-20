@@ -40,6 +40,8 @@ Review history. Serialized-context repair (2026-10-20): independent verifiers re
 
 No live Engine/browser run is claimed for this round: the dev stack is unavailable and the GPU is reserved. Independent verification must check the candidate over the real handlers/store.
 
+Review history. Load/draft repair (2026-10-20): verifier-5 rejected X10 (history unreadable after reload) and X13 (input edited while Ask waits was cleared), and the intent citations for the serialized-context entries. Those entries now cite agreed FA1–FA3, FS0 and FS10 rather than the orchestrator's brief. New checks cite FA2–FA4 and fail by assertion on 11c359f49. FA3 also supersedes the existing check that expected sending without earlier context after a failed history read; its replacement asserts refusal, reason and draft retention. All acceptance/rejection records below remain unchanged. Separate producer evidence: uiux-v3-followups-context-load-draft.json (--before 11c359f49); unchanged checks receive refreshed content digests in uiux-v3-followups-context-load-draft-preservation.json (--before 117e89be9) and uiux-v3-followups-context-load-draft-queue-preservation.json (--before 1f1f9bfad). No acceptance record is written by the builder.
+
 No acceptance record is supplied by the builder.
 
 ```json
@@ -320,7 +322,7 @@ No acceptance record is supplied by the builder.
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts"
       ],
       "class": "New",
-      "behaviour": "A follow-up Ask carries the earlier turns as context on the conversation's own id, oldest first, and none for a first question. It leaves out excluded messages and everything before the floor, leads with the summary, and does not bring older turns back when the floor's own message is excluded. A floor on a message not shown is placed by the saved order. Inside a combined (multi-message) answer, a hidden message is left out and a floor on a middle or last part sends only the saved messages from it on, as the bar counts them. Nothing older is sent until the /history settings have arrived, and no earlier turn is sent when they cannot be read. The inspector shows exactly the messages sent (one hidden answer, not its turn).",
+      "behaviour": "A follow-up Ask carries the earlier turns as context on the conversation's own id, oldest first, and none for a first question. It leaves out excluded messages and everything before the floor, leads with the summary, and does not bring older turns back when the floor's own message is excluded. A floor on a message not shown is placed by the saved order. Inside a combined (multi-message) answer, a hidden message is left out and a floor on a middle or last part sends only the saved messages from it on, as the bar counts them. Nothing older is sent until the /history settings have arrived. The inspector shows exactly the messages sent (one hidden answer, not its turn).",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -344,7 +346,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-queue-preservation.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-load-draft-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends the earlier turns as context, oldest first, on the conversation’s own id",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#leaves out excluded messages and everything above the floor, and leads with the summary",
@@ -363,7 +365,7 @@ No acceptance record is supplied by the builder.
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts"
       ],
       "class": "New",
-      "behaviour": "A follow-up Ask carries the earlier turns as context on the conversation's own id, oldest first, and none for a first question. It leaves out excluded messages and everything before the floor, leads with the summary, and does not bring older turns back when the floor's own message is excluded. A floor on a message not shown is placed by the saved order. Inside a combined (multi-message) answer, a hidden message is left out and a floor on a middle or last part sends only the saved messages from it on, as the bar counts them. Nothing older is sent until the /history settings have arrived, and no earlier turn is sent when they cannot be read. The inspector shows exactly the messages sent (one hidden answer, not its turn).",
+      "behaviour": "A follow-up Ask carries the earlier turns as context on the conversation's own id, oldest first, and none for a first question. It leaves out excluded messages and everything before the floor, leads with the summary, and does not bring older turns back when the floor's own message is excluded. A floor on a message not shown is placed by the saved order. Inside a combined (multi-message) answer, a hidden message is left out and a floor on a middle or last part sends only the saved messages from it on, as the bar counts them. Nothing older is sent until the /history settings have arrived. The inspector shows exactly the messages sent (one hidden answer, not its turn).",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -387,10 +389,9 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-queue-preservation.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-load-draft-preservation.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends no context with the first question of a new conversation",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends no older turns when the conversation’s context settings cannot be read"
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends no context with the first question of a new conversation"
       ]
     },
     {
@@ -415,7 +416,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-queue-preservation.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-load-draft-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows each note on its own turn live, after the record refresh, and after a reload"
       ],
@@ -443,7 +444,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-queue-preservation.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-load-draft-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#counts unique hidden messages not shown here beside the hidden turns on screen",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows and undoes exclusions that are ALL off screen, without inventing a turn count",
@@ -467,7 +468,7 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-queue-preservation.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-load-draft-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#reports a PARTIALLY refused Include all as a failure and shows what was really saved",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#does not wipe the bar when the reload after Include all fails",
@@ -1092,19 +1093,39 @@ No acceptance record is supplied by the builder.
       "class": "Obsolete",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261019-bd718f request",
-          "quote": "Context writes of one conversation (Restore, Reset context to here, Compact, Exclude, Include, Include all, summary edit) are serialized: a write is sent only after the previous write's response and its refresh have settled. Controls stay usable; later actions queue in order (or the control says it is busy; your choice, accessible either way). Nothing can then reach the store out of order from this window."
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA1",
+          "quote": "Context writes of one conversation are sent one at a time from a window: each after the previous one's response and refresh have settled; later actions wait their turn in order.",
+          "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261019-bd718f request",
-          "quote": "When a write's outcome or its refresh is unknown (lost response, failed refresh), the window does not guess: the context bar says plainly that the saved context could not be confirmed, and refreshes again (on a backoff and on reconnect). Before sending an Ask or a follow-up while context is unconfirmed, the window reads the saved history; if that read fails, the question is not sent, the reason is shown, and the draft stays."
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA2",
+          "quote": "When the saved context cannot be confirmed (a write's outcome or refresh is unknown, or the saved history cannot be read, including on load or reload), the context bar says so plainly and keeps trying; it never shows a guessed state as saved.",
+          "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261019-bd718f request",
-          "quote": "Remove the snapshot-ordering logic of 7f0ed2e0f that this makes unnecessary (deletion beats addition), and replace the rejected check."
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA3",
+          "quote": "A question sent while the saved context is unconfirmed is sent only after the saved history has been read again; if that read fails, it is not sent, the reason is shown and the draft stays.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS0",
+          "quote": "A follow-up Ask in Search v3 is answered in the light of the conversation, as in the current window: retrieval runs on the rewritten standalone question (a real second question produces the rewrite), and the answer can refer to the earlier turn. Messages excluded from context and messages before the context starting point are not sent with the follow-up; the context bar's numbers match what was sent.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS10",
+          "quote": "A failed or partially refused Include all / Restore does not announce success; a failed refresh, out-of-order responses or navigating away during the undo never leave the bar showing a state that is not the saved one.",
+          "label": "agent-drafted, owner-adopted"
         }
       ],
       "conflictSearch": "Decision records searched for a conflict: none; no context-write response-order or failed-refresh snapshot guarantee found. S2.0 and S2.10 require confirmed context; the explicitly rejected floor-0 expectation contradicts this decision.",
@@ -1118,17 +1139,42 @@ No acceptance record is supplied by the builder.
       "behaviour": "S2.10/S2.0, R1/R4/R5/R10: later controls cannot overtake a delayed request, response, or saved-history refresh. Reset (R2), Compact, summary edit (R3), Restore, Exclude, Include and Include all show unconfirmed context on refresh failure. Ask waits for queued writes, confirms history, and blocks a failed read with its draft and transcript intact; recovery sends exactly the saved floor, summary and exclusions. Include all reads the ledger produced by earlier queued actions, retries recover on backoff/reconnect, and disconnect cancels retries. A lost write response is resolved through history. All checks fail by assertion on 1f1f9bfad.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261019-bd718f request",
-          "quote": "Context writes of one conversation (Restore, Reset context to here, Compact, Exclude, Include, Include all, summary edit) are serialized: a write is sent only after the previous write's response and its refresh have settled. Controls stay usable; later actions queue in order (or the control says it is busy; your choice, accessible either way). Nothing can then reach the store out of order from this window."
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA1",
+          "quote": "Context writes of one conversation are sent one at a time from a window: each after the previous one's response and refresh have settled; later actions wait their turn in order.",
+          "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261019-bd718f request",
-          "quote": "When a write's outcome or its refresh is unknown (lost response, failed refresh), the window does not guess: the context bar says plainly that the saved context could not be confirmed, and refreshes again (on a backoff and on reconnect). Before sending an Ask or a follow-up while context is unconfirmed, the window reads the saved history; if that read fails, the question is not sent, the reason is shown, and the draft stays."
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA2",
+          "quote": "When the saved context cannot be confirmed (a write's outcome or refresh is unknown, or the saved history cannot be read, including on load or reload), the context bar says so plainly and keeps trying; it never shows a guessed state as saved.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA3",
+          "quote": "A question sent while the saved context is unconfirmed is sent only after the saved history has been read again; if that read fails, it is not sent, the reason is shown and the draft stays.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS0",
+          "quote": "A follow-up Ask in Search v3 is answered in the light of the conversation, as in the current window: retrieval runs on the rewritten standalone question (a real second question produces the rewrite), and the answer can refer to the earlier turn. Messages excluded from context and messages before the context starting point are not sent with the follow-up; the context bar's numbers match what was sent.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS10",
+          "quote": "A failed or partially refused Include all / Restore does not announce success; a failed refresh, out-of-order responses or navigating away during the undo never leave the bar showing a state that is not the saved one.",
+          "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-queue.json",
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-load-draft-queue-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks Include all unconfirmed when its reload failed",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#marks Restore unconfirmed when its reload failed",
@@ -1152,6 +1198,92 @@ No acceptance record is supplied by the builder.
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#waits for queued context writes before Ask and sends the question once",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#Include all uses the exclusions saved by an earlier queued action after its failed refresh",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#automatically confirms saved context when a backoff retry succeeds"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA2",
+          "quote": "When the saved context cannot be confirmed (a write's outcome or refresh is unknown, or the saved history cannot be read, including on load or reload), the context bar says so plainly and keeps trying; it never shows a guessed state as saved.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA3",
+          "quote": "A question sent while the saved context is unconfirmed is sent only after the saved history has been read again; if that read fails, it is not sent, the reason is shown and the draft stays.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS0",
+          "quote": "A follow-up Ask in Search v3 is answered in the light of the conversation, as in the current window: retrieval runs on the rewritten standalone question (a real second question produces the rewrite), and the answer can refer to the earlier turn. Messages excluded from context and messages before the context starting point are not sent with the follow-up; the context bar's numbers match what was sent.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none; the old send-without-context expectation is superseded by agreed FA3, which refuses sending when saved history cannot be read.",
+      "behaviour": "Replace the check \"sends no older turns when the conversation’s context settings cannot be read\" that expected a dispatch with no earlier context. FA3 requires no dispatch and a retained draft instead; its replacement is a repaired New check with fail-before evidence on 11c359f49."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "FA2/FA3, X10: a failed history read on load or cold reload shows uncertainty; Ask re-reads history, refuses on failure with reason and unchanged draft/transcript, then sends the saved exclusions when reads recover. An Ask submitted while the initial load read is still pending also requires a successful confirmation read before adding a turn or dispatching. Background backoff confirms the saved floor without another user action and cancels further retries. FA4, X13: while Ask waits for a context write, input remains editable; it sends the submitted question once with the saved context and preserves all later input, including editing back to the submitted words. The old send-without-context expectation is replaced by explicit refusal under FA3. All seven checks fail by assertion on 11c359f49.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA2",
+          "quote": "When the saved context cannot be confirmed (a write's outcome or refresh is unknown, or the saved history cannot be read, including on load or reload), the context bar says so plainly and keeps trying; it never shows a guessed state as saved.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA3",
+          "quote": "A question sent while the saved context is unconfirmed is sent only after the saved history has been read again; if that read fails, it is not sent, the reason is shown and the draft stays.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA4",
+          "quote": "A question that waits before sending sends the text the user submitted; anything typed into the composer meanwhile stays in the composer.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS0",
+          "quote": "A follow-up Ask in Search v3 is answered in the light of the conversation, as in the current window: retrieval runs on the rewritten standalone question (a real second question produces the rewrite), and the answer can refer to the earlier turn. Messages excluded from context and messages before the context starting point are not sent with the follow-up; the context bar's numbers match what was sent.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FS10",
+          "quote": "A failed or partially refused Include all / Restore does not announce success; a failed refresh, out-of-order responses or navigating away during the undo never leave the bar showing a state that is not the saved one.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-load-draft.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#refuses the follow-up when the conversation’s context settings cannot be read",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends the submitted question after a context wait and keeps later input: A newer unsent question",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends the submitted question after a context wait and keeps later input: Submitted question",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#warns after a failed history read on load and refuses Ask with its draft kept",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#warns after a failed history read on reload and refuses Ask with its draft kept",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#recovers a failed load history read on backoff without another action",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#refuses Ask when a load read is still pending and its confirmation read fails"
       ],
       "repaired": true
     }

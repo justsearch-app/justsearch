@@ -1439,6 +1439,9 @@ export class SearchV3View extends JfElement {
       this.sessions = applySv3History(this.sessions, conversationId, sv3HistoryOf(history));
       // A read during a pending write cannot confirm that write's eventual result.
       if (!this.contextWrites.has(conversationId)) this.confirmContext(conversationId);
+    } else {
+      this.contextNotices.set(conversationId, 'Saved context could not be confirmed. Retrying…');
+      this.requestUpdate();
     }
     this.scheduleContextRetry();
     return landed;
@@ -1687,7 +1690,7 @@ export class SearchV3View extends JfElement {
   /** Wait for queued actions, then confirm uncertainty before a question can consume this state. */
   private async confirmContextForAsk(sessionId: string): Promise<boolean> {
     while (this.contextWrites.has(sessionId)) await this.contextWrites.get(sessionId);
-    if (!this.contextNotices.has(sessionId)) return true;
+    if (!this.contextNotices.has(sessionId) && sessionById(this.sessions, sessionId)?.history !== null) return true;
     const read = await this.refreshHistory(sessionId);
     // A control used during that read must also settle before this question is sent.
     if (this.contextWrites.has(sessionId)) return this.confirmContextForAsk(sessionId);
@@ -2802,9 +2805,12 @@ export class SearchV3View extends JfElement {
   private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null): Promise<void> {
     const question = rawQuestion.trim();
     if (question === '') return;
+    const composer = this.composer;
+    const draftRevision = composer?.draftRevision;
     const sessionId = this.sessions.activeId;
     if (this.contextAskPending) return;
-    if (sessionId !== null && (this.contextWrites.has(sessionId) || this.contextNotices.has(sessionId))) {
+    if (sessionId !== null && (this.contextWrites.has(sessionId) || this.contextNotices.has(sessionId)
+      || this.historyReads.has(sessionId))) {
       this.contextAskPending = true;
       let confirmed: boolean;
       try {
@@ -2826,7 +2832,8 @@ export class SearchV3View extends JfElement {
     // transcript and the bar draw. The new turn itself is the question, not context.
     const pendingContext = this.followUpContext(ref.sessionId, ref.turnId);
     this.claimConversation(ref.sessionId);
-    this.composer?.clearDraft();
+    // The submitted question is fixed; input typed while confirmation waited belongs to the reader.
+    if (this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
     void this.setComposerState('docked');
 
     const abort = new AbortController();
