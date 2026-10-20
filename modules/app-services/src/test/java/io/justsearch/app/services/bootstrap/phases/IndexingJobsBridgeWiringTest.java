@@ -31,6 +31,39 @@ final class IndexingJobsBridgeWiringTest {
         pathHash, state, attempts, 1_700_000_000_000L, err, 0L, "default", scanId);
   }
 
+  @Test void liveTerminalOutcomesOutsideWindowKeepScanAttributionWithoutSnapshotReplay() throws Exception {
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
+      var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+      var sink = new java.util.concurrent.atomic.AtomicReference<java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame>>();
+      org.mockito.Mockito.doAnswer(call -> {
+        sink.set(call.getArgument(0));
+        sink.get().accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(1)
+            .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.getDefaultInstance()).build());
+        return (io.justsearch.app.services.worker.KnowledgeClient.IndexingJobsStream) () -> {};
+      }).when(client).subscribeIndexingJobs(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+      var ledger = new io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry();
+      var wired = IndexingJobsBridgeWiring.wire(executors, () -> client,
+          new io.justsearch.app.observability.indexing.IndexingJobsChangeRegistry(), ledger);
+      try {
+        wired.bridge().start().get(2, java.util.concurrent.TimeUnit.SECONDS);
+        long seq = 2;
+        for (String state : java.util.List.of("DONE", "PENDING", "FAILED", "PENDING", "RETRY_EXHAUSTED", "DONE")) {
+          var row = io.justsearch.ipc.IndexingJobView.newBuilder().setPathHash("a".repeat(64))
+              .setState(state).setLastUpdatedMs(seq).setCollection("default").setScanId("scan-42");
+          sink.get().accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(seq++)
+              .setDelta(io.justsearch.ipc.IndexingJobsDelta.newBuilder().setUpdate(row)).build());
+        }
+        assertEquals(4, ledger.store().recent().size(), "later outcomes after retry are still recorded");
+        assertTrue(ledger.store().recent().stream().allMatch(event -> ((ActionEvent.Index) event).scanId().equals("scan-42")));
+        sink.get().accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(seq)
+            .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.newBuilder().addItems(
+                io.justsearch.ipc.IndexingJobView.newBuilder().setPathHash("historic").setState("FAILED"))).build());
+        assertEquals(4, ledger.store().recent().size(), "reconnect snapshots never replay ledger outcomes");
+      } finally { wired.subscription().close(); wired.bridge().stop(); }
+    }
+  }
+
   @Test
   @DisplayName("DONE emits one index event (originator=system) with the terminal state")
   void doneEmits() {

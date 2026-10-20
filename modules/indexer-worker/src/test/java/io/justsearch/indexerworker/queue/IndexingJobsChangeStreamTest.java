@@ -84,11 +84,13 @@ final class IndexingJobsChangeStreamTest {
     Path stable = tempDir.resolve("stable.txt");
     Path changing = tempDir.resolve("changing.txt");
     assertEquals(2, jobQueue.enqueue(List.of(stable, changing)));
-    // Exercise cache population from existing rows as well as live inserts.
+    setAllStates("FAILED");
+    // Exercise bounded cache hydration from existing eligible rows as well as live updates.
     jobQueue.close();
     jobQueue.open();
     var stream = jobQueue.changeStream();
     var rows = cachedRows(stream, "rowIdToPathHash");
+    assertTrue(rows.isEmpty(), "boot does not populate a table-sized identity cache");
     CapturingSubscriber sub = new CapturingSubscriber();
     var snapshot = stream.subscribeWithSnapshot(sub);
     var liveHashes =
@@ -98,10 +100,12 @@ final class IndexingJobsChangeStreamTest {
 
     for (int i = 0; i < 1_000; i++) {
       assertEquals(1, jobQueue.enqueue(List.of(changing)));
-      assertEquals(2, rows.size(), "cache must track live jobs, not replacement history: " + i);
+      setAllStates("FAILED");
+      assertEquals(2, rows.size(), "cache must track window rows, not replacement history: " + i);
     }
-    sub.awaitDeliveries(1_000);
-    assertTrue(sub.deltas.stream().allMatch(d -> d instanceof IndexingJobChangeFeed.Delta.Insert));
+    assertEquals(1_000, sub.deltas.stream()
+        .filter(d -> d instanceof IndexingJobChangeFeed.Delta.Insert).count());
+    assertTrue(sub.deltas.stream().anyMatch(d -> d instanceof IndexingJobChangeFeed.Delta.Update));
     var reverse = cachedRows(stream, "pathHashToRowId");
     assertEquals(2, reverse.size(), "reverse cache must also stay bounded");
     assertEquals(liveHashes, new java.util.HashSet<>(rows.values()));
@@ -115,23 +119,158 @@ final class IndexingJobsChangeStreamTest {
 
     sub.deltas.clear();
     assertEquals(2, jobQueue.clearAll());
-    sub.awaitDeliveries(2);
+    sub.awaitDeliveries(3); // Two known deletes, then one bounded refill marker.
     assertEquals(
         liveHashes,
         sub.deltas.stream()
+            .filter(d -> d instanceof IndexingJobChangeFeed.Delta.Delete)
             .map(d -> ((IndexingJobChangeFeed.Delta.Delete) d).pathHash())
             .collect(java.util.stream.Collectors.toSet()));
+    assertTrue(((IndexingJobChangeFeed.Delta.Resync) sub.deltas.getLast()).items().isEmpty());
     assertTrue(rows.isEmpty());
     assertTrue(reverse.isEmpty());
 
     // A reused SQLite row ID after cleanup must not leave a reverse entry behind on close.
     assertEquals(1, jobQueue.enqueue(List.of(tempDir.resolve("new.txt"))));
+    setAllStates("PROCESSING");
     assertEquals(1, rows.size());
     assertEquals(1, reverse.size());
     stream.close();
     assertTrue(rows.isEmpty());
     assertTrue(reverse.isEmpty());
     snapshot.subscription().close();
+  }
+
+  private void setAllStates(String state) throws Exception {
+    Connection connection = readField("connection", Connection.class);
+    connection.setAutoCommit(false);
+    try (var update = connection.prepareStatement("UPDATE jobs SET state = ?")) {
+      update.setString(1, state);
+      update.executeUpdate();
+      connection.commit();
+      connection.setAutoCommit(true);
+      jobQueue.changeStream().commitSucceeded();
+      jobQueue.changeStream().drainCommitted();
+    }
+  }
+
+  @Test
+  void unknownDeletesCoalesceAndRollbackDoesNotResync() throws Exception {
+    var paths = java.util.stream.IntStream.range(0, 1_000)
+        .mapToObj(i -> tempDir.resolve("pending-" + i)).toList();
+    jobQueue.enqueue(paths);
+    var sub = new CapturingSubscriber();
+    var snapshot = jobQueue.changeStream().subscribeWithSnapshot(sub);
+    assertTrue(snapshot.items().isEmpty(), "PENDING rows do not hydrate the view");
+    assertTrue(cachedRows(jobQueue.changeStream(), "rowIdToPathHash").isEmpty());
+    var connection = readField("connection", Connection.class);
+    connection.setAutoCommit(false);
+    try (var statement = connection.createStatement()) {
+      statement.executeUpdate("DELETE FROM jobs");
+      connection.rollback();
+    } finally {
+      connection.setAutoCommit(true);
+    }
+    jobQueue.changeStream().commitSucceeded();
+    jobQueue.changeStream().drainCommitted();
+    assertTrue(sub.deltas.isEmpty(), "rollback discards the provisional resync marker");
+    assertEquals(1_000, jobQueue.clearAll());
+    assertEquals(1, sub.deltas.size(), "unknown deletes produce one marker per commit");
+    assertTrue(assertInstanceOf(IndexingJobChangeFeed.Delta.Resync.class,
+        sub.deltas.getFirst()).items().isEmpty());
+    snapshot.subscription().close();
+  }
+
+  @Test
+  void snapshotKeepsAllProcessingAndOnlyNewestTwoHundredFailures() throws Exception {
+    var paths = java.util.stream.IntStream.range(0, 600)
+        .mapToObj(i -> tempDir.resolve("window-" + i)).toList();
+    jobQueue.enqueue(paths);
+    var conn = readField("connection", Connection.class);
+    try (var stmt = conn.createStatement()) {
+      stmt.executeUpdate("UPDATE jobs SET state=CASE WHEN rowid<=300 THEN 'PROCESSING' "
+          + "WHEN rowid%2=0 THEN 'FAILED' ELSE 'RETRY_EXHAUSTED' END, last_updated=rowid");
+    }
+    var snapshot = jobQueue.changeStream().subscribeWithSnapshot(d -> {});
+    assertEquals(500, snapshot.items().size(), "processing rows cannot be displaced by failures");
+    assertEquals(300, snapshot.items().stream().filter(r -> r.state().equals("PROCESSING")).count());
+    assertEquals(200, snapshot.items().stream().filter(r -> !r.state().equals("PROCESSING")).count());
+    assertTrue(snapshot.items().stream().filter(r -> !r.state().equals("PROCESSING"))
+        .allMatch(r -> r.lastUpdatedMs() > 400), "the failure window contains the newest rows");
+    assertEquals(500, cachedRows(jobQueue.changeStream(), "rowIdToPathHash").size());
+    snapshot.subscription().close();
+    assertTrue(cachedRows(jobQueue.changeStream(), "rowIdToPathHash").isEmpty());
+  }
+
+  @Test
+  void reentrantSubscribeAndWritesConvergeWithoutReplayingEarlierCommit() throws Exception {
+    var current = new java.util.LinkedHashMap<String, IndexingJobChangeFeed.JobRow>();
+    var capture = new java.util.concurrent.atomic.AtomicReference<IndexingJobChangeFeed.SnapshotAndSubscription>();
+    var guard = new java.util.concurrent.atomic.AtomicBoolean();
+    var first = jobQueue.changeStream().subscribe(delta -> {
+      if (delta instanceof IndexingJobChangeFeed.Delta.Update && guard.compareAndSet(false, true)) {
+        try {
+          var snap = jobQueue.changeStream().subscribeWithSnapshot(event -> {
+            switch (event) {
+              case IndexingJobChangeFeed.Delta.Insert insert -> current.put(insert.row().pathHash(), insert.row());
+              case IndexingJobChangeFeed.Delta.Update update -> current.put(update.row().pathHash(), update.row());
+              case IndexingJobChangeFeed.Delta.Delete delete -> current.remove(delete.pathHash());
+              case IndexingJobChangeFeed.Delta.Resync resync -> {
+                current.clear();
+                resync.items().forEach(row -> current.put(row.pathHash(), row));
+              }
+            }
+          });
+          snap.items().forEach(row -> current.put(row.pathHash(), row));
+          capture.set(snap);
+        } catch (java.sql.SQLException e) { throw new IllegalStateException(e); }
+      }
+    });
+    jobQueue.enqueue(java.util.stream.IntStream.range(0, 600)
+        .mapToObj(i -> tempDir.resolve("concurrent-" + i)).toList());
+    setAllStates("FAILED");
+    assertNotNull(capture.get());
+    // All 600 deltas in this commit were already frozen into the reentrant snapshot. They must
+    // not replay and temporarily expand it back into the complete table.
+    assertEquals(200, current.size());
+    jobQueue.clearAll();
+    var reconnect = jobQueue.changeStream().subscribeWithSnapshot(d -> {});
+    assertEquals(reconnect.items(), List.copyOf(current.values()));
+    assertTrue(current.isEmpty(), "the deletion resync removes every phantom row");
+    reconnect.subscription().close();
+    capture.get().subscription().close();
+    first.close();
+  }
+
+  @Test
+  void cancellationNeverWaitsForTheQueueWriterLock() throws Exception {
+    var snapshot = jobQueue.changeStream().subscribeWithSnapshot(d -> {});
+    var lock = readField("lock", java.util.concurrent.locks.ReentrantLock.class);
+    try (var threads = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+      lock.lock();
+      try {
+        threads.submit(snapshot.subscription()::close).get(1, java.util.concurrent.TimeUnit.SECONDS);
+      } finally {
+        lock.unlock();
+      }
+    }
+    jobQueue.enqueue(List.of(tempDir.resolve("unobserved.txt")));
+    assertTrue(cachedRows(jobQueue.changeStream(), "rowIdToPathHash").isEmpty());
+  }
+
+  @Test
+  void distinctFailureChurnDoesNotRegrowTheIdentityCache() throws Exception {
+    var subscription = jobQueue.changeStream().subscribe(d -> {});
+    for (int round = 0; round < 3; round++) {
+      int offset = round * 400;
+      jobQueue.enqueue(java.util.stream.IntStream.range(0, 400)
+          .mapToObj(i -> tempDir.resolve("churn-" + (offset + i))).toList());
+      setAllStates("FAILED");
+      assertEquals(200, cachedRows(jobQueue.changeStream(), "rowIdToPathHash").size());
+      assertEquals(200, cachedRows(jobQueue.changeStream(), "pathHashToRowId").size());
+      assertEquals(200, cachedRows(jobQueue.changeStream(), "failedRows").size());
+    }
+    subscription.close();
   }
 
   private static Map<?, ?> cachedRows(IndexingJobsChangeStream stream, String name)
@@ -369,7 +508,15 @@ final class IndexingJobsChangeStreamTest {
             .orElseThrow();
     assertEquals("scan-42", lastForScanned.scanId());
 
-    // And through the snapshot path a reconnecting Head reads.
+    // DONE stays on the live terminal path. The remaining PROCESSING scan row carries the
+    // same attribution through the bounded snapshot path on reconnect.
+    var terminalSnapshot = jobQueue.changeStream().subscribeWithSnapshot(d -> {});
+    assertTrue(terminalSnapshot.items().stream()
+        .noneMatch(r -> "scan-42".equals(r.scanId())), "DONE is outside the window");
+    terminalSnapshot.subscription().close();
+    jobQueue.enqueueEntries(List.of(new JobQueue.EnqueueEntry(Path.of("/tmp/scanned-again.txt"), 42L)),
+        "scifact", "scan-42");
+    jobQueue.pollPending(1);
     var s2 = jobQueue.changeStream().subscribeWithSnapshot(new CapturingSubscriber());
     assertTrue(
         s2.items().stream().anyMatch(r -> "scan-42".equals(r.scanId())),
@@ -469,13 +616,14 @@ final class IndexingJobsChangeStreamTest {
   @Test
   void snapshotCapturesPriorState() throws Exception {
     jobQueue.enqueue(List.of(Path.of("/tmp/c.txt"), Path.of("/tmp/d.txt")));
+    jobQueue.pollPending(2);
 
     CapturingSubscriber sub = new CapturingSubscriber();
     var snap = jobQueue.changeStream().subscribeWithSnapshot(sub);
 
-    assertEquals(2, snap.items().size(), "snapshot reflects pre-subscribe enqueues");
-    // Both inserts pre-dated subscribe: snapshotSeq should equal currentSeq at that moment.
-    assertTrue(snap.snapshotSeq() >= 2, "seq advanced by 2 inserts");
+    assertEquals(2, snap.items().size(), "snapshot contains pre-subscribe PROCESSING rows");
+    assertTrue(snap.items().stream().allMatch(r -> "PROCESSING".equals(r.state())));
+    assertEquals(jobQueue.changeStream().currentSeq(), snap.snapshotSeq());
     assertTrue(sub.deltas.isEmpty(), "no live deltas yet");
 
     snap.subscription().close();

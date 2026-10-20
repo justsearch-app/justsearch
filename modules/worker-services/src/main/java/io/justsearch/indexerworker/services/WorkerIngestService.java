@@ -3234,7 +3234,25 @@ public final class WorkerIngestService {
           if (ctx.cancelled() || closeRequested.get()) return;
           io.justsearch.ipc.IndexingJobsDelta.Builder deltaBuilder =
               io.justsearch.ipc.IndexingJobsDelta.newBuilder();
+          if (delta instanceof IndexingJobChangeFeed.Delta.Resync resync) {
+            var replacement = io.justsearch.ipc.IndexingJobsSnapshot.newBuilder();
+            for (var row : resync.items()) replacement.addItems(toJobView(row));
+            synchronized (emitLock) {
+              try {
+                sink.accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder()
+                    .setSnapshot(replacement.build()).setSeq(frameSeq.incrementAndGet())
+                    .setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.newBuilder()
+                        .addAllStates(resync.presentStates() == null ? Set.of() : resync.presentStates()))
+                    .build());
+              } catch (RuntimeException e) {
+                log.warn("subscribeIndexingJobs: resync delivery failed; closing subscription", e);
+                closeSubscription.run();
+              }
+            }
+            return;
+          }
           switch (delta) {
+            case IndexingJobChangeFeed.Delta.Resync ignored -> throw new IllegalStateException("Resync already handled");
             case IndexingJobChangeFeed.Delta.Insert ins ->
                 deltaBuilder.setInsert(toJobView(ins.row()));
             case IndexingJobChangeFeed.Delta.Update upd ->
@@ -3244,11 +3262,13 @@ public final class WorkerIngestService {
           }
           synchronized (emitLock) {
             try {
-              sink.accept(
-                  io.justsearch.ipc.IndexingJobsFrame.newBuilder()
-                      .setDelta(deltaBuilder.build())
-                      .setSeq(frameSeq.incrementAndGet())
-                      .build());
+              var frame = io.justsearch.ipc.IndexingJobsFrame.newBuilder()
+                  .setDelta(deltaBuilder.build()).setSeq(frameSeq.incrementAndGet());
+              if (delta.presentStates() != null) {
+                frame.setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.newBuilder()
+                    .addAllStates(delta.presentStates()));
+              }
+              sink.accept(frame.build());
             } catch (RuntimeException e) {
               log.warn("subscribeIndexingJobs: delta delivery failed; closing subscription", e);
               closeSubscription.run();
@@ -3300,6 +3320,8 @@ public final class WorkerIngestService {
         sink.accept(
             io.justsearch.ipc.IndexingJobsFrame.newBuilder()
                 .setSnapshot(snapBuilder.build())
+                .setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.newBuilder()
+                    .addAllStates(snap.presentStates() == null ? Set.of() : snap.presentStates()))
                 .setSeq(frameSeq.incrementAndGet())
                 .build());
         // Reentrant sink writes also join this queue, behind already buffered deltas.

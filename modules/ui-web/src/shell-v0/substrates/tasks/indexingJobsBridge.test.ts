@@ -248,12 +248,12 @@ describe('§32 #1 — startIndexingJobsBridge (stream → reducer → tasks)', (
       lifecycle(1, {
         kind: 'snapshot',
         items: [
-          { pathHash: 'a1b2c3d4e5', state: 'PENDING', collection: 'docs' },
+          { pathHash: 'a1b2c3d4e5', state: 'PROCESSING', collection: 'docs', lastUpdatedMs: Date.now() },
           { pathHash: 'f6g7h8i9j0', state: 'FAILED', collection: 'docs' },
         ],
       }),
     );
-    expect(getTask('idxjob:a1b2c3d4e5')?.status).toBe('queued');
+    expect(getTask('idxjob:a1b2c3d4e5')?.status).toBe('running');
     expect(getTask('idxjob:f6g7h8i9j0')?.status).toBe('failed');
 
     // delete frame → that job's task is removed (not 'succeeded').
@@ -273,10 +273,10 @@ describe('§32 #1 — startIndexingJobsBridge (stream → reducer → tasks)', (
     es!.emitFrame(
       lifecycle(4, {
         kind: 'snapshot',
-        items: [{ pathHash: 'f6g7h8i9j0', state: 'PENDING', collection: 'docs' }],
+        items: [{ pathHash: 'f6g7h8i9j0', state: 'PROCESSING', collection: 'docs', lastUpdatedMs: Date.now() }],
       }),
     );
-    expect(getTask('idxjob:f6g7h8i9j0')?.status).toBe('queued'); // not stuck
+    expect(getTask('idxjob:f6g7h8i9j0')?.status).toBe('running'); // not stuck
 
     stop();
     expect(es!.closed).toBe(true);
@@ -305,12 +305,11 @@ describe('§32 #1 — startIndexingJobsBridge (stream → reducer → tasks)', (
     es!.emitFrame(
       lifecycle(1, {
         kind: 'snapshot',
-        items: [{ pathHash: 'z1', state: 'PENDING', collection: 'docs' }],
+        items: [{ pathHash: 'z1', state: 'PROCESSING', collection: 'docs', lastUpdatedMs: Date.now() }],
       }),
     );
-    // Tempdoc 550 Thesis II (F-1 cure): a PENDING job is `queued`, not `running`.
-    // (This pooling test's point is the SHARED EventSource; the status is incidental.)
-    expect(getTask('idxjob:z1')?.status).toBe('queued'); // bridge projected
+    // The shared EventSource hydrates an eligible, fresh PROCESSING row for both consumers.
+    expect(getTask('idxjob:z1')?.status).toBe('running'); // bridge projected
     expect(secondFrames).toBeGreaterThan(0); // second consumer also received
 
     stop2();
@@ -390,10 +389,10 @@ describe('§32 #1 — startIndexingJobsBridge (stream → reducer → tasks)', (
         resumeToken: 'tok-1',
         payload: {
           kind: 'snapshot',
-          items: [{ pathHash: 'mux1', state: 'PENDING', collection: 'docs' }],
+          items: [{ pathHash: 'mux1', state: 'PROCESSING', collection: 'docs', lastUpdatedMs: Date.now() }],
         },
       });
-      expect(getTask('idxjob:mux1')?.status).toBe('queued');
+      expect(getTask('idxjob:mux1')?.status).toBe('running');
 
       stop();
     });

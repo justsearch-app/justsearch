@@ -674,8 +674,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // Run integrity check on existing databases (throws SQLException on corruption)
       performIntegrityCheck();
 
-      // Slice 445: attach change-stream after schema is up so the rowId cache
-      // sees the post-migration row set.
+      // Attach the bounded change stream after the schema is ready.
       changeStream = new IndexingJobsChangeStream(connection, lock, this::ensureOpen);
       walkChanges = new SqliteRecordedWalkChanges(connection);
 

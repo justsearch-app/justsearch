@@ -14,7 +14,8 @@ import java.util.function.Consumer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.LinkedHashMap;
+import java.util.Set;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -103,8 +104,11 @@ public final class RemoteIndexingJobsBridge {
    */
   public record CachedSnapshot(long seq, List<IndexingJobView> items) {}
 
-  private final AtomicReference<CachedSnapshot> cached =
-      new AtomicReference<>(new CachedSnapshot(0L, List.of()));
+  private final LinkedHashMap<String, IndexingJobView> rows = new LinkedHashMap<>();
+  private final LinkedHashMap<String, IndexingJobView> failures = new LinkedHashMap<>();
+  private long snapshotSeq;
+  private Set<String> presentStates = Set.of();
+  private static final int FAILURE_WINDOW_SIZE = 200;
   private final AtomicBoolean started = new AtomicBoolean(false);
   private volatile boolean stopped = false;
 
@@ -237,18 +241,18 @@ public final class RemoteIndexingJobsBridge {
    * The current (seq, items) pair as ONE atomic read — the correct way for a new SSE subscriber to
    * hydrate, so the seq and items can never be torn apart (tempdoc 550 §B.2 fix-pass).
    */
-  public CachedSnapshot latestSnapshotPair() {
-    return cached.get();
+  public synchronized CachedSnapshot latestSnapshotPair() {
+    return new CachedSnapshot(snapshotSeq, List.copyOf(rows.values()));
   }
 
   /** Most recent snapshot items. Empty list before first connect. */
   public List<IndexingJobView> latestSnapshot() {
-    return cached.get().items();
+    return latestSnapshotPair().items();
   }
 
   /** Seq cursor as of the most recent snapshot. {@code 0} before first connect. */
-  public long latestSnapshotSeq() {
-    return cached.get().seq();
+  public synchronized long latestSnapshotSeq() {
+    return snapshotSeq;
   }
 
   /**
@@ -418,8 +422,9 @@ public final class RemoteIndexingJobsBridge {
                   for (var view : frame.getSnapshot().getItemsList()) {
                     items.add(toView(view));
                   }
-                  List<IndexingJobView> immutable = List.copyOf(items);
-                  replaceSnapshot(new CachedSnapshot(frame.getSeq(), immutable));
+                  replaceSnapshot(frame.getSeq(), items);
+                  applyStatePresence(frame);
+                  List<IndexingJobView> immutable = latestSnapshot();
                   // Separate overload bursts must not exhaust a lifetime cap after recovery.
                   // Keep the delay backoff: snapshot-then-immediate-failure must not busy-loop.
                   recentAttempts.clear();
@@ -430,15 +435,9 @@ public final class RemoteIndexingJobsBridge {
                 }
                 case DELTA -> {
                   IndexingJobsDelta d = frame.getDelta();
-                  // Tempdoc 550 §B.2 keystone fix: keep `latestSnapshot` a FAITHFUL LIVE
-                  // projection of the worker's job table by applying every delta to the
-                  // cached snapshot — not only emitting it to live listeners. Previously
-                  // only the SNAPSHOT frame mutated `latestSnapshot`, so after the worker
-                  // drained jobs (PENDING→DONE via UPDATE deltas) the cache stayed frozen
-                  // at the subscribe-time snapshot; every NEW SSE subscriber (browser
-                  // reload) then received phantom PENDING rows the live `queueDepth()`
-                  // reported as 0 — the count-vs-list drift. Applying deltas here makes a
-                  // fresh subscriber's snapshot agree with the live worker state.
+                  // Keep the bounded snapshot current for new and reconnected clients.
+                  // Terminal rows still flow to the activity ledger through live listeners.
+                  applyStatePresence(frame);
                   switch (d.getChangeCase()) {
                     case INSERT -> {
                       IndexingJobView view = toView(d.getInsert());
@@ -491,65 +490,53 @@ public final class RemoteIndexingJobsBridge {
     }
   }
 
-  /**
-   * Apply an Insert/Update to the cached snapshot (tempdoc 550 §B.2). Keyed by
-   * {@code pathHash}; preserves insertion order (a re-keyed Update keeps the row's
-   * original position). Atomic so concurrent {@link #latestSnapshot()} readers
-   * always see a consistent immutable list.
-   */
+  /** Mutate the bounded view in place; terminal deltas still reach every live listener. */
   private synchronized void upsertSnapshot(IndexingJobView view, long seq) {
-    var before = cached.get();
-    cached.updateAndGet(
-        cur -> {
-          var map = new java.util.LinkedHashMap<String, IndexingJobView>(cur.items().size() + 1);
-          for (var v : cur.items()) {
-            map.put(v.pathHash(), v);
-          }
-          map.put(view.pathHash(), view);
-          return new CachedSnapshot(seq, List.copyOf(map.values()));
-        });
-    statusChanged(before, cached.get());
+    String key = view.pathHash();
+    failures.remove(key);
+    if ("PROCESSING".equals(view.state())) {
+      rows.put(key, view);
+    } else if (isFailure(view)) {
+      rows.put(key, view);
+      failures.putLast(key, view);
+      evictFailures();
+    } else {
+      rows.remove(key);
+    }
+    snapshotSeq = seq;
   }
 
-  /** Remove a row from the cached snapshot by primary key (tempdoc 550 §B.2). */
   private synchronized void removeFromSnapshot(String pathHash, long seq) {
-    var before = cached.get();
-    cached.updateAndGet(
-        cur -> {
-          boolean present = false;
-          for (var v : cur.items()) {
-            if (v.pathHash().equals(pathHash)) {
-              present = true;
-              break;
-            }
-          }
-          // Advance seq even on a no-op remove so the (seq, items) cursor stays current.
-          if (!present) {
-            return new CachedSnapshot(seq, cur.items());
-          }
-          var out = new ArrayList<IndexingJobView>(cur.items().size());
-          for (var v : cur.items()) {
-            if (!v.pathHash().equals(pathHash)) {
-              out.add(v);
-            }
-          }
-          return new CachedSnapshot(seq, List.copyOf(out));
-        });
-    statusChanged(before, cached.get());
+    rows.remove(pathHash);
+    failures.remove(pathHash);
+    snapshotSeq = seq;
   }
 
-  private synchronized void replaceSnapshot(CachedSnapshot next) {
-    statusChanged(cached.getAndSet(next), next);
+  private synchronized void replaceSnapshot(long seq, List<IndexingJobView> items) {
+    rows.clear();
+    failures.clear();
+    // Worker snapshots arrive newest first. Keep a separate oldest-first eviction order.
+    for (IndexingJobView view : items) {
+      if ("PROCESSING".equals(view.state()) || isFailure(view)) rows.put(view.pathHash(), view);
+      if (isFailure(view)) failures.putFirst(view.pathHash(), view);
+    }
+    evictFailures();
+    snapshotSeq = seq;
   }
 
-  private static void statusChanged(CachedSnapshot before, CachedSnapshot after) {
-    io.justsearch.core.status.StatusChangeCounter.process().changed(jobStates(before), jobStates(after));
+  private void evictFailures() {
+    while (failures.size() > FAILURE_WINDOW_SIZE) rows.remove(failures.pollFirstEntry().getKey());
   }
 
-  /** Which job states are present. How many jobs are in each is a measurement, not a publication. */
-  private static Object jobStates(CachedSnapshot snapshot) {
-    return snapshot.items().stream().map(IndexingJobView::state)
-        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+  private static boolean isFailure(IndexingJobView view) {
+    return "FAILED".equals(view.state()) || "RETRY_EXHAUSTED".equals(view.state());
+  }
+
+  private synchronized void applyStatePresence(IndexingJobsFrame frame) {
+    if (!frame.hasStatePresence()) return;
+    Set<String> next = Set.copyOf(frame.getStatePresence().getStatesList());
+    io.justsearch.core.status.StatusChangeCounter.process().changed(presentStates, next);
+    presentStates = next;
   }
 
   private void emit(Delta delta) {

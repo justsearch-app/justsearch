@@ -1765,7 +1765,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   }
 
   private static String indexingJobsPath(IndexingJobsFrame frame) {
-    if (!frame.hasDelta()) return null;
+    // State-presence publications must survive path coalescing and retain commit order.
+    if (frame.hasStatePresence() || !frame.hasDelta()) return null;
     return switch (frame.getDelta().getChangeCase()) {
       case INSERT -> frame.getDelta().getInsert().getPathHash();
       case UPDATE -> frame.getDelta().getUpdate().getPathHash();

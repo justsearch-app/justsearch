@@ -14,9 +14,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
+import org.sqlite.Function;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.LinkedHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -57,7 +61,18 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
   private final Runnable ensureOwnerOpen;
 
   /** rowId → pathHash mapping; required for DELETE notifications (the row is gone post-commit). */
-  private final ConcurrentHashMap<Long, String> rowIdToPathHash = new ConcurrentHashMap<>();
+  private final Map<Long, String> rowIdToPathHash = new HashMap<>();
+
+  /** Failure identities in emission order; PROCESSING identities are never evicted. */
+  private final LinkedHashMap<Long, String> failedRows = new LinkedHashMap<>();
+  private boolean pendingResync;
+  private Set<String> presentStates = Set.of();
+  private final Set<String> enteredStates = new HashSet<>();
+  private final Set<String> leftStates = new HashSet<>();
+  static final String STATE_EXISTS_SQL =
+      "SELECT 1 FROM jobs INDEXED BY idx_jobs_state_updated WHERE state=? LIMIT 1";
+  private static final List<String> JOB_STATES =
+      List.of("PENDING", "PROCESSING", "DONE", "FAILED", "RETRY_EXHAUSTED");
 
   /** Current row per path hash; replaces entries hidden by SQLite's REPLACE update-hook behavior. */
   private final Map<String, Long> pathHashToRowId = new HashMap<>();
@@ -89,9 +104,8 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
   private record Subscriber(long afterSequence, Consumer<Delta> consumer) {}
 
   /**
-   * Attaches update + commit hooks to {@code conn}. Eagerly populates the
-   * rowId→pathHash cache from the current jobs table so DELETE notifications
-   * carry the right primary key.
+   * Attaches update + commit hooks to {@code conn}. Row identities are retained only for
+   * the emitted window; an unknown deletion requests a bounded replacement snapshot.
    *
    * <p>The connection MUST be the same connection that mutates the jobs table.
    * Per {@link SqliteJobQueue} architecture (single-connection model verified
@@ -102,7 +116,6 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
     this.ensureOwnerOpen = Objects.requireNonNull(ensureOwnerOpen, "ensureOwnerOpen");
     this.conn = Objects.requireNonNull(conn, "conn");
     this.sqliteConn = conn.unwrap(SQLiteConnection.class);
-    populateRowIdCache();
     this.updateListener = this::onRowChange;
     this.commitListener =
         new SQLiteCommitListener() {
@@ -116,6 +129,42 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
             discardPending();
           }
         };
+    // Connection-local triggers observe OLD.state, which SQLite's update hook does not expose.
+    // They only collect provisional state names; rollback discards these with the row hooks.
+    Function.create(sqliteConn, "indexing_jobs_state_transition", new Function() {
+      @Override protected void xFunc() throws SQLException {
+        if (!closed && !subscribers.isEmpty()) {
+          String before = value_text(0);
+          String after = value_text(1);
+          if (before != null) leftStates.add(before);
+          if (after != null) enteredStates.add(after);
+        }
+        result();
+      }
+    });
+    try (Statement stmt = conn.createStatement()) {
+      // REPLACE's implicit deletion does not fire DELETE triggers by default. A prior row
+      // at this key must therefore be rechecked even when an INSERT is ignored on conflict.
+      stmt.execute("""
+          CREATE TEMP TRIGGER indexing_jobs_before_insert BEFORE INSERT ON main.jobs
+          WHEN EXISTS(SELECT 1 FROM jobs WHERE path=NEW.path)
+          BEGIN SELECT indexing_jobs_state_transition(
+            (SELECT state FROM jobs WHERE path=NEW.path), NULL); END
+          """);
+      stmt.execute("""
+          CREATE TEMP TRIGGER indexing_jobs_after_insert AFTER INSERT ON main.jobs
+          BEGIN SELECT indexing_jobs_state_transition(NULL, NEW.state); END
+          """);
+      stmt.execute("""
+          CREATE TEMP TRIGGER indexing_jobs_after_update AFTER UPDATE OF state ON main.jobs
+          WHEN OLD.state IS NOT NEW.state
+          BEGIN SELECT indexing_jobs_state_transition(OLD.state, NEW.state); END
+          """);
+      stmt.execute("""
+          CREATE TEMP TRIGGER indexing_jobs_after_delete AFTER DELETE ON main.jobs
+          BEGIN SELECT indexing_jobs_state_transition(OLD.state, NULL); END
+          """);
+    }
     sqliteConn.addUpdateListener(updateListener);
     sqliteConn.addCommitListener(commitListener);
   }
@@ -135,8 +184,9 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
       ensureOwnerOpen.run();
       if (closed) throw new IllegalStateException("Indexing jobs feed is closed");
       long snapshotSeq = seq.get();
-      List<JobRow> rows = readAllRows();
-      return new SnapshotAndSubscription(snapshotSeq, rows, addSubscriber(subscriber));
+      List<JobRow> rows = readWindow();
+      presentStates = readPresentStates();
+      return new SnapshotAndSubscription(snapshotSeq, rows, presentStates, addSubscriber(subscriber));
     } finally {
       ownerLock.unlock();
     }
@@ -149,6 +199,10 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
     try {
       ensureOwnerOpen.run();
       if (closed) throw new IllegalStateException("Indexing jobs feed is closed");
+      if (subscribers.isEmpty()) {
+        try { presentStates = readPresentStates(); }
+        catch (SQLException failure) { throw new IllegalStateException("Cannot read queue state presence", failure); }
+      }
       return addSubscriber(subscriber);
     } finally {
       ownerLock.unlock();
@@ -158,7 +212,18 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
   private Subscription addSubscriber(Consumer<Delta> consumer) {
     Subscriber subscriber = new Subscriber(seq.get(), consumer);
     subscribers.add(subscriber);
-    return () -> subscribers.remove(subscriber);
+    return () -> {
+      subscribers.remove(subscriber);
+      // Cancellation can hold a downstream emission lock while a writer holds ownerLock.
+      // Never wait here. A busy writer's commitSucceeded() clears this bounded cache instead.
+      if (subscribers.isEmpty() && ownerLock.tryLock()) {
+        try {
+          if (subscribers.isEmpty()) clearRowCache();
+        } finally {
+          ownerLock.unlock();
+        }
+      }
+    };
   }
 
   @Override
@@ -177,9 +242,16 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
       } catch (RuntimeException e) {
         log.warn("removeCommitListener threw on close", e);
       }
+      try (Statement stmt = conn.createStatement()) {
+        for (String suffix : List.of("before_insert", "after_insert", "after_update", "after_delete")) {
+          stmt.execute("DROP TRIGGER IF EXISTS temp.indexing_jobs_" + suffix);
+        }
+        Function.destroy(sqliteConn, "indexing_jobs_state_transition");
+      } catch (SQLException failure) {
+        log.warn("Cannot detach queue state-presence tracking", failure);
+      }
       subscribers.clear();
-      rowIdToPathHash.clear();
-      pathHashToRowId.clear();
+      clearRowCache();
       committed.clear();
       discardPending();
     } finally {
@@ -189,29 +261,45 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
 
   // ---- internal ----
 
-  private void populateRowIdCache() throws SQLException {
+  private void clearRowCache() {
     rowIdToPathHash.clear();
     pathHashToRowId.clear();
-    try (Statement stmt = conn.createStatement();
-        ResultSet rs = stmt.executeQuery("SELECT rowid, path FROM jobs")) {
-      while (rs.next()) {
-        long rowId = rs.getLong(1);
-        String path = rs.getString(2);
-        if (path != null) {
-          cacheRow(rowId, sha256(path));
-        }
-      }
-    }
+    failedRows.clear();
   }
 
-  private List<JobRow> readAllRows() throws SQLException {
+  // Separate limited index walks avoid sorting the full history for an IN(...) query.
+  // rowid is SQLite's implicit final key in idx_jobs_state_updated and breaks timestamp ties.
+  private static final String WINDOW_SQL = String.format(Locale.ROOT, """
+      SELECT * FROM (
+        SELECT path, state, attempts, last_updated, error_message, retry_after, collection, scan_id, rowid
+        FROM jobs WHERE state = 'PROCESSING'
+        UNION ALL
+        SELECT * FROM (
+          SELECT * FROM (
+            SELECT path, state, attempts, last_updated, error_message, retry_after, collection, scan_id, rowid
+            FROM jobs WHERE state = 'FAILED' ORDER BY last_updated DESC, rowid DESC LIMIT %d
+          )
+          UNION ALL
+          SELECT * FROM (
+            SELECT path, state, attempts, last_updated, error_message, retry_after, collection, scan_id, rowid
+            FROM jobs WHERE state = 'RETRY_EXHAUSTED' ORDER BY last_updated DESC, rowid DESC LIMIT %d
+          )
+          ORDER BY last_updated DESC, rowid DESC LIMIT %d
+        )
+      ) ORDER BY last_updated DESC, rowid DESC
+      """, FAILURE_WINDOW_SIZE, FAILURE_WINDOW_SIZE, FAILURE_WINDOW_SIZE);
+
+  private List<JobRow> readWindow() throws SQLException {
     List<JobRow> result = new ArrayList<>();
-    String sql =
-        "SELECT path, state, attempts, last_updated, error_message, retry_after, collection, scan_id "
-            + "FROM jobs";
-    try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+    clearRowCache();
+    try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(WINDOW_SQL)) {
       while (rs.next()) {
-        result.add(rowFromResultSet(rs));
+        JobRow row = rowFromResultSet(rs);
+        result.add(row);
+        long rowId = rs.getLong(9);
+        cacheRow(rowId, row);
+        // The snapshot arrives newest first; live changes append newest identities at the end.
+        if (isFailure(row.state())) failedRows.putFirst(rowId, row.pathHash());
       }
     }
     return result;
@@ -246,8 +334,14 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
   private void onRowChange(
       SQLiteUpdateListener.Type type, String dbName, String tableName, long rowId) {
     if (!JOBS_TABLE.equals(tableName)) return;
-    if (closed) return;
+    if (closed || subscribers.isEmpty()) return;
     synchronized (pendingLock) {
+      // A bulk cleanup can delete a million non-window rows in one statement. Keep a marker,
+      // not a million provisional identities. The cache is read under the queue's owner lock.
+      if (type == SQLiteUpdateListener.Type.DELETE && !rowIdToPathHash.containsKey(rowId)) {
+        pendingResync = true;
+        return;
+      }
       pending.add(new PendingChange(type, rowId));
     }
   }
@@ -260,10 +354,66 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
       snapshot = List.copyOf(pending);
       pending.clear();
     }
+    if (subscribers.isEmpty()) {
+      discardPending();
+      clearRowCache();
+      return;
+    }
+    Set<String> beforeStates = presentStates;
+    if (!enteredStates.isEmpty() || !leftStates.isEmpty()) {
+      try {
+        var next = new HashSet<>(presentStates);
+        next.addAll(enteredStates);
+        for (String state : leftStates) {
+          if (stateExists(state)) next.add(state);
+          else next.remove(state);
+        }
+        presentStates = Set.copyOf(next);
+        enteredStates.clear();
+        leftStates.clear();
+      } catch (SQLException failure) {
+        throw new IllegalStateException("Cannot refresh queue state presence", failure);
+      }
+    }
+    int commitStart = committed.size();
     // Freeze rows now: a later committed chunk or a reentrant subscriber may replace/delete them.
     for (PendingChange change : snapshot) {
       Delta delta = materialize(change);
       if (delta != null) committed.add(new CommittedDelta(seq.incrementAndGet(), delta));
+    }
+    if (pendingResync) {
+      pendingResync = false;
+      try {
+        List<JobRow> rows = readWindow();
+        presentStates = readPresentStates();
+        committed.add(new CommittedDelta(seq.incrementAndGet(), new Delta.Resync(rows, presentStates)));
+      } catch (SQLException e) {
+        throw new IllegalStateException("Cannot resynchronize indexing jobs window", e);
+      }
+    }
+    if (!beforeStates.equals(presentStates) && committed.size() > commitStart) {
+      int last = committed.size() - 1;
+      CommittedDelta change = committed.get(last);
+      Delta delta = switch (change.delta()) {
+        case Delta.Insert insert -> new Delta.Insert(insert.row(), presentStates);
+        case Delta.Update update -> new Delta.Update(update.row(), presentStates);
+        case Delta.Delete delete -> new Delta.Delete(delete.pathHash(), presentStates);
+        case Delta.Resync resync -> new Delta.Resync(resync.items(), presentStates);
+      };
+      committed.set(last, new CommittedDelta(change.sequence(), delta));
+    }
+  }
+
+  private Set<String> readPresentStates() throws SQLException {
+    var states = new HashSet<String>();
+    for (String state : JOB_STATES) if (stateExists(state)) states.add(state);
+    return Set.copyOf(states);
+  }
+
+  private boolean stateExists(String state) throws SQLException {
+    try (PreparedStatement stmt = conn.prepareStatement(STATE_EXISTS_SQL)) {
+      stmt.setString(1, state);
+      try (ResultSet rs = stmt.executeQuery()) { return rs.next(); }
     }
   }
 
@@ -293,6 +443,9 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
   private void discardPending() {
     synchronized (pendingLock) {
       pending.clear();
+      pendingResync = false;
+      enteredStates.clear();
+      leftStates.clear();
     }
   }
 
@@ -302,35 +455,56 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
       case INSERT -> {
         JobRow row = readRowByRowId(rowId);
         if (row == null) yield null;
-        cacheRow(rowId, row.pathHash());
+        cacheRow(rowId, row);
         yield new Delta.Insert(row);
       }
       case UPDATE -> {
         JobRow row = readRowByRowId(rowId);
         if (row == null) yield null;
-        cacheRow(rowId, row.pathHash());
+        cacheRow(rowId, row);
         yield new Delta.Update(row);
       }
       case DELETE -> {
         String pathHash = rowIdToPathHash.remove(rowId);
-        if (pathHash == null) yield null;
+        if (pathHash == null) {
+          pendingResync = true;
+          yield null;
+        }
+        failedRows.remove(rowId);
         pathHashToRowId.remove(pathHash, rowId);
+        pendingResync = true; // Refill a vacancy from older failures, once per commit.
         yield new Delta.Delete(pathHash);
       }
     };
   }
 
   /** Called under the owner lock, only for rows read from the committed table. */
-  private void cacheRow(long rowId, String pathHash) {
-    String previousHash = rowIdToPathHash.put(rowId, pathHash);
-    if (previousHash != null && !previousHash.equals(pathHash)) {
-      pathHashToRowId.remove(previousHash, rowId);
+  private void cacheRow(long rowId, JobRow row) {
+    String pathHash = row.pathHash();
+    Long previousRowId = pathHashToRowId.remove(pathHash);
+    if (previousRowId != null) {
+      rowIdToPathHash.remove(previousRowId);
+      boolean wasFailed = failedRows.remove(previousRowId) != null;
+      if (wasFailed && !isFailure(row.state())) pendingResync = true;
     }
-    Long previousRowId = pathHashToRowId.put(pathHash, rowId);
-    if (previousRowId != null && previousRowId.longValue() != rowId) {
-      // INSERT OR REPLACE allocates a new rowid but does not report the implicit DELETE.
-      rowIdToPathHash.remove(previousRowId, pathHash);
+    String previousHash = rowIdToPathHash.remove(rowId);
+    if (previousHash != null) pathHashToRowId.remove(previousHash);
+    failedRows.remove(rowId);
+    if (!"PROCESSING".equals(row.state()) && !isFailure(row.state())) return;
+    rowIdToPathHash.put(rowId, pathHash);
+    pathHashToRowId.put(pathHash, rowId);
+    if (isFailure(row.state())) {
+      failedRows.put(rowId, pathHash);
+      if (failedRows.size() > FAILURE_WINDOW_SIZE) {
+        var oldest = failedRows.pollFirstEntry();
+        rowIdToPathHash.remove(oldest.getKey());
+        pathHashToRowId.remove(oldest.getValue());
+      }
     }
+  }
+
+  private static boolean isFailure(String state) {
+    return "FAILED".equals(state) || "RETRY_EXHAUSTED".equals(state);
   }
 
   private JobRow readRowByRowId(long rowId) {

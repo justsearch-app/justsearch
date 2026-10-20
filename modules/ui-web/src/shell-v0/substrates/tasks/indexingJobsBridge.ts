@@ -25,7 +25,7 @@
  *     (vs a guarded terminal transition) is what lets a re-appearing job re-add
  *     cleanly instead of being stranded in a terminal status after a reset.
  *
- * Reuses the canonical TABULAR reducer (`subscriptionStrategy.tabularStrategy`)
+ * Reuses the canonical TABULAR reducer (`subscriptionStrategy.indexingJobsStrategy`)
  * so frame parsing (snapshot / insert / update / delete / snapshot-replaced) is
  * not re-derived; the bridge owns only the items→Task projection.
  */
@@ -34,7 +34,7 @@ import { subscribePooled, nudgePooledStream } from '../../streaming/EnvelopeStre
 import type { MultiplexedStream } from '../../streaming/MultiplexedStream.js';
 import { SHELL_EVENT_STREAM_IDS } from '../../streaming/shellEventStreamIds.js';
 import {
-  tabularStrategy,
+  indexingJobsStrategy,
   type TabularData,
   type StrategyState,
 } from '../../strategies/subscriptionStrategy.js';
@@ -421,7 +421,7 @@ export function startIndexingJobsBridge(
     ? multiplex.subscribe<StrategyState<TabularData<IndexingJobRow>>>(
         SHELL_EVENT_STREAM_IDS.INDEXING_JOBS,
         () => {
-          const strat = tabularStrategy<IndexingJobRow>(PRIMARY_KEY);
+          const strat = indexingJobsStrategy<IndexingJobRow>(PRIMARY_KEY);
           return { initialState: strat.initialState, reducer: strat.reducer };
         },
         onSnapshot,
@@ -430,7 +430,7 @@ export function startIndexingJobsBridge(
         url,
         onSnapshot,
         () => {
-          const strat = tabularStrategy<IndexingJobRow>(PRIMARY_KEY);
+          const strat = indexingJobsStrategy<IndexingJobRow>(PRIMARY_KEY);
           return {
             url,
             initialState: strat.initialState,
