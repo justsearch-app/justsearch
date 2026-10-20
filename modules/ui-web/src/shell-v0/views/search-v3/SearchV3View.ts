@@ -843,7 +843,7 @@ export class SearchV3View extends JfElement {
   private refusedQuestions = new Map<string, string>();
   private contextRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private contextRetryDelay = 1000;
-  private contextAskPending = false;
+  private contextAskPending = new Set<string>();
   /**
    * One-shot, mirroring the shipped window's `reattachChecked` (`views/UnifiedChatView.ts:3496`): a
    * cold load asks the shared controller to reattach to a live run ONCE. Re-asking on every render
@@ -1463,7 +1463,7 @@ export class SearchV3View extends JfElement {
     // Keep the exact submitted text selectable even after a retry confirms context. Never replace
     // newer input to recover it; the reader can copy these words back when ready to try again.
     return [context, question === undefined ? ''
-      : `Question not sent. Your draft is kept. Unsent question (copy to reuse): “${question}”`]
+      : `Question not sent. Unsent question (copy to reuse): “${question}”`]
       .filter(Boolean).join(' ');
   }
 
@@ -2810,10 +2810,10 @@ export class SearchV3View extends JfElement {
     const composer = this.composer;
     const draftRevision = composer?.draftRevision;
     const sessionId = this.sessions.activeId;
-    if (this.contextAskPending) return;
+    if (sessionId !== null && this.contextAskPending.has(sessionId)) return;
     let context: ReturnType<typeof sv3FollowUpContext> = [];
     if (sessionId !== null) {
-      this.contextAskPending = true;
+      this.contextAskPending.add(sessionId);
       try {
         const resolved = await this.followUpContext(sessionId);
         if (resolved === null || !this.isConnected || this.sessions.activeId !== sessionId) {
@@ -2824,7 +2824,7 @@ export class SearchV3View extends JfElement {
         context = resolved;
         this.refusedQuestions.delete(sessionId);
       } finally {
-        this.contextAskPending = false;
+        this.contextAskPending.delete(sessionId);
       }
     }
     this.leaveResultsBySending();

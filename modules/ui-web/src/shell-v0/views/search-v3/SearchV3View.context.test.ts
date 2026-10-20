@@ -1647,6 +1647,98 @@ describe('the undo never leaves the bar showing a state that is not saved (S2.10
     },
   );
 
+  it.each(['', 'A different draft'])(
+    'keeps an honest refusal after context recovers and the composer becomes "%s" (X20)', async (draft) => {
+      twoTurnConversation();
+      const el = await mount();
+      await openTheOnlyConversation(el);
+      vi.useFakeTimers();
+      try {
+        backend.failHistoryFor.add('uc-ctx');
+        contextAction(el, 'restore');
+        await settle(el);
+        await ask(el, 'The refused question');
+        expect(backend.dispatches).toHaveLength(0);
+        expect(await contextNotice(el)).toContain('Question not sent');
+        backend.failHistoryFor.clear();
+        window.dispatchEvent(new Event('online'));
+        await settle(el);
+        expect(await contextNotice(el)).not.toContain('could not be confirmed');
+        const composer = await region(el, 'jf-sv3-composer');
+        const field = composer.shadowRoot!.querySelector<HTMLTextAreaElement>('textarea')!;
+        field.value = draft;
+        field.dispatchEvent(new Event('input'));
+        await composer.updateComplete;
+        await settle(el);
+        expect(field.value).toBe(draft);
+        const notice = await contextNotice(el);
+        expect(notice).toContain('Question not sent');
+        expect(notice).toContain('Unsent question (copy to reuse): “The refused question”');
+        expect(notice).not.toContain('Your draft is kept');
+        expect(backend.dispatches).toHaveLength(0);
+      } finally {
+        el.remove();
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it('sends in another conversation while the first question waits for context (X28)', async () => {
+    twoTurnConversation();
+    backend.conversations.push(conversationRow('uc-other', 'The other conversation'));
+    backend.threads['uc-other'] = {
+      conversationId: 'uc-other',
+      events: [
+        wireEvent(storedId(5), 'USER_MESSAGE', 'The other conversation'),
+        wireEvent(storedId(6), 'ASSISTANT_MESSAGE', 'The other answer'),
+      ],
+    };
+    backend.histories['uc-other'] = {
+      sessionId: 'uc-other',
+      messages: [
+        { role: 'user', content: 'The other conversation', id: storedId(5) },
+        { role: 'assistant', content: 'The other answer', id: storedId(6) },
+      ],
+    };
+    // Finish each dispatched answer immediately, so only context confirmation can block Send.
+    const serve = fetchMock.getMockImplementation() as (url: unknown, init: unknown) => Promise<unknown>;
+    fetchMock.mockImplementation((url: unknown, init: unknown) => {
+      if (String(url).includes('/api/chat/dispatch')) {
+        backend.dispatches.push(bodyOf(init));
+        return Promise.resolve(new Response('event: done\ndata: {}\n\n'));
+      }
+      return serve(url, init);
+    });
+    const el = await mount();
+    await openTheOnlyConversation(el);
+    const release = holdWriteResponse(`/messages/${storedId(0)}/exclude`);
+    contextAction(el, 'exclude', 0);
+    await settle(el);
+    try {
+      await ask(el, 'Waiting question in the first conversation');
+      const sidebar = await region(el, 'jf-sv3-sidebar');
+      for (const row of sidebar.shadowRoot!.querySelectorAll<Updatable>('jf-sv3-session-row')) {
+        await row.updateComplete;
+        const button = row.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="sv3-session-row-button"]')!;
+        if (button.textContent?.includes('The other conversation')) button.click();
+      }
+      await settle(el);
+      expect(el.sessions.activeId).toBe('uc-other');
+      await ask(el, 'Question in the other conversation');
+      expect(backend.dispatches.filter((d) => d.conversationId === 'uc-other')).toEqual([
+        expect.objectContaining({ question: 'Question in the other conversation' }),
+      ]);
+      const composer = await region(el, 'jf-sv3-composer');
+      expect(composer.shadowRoot!.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('');
+    } finally {
+      release();
+      await settle(el);
+    }
+    expect(backend.dispatches.filter((d) => d.conversationId === 'uc-other')).toHaveLength(1);
+    expect(backend.dispatches.some((d) => d.conversationId === 'uc-other'
+      && d.question === 'Waiting question in the first conversation')).toBe(false);
+  });
+
   it('keeps the refused-send reason through failed background retries (X19)', async () => {
     twoTurnConversation();
     const el = await mount();
