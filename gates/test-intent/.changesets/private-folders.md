@@ -515,3 +515,14 @@ The existing rejection and acceptance records below are preserved byte-for-byte.
   "note": "Entries match P1-P9 and the delegated choices; at 4975ceedf the 13 repair checks fail by assertion, the four link and keystore preservation checks pass on both, and the live Linux Engine plus shell ledger checks agree."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "68cbdc5d-edcd-48f2-877a-6ee743af71e9",
+  "verdict": "accept",
+  "digest": "sha256:97dce9d5814fe39b6e7e7b9728076c259ea9def3cb5dcca93ecd4a8bbecf0a70",
+  "note": "Hard-link and iterator entries follow P6/P7 and the delegated hard-link choice; both new checks fail by assertion at 46816f593 (outside file chmod to 0600, escaping DirectoryIteratorException) and pass on f4fafcb26, and the live Linux Engine confirms hard-linked outside files keep mode 0664 with a warning while P1/P2 still hold."
+}
+```
