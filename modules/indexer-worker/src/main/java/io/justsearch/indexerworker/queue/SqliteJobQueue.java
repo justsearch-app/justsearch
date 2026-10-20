@@ -1369,6 +1369,30 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override
+  public boolean queueStillOwnsFileAdmission(String path, String unitRevision) {
+    if (path == null || unitRevision == null) return false;
+    lock.lock();
+    try {
+      ensureOpen();
+      try (PreparedStatement query = connection.prepareStatement(
+          "SELECT state, unit_revision FROM jobs WHERE path = ?")) {
+        query.setString(1, path);
+        try (ResultSet row = query.executeQuery()) {
+          if (!row.next()) return false;
+          String revision = row.getString("unit_revision");
+          return STATE_PENDING.equals(row.getString("state"))
+              || (revision != null && !unitRevision.equals(revision));
+        }
+      }
+    } catch (SQLException unavailable) {
+      recordDbError();
+      throw new IllegalStateException("Queue admission ownership evidence is unreadable", unavailable);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
   public boolean matchesAcceptedCapturedFileDeletion(
       String path, String unitRevision, String plannedSourceSha256) {
     if (path == null || path.isBlank() || unitRevision == null || unitRevision.isBlank()

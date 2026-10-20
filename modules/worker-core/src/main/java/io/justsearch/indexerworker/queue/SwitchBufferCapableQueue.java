@@ -139,6 +139,15 @@ public interface SwitchBufferCapableQueue extends JobQueue {
   }
 
   /**
+   * True when the durable queue row for {@code path} still owns this admission: the row is
+   * pending, or a later admission of the same path replaced its revision. A writer that drains
+   * the queue later then applies the path to whatever generation it serves.
+   */
+  default boolean queueStillOwnsFileAdmission(String path, String unitRevision) {
+    throw new UnsupportedOperationException("Queue admission ownership evidence is unavailable");
+  }
+
+  /**
    * Exact captured-plan evidence for a file already removed by a later broad replay receipt.
    * This is read-only: the retained sealed walk row must remain available for its owner to
    * acknowledge after the final pointer certificate.

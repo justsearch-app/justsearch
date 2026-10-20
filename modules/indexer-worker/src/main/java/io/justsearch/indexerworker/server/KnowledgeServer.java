@@ -8181,7 +8181,7 @@ public final class KnowledgeServer implements Closeable {
                         MIGRATION_SWITCHING_MAX_DURATION_MS,
                         cutoverMaxFailedJobs,
                         () -> ingestLifecycle,
-                        this::finalizeEmbeddingRebuildBeforeCutover,
+                        this::finalizeOrRefuseRecordedCandidateBeforeCutover,
                         this::drainSwitchBufferBestEffort,
                         log,
                          this::enterSwitchingWithMutationAdmission,
@@ -8218,8 +8218,10 @@ public final class KnowledgeServer implements Closeable {
                            }
                          }));
               } finally {
-                try { reconcileRefusedRecordedCandidate(); }
-                catch (RuntimeException failure) {
+                try {
+                  observeFailedRecordedCandidate();
+                  reconcileRefusedRecordedCandidate();
+                } catch (RuntimeException failure) {
                   log.error("Refused candidate cutover cleanup will retry", failure);
                 }
               }
@@ -8227,6 +8229,35 @@ public final class KnowledgeServer implements Closeable {
             "migration-cutover");
     migrationCutoverThread.setDaemon(true);
     migrationCutoverThread.start();
+  }
+
+  /**
+   * A FAILED pointer is a precommit refusal only once the application records it. Ask the
+   * recorded owner to observe it now, so cleanup follows at once instead of at the next reaper
+   * tick, minutes later.
+   */
+  private void observeFailedRecordedCandidate() {
+    if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
+        || recordedCandidatePrecommitRefused()) return;
+    String candidate;
+    try {
+      candidate = IndexGenerationManager.recordedGenerationId(recorded.operationKey());
+    } catch (IOException invalid) {
+      return; // The ordinary reaper path reports an operation key it cannot map.
+    }
+    RecordedIngestionLifecycle.Attachment attachment;
+    runtimeSwapLock.lock();
+    try {
+      var state = indexGenerationManager.readStateBestEffort();
+      boolean failedCandidate = !closeStarted && running && state != null
+          && "FAILED".equals(state.migration_state())
+          && candidate.equals(state.building_generation());
+      attachment = failedCandidate ? recordedIngestionAttachment : null;
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+    // As in notifyRecordedServicesPublished: the callback runs outside the runtime lock.
+    if (attachment != null) attachment.servicesPublished();
   }
 
   private boolean recordedCandidatePrecommitRefused() {
@@ -8814,12 +8845,18 @@ public final class KnowledgeServer implements Closeable {
           // certified on surviving A. The same producer fence excludes a later file admission.
           try (var fence = producer.mutationAdmission().beginFinalFence(
               producer.mutationOwnerToken(), 10_000)) {
-            if (fence == null || !producer.mutationAdmission().replayCertain()) {
+            // An uncertain watcher latch does not block rollback. Every latch source is a
+            // filesystem observation this producer could not record; nothing is deleted or
+            // approved on it here. The restart after cleanup replaces the producer, and the new
+            // owner's root registration walk and periodic sync reconcile A from the roots.
+            if (fence == null) {
               throw new IOException("Refused candidate mutation admission is not settled");
             }
+            // Pending rows are path work on the shared queue, not B effects: a FENCED boot
+            // enqueues its root walk but never runs the loop. They stay durable and run on A
+            // after the restart; only a claimed row could still publish a late write.
             var counts = jobQueue.jobStateCountsStrict();
-            if (counts.processingCount() != 0 || counts.pendingCount() != 0
-                || !producer.pauseProducerForCutover(10_000)) {
+            if (counts.processingCount() != 0 || !producer.pauseProducerForCutover(10_000)) {
               throw new IOException("Refused candidate writer has not settled");
             }
             try {
@@ -8830,9 +8867,11 @@ public final class KnowledgeServer implements Closeable {
                       JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log,
                       System.nanoTime() + TimeUnit.SECONDS.toNanos(10),
                       state.building_generation(), ignored -> true)
-                      .withPublisher(producer.ingestService()))) {
+                      .withPublisher(producer.ingestService()),
+                  () -> migrationHaltCut("migration-refusal-after-source-commit"))) {
                 throw new IOException("Refused candidate still has unproved source mutations");
               }
+              migrationTransition("migration-refusal-after-journal-ack");
               // Producer close joins the actual Green writer before its B model lease can leave.
               producer.close();
               if (recordedCandidateInPlace) {
@@ -8845,8 +8884,10 @@ public final class KnowledgeServer implements Closeable {
               if (recordedCandidateInPlace) return; // A recompose failed; retain exact owners.
               if (ingestLifecycle != null && ingestLifecycle != searchLifecycle) ingestLifecycle.close();
               indexGenerationManager.abandonBuildingGeneration("recorded candidate refused");
+              migrationTransition("migration-refusal-after-abandonment");
               indexGenerationManager.retireRefusedRecordedGeneration(
                   recorded.operationKey(), recorded.sourceGeneration());
+              migrationTransition("migration-refusal-after-retirement");
               restart = true;
             } finally {
               if (!producer.producerClosed()) producer.resumeProducerAfterCutover();
@@ -8870,6 +8911,100 @@ public final class KnowledgeServer implements Closeable {
       notifyRecordedServicesPublished();
       migrationRestartAction.run();
     }
+  }
+
+  /**
+   * The SWITCHING finalization step of a recorded candidate. Two candidates can never certify,
+   * so waiting only spends the whole SWITCHING deadline: one whose producer latched an
+   * unrecorded watcher mutation (the latch never clears in this process), and one that is
+   * provably empty while an embedding model is configured (it never earns the embedding stamp,
+   * and an empty index is never attested). Both are refused now, before the pointer moves, and
+   * the ordinary refused-candidate cleanup restores A.
+   */
+  private boolean finalizeOrRefuseRecordedCandidateBeforeCutover() {
+    if (refuseUncertifiableRecordedCandidate(false)) return false;
+    if (finalizeEmbeddingRebuildBeforeCutover()) return true;
+    refuseUncertifiableRecordedCandidate(true);
+    return false;
+  }
+
+  /** Writes FAILED under the promotion lock order when the SWITCHING candidate cannot certify. */
+  private boolean refuseUncertifiableRecordedCandidate(boolean refuseProvablyEmpty) {
+    if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
+        || !(appServices instanceof DefaultWorkerAppServices observed)) {
+      return false;
+    }
+    // Unfenced pre-check: an ordinary candidate still earning its stamp never takes the fence.
+    if (observed.mutationAdmission().replayCertain() && !(refuseProvablyEmpty
+        && ingestLifecycle instanceof RunningRuntime observedGreen
+        && observedGreen.indexCountOps().docCount() == 0L)) {
+      return false;
+    }
+    try {
+      runtimeSwapLock.lockInterruptibly();
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
+    try {
+      if (closeStarted || encoderRecoveryReservation != null
+          || (recoveryStartContext != null && recoveryStartContext.recoveryAttempt())
+          || !(appServices instanceof DefaultWorkerAppServices producer)) return false;
+      try (var fence = producer.mutationAdmission().beginFinalFence(
+          producer.mutationOwnerToken(), 10_000)) {
+        if (fence == null) return false;
+        var state = indexGenerationManager.readStateBestEffort();
+        String candidate = IndexGenerationManager.recordedGenerationId(recorded.operationKey());
+        if (state == null || !"SWITCHING".equals(state.migration_state())
+            || !recorded.sourceGeneration().equals(state.active_generation())
+            || !candidate.equals(state.building_generation())) return false;
+        String reason;
+        if (!producer.mutationAdmission().replayCertain()) {
+          reason = "an unrecorded watcher mutation prevents certified promotion";
+        } else if (refuseProvablyEmpty && recordedCandidateProvablyEmpty(recorded, candidate)) {
+          reason = "the candidate is empty and an empty index cannot earn the embedding stamp";
+        } else {
+          return false;
+        }
+        log.warn("Recorded candidate {} refused before the pointer moved: {}", candidate, reason);
+        indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+        return true;
+      }
+    } catch (IOException | RuntimeException unavailable) {
+      log.warn("Cannot decide whether the SWITCHING candidate can certify", unavailable);
+      return false;
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return false;
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  /**
+   * Provably empty: the captured walk closed complete with no planned unit, no recorded claim
+   * was issued, no queue row is pending or claimed, no projection source seeds the candidate, no
+   * accepted journal obligation is waiting for B, and B holds no document. Anything unreadable
+   * or still moving is not empty.
+   */
+  private boolean recordedCandidateProvablyEmpty(
+      IndexGenerationManager.BootOwnership.Recorded recorded, String candidate) throws IOException {
+    if (!(ingestLifecycle instanceof RunningRuntime green) || green == searchLifecycle
+        || recordedCandidateInPlace || buildingIndexPath == null
+        || !indexGenerationManager.resolveGenerationPathStrict(candidate).equals(buildingIndexPath)
+        || !migrationEnumeratorDone || migrationEnumeratorRunning.get()
+        || !expectedProjectionSourceIds().isEmpty()) return false;
+    var walk = jobQueue.recordedWalk(recorded.operationKey()).orElse(null);
+    if (walk == null || !walk.capturedPlan()
+        || walk.enumerationOutcome() != JobQueue.WalkEnumerationOutcome.COMPLETE
+        || walk.plannedUnits() == null || walk.plannedUnits() != 0L
+        || jobQueue.hasIssuedRecordedClaims(recorded.operationKey())) return false;
+    var counts = jobQueue.jobStateCountsStrict();
+    if (counts.pendingCount() != 0 || counts.processingCount() != 0
+        || !(jobQueue instanceof SwitchBufferCapableQueue journal)
+        || !journal.listSwitchBufferOpsStrictForGeneration(candidate).isEmpty()) return false;
+    green.commitOps().maybeRefreshBlocking();
+    return green.indexCountOps().docCountOrThrow() == 0L;
   }
 
   /** State transition and producer admission use one lock order: runtime, mutation, generation. */

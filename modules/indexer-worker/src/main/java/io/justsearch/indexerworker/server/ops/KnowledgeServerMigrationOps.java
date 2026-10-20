@@ -540,8 +540,15 @@ public final class KnowledgeServerMigrationOps {
    * abandonment once exact journal versions are committed and verified on A.
    */
   public static boolean drainRefusedCandidateOnSource(DrainSwitchBufferContext context) {
+    return drainRefusedCandidateOnSource(context, () -> {});
+  }
+
+  /** As above, with a harness cut after A's commit and verification, before the journal ack. */
+  public static boolean drainRefusedCandidateOnSource(DrainSwitchBufferContext context,
+      Runnable sourceCommittedBeforeAck) {
     if (context.replayGeneration() == null || context.replayGeneration().isBlank()) return false;
-    return drainSwitchBuffer(context, true, true, false, () -> {}, true).applied();
+    return drainSwitchBuffer(context, true, true, false,
+        Objects.requireNonNull(sourceCommittedBeforeAck, "sourceCommittedBeforeAck"), true).applied();
   }
 
   /** Replay remains durable until the generation pointer commits, so abandonment can replay on A. */
@@ -994,8 +1001,9 @@ public final class KnowledgeServerMigrationOps {
       // that a later DELETE_PREFIX removed.
       if (!"UPSERT".equals(kind) && !toEnqueue.isEmpty()) {
         if (!enqueueBufferedUpserts(context, toEnqueue)
-            || (exactRead && (!awaitQueuedUpserts(context)
-                || !verifyBufferedUpserts(context, toEnqueue, ops, deleteOrder, false)))) {
+            || (exactRead && (!awaitQueuedUpserts(context, refusedSourceRecovery)
+                || !verifyBufferedUpserts(context, toEnqueue, ops, deleteOrder, false,
+                    refusedSourceRecovery)))) {
           context.log().warn("Buffered UPSERT did not settle before a later {}", kind);
           return new ReplayOutcome(false, List.of());
         }
@@ -1356,7 +1364,7 @@ public final class KnowledgeServerMigrationOps {
                 // Enumeration may enqueue a file that the Green loop has already claimed. A
                 // subsequent direct DELETE_PREFIX must wait for that writer, not merely remove its
                 // queue row while it can still publish a late Lucene write.
-                if (exactRead && !awaitQueuedUpserts(context)) {
+                if (exactRead && !awaitQueuedUpserts(context, refusedSourceRecovery)) {
                   return new ReplayOutcome(false, List.of());
                 }
               }
@@ -1409,7 +1417,8 @@ public final class KnowledgeServerMigrationOps {
                     .info("Replayed buffered PRUNE_PREFIX: prefix={} pruned={}", payload, pruned);
                 // A removed file found present again was queued; a later direct delete must wait
                 // for its writer, as after a replayed SYNC_ROOT.
-                if (exactRead && replayed.requeued() > 0 && !awaitQueuedUpserts(context)) {
+                if (exactRead && replayed.requeued() > 0
+                    && !awaitQueuedUpserts(context, refusedSourceRecovery)) {
                   return new ReplayOutcome(false, List.of());
                 }
               }
@@ -1443,7 +1452,7 @@ public final class KnowledgeServerMigrationOps {
 
     if (!toEnqueue.isEmpty()) {
       allApplied &= enqueueBufferedUpserts(context, toEnqueue)
-          && (!exactRead || awaitQueuedUpserts(context));
+          && (!exactRead || awaitQueuedUpserts(context, refusedSourceRecovery));
     }
 
     if (mutatedLucene && context.ingestLifecycle() != null) {
@@ -1466,7 +1475,8 @@ public final class KnowledgeServerMigrationOps {
     if (allApplied && exactRead) {
       allApplied = verifyBufferedUpserts(context, ops.stream()
           .filter(op -> "UPSERT".equalsIgnoreCase(op.op())
-              && !context.approvedGapVersions().contains(op)).toList(), ops, deleteOrder, true);
+              && !context.approvedGapVersions().contains(op)).toList(), ops, deleteOrder, true,
+          refusedSourceRecovery);
     }
     if (allApplied) {
       allApplied = verifyBufferedProjections(context, ops, deleteOrder);
@@ -1478,6 +1488,11 @@ public final class KnowledgeServerMigrationOps {
       context.log().warn("Serving generation changed during VDU replay; retaining snapshot for retry");
     }
     boolean removed = false;
+    if (allApplied && removeAfterReplay && refusedSourceRecovery) {
+      // Refused recovery never takes the candidate projection cut above; its runnable is the
+      // harness cut between A's committed, verified replay and the journal acknowledgement.
+      firstCandidateProjectionApplied.run();
+    }
     if (allApplied && removeAfterReplay) {
       try {
         int cleared = sbq.removeReplayedSwitchBufferOps(ops);
@@ -1540,13 +1555,18 @@ public final class KnowledgeServerMigrationOps {
   }
 
   /** A later direct Lucene delete cannot overtake a claimed UPSERT still writing on Green. */
-  private static boolean awaitQueuedUpserts(DrainSwitchBufferContext context) {
+  private static boolean awaitQueuedUpserts(DrainSwitchBufferContext context,
+      boolean refusedSourceRecovery) {
     // All replay barriers consume the same SWITCHING budget. Returning early would re-enqueue
     // retained UPSERT versions on the next attempt, possibly resetting a claimed write.
     long deadline = context.deadlineNanos();
     try {
       while (true) {
         JobQueue.JobStateCounts counts = context.jobQueue().jobStateCountsStrict();
+        // Refused-candidate recovery runs with its writer paused and proved idle, so pending rows
+        // cannot move here; they stay durable queue work that surviving A's writer runs after
+        // the restart that follows cleanup. Only a claimed row could still publish a late write.
+        if (refusedSourceRecovery) return counts.processingCount() == 0;
         if (counts.processingCount() == 0 && counts.pendingCount() == 0) return true;
         if (System.nanoTime() >= deadline) return false;
         Thread.sleep(50);
@@ -1588,7 +1608,7 @@ public final class KnowledgeServerMigrationOps {
   private static boolean verifyBufferedUpserts(DrainSwitchBufferContext context,
       List<SwitchBufferCapableQueue.SwitchBufferOp> upserts,
       List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps, ReplayDeleteOrder deleteOrder,
-      boolean finalEffects) {
+      boolean finalEffects, boolean refusedSourceRecovery) {
     if (upserts.isEmpty()) return true;
     if (context.ingestLifecycle() == null
         || !(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) return false;
@@ -1610,6 +1630,12 @@ public final class KnowledgeServerMigrationOps {
           // the queue before crossing the boundary, then prove final absence after all writes.
           if (finalEffects && context.ingestLifecycle().indexCountOps()
               .countByIdAndChunksStrict(upsert.path()) != 0) return false;
+          continue;
+        }
+        if (refusedSourceRecovery
+            && queue.queueStillOwnsFileAdmission(upsert.path(), upsert.unitRevision())) {
+          // A pending row, or a later admission of the same path, owns this file on the queue
+          // that surviving A's writer drains after cleanup. A restart replays it on A.
           continue;
         }
         String indexed = context.ingestLifecycle().documentFieldOps()
