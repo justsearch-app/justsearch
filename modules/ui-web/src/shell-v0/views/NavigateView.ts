@@ -12,7 +12,7 @@
  * resolves to this view through the `viewFactoryRegistry`. The shape is
  * registered at module-load time via the side-effect import below. No
  * user-clickable surface mount today; the standalone probe path remains
- * `POST /api/chat/url-emit` (see slice 487's `agent-battery-url-probe.mjs`).
+ * `POST /api/chat/url-emit`.
  *
  * Trust gate: the shape's `URLExtractor` runs the trust lattice server-side
  * before forwarding any Navigation envelope onto `/api/intent/stream`. This
