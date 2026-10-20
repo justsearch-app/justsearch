@@ -340,7 +340,10 @@ final class LlamaServerOps {
    * port of this managed launch, or the external endpoint's port. It is kept here rather than in
    * {@link StartResult} so a same-configuration relaunch on a new port keeps its start identity.
    */
-  private record ActiveServer(StartResult start, ChildHandle child, int port) {}
+  private record ActiveServer(
+      StartResult start, ChildHandle child, LlamaServerEndpoint endpoint) {
+    int port() { return endpoint.port(); }
+  }
 
   // ==================== Constructor ====================
 
@@ -1759,11 +1762,16 @@ final class LlamaServerOps {
     // image).
     Path serverExeDir = context.inference().serverExecutable().getParent();
     Path logFile = prepareServerLog(resolveLlamaServerLogFile(context));
+    byte[] secret = new byte[32];
+    new java.security.SecureRandom().nextBytes(secret);
+    String apiKey = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(secret);
+    Map<String, String> environment = new java.util.HashMap<>(launchEnvironment());
+    environment.put("LLAMA_API_KEY", apiKey);
     ChildSpec spec = new ChildSpec(
         ChildKind.LLAMA_SERVER,
         command,
         serverExeDir != null && Files.isDirectory(serverExeDir) ? serverExeDir : null,
-        launchEnvironment(),
+        environment,
         new ChildSpec.Stdio.AppendToLog(logFile),
         gpuLayersOf(command) > 0,
         java.util.OptionalLong.empty(),
@@ -1772,7 +1780,7 @@ final class LlamaServerOps {
         "llama-server",
         runtimeDllPath(serverExeDir, context));
     LOG.debug("Starting server with command: {}", String.join(" ", command));
-    startManagedChild(spec, logFile, result, port);
+    startManagedChild(spec, logFile, result, new LlamaServerEndpoint(port, apiKey));
   }
 
   /** The {@code -ngl} value of a launch command; 0 when absent or unreadable. */
@@ -1907,8 +1915,9 @@ final class LlamaServerOps {
    * server whose stop did not confirm its exit stays held, as one that survived a stop does: the
    * next stop retries it and fails while it lives, and no start launches beside it.
    */
-  private void startManagedChild(ChildSpec spec, Path logFile, StartResult result, int port)
+  private void startManagedChild(ChildSpec spec, Path logFile, StartResult result, LlamaServerEndpoint endpoint)
       throws IOException {
+    int port = endpoint.port();
     retrySurvivor();
     InferenceConfig cfg = result.context().inference();
     ChildControl.ManifestEntry entry = new ChildControl.ManifestEntry(
@@ -1927,7 +1936,7 @@ final class LlamaServerOps {
     child = started;
     LOG.info("llama-server logs: {}", logFile);
     LOG.info("llama-server started, PID: {}, port: {}", started.pid(), port);
-    installActive(result, started, port);
+    installActive(result, started, endpoint);
   }
 
   private void armRuntimeMonitoring(ActiveServer owner)
@@ -2016,13 +2025,17 @@ final class LlamaServerOps {
 
   private HealthProbe probeHealth(ActiveServer expected, Duration timeout) {
     if (!isActive(expected)) return staleHealthProbe();
-    HealthProbe probe = probeHealth(expected.port(), timeout);
+    HealthProbe probe = probeHealth(expected.endpoint(), timeout);
     return isActive(expected) ? probe : staleHealthProbe();
   }
 
   private HealthProbe probeHealth(int port, Duration timeout) {
+    return probeHealth(new LlamaServerEndpoint(port, null), timeout);
+  }
+
+  private HealthProbe probeHealth(LlamaServerEndpoint endpoint, Duration timeout) {
     try {
-      HttpRequest request = buildGetRequest(port, PATH_HEALTH, timeout);
+      HttpRequest request = buildGetRequest(endpoint, PATH_HEALTH, timeout);
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
       boolean ok = response.statusCode() == 200;
@@ -2040,13 +2053,17 @@ final class LlamaServerOps {
 
   private PropsProbe probeServerProps(ActiveServer expected, Duration timeout) {
     if (!isActive(expected)) return stalePropsProbe();
-    PropsProbe probe = probeServerProps(expected.port(), timeout);
+    PropsProbe probe = probeServerProps(expected.endpoint(), timeout);
     return isActive(expected) ? probe : stalePropsProbe();
   }
 
   private PropsProbe probeServerProps(int port, Duration timeout) {
+    return probeServerProps(new LlamaServerEndpoint(port, null), timeout);
+  }
+
+  private PropsProbe probeServerProps(LlamaServerEndpoint endpoint, Duration timeout) {
     try {
-      HttpRequest request = buildGetRequest(port, PATH_PROPS, timeout);
+      HttpRequest request = buildGetRequest(endpoint, PATH_PROPS, timeout);
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
       if (response.statusCode() != 200) {
@@ -2337,14 +2354,18 @@ final class LlamaServerOps {
     return owner != null && owner.start() == expected && ownedPhysicalServerAlive(owner);
   }
 
-  /** Where the active server listens: this launch's fresh port, or the external endpoint's. */
-  OptionalInt activePort() {
+  Optional<LlamaServerEndpoint> activeEndpoint() {
     ActiveServer owner = activeServer;
-    return owner == null ? OptionalInt.empty() : OptionalInt.of(owner.port());
+    return owner == null ? Optional.empty() : Optional.of(owner.endpoint());
   }
 
   private ActiveServer installActive(StartResult start, ChildHandle launched, int port) {
-    ActiveServer owner = new ActiveServer(start, launched, port);
+    return installActive(start, launched, new LlamaServerEndpoint(port, null));
+  }
+
+  private ActiveServer installActive(
+      StartResult start, ChildHandle launched, LlamaServerEndpoint endpoint) {
+    ActiveServer owner = new ActiveServer(start, launched, endpoint);
     synchronized (ownershipMonitor) {
       activeServer = owner;
       failureSignalledOwner = null;

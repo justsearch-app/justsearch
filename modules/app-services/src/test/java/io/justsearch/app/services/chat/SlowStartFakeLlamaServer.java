@@ -111,7 +111,7 @@ public final class SlowStartFakeLlamaServer {
       exchange.getResponseBody().write(body);
       exchange.close();
     });
-    server.createContext("/props", exchange -> {
+    var props = server.createContext("/props", exchange -> {
       byte[] body = ("{\"model_path\":\"" + model + "\",\"n_ctx\":" + window + "}")
           .getBytes(StandardCharsets.UTF_8);
       exchange.getResponseHeaders().add("Content-Type", "application/json");
@@ -119,7 +119,7 @@ public final class SlowStartFakeLlamaServer {
       exchange.getResponseBody().write(body);
       exchange.close();
     });
-    server.createContext("/v1/chat/completions", exchange -> {
+    var chat = server.createContext("/v1/chat/completions", exchange -> {
       if (home != null) {
         Files.writeString(Path.of(home, "requests.txt"), "completion\n",
             StandardOpenOption.CREATE, StandardOpenOption.APPEND);
@@ -138,6 +138,27 @@ public final class SlowStartFakeLlamaServer {
       exchange.getResponseBody().write(body);
       exchange.close();
     });
+    String key = System.getenv("LLAMA_API_KEY");
+    if (key != null || (home != null && Files.exists(Path.of(home, "require-api-key")))) {
+      String expected = key == null ? "missing-engine-key" : key;
+      for (var context : List.of(props, chat)) {
+        context.getFilters().add(new com.sun.net.httpserver.Filter() {
+          @Override public String description() { return "llama API authentication"; }
+          @Override public void doFilter(com.sun.net.httpserver.HttpExchange exchange,
+              Chain chain) throws IOException {
+            if (("Bearer " + expected).equals(
+                exchange.getRequestHeaders().getFirst("Authorization"))) {
+              chain.doFilter(exchange);
+            } else {
+              byte[] body = "Invalid API Key".getBytes(StandardCharsets.UTF_8);
+              exchange.sendResponseHeaders(401, body.length);
+              exchange.getResponseBody().write(body);
+              exchange.close();
+            }
+          }
+        });
+      }
+    }
     server.start();
     long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2);
     while (launcherAlive.getAsBoolean() && System.nanoTime() < deadline) {

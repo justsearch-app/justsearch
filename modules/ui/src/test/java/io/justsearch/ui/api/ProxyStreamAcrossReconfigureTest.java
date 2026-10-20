@@ -37,7 +37,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.IntSupplier;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,7 +110,7 @@ final class ProxyStreamAcrossReconfigureTest {
       config.jsonMapper(new io.justsearch.ui.json.Jackson3JsonMapper());
     });
     // The live server's port, as LocalApiServer resolves it: launches bind a fresh loopback port.
-    OpenAiCompatController proxy = proxy(executors, manager::servingPort, manager);
+    OpenAiCompatController proxy = proxy(executors, manager::servingEndpoint, manager);
     app.post("/v1/chat/completions", proxy::handleChatCompletions);
     app.start("127.0.0.1", 0);
 
@@ -171,7 +171,7 @@ final class ProxyStreamAcrossReconfigureTest {
    * proxy then.
    */
   private static OpenAiCompatController proxy(
-      EngineExecutorRegistry executors, IntSupplier port, InferenceLifecycleManager manager)
+      EngineExecutorRegistry executors, Supplier<io.justsearch.app.inference.LlamaServerEndpoint> port, InferenceLifecycleManager manager)
       throws Exception {
     Class<?> admissionType;
     try {
@@ -199,7 +199,7 @@ final class ProxyStreamAcrossReconfigureTest {
           }
         });
     return (OpenAiCompatController) OpenAiCompatController.class
-        .getConstructor(EngineExecutorRegistry.class, IntSupplier.class, Telemetry.class,
+        .getConstructor(EngineExecutorRegistry.class, Supplier.class, Telemetry.class,
             admissionType)
         .newInstance(executors, port, null, admission);
   }

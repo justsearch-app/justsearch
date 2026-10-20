@@ -152,7 +152,7 @@ class OnlineModeOpsTest {
             HttpClient.newHttpClient(),
             MAPPER,
             mode::get,
-            () -> port,
+            () -> new LlamaServerEndpoint(port, null),
             lastKnownModelId::get,
             () -> "default-model.gguf");
   }

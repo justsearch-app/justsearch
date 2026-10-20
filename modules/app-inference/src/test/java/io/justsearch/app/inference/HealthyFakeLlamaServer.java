@@ -220,7 +220,18 @@ public final class HealthyFakeLlamaServer {
           StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.CREATE,
           java.nio.file.StandardOpenOption.APPEND);
     }
+    if (behaviour.contains("--reject-reasoning") && List.of(args).contains("--reasoning-budget")) {
+      System.out.println("error while handling argument \"--reasoning-budget\": invalid stoi argument");
+      Thread.sleep(500);
+      System.exit(1);
+    }
     failLikeLlamaServerWhenAsked(behaviour, value(args, "-c", "4096"));
+    String apiKey = System.getenv("LLAMA_API_KEY");
+    if (behaviour.contains("--reject-api-key") && apiKey != null) {
+      System.out.println("LLAMA_API_KEY rejected by binary");
+      Thread.sleep(500);
+      System.exit(1);
+    }
     int port = Integer.parseInt(value(args, "--port", "-1"));
     String model = value(args, "-m", "model.gguf").replace('\\', '/');
     String window = value(args, "-c", "4096");
@@ -237,10 +248,11 @@ public final class HealthyFakeLlamaServer {
       exchange.getResponseBody().write(body);
       exchange.close();
     });
+    List<com.sun.net.httpserver.HttpContext> contexts = new ArrayList<>();
     var slots = new java.util.concurrent.Semaphore(Integer.parseInt(value(args, "-np", "1")));
     if (behaviour.contains("--single-slot-stream")) {
       server.setExecutor(command -> Thread.ofPlatform().daemon().start(command));
-      server.createContext("/v1/chat/completions", exchange -> {
+      contexts.add(server.createContext("/v1/chat/completions", exchange -> {
         exchange.getRequestBody().readAllBytes();
         boolean acquired = false;
         try {
@@ -258,9 +270,17 @@ public final class HealthyFakeLlamaServer {
         } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
         catch (IOException ended) { /* Client cancellation ends the exchange. */ }
         finally { exchange.close(); if (acquired) slots.release(); }
-      });
+      }));
+    } else {
+      contexts.add(server.createContext("/v1/chat/completions", exchange -> {
+        exchange.getRequestBody().readAllBytes();
+        byte[] body = "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}".getBytes(StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(200, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
+      }));
     }
-    server.createContext("/completion", exchange -> {
+    contexts.add(server.createContext("/completion", exchange -> {
       if (behaviour.contains("--single-slot-stream")) {
         Files.writeString(Path.of(home, "probe-attempts"), "probe\n", StandardCharsets.US_ASCII,
             java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
@@ -288,15 +308,45 @@ public final class HealthyFakeLlamaServer {
       exchange.getResponseBody().write(body);
       exchange.close();
       if (behaviour.contains("--single-slot-stream")) slots.release();
-    });
-    server.createContext("/props", exchange -> {
+    }));
+    contexts.add(server.createContext("/props", exchange -> {
       byte[] body = ("{\"model_path\":\"" + model + "\",\"n_ctx\":" + window + "}")
           .getBytes(StandardCharsets.UTF_8);
       exchange.getResponseHeaders().add("Content-Type", "application/json");
       exchange.sendResponseHeaders(200, body.length);
       exchange.getResponseBody().write(body);
       exchange.close();
-    });
+    }));
+    for (String path : List.of("/tokenize", "/apply-template")) {
+      contexts.add(server.createContext(path, exchange -> {
+        exchange.getRequestBody().readAllBytes();
+        byte[] body = (path.equals("/tokenize") ? "{\"tokens\":[1,2,3]}"
+            : "{\"prompt\":\"user: test\"}").getBytes(StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(200, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
+      }));
+    }
+    if (behaviour.contains("--require-api-key") || apiKey != null) {
+      String expected = apiKey == null ? "missing-engine-key" : apiKey;
+      for (var context : contexts) {
+        context.getFilters().add(new com.sun.net.httpserver.Filter() {
+          @Override public String description() { return "llama API authentication"; }
+          @Override public void doFilter(com.sun.net.httpserver.HttpExchange exchange,
+              Chain chain) throws IOException {
+            if (("Bearer " + expected).equals(
+                exchange.getRequestHeaders().getFirst("Authorization"))) {
+              chain.doFilter(exchange);
+            } else {
+              byte[] body = "Invalid API Key".getBytes(StandardCharsets.UTF_8);
+              exchange.sendResponseHeaders(401, body.length);
+              exchange.getResponseBody().write(body);
+              exchange.close();
+            }
+          }
+        });
+      }
+    }
     server.start();
     if (home != null && behaviour.contains("--spawn-lingerer")) {
       new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(), "-cp",
@@ -405,6 +455,10 @@ public final class HealthyFakeLlamaServer {
         windows
             ? "@echo off\r\n\"" + java + "\" @\"" + argFile + "\" " + main + " %*\r\n"
             : "#!/bin/sh\nexec \"" + java + "\" @\"" + argFile + "\" " + main + " \"$@\"\n";
+    if (!windows && List.of(behaviour).contains("--wrapper")) {
+      body = "#!/bin/sh\n\"" + java + "\" @\"" + argFile + "\" " + main + " \"$@\" &\n"
+          + "server=$!\ntrap 'kill \"$server\" 2>/dev/null; wait \"$server\"' EXIT\nwait \"$server\"\n";
+    }
     Files.writeString(script, body, StandardCharsets.UTF_8);
     if (!script.toFile().setExecutable(true)) {
       throw new IOException("could not make " + script + " executable");

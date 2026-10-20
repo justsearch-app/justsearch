@@ -251,7 +251,7 @@ final class VduRequestActivityTest {
       });
       upstream.start();
       chat = new ChatController(root.executors(), conversation, new SseWriter(null), null);
-      var proxy = new OpenAiCompatController(http, () -> upstream.getAddress().getPort(), null);
+      var proxy = new OpenAiCompatController(http, () -> new io.justsearch.app.inference.LlamaServerEndpoint(upstream.getAddress().getPort(), null), null);
       when(surface.callTool(anyString(), anyMap(), any(), any(), any()))
           .thenReturn(Map.of("content", List.of()));
       var protocol = new McpProtocolHandler(surface, List.of(), Clock.systemUTC(), root.admission());

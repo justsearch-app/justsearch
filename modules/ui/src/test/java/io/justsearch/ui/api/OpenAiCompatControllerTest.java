@@ -95,7 +95,7 @@ class OpenAiCompatControllerTest {
       config.jsonMapper(new io.justsearch.ui.json.Jackson3JsonMapper());
     });
     try (var http = HttpClient.newHttpClient()) {
-      var controller = new OpenAiCompatController(http, () -> upstream.getAddress().getPort(), null,
+      var controller = new OpenAiCompatController(http, () -> new io.justsearch.app.inference.LlamaServerEndpoint(upstream.getAddress().getPort(), null), null,
           work -> {
             generations.incrementAndGet();
             return generations::decrementAndGet;
@@ -159,7 +159,7 @@ class OpenAiCompatControllerTest {
     var result = ArgumentCaptor.forClass(InputStream.class);
     when(ctx.result(result.capture())).thenReturn(ctx);
     var pacing = new AtomicInteger();
-    new OpenAiCompatController(http, () -> 8081, null, owner -> {
+    new OpenAiCompatController(http, () -> new io.justsearch.app.inference.LlamaServerEndpoint(8081, null), null, owner -> {
       pacing.incrementAndGet();
       return pacing::decrementAndGet;
     }).handleChatCompletions(ctx);
@@ -185,7 +185,7 @@ class OpenAiCompatControllerTest {
       var result = ArgumentCaptor.forClass(InputStream.class);
       when(ctx.result(result.capture())).thenReturn(ctx);
       var generations = new AtomicInteger();
-      new OpenAiCompatController(http, () -> 8081, null, owner -> {
+      new OpenAiCompatController(http, () -> new io.justsearch.app.inference.LlamaServerEndpoint(8081, null), null, owner -> {
         generations.incrementAndGet();
         return () -> {};
       }).handleModels(ctx);
@@ -209,7 +209,7 @@ class OpenAiCompatControllerTest {
       when(ctx.attribute(RequestEngineWork.ATTRIBUTE)).thenReturn(work);
       when(ctx.result(any(InputStream.class))).thenThrow(new IllegalStateException("handoff failed"));
       assertThrows(IllegalStateException.class,
-          () -> new OpenAiCompatController(http, () -> 8081, null).handleChatCompletions(ctx));
+          () -> new OpenAiCompatController(http, () -> new io.justsearch.app.inference.LlamaServerEndpoint(8081, null), null).handleChatCompletions(ctx));
       assertTrue(bodyClosed.get());
     }
     assertEquals(0, admission.activeWorkCount());
@@ -253,7 +253,7 @@ class OpenAiCompatControllerTest {
     var slowRequests = Executors.newSingleThreadExecutor();
     var app = Javalin.create(config -> config.showJavalinBanner = false);
     try (var http = HttpClient.newHttpClient()) {
-      var controller = new OpenAiCompatController(http, () -> upstream.getAddress().getPort(), null);
+      var controller = new OpenAiCompatController(http, () -> new io.justsearch.app.inference.LlamaServerEndpoint(upstream.getAddress().getPort(), null), null);
       new ApiSecurityFilters(true, "test-session-token", new EventBuffer(), slowRequests, null)
           .install(app);
       app.get("/v1/models", controller::handleModels);
@@ -308,7 +308,7 @@ class OpenAiCompatControllerTest {
     var ctx = mockContext("POST", "/v1/chat/completions");
     var result = ArgumentCaptor.forClass(InputStream.class);
     when(ctx.result(result.capture())).thenReturn(ctx);
-    new OpenAiCompatController(http, () -> 8081, null).handleChatCompletions(ctx);
+    new OpenAiCompatController(http, () -> new io.justsearch.app.inference.LlamaServerEndpoint(8081, null), null).handleChatCompletions(ctx);
     verify(ctx).header("Content-Type", "text/event-stream");
     verify(ctx, org.mockito.Mockito.never()).header("Connection", " cAcHe-CoNtRoL, X-Accel-Buffering ");
     verify(ctx, org.mockito.Mockito.never()).header("Cache-Control", "no-cache");
@@ -341,7 +341,7 @@ class OpenAiCompatControllerTest {
       when(ctx.attribute(RequestEngineWork.ATTRIBUTE)).thenReturn(work);
       var request = executor.submit(() -> {
         try {
-          new OpenAiCompatController(http, () -> 8081, null).handleChatCompletions(ctx);
+          new OpenAiCompatController(http, () -> new io.justsearch.app.inference.LlamaServerEndpoint(8081, null), null).handleChatCompletions(ctx);
         } finally {
           finished.countDown();
         }
@@ -364,7 +364,7 @@ class OpenAiCompatControllerTest {
     HttpClient httpClient = mock(HttpClient.class);
     Telemetry telemetry = null; // ApiErrorHandler.toResponse handles null telemetry.
     OpenAiCompatController ctrl =
-        new OpenAiCompatController(httpClient, () -> 0, telemetry);
+        new OpenAiCompatController(httpClient, () -> new io.justsearch.app.inference.LlamaServerEndpoint(0, null), telemetry);
 
     Context ctx = mockContext("POST", "/v1/chat/completions");
 
@@ -386,7 +386,7 @@ class OpenAiCompatControllerTest {
     when(httpClient.send(any(), any())).thenThrow(new ConnectException("connect refused"));
 
     OpenAiCompatController ctrl =
-        new OpenAiCompatController(httpClient, () -> 8081, null);
+        new OpenAiCompatController(httpClient, () -> new io.justsearch.app.inference.LlamaServerEndpoint(8081, null), null);
 
     Context ctx = mockContext("POST", "/v1/chat/completions");
 
@@ -423,7 +423,7 @@ class OpenAiCompatControllerTest {
     org.mockito.Mockito.doReturn(upstreamResp).when(httpClient).send(any(), any());
 
     OpenAiCompatController ctrl =
-        new OpenAiCompatController(httpClient, () -> 8081, null);
+        new OpenAiCompatController(httpClient, () -> new io.justsearch.app.inference.LlamaServerEndpoint(8081, null), null);
 
     Context ctx = mockContext("POST", "/v1/chat/completions");
 
