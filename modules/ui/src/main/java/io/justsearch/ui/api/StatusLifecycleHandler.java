@@ -786,33 +786,37 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * Performs one Worker observation and caches it. Never throws — a failed observation is itself a
    * recorded sample, which is what keeps {@code workerRpcStale} honest when the Worker is gone.
    */
-  private WorkerViewSample observeWorker() {
+  private java.util.Optional<WorkerViewSample> observeWorker() {
     // Stamped BEFORE the call, not after it, so the age reported to consumers is never younger
     // than the observation actually is (the 821 §3-C1 convention, preserved).
     long sampledAtMs = clockMs.getAsLong();
     KnowledgeServerBootstrap server = knowledgeServer;
     if (server == null || !server.hasClient()) {
-      return new WorkerViewSample(
-          WorkerOperationalView.fallback(cachedWorkerHealth()), true, null, sampledAtMs);
+      return java.util.Optional.of(new WorkerViewSample(
+          WorkerOperationalView.fallback(cachedWorkerHealth()), true, null, sampledAtMs));
     }
-    try (var lease = server.captureClient()) {
-      WorkerOperationalView view = lease.withClient(client -> client.getWorkerOperationalView(
-          io.justsearch.app.services.intent.EngineProvenance.internal("status-sampler",
-              io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
-              io.justsearch.core.context.EngineContext.Urgency.BACKGROUND)));
-      lastWorkerObservationAtMs = sampledAtMs;
-      return new WorkerViewSample(view, false, null, sampledAtMs);
+    try {
+      var captured = server.tryCaptureClient();
+      if (captured.isEmpty()) return java.util.Optional.empty();
+      try (var lease = captured.orElseThrow()) {
+        WorkerOperationalView view = lease.withClient(client -> client.getWorkerOperationalView(
+            io.justsearch.app.services.intent.EngineProvenance.internal("status-sampler",
+                io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+                io.justsearch.core.context.EngineContext.Urgency.BACKGROUND)));
+        lastWorkerObservationAtMs = sampledAtMs;
+        return java.util.Optional.of(new WorkerViewSample(view, false, null, sampledAtMs));
+      }
     } catch (Exception e) {
       log.debug(
           "Failed to fetch Knowledge Server status: {} - {}",
           e.getClass().getSimpleName(),
           e.getMessage(),
           e);
-      return new WorkerViewSample(
+      return java.util.Optional.of(new WorkerViewSample(
           WorkerOperationalView.fallback("UNAVAILABLE"),
           true,
           e.getClass().getSimpleName() + ": " + e.getMessage(),
-          sampledAtMs);
+          sampledAtMs));
     }
   }
 
@@ -937,7 +941,11 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
 
   private WorkerViewSample sampleWorkerIndependently(long period) {
     var before = lastComponentSnapshot.get();
-    var sampled = observeWorker();
+    var observed = observeWorker();
+    // Keep the previous sample's actual timestamp. No contact verdict was observed while the
+    // physical owner was intentionally retiring, so there is nothing new to publish as a fault.
+    if (observed.isEmpty()) return lastWorkerSample == null ? fallbackWorker() : lastWorkerSample;
+    var sampled = observed.orElseThrow();
     lastWorkerSample = sampled;
     // Contact is published independently of the registry's apply/publication lock.
     this.<Boolean>observation("index-publication").refresh("index-publication", () -> {

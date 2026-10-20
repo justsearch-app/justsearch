@@ -669,6 +669,29 @@ public final class KnowledgeServerBootstrap implements Closeable {
         }
     }
 
+    /** Observation-only capture: an intended physical transition defers the sample. */
+    public java.util.Optional<ClientLease> tryCaptureClient() {
+        publicationLock.readLock().lock();
+        try {
+            synchronized (clientLeaseMonitor) {
+                KnowledgeClient captured = client;
+                if (clientRetiring || !clientVerified || captured == null) {
+                    throw new IllegalStateException("Knowledge Server client is unavailable");
+                }
+                var observation = workerHost.tryCaptureHealthView();
+                if (observation.isEmpty() && !workerHost.runtimeReloadInProgress()) {
+                    return java.util.Optional.of(captureClient());
+                }
+                return observation.map(serving -> {
+                    clientHolders++;
+                    return new ClientLease(captured, serving);
+                });
+            }
+        } finally {
+            publicationLock.readLock().unlock();
+        }
+    }
+
     /** Process lock used to capture configuration and this client as one serving view. */
     public java.util.concurrent.locks.ReentrantReadWriteLock publicationLock() {
         return publicationLock;
@@ -891,7 +914,21 @@ public final class KnowledgeServerBootstrap implements Closeable {
     public java.util.Optional<Boolean> tryCheckHealth() {
         if (!initLock.tryLock()) return java.util.Optional.empty();
         try {
-            return java.util.Optional.of(checkHealth());
+            if (client == null) return java.util.Optional.of(false);
+            java.util.Optional<WorkerHost.ServingLease> captured;
+            try {
+                captured = workerHost.tryCaptureHealthView();
+            } catch (RuntimeException failure) {
+                observePhysicalLoss("Health capture failed: " + failure.getMessage());
+                throw failure;
+            }
+            if (captured.isEmpty()) {
+                return workerHost.runtimeReloadInProgress() ? java.util.Optional.empty()
+                    : java.util.Optional.of(checkHealth());
+            }
+            try (var view = captured.orElseThrow()) {
+                return java.util.Optional.of(view.withClient(client, ignored -> checkHealth()));
+            }
         } finally {
             initLock.unlock();
         }
