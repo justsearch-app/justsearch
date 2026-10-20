@@ -406,3 +406,14 @@ Pending independent verification; no builder acceptance.
   "note": "Audit 4 at fbf212bbf (B5 only changed since audit 3): the port-wait mutation that escaped audit 3, plus relaunch-only port wait and a lock held for the first 1.2 s of each health wait, now fail B5 3/3 on the candidate as on base 087cd7138; lock held only during back-off sleeps escapes both, so it is not a loss. Clean B5 3/3, 10-class batch 161/161."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-slow-tests-b-r10-cc6d91b2",
+  "verdict": "accept",
+  "digest": "sha256:e39f23ecaf13f44c796177b9c99f806f5cd25cae4e63277ea685f06c8b4511ca",
+  "note": "Round 10 at a6fbcee54: the four restored oracles fail 5/5 on the candidate for M1 reloads 600/900 ms after a foreign unload (base also 5/5), M2 a reconfigure drain ending after 500 ms (base 5/5), M3 an expiry that interrupts the worker (base 5/5) and M4 a leaked index root lock (candidate only; base sleeps), the item-4 helper passes six real-filesystem fault scenarios 5/5, B5 and F1 samples still fail 5/5, clean classes pass 5/5 with medians B8 8.67 s vs 10.22 s base, B9 3.01 vs 6.89, executor 32.61 vs 32.39, rich document 8.93 vs 10.87, and all 22 relabelled sources are delegated choices within the quoted grant."
+}
+```
