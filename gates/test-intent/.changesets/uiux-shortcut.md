@@ -59,13 +59,7 @@ state while closed and ignores older replies from overlapping calls.
 The temporary core fallback is tied to the override that caused it. A later explicit override
 change clears that fallback; it must not keep masking a newly configured search composer.
 
-Integration blocker requiring an orchestrator decision: the actual legacy composer is disabled
-while streaming. A component diagnostic confirmed no modal was active, the existing legacy focus
-handler was called once, streaming remained running, and focus stayed on the prior button. SC14
-therefore does not hold for that state under the no-UnifiedChatView-edit constraint. The diagnostic
-is scaffolding retained under tmp/uiux-shortcut, not a passing durable check. An explicit decision
-is pending: hold for the Search v3 flip, exempt the legacy streaming state, or separately specify
-a legacy composer change. No exception, acceptance record or legacy edit is authored here.
+Amendment after builder-2 (orchestrator, 2026-10-20 02:15): while the old window is the default (before WP1.5) and its composer is disabled because an answer is streaming, summon foregrounds the window and calls the old window's existing focus handler; focus stays where that handler leaves it. This is a pre-existing limit of the old window under decision 2 (report, do not fix; no UnifiedChatView changes) and is not counted as an S14.1/S14.14 pass. In Search v3, summon must still land in the search bar while an answer streams or an agent runs (S14.3 holds there).
 
 ```json
 {
@@ -376,14 +370,14 @@ a legacy composer change. No exception, acceptance record or legacy edit is auth
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
           "scenario": "SC1",
-          "quote": "2. (2): activate the window on every summon path (unminimize, show, focus, and the activation request X11 and Windows window managers honour), cold and warm; keep focus rules S14.4.",
+          "quote": "**S14.1 Summon from another app.** JustSearch is running and another application is in front. One press of the global shortcut brings the JustSearch main window to the foreground (it really takes it; a taskbar flash alone fails), and the keyboard focus lands in the search bar of the default search window, so typing goes there. This must hold from every window state:\n  - hidden to the tray by closing;\n  - minimized;\n  - behind other windows;\n  - never shown since an autostart `--minimized` launch.\n\n  The window must appear on a connected screen. A screen it was last on that is now disconnected must not hide it. Otherwise saved geometry is kept, with no move-to-current-monitor or move-to-workspace policy (decision 8).",
           "label": "agent-drafted, owner-adopted"
         },
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
           "scenario": "SC7",
-          "quote": "3. (3): plain-language reason, no internal text.",
+          "quote": "**S14.7 Three distinct states.** The shell and Settings tell apart:\n  - turned off by choice;\n  - on and registered;\n  - on but not active.\n\n  \"Not active\" covers: another app holds the chord, the OS refuses, an unsupported session (S14.10), or an unreadable preference (S14.8). Settings says in plain words that the shortcut is not active and why, and points to the command-line alternative. JustSearch starts and works normally. A failed registration never shows as active.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -426,8 +420,8 @@ a legacy composer change. No exception, acceptance record or legacy edit is auth
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
-          "scenario": "SC11",
-          "quote": "4. (4): if the \"space\" change is needed for the chord, keep it and add a preservation note; otherwise revert it.",
+          "scenario": "SN5",
+          "quote": "N14.5 In-app keys as today. Ctrl+L and `/` focus the bar with the same refusals, in Search v3 and in the old window. Ctrl+Shift+A is unchanged.",
           "label": "agent-drafted, owner-adopted"
         }
       ],
@@ -444,6 +438,8 @@ a legacy composer change. No exception, acceptance record or legacy edit is auth
 ## Review history
 
 2026-10-20: builder agent-session-7rm1w6nw added regression entries for the X11 release, summon activation, plain reason, and retired space normalization. The prior acceptance record is preserved verbatim and is stale; independent review of this candidate is required. Round checks use before 8ab5d0fab. Existing repaired checks retain c00a0cb24 fail-before evidence; preservation checks compare 8ab5d0fab.
+
+2026-10-20: builder agent-session-hau17olo replaced entry 7 brief citations with verbatim S14.1/SC1 and S14.7/SC7, and entry 8's disabled-binding source with N14.5/SN5. Recorded the agreed amendment after builder-2 above. Retired uncited uiux-shortcut-shell-new.json, superseded by the cited repairs-preservation evidence. Regenerated uiux-shortcut-frontend-new.json for the Settings and Help entries it serves, retaining before c00a0cb24 and removing the retired SC11 expectation. Acceptance records are unchanged; independent review is required.
 
 ## Acceptance records
 

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-19T23:50:43.960Z",
-  "revision": "c00a0cb24b4c6000e090d5d09054c1e7e1d24e2f",
-  "tree": "2702b6db9f2abf1cf70f7aae89a9361aec22951c",
+  "createdAt": "2026-10-20T02:27:46.458Z",
+  "revision": "e9a5dad65c43a015e95cfd1136ae5b3c1f1b46eb",
+  "tree": "957958f509f463bdeddd4351b149fe7b34cef9a0",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,148 +18,13 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" \"src/shell-v0/views/SettingsSurface.searchShortcut.test.ts\" \"src/shell-v0/views/HelpSurface.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-vitest-1700969-1792453834094.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/SettingsSurface.searchShortcut.test.ts\" \"src/shell-v0/views/HelpSurface.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/agent-method/sessions/agent-session-hau17olo/tmp/test-intent-vitest-4184006-1792463257704.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4317
+      "durationMs": 4141
     }
   ],
   "checks": [
-    {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 SC3 focuses the current default once without changing draft, URL or journal",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:4c5680c8bd7f9819cc541297dc8987a665b1431e0481e207fdc9244dca37dba6",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "native search summon shared destination SC2 SC3 focuses the current default once without changing draft, URL or journal",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC4 navigates from a non-modal view once with the prior view one Back away",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:4c5680c8bd7f9819cc541297dc8987a665b1431e0481e207fdc9244dca37dba6",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "native search summon shared destination SC4 navigates from a non-modal view once with the prior view one Back away",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC5 drains a request already pending before subscription and never replays it on reconnect",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:4c5680c8bd7f9819cc541297dc8987a665b1431e0481e207fdc9244dca37dba6",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "native search summon shared destination SC5 drains a request already pending before subscription and never replays it on reconnect",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 preserves a composer override and uses it as the destination",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:4c5680c8bd7f9819cc541297dc8987a665b1431e0481e207fdc9244dca37dba6",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "native search summon shared destination SC2 preserves a composer override and uses it as the destination",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 falls back temporarily for an override without a composer and preserves the saved override",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:4c5680c8bd7f9819cc541297dc8987a665b1431e0481e207fdc9244dca37dba6",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "native search summon shared destination SC2 falls back temporarily for an override without a composer and preserves the saved override",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 reuses a secondary search pane and never focuses the other composer",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:4c5680c8bd7f9819cc541297dc8987a665b1431e0481e207fdc9244dca37dba6",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "native search summon shared destination SC2 reuses a secondary search pane and never focuses the other composer",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC9 a pending explicit deep link keeps its destination instead of focusing Search",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:4c5680c8bd7f9819cc541297dc8987a665b1431e0481e207fdc9244dca37dba6",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "native search summon shared destination SC9 a pending explicit deep link keeps its destination instead of focusing Search",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC5 does not wait for the Engine schema request before consuming a ready focus request",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:4c5680c8bd7f9819cc541297dc8987a665b1431e0481e207fdc9244dca37dba6",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "native search summon shared destination SC5 does not wait for the Engine schema request before consuming a ready focus request",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC11 native registration takes precedence and an overlapping saved binding resumes when inactive",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:4c5680c8bd7f9819cc541297dc8987a665b1431e0481e207fdc9244dca37dba6",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "native search summon shared destination SC11 native registration takes precedence and an overlapping saved binding resumes when inactive",
-          "status": "passed"
-        }
-      ]
-    },
     {
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts#SC13 shows shortcut status independently of failed autostart and announces it politely",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts",
@@ -236,66 +101,6 @@
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts#SC12 explains the desktop summon, focus exceptions and command-line alternative",
-      "file": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:4b9152af197aa60b00bf5f8fd54123704be609052cebbb46d0cdffead0065851",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "HelpSurface — keyboard shortcuts (tempdoc 586 P-3) SC12 explains the desktop summon, focus exceptions and command-line alternative",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC5 SC6 late subscription cleanup cannot disable the reloaded view shortcut guard",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:4c5680c8bd7f9819cc541297dc8987a665b1431e0481e207fdc9244dca37dba6",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "native search summon shared destination SC5 SC6 late subscription cleanup cannot disable the reloaded view shortcut guard",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 ignores a missing override target without changing the saved override",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:4c5680c8bd7f9819cc541297dc8987a665b1431e0481e207fdc9244dca37dba6",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "native search summon shared destination SC2 ignores a missing override target without changing the saved override",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 targets the real Search v3 composer with no chat model and preserves its draft",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:4c5680c8bd7f9819cc541297dc8987a665b1431e0481e207fdc9244dca37dba6",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "native search summon shared destination SC2 targets the real Search v3 composer with no chat model and preserves its draft",
-          "status": "passed"
-        }
-      ]
-    },
-    {
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts#SC8 keeps newer shell state when an older toggle reply arrives late",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts",
       "runner": "vitest",
@@ -311,16 +116,16 @@
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 respects a changed override after a temporary core fallback",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "id": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts#SC12 explains the desktop summon, focus exceptions and command-line alternative",
+      "file": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4c5680c8bd7f9819cc541297dc8987a665b1431e0481e207fdc9244dca37dba6",
+      "contentDigest": "sha256:4b9152af197aa60b00bf5f8fd54123704be609052cebbb46d0cdffead0065851",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "native search summon shared destination SC2 respects a changed override after a temporary core fallback",
+          "name": "HelpSurface — keyboard shortcuts (tempdoc 586 P-3) SC12 explains the desktop summon, focus exceptions and command-line alternative",
           "status": "passed"
         }
       ]
@@ -333,78 +138,33 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" \"src/shell-v0/views/SettingsSurface.searchShortcut.test.ts\" \"src/shell-v0/views/HelpSurface.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-vitest-1700969-1792453839600.json\"",
+        "command": "npx vitest run \"src/shell-v0/views/SettingsSurface.searchShortcut.test.ts\" \"src/shell-v0/views/HelpSurface.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/agent-method/sessions/agent-session-hau17olo/tmp/test-intent-vitest-4184006-1792463263167.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 4186,
-        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-vitest-1700969-1792453839600.json\n\n"
+        "durationMs": 3081,
+        "output": "JSON report written to /home/elias/.cache/agent-method/sessions/agent-session-hau17olo/tmp/test-intent-vitest-4184006-1792463263167.json\n\n"
       }
     ],
     "checks": [
       {
-        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 SC3 focuses the current default once without changing draft, URL or journal",
-        "classification": "assertion",
-        "detail": "native search summon shared destination SC2 SC3 focuses the current default once without changing draft, URL or journal:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:111:35\n    at file:///home/elias/dev/justsearch/.claude"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC4 navigates from a non-modal view once with the prior view one Back away",
-        "classification": "assertion",
-        "detail": "native search summon shared destination SC4 navigates from a non-modal view once with the prior view one Back away:  AssertionError: expected 'core.library-surface' to be 'core.unified-chat-surface' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:142:28\n    at file:///ho"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC5 drains a request already pending before subscription and never replays it on reconnect",
-        "classification": "assertion",
-        "detail": "native search summon shared destination SC5 drains a request already pending before subscription and never replays it on reconnect:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:150:41\n    at file:///home/elias/dev/justsearch/.claude"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 preserves a composer override and uses it as the destination",
-        "classification": "assertion",
-        "detail": "native search summon shared destination SC2 preserves a composer override and uses it as the destination:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:162:36\n    at file:///home/elias/dev/justsearch/.claude"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 falls back temporarily for an override without a composer and preserves the saved override",
-        "classification": "assertion",
-        "detail": "native search summon shared destination SC2 falls back temporarily for an override without a composer and preserves the saved override:  AssertionError: expected null to be truthy\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:170:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 reuses a secondary search pane and never focuses the other composer",
-        "classification": "assertion",
-        "detail": "native search summon shared destination SC2 reuses a secondary search pane and never focuses the other composer:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:232:34\n    at file:///home/elias/dev/justsearch/.claude"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC9 a pending explicit deep link keeps its destination instead of focusing Search",
-        "classification": "assertion",
-        "detail": "native search summon shared destination SC9 a pending explicit deep link keeps its destination instead of focusing Search:  AssertionError: expected 'core.unified-chat-surface' to be 'core.library-surface' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:240:28\n    at file:///ho"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC5 does not wait for the Engine schema request before consuming a ready focus request",
-        "classification": "assertion",
-        "detail": "native search summon shared destination SC5 does not wait for the Engine schema request before consuming a ready focus request:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:250:43\n    at file:///home/elias/dev/justsearch/.claude"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC11 native registration takes precedence and an overlapping saved binding resumes when inactive",
-        "classification": "assertion",
-        "detail": "native search summon shared destination SC11 native registration takes precedence and an overlapping saved binding resumes when inactive:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:291:38\n    at file:///home/elias/dev/justsearch/.claude/worktree"
-      },
-      {
         "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts#SC13 shows shortcut status independently of failed autostart and announces it politely",
         "classification": "assertion",
-        "detail": "desktop search shortcut SC13 shows shortcut status independently of failed autostart and announces it politely:  AssertionError: expected '' to contain 'Alt + Shift + Space'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts:52:36\n    at runNextTicks (node:internal/process/task_qu"
+        "detail": "desktop search shortcut SC13 shows shortcut status independently of failed autostart and announces it politely:  AssertionError: expected '' to contain 'Alt + Shift + Space'\n    at /home/elias/.cache/agent-method/sessions/agent-session-hau17olo/tmp/test-intent-before-xVGW4c/modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts:52:36\n    at runNextTicks (node:internal/process/task_queues:65:5"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts#SC13 exposes the unavailable reason on the keyboard switch itself",
         "classification": "assertion",
-        "detail": "desktop search shortcut SC13 exposes the unavailable reason on the keyboard switch itself:  AssertionError: expected null to be truthy\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts:63:21\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at"
+        "detail": "desktop search shortcut SC13 exposes the unavailable reason on the keyboard switch itself:  AssertionError: expected null to be truthy\n    at /home/elias/.cache/agent-method/sessions/agent-session-hau17olo/tmp/test-intent-before-xVGW4c/modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts:63:21\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTim"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts#SC7 distinguishes off, active and enabled but unavailable",
         "classification": "assertion",
-        "detail": "desktop search shortcut SC7 distinguishes off, active and enabled but unavailable:  AssertionError: expected '' to contain 'Turned off'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts:76:106\n    at runNextTicks (node:internal/process/task_queues:65:"
+        "detail": "desktop search shortcut SC7 distinguishes off, active and enabled but unavailable:  AssertionError: expected '' to contain 'Turned off'\n    at /home/elias/.cache/agent-method/sessions/agent-session-hau17olo/tmp/test-intent-before-xVGW4c/modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts:76:106\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts#SC8 keeps the shell state after a failed save and prevents overlapping toggles",
         "classification": "assertion",
-        "detail": "desktop search shortcut SC8 keeps the shell state after a failed save and prevents overlapping toggles:  AssertionError: expected undefined to be truthy\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts:89:21\n    at runNextTicks (node:internal/process/task_queues:65:5)"
+        "detail": "desktop search shortcut SC8 keeps the shell state after a failed save and prevents overlapping toggles:  AssertionError: expected undefined to be truthy\n    at /home/elias/.cache/agent-method/sessions/agent-session-hau17olo/tmp/test-intent-before-xVGW4c/modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts:89:21\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at list"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts#SC7 reports an unavailable status when the native reply is malformed",
@@ -412,36 +172,16 @@
         "detail": "desktop search shortcut SC7 reports an unavailable status when the native reply is malformed:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/modules"
       },
       {
-        "id": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts#SC12 explains the desktop summon, focus exceptions and command-line alternative",
-        "classification": "assertion",
-        "detail": "HelpSurface — keyboard shortcuts (tempdoc 586 P-3) SC12 explains the desktop summon, focus exceptions and command-line alternative:  AssertionError: expected ' Help & Support Copy a redacted summa…' to contain 'Alt + Shift + Space'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/views/HelpSurface.test.ts:140:18\n    at file:///home/elias/dev/"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC5 SC6 late subscription cleanup cannot disable the reloaded view shortcut guard",
-        "classification": "assertion",
-        "detail": "native search summon shared destination SC5 SC6 late subscription cleanup cannot disable the reloaded view shortcut guard:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:270:40\n    at file:///home/elias/dev/justsearch/.claude/worktree"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 ignores a missing override target without changing the saved override",
-        "classification": "assertion",
-        "detail": "native search summon shared destination SC2 ignores a missing override target without changing the saved override:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:194:41\n    at file:///home/elias/dev/justsearch/.claude"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 targets the real Search v3 composer with no chat model and preserves its draft",
-        "classification": "assertion",
-        "detail": "native search summon shared destination SC2 targets the real Search v3 composer with no chat model and preserves its draft:  AssertionError: expected <button></button> to be <textarea rows=\"1\" …(2)></textarea> // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:214:33\n    at file://"
-      },
-      {
         "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts#SC8 keeps newer shell state when an older toggle reply arrives late",
         "classification": "assertion",
-        "detail": "desktop search shortcut SC8 keeps newer shell state when an older toggle reply arrives late:  AssertionError: expected undefined to be truthy\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts:113:21\n    at runNextTicks (node:internal/process/task_queues:65:5)"
+        "detail": "desktop search shortcut SC8 keeps newer shell state when an older toggle reply arrives late:  AssertionError: expected undefined to be truthy\n    at /home/elias/.cache/agent-method/sessions/agent-session-hau17olo/tmp/test-intent-before-xVGW4c/modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts:113:21\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at lis"
       },
       {
-        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 respects a changed override after a temporary core fallback",
+        "id": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts#SC12 explains the desktop summon, focus exceptions and command-line alternative",
         "classification": "assertion",
-        "detail": "native search summon shared destination SC2 respects a changed override after a temporary core fallback:  AssertionError: expected null to be truthy\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-before-JPq312/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:179:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering"
+        "detail": "HelpSurface — keyboard shortcuts (tempdoc 586 P-3) SC12 explains the desktop summon, focus exceptions and command-line alternative:  AssertionError: expected ' Help & Support Copy a redacted summa…' to contain 'Alt + Shift + Space'\n    at /home/elias/.cache/agent-method/sessions/agent-session-hau17olo/tmp/test-intent-before-xVGW4c/modules/ui-web/src/shell-v0/views/HelpSurface.test.ts:140:18\n    at file:///home/elias/dev/justsearc"
       }
     ]
   },
-  "digest": "sha256:f5f882081fa138618b02fd3c28efb2b9d8c2c05a77d17b99baad461046e69aa6"
+  "digest": "sha256:79a4091d7b7cc0b5e9f753c9cfb08c6e8c79d1d2faf30d7e28a7426a58aed4ae"
 }
