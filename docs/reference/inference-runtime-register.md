@@ -621,8 +621,8 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
   EP claim; the honest reading is the observed triple. A status field is an intent or an
   observation, never an intent presented as an outcome (805 Part D principle 3).
 - **Companion guarantees:** the ORT native pack is content-checked at publish
-  (`scripts/release/check-ort-native-asset.mjs`, DLL set parsed from
-  `OrtCudaHelper.ORT_NATIVE_DLL_SET` — no second hardcoded list), per the ORT-bump coupling
+  (`scripts/release/check-ort-native-asset.mjs`, library IDs read from
+  `OrtCudaHelper.ortNativeDllSet()` and resolved through the native-target contract — no second hardcoded list), per the ORT-bump coupling
   checklist in `cut-a-release.md`. Install truth split into two axes:
   `installedFully` (install history, contract-measured per FILE, entry-kind aware) vs
   `repairNeeded` (disk reality vs current registry, contract-independent) —

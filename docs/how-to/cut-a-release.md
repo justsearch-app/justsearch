@@ -565,9 +565,10 @@ speed). When bumping the ORT version, all of the following must move together:
       ```bash
       node scripts/release/check-ort-native-asset.mjs <path-to>/ort-native-cuda12-v<ver>.zip
       ```
-      It fails (exit 1) listing any of `OrtCudaHelper.ORT_NATIVE_DLL_SET` the archive lacks —
-      `onnxruntime.dll`, `onnxruntime4j_jni.dll`, `onnxruntime_providers_shared.dll`,
-      `onnxruntime_providers_cuda.dll` — read from the Java authority, not a second list. A pack
+      It fails (exit 1) listing any of `OrtCudaHelper.ortNativeDllSet()` the archive lacks for the current platform —
+      on Windows: `onnxruntime.dll`, `onnxruntime4j_jni.dll`, `onnxruntime_providers_shared.dll`,
+      `onnxruntime_providers_cuda.dll`. Library IDs come from the Java authority and filenames
+      from the native-target contract (Linux uses the corresponding `.so` names), not a second list. A pack
       missing one does **not** fail loudly at runtime: ORT falls back to CPU and every ONNX encoder
       runs at CPU speed while the status surfaces still report a GPU variant (tempdoc 734 R11-F3).
       The registry pin then makes the verified bytes the only accepted bytes, so this is the one
