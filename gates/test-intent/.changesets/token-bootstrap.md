@@ -660,3 +660,25 @@ like acceptance, must come from another session. No author approval is supplied.
   "note": "All 15 entries match their class and T1-T19 sources, and both delegated choices stay inside 'resume with remaining work autonomously' with no stronger conflict (ADR-0046 at base is replaced by the later T1/T2); my reruns show the Java and web new checks fail on c00a0cb24 by assertion for the reason under test and pass on e1a09d099, and the unmodified base McpOriginValidationTest and LocalApiUiTokenPolicyTest pass on the candidate except the T1-retired token-route cases, so the dev-mode Origin cases are kept; notes: the launcher delegated-choice text is a brief line rather than a stated choice, and the launcher and installed-route-walk receipts were made with JAVA_TOOL_OPTIONS (not rerun by me)."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "24342684-97c7-4add-95c5-bf296423268c",
+  "verdict": "accept",
+  "digest": "sha256:0f11c30e4abfe497db3d91a352a4c88d77cab807295ed443e97ef0fb2910723f",
+  "note": "All entries hold their class against owner-adopted T1-T19 with no stronger conflict (ADR-0046 at base is superseded by T1/T2; the launcher choice matches the recorded orchestrator decision); I reran the Java (LocalApiUiTokenPolicyTest, McpOriginValidationTest) and web (http, authorizedFetch) new checks on 8f49bdc3a, where they fail by assertion for the reason under test, and they pass on 316da8a0a; the unmodified originals pass at f003a5c64, the dev-mode Origin cases are kept 19/19, and the merged ResourceView.render/HealthLitView keep all assertions; minor: two delegated-choice texts read as brief lines."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "e74f8991-bc56-4a12-a427-5f33819f440d",
+  "verdict": "accept",
+  "digest": "sha256:0f11c30e4abfe497db3d91a352a4c88d77cab807295ed443e97ef0fb2910723f",
+  "note": "All 15 entries hold against owner-adopted T1-T19 with in-scope delegated choices (ADR-0046 at base is superseded by T1/T2/T19); my reruns show the Java and web new checks fail on base f003a5c64 by assertion for the reason under test and pass on 316da8a0a, all 18 surviving dev-mode McpOriginValidationTest cases pass unchanged on both, and adapted stream tests still fail when the real fetch SSE parser drops frames; notes: idleSurfaces now feeds frames only to open streams (transport-forced, not called out in whatMoved), and the launcher and installed-walk receipts were made with JAVA_TOOL_OPTIONS (launcher re-verified without it; walk not rerun)."
+}
+```
