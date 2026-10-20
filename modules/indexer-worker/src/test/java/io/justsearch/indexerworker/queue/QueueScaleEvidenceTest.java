@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,7 @@ final class QueueScaleEvidenceTest {
   private Path output;
   private Path backlog;
   private Path history;
+  private Path generatedFixture;
 
   @BeforeAll
   void fixtures() throws Exception {
@@ -53,11 +55,7 @@ final class QueueScaleEvidenceTest {
     Files.createDirectories(output);
     backlog = output.resolve("F1-v22.db");
     history = output.resolve("F2-v22.db");
-    // Generate afresh so a harness/schema edit cannot silently reuse stale fixtures.
-    Files.deleteIfExists(backlog);
-    Files.deleteIfExists(history);
-    QueueScaleFixtures.generate(backlog, "F1", 22);
-    QueueScaleFixtures.generate(history, "F2", 22);
+    // These are fixture descriptors. Generate only the active database, not retained originals.
   }
 
   @Test
@@ -467,7 +465,7 @@ final class QueueScaleEvidenceTest {
       System.out.printf("Q6 %s selection p95=%.3fms whole-poll p95=%.3fms polls=%d%n",label,selectionMs,wholeMs,size);
       assertAll(
           ()->assertTrue(selectionMs<10,"Q6 "+label+" selection excluding commit exceeds 10ms p95"),
-          ()->assertTrue(wholeMs<20,"Q6 "+label+" whole poll including commit exceeds 20ms p95"));
+          ()->assertTrue(wholeMs<10,"Q6 "+label+" whole poll including commit exceeds 10ms p95"));
     }
 
     private static double percentile(long[] times,int count) {
@@ -509,8 +507,7 @@ final class QueueScaleEvidenceTest {
   @Test
   void q12MigrationTimeSavedFieldsCountsAndRollback() throws Exception {
     Path legacy = output.resolve("F1-v13.db");
-    Files.deleteIfExists(legacy);
-    QueueScaleFixtures.generate(legacy, "F1", 13);
+
     for (Path fixture : List.of(legacy, backlog)) {
       Path file = freshCopy(fixture, "q12");
       List<String> columns;
@@ -621,12 +618,23 @@ final class QueueScaleEvidenceTest {
   }
 
   private Path freshCopy(Path fixture, String name) throws Exception {
+    // Every caller has closed the previous queue before requesting another fixture.
+    // Re-generating deterministic rows keeps even the migration/crash checks to one database.
+    deleteGeneratedFixture();
     Path file = output.resolve(name + "-" + fixture.getFileName());
-    Files.deleteIfExists(Path.of(file + "-wal"));
-    Files.deleteIfExists(Path.of(file + "-shm"));
-    Files.deleteIfExists(Path.of(file + "-journal"));
-    Files.copy(fixture, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+    generatedFixture = file;
+    QueueScaleFixtures.generate(file, fixture.equals(history) ? "F2" : "F1",
+        fixture.getFileName().toString().endsWith("v13.db") ? 13 : 22);
     return file;
+  }
+
+  @AfterEach
+  void deleteGeneratedFixture() throws Exception {
+    if (generatedFixture == null) return;
+    for (String suffix : List.of("-wal", "-shm", "-journal", "")) {
+      Files.deleteIfExists(Path.of(generatedFixture + suffix));
+    }
+    generatedFixture = null;
   }
 
   private static IndexingJobsFrame snapshot(List<IndexingJobChangeFeed.JobRow> rows, long seq) {

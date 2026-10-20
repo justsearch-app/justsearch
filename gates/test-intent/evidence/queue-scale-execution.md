@@ -1,7 +1,7 @@
 # Queue-scale execution protocol
 
 Task t-20261020-540095, builder session `01a1562b-b2e9-7510-832f-04ea6ad6da28`.
-Changeset: `gates/test-intent/.changesets/queue-scale.md`. No acceptance record.
+Changeset: `gates/test-intent/.changesets/queue-scale.md`. The independent rejection record is preserved; the builder has authored no acceptance record.
 
 All receipts are written by the unchanged
 `scripts/governance/gates/test-intent/run-evidence.mjs`, never hand-edited. Its entire lifecycle,
@@ -15,7 +15,7 @@ throwaway indexes are under the task TMPDIR, not `/tmp`.
 - TMPDIR: checkout `tmp/builder/test-intent`.
 - GRADLE_USER_HOME: its `gradle-home`; caches/wrapper/jdks reuse installed Gradle artifacts;
   daemon registry and init script are private to this run.
-- JAVA_TOOL_OPTIONS: `-Djava.io.tmpdir=<TMPDIR>`; Test JVMs also receive that property.
+- Q6 correction reruns unset JAVA_TOOL_OPTIONS. JAVA_OPTS supplies `-Djava.io.tmpdir=<TMPDIR>` to the Gradle client; the private init script supplies it explicitly to Test JVMs and migration children already pass it explicitly. Earlier unchanged receipts retain their recorded historical environment.
 - JUSTSEARCH_HOME and JUSTSEARCH_DATA_DIR: distinct task-local home/data directories. No
   installed Engine is launched for this metadata task.
 - The committed runner groups Java checks by module and invokes `./gradlew ...:test --tests ...
@@ -131,3 +131,47 @@ Enable `QUEUE_SCALE_EVIDENCE=1` only for the two harness receipts, with the priv
 above. The original-base receipt was produced by the unchanged runner on a shared clone at
 c00a0cb24, with the original three check scopes and no overlays. A before check that is marked
 `passed` is a preservation result; it must not be relabelled as a repaired expectation.
+
+## Q6 acceptance rework
+
+The unagreed two-number Q6 amendment is removed. The agreed Q6 quote remains verbatim, and
+every whole `pollPending(16)` call has the same under10ms p95 threshold, including its commit.
+Selection-only timing remains an additional measurement. No delegated choice relaxes a scenario
+threshold. The independent rejection record remains byte-identical.
+
+Source audit: every remaining owner-adopted source is exactly one of the agreed Q1–Q27 scenario
+texts (Q20 amended); there are no owner-words sources. Specific implementation choices retain
+the exact delegated-choice attribution supplied by the task. The rejected Q6 proposal is removed
+rather than recast as a choice that could override the agreed threshold.
+
+Fixture lifetime: descriptors replace retained original SQLite files. Each requested fixture is
+generated afresh with the same deterministic generator and deleted before the next fixture and
+after each test. The harness retains at most one million-row database, including Q12's migration
+and crash/reopen checks. Their saved-field, claim, count and rollback assertions remain unchanged.
+
+### Corrected Q6 execution results
+
+The shared whole-poll assertion changed from `wholeMs < 20` to `wholeMs < 10`; its timer still
+surrounds the entire `pollPending(16)` call, including commit. Selection timing remains reported.
+The candidate's eight Q1–Q6 checks passed; all eight assertion-failed on c00a0cb24. Both Q6 checks
+failed their selection and whole-poll latency assertions on that base, rather than failing to
+compile or throwing an infrastructure exception. The refreshed migration/count receipt also
+passed all seven cases, including 100k operations and both crash/reopen sections.
+
+Candidate timings from the completed JUnit stdout (milliseconds):
+
+| Q6 case | Selection p95 | Whole-call p95 | Polls |
+|---|---:|---:|---:|
+| F1 denied/retry head | 0.663 | 5.003 | 40036 |
+| 100k equal timestamps | 0.498 | 4.940 | 40036 |
+| F2 history | 0.359 | 0.418 | 63 |
+| 700k due | 0.396 | 4.817 | 512 |
+| 700k retry-waiting | 0.053 | 0.055 | 512 |
+| 350k due interleaved with 350k future | 0.444 | 4.872 | 512 |
+
+The additional early128-poll guards passed at6.989ms whole-call p95 on F1 and9.831ms with ties;
+9.831ms was the highest whole-call p95 observed in this rerun. Both full F1 drains returned exactly
+640000 unique eligible rows in40036polls, including36empty polls, within the40045poll bound.
+Migration/open was2.774s for v13 and1.780s for v22; current-schema drift repair was0.603s.
+The raw measurement transcript is retained in ignored task temp at
+`tmp/builder/test-intent/q6-recheck.log`. Spotless passed before these runs.

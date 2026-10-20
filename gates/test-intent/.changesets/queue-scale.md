@@ -7,11 +7,11 @@ author-session: 01a1562b-b2e9-7510-832f-04ea6ad6da28
 
 # Test-intent entries
 
-Author: builder Codex session 01a1562b-b2e9-7510-832f-04ea6ad6da28. Scope is the final branch diff against merge-base c00a0cb24 with origin/main, not intermediate commit diffs. The user adopted scenarios Q1–Q27 on2026-10-20: “i agree, proceed accordingly”. Every scenario source below is **agent-drafted, owner-adopted**; no brief text is attributed as owner words. Choices are **agent choice** under the separately quoted delegation. Q20 uses its aggregate-queued amendment; Q25–Q27 are included. For Q6, the later quoted two-number amendment supersedes the original whole-poll10ms proposal: selection<10ms p95 and whole poll<20ms p95. Q24 packaged-system verification belongs to the independent verifier, not this test-intent delivery.
+Author: builder Codex session 01a1562b-b2e9-7510-832f-04ea6ad6da28. Scope is the final branch diff against merge-base c00a0cb24 with origin/main, not intermediate commit diffs. The user adopted scenarios Q1–Q27 on2026-10-20: “i agree, proceed accordingly”. Every scenario source below is **agent-drafted, owner-adopted**; no brief text is attributed as owner words. Choices are **agent choice** under the separately quoted delegation. Q20 uses its aggregate-queued amendment; Q25–Q27 are included. Q6 retains the agreed whole-call limit: pollPending(16) under10ms p95, including its durable commit. Selection-only timing is additional reporting, not a substitute threshold. Q24 packaged-system verification belongs to the independent verifier, not this test-intent delivery.
 
 For modified files with both retired oracles and added checks, separate entries name the portions. All full-table and per-file-PENDING state/input changes are Obsolete, not hidden as adaptations. Old→new assertion inventories are attached to those entries; remaining original assertions stay unchanged. The two Adaptation entries identify exactly unchanged assertions and old/new transport encoding. Repaired checks require an assertion fail-before; new instrumentation and preservation checks are explicitly identified and do not pretend a missing old API/table was a defect.
 
-Execution protocol and compatibility scaffolding: gates/test-intent/evidence/queue-scale-execution.md. Evidence files are produced only by the unchanged run-evidence.mjs, with its whole lifecycle under js-gradle-slot; no acceptance record is authored here.
+Execution protocol and compatibility scaffolding: gates/test-intent/evidence/queue-scale-execution.md. Evidence files are produced only by the unchanged run-evidence.mjs, with its whole lifecycle under js-gradle-slot; the builder authors no acceptance record and preserves the independent records below.
 
 ```json
 {
@@ -1217,7 +1217,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
         "modules/indexer-worker/build.gradle.kts"
       ],
       "class": "New",
-      "behaviour": "New opt-in million-row measurement selection/heap-agent task. Q1 boot/subscribed/concurrent peak at1GiB and<5MB retained; Q2 10kupdates/commits<1s and bounded churn; Q3 snapshot lock<50ms; Q4 warm status<5ms/no jobs scans; Q5 readiness<1ms; Q6 reads/merge/cursor<10ms and entire poll<20ms across6cases, drain640k unique ordered eligible rows with no denied claims and bounded polls. Added one current-v23 reopen/drift measurement. Stress tests stay opt-in.",
+      "behaviour": "New opt-in million-row measurement selection/heap-agent task. Q1 boot/subscribed/concurrent peak at1GiB and<5MB retained; Q2 10kupdates/commits<1s and bounded churn; Q3 snapshot lock<50ms; Q4 warm status<5ms/no jobs scans; Q5 readiness<1ms; Q6 entire pollPending(16), including commit, <10ms p95 in each of F1, ties, F2,700k due,700k retry-waiting and interleaved cases; selection-only timing is additionally reported; drain640k unique ordered eligible rows with no denied claims and bounded polls. Added one current-v23 reopen/drift measurement. Stress tests stay opt-in.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1300,11 +1300,12 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261020-540095",
-          "scenario": "Q6",
-          "quote": "Q6 becomes two numbers per case: claim selection (reads, merge and cursor, excluding the commit) under 10 ms p95, and the whole poll including the commit under 20 ms p95, in every case (F1, ties, F2, 700k due, all retry-waiting, interleaved).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Generate each million-row fixture on demand, retain only the active database, and delete it after the check.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/queue-scale-harness-before.json",
@@ -1362,6 +1363,22 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "delegationLocation": "task t-20261020-540095 request",
           "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
           "choice": "Keep million-row fixture, heap, latency and 100k-operation measurements behind the evidence tag, using an instrumentation agent, paired selection/whole-poll timings, and an explicit ten-minute evidence deadline.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Generate each million-row fixture on demand, retain only the active database, and delete it after the check.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Use a 60-second budget for million-row migration/open reconciliation.",
           "label": "agent choice"
         }
       ],
