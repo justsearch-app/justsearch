@@ -77,3 +77,16 @@ The evidence producer ran from a separate shared clone; its internal before-work
 belongs to that clone, leaving the source repository worktree metadata untouched.
 
 No acceptance record is authored by the builder.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-a382b6a881bf89c5e",
+  "verdict": "accept",
+  "digest": "sha256:7c73be4c406b54006278bca017ca6326b57ddf116403542ac0f61b94edb20401",
+  "note": "Real built Linux shell (own Engine) under Xvfb and headless kwin_wayland, 3 configs x 4 triggers x 3 launches: base SIGSEGV after the trigger in every config, candidate 72/72 alive with state changed and zero startViewTransition calls; unit tests fail on base for the reason under test and four gate mutations are caught."
+}
+```
