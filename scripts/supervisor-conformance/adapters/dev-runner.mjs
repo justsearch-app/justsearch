@@ -110,9 +110,9 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
 
   const planPath = path.join(workDir, 'fake-engine.plan.json');
   if (!fs.existsSync(planPath)) io.writeEnginePlan(workDir, enginePlanFor(testCase));
-  // A case may bound the first boot's start (Spec F §7.2 `startTimeoutMs`); the dev-runner's knobs
-  // for it are the port and readiness timeouts.
-  const startTimeoutMs = String(testCase.startTimeoutMs ?? 10000);
+  // The case's short budget belongs to incarnation 1, even if it never reaches readiness.
+  const firstBootPreload = testCase.startTimeoutMs === undefined ? []
+    : ['--require', path.join(io.repoRoot, 'scripts/supervisor-conformance/first-boot-budget.cjs')];
   const uiPort = await freePort();
   const statePath = path.join(dataDir, 'runtime', 'supervisor.v1.json');
   const faultGatePath = path.join(workDir, 'first-incarnation-running.json');
@@ -122,6 +122,7 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
     process.execPath,
     [
       ...preload,
+      ...firstBootPreload,
       path.join(io.repoRoot, 'scripts', 'dev', 'dev-runner.cjs'),
       'start',
       '--json',
@@ -144,10 +145,11 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
         JUSTSEARCH_FAKE_ENGINE_PLAN: planPath,
         JUSTSEARCH_FAKE_ENGINE_FAULT_GATE: faultGatePath,
         JUSTSEARCH_SUPERVISOR_HARNESS_REQUEST_REASON: testCase.request?.reason ?? '',
+        JUSTSEARCH_CONFORMANCE_FIRST_BOOT_TIMEOUT_MS: String(testCase.startTimeoutMs ?? ''),
         // Keep the first incarnation's start bounded: the default is 15 s locally and 300 s in CI,
         // and a case that hangs for either is a case nobody will run.
-        JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: startTimeoutMs,
-        JUSTSEARCH_DEV_RUNNER_BACKEND_READY_TIMEOUT_MS: startTimeoutMs,
+        JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: '10000',
+        JUSTSEARCH_DEV_RUNNER_BACKEND_READY_TIMEOUT_MS: '10000',
         CI: '',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
