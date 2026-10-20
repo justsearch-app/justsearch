@@ -46,6 +46,8 @@ Review history: verifier-5 found that the invalid saved-parent HTTP check alread
 
 Review history: the independent audit rejected the batch-name preservation citation. That entry now also cites S9.1’s single-plain-name rule and the Windows reserved-name bound. Every cited orchestrator amendment after verifier-1 through verifier-4 is now a delegated choice quoting the user’s delegation; the restore notice’s exact wording has its own delegated choice alongside the saved-data scenario. Existing review records and execution evidence remain unchanged.
 
+Review history: the latest acceptance rejection identified the missing batch/file-history scope amendment in the batch-name preservation entry. That entry, the generic undo and additional file-history device-name entries, and the batch-journal enumeration entry now cite the exact verifier-1 amendment as a delegated choice. The other batch/file-history entries already cite it. Existing review records and execution evidence remain unchanged.
+
 ```json
 {
   "entries": [
@@ -416,6 +418,14 @@ Review history: the independent audit rejected the batch-name preservation citat
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 covers every id from a request that becomes a path, including batch/file-history ids on agent routes (the file-history route still read any .json by a traversal id; undo uses the same lookup).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
           "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
           "label": "agent choice"
         }
@@ -481,6 +491,14 @@ Review history: the independent audit rejected the batch-name preservation citat
           "scenario": "PS2",
           "quote": "Every HTTP route that takes such an id answers an unsafe id with a client error (4xx) and touches no store, including percent-encoded and mixed forms (%2F, %5C, %2E%2E, ..%5C.., %00), under both Windows and Linux path rules.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 covers every id from a request that becomes a path, including batch/file-history ids on agent routes (the file-history route still read any .json by a traversal id; undo uses the same lookup).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-review-repair.json",
@@ -512,6 +530,14 @@ Review history: the independent audit rejected the batch-name preservation citat
           "scenario": "PS2",
           "quote": "Every HTTP route that takes such an id answers an unsafe id with a client error (4xx) and touches no store, including percent-encoded and mixed forms (%2F, %5C, %2E%2E, ..%5C.., %00), under both Windows and Linux path rules.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 covers every id from a request that becomes a path, including batch/file-history ids on agent routes (the file-history route still read any .json by a traversal id; undo uses the same lookup).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-review-repair.json",
@@ -623,6 +649,14 @@ Review history: the independent audit rejected the batch-name preservation citat
           "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
           "choice": "N9.1: a folder or file with a name that is not a valid id inside any store (blank-named conversation folders made by the old dispatch bug, or any other invalid name found on disk) is skipped by every operation that enumerates the store (conversation and session lists, branch and child checks, presence, thread views, run lists); it never makes an operation on a valid id fail, and its files stay on disk.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 covers every id from a request that becomes a path, including batch/file-history ids on agent routes (the file-history route still read any .json by a traversal id; undo uses the same lookup).",
           "label": "agent choice"
         }
       ],
