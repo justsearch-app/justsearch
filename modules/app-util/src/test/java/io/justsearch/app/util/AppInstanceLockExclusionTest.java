@@ -9,9 +9,11 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+@Tag("cross-platform")
 class AppInstanceLockExclusionTest {
   @TempDir Path directory;
 

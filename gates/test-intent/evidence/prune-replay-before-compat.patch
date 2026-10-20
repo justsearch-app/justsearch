@@ -1,0 +1,75 @@
+diff --git a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/ops/KnowledgeServerMigrationOps.java b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/ops/KnowledgeServerMigrationOps.java
+index 6246c50ea..d134dc30a 100644
+--- a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/ops/KnowledgeServerMigrationOps.java
++++ b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/ops/KnowledgeServerMigrationOps.java
+@@ -125,6 +125,10 @@ public final class KnowledgeServerMigrationOps {
+     public DrainSwitchBufferContext {
+       approvedGapVersions = Set.copyOf(approvedGapVersions);
+     }
++    /** Before-state compatibility only: the replay has no notion of a live publisher. */
++    public DrainSwitchBufferContext withPublisher(WorkerIngestService ignoredPublisher) {
++      return this;
++    }
+     public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
+         WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
+         Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
+@@ -536,6 +540,13 @@ public final class KnowledgeServerMigrationOps {
+     return prepareSwitchReplayForPromotion(context, () -> {});
+   }
+ 
++  /** Before-state compatibility only: there is no stop point inside a replayed prune. */
++  public static java.util.Optional<StrictReplay> prepareSwitchReplayForPromotion(
++      DrainSwitchBufferContext context, Runnable firstCandidateProjectionApplied,
++      Runnable ignoredFirstPruneRemoval) {
++    return prepareSwitchReplayForPromotion(context, firstCandidateProjectionApplied);
++  }
++
+   /** Only the candidate promotion caller supplies a harness cut inside its ordered replay. */
+   public static java.util.Optional<StrictReplay> prepareSwitchReplayForPromotion(
+       DrainSwitchBufferContext context, Runnable firstCandidateProjectionApplied) {
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/FileMutationFence.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/FileMutationFence.java
+new file mode 100644
+index 000000000..b58ad6f79
+--- /dev/null
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/FileMutationFence.java
+@@ -0,0 +1,24 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.loop;
++
++import java.util.concurrent.locks.ReentrantLock;
++import java.util.function.Supplier;
++
++/**
++ * Before-state compatibility only (test-intent fail-before run): the type the new checks name for
++ * the loop's fence, as the plain lock the loop and its writer already use. It records nothing.
++ */
++public final class FileMutationFence extends ReentrantLock {
++  public FileMutationFence() {
++    super(true);
++  }
++
++  public <T> T guard(Supplier<T> mutation) {
++    lock();
++    try {
++      return mutation.get();
++    } finally {
++      unlock();
++    }
++  }
++}
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java
+index 86f9d1104..9ff81104f 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java
+@@ -1077,6 +1077,11 @@ public class IndexingLoop implements Closeable {
+     if (source != null) source.commitOps().commitAndTrack(reason);
+   }
+ 
++  /** Before-state compatibility only: the new checks stub this on a test double. */
++  public FileMutationFence fileMutationFence() {
++    return null;
++  }
++
+   /** Direct source deletions hold this through A/B effects and queue removal. */
+   public <T> T withFileMutationFence(Supplier<T> mutation) {
+     fileMutationFence.lock();

@@ -127,9 +127,9 @@ node scripts/lib/tool-invoker.cjs gradle build
 
 Code style is enforced automatically:
 
-- **Java**: Spotless (auto-formats on build)
+- **Java**: Spotless checks trailing whitespace and final newlines (`spotlessApply` fixes them); there is no Java formatter
 - **PMD**: Static analysis rules enforced
-- **TypeScript**: ESLint + Prettier
+- **TypeScript**: ESLint
 
 To fix formatting issues:
 

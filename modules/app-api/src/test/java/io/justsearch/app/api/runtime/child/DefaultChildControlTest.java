@@ -31,6 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +41,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** Spec B §8 T1-T9, T13, T14 and the manifest adapter, on real fake-child processes. */
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
+@Tag("cross-platform")
 final class DefaultChildControlTest {
   private static final long GIB = 1024L * 1024 * 1024;
 

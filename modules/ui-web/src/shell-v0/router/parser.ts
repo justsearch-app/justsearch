@@ -2,20 +2,20 @@
 /**
  * URL parser — slice 489 §7 stage 1.
  *
- * TS port of the structural parser in
- * `scripts/ci/agent-battery-url-scorer.mjs` (round-2 §7 finding). Same grammar,
- * same canonicalization, same id regex. The scorer's parser is the canonical
- * reference; this module mirrors it.
+ * Structural parser for shell-address URLs. The Java shell-address model
+ * and URL emitters share this grammar; canonicalization differences are noted below.
  *
  * Grammar:
  *   justsearch://surface/<surfaceId>[?key=value&...]    → Navigation
  *   justsearch://op/<opId>[?argName=value&...]          → Invocation
+ *   justsearch://query?q=<text>[&key=value&...]        → Query
+ *   justsearch://answer?q=<prompt>[&shape=<id>][&key=value&...] → Answer
  *
  * Rules:
  *   - scheme must be `justsearch:`
- *   - host must be `op` or `surface`
- *   - pathname is /<id>; strip leading slash; require single segment
- *   - id must match /^[A-Za-z0-9_.\-]+$/
+ *   - host must be `op`, `surface`, `query`, or `answer`
+ *   - for `op` and `surface`, pathname is /<id>; strip surrounding slashes; require single segment
+ *   - op/surface id must match /^(core|vendor\.[a-z][a-z0-9-]*)\.[a-z][a-z0-9-]*$/
  *   - args use URLSearchParams; repeated keys → array
  *
  * Returns `null` for malformed input — pure function, no exceptions.
@@ -52,14 +52,14 @@ export const DEFAULT_ANSWER_SHAPE = 'core.rag-ask';
 // uniformly at the syntactic stage; semantic id-in-catalog resolution still
 // happens at the resolver.
 const ID_REGEX = /^(core|vendor\.[a-z][a-z0-9-]*)\.[a-z][a-z0-9-]*$/;
-// Trailing prose punctuation strip — mirrors scorer's `trailingPunctRe`.
+// Strip trailing prose punctuation from extracted URLs.
 const TRAILING_PUNCT_REGEX = /[.,;:!?”'"]+$/;
 
 /**
  * Extract every justsearch:// URL from a free-text string.
  *
- * Mirrors the scorer's `extractUrls`. Returns matches in document order,
- * each with `{ raw, url, span }`. Used by slice 491's URLExtractor for LLM
+ * Returns matches in document order, each with `{ raw, url, span }`.
+ * Used by slice 491's URLExtractor for LLM
  * responses; the chrome's intent sources call {@link parseUrl} directly with
  * a single URL string and don't need extraction.
  */
@@ -155,9 +155,10 @@ export function parseUrl(raw: string): ShellAddress | null {
  * Invocation, which are an args-parsing concern). For Navigation, the round
  * trip is exact.
  *
- * Canonicalization rules: keys sorted alphabetically; repeated keys preserved
- * for array values; values URL-encoded. Mirrors `URLSurfaceEmitter` and the
- * scorer's `canonicalUrlString`.
+ * Like `URLSurfaceEmitter`, keys are sorted alphabetically and array values
+ * produce repeated keys in array order. Value encoding differs: this uses
+ * `encodeURIComponent` (space → %20, apostrophe unchanged); Java uses
+ * `URLEncoder` (space → +, apostrophe → %27).
  */
 export function canonicalize(addr: ShellAddress): string {
   if (addr.kind === 'answer') {

@@ -655,3 +655,25 @@ describe('a restored turn stands on the evidence the record carries (847 §2.4)'
     expect(turn?.id).toBe('e1');
   });
 });
+
+// WP6.2 S8.2 — a reloaded direction keeps the outcome it had live, under the same label.
+describe('a reloaded direction', () => {
+  it('becomes a note labelled by its recorded outcome', () => {
+    clock = 0;
+    const direction = (id: string, content: string, attributes: Record<string, unknown>): ThreadEvent => ({
+      id, occurredAt: at(), kind: 'PROGRESS', originator: 'user', content,
+      attributes: { steer: true, phase: 'direction', ...attributes },
+    });
+    const [turn] = project([
+      event('e1', 'USER_MESSAGE', 'index the vendor folder'),
+      direction('e2', 'Focus on Q3.', { directiveOutcome: 'applied' }),
+      event('e3', 'ASSISTANT_MESSAGE', 'done'),
+      direction('e4', 'Too late.', { directiveOutcome: 'not_applied', directiveReason: 'run_interrupted' }),
+    ]);
+    const notes = turn!.activity.filter((i) => i.kind === 'note');
+    expect(notes.map((n) => (n.kind === 'note' ? [n.label, n.text] : null))).toEqual([
+      ['Steered', 'Focus on Q3.'],
+      ['Not applied', 'Too late. (the run was interrupted when JustSearch restarted)'],
+    ]);
+  });
+});

@@ -10,12 +10,11 @@ description: "Screenshot capture for UI verification and agent visual feedback."
 Capture UI screenshots **and a structured `<step>.measure.json` fact-sheet** for verification using the jseval
 toolkit (tempdoc 615). The harness drives the **live Lit `shell-v0`** UI.
 
-> **⚠️ Correction (2026-06, tempdoc 615):** the harness targets the live shell-v0 (not the retired React
-> stack), and **`?demo=true` mock data is orphaned** — it supplies no data to the shell-v0 boot. So
-> view/chrome steps need only a served frontend (the tool auto-serves Vite), but **search/inspector/AI steps
-> need the dev stack running** (AI also needs `ai_activate`). Every capture also writes a `.measure.json`
-> (accessibility tree + axe + geometry + console) — **judge correctness from those facts, the PNG for
-> gestalt.**
+For deterministic data without a backend, use `ui-shot --fixtures`: the harness intercepts API
+requests with fixtures and dismisses the first-run walkthrough. `?demo=true` alone supplies no data
+to the current shell. Real integration checks need a running dev stack; AI checks also need an active
+local model. Every capture writes a `.measure.json` (accessibility tree, axe, geometry, and console)
+unless disabled; use those facts alongside the PNG.
 
 ## Single-Step Capture (Agent Feedback)
 
@@ -26,7 +25,7 @@ cd scripts/jseval
 
 # Capture one step (prints the PNG path + a one-line MEASURE fact summary)
 python -m jseval ui-shot home
-python -m jseval ui-shot search-results
+python -m jseval ui-shot search-results --fixtures
 
 # List all available steps
 python -m jseval ui-shot --list
@@ -39,7 +38,7 @@ Output: PNG path + the measurement fact summary to stdout; `<step>.measure.json`
 JSON for facts; read the PNG for the overall look. `--no-measure` skips the companion.
 
 In a worktree, `ui-shot` auto-starts a Vite dev server on port 5174 (no backend — data steps 502). Pass
-`--ui-url http://127.0.0.1:5173` to drive a running dev stack instead.
+`--fixtures` for data without a backend, or `--ui-url http://127.0.0.1:5173` to drive a running dev stack.
 
 ## Batch Verification (CI Gate)
 
@@ -63,11 +62,25 @@ drift between runs.
 
 ## Prerequisites
 
-**Demo mode (default):** Only a Vite dev server:
+Use Python 3.11+ with the jseval package and its `ui` extra installed
+(`scripts/jseval/pyproject.toml`), Playwright's Chromium browser, and the frontend npm dependencies.
+From repo root in your Python environment:
 
 ```bash
-cd modules/ui-web && npm run dev:mock
+python -m pip install -e 'scripts/jseval[ui]' -c scripts/jseval/requirements.lock.txt
+python -m playwright install chromium
+npm ci --prefix modules/ui-web --audit=false
 ```
+
+
+**Layout-only browser work:** Start Vite without a backend:
+
+```bash
+cd modules/ui-web && npm run dev
+```
+
+**Deterministic data captures:** `python -m jseval ui-shot search-results --fixtures` from
+`scripts/jseval` auto-serves Vite and installs request fixtures.
 
 **Real-backend mode:** Use jseval to start the backend:
 
@@ -80,7 +93,7 @@ cd scripts/jseval && python -m jseval dev --clean
 | File | Purpose |
 |------|---------|
 | `scripts/jseval/jseval/ui_shot.py` | Single-step capture |
-| `scripts/jseval/jseval/ui_check.py` | Batch capture (47 steps) |
+| `scripts/jseval/jseval/ui_check.py` | Batch capture (`ui-shot --list` for current steps) |
 | `scripts/jseval/jseval/ui_selectors.py` | Shared testid selectors |
 | `scripts/jseval/jseval/ui_step_index.json` | File-to-step mapping |
 

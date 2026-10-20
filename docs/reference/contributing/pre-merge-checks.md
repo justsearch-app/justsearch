@@ -36,7 +36,7 @@ Always: `node scripts/lib/tool-invoker.cjs gradle build -x test` from the candid
 | `governance/logic-seams.v1.json` or a registered seam | `check-logic-seams --mode gate` |
 | guard-string register (`execution-surfaces`/`operation-surfaces`) | `--gate register-guard-resolution` |
 | `LifecycleReasonCode.java` / `readinessNotice.ts` | `check-readiness-reason-codes` |
-| `justsearch-dev-mcp/**` | `check-dev-mcp-doc-sync` |
+| `scripts/dev/justsearch-dev-mcp/**` · `scripts/dev/justsearch-dev-mcp.mjs` | `check-dev-mcp-doc-sync` |
 | `StoreCatalog.java` · store construction sites · `governance/store-{recoverability,corruption-policies}.v1.json` | `check-store-recoverability` |
 | `modules/ui-web/src/**` | `node scripts/ci/run-ui-web-gates.mjs` |
 | ui-shot harness · new RAIL surface | `check-ui-step-coverage` |

@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.io.TempDir;
  * <p>Real file-system conditions only: the root is renamed away (before or during the prune) or
  * the drive letter it lives on is unmapped (SUBST). The mapping is removed before the test returns.
  */
+@Tag("cross-platform")
 final class PruneUncertainAbsenceTest extends LuceneExecutorTestBase {
   private static final boolean WINDOWS =
       System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");

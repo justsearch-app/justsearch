@@ -42,8 +42,11 @@ Compare the printed hash (case-insensitive) against the matching line in the rel
 **On git-bash / WSL**, if you downloaded both files into the same folder:
 
 ```bash
-sha256sum -c SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS
 ```
+
+Confirm the installer line says **OK**. `SHA256SUMS` also lists the MCP bundle and updater assets;
+`--ignore-missing` skips files you did not download.
 
 This only tells you the file wasn't corrupted or swapped in transit — it does not tell you the
 maintainer is trustworthy or that the code is safe. It's the same guarantee a checksum always
@@ -88,23 +91,30 @@ git clone https://github.com/justsearch-app/justsearch && cd justsearch
 node scripts/lib/tool-invoker.cjs gradle build
 ```
 
-To produce the actual Windows installer (not just build/test the code) rather than the CI build
-below, the entry point is
-[`scripts/ci/package-installer-win.ps1`](../../scripts/ci/package-installer-win.ps1) — but a local
-run needs the MSVC C++ Build Tools and the Rust toolchain, and fails fast if Windows Smart App
-Control is enforcing (SAC blocks unsigned cargo build-scripts with `os error 4551`, a build-time
-version of the same enforcement described above). The path that works regardless of your machine's
-SAC state, and is what CI itself uses, is dispatching the build workflow:
+To produce a Windows installer locally, use
+[`scripts/ci/package-installer-win.ps1`](../../scripts/ci/package-installer-win.ps1) on Windows with
+Node.js 24, JDK 25, MSVC C++ Build Tools, and the Rust toolchain installed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/package-installer-win.ps1
+```
+
+The local build fails its preflight if Windows Smart App Control is enforcing: SAC blocks unsigned
+cargo build-scripts (`os error 4551`). Use a separate build machine where SAC is not enforcing;
+do not disable a security control to bypass a signature mismatch. A local build is not signed with
+the project's publisher certificate. It lets you build the source you inspect; matching the release
+hash is not expected, especially because signing changes the bytes.
+
+**Maintainers with repository write access** can instead dispatch the build workflow:
 
 ```bash
 gh workflow run build-installer.yml --ref main
 gh run download <run-id>
 ```
 
-See step 1 of [`cut-a-release.md`](cut-a-release.md) for the full sequence. Either way you end up
-with an installer built directly from the source you can read — plus you can still run the
-`SHA256SUMS`/`certutil` check above against your own build output if you want to confirm the
-release asset matches what CI produces from the same commit.
+This is not available to an ordinary release downloader. The project's protected `release-signing`
+Environment also requires owner approval before the build starts. Maintainers should follow
+step 1 of [Cut a release](cut-a-release.md) for the full candidate sequence.
 
 ## See also
 
