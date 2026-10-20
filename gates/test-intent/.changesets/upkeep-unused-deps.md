@@ -94,3 +94,14 @@ Incidental preservation evidence is under ignored `tmp/f5-deps/`; no new checks 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-4mh7228h",
+  "verdict": "accept",
+  "digest": "sha256:b275fe8f1b453d35ff175c983c40de0ec8eb0848e04963bb1e97c31d1210e7e0",
+  "note": "Quote verbatim from task t-20261019-9d870e request; dead-code predicate unchanged, pins match re-measured Knip (package.json 5->0, runtimeConformance 2->1); no app-services/worker-core fixture producers or consumers; system-tests lock loses only main compile/runtime Guava memberships."
+}
+```
