@@ -42,3 +42,14 @@ No acceptance record is authored here.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-o0em50fz",
+  "verdict": "accept",
+  "digest": "sha256:c763dbc907aed18b254b46220773c72a74deb47bb7b128831bd48d70263b166f",
+  "note": "Both Adaptation entries retain every input, precondition, observation, assertion and execution condition. Eight expansion calls reach the unchanged shared method directly; the reindex supplier encodes the same one-pattern list as strict JSON with the same Windows flag. All 22 affected checks pass without skips on baseline and candidate; independent matcher equivalence checks pass on both."
+}
+```
