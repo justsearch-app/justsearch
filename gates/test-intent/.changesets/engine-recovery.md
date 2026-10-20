@@ -58,14 +58,20 @@ are evidence-only fixtures, never production patches or substituted passing impl
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261020-51b072 request, design D-d",
-          "quote": "Read only the first 64 lines and redact paths."
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-51b072 request",
+          "delegationScope": "implementation choices inside the agreed recovery scenarios E1-E21",
+          "choice": "Read only the first 64 lines and redact paths.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261020-51b072 request, additional design E2",
-          "quote": "E2: find the diagnostics export and the latest-crash summary (they currently look only at crash-*.json); make them include the JVM fatal-error logs in `<dataDir>/crashes/` (bounded: newest few, text only, no heap dumps)."
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-51b072 request",
+          "delegationScope": "implementation choices inside the agreed recovery scenarios E1-E21",
+          "choice": "E2: find the diagnostics export and the latest-crash summary (they currently look only at crash-*.json); make them include the JVM fatal-error logs in `<dataDir>/crashes/` (bounded: newest few, text only, no heap dumps).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/engine-recovery-java.json",
@@ -110,9 +116,12 @@ are evidence-only fixtures, never production patches or substituted passing impl
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261020-51b072 user turn: independent rejection of 89c6581d5 and corrected decision",
-          "quote": "the shared supervisor behaviour stays identical in both (delayed retry after exhaustion, whether or not the Engine was healthy before), so revert the `!s.firstReadyDone` condition."
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-51b072 request",
+          "delegationScope": "implementation choices inside the agreed recovery scenarios E1-E21",
+          "choice": "the shared supervisor behaviour stays identical in both (delayed retry after exhaustion, whether or not the Engine was healthy before), so revert the `!s.firstReadyDone` condition.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/engine-recovery-rust.json",
@@ -264,9 +273,12 @@ are evidence-only fixtures, never production patches or substituted passing impl
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261020-51b072 request, design D-d",
-          "quote": "Read only the first 64 lines and redact paths."
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-51b072 request",
+          "delegationScope": "implementation choices inside the agreed recovery scenarios E1-E21",
+          "choice": "Read only the first 64 lines and redact paths.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/engine-recovery-rust.json",
@@ -292,9 +304,12 @@ are evidence-only fixtures, never production patches or substituted passing impl
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261020-51b072 user turn: verifier follow-up on 347c0f4c7, item 4",
-          "quote": "Decision: at Engine spawn preparation keep at most two heap dumps in `crashes/`, the oldest (first failure, E1) and the newest, and delete the others; fatal-error logs are small and stay."
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-51b072 request",
+          "delegationScope": "implementation choices inside the agreed recovery scenarios E1-E21",
+          "choice": "Decision: at Engine spawn preparation keep at most two heap dumps in `crashes/`, the oldest (first failure, E1) and the newest, and delete the others; fatal-error logs are small and stay.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/engine-recovery-heap-retention.json",
@@ -423,5 +438,16 @@ are evidence-only fixtures, never production patches or substituted passing impl
   "verdict": "reject",
   "digest": "sha256:74a3d93e3c85456c4e3bf1b0c3f02369ff9f5a314a24a8dd15556a66e88f96bf",
   "note": "E17 fails: Rust retries a never-healthy Engine while JS exits, and the new Rust manual-restart test requires that forbidden delayed fifth spawn."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1587a-97ec-7c50-97f4-8cf4a4aa7694",
+  "verdict": "reject",
+  "digest": "sha256:03df668be031c302c7d9ea36f84d1a900837e34ab68a2c8a177222aa0945a24b",
+  "note": "Behavioral checks pass, but the brief omits independently verifiable sources for E1/E2/E3/E5/E6/E16/E19/E20/E21 and the redaction and heap-retention decisions."
 }
 ```
