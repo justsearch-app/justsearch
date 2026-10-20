@@ -20,7 +20,12 @@
  * `Sv3RunFeedItem` shapes the live controller feed produces — so a settled run and a running one go
  * through one renderer in `Sv3Main`, not two.
  */
-import { projectUnifiedThread, type ThreadEvent, type UnifiedTurnItem } from '../unifiedThreadProjection.js';
+import {
+  directionNote,
+  projectUnifiedThread,
+  type ThreadEvent,
+  type UnifiedTurnItem,
+} from '../unifiedThreadProjection.js';
 import type { ToolCall } from '../../controllers/AgentSessionController.js';
 import {
   reasoningBlocksFromRecord,
@@ -466,6 +471,15 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       // nothing changes about which events project on the Java side, so the fold's cut/flush
       // targeting (whose trailing rule names the run's ERROR event) is untouched.
       if (itemStopsRun) continue;
+    }
+    if (item.attributes.steer === true) {
+      // WP6.2 — a reloaded direction, named as the live feed named it.
+      turn.activity.push({
+        kind: 'note',
+        id: item.id,
+        ...directionNote(item.content, item.attributes.directiveOutcome, item.attributes.directiveReason),
+      });
+      continue;
     }
     turn.activity.push({
       kind: 'note',

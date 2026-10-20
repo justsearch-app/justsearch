@@ -103,6 +103,8 @@ import {
   projectUnifiedThread,
   projectLiveAgentActivity,
   terminalAssistantIds,
+  directionNotAppliedBecause,
+  DIRECTION_QUEUED_NOTE,
   PROMINENCE_SCALE,
   TERMINAL_NODE_WEIGHT,
   type ThreadEvent,
@@ -4154,6 +4156,13 @@ export class UnifiedChatView extends JfElement {
     // consecutive turns ("ok" / "ok") no longer collapse to one.
     const recordedCallIds = new Set<string>();
     const recordedContentCount = new Map<string, number>();
+    // WP6.2 — a direction is durable progress: the record carries it too, under the same directive id.
+    const recordedDirections = new Map<string, number>();
+    recordItems.forEach((it, index) => {
+      if (it.attributes.steer === true && typeof it.attributes.directiveId === 'string') {
+        recordedDirections.set(it.attributes.directiveId, index);
+      }
+    });
     for (const it of recordItems) {
       if (it.kind === 'tool-activity') {
         const cid = typeof it.attributes.callId === 'string' ? it.attributes.callId : it.id;
@@ -4169,6 +4178,30 @@ export class UnifiedChatView extends JfElement {
         const cid = typeof it.attributes.callId === 'string' ? it.attributes.callId : it.id;
         return !recordedCallIds.has(cid);
       }
+      const recorded =
+        typeof it.attributes.directiveId === 'string'
+          ? recordedDirections.get(it.attributes.directiveId)
+          : undefined;
+      if (recorded !== undefined) {
+        // Shown once, at the record's place. A record read before the direction's final outcome
+        // still says queued; the live run already knows what became of it.
+        const record = recordItems[recorded]!;
+        const recordFinal =
+          record.attributes.directiveOutcome !== undefined && record.attributes.directiveOutcome !== 'queued';
+        const liveFinal =
+          it.attributes.directiveOutcome !== undefined && it.attributes.directiveOutcome !== 'queued';
+        if (!recordFinal && liveFinal) {
+          recordItems[recorded] = {
+            ...record,
+            attributes: {
+              ...record.attributes,
+              directiveOutcome: it.attributes.directiveOutcome,
+              directiveReason: it.attributes.directiveReason,
+            },
+          };
+        }
+        return false;
+      }
       if (it.kind === 'user' || it.kind === 'assistant') {
         const k = `${it.kind} ${it.content}`;
         const used = usedContent.get(k) ?? 0;
@@ -4178,7 +4211,7 @@ export class UnifiedChatView extends JfElement {
         }
         return true; // no unused record occurrence remains → keep (e.g. a 2nd identical turn)
       }
-      return true; // progress / handoff / error are ephemeral — never in the record
+      return true; // other progress / handoff / error are ephemeral — never in the record
     });
 
     const ordered = [...recordItems, ...liveOnly].sort(
@@ -5686,9 +5719,19 @@ export class UnifiedChatView extends JfElement {
         // Tempdoc 565 §30 — a human STEERING directive (the DIRECTION authority's interject) renders as
         // a distinct human-origin chip, not an ambient agent step, so the user sees their direction land.
         if (it.attributes?.steer === true) {
+          // WP6.2 — an applied direction reads as it always has; one that has not reached the model
+          // (yet, or at all) says so.
+          const outcome = it.attributes.directiveOutcome;
           return html`<div class="steer-directive" data-steer>
             <span class="steer-directive__label">Your direction</span>
             <span class="steer-directive__text">${it.content}</span>
+            ${outcome === 'queued'
+              ? html`<span class="steer-directive__outcome">Queued — ${DIRECTION_QUEUED_NOTE}</span>`
+              : outcome === 'not_applied'
+                ? html`<span class="steer-directive__outcome"
+                    >Not applied — ${directionNotAppliedBecause(it.attributes.directiveReason)}</span
+                  >`
+                : nothing}
           </div>`;
         }
         // Tempdoc 565 §17 — the step's tone/glyph is carried by the <jf-run-node> beside this in the

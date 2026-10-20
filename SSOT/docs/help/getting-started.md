@@ -2,8 +2,9 @@
 
 JustSearch is a local-first knowledge engine that indexes your files and lets
 you search across them using natural language — and, with the optional AI
-models, ask questions and get answers backed by citations. Everything stays on
-your machine.
+models, ask questions and get answers backed by citations. Indexing, retrieval,
+and built-in AI inference run on your machine. See AI Features for downloads,
+update checks, optional trace export, and external integrations.
 
 ## Adding files to search
 

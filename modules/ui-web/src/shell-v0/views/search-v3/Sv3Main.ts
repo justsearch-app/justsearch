@@ -1305,6 +1305,7 @@ export class Sv3Main extends JfElement {
     turnScopes: { attribute: false },
     run: { attribute: false },
     liveEvidencePaths: { attribute: false },
+    unconfirmedSteerNotes: { attribute: false },
     recordNotice: { type: Boolean, attribute: 'record-notice' },
     historyLocked: { type: Boolean, attribute: 'history-locked' },
     lockedRefusal: { type: Boolean, attribute: 'locked-refusal' },
@@ -1357,6 +1358,11 @@ export class Sv3Main extends JfElement {
    * (or an older caller not yet passing it) renders every hit as not-yet-in-evidence rather than throw.
    */
   declare liveEvidencePaths: ReadonlySet<string>;
+  /**
+   * WP6.2 S8.2 — per turn id, the window's notes for steer sends whose outcome is unconfirmed. The
+   * record does not carry them, so a settled turn draws them after its recorded activity.
+   */
+  declare unconfirmedSteerNotes: ReadonlyMap<string, readonly Sv3RunFeedItem[]>;
   /**
    * The claimed conversation's canonical record could not be read, so what is on screen may be
    * incomplete (tempdoc 822 Phase F6 / inventory D2). A BOOLEAN, not a message: the copy is fixed
@@ -1589,6 +1595,7 @@ export class Sv3Main extends JfElement {
     this.turnScopes = new Map();
     this.run = null;
     this.liveEvidencePaths = new Set();
+    this.unconfirmedSteerNotes = new Map();
     this.recordNotice = false;
     this.historyLocked = false;
     this.lockedRefusal = false;
@@ -2622,14 +2629,18 @@ export class Sv3Main extends JfElement {
    * window could refresh looks like — the receipt line below still says what it was.
    */
   private recordedActivity(turn: Sv3Turn): TemplateResult | typeof nothing {
-    if (turn.activity.length === 0) return nothing;
+    // WP6.2 S8.2 — the window's own unconfirmed-send notes, which the record does not carry.
+    const notes = this.unconfirmedSteerNotes.get(turn.id) ?? [];
+    if (turn.activity.length === 0 && notes.length === 0) return nothing;
     const terminalId = terminalTextItemId(turn.activity);
     // Tempdoc 867 — this turn's OWN evidence-path set (`sv3-record.ts`'s projection), not the live
     // prop: a settled turn has no controller left to ask, and `turn.evidencePaths` is what it wrote
     // down instead.
     const evidencePaths = new Set(turn.evidencePaths ?? []);
     return html`<div class="run-feed" data-testid="sv3-record-activity">
-      ${turn.activity.map((item) => this.runItem(item, turn, item.id === terminalId, evidencePaths))}
+      ${[...turn.activity, ...notes].map((item) =>
+        this.runItem(item, turn, item.id === terminalId, evidencePaths),
+      )}
     </div>`;
   }
 

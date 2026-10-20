@@ -55,9 +55,12 @@ static int read_file(const char *path, char *buffer, size_t size) {
   FILE *file = fopen(path, "re");
   if (!file) return errno == ENOENT || errno == ESRCH ? 3 : 2;
   size_t count = fread(buffer, 1, size - 1, file);
-  int error = ferror(file) || !feof(file);
+  int read_errno = errno;
+  int read_error = ferror(file);
+  int incomplete = !feof(file);
   fclose(file);
-  if (error || !count) return 2;
+  if (read_error) return read_errno == ESRCH ? 3 : 2;
+  if (incomplete || !count) return 2;
   buffer[count] = 0;
   return 0;
 }
