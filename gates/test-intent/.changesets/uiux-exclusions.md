@@ -657,3 +657,14 @@ Affected fixture evidence is refreshed separately by the evidence runner; unrela
   "note": "Accept exact 82268c305, scoped to the replay-fixture adjustment since 957142534. All 19 assertion calls retained; no product changes. Ten consecutive runs passed with 20 CPU-bound processes (peak one-minute load 27.15). The check fails on 9982cb522 by five post-cutover policy assertions and passes on 957142534. Fresh run-evidence matches committed outcomes and source digest. Ordinary live cutover passes before and after. Evidence: /home/elias/.cache/am/xykf_lk_/evidence."
 }
 ```
+
+```json
+{
+  "kind": "tie-break",
+  "role": "verifier",
+  "session": "verifier-ckzyzqyy",
+  "verdict": "accept",
+  "digest": "sha256:a62cb24488e979ca0dc89adeabb3b9bcc529fa9eb1ecc56f6dc55fadb5e072c8",
+  "note": "Accept exact 82268c305, scoped to the fixture delta since 957142534. All 19 assertion calls remain equivalent; no product code changed. Ten consecutive runs passed with 20 CPU-bound processes; peak one-minute load 35.45. The same check fails on 9982cb522 by five post-cutover policy assertions and passes on known-good 957142534. Ordinary live cutover, concurrent search and restart pass before and after. Evidence: /home/elias/.cache/am/ckzyzqyy/evidence."
+}
+```
