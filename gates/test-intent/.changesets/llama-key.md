@@ -369,3 +369,14 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
   "note": "Reject: the 43-character key-format pin is now correctly sourced as a delegated-choice, but the New entry for HealthyFakeLlamaServer/SlowStartFakeLlamaServer/ManagedLlamaAdoptionTest still says in its behaviour that the encoding 'follows the owner-provided 32-byte base64url design', a stale claim of owner provenance that contradicts its own agent-choice source (the owner's words are only 'all as recommended', 'i agree, proceed accordingly', 'resume with remaining work autonomously') and must be reworded; all classes, sources, scope of both delegated choices and evidence otherwise check out, including my reruns of the ignored-key fail-before on 673b54a1b and the lost-bind and CPU-environment fail-befores on f003a5c64 (assertion failures at the key assertions), all 21 flagged classes passing on the candidate, and full app-inference/app-services suites green."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "06e5e490-24c9-4b1c-820d-d47e22bb27b0",
+  "verdict": "accept",
+  "digest": "sha256:042947100d24c2f44ca747e68ec4e5d72649861f2cb534ac9722f1e4d9c27fcc",
+  "note": "Accept: all five entries' classes, sources and evidence hold; both delegated choices (401 probe before ready; 32-byte base64url key per launch) lie within the stated K1-K9 implementation scope with no conflicting owner source; I reproduced assertion fail-befores for the reason under test on 673b54a1b (ignored-key, 4 cases) and f003a5c64 (lost-bind, context step-down, both CPU environment checks), all 21 flagged and 3 exempt classes pass unskipped on the candidate, and a proxy-omits-key mutant fails the adapted ProxyStreamAcrossReconfigureTest; non-blocking: the assertion-audit evidence attributes the evidence-runner permission to the owner while the changeset attributes it to the orchestrator, and the 43-character format pin rejects other correct key encodings."
+}
+```
