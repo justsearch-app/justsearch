@@ -1182,3 +1182,14 @@ No acceptance record is supplied by the builder.
   "note": "Reviewed scenarios FS0/FS10, the 917d7d60b tests, then the diff. Re-ran evidence: six new checks fail by assertion on 917d7d60b and pass; three preservation checks pass on both; 23 refreshed context checks match. Reject: (1) 'keeps the last saved snapshot when a newer floor write also cannot refresh before an older Restore response' expects the window to show floor storedId(0) while the store holds storedId(3), with no uncertainty shown. That contradicts its cited FS10 ('never leave the bar showing a state that is not the saved one'); the expectation follows the code, not the source. (2) Omission: the entry claims every context write keeps the saved state, but no check covers an older write whose REQUEST reaches the store after a newer write's refresh, then fails its own refresh. Real-HTTP and component probes show this regressed from 917d7d60b for Restore, Exclude and Include all (R4/R5/R10); for Exclude, the next Ask sends excluded messages. (3) Omission: no check covers a single saved Reset-to-here, Compact or summary edit whose refresh fails. Shown and sent state then differ from the store (R2/R3, before and after). Evidence: verifier-3 real/summary.txt."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-g_qc62cs",
+  "verdict": "reject",
+  "digest": "sha256:22895b7c04eb8d01d17241e074f1b7ce949b0baa2da14f9d46c37de87f7ef8ad",
+  "note": "Reviewed agreed FS0/FS10, the 1f1f9bfad and 117e89be9 tests, then the diff. Re-ran evidence: 22 queue checks pass and fail by assertion on 1f1f9bfad for the reason under test (no unconfirmed notice; newer write overtook an unsettled one; Ask sent during a write); 20 refreshed context checks pass, 18 fail by assertion on 117e89be9, 2 pass there as declared. Real-HTTP browser checks agree for R1-R10. Reject: (1) Entry 37 (New, repaired, 22 checks) and entry 36 (Obsolete) cite only owner-words quotes located at 'task t-20261019-bd718f request'. Those quotes are the orchestrator's design decision (the brief calls it that; the user's request does not contain them; 'your choice' addresses the builder), and agent-written decisions count as nothing. So entry 37 has no expectation source and entry 36 has no source for retiring the guarded expectations. Remedy: cite FS10 and FS0 (owner-adopted), plus a delegated-choice source quoting the user's delegation for the queue, notice and blocked-Ask choices. (2) Behavior, not test-intent: a send that waited for a write sends the text captured at click time and then clears an edit the reader made to the still-shown draft (X13); and after a reload whose history read fails the bar shows nothing hidden with no warning (X10, pre-existing). Neither is pinned."
+}
+```
