@@ -158,6 +158,7 @@ export class LibrarySurface extends JfElement {
     isTauri: { state: true },
     activeTab: { state: true },
     provisional: { state: true },
+    indexingActivity: { state: true },
     enrichmentStages: { state: true },
     enrichmentPending: { state: true },
     enrichmentBlocked: { state: true },
@@ -211,6 +212,7 @@ export class LibrarySurface extends JfElement {
    * → "fully searchable") is computed from applicable stages only. `null` until the first poll
    * snapshot arrives, which the seam reads as "coverage unknown" (no percent).
    */
+  declare indexingActivity: ReturnType<typeof selectIndexingProgress>['activity'];
   declare enrichmentStages: EnrichmentApplicability | null;
   /**
    * 809 finding 1 — the enrichment backfill still owes work, so a drained folder is keyword-searchable
@@ -281,6 +283,7 @@ export class LibrarySurface extends JfElement {
     this.isTauri = false;
     this.activeTab = 'folders';
     this.provisional = false;
+    this.indexingActivity = selectIndexingProgress(null, false, 0, []).activity;
     this.enrichmentStages = null;
     this.enrichmentPending = false;
     this.enrichmentBlocked = false;
@@ -584,6 +587,7 @@ export class LibrarySurface extends JfElement {
         s.episodeMaxPendingJobs,
         s.enrichSettleSamples,
       );
+      this.indexingActivity = progress.activity;
       this.enrichmentStages = progress.stages;
       // Round-15 F1b — same projection, same tick: whether the semantic stage can run at all, so a
       // row cannot render an unqualified "✓ … Verified just now" over an index with no vectors.
@@ -676,7 +680,7 @@ export class LibrarySurface extends JfElement {
         // Tempdoc 804 §B9 (F8) — never the raw hash as the row's name (see folderRowLabel).
         displayPath: folderRowLabel(pathHash, this.resolvedPaths[pathHash]).label,
         status: fs.glyph,
-        metaText: fs.metaText,
+        metaText: this.folderActivityText(fs.metaText),
         walkError: undefined,
         // Tempdoc 599 §16/B1 — the clickable "N failed" chip's count (the declared renderer emits an
         // intent the surface handles by opening the failed-files drawer). Named `failed` (the seam's
@@ -1266,7 +1270,7 @@ export class LibrarySurface extends JfElement {
             >
           </div>
           <div class="card-meta">
-            ${status.metaText}${status.failed > 0
+            ${this.folderActivityText(status.metaText)}${status.failed > 0
               ? this.renderFailedChip(pathHash, status)
               : nothing}${status.state === 'unverified'
               ? html`<jf-button
@@ -1300,6 +1304,17 @@ export class LibrarySurface extends JfElement {
    * renders: the scan omits collections rather than undercounting them (see `otherSources.ts`), so
    * silence there would be the same invisibility this section exists to end.
    */
+  private folderActivityText(folderText: string): string {
+    const activity = this.indexingActivity;
+    if (!activity.confirmed || activity.detail) {
+      // The global reason is explicitly scoped to the index; per-folder failures and verification
+      // caveats remain owned by folderStatus, even when its observation is only last known.
+      const scope = activity.confirmed ? 'Index: ' : 'Index (folder observation last known): ';
+      return `${folderText} · ${scope}${activity.summary}${activity.detail ? ` — ${activity.detail}` : ''}`;
+    }
+    return folderText;
+  }
+
   private renderOtherSources(): TemplateResult | typeof nothing {
     const { sources, truncated } = this.otherSources;
     if (sources.length === 0 && !truncated) return nothing;

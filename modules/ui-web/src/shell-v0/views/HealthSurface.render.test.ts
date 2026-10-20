@@ -752,7 +752,7 @@ describe('HealthSurface — Queue card status vocabulary (630 D1)', () => {
     }
   });
 
-  it('energy-pause still wins precedence over the working label', async () => {
+  it('S33.1 energy saver explains enrichment deferral while text indexing continues', async () => {
     feed({ indexedDocuments: 5, pendingJobs: 5, indexHealthy: true, power: undefined });
     // power lives at the top level of the status, not under core — feed it directly.
     __feedForTest({
@@ -766,7 +766,9 @@ describe('HealthSurface — Queue card status vocabulary (630 D1)', () => {
     const el = await mount();
     try {
       const subs = queueSubs(el);
-      expect(subs).toContain('Paused — saving energy');
+      expect(subs.some((s) => s.includes('Text indexing continues'))).toBe(true);
+      expect(subs.some((s) => s.includes('Enrichment deferred to save energy.'))).toBe(true);
+      expect(subs).not.toContain('Paused — saving energy');
       expect(subs).not.toContain('Indexing');
     } finally {
       teardown(el);

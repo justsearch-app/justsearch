@@ -431,6 +431,11 @@ public final class BackfillScheduler {
     return ner != null && ner.isGpuAvailable();
   }
 
+  /** Read-only placement predicate for status; a GPU bulk hold gates the whole idle cycle. */
+  public boolean backfillGpuBound() {
+    return embeddingLifecycle.embeddingProvider().isUsingGpu() || sparseOrNerOnGpu();
+  }
+
   /** Resets backoff/latch state. Called from {@code resetForProfiling}. */
   public void resetState() {
     lastSpladeInterleaveTime = 0;

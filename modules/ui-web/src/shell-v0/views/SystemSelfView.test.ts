@@ -18,6 +18,7 @@ import {
 
 /** One projection snapshot — the ONE authority both strip rows now read (813 §3b). */
 const progress = (over: Partial<IndexingProgress>): IndexingProgress => ({
+  activity: { summary: 'Ready — fully searchable', detail: null, confirmed: true, enrichmentDeferred: false },
   phase: 'ready',
   jobsPending: 0,
   jobsRunning: 0,
@@ -72,11 +73,12 @@ describe('jf-system-self-view — strip variant (578 Workstream A)', () => {
     expect(el.shadowRoot!.querySelector('h2')).toBeNull();
   });
 
-  it('strip variant still renders the live body (idle state)', async () => {
+  it('S33.4 strip variant keeps the body and marks a missing observation unconfirmed', async () => {
     const el = await mount('strip');
-    // The body region is always present; with nothing running it shows the compact idle marker.
+    // Absence of a status observation cannot establish idleness.
     expect(el.shadowRoot!.querySelector('.body')).not.toBeNull();
-    expect(el.shadowRoot!.querySelector('[data-testid="self-view-idle"]')).not.toBeNull();
+    expect(el.shadowRoot!.textContent).toContain('Indexing status unconfirmed');
+    expect(el.shadowRoot!.querySelector('[data-testid="self-view-idle"]')).toBeNull();
   });
 });
 

@@ -127,6 +127,9 @@ message ChatLoadView {
 }
 
 message OperatingIndexingView {
+  // Automatic PAUSED reasons describe enrichment/GPU bulk holds, not a stop of text indexing.
+  // energy_saver defers CPU and GPU enrichment; game_mode/gpu_busy_external hold GPU-bound
+  // idle enrichment cycles only. Consult worker.enrichment.backfillGpuBound, not GPU profile.
   // IndexingState: IDLE | RUNNING | SLOWED | PAUSED.
   string state = 1 [json_name = "state"];
   // IndexingReason tokens in precedence order: game_mode, gpu_busy_external, energy_saver,
@@ -408,6 +411,8 @@ message EnrichmentProgressView {
   bool embedding_available = 26 [json_name = "embeddingAvailable"];
   bool splade_available = 27 [json_name = "spladeAvailable"];
   bool ner_available = 28 [json_name = "nerAvailable"];
+  // Aggregate idle-cycle GPU hold predicate; true includes mixed placement, absent = unknown.
+  optional bool backfill_gpu_bound = 29 [json_name = "backfillGpuBound"];
 }
 
 message StageCompletenessView {

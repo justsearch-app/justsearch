@@ -1,0 +1,58 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T15:24:32.444Z",
+  "revision": "f6a14b5a66e7b879c711ef9ca54280723de2c242",
+  "tree": "356f5d2276294d7dcf9e8efb5a6c7c3a790ff1f1",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/api/generated/schema-types/status-response.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-vitest-253848-1792509869840.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2603
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/api/generated/schema-types/status-response.test.ts",
+      "file": "modules/ui-web/src/api/generated/schema-types/status-response.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:94c57c3f7551312a7e4bf8d40c8b96f031bc12b901a6b975664003323f5b446a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generated statusResponseSchema (564 faithfulness) validates the real captured status wire fixture with no contract drift",
+          "status": "passed"
+        },
+        {
+          "name": "generated statusResponseSchema (564 faithfulness) accepts the INDEXING GPU lease holder projected by the Engine",
+          "status": "passed"
+        },
+        {
+          "name": "generated statusResponseSchema (564 faithfulness) exposes the six engine-component states as a distinct generated vocabulary",
+          "status": "passed"
+        },
+        {
+          "name": "generated statusResponseSchema (564 faithfulness) rejects the retired aggregate spelling and unknown component states",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:6eb1239d31c30b60b5475f3ceab1cd5cc6bb7d3534ed133d14d53e5661baf730"
+}

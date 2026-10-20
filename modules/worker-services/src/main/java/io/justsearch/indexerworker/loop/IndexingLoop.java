@@ -1234,6 +1234,11 @@ public class IndexingLoop implements Closeable {
     return backfillScheduler.stageAvailability();
   }
 
+  /** Whether a GPU bulk hold would defer the idle enrichment cycle, including mixed placement. */
+  public boolean backfillGpuBound() {
+    return backfillScheduler.backfillGpuBound();
+  }
+
   /**
    * Returns the current state of the indexing loop as a wire-stable string
    * ({@code "IDLE"} / {@code "RUNNING"} / {@code "PAUSED"} / {@code "FAILED"}, produced via

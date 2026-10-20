@@ -353,6 +353,7 @@ export interface StatusResponse {
       writerQueueDepth?: number;
     };
     enrichment?: {
+      backfillGpuBound?: boolean | null;
       backfillMode?: string | null;
       batchTiming?: {
         batchCount?: Record<string, number> | null;
@@ -788,6 +789,7 @@ export const statusResponseSchema = z.strictObject({
       "writerQueueDepth": z.number().int().optional(),
     }).optional(),
     "enrichment": z.strictObject({
+      "backfillGpuBound": z.boolean().nullable().optional(),
       "backfillMode": z.string().nullable().optional(),
       "batchTiming": z.strictObject({
         "batchCount": z.record(z.string(), z.number().int()).nullable().optional(),

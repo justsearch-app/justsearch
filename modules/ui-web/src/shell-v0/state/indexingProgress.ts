@@ -87,6 +87,13 @@ export interface EnrichSettleSample {
 }
 
 export interface IndexingProgress {
+  /** WP3.3: one account of current activity and automatic holds for every status surface. */
+  activity: {
+    summary: string;
+    detail: string | null;
+    confirmed: boolean;
+    enrichmentDeferred: boolean;
+  };
   /** §3a phase. `unknown` ⟹ no trustworthy progress observation; NO number below may be rendered. */
   phase: IndexingPhase;
   /** Non-terminal job rows (PENDING + PROCESSING) — `worker.core.pendingJobs` (the queueDepth projection). */
@@ -98,7 +105,7 @@ export interface IndexingProgress {
   /**
    * Settled-over-total across every APPLICABLE enrichment stage (parent embedding/SPLADE/NER + the
    * chunk tier), 0-100, rounded. `null` when there is no faithful denominator — the worker did not
-   * report, or no stage has any documents to enrich. Never NaN, never a fabricated number
+   * report, no stage has documents to enrich, or no work has settled yet. Never NaN, never a fabricated number
    * (`availability.ts:193-194`'s discipline, applied to progress).
    */
   enrichingPercent: number | null;
@@ -160,7 +167,7 @@ export interface IndexingProgress {
    */
   etaSeconds: number | null;
   /**
-   * 813 §19 (W2) — the DETERMINATE position of the `indexing` phase's drain, 0-100, measured against
+   * 813 §19 (W2) — the DETERMINATE position of the `indexing` phase's drain, 0-99, measured against
    * the largest backlog observed this drain episode (`AiState.episodeMaxPendingJobs`, the store's
    * cross-poll memory). `null` whenever there is no denominator to be honest about:
    *  - any phase other than `indexing` (the enrichment fraction is {@link enrichingPercent}'s job);
@@ -215,6 +222,7 @@ export function isWorkerReportedIndex(status: StatusResponse | null | undefined)
 }
 
 const EMPTY: IndexingProgress = {
+  activity: { summary: 'Indexing status unconfirmed', detail: null, confirmed: false, enrichmentDeferred: false },
   phase: 'unknown',
   jobsPending: 0,
   jobsRunning: 0,
@@ -580,12 +588,14 @@ export function selectIndexingProgress(
   // Symmetric rule (owner finding, 2026-08-06): never a fake 100% either — Math.round lets a
   // sub-half-percent tail (e.g. 2 of 600 pending) render "100%" beside "semantic search catching
   // up", a full bar contradicting its own caveat. While ANY counted work is pending the display
-  // is capped at 99; a true 100 is only reachable when pending === 0 (and the phase gate, which
-  // also sees denominator-less stages, still decides `ready` on its own evidence).
-  const enrichingPercent =
-    total > 0 ? Math.min(pending > 0 ? 99 : 100, Math.round(((total - pending) / total) * 100)) : null;
+  // is capped at 99, including denominator-less pending stages. Before any settlement is observed,
+  // withhold a starting percentage just as indexing withholds one before an observed drain.
+  const enrichingPercent = total > pending
+    ? Math.min(work.rawPending > 0 ? 99 : 100, Math.round(((total - pending) / total) * 100))
+    : null;
 
   const phase = derivePhase(jobsPending, work);
+  const activity = indexingActivity(status, snapshotLive, phase, work.rawPending);
 
   // 813 §19 (W2) — the high-water denominator. `episodeMax > jobsPending` is the whole admission
   // test: it is simultaneously "a drain was observed" and "the denominator is positive", so the
@@ -593,10 +603,11 @@ export function selectIndexingProgress(
   const episodeMax = count(episodeMaxPendingJobs);
   const indexingPercent =
     phase === 'indexing' && episodeMax > jobsPending
-      ? Math.round(((episodeMax - jobsPending) / episodeMax) * 100)
+      ? Math.min(99, Math.round(((episodeMax - jobsPending) / episodeMax) * 100))
       : null;
 
   return {
+    activity,
     phase,
     jobsPending,
     jobsRunning,
@@ -612,7 +623,7 @@ export function selectIndexingProgress(
     // second pass over the wire.
     enrichingStages: work.rows,
     enrichingEtaSeconds:
-      phase === 'enriching' && snapshotLive
+      phase === 'enriching' && activity.confirmed && !activity.enrichmentDeferred
         ? deriveEnrichEtaSeconds(enrichSettleSamples, pending)
         : null,
     embeddingPending: count(status.worker?.enrichment?.embeddingPendingCount),
@@ -630,4 +641,44 @@ export function selectIndexingProgress(
     live: snapshotLive,
     stages: applicable,
   };
+}
+
+/** Automatic reasons describe the work they hold, never the broad wire state's name. */
+function indexingActivity(
+  status: StatusResponse,
+  snapshotLive: boolean,
+  phase: IndexingPhase,
+  enrichingPending: number,
+): IndexingProgress['activity'] {
+  if (!snapshotLive || status.meta?.workerRpcStale === true ||
+      status.operating?.freshness?.staleSources?.includes('indexing')) return EMPTY.activity;
+
+  const reasons = new Set(status.operating?.indexing?.reasons ?? []);
+  const gpuBound = status.worker?.enrichment?.backfillGpuBound;
+  // Power is the assembler's authority for this reason; older snapshots can lack operating.
+  const energy = reasons.has('energy_saver') || status.power?.energyReduced === true;
+  const gpuCauses = [
+    ...(reasons.has('game_mode') ? ['a game is running'] : []),
+    ...(reasons.has('gpu_busy_external') ? ['another app is using the GPU'] : []),
+  ];
+  const enrichmentDeferred = enrichingPending > 0 && (energy || (gpuCauses.length > 0 && gpuBound === true));
+  const details: string[] = [];
+  if (energy) details.push('Enrichment deferred to save energy.');
+  if (gpuCauses.length > 0) {
+    const cause = gpuCauses.join(' and ');
+    if (gpuBound === true) details.push(`Enrichment deferred while ${cause} (GPU bulk hold).`);
+    else if (gpuBound === false) details.push(`GPU bulk work deferred while ${cause}.${
+      enrichingPending > 0 && !energy ? ' CPU enrichment continues.' : ''}`);
+    else details.push(`GPU bulk work deferred while ${cause}; enrichment placement unconfirmed.`);
+  }
+  if (reasons.has('chat_generating') && !enrichmentDeferred) {
+    details.push(gpuBound === true ? 'Enrichment shares GPU time with chat.' : 'Indexing shares time with chat.');
+  }
+  const summary = phase === 'indexing'
+    ? energy || gpuCauses.length > 0 ? 'Text indexing continues' : 'Indexing'
+    : phase === 'enriching'
+      ? enrichmentDeferred ? 'Enrichment deferred' : 'Search is ready — still improving'
+      : phase === 'blocked' ? 'Semantic search waiting for AI install'
+        : status.worker?.core?.indexHealthy === true ? 'Ready — fully searchable' : 'Indexing queue empty';
+  return { summary, detail: details.join(' ') || null, confirmed: true, enrichmentDeferred };
 }

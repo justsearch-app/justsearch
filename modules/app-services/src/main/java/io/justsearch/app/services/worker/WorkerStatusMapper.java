@@ -180,6 +180,7 @@ final class WorkerStatusMapper {
                         .embeddingAvailable(enrichment.getEmbeddingAvailable())
                         .spladeAvailable(enrichment.getSpladeAvailable())
                         .nerAvailable(enrichment.getNerAvailable())
+                        .backfillGpuBound(enrichment.hasBackfillGpuBound() ? enrichment.getBackfillGpuBound() : null)
                         .enrichmentCompleted(enrichment.getEnrichmentCompletedMap())
                         .batchTiming(new BatchTimingView(
                                 enrichment.getBatchTiming().getBatchCountMap(),

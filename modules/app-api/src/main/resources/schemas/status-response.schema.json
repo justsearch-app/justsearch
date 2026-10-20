@@ -994,6 +994,9 @@
         "enrichment" : {
           "type" : "object",
           "properties" : {
+            "backfillGpuBound" : {
+              "type" : [ "boolean", "null" ]
+            },
             "backfillMode" : {
               "type" : [ "string", "null" ]
             },

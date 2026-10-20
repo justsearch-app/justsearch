@@ -867,7 +867,7 @@ export class HealthSurface extends JfElement {
 
   /**
    * Queue-card sub-text (630). The calm status vocabulary: "Catching up…" (a post-resume reconcile
-   * transient) and "Paused — saving energy" (OS energy saver is deferring backfill) sit beside the
+   * transient) and the shared automatic-hold explanation sit beside the
    * working state, and the **terminal "Up to date"** (idle + a verified-healthy index) is the
    * explicit trust close — the Dropbox "Syncing… → Up to date" model, to which "Catching up…" and
    * "Paused…" both resolve once they clear. None of these is a fault — search keeps working.
@@ -879,12 +879,18 @@ export class HealthSurface extends JfElement {
    * comes from the ONE indexing-progress projection — this card derives none of it privately.
    */
   private queueSubLabel(queue: number, known: boolean): string {
+    const progress = selectIndexingProgress(
+      this.status, this.aiState?.snapshotLive ?? false,
+      this.aiState?.episodeMaxPendingJobs ?? 0, this.aiState?.enrichSettleSamples ?? [],
+    );
+    if (!progress.activity.confirmed || progress.activity.detail) {
+      return [progress.activity.summary, progress.activity.detail].filter(Boolean).join(' — ');
+    }
     const stability = this.aiState?.stability;
     if (stability?.kind === 'provisional' && stability.cause === 'catching-up') {
       return 'Catching up…';
     }
     if (this.provisional) return 'Rebuilding…';
-    if (this.status?.power?.energyReduced === true && queue > 0) return 'Paused — saving energy';
     if (!known) return 'Unknown';
     if (queue > 0) return 'Indexing';
     // 809 finding 1 — the JOB queue draining is not the work finishing. Embedding/SPLADE/NER run
@@ -892,12 +898,6 @@ export class HealthSurface extends JfElement {
     // work — so neither the terminal "Up to date" nor "Idle" is true here. Phase comes from the ONE
     // progress projection (which also guards the unknown/zeroed-worker arm); the phrase is the shared
     // enrichment vocabulary the Brain surface and Library rows use, plus the percent when faithful.
-    const progress = selectIndexingProgress(
-      this.status,
-      this.aiState?.snapshotLive ?? false,
-      this.aiState?.episodeMaxPendingJobs ?? 0,
-      this.aiState?.enrichSettleSamples ?? [],
-    );
     if (progress.phase === 'enriching') {
       return progress.enrichingPercent === null
         ? ENRICHMENT_IN_PROGRESS_LABEL

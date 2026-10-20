@@ -33,12 +33,14 @@ export class IndexingOverlay extends JfElement {
   static properties = {
     embeddingQueueSize: { type: Number, attribute: 'embedding-queue-size' },
     vduQueueSize: { type: Number, attribute: 'vdu-queue-size' },
+    activity: { attribute: false },
     switching: { type: Boolean },
     dismissible: { type: Boolean },
   };
 
   declare embeddingQueueSize: number;
   declare vduQueueSize: number;
+  declare activity: ReturnType<typeof selectIndexingProgress>['activity'];
   declare switching: boolean;
   declare dismissible: boolean;
 
@@ -66,6 +68,7 @@ export class IndexingOverlay extends JfElement {
 
   constructor() {
     super();
+    this.activity = selectIndexingProgress(null, false, 0, []).activity;
     this.embeddingQueueSize = 0;
     this.vduQueueSize = 0;
     this.switching = false;
@@ -229,7 +232,7 @@ export class IndexingOverlay extends JfElement {
             <div class="head-left">
               <div class="icon-box">${icon({ name: 'cpu', size: 22 })}</div>
               <div>
-                <h3>Batch Processing Active</h3>
+                <h3>${this.activity.summary}</h3>
                 <p class="sub">Chat &amp; Q&amp;A paused — search still works</p>
               </div>
             </div>
@@ -240,13 +243,12 @@ export class IndexingOverlay extends JfElement {
               : nothing}
           </div>
           <p class="explain">
-            The system is generating embeddings for your indexed files. Chat, Q&amp;A, and
-            summarization are paused to prevent GPU memory conflicts — search still works.
+            ${this.activity.detail ?? (this.activity.confirmed ? 'Search still works while enrichment improves your results.' : 'Waiting for a fresh status observation.')}
           </p>
           ${hasWork
             ? html`
                 <div class="queue">
-                  <div class="queue-label">Processing queue</div>
+                  <div class="queue-label">${this.activity.confirmed ? 'Remaining work' : 'Last observed queue'}</div>
                   ${this.vduQueueSize > 0
                     ? html`
                         <div class="queue-row vdu">
@@ -397,6 +399,7 @@ export class IndexingOverlayHost extends JfElement {
         ?switching=${this.switching}
         @go-online=${() => void this.handleGoOnline()}
         @dismiss=${() => (this.userDismissed = true)}
+        .activity=${progress.activity}
       ></jf-indexing-overlay>
     `;
   }

@@ -627,21 +627,14 @@ export class StatusDeck extends JfElement {
         </jf-control>`;
       }
       case 'core.queue': {
-        if (queue <= 0 && embed <= 0) return nothing;
-        // 630: the global, main-surface home for energy-pause legibility. When the OS energy saver
-        // is deferring deferrable backfill, a queue that sits still should read as "paused to save
-        // energy", not stalled/broken — the calm twin of the Health card's "Paused — saving energy".
-        // (Not routed through the degradation banner: that mechanism is degradation-only, and search
-        // still works. "Catching up…" already shows here via the verdict pill.)
-        const energyPaused = this.status?.power?.energyReduced === true && queue > 0;
-        if (energyPaused) {
-          return html`<span
-            class="group"
-            role="img"
-            aria-label="${name}: ${NUM.format(queue)} job(s) queued — paused to save energy"
-          >
-            ${icon({ name: 'moon', size: 11 })}
-            <span class="val">queue: ${NUM.format(queue)} · paused</span>
+        if (queue <= 0 && embed <= 0 && progress.activity.confirmed) return nothing;
+        const activity = progress.activity;
+        if (!activity.confirmed || activity.detail) {
+          const description = [activity.summary, activity.detail].filter(Boolean).join(' — ');
+          const label = activity.confirmed ? `queue: ${NUM.format(queue)} · ${description}` : description;
+          return html`<span class="group" role="img" aria-label=${label} title=${label}>
+            ${icon({ name: 'zap', size: 11 })}
+            <span class="val">${label}</span>
           </span>`;
         }
         // 813 §4 — during the enrichment window the honest second number is the COVERAGE fraction,
@@ -707,7 +700,14 @@ export class StatusDeck extends JfElement {
     // ALWAYS-MOUNTED surface (not BrainSurface's own render) so a transition still announces even if
     // the user has navigated away from the AI Brain page.
     const aiEngineAnnounce = this.aiState ? presentAiEngineVerdict(this.aiState.aiEngine).announce : null;
+    const progress = selectIndexingProgress(
+      this.status, this.aiState?.snapshotLive ?? false,
+      this.aiState?.episodeMaxPendingJobs ?? 0, this.aiState?.enrichSettleSamples ?? [],
+    );
+    const indexingAnnounce = [progress.activity.summary, progress.activity.detail].filter(Boolean).join(' — ');
     return html`
+      <jf-system-notice class="visually-hidden" live="polite" data-testid="indexing-announcer"
+        >${indexingAnnounce}</jf-system-notice>
       ${announce
         ? html`<jf-system-notice
             class="visually-hidden"

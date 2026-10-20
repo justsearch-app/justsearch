@@ -225,7 +225,7 @@ describe('StatusDeck (slice 461)', () => {
       .map((g) => g.textContent ?? '')
       .find((t) => t.includes('queue:'));
 
-  it('630: queue reads "paused" on the main-surface bar when energy saver is active', async () => {
+  it('S33.1 energy saver names continued text indexing and deferred enrichment', async () => {
     const el = make();
     el.aiState = makeAiState({
       index: { documentCount: known(0), searchableDocumentCount: known(0), pendingJobs: known(5), embeddingPending: known(0), embeddingBlocked: known(false), embeddingQueueSize: known(0), vduQueueSize: known(0) },
@@ -235,7 +235,9 @@ describe('StatusDeck (slice 461)', () => {
       } as unknown as AiState['status'],
     });
     await el.updateComplete;
-    expect(queueText(el)).toContain('paused');
+    expect(queueText(el)).toContain('Text indexing continues');
+    expect(queueText(el)).toContain('Enrichment deferred to save energy.');
+    expect(queueText(el)).not.toContain('paused');
   });
 
   it('630: queue stays the plain active count when not energy-reduced', async () => {

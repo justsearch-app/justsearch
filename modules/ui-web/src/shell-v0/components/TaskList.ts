@@ -143,25 +143,7 @@ const STAGE_LABELS: Record<EnrichingStageRow['id'], string> = {
 };
 
 /** The empty projection this component starts from, before the first `/api/status` poll lands. */
-const NO_PROGRESS: IndexingProgress = {
-  phase: 'unknown',
-  jobsPending: 0,
-  jobsRunning: 0,
-  jobsQueued: 0,
-  enrichingPercent: null,
-  enrichingPending: 0,
-  blockedPending: 0,
-  enrichingStages: [],
-  enrichingEtaSeconds: null,
-  embeddingPending: 0,
-  vduPending: 0,
-  etaSeconds: null,
-  indexingPercent: null,
-  pendingBytes: null,
-  live: false,
-  // Applicability is UNKNOWN before the first poll — never all-false, which reads as a claim.
-  stages: null,
-};
+const NO_PROGRESS = selectIndexingProgress(null, false, 0, []);
 
 export class TaskList extends JfElement {
   static properties = {
@@ -535,6 +517,7 @@ export class TaskList extends JfElement {
    */
   private renderAggregate(): TemplateResult | typeof nothing {
     const p = this.progress;
+    if (!p.activity.confirmed) return nothing;
     if (this.showingReady) {
       // Round-15 F1 — the terminal card has TWO bodies, and which one is true is decided by the
       // projection's own evidence, never by the absence of queued work: an index whose semantic
@@ -592,6 +575,11 @@ export class TaskList extends JfElement {
           </div>
         </div>
       `;
+    }
+    if (p.phase === 'enriching' && p.activity.enrichmentDeferred) {
+      return html`<div class="counts" data-testid="task-aggregate-counts">${
+        p.enrichingPercent === null ? '' : `${p.enrichingPercent}% · `
+      }${formatCount(p.enrichingPending)} enrichment steps waiting</div>`;
     }
     if (p.phase === 'enriching') {
       const pct = p.enrichingPercent;
@@ -655,6 +643,7 @@ export class TaskList extends JfElement {
               </jf-button>`
             : nothing}
         </div>
+        ${this.progress.activity.detail ? html`<div class="counts">${this.progress.activity.detail}</div>` : nothing}
         ${this.renderAggregate()}
         <!-- 595 §4.4: when the live feed stalls, say so — don't show stale counts
              as if they were live (the §1.3 freeze). -->
@@ -726,6 +715,7 @@ export class TaskList extends JfElement {
    * panel is up for agent operations alone.
    */
   private headline(): string {
+    if (!this.progress.activity.confirmed || this.progress.activity.detail) return this.progress.activity.summary;
     // Round-15 F1 — "fully searchable" is a claim about COVERAGE, so it may only be made when the
     // projection says coverage supports it. With the semantic stage unable to run, the honest
     // headline keeps the capability lead (§19 W1) and names the limit instead of hiding it.

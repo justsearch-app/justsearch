@@ -9,7 +9,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * <p>Populated from the {@code EnergyStatePoller.energyState()} poll. When {@code
  * energyReduced} is true the OS has asked apps to reduce background activity (e.g. Windows Energy
  * Saver) and the Worker is deferring GPU/CPU-heavy bulk backfill — the Health Queue card renders
- * this as the calm "Paused — saving energy" state. {@code source} ({@code AC}/{@code BATTERY}/{@code
+ * this as "Enrichment deferred to save energy" while text indexing continues. {@code source} ({@code AC}/{@code BATTERY}/{@code
  * UNKNOWN}) is wording-only. This is not a degradation: search keeps working.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
