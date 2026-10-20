@@ -17,6 +17,7 @@ import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
 import { present } from '../display/present.js';
+import { selectIndexingProgress } from '../state/indexingProgress.js';
 
 /** The observed tones the engine derives from the authority (never authored). */
 type LivenessTone = 'live' | 'info' | 'degraded' | 'error' | 'idle';
@@ -110,10 +111,14 @@ export class LivenessReadout extends JfElement {
   }
 
   override render(): TemplateResult {
-    const tone = toneFor(this.aiState);
+    const state = this.aiState;
+    const activity = state?.statusLabel === 'Indexing'
+      ? selectIndexingProgress(state.status, state.indexingStatusLive, state.episodeMaxPendingJobs, state.enrichSettleSamples).activity
+      : null;
+    const tone = activity && !activity.confirmed ? 'idle' : toneFor(state);
     // The accessible name projects through the one display authority (no inline string).
     const name = this.metricId ? present({ kind: 'metric', id: this.metricId }).label : '';
-    const liveText = this.aiState?.statusLabel ?? 'unknown';
+    const liveText = activity ? [activity.summary, activity.detail].filter(Boolean).join(' — ') : state?.statusLabel ?? 'unknown';
     return html`
       <span
         class="dot"

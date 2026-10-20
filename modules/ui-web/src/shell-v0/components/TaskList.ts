@@ -47,6 +47,7 @@ import { subscribeFeedStalled } from '../substrates/tasks/indexingJobsBridge.js'
 import { subscribeAiState } from '../state/aiStateStore.js';
 import {
   selectIndexingProgress,
+  indexingTaskStatus,
   type EnrichingStageRow,
   type IndexingProgress,
 } from '../state/indexingProgress.js';
@@ -466,11 +467,13 @@ export class TaskList extends JfElement {
   }
 
   private renderTask(t: Task): TemplateResult {
+    const status = indexingTaskStatus(t, this.progress.activity);
+    const confirmed = status === t.status;
     return html`
       <div class="task" data-testid="task-${t.id}">
         <div class="task-row">
-          <span class="status ${t.status}" data-testid="task-status-${t.id}"
-            >${t.status}</span
+          <span class="status ${confirmed ? t.status : 'stale'}" data-testid="task-status-${t.id}"
+            >${status}</span
           >
           ${/* Tempdoc 609 §R (T1.3) — when the task knows its origin surface, the label is a button that
                 returns there ("return to running job"); otherwise a plain span. */ ''}
@@ -496,7 +499,7 @@ export class TaskList extends JfElement {
               </jf-button>`
             : nothing}
         </div>
-        ${t.status === 'running' && t.progress !== undefined
+        ${confirmed && t.status === 'running' && t.progress !== undefined
           ? html`<div class="bar">
               <span style=${`width:${Math.round(t.progress * 100)}%`}></span>
             </div>`
@@ -674,6 +677,7 @@ export class TaskList extends JfElement {
           : nothing}
         ${this.filesOpen && hasDetail
           ? html`<div class="files" data-testid="tasks-files">
+              ${!this.progress.activity.confirmed ? html`<div class="counts">Last observed indexing and enrichment details</div>` : nothing}
               <!-- 813 §20 — machine stages, in the disclosure: the very rows the surface percent
                    sums (enrichingStages), so this is a narrower SCOPE of the same number, never a
                    second derivation. -->

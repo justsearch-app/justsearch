@@ -56,7 +56,7 @@ import { projectFact } from '../display/facts.js';
 import { formatBytes, formatCount } from '../display/format.js';
 import './Control.js';
 import { subscribeTasks, listRunningTasks, type Task } from '../substrates/tasks/index.js';
-import { selectIndexingProgress } from '../state/indexingProgress.js';
+import { selectIndexingProgress, indexingTaskStatus } from '../state/indexingProgress.js';
 import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
 import type { ComponentState } from '../../api/generated/schema-types/status-response.js';
 
@@ -477,8 +477,15 @@ export class StatusDeck extends JfElement {
    */
   private inferenceChipReadout(): { label: string; tone: NoticeTone } {
     const s = this.aiState;
-    if (s && this.yieldsDegradationToBanner()) return statusWithoutVerdictFlavor(s);
-    return { label: s?.statusLabel ?? 'offline', tone: this.inferencePillTone() };
+    const readout = s && this.yieldsDegradationToBanner()
+      ? statusWithoutVerdictFlavor(s)
+      : { label: s?.statusLabel ?? 'offline', tone: this.inferencePillTone() };
+    // Runtime mode says who owns the GPU, not whether its enrichment cycle is running.
+    if (s?.aiEngine.kind === 'indexing' && readout.label === 'Indexing') {
+      const { activity } = selectIndexingProgress(s.status, s.indexingStatusLive, s.episodeMaxPendingJobs, s.enrichSettleSamples);
+      return { label: activity.summary, tone: activity.confirmed ? readout.tone : 'neutral' };
+    }
+    return readout;
   }
 
   /**
@@ -555,10 +562,11 @@ export class StatusDeck extends JfElement {
         if (running.length === 0) return nothing;
         const target = running.find((t) => t.originSurfaceId)?.originSurfaceId;
         const count = running.length;
-        const text = count === 1 ? running[0]!.label : `${count} running`;
+        const lastKnown = running.some(task => indexingTaskStatus(task, progress.activity) !== task.status);
+        const text = (count === 1 ? running[0]!.label : `${count} running`) + (lastKnown ? ' — indexing last observed' : '');
         if (!target) {
           return html`<span class="group" role="img" aria-label="${name}: ${text}">
-            <span aria-hidden="true">⟳</span><span class="val">${count}</span>
+            <span aria-hidden="true">⟳</span><span class="val">${count}${lastKnown ? ' · indexing last observed' : ''}</span>
           </span>`;
         }
         return html`<jf-control
@@ -566,7 +574,7 @@ export class StatusDeck extends JfElement {
           label="${name}: ${text}. Return to it."
           .onActivate=${() => requestSurfaceNavigation(target)}
         >
-          <span aria-hidden="true">⟳</span><span class="val">${count}</span>
+          <span aria-hidden="true">⟳</span><span class="val">${count}${lastKnown ? ' · indexing last observed' : ''}</span>
         </jf-control>`;
       }
       case 'core.conn': {
@@ -620,6 +628,7 @@ export class StatusDeck extends JfElement {
         return html`<jf-control
           class="status-pill group"
           label="${name}: ${mode}. ${actionLabel}"
+          title=${this.aiState?.aiEngine.kind === 'indexing' ? progress.activity.detail ?? nothing : nothing}
           .onActivate=${() =>
             needsBrain ? requestSurfaceNavigation('core.brain-surface') : this.openHealth()}
         >
@@ -699,7 +708,9 @@ export class StatusDeck extends JfElement {
     // Tempdoc 663 Design pass 3 — the AI-engine sibling announcer, same pattern, living in this
     // ALWAYS-MOUNTED surface (not BrainSurface's own render) so a transition still announces even if
     // the user has navigated away from the AI Brain page.
-    const aiEngineAnnounce = this.aiState ? presentAiEngineVerdict(this.aiState.aiEngine).announce : null;
+    // The shared indexing announcer below already owns indexing activity and its holds.
+    const aiEngineAnnounce = this.aiState && this.aiState.aiEngine.kind !== 'indexing'
+      ? presentAiEngineVerdict(this.aiState.aiEngine).announce : null;
     const progress = selectIndexingProgress(
       this.status, this.aiState?.indexingStatusLive ?? false,
       this.aiState?.episodeMaxPendingJobs ?? 0, this.aiState?.enrichSettleSamples ?? [],

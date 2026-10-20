@@ -32,6 +32,7 @@ const progress = (over: Partial<IndexingProgress>): IndexingProgress => ({
   vduPending: 0,
   etaSeconds: null,
   indexingPercent: null,
+  rebuildPercent: null,
   pendingBytes: null,
   live: true,
   stages: { embedding: true, splade: true, ner: true },

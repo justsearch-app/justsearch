@@ -144,25 +144,6 @@ function formatUptime(ms: number | undefined): string {
   return `${sec}s`;
 }
 
-function formatIndexState(state: string): string {
-  switch (state) {
-    case 'IDLE':
-      return 'Ready';
-    case 'INDEXING':
-      return 'Indexing';
-    case 'NOT_STARTED':
-      return 'Not started';
-    case 'UNAVAILABLE':
-      return 'Unavailable';
-    case 'ERROR':
-      return 'Error';
-    case 'FAILED':
-      return 'Indexing failed';
-    default:
-      return state || 'Unknown';
-  }
-}
-
 export class HealthSurface extends JfElement {
   static properties = {
     apiBase: { attribute: 'api-base', type: String },
@@ -798,8 +779,11 @@ export class HealthSurface extends JfElement {
     const hasOpenConditions = this.recommendedActions.size > 0;
     const attention =
       hasOpenConditions && (verdict.kind === 'operational' || verdict.kind === 'checking');
-    const label = attention ? 'Attention needed' : present.headline;
-    const tone = attention ? 'warning' : present.tone;
+    const activity = this.indexingProgress().activity;
+    const label = !activity.confirmed
+      ? verdict.kind === 'connecting' ? `${present.headline} — ${activity.summary}` : activity.summary
+      : attention ? 'Attention needed' : present.headline;
+    const tone = !activity.confirmed || attention ? 'warning' : present.tone;
     return html`
       <div class="header">
         <div class="header-left">
@@ -845,12 +829,8 @@ export class HealthSurface extends JfElement {
     const stability = this.aiState?.stability;
     if (!stability || stability.kind !== 'provisional') return nothing;
     if (stability.cause !== 'rebuilding' && stability.cause !== 'generation-switch') return nothing;
-    const migration = this.status?.worker?.migration;
-    const active = migration?.activeIndexedDocuments ?? 0;
-    const building = migration?.buildingIndexedDocuments ?? 0;
-    if (active <= 0) return nothing; // no faithful denominator yet — the badge already says "Rebuilding…"
-    const ratio = Math.min(building / active, 1);
-    const pct = Math.round(ratio * 100);
+    const pct = this.indexingProgress().rebuildPercent;
+    if (pct === null) return nothing;
     return html`
       <div
         class="rebuild-progress"
@@ -865,7 +845,7 @@ export class HealthSurface extends JfElement {
           <span>Rebuilding…</span>
         </div>
         <div class="progress">
-          <div class="progress-bar info" style="width: ${ratio * 100}%"></div>
+          <div class="progress-bar info" style="width: ${pct}%"></div>
         </div>
       </div>
     `;
@@ -884,11 +864,15 @@ export class HealthSurface extends JfElement {
    * reads "Building semantic search — N%", and "Up to date" is reserved for coverage-complete. The number
    * comes from the ONE indexing-progress projection — this card derives none of it privately.
    */
-  private queueSubLabel(queue: number, known: boolean): string {
-    const progress = selectIndexingProgress(
+  private indexingProgress() {
+    return selectIndexingProgress(
       this.status, this.aiState?.indexingStatusLive ?? false,
       this.aiState?.episodeMaxPendingJobs ?? 0, this.aiState?.enrichSettleSamples ?? [],
     );
+  }
+
+  private queueSubLabel(queue: number, known: boolean): string {
+    const progress = this.indexingProgress();
     if (!progress.activity.confirmed || progress.activity.detail) {
       return [progress.activity.summary, progress.activity.detail].filter(Boolean).join(' — ');
     }
@@ -1058,8 +1042,11 @@ export class HealthSurface extends JfElement {
       : this.connPhase === 'connecting'
         ? 'connecting…'
         : 'disconnected';
-    const rawIndexState = this.status?.worker?.core?.indexState ?? 'UNKNOWN';
-    const indexState = formatIndexState(rawIndexState);
+    const progress = this.indexingProgress();
+    const activity = progress.activity;
+    const indexState = [activity.summary, activity.detail].filter(Boolean).join(' — ');
+    const failure = this.status?.worker?.core?.indexState === 'FAILED' ? 'Indexing failed'
+      : this.status?.worker?.core?.indexState === 'ERROR' ? 'Indexing error' : null;
     // Endpoint / index-state / uptime are content (data), shared by both renders.
     const rows = html`
       <div class="data-row">
@@ -1070,15 +1057,13 @@ export class HealthSurface extends JfElement {
         <span class="key">Index state</span>
         <span
           class="val"
-          style="color: ${rawIndexState === 'IDLE'
-            ? 'var(--accent-success)'
-            : rawIndexState === 'INDEXING'
-              ? 'var(--accent-warning)'
-              : rawIndexState === 'ERROR' || rawIndexState === 'FAILED' || rawIndexState === 'UNAVAILABLE'
-                ? 'var(--accent-danger)'
-                : 'var(--text-secondary)'}"
-          >${indexState}</span
-        >
+          style="color: ${failure ? 'var(--accent-danger)' : !activity.confirmed
+            ? 'var(--text-secondary)'
+            : progress.phase === 'ready' && this.status?.worker?.core?.indexHealthy === true
+              ? 'var(--accent-success)'
+              : 'var(--text-secondary)'}"
+          >${failure ?? indexState}</span>
+        ${failure ? html`<span>${indexState}</span>` : nothing}
       </div>
       <div class="data-row">
         <span class="key">Uptime</span>
@@ -1141,6 +1126,7 @@ export class HealthSurface extends JfElement {
   private renderQueueDb(): TemplateResult | typeof nothing {
     if (!this.status) return nothing;
     const indexHealthy = this.status?.worker?.core?.indexHealthy ?? null;
+    const confirmed = this.indexingProgress().activity.confirmed;
     return html`
       <div class="card section">
         <h3>${icon({ name: 'database', size: 12 })} Queue DB</h3>
@@ -1148,7 +1134,7 @@ export class HealthSurface extends JfElement {
           <span class="key">Status</span>
           <span
             class="val"
-            style="color: ${indexHealthy === true
+            style="color: ${!confirmed ? 'var(--text-secondary)' : indexHealthy === true
               ? 'var(--accent-success)'
               : indexHealthy === false
                 ? 'var(--accent-danger)'
@@ -1157,7 +1143,7 @@ export class HealthSurface extends JfElement {
               ? 'Healthy'
               : indexHealthy === false
                 ? 'Unhealthy'
-                : 'Unknown'}</span
+                : 'Unknown'}${confirmed ? '' : ' (last observed)'}</span
           >
         </div>
         <div class="data-row">
@@ -1177,6 +1163,8 @@ export class HealthSurface extends JfElement {
     const mode = this.aiState?.runtime?.mode ?? this.inference.mode ?? 'unknown';
     const isOnline = mode === 'online';
     const failure = this.aiState?.chatFailureReason ?? null;
+    const progress = this.indexingProgress();
+    const activity = progress.activity;
     return html`
       <div class="card section">
         <h3>
@@ -1202,20 +1190,21 @@ export class HealthSurface extends JfElement {
                 ? 'Starting…'
                 : // Spec A step 7 (F1): a failed chat says why, in the readiness notice's words.
                   failure
-                  ? reasonFor(failure).wording
+                  ? reasonFor(failure, activity).wording
                   : 'Offline'}</span
           >
         </div>
+        <p data-testid="health-ai-indexing-activity">${activity.summary}${activity.detail ? ` — ${activity.detail}` : ''}</p>
         <div
           style="display: grid; grid-template-columns: max-content 1fr max-content 1fr; gap: 0.375rem 1rem; margin-top: 0.5rem; font-size: var(--font-size-sm)"
         >
-          <span class="key" style="color: var(--text-secondary)">Embed queue</span>
+          <span class="key" style="color: var(--text-secondary)">${activity.confirmed ? 'Embed queue' : 'Last observed embed queue'}</span>
           <span class="val" style="font-family: monospace; text-align: right"
-            >${NUM.format(this.inference.embeddingQueueSize ?? 0)}</span
+            >${progress.phase === 'unknown' ? '—' : NUM.format(progress.embeddingPending)}</span
           >
-          <span class="key" style="color: var(--text-secondary)">VDU queue</span>
+          <span class="key" style="color: var(--text-secondary)">${activity.confirmed ? 'VDU queue' : 'Last observed VDU queue'}</span>
           <span class="val" style="font-family: monospace; text-align: right"
-            >${NUM.format(this.inference.vduQueueSize ?? 0)}</span
+            >${progress.phase === 'unknown' ? '—' : NUM.format(progress.vduPending)}</span
           >
           <span class="key" style="color: var(--text-secondary)">Context (actual)</span>
           <span class="val" style="font-family: monospace; text-align: right"
@@ -1391,21 +1380,25 @@ export class HealthSurface extends JfElement {
     // 'Service degraded' header beside a '✓ All systems operational' footer). The
     // verdict already encodes connecting / transitioning / checking / degraded /
     // unreachable; the footer only adds the green "✓" affordance for operational.
+    const activity = this.indexingProgress().activity;
+    const indexingSummary = html`<p data-testid="health-indexing-summary">${activity.summary}${activity.detail ? ` — ${activity.detail}` : ''}</p>`;
     if (this.recommendedActions.size === 0) {
       const v = this.verdict;
-      if (v.kind === 'operational') {
+      if (v.kind === 'operational' && activity.confirmed) {
         return html`
           <div class="card section recommended all-healthy">
             <h3>✓ All systems operational</h3>
             <p>No recoverable conditions active.</p>
+            ${indexingSummary}
           </div>
         `;
       }
       const present = presentVerdict(v);
       return html`
         <div class="card section recommended">
-          <h3>${present.headline}</h3>
+          <h3>${v.kind === 'operational' && !activity.confirmed ? activity.summary : present.headline}</h3>
           <p>${present.body}</p>
+          ${indexingSummary}
         </div>
       `;
     }
@@ -1415,6 +1408,7 @@ export class HealthSurface extends JfElement {
     return html`
       <div class="card section recommended">
         <h3>⚡ Fixable now (${entries.length})</h3>
+        ${indexingSummary}
         <div class="actions">
           ${entries.map(([key, invocation]) => {
             const [conditionId, subject] = key.split('|');

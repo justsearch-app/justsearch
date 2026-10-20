@@ -60,9 +60,11 @@ type Mounted = HTMLElement & { updateComplete: Promise<unknown> };
 
 /* ── The one input every projection case shares ──────────────────────────────────────────────── */
 
-/** A snapshot whose ONLY relevant field is the verdict — which is all the projection reads. */
+/** A confirmed index observation with the supplied capability verdict. */
 const snapshotFor = (verdict: SystemHealthVerdict): AiState =>
-  ({ verdict }) as unknown as AiState;
+  ({ verdict, indexingStatusLive: true, episodeMaxPendingJobs: 0, enrichSettleSamples: [],
+    status: { worker: { core: { indexState: 'IDLE', pendingJobs: 0, indexHealthy: true } } },
+  }) as unknown as AiState;
 
 const degraded = (
   reasons: readonly string[],

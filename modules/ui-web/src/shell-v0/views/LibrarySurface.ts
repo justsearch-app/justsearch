@@ -57,7 +57,6 @@ import {
   selectIndexingProgress,
   type EnrichmentApplicability,
 } from '../state/indexingProgress.js';
-import { enrichmentProgress } from '../state/enrichmentCoverage.js';
 // Tempdoc 811 C-2a — the non-root (ad-hoc / MCP) sources the folder rows cannot describe.
 import {
   deriveOtherSources,
@@ -594,7 +593,7 @@ export class LibrarySurface extends JfElement {
       this.enrichmentBlocked = progress.phase === 'blocked';
       // 809 finding 1 — same tick, same store: whether the enrichment backfill is still running, so a
       // row cannot claim the terminal "✓ indexed" while semantic search is still being built.
-      this.enrichmentPending = enrichmentProgress(s.status).pending;
+      this.enrichmentPending = progress.enrichingPending > 0;
       // Tempdoc 811 C-2a — the facet probe runs under the DEFAULT search scope, so the
       // default-scope population is its exact bound; fall back to the whole-index count on a
       // backend that predates `searchableDocuments` (C-4).
@@ -679,7 +678,7 @@ export class LibrarySurface extends JfElement {
         pathHash,
         // Tempdoc 804 §B9 (F8) — never the raw hash as the row's name (see folderRowLabel).
         displayPath: folderRowLabel(pathHash, this.resolvedPaths[pathHash]).label,
-        status: fs.glyph,
+        status: !this.indexingActivity.confirmed && fs.glyph === 'indexed' ? 'pending' : fs.glyph,
         metaText: this.folderActivityText(fs.metaText),
         walkError: undefined,
         // Tempdoc 599 §16/B1 — the clickable "N failed" chip's count (the declared renderer emits an
@@ -1262,7 +1261,7 @@ export class LibrarySurface extends JfElement {
         <span class="card-icon">${icon({ name: 'folder', size: 24 })}</span>
         <div class="card-info">
           <div class="card-path">
-            ${this.renderStatusIcon(status.glyph)}<span
+            ${this.renderStatusIcon(!this.indexingActivity.confirmed && status.glyph === 'indexed' ? 'pending' : status.glyph)}<span
               class="folder-name"
               title=${displayTitle}
               data-testid="library-folder-name"

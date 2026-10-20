@@ -179,6 +179,8 @@ export interface IndexingProgress {
    * truthful than showing it.
    */
   indexingPercent: number | null;
+  /** Indicative generation rebuild fraction; absent when the observation is unconfirmed. */
+  rebuildPercent: number | null;
   /**
    * 813 Slice B — the byte weight of the remaining job backlog (`worker.core.pendingBytes`), or
    * `null` when it would not be faithful: nothing recorded, the worker could not compute the
@@ -236,6 +238,7 @@ const EMPTY: IndexingProgress = {
   vduPending: 0,
   etaSeconds: null,
   indexingPercent: null,
+  rebuildPercent: null,
   pendingBytes: null,
   live: false,
   // Nothing was reported ⟹ applicability is UNKNOWN ⟹ no per-root percent may be asserted. `null`,
@@ -634,6 +637,9 @@ export function selectIndexingProgress(
         ? deriveEtaSeconds(core.recentDocsPerSec, core.recentJobQueueDepth, jobsPending)
         : null,
     indexingPercent,
+    rebuildPercent: activity.confirmed && count(migration?.activeIndexedDocuments) > 0
+      ? Math.min(99, Math.round(count(migration?.buildingIndexedDocuments) / count(migration?.activeIndexedDocuments) * 100))
+      : null,
     pendingBytes: derivePendingBytes(
       count(core.pendingBytes),
       count(core.pendingUnknownSizeJobs),
@@ -642,6 +648,16 @@ export function selectIndexingProgress(
     live: indexingStatusLive,
     stages: applicable,
   };
+}
+
+/** Indexing's mirrored file rows share the observation verdict; independent agent tasks do not. */
+export function indexingTaskStatus(
+  task: { id: string; status: string },
+  activity: IndexingProgress['activity'],
+): string {
+  return task.id.startsWith('idxjob:') && !activity.confirmed
+    ? `last observed ${task.status}`
+    : task.status;
 }
 
 /** Automatic reasons describe the work they hold, never the broad wire state's name. */

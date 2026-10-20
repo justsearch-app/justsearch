@@ -1,0 +1,1275 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T18:23:45.415Z",
+  "revision": "1427aad2f219fade000b3933f2cf48032409a9bf",
+  "tree": "f8e59128c72891d53f049cc837d013105ec8ecf5",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/availability.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.degradation.test.ts\" \"src/shell-v0/views/UnifiedChatView.test.ts\" \"src/shell-v0/components/CapabilityMap.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-vitest-2540156-1792520621914.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3497
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/availability.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:63f8a48d491c0e660f6717ec8fc88b3cf4e2d7c8983cbe17cc20221401bce672",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "projectAvailability (tempdoc 596) null store → transient loading reason (the obs #420 loading window)",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) phase==='connecting' → transient (still loading, not offline)",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) runtime.mode==='starting' with a prior duration → transient 'still starting' + '~Ns' estimate",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) runtime.mode==='starting' without a prior duration (-1) → 'still starting' with NO number (unknown arm)",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) runtime.mode==='starting' takes precedence over the settled offline reason (keyed on load state)",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) chat offline → settled offline reason + the shared-vocabulary remedy (§17)",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) documents with zero indexed docs (idle) → settled \"No documents indexed\" + onboarding remedy",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) zero docs WHILE indexing (confirmed status) → transient forward-looking reason (§16.4 availableWhen)",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) zero docs WHILE jobs pending → transient forward-looking reason (§16.4 availableWhen)",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) documents with docs>0 and chat up → available",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) documents usable but verdict degraded (cosmetic) → calm caveat, still operable",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) 805 §G.2: a RETRIEVAL-impairing cause → the keyword-fallback caveat (imported, not re-authored)",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) 805 §G.2: a PASSAGE-only gap → the passage caveat, never the keyword-fallback claim",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) D1-15: a missing selected query model does not assert keyword-only retrieval",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) D1-15: a fatal schema open refusal does not claim keyword search still serves",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) 805 §G.2: an AI-model cause → the calm caveat (retrieval is untouched)",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) 805 §G.2: an UNCLASSIFIED cause stays conservative (the keyword-fallback caveat)",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) documents with an operational verdict → available (no caveat)",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) extract/agent only need chat (zero docs is irrelevant to them)",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) docs unknown (not yet reported) does not fabricate a zero-docs block",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) 807: a not-live snapshot blocks every affordance, in the shared vocabulary",
+          "status": "passed"
+        },
+        {
+          "name": "projectAvailability (tempdoc 596) 807 ANTI-REGRESSION: the SAME state with a live snapshot is available (the gate is liveness, nothing else)",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableBecause — literal local-gap reason (tempdoc 596 §16.2 a11y-debt close) builds a settled unavailable carrying the verbatim reason, no remedy",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableBecause — literal local-gap reason (tempdoc 596 §16.2 a11y-debt close) transient=true marks a self-clearing gap (an in-flight refresh)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.degradation.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.degradation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:89761c64f60ea90f97eed5315fc7353145681b4bf44c2235c24fff0d3c11520d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window says when capability is reduced, and says nothing when it is not D1-14: projects the paused-semantic transition with its Health remedy",
+          "status": "passed"
+        },
+        {
+          "name": "the window says when capability is reduced, and says nothing when it is not D1-14: projects the physical encoder reload through a generation switch",
+          "status": "passed"
+        },
+        {
+          "name": "the window says when capability is reduced, and says nothing when it is not projects a banner for a degraded verdict and NONE for a healthy one",
+          "status": "passed"
+        },
+        {
+          "name": "the window says when capability is reduced, and says nothing when it is not projects nothing at all before the store has reported",
+          "status": "passed"
+        },
+        {
+          "name": "the window says when capability is reduced, and says nothing when it is not withholds the banner from a cosmetic info-severity gap, which Health carries calmly",
+          "status": "passed"
+        },
+        {
+          "name": "the window says when capability is reduced, and says nothing when it is not speaks the shared authority's wording, comparing against its own output rather than a literal",
+          "status": "passed"
+        },
+        {
+          "name": "the window says when capability is reduced, and says nothing when it is not carries a backend-disconnected verdict too — the loud state, never silence",
+          "status": "passed"
+        },
+        {
+          "name": "the remedy is a single navigation this window can perform passes a navigate remedy through verbatim",
+          "status": "passed"
+        },
+        {
+          "name": "the remedy is a single navigation this window can perform points an OPERATION remedy at Health rather than firing it out from under its ceremony",
+          "status": "passed"
+        },
+        {
+          "name": "causes are deduped by reason code, not by wording collapses the SAME code reported twice into one entry, and keeps the code on it",
+          "status": "passed"
+        },
+        {
+          "name": "causes are deduped by reason code, not by wording keeps two DIFFERENT codes as two entries",
+          "status": "passed"
+        },
+        {
+          "name": "causes are deduped by reason code, not by wording drops a LONE cause that only restates the rebuild headline — keyed on isReindexCause",
+          "status": "passed"
+        },
+        {
+          "name": "causes are deduped by reason code, not by wording keeps TWO rebuild causes, because then the list is telling the reader which ones",
+          "status": "passed"
+        },
+        {
+          "name": "causes are deduped by reason code, not by wording consumes the authority's cause SCOPING instead of re-deriving it",
+          "status": "passed"
+        },
+        {
+          "name": "causes are deduped by reason code, not by wording drops even a SCOPED-DOWN lone rebuild cause, because the headline has already said it",
+          "status": "passed"
+        },
+        {
+          "name": "causes are deduped by reason code, not by wording drops a code the authority did not word into this branch, and words an unknown one honestly",
+          "status": "passed"
+        },
+        {
+          "name": "the composer slot holds one banner, never the same fact twice drops the availability reason when the banner already words its code",
+          "status": "passed"
+        },
+        {
+          "name": "the composer slot holds one banner, never the same fact twice KEEPS a reason the banner does not word — a refusal with no reason on screen is the worse failure",
+          "status": "passed"
+        },
+        {
+          "name": "the composer slot holds one banner, never the same fact twice keeps the reason when there is no banner at all",
+          "status": "passed"
+        },
+        {
+          "name": "the banner rests at one line and discloses the rest renders EXACTLY ONE banner for a degraded state and NONE for a healthy one",
+          "status": "passed"
+        },
+        {
+          "name": "the banner rests at one line and discloses the rest rests the headline and the remedy, and nothing else",
+          "status": "passed"
+        },
+        {
+          "name": "the banner rests at one line and discloses the rest takes the reader to the fix in ONE click, through the window's one remedy exit",
+          "status": "passed"
+        },
+        {
+          "name": "the banner rests at one line and discloses the rest opens the causes on the disclosure, which is a real button and not a hover",
+          "status": "passed"
+        },
+        {
+          "name": "the banner rests at one line and discloses the rest names the banner from the send when the availability notice yielded its line",
+          "status": "passed"
+        },
+        {
+          "name": "the banner rests at one line and discloses the rest keeps BOTH lines when they are different facts",
+          "status": "passed"
+        },
+        {
+          "name": "the banner announces nothing and hides nothing (830 audit) D1 — wraps its CONTROLS in no live region, in either disclosure state",
+          "status": "passed"
+        },
+        {
+          "name": "the banner announces nothing and hides nothing (830 audit) D2 — the clipped headline keeps a sighted recovery route, and a whole accessible name",
+          "status": "passed"
+        },
+        {
+          "name": "the banner announces nothing and hides nothing (830 audit) A6 — the severity glyph is decorative, so it is hidden from assistive tech",
+          "status": "passed"
+        },
+        {
+          "name": "Simple and Detailed decide how much banner (E3) SIMPLE keeps the causes closed and offers the disclosure",
+          "status": "passed"
+        },
+        {
+          "name": "Simple and Detailed decide how much banner (E3) DETAILED opens the causes and drops the disclosure, which would have nothing left to do",
+          "status": "passed"
+        },
+        {
+          "name": "Simple and Detailed decide whether the frame line names the model (E3) SIMPLE states the duration and NOT the model",
+          "status": "passed"
+        },
+        {
+          "name": "Simple and Detailed decide whether the frame line names the model (E3) DETAILED states both",
+          "status": "passed"
+        },
+        {
+          "name": "the mounted window renders the banner from the observed-state authority shows the banner for a degraded readiness composite and NOT for a ready one",
+          "status": "passed"
+        },
+        {
+          "name": "the mounted window renders the banner from the observed-state authority follows the app-wide mode without a re-mount",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86e7b9d8c338ec2feb98fa120666d7839e67d50f21749dc5a2a1cb55fdd95365",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "UnifiedChatView — 637 #1 disconnected banner tone (Fix 1) renders the disconnected banner with the verdict-SEVERITY tone (unreachable ⇒ error), not a hardcoded warning — matching SearchSurface",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve-tier degradation banner (ports SearchSurface.degradation.test.ts, Search Thread S5b) 621/595 — an impairing degradation renders \"Semantic search degraded\" (warn) while on the retrieve tier",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve-tier degradation banner (ports SearchSurface.degradation.test.ts, Search Thread S5b) round-14 finding 9 — an INFO-severity-only verdict renders NO banner-tier warning",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve-tier degradation banner (ports SearchSurface.degradation.test.ts, Search Thread S5b) round-14 finding 9 — the same cause at WARN severity still gets the banner (the tier gate is severity, not the cause)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve-tier degradation banner (ports SearchSurface.degradation.test.ts, Search Thread S5b) 600 Design A — a compat-blocked index renders \"Reindex required\" naming the specific cause + the rebuild remedy",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve-tier degradation banner (ports SearchSurface.degradation.test.ts, Search Thread S5b) falls back to the Open Health navigate remedy for an unknown/empty cause",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView degradation banner disclosure (Tempdoc 738) Simple mode (default): a warn degradation renders the collapsed pill (headline + remedy, no raw causes)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView degradation banner disclosure (Tempdoc 738) Detailed mode: the same degradation renders expanded with the raw causes",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView degradation banner disclosure (Tempdoc 738) a severe (error) verdict opens expanded even in Simple, with no collapse chevron",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView degradation banner disclosure (Tempdoc 738) the local \"See details\" chevron opens a collapsed banner; the collapse chevron closes it (Simple)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView degradation banner disclosure (Tempdoc 738) below the block-axis breakpoint, Detailed renders the COLLAPSED pill with a working expand affordance",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView degradation banner disclosure (Tempdoc 738) a severe (error) verdict still forces expansion below the breakpoint — the height gate is not a severity gate",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView degradation banner disclosure (Tempdoc 738) drops the single reindex cause bullet (dedup by code) when expanded — the headline already says it",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView header controls are rung-invariant (round-14 finding 14) renders the SAME header controls on all four rungs for the same thread state",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView header controls are rung-invariant (round-14 finding 14) the surviving gate is thread state, not the rung — an empty thread hides Export (nothing to export) but keeps New chat visible+disabled on EVERY rung alike",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView \"New chat\" control (tempdoc 821 §4, typed availability 596) renders New chat aria-disabled with a REACHABLE reason (not a suppressed title) when the thread is empty",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView \"New chat\" control (tempdoc 821 §4, typed availability 596) renders New chat operable (no aria-disabled) once the thread has content",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView \"New chat\" control (tempdoc 821 §4, typed availability 596) activating the operable control starts a new conversation; activating it while unavailable does not",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView .new-chat-btn ::part styling does not blank the primitive focus ring styles the composed control through ::part at all (anti-vacuity for the rules below)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView .new-chat-btn ::part styling does not blank the primitive focus ring no ::part(control) rule declares `all`",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView .new-chat-btn ::part styling does not blank the primitive focus ring no ::part(control) rule declares `outline`",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView .new-chat-btn ::part styling does not blank the primitive focus ring no ::part(control) rule declares `outline-style`",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView .new-chat-btn ::part styling does not blank the primitive focus ring no ::part(control) rule declares `outline-width`",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView .new-chat-btn ::part styling does not blank the primitive focus ring no ::part(control) rule declares `outline-color`",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView .new-chat-btn ::part styling does not blank the primitive focus ring the native <button> form keeps its own `all: unset`, which is what the ::part rule must not share",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView .new-chat-btn ::part styling does not blank the primitive focus ring the primitive still supplies the focus ring the rules above are protecting",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve-tier selection retention (ports SearchSurface.stateRetention.test.ts, Search Thread S5b) re-publishes a retained single-hit selection to the GLOBAL selectionState on reconnect",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve-tier selection retention (ports SearchSurface.stateRetention.test.ts, Search Thread S5b) drops a stale id no longer present in the current snapshot instead of republishing garbage",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve-tier selection retention (ports SearchSurface.stateRetention.test.ts, Search Thread S5b) is a no-op when there is no held selection",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) renders ONE conversation body — the agent run is inline, no separate <jf-agent-view> plane (561 P-B body-unification)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 561 C-2 — the supervision dial appears only at the agency crossing, and the chrome grades with it",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) C8 (Tempdoc 738) — the run budget-gate state is plain in Simple, technical in Detailed",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) round-14 finding 12(a) — the run-telemetry band starts COLLAPSED",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 814 §D2 — the held budget gate is content, not chrome the transition INTO the held state opens the rail, so the decision row is on screen",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 814 §D2 — the held budget gate is content, not chrome a user who re-collapses while still parked keeps it collapsed (no re-force)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 814 §D2 — the held budget gate is content, not chrome a DONE transition does NOT auto-expand — a terminal run is history, not a decision",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) round-14 finding 12(b) — a COMPLETED (DONE) run states \"Over budget\" as a fact, not an alarm",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 867 — renders agent search evidence from the RECORD through the tool card's own level-2 body (not the raw dump)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) renders the unified interleaved thread (chat + agent tool activity) from the record (Slice 2)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) hides the resume card when the shared agent controller already has run content",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 577 #19 — renders a run/session seam between restored record history and the live run",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 577 #14 — the context-headroom meter persists across an iteration_start (no flicker)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 577 #19 — NO seam for an all-record thread (nothing live to separate)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 577 #19 — NO seam between a question and its own answer (the mid-turn false-positive)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 565 fix A — a multi-turn record renders one INDEPENDENTLY-collapsible trace per run",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 565 §12.3.E — renders a source-chip row under a grounded answer + cross-highlights via the store",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 565 §13.8 P3 — the source chips collapse behind a \"Sources · N\" disclosure; clicking toggles it",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 565 fix D — occurrence-aware dedup: two identical consecutive turns do NOT collapse",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 565 §12.3.D — the left run-spine renders a status node per step + a terminal answer node",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 565 §13 Pillar A — the spine spans the WHOLE conversation, not just the latest run",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 565 §13/§19.3 — only the FINAL assistant of a turn is the terminal \"Answer\"; intermediate assistants recede",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 565 §13 Pillar A — clicking a spine node scrolls the reading column to that item + marks it active",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 565 §13 — a click-jump pins the ring; the scroll-spy cannot override it until a user scroll releases the pin",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 565 §13 Pillar A — clicking a STEP node opens its collapsed run-trace so the jump lands (regression: scrollIntoView no-ops inside a closed <details>)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 565 fix F + §12.3.D — at the narrow breakpoint the rail AND the run-spine do not mount",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) round-14 finding 15 — a SINGLE-TURN conversation renders no run spine (and keeps its native scrollbar)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) round-14 finding 15 — a SECOND turn brings the spine back (the gate is structure, not the agent rung)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 814 §D5 — with the evidence rail MOUNTED the rail head is the ONE source-count render",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 814 §D5 — with NO rail mounted (narrow) the in-answer count + disclosure return",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 814 finding 7 — a background-origin run segment renders a marked POINTER to its inbox item",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 814 §D4 — dense intra-run steps AGGREGATE into one counted, keyboard-operable cluster badge",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 814 §D4 — spine texture markers draw as OUTLINE nodes; landmarks stay filled (no colour added)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 603 D-4: a DOCUMENT-LEVEL agent answer shows the SOURCED provenance verdict, NOT \"Grounded · 0 of N\"",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 720: a SETTLED CHUNK-PRECISE agent answer with ZERO cites shows provenance, NOT \"Grounded · 0 of N\"",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) renders the projection as the single read-model: reconciled live turns dedupe, in-flight turns overlay (Pillar 2)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) the inline agent controller survives a chat↔agent round-trip (lossless, 561 P-B body-unification)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 621 §F.3 — the merge authority attaches the live match (prefer-fresher) once, not at render time",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 621 Phase 4-full — a reloaded RAG turn renders via renderMessage (shape tag + record citations)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView one-window agent affordance (561 P-B3) 621 review — a reloaded extract turn renders verbatim (transform frame), not markdown",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView per-turn receipt line (Search Thread S7, tempdoc decision 6) Simple mode (default) omits the model name from the receipt (Tempdoc 738 C7)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView per-turn receipt line (Search Thread S7, tempdoc decision 6) a grounded turn with duration + model shows ONLY the quiet receipt tail (no warning text), non-italic",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView per-turn receipt line (Search Thread S7, tempdoc decision 6) a partially-grounded turn keeps its warning text and appends the receipt tail on the SAME line",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView per-turn receipt line (Search Thread S7, tempdoc decision 6) an extract (transform) turn keeps the unmissable banner BEFORE the answer, extended with the receipt",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView per-turn receipt line (Search Thread S7, tempdoc decision 6) omits duration (never fabricates) when the turn carries none — a reloaded turn with no stored durationMs",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView per-turn receipt line (Search Thread S7, tempdoc decision 6) renders no line at all when neither a warning nor a duration/model receipt applies",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView abort on conversation switch (Slice 516 FIX-T1) loadConversation aborts the in-flight AbortController",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView abort on conversation switch (Slice 516 FIX-T1) newConversation aborts the in-flight AbortController",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView abort on conversation switch (Slice 516 FIX-T1) abort is a no-op when no stream is in flight (abortController is null)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView mid-stream conversation switch (Slice 517 FIX-U2) switching conversation mid-stream leaves the new conversation clean (bug-absence)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView answer auto-run (548 §4.5) auto-fires send() once when an answer verb parked the prompt + auto-run flag",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView answer auto-run (548 §4.5) does NOT auto-fire on a plain mount (no answer verb)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView declares sessionId field mounts with a fresh sessionId",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView §33 — window-level J/K step navigation a window \"j\"/\"k\" keydown jumps the nav forward/back; other keys are ignored",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView §33 — window-level J/K step navigation never hijacks typing — a focused <input> (light DOM) blocks navigation",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView §33 — window-level J/K step navigation never hijacks typing — descends nested shadow roots to the truly-focused editable (the steer input case)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView §33 — window-level J/K step navigation never hijacks typing — a focused <select> blocks navigation (tempdoc 857 PR-A: a fix, not a port)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView §33 — window-level J/K step navigation removes the window listener on disconnect (no leak after the view is gone)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView §33 — window-level J/K step navigation 864: stands down for IME composition, auto-repeat, and an open modal",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView corpus counts (tempdoc 811 C-4) the documents preview counts the searchable population, not the whole index",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView corpus counts (tempdoc 811 C-4) the documents preview falls back to the whole-index count when the field is absent",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView corpus counts (tempdoc 811 C-4) a KNOWN searchable count of 0 is shown as 0, never silently replaced by the index count",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView corpus counts (tempdoc 811 C-4) an index the backend could not count shows no number, never \"Searching 0 documents\" (t-20261013-ef3c41)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView corpus counts (tempdoc 811 C-4) the landing corpus line counts the searchable population, falling back when absent",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView corpus counts (tempdoc 811 C-4) a searchable count of 0 offers \"Add folders\" instead of claiming to search 0 files",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) reaches the retrieve tier via an explicit affordance set, with no tab row rendered (Search Thread S5b)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) renders the ephemeral hit-list from the search store, never as thread turns",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) the retrieve tier drives the search store on input/submit, not the LLM send path",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) renders the shared facet chips + per-hit \"why\" disclosure in the retrieve tier (§3.9a parity)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) 602 R3 — the retrieve row formats the path + highlights query terms like the Search surface",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) 597 R-1 — shows the matchCount funnel label \"Top N of M matches\", not window-as-count",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) 597 R-1 — collapses to \"M matches\" when the whole match set is on screen",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) boots into the retrieve base tier, not free-chat (577 Goal 3 §3.11)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) labels the retrieve submit control \"Search\", never \"Send\" or \"AI Offline\" (577 Goal 3 Fix B)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) keeps past chats reachable on the retrieve landing, hidden once searching (577 Goal 3 §3.13 / A2)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) Search Thread D2/D3 (stage S2) — route + landing the floor rule feeds instant search on every keystroke, even outside retrieve",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) Search Thread D2/D3 (stage S2) — route + landing routes an interrogative draft to Ask (escalates), never to submitSearch",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) Search Thread D2/D3 (stage S2) — route + landing routes a keyword draft to Search (submitSearch), staying in the retrieve tier",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) Search Thread D2/D3 (stage S2) — route + landing composer-submit-alt sends the OPPOSITE route from composer-submit",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) Search Thread D2/D3 (stage S2) — route + landing renders the route chip in retrieve; route-toggle flips the displayed route",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) Search Thread D2/D3 (stage S2) — route + landing pins the chip (and the route) to search when Ask is unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) Search Thread D2/D3 (stage S2) — route + landing 807: pins to search when the snapshot is no longer live, even though chat still reads capable",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) Search Thread D2/D3 (stage S2) — route + landing 807 ANTI-REGRESSION: the SAME state with a live snapshot is not pinned",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) Search Thread D2/D3 (stage S2) — route + landing never escalates to Ask when pinned — submit runs a search instead",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) Search Thread D2/D3 (stage S2) — route + landing renders the bare landing when empty, docks when a query is typed — exactly one jf-composer either way",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView retrieve base tier (577 Goal 3 §3.2) Search Thread D2/D3 (stage S2) — route + landing the jf-focus-composer window event focuses the composer textarea",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread D5 (stage S3) — scope chips renders the scope-chip row from the subscribed store",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread D5 (stage S3) — scope chips renders no scope-chip row when no chips are pinned",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread D5 (stage S3) — scope chips card-scope-file (\"Ask about this file\") adds a file chip carrying the PATH, not the hit id",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread D5 (stage S3) — scope chips card-scope-file does NOT flip routeOverride to ask when Ask is pinned to search",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread D5 (stage S3) — scope chips shows \"Ask about these N results\" only when >1 selected, and clicking pins a result-set chip of PATHS",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread D5 (stage S3) — scope chips Backspace on an empty draft pops the last pinned scope chip",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread D5 (stage S3) — scope chips Backspace does NOT pop a chip while the draft has text",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread D5 (stage S3) — scope chips removing a chip via its remove affordance re-runs submitSearch while a retrieve query is active",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread D5 (stage S3) — scope chips removing a chip outside the retrieve tier does NOT re-run submitSearch",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread D5 (stage S3) — scope chips a grounded Ask forwards the union of pinnedDocIds and scope-chip docIds (both PATHS), deduped",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 Phase A — transcript edit/retry controls §D.2 — per-turn action bar renders below user + assistant turns with a ⋯ overflow",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 Phase A — transcript edit/retry controls §D.2 — primary verbs are visible icons: Edit on user, Copy + Retry on assistant",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 Phase A — transcript edit/retry controls §D.2 — clicking the visible Edit icon morphs the bubble into the edit-in-place textarea",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 Phase A — transcript edit/retry controls suppresses the ⋯ menu on inherited (parent-branch) turns",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 Phase A — transcript edit/retry controls swaps a user turn for an editable textarea when editing",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 Phase A — transcript edit/retry controls edit of the first turn branches with the empty-prefix sentinel",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 Phase A — transcript edit/retry controls retry of a non-first answer branches from the preceding message id",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 Phase B — inline version pager renders ‹ n/m › on a branch's first own turn and reports its version index",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 Phase B — inline version pager renders no pager when a turn has a single version",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 Phase C — effective-context floor divider renders the floor divider above the floor message and dims messages above it",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 Phase C — effective-context floor divider renders no floor divider when no floor is set",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 610 Phase C — effective-context floor divider shows the compacted-variant divider with an expandable summary",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView state retention (tempdoc 609 M1) does not reset the chat store (draft + mode) on connect",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView state retention (tempdoc 609 M1) clears the store only through the explicit New chat action",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView last-viewed auto-restore (tempdoc 609 Phase 3) auto-restores the conversation this tab was viewing, with no resume card",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView last-viewed auto-restore (tempdoc 609 Phase 3) does not auto-restore on a cold start (no last-viewed pointer)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView last-viewed auto-restore (tempdoc 609 Phase 3) forgets the pointer on New chat so a later return does not auto-restore",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView last-viewed auto-restore (tempdoc 609 Phase 3) does NOT re-fetch on reconnect when the retained instance already holds a thread",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView activity truthfulness on disconnect (tempdoc 609 Phase 4) does not force the activity indicator idle when no plain stream is in flight",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView activity truthfulness on disconnect (tempdoc 609 Phase 4) idles the indicator when a plain stream is genuinely aborted on disconnect",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView settle transients on hide (tempdoc 609 instance-retention) resets in-flight/partial transient state on disconnect but KEEPS the thread + draft",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView context-budget meter (610 §E.4) renders the meter when occupancy + window are known, hides it when occupancy is absent",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView context-budget meter (610 §E.4) hides the meter in agent mode (the activity rail owns headroom there)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView context-budget meter (610 §E.4) renders the per-phase attribution breakdown when contextBreakdown is present (610 §I.2)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView context-budget meter (610 §E.4) the meter label opens the inspector, whose view projects the in-context turns + sources (610 §K)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView editable compaction summary (610 §E.2) commits an in-place summary edit: persists via the store and updates the floor summary",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView editable compaction summary (610 §E.2) renders Edit on the expanded compaction summary and opens an editable textarea",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView per-message exclude (610 §E.3) toggles a message excluded: persists via the store, tracks the id, and dims the turn",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView per-message exclude (610 §E.3) shows the \"N hidden · Include all\" aggregate and includeAll re-includes in bulk (610 §I.2)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView per-message exclude (610 §E.3) toggles a retrieved source excluded: persists via the store + tracks the unit-sep key (610 §J.3)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView per-message exclude (610 §E.3) floorFrameParts is the single authority for divider + dim-class (610 §F.3 frame parity)",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S4-final — commit-on-consequence + query trail commit-on-open: freezes the live search into a snapshot card above the live card, and POSTs the event",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S4-final — commit-on-consequence + query trail 805 §G.2: a commit during the QUICK window freezes mode 'UNKNOWN' and renders NO mode label",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S4-final — commit-on-consequence + query trail 805 §G.2: a MISSING trace on the refined pass also freezes 'UNKNOWN' (no `?? 'TEXT'` default)",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S4-final — commit-on-consequence + query trail 805 §G.2: a commit AFTER the refined pass keeps the real mode + renders its label",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S4-final — commit-on-consequence + query trail commit-on-ask: escalateAsk commits the retrieve-tier query before the affordance flips to documents",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S4-final — commit-on-consequence + query trail default (unmodified) card-ask-ai sends immediately: commits the search and flips to documents",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S4-final — commit-on-consequence + query trail a SHIFT-held card-ask-ai activation stages instead of sending (compose(), no commit/no affordance flip)",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S4-final — commit-on-consequence + query trail plain query iteration (no open/ask) commits nothing, but the superseded query lands on the trail",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S4-final — commit-on-consequence + query trail auto-collapse: only the 3 most recent commits render as full snapshot; older ones collapse to excerpt",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S4-final — commit-on-consequence + query trail a restored SEARCH thread event renders as an excerpt card with a \"Search again\" affordance",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S4-final — commit-on-consequence + query trail the query-trail dropdown lists recent queries newest-first (deduped); clicking one restores the draft + re-issues the query",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S5b — pinned searches (landing strip + pin toggle) renders the landing pinned strip from the store and one click re-runs the pin",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S5b — pinned searches (landing strip + pin toggle) hides the strip when nothing is pinned",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S5b — pinned searches (landing strip + pin toggle) the bar pin toggle (jf-control) pins the active query and unpins a pinned one",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S5b — pinned searches (landing strip + pin toggle) a committed search records a run against the pin history",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread Round-2 R4 — bar re-skin (jf-control compositions) schema-attach (jf-control) attaches the schema and is replaced by schema-detach",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread Round-2 R4 — bar re-skin (jf-control compositions) escalation-delegate (jf-control) is availability-gated: blocked offline, operable when AI is up",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread Round-2 R4 — bar re-skin (jf-control compositions) escalation-ask (jf-control) is availability-gated with the sibling reason: blocked offline, operable when AI is up",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 807 B.2 — escalation rungs survive the landing → post-search transition every rung is reachable AFTER a search has run — Delegate (round 11), Structured (round 13), Ask, and back to the floor",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 807 B.2 — escalation rungs survive the landing → post-search transition the Structured rung ATTACHES (it does not pin the tier), so \"Detach schema\" still returns to the floor",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 807 B.2 — escalation rungs survive the landing → post-search transition post-search, an AI-requiring rung still NAMES its reason offline instead of dying silently (804 §B9 semantics survive)",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 807 B.2 — escalation rungs survive the landing → post-search transition the landing strip is UNCHANGED: one strip, landing copy, no docked-only rungs, no pressed state",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 807 B.2 — escalation rungs survive the landing → post-search transition the docked strip marks the tier you are ON, so no rung offers a click that would change nothing",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S6 — the reading pane (DocumentPane mount + open flows) is unmounted by default and mounts <jf-document-pane> when readingDocPath is set",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S6 — the reading pane (DocumentPane mount + open flows) card-open on the LIVE retrieve card sets readingDocPath and auto-pins the opened hit's file scope chip",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S6 — the reading pane (DocumentPane mount + open flows) a committed (historical snapshot) card-open also sets readingDocPath and auto-pins the chip",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S6 — the reading pane (DocumentPane mount + open flows) a card-open from the agent-search tool card also sets readingDocPath and auto-pins the chip",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S6 — the reading pane (DocumentPane mount + open flows) a citation-select-driven inspectorState.selected (Shell.onCitationSelect) sets readingDocPath + readingHighlightRange",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S6 — the reading pane (DocumentPane mount + open flows) the pane's pane-close clears readingDocPath and closes the shared inspectorState",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S6 — the reading pane (DocumentPane mount + open flows) the retired jf-inspector-pane never appears in the template",
+          "status": "passed"
+        },
+        {
+          "name": "Search Thread S6 — the reading pane (DocumentPane mount + open flows) scoped-ask coherence: card-open sets readingDocPath + pins the chip, and an escalated Ask forwards the opened path in docIds",
+          "status": "passed"
+        },
+        {
+          "name": "Extraction dispatches the chosen mode, WITH the selected document sends core.extract even though a document is selected (selection no longer overrides the mode)",
+          "status": "passed"
+        },
+        {
+          "name": "Extraction dispatches the chosen mode, WITH the selected document forwards the LIVE selection as body.selection, so the extraction has a document behind it",
+          "status": "passed"
+        },
+        {
+          "name": "Extraction dispatches the chosen mode, WITH the selected document the mode chip names the shape that is actually dispatched",
+          "status": "passed"
+        },
+        {
+          "name": "Extraction dispatches the chosen mode, WITH the selected document with NO explicit mode, a selected document still resolves the shape — and the chip follows it",
+          "status": "passed"
+        },
+        {
+          "name": "798 — the landing collapse yields to a mounted reading pane .landing-collapsed is the declaration that content-sizes the zone (the class is load-bearing)",
+          "status": "passed"
+        },
+        {
+          "name": "798 — the landing collapse yields to a mounted reading pane keeps the zone bounded when the query is cleared while the reading pane is mounted",
+          "status": "passed"
+        },
+        {
+          "name": "798 — the landing collapse yields to a mounted reading pane still collapses on a cleared query when no reading pane is mounted (the gate is the pane, not the clear)",
+          "status": "passed"
+        },
+        {
+          "name": "798 — the wide-layout query container wraps the zones that query it .conversation-zone and the composer both descend from .answer-plane",
+          "status": "passed"
+        },
+        {
+          "name": "734 round-14 F4 — a locked chat store blocks Send and names why locked ⇒ Send is disabled and the reason names the lock AND where to unlock it",
+          "status": "passed"
+        },
+        {
+          "name": "734 round-14 F4 — a locked chat store blocks Send and names why the retrieve tier stays sendable while locked (the exemption is deliberate, not an oversight)",
+          "status": "passed"
+        },
+        {
+          "name": "734 round-14 F4 — a locked chat store blocks Send and names why a 423 dispatch renders the notice + Unlock affordance, restores the draft, and takes back the optimistic bubble",
+          "status": "passed"
+        },
+        {
+          "name": "734 round-14 F4 — a locked chat store blocks Send and names why negative control: a 500 dispatch is an ERROR, never treated as locked",
+          "status": "passed"
+        },
+        {
+          "name": "round-14 finding 15 — the spine gate is a DISJUNCTION: node boundaries are the second arm a SINGLE-turn run with two node boundaries renders the spine",
+          "status": "passed"
+        },
+        {
+          "name": "round-14 finding 15 — the spine gate is a DISJUNCTION: node boundaries are the second arm ONE node boundary is not a boundary — it is the whole run, so the spine stays suppressed",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 822 §3d — the shipped window keeps lexical and verified scores apart a citation_delta contributes a LEXICAL score only — no verified score, no mark",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 822 §3d — the shipped window keeps lexical and verified scores apart a citation_matches merge sets the VERIFIED score and never maxes across the two scales",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 822 §3d — the shipped window keeps lexical and verified scores apart a citation_matches merge REPLACES the draft sentence text at the same index (847 S5)",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 822 §3d — the shipped window keeps lexical and verified scores apart a rendered turn weaves marks for verified claims only — the lexical one stays plain prose",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 822 §3d — the shipped window keeps lexical and verified scores apart a doubly-matched sentence resolves through the VERIFIED ref, not the delta that arrived first",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 822 §3d — the shipped window keeps lexical and verified scores apart an out-of-range streamed index mints NO mark — the 59-against-5 reproduction fails to reproduce",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 822 §3d — the shipped window keeps lexical and verified scores apart reads a legacy persisted record under its old `chunkIndex` key (user data, no migration)",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 836 S2S3 — coverage honesty and the producer gate on both render paths A.6f — the same payload yields identical claims live and on persisted replay",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 836 S2S3 — coverage honesty and the producer gate on both render paths A.6f — a cosine-fallback payload mints no verified score on EITHER path",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 836 S2S3 — coverage honesty and the producer gate on both render paths 847 §1.5b — the SOURCES panel answers to the same producer verdict, live and on replay",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 836 S2S3 — coverage honesty and the producer gate on both render paths a record written before the producer field existed keeps its marks (absence is not a verdict)",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 836 S2S3 — coverage honesty and the producer gate on both render paths the coverage facts land on the view, live",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 848 — the turn keeps its thinking after done, and after a reload renders the thinking MID-STREAM, from the first answer token until done",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 848 — the turn keeps its thinking after done, and after a reload keeps the thinking on the SETTLED turn after done (the 835 §9e loss)",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 848 — the turn keeps its thinking after done, and after a reload renders the thinking a FAILED run recorded on its terminal error event (848 D-7)",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 848 — the turn keeps its thinking after done, and after a reload renders the thinking from the RECORD on reload, with no live thread entry",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 848 — the turn keeps its thinking after done, and after a reload U-1 (859 §A D-2b): reasoning riding a TOOL-ACTIVITY carrier renders here too",
+          "status": "passed"
+        },
+        {
+          "name": "Tempdoc 848 — the turn keeps its thinking after done, and after a reload U-1b: a turn’s thinking is never drawn TWICE — one read, above the switch",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView reloaded-turn shape provenance (tempdoc 941 F4) F4: a reloaded core.rag-ask turn keeps its grounded frame after a cold restart drops the affordance",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView reloaded-turn shape provenance (tempdoc 941 F4) F4: the reloaded turn shape tag names the shape that answered, not the window mode",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView reloaded-turn shape provenance (tempdoc 941 F4) F4: a record turn that declares NO shape still falls back to the window mode (pre-863 rows)",
+          "status": "passed"
+        },
+        {
+          "name": "859: loading a conversation leaves the retrieve tier, whichever door was used the History dropdown renders the thread instead of a blank stage",
+          "status": "passed"
+        },
+        {
+          "name": "859: loading a conversation leaves the retrieve tier, whichever door was used the resume card keeps the behaviour it already had",
+          "status": "passed"
+        },
+        {
+          "name": "859: loading a conversation leaves the retrieve tier, whichever door was used a load from a NON-retrieve tier leaves the tier alone",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView resumed-thread shape provenance (tempdoc 941) stamps each resumed turn with the shape the RECORD declares",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView resumed-thread shape provenance (tempdoc 941) falls back to the conversation shape for a record that declares none, or an unknown one",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView resumed-thread shape provenance (tempdoc 941) 941 review — the conversation-level shape narrows through the same authority (workflow-run)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView resumed-thread shape provenance (tempdoc 941) 941 review — a resumed EXTRACT turn keeps its verbatim render (isExtract)",
+          "status": "passed"
+        },
+        {
+          "name": "UnifiedChatView resumed-thread shape provenance (tempdoc 941) carries a resumed turn’s standaloneQuestion onto the thread",
+          "status": "passed"
+        },
+        {
+          "name": "a direction chip reports its outcome keeps the applied chip unchanged and marks queued and not-applied directions",
+          "status": "passed"
+        },
+        {
+          "name": "a direction chip reports its outcome shows each direction once when the live run and the record both carry it",
+          "status": "passed"
+        },
+        {
+          "name": "an unconfirmed steer send keeps its note in the old window after the run completes and its record loads, alone",
+          "status": "passed"
+        },
+        {
+          "name": "an unconfirmed steer send keeps its note in the old window after the run completes and its record loads, beside another client's direction with the same words",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/CapabilityMap.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/CapabilityMap.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:97eb0b868e0021b7e4a32e9e8ba38c41a49b262adea68b97be71c6ebe88c3749",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CapabilityMap (jf-capability-map) always lists keyword search as available, regardless of AI state",
+          "status": "passed"
+        },
+        {
+          "name": "CapabilityMap (jf-capability-map) AI offline → the AI affordances read their reason",
+          "status": "passed"
+        },
+        {
+          "name": "CapabilityMap (jf-capability-map) chat up + docs present → the documents affordance is available",
+          "status": "passed"
+        },
+        {
+          "name": "CapabilityMap (jf-capability-map) a blocked affordance with a remedy renders an inline remedy control",
+          "status": "passed"
+        },
+        {
+          "name": "CapabilityMap (jf-capability-map) 807: a not-live snapshot stops the map reporting AI capabilities as available",
+          "status": "passed"
+        },
+        {
+          "name": "CapabilityMap (jf-capability-map) 807 §E.4: a not-live snapshot stops the keyword row claiming \"Available\"",
+          "status": "passed"
+        },
+        {
+          "name": "CapabilityMap (jf-capability-map) 807 §E.4 ANTI-REGRESSION: with a live snapshot the keyword row is available again",
+          "status": "passed"
+        },
+        {
+          "name": "CapabilityMap (jf-capability-map) 807 ANTI-REGRESSION: the SAME state with a live snapshot is still available",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:041c5cbab2d3050f83479379a7b6054c12ba1b5f63381e22d5c383e12d0fe1af"
+}

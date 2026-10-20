@@ -24,7 +24,7 @@ import { JfElement } from '../primitives/JfElement.js';
 import { surfaceLayoutStyles } from '../primitives/surfaceLayout.js';
 import { subscribeTasks, listTasks, type Task } from '../substrates/tasks/index.js';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
-import { selectIndexingProgress, type IndexingProgress } from '../state/indexingProgress.js';
+import { selectIndexingProgress, indexingTaskStatus, type IndexingProgress } from '../state/indexingProgress.js';
 import { ENRICHMENT_BODY } from '../state/enrichmentCoverage.js';
 import {
   subscribeInstallStatus,
@@ -54,7 +54,7 @@ import {
  * {@link enrichingLabel} applies.
  */
 export function visibleIndexQueueCount(progress: IndexingProgress): number | null {
-  if (!progress.live || progress.phase === 'unknown') return null;
+  if (!progress.live || !progress.activity.confirmed || progress.phase === 'unknown') return null;
   return progress.jobsPending > 0 ? progress.jobsPending : null;
 }
 
@@ -65,7 +65,7 @@ export function visibleIndexQueueCount(progress: IndexingProgress): number | nul
  * all yield `null`, so the confident "System idle" close is preserved everywhere it was true.
  */
 export function enrichingLabel(progress: IndexingProgress): string | null {
-  if (!progress.live || progress.phase !== 'enriching') return null;
+  if (!progress.live || !progress.activity.confirmed || progress.activity.enrichmentDeferred || progress.phase !== 'enriching') return null;
   return progress.enrichingPercent === null
     ? `Enriching — ${ENRICHMENT_BODY}`
     : `Enriching — ${progress.enrichingPercent}% · ${ENRICHMENT_BODY}`;
@@ -278,7 +278,7 @@ export class SystemSelfView extends JfElement {
                 (t) => html`
                   <div class="row" data-testid="self-view-task">
                     <span class="label">${t.label}</span>
-                    <span class="badge badge-${t.status}">${t.status}</span>
+                    <span class="badge badge-${indexingTaskStatus(t, activity) === t.status ? t.status : 'stale'}">${indexingTaskStatus(t, activity)}</span>
                   </div>
                 `,
               )}

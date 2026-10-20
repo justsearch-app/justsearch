@@ -14,6 +14,7 @@
  * shape that produced its response.
  */
 
+import { selectIndexingProgress } from '../state/indexingProgress.js';
 import { retrievalFallbackPhrase } from '../aggregate-substrate/strategies/searchTraceExplain.js';
 import { html, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
@@ -2572,7 +2573,9 @@ export class UnifiedChatView extends JfElement {
     // not get it (the same verdict's causes are still carried, calmly, by Health). The tier decision
     // lives in the notice authority, beside the wording it gates, not as a local severity test here.
     if (!warrantsSearchDegradationBanner(verdict)) return nothing;
-    const notice = readinessNotice(verdict);
+    const s = this.aiState;
+    const activity = s ? selectIndexingProgress(s.status, s.indexingStatusLive, s.episodeMaxPendingJobs, s.enrichSettleSamples).activity : undefined;
+    const notice = readinessNotice(verdict, activity);
     if (!notice) return nothing;
     // Tempdoc 738 — disclosure decides how much banner. Simple (default) is the one-line pill
     // (headline + remedy, raw causes hidden); Detailed shows the causes. A severe (`error`) verdict
