@@ -159,9 +159,12 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261019-5ec1a1 user turn 4",
-          "quote": "the Engine requires a 401 from an unauthenticated probe before treating the server ready"
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261019-5ec1a1 request",
+          "delegationScope": "implementation choices inside the agreed security scenarios K1-K9",
+          "choice": "the Engine requires a 401 from an unauthenticated probe before treating the server ready",
+          "label": "agent choice"
         }
       ]
     },
@@ -226,9 +229,12 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261019-5ec1a1 request",
-          "quote": "Mint a key per launch (32 random bytes from SecureRandom, base64url), including every retry on a fresh port and every recovery restart; it lives with the launch record beside the port in LlamaServerOps."
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261019-5ec1a1 request",
+          "delegationScope": "implementation choices inside the agreed security scenarios K1-K9",
+          "choice": "Mint a key per launch (32 random bytes from SecureRandom, base64url), including every retry on a fresh port and every recovery restart; it lives with the launch record beside the port in LlamaServerOps.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/llama-key-initial-auth.json",
@@ -280,9 +286,12 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261019-5ec1a1 request",
-          "quote": "Mint a key per launch (32 random bytes from SecureRandom, base64url), including every retry on a fresh port and every recovery restart; it lives with the launch record beside the port in LlamaServerOps."
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261019-5ec1a1 request",
+          "delegationScope": "implementation choices inside the agreed security scenarios K1-K9",
+          "choice": "Mint a key per launch (32 random bytes from SecureRandom, base64url), including every retry on a fresh port and every recovery restart; it lives with the launch record beside the port in LlamaServerOps.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/llama-key-cpu-environment.json",
@@ -317,9 +326,12 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261019-5ec1a1 user turn 4",
-          "quote": "the Engine requires a 401 from an unauthenticated probe before treating the server ready"
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261019-5ec1a1 request",
+          "delegationScope": "implementation choices inside the agreed security scenarios K1-K9",
+          "choice": "the Engine requires a 401 from an unauthenticated probe before treating the server ready",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/llama-key-ignored-key.json",
