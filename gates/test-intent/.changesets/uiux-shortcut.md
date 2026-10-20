@@ -457,3 +457,14 @@ a legacy composer change. No exception, acceptance record or legacy edit is auth
   "note": "Accept. Classes fit: 6 New entries, each with agreed-scenario sources quoted verbatim (S14.2-S14.13, N14.1/N14.3/N14.6, pass-2 amendments); expectations follow from those sources, not from code. Re-ran run-evidence to a scratch path: 20 frontend New checks pass on 49f33e980 and fail on c00a0cb24 with assertion failures; 2 preservation checks pass before and after (not claimed as repairs); 8 Rust checks pass (no fail-before claimed; new private API). The help entry keeps the old check's inputs and once-only oracle and moves its expected marker v3->v4 as S14.12's version bump requires; it fails before with an assertion. Notes, not omissions: repaired:true on new behaviour is stricter than needed; the prose still calls the legacy-streaming decision pending (resolved by the 2026-10-20 amendment); rename/confirmation-dialog/indexing-overlay protections rest on the shared modal and typing guards plus existing sv3-focus refusal tests, not a summon-specific check; unit checks with a fake registrar cannot see the live X11 off-switch defect reported separately. This record covers test intent only, not the behaviour verdict."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-esis344l",
+  "verdict": "reject",
+  "digest": "sha256:05409f927683f7d1ee2a4d6475d208162414f5868f263086030d7129185ba966",
+  "note": "Reject. The checks run green and fail before for the reason under test (scratch rerun: fe-new 19 pass, fail on c00a0cb24 by assertion; fe-pres 2 pass before and after; SC11 passes, fails on 8ab5d0fab by assertion; repairs-shell 3 pass, fail on 8ab5d0fab by assertion when the probe script is overlaid; entry 5 Rust 8 pass; Java v2 and v3 markers -> v4: 2 pass, fail on c00a0cb24 by assertion). The sources do not hold (entries counted from 0). (1) Entry 7 source 0 quotes brief item \"2. (2): activate the window on every summon path ...\" as owner-adopted-scenario; it is not in the agreed scenarios. Cite S14.1 (\"brings the JustSearch main window to the foreground (it really takes it; a taskbar flash alone fails)\"). (2) Entry 7 source 1 quotes brief item \"3. (3): plain-language reason, no internal text.\"; sc7_registration_reason_contains_no_internal_error_text has no agreed source. Cite S14.7. (3) Entry 8 source 1 quotes brief item \"4. (4): if the \"space\" change is needed ...\"; the disabled-state expectation (space spelling stays inert, saved binding kept) needs N14.5 \"In-app keys as today\". (4) Prose lines 62-68 still call the legacy-streaming decision pending; the orchestrator's \"Amendment after builder-2\" (2026-10-20 02:15) settled it. (5) Evidence uiux-shortcut-shell-new.json is cited by no entry, and uiux-shortcut-frontend-new.json still lists the removed SC11 \"resumes when inactive\" check. Behaviour itself verified live on X11 (separate report)."
+}
+```
