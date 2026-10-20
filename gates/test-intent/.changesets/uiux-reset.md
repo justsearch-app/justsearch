@@ -814,3 +814,14 @@ No Java files were changed. Actual Windows junction/WebView checks remain unveri
   "note": "Accepted after reading the before-state tests, area5 WP5.1 + pass-2 amendments and the challenger report before the diff. New entries: each expectation follows from the cited S51.x/N51.x text or the Finding-1 amendment; fail-before re-run to a scratch path reproduced every outcome (all 26 pass on the candidate; every repaired check fails before with an assertion). The baseline seam patch was compared line by line with the c00a0cb24 wipe and reproduces it (errors ignored, marker cleared, backend never blocked). Adaptation: the three boot tests only route factory_reset_status to an idle reply; inputs, faults and assertions unchanged; re-run passes before and after. Minor, not blocking: rn1 also asserts native-bin/tesseract is removed, which RN1 does not state (it matches the locked Option A that area5 cites, and passes before); several RS4 quotes still carry the superseded 'never stops the app from starting' sentence, overridden by the cited amendment."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-xxz8uk16",
+  "verdict": "reject",
+  "digest": "sha256:ff9d36ff4b42020f9ca8688c5e6ab521aa1d0fed0e3ec23f0f69cd7509408a79",
+  "note": "Reject. Re-ran all four evidence files to scratch: every existing check matches its committed outcome and fail-before class (rs7_native_bin_link_is_removed... is now renamed; its successor passes in uiux-reset-boot-repair.json). Omissions: (1) Entries 7, 24 (first source), 25, 26 and 27 cite owner-adopted-scenario sources whose quotes are not in the agreed scenarios (area5.md): they quote orchestrator decisions ('Decision (orchestrator): ...') or repair-brief text ('Repair the defect at its cause ...'), which test-intent.md counts as no source; entries 25-27 have no valid expectation source. Cite the agreed text (RN1 'Models and the AI runtime are kept and keep working (Option A)') and/or a delegated-choice quoting the owner's grant with its scope. (2) Entry 7 is classified Adaptation but changes the oracle (link deleted -> kept) of a test absent at the before-state c00a0cb24; an oracle change is not an Adaptation. Reclassify as New with source, evidence (boot-repair evidence already holds its pass and 97dc55c62 assertion fail-before) and newChecks. Minor: RS4 quotes keep the superseded 'It never stops the app from starting.'; the boot-lockdown checks are not run in CI."
+}
+```
