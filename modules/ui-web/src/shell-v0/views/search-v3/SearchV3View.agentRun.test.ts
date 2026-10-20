@@ -28,6 +28,7 @@ import type {
   ConversationEntry,
   ToolCall,
 } from '../../controllers/AgentSessionController.js';
+import { AgentSessionController as RealAgentSessionController } from '../../controllers/AgentSessionController.js';
 import { ReasoningController } from '../../controllers/ReasoningController.js';
 import type { BudgetUpdate } from '../../controllers/AgentSessionController.js';
 import { SV3_STANDING_STOP_REASON } from './sv3-run.js';
@@ -718,6 +719,95 @@ describe('the run ends in ONE receipt whose counts come from the feed it summari
     // conversation (Phase F6: the run's conversation is the identity, so it is not a second row).
     expect(receipts).toHaveLength(2);
     expect(receipts[1]?.textContent?.trim()).toBe('3 tool calls · finished');
+  });
+});
+
+// WP6.2 S8.2 (review 5) — the note of a steer send whose outcome is unconfirmed is window-local: the
+// record never carries it, so the settled turn must not drop it when the live feed yields to the record.
+// It stays for as long as the conversation is open here, until the run's report of that send removes it.
+describe('an unconfirmed steer send keeps its note after the run ends', () => {
+  /** The note the real controller shows for a steer send whose connection failed. */
+  async function unconfirmedNote(): Promise<ConversationEntry> {
+    const real = new RealAgentSessionController('http://127.0.0.1:9999', () => {});
+    real.sessionId = 'run-1';
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))));
+    try {
+      expect(await real.steer('Answer in French.')).toBe(false);
+    } finally {
+      vi.stubGlobal('fetch', fetchMock);
+      real.destroy();
+    }
+    const note = real.conversation.at(-1)!;
+    expect(note.content).toMatch(/^Could not confirm your direction reached the run/);
+    return { ...note, id: 'n1' };
+  }
+
+  const transcript = (main: Mounted): string => q(main, 'sv3-transcript')?.textContent ?? '';
+
+  /** The canonical record a settled turn yields to: the task, a step and the run's answer, and no note. */
+  function serveRecord(): void {
+    const event = (id: string, kind: string, content: string, second: number) => ({
+      id, occurredAt: `2026-10-19T10:00:0${second}Z`, kind, originator: kind === 'USER_MESSAGE' ? 'user' : 'agent',
+      content, attributes: {},
+    });
+    fetchMock.mockImplementation(async (url: unknown) =>
+      String(url).includes('/api/thread/')
+        ? {
+            ok: true,
+            status: 200,
+            json: () =>
+              Promise.resolve({
+                conversationId: 'conv-1',
+                events: [
+                  event('r1', 'USER_MESSAGE', 'audit the folder', 0),
+                  event('r2', 'PROGRESS', 'Recorded step.', 1),
+                  event('r3', 'ASSISTANT_MESSAGE', 'The recorded answer.', 2),
+                ],
+                lifecycles: [],
+              }),
+          }
+        : { ok: true, status: 200, body: null, json: () => Promise.resolve({}) },
+    );
+  }
+
+  it('shows the note on the settled turn, through a later run, until its own report removes it', async () => {
+    const note = await unconfirmedNote();
+    serveRecord();
+    aiOnline();
+    const el = await mount();
+    await delegateWithCalls(el, 'audit the folder', ['c1']);
+    const live = [...ctrl.conversation, note];
+    await frame(el, { conversation: live });
+    const main = await region(el, 'jf-sv3-main');
+    expect(transcript(main)).toContain(note.content);
+
+    await frame(el, { runInFlight: false, isStreaming: false });
+    expect(q(main, 'sv3-run-feed')).toBeNull();
+    expect(transcript(main)).toContain('Recorded step.');
+    expect(transcript(main)).toContain(note.content);
+
+    // A later run in the same conversation leaves the first turn's note where it is.
+    const later = [...live, { id: 'u2', type: 'user' as const, content: 'and the archive', timestamp: 1 }];
+    await frame(el, { runInFlight: true, sessionId: 'run-2', conversation: later });
+    await frame(el, { runInFlight: false, isStreaming: false });
+    expect(all(main, 'sv3-run-receipt')).toHaveLength(2);
+    expect(transcript(main).split(note.content)).toHaveLength(2);
+  });
+
+  it('drops the note once the run reports the direction that send produced', async () => {
+    const note = await unconfirmedNote();
+    serveRecord();
+    aiOnline();
+    const el = await mount();
+    await delegateWithCalls(el, 'audit the folder', ['c1']);
+    const live = [...ctrl.conversation, note];
+    await frame(el, { conversation: live });
+    await frame(el, { runInFlight: false, isStreaming: false });
+    const main = await region(el, 'jf-sv3-main');
+    expect(transcript(main)).toContain(note.content);
+    // The controller removes a settled note from its conversation; the turn follows it.
+    await frame(el, { conversation: live.filter((e) => e.id !== note.id) });
+    expect(transcript(main)).not.toContain(note.content);
   });
 });
 
