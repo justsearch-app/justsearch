@@ -423,3 +423,14 @@ The scenarios are delegated orchestrator choices, not owner words. Linux and Win
 ## Acceptance records
 
 An independent verifier supplies acceptance after checking the final candidate and generated evidence.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-822b-codex",
+  "verdict": "accept",
+  "digest": "sha256:465745458cdc10a06b439c6614a3824f8c8fa700a1065253ac7621825f36ef0c",
+  "note": "Verified Linux part A on 09060a67a vs f9bd104d2 with fresh installed, SIGKILL, refusal, preservation and mutation checks. Windows unverified; independence is a separate Codex session."
+}
+```
