@@ -280,3 +280,16 @@ F1/F2 follow the adopted b81d05 scenarios. I5 uses five alternating pairs on mat
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-claude-lane-a-30f848dc9",
+  "verdict": "accept",
+  "digest": "sha256:0000e1d20f0f2756f4c9cba9c406c4ec3a8cf49ef0603fb8053ea73a5ea6a187",
+  "note": "Real-Engine F1 (stale VDU rejected, live+restart; baseline publishes V0 text) and F2 (windowing restarts; baseline resumes C0) checked; adapted-test assertion removals are signature/preflight-refresh adaptations."
+}
+```
