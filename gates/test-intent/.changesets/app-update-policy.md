@@ -128,3 +128,14 @@ contain no policy parsing, environment suppression or fail-closed repair.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "9a0baymd",
+  "verdict": "accept",
+  "digest": "sha256:57b6af5e6dc69e19ca7c110d4fd5b610968f2a7e334f1098f3d6cb736a132fd4",
+  "note": "Sources and classes verified; digest-bound execution evidence matches; product verdict is separate."
+}
+```
