@@ -857,7 +857,8 @@ public final class KnowledgeServerMigrationOps {
         || indexPath.getParent().getParent() == null) return false;
     var authority = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(),
         indexPath.getParent().getParent(), indexPath, active, null, null, 0L);
-    return authority.replayBufferedFileDelete(active, deletion);
+    return authority.replayBufferedFileDelete(active, deletion)
+        == WorkerIngestService.BufferedDeleteReplay.SETTLED;
   }
 
   private static boolean settleCommittedNativeFiles(JobQueue queue, RunningRuntime active,
@@ -1148,7 +1149,14 @@ public final class KnowledgeServerMigrationOps {
               } else {
                 WorkerIngestService authority = context.publisher() != null
                     ? context.publisher() : replayService(context);
-                if (!authority.replayBufferedFileDelete(context.ingestLifecycle(), deletion)) {
+                var replayed = authority.replayBufferedFileDelete(context.ingestLifecycle(), deletion);
+                if (replayed == WorkerIngestService.BufferedDeleteReplay.UNCERTAIN
+                    && refusedSourceRecovery) {
+                  // Nothing was changed on surviving A. Its own root reconciliation removes the
+                  // file's rows once the root returns and proves the file absent.
+                  context.log().info("Refused candidate leaves an unproved DELETE to root "
+                      + "reconciliation on the surviving generation: key={}", op.key());
+                } else if (replayed != WorkerIngestService.BufferedDeleteReplay.SETTLED) {
                   allApplied = false;
                 }
               }

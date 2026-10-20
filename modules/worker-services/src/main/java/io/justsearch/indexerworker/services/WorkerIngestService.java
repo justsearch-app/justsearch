@@ -516,9 +516,10 @@ public final class WorkerIngestService {
    * Exact watcher/legacy replay shares the publisher's fence and root proof. Queue work is left
    * intact: a newer UPSERT can arrive after the final filesystem probe. A recreated source is
    * admitted even when an earlier replay crashed after deleting Lucene but before committing.
-   * Returns false on uncertainty so the exact receipt remains durable for retry.
+   * Anything but {@link BufferedDeleteReplay#SETTLED} keeps the exact receipt durable for retry,
+   * unless the caller's surviving generation owns the file's root reconciliation.
    */
-  public boolean replayBufferedFileDelete(
+  public BufferedDeleteReplay replayBufferedFileDelete(
       io.justsearch.adapters.lucene.runtime.RunningRuntime target,
       io.justsearch.indexerworker.queue.SwitchBufferDelete deletion) {
     return withFileMutationFence(() -> {
@@ -531,13 +532,15 @@ public final class WorkerIngestService {
           && collection == null) {
         try {
           collection = target.documentFieldOps().getDocumentFieldOrThrow(deletion.path(), SchemaFields.COLLECTION);
-        } catch (IOException unreadable) { return false; }
+        } catch (IOException unreadable) { return BufferedDeleteReplay.FAILED; }
       }
       if (deletion.rootIdentity() != null) {
         try {
-          if (!deletion.rootIdentity().equals(RootIdentity.capture(root).toString())) return false;
+          if (!deletion.rootIdentity().equals(RootIdentity.capture(root).toString())) {
+            return BufferedDeleteReplay.UNCERTAIN;
+          }
         } catch (IOException unavailable) {
-          return false;
+          return BufferedDeleteReplay.UNCERTAIN;
         }
       }
       var verdict = io.justsearch.indexerworker.loop.SourcePresence.classify(file, root, rootWitness);
@@ -545,19 +548,21 @@ public final class WorkerIngestService {
         if (deletion.origin() == io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.LEGACY) {
           log.warn("Legacy buffered DELETE skipped because its source exists: {}", file);
         }
-        if (!rootWitness.admits(root)) return false;
+        if (!rootWitness.admits(root)) return BufferedDeleteReplay.UNCERTAIN;
         if (!io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(file, root)) {
           var entry = JobQueue.EnqueueEntry.stat(file);
           // Originless rows did not retain an admitting root. Preserve any existing job's root
           // rather than replacing it with an inferred parent; a live binding is authoritative.
           if (deletion.root() != null || binding != null) entry = entry.withinRoot(root);
           if (!jobQueue.enqueueReappearedFile(entry, collection)) {
-            return false;
+            return BufferedDeleteReplay.FAILED;
           }
         }
-        return true;
+        return BufferedDeleteReplay.SETTLED;
       }
-      if (verdict != io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT) return false;
+      if (verdict != io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT) {
+        return BufferedDeleteReplay.UNCERTAIN;
+      }
       target.indexingCoordinator().deleteByIdAndChunks(deletion.path());
       target.commitOps().commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
       target.commitOps().maybeRefreshBlocking();
@@ -565,14 +570,22 @@ public final class WorkerIngestService {
       // on a crash the retained receipt performs this same admission on the next boot.
       if (io.justsearch.adapters.lucene.runtime.PathPresence.probe(file)
           == io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT) {
-        if (!rootWitness.admits(root)) return false;
+        if (!rootWitness.admits(root)) return BufferedDeleteReplay.FAILED;
         var entry = JobQueue.EnqueueEntry.stat(file);
         if (deletion.root() != null || binding != null) entry = entry.withinRoot(root);
-        return jobQueue.enqueueReappearedFile(entry, collection);
+        return jobQueue.enqueueReappearedFile(entry, collection)
+            ? BufferedDeleteReplay.SETTLED : BufferedDeleteReplay.FAILED;
       }
-      return confirmedAbsent(deletion.path(), root);
+      return confirmedAbsent(deletion.path(), root)
+          ? BufferedDeleteReplay.SETTLED : BufferedDeleteReplay.FAILED;
     });
   }
+
+  /**
+   * A buffered file delete's replay outcome. {@code UNCERTAIN} means nothing was changed because
+   * the root or the source could not be proved; {@code FAILED} means a write or proof failed.
+   */
+  public enum BufferedDeleteReplay { SETTLED, UNCERTAIN, FAILED }
 
   /** A replayed prune's result, and the number of files it removed that were queued again. */
   public record ReplayedPrune(

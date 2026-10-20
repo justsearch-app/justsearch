@@ -243,7 +243,7 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
   }
 
   @org.junit.jupiter.params.ParameterizedTest(name = "watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute({0})")
-  @org.junit.jupiter.params.provider.ValueSource(strings = {"ordinary", "refusal", "promoted"})
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"ordinary", "promoted"})
   void watcherReceiptRetainsUnavailableRootAcrossEveryReplayRoute(String route) throws Exception {
     Path file = indexed("unavailable-route.txt");
     assertTrue(queue.putSwitchBufferForGeneration("green", "path:" + file, "DELETE", file.toString()));
@@ -252,6 +252,39 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
     assertFalse(replayRoute(route), "a missing root cannot prove source deletion");
     assertEquals(1, runtime.indexCountOps().countByIdAndChunksStrict(file.toString()));
     assertEquals(receipt, queue.listSwitchBufferOpsStrict());
+  }
+
+  /**
+   * P1: a root withdrawn during SWITCHING must not wedge a refused candidate. Surviving A keeps
+   * the file's rows while the root is uncertain, and A's own root reconciliation removes them
+   * once the root is back.
+   */
+  @org.junit.jupiter.params.ParameterizedTest(name = "refusalLeavesUnprovedDeleteToSurvivingRootReconciliation({0})")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"watcher", "legacy"})
+  void refusalLeavesUnprovedDeleteToSurvivingRootReconciliation(String format) throws Exception {
+    Path file = indexed("withdrawn-root.txt");
+    Path sibling = indexed("withdrawn-root-sibling.txt");
+    String payload = "watcher".equals(format) ? watcherPayload(file) : file.toString();
+    assertTrue(queue.putSwitchBufferForGeneration("green", "path:" + file, "DELETE", payload));
+    Files.delete(file);
+    Path away = temp.resolve("withdrawn");
+    Files.move(root, away);
+    assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(context("green")),
+        "an unprovable delete must not keep the refused candidate's Green alive");
+    runtime.commitOps().maybeRefreshBlocking();
+    assertEquals(1, runtime.indexCountOps().countByIdAndChunksStrict(file.toString()),
+        "nothing is deleted while the root is uncertain");
+    assertEquals(1, runtime.indexCountOps().countByIdAndChunksStrict(sibling.toString()));
+    assertTrue(queue.listSwitchBufferOpsStrict().isEmpty(),
+        "the abandoned candidate's journal must not outlive it");
+    Files.move(away, root);
+    var synced = service.syncDirectory(SyncDirectoryRequest.newBuilder()
+        .setRootPath(root.toString()).setForce(false).build(), CallContext.none());
+    assertTrue(synced.getError().isBlank(), synced.getError());
+    runtime.commitOps().maybeRefreshBlocking();
+    assertEquals(0, runtime.indexCountOps().countByIdAndChunksStrict(file.toString()),
+        "the surviving generation's root reconciliation must remove the deleted file");
+    assertEquals(1, runtime.indexCountOps().countByIdAndChunksStrict(sibling.toString()));
   }
 
   @Test void recreationAfterFinalAbsenceProbeKeepsNewerQueuedRevision() throws Exception {
@@ -284,7 +317,7 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
   }
 
   @Test void linuxCaseDistinctNamesAndAtomicReplacementArePreserved() throws Exception {
-    org.junit.jupiter.api.Assumptions.assumeTrue(System.getProperty("os.name").startsWith("Linux"));
+    Assumptions.assumeTrue(System.getProperty("os.name").startsWith("Linux"));
     Path upper = indexed("Case.txt");
     Path lower = indexed("case.txt");
     receipt(upper, watcherPayload(upper));
@@ -371,14 +404,14 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
   }
 
   @Test void linuxUnreadableRootKeepsExactDeleteReceiptAndRows() throws Exception {
-    org.junit.jupiter.api.Assumptions.assumeTrue(System.getProperty("os.name").startsWith("Linux"));
+    Assumptions.assumeTrue(System.getProperty("os.name").startsWith("Linux"));
     Path file = indexed("unreadable-root.txt");
     receipt(file, file.toString());
     var before = queue.listSwitchBufferOpsStrict();
     var permissions = Files.getPosixFilePermissions(root);
     try {
       Files.setPosixFilePermissions(root, java.util.Set.of());
-      org.junit.jupiter.api.Assumptions.assumeFalse(Files.isReadable(root), "requires a non-privileged OS user");
+      Assumptions.assumeFalse(Files.isReadable(root), "requires a non-privileged OS user");
       assertFalse(replay(null), "unreadable roots cannot prove absence");
       assertEquals(1, runtime.indexCountOps().countByIdAndChunksStrict(file.toString()));
       assertEquals(before, queue.listSwitchBufferOpsStrict());
@@ -386,13 +419,13 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
   }
 
   @Test void linuxUnreadableSourceKeepsRowsAndRefreshWork() throws Exception {
-    org.junit.jupiter.api.Assumptions.assumeTrue(System.getProperty("os.name").startsWith("Linux"));
+    Assumptions.assumeTrue(System.getProperty("os.name").startsWith("Linux"));
     Path file = indexed("unreadable-source.txt");
     receipt(file, file.toString());
     var permissions = Files.getPosixFilePermissions(file);
     try {
       Files.setPosixFilePermissions(file, java.util.Set.of());
-      org.junit.jupiter.api.Assumptions.assumeFalse(Files.isReadable(file), "requires a non-privileged OS user");
+      Assumptions.assumeFalse(Files.isReadable(file), "requires a non-privileged OS user");
       assertTrue(replay(null));
       assertEquals(1, runtime.indexCountOps().countByIdAndChunksStrict(file.toString()),
           "unreadable source bytes are not deletion authority");
