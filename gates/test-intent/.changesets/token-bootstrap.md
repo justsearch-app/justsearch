@@ -535,3 +535,14 @@ like acceptance, must come from another session. No author approval is supplied.
   "note": "All 11 entries match their class and owner-adopted T1-T19 sources; reran the Java security pins and web token/stream pins (both fail on base by assertion for the reason under test and pass on fcdac3d8f), and the 0073e38aa and http.test.ts edits add only the token or capture the outcome without weakening any assertion."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "efb762b0-25cb-4e32-9a2c-62d35ea349d0",
+  "verdict": "reject",
+  "digest": "sha256:6ee3080b467b5dbd824f79bc9b9b053ce32f86dca22cf86eb85373bab1f3ec80",
+  "note": "The McpOriginValidationTest Adaptation changes a precondition, not just instrumentation: it moves the live /mcp Origin cases from dev to production mode, which the change did not force (my rerun with the dev-mode fixture passes 19/19 on the candidate), and leaves no live test of the guard in dev mode, where ADR-0046 says it applies regardless of mode and where it is the only barrier because no token is required; keep the dev-mode cases (add the production run alongside) or cite a source for dropping them."
+}
+```
