@@ -417,3 +417,14 @@ Pending independent verification; no builder acceptance.
   "note": "Round 10 at a6fbcee54: the four restored oracles fail 5/5 on the candidate for M1 reloads 600/900 ms after a foreign unload (base also 5/5), M2 a reconfigure drain ending after 500 ms (base 5/5), M3 an expiry that interrupts the worker (base 5/5) and M4 a leaked index root lock (candidate only; base sleeps), the item-4 helper passes six real-filesystem fault scenarios 5/5, B5 and F1 samples still fail 5/5, clean classes pass 5/5 with medians B8 8.67 s vs 10.22 s base, B9 3.01 vs 6.89, executor 32.61 vs 32.39, rich document 8.93 vs 10.87, and all 22 relabelled sources are delegated choices within the quoted grant."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "auditor-slow-tests-b-5-codex",
+  "verdict": "accept",
+  "digest": "sha256:e39f23ecaf13f44c796177b9c99f806f5cd25cae4e63277ea685f06c8b4511ca",
+  "note": "Independent audit: base and candidate pass 161/161; stale serving-view reuse fails both, missing unload delivery fails candidate, and a 2 s runtime drain cap escapes only candidate as declared. All 22 delegated-choice relabels checked."
+}
+```
