@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { driveCase, watchSupervisor } from './adapters/dev-runner.mjs';
+import { driveCase, runCase, watchSupervisor } from './adapters/dev-runner.mjs';
+import { readLinuxProcess } from '../dev/lib/process-identity.cjs';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { FAKE_ENGINE, HARNESS_FLAG, OVERRIDE_ENV, repoRoot, loadPolicy } from './contract.mjs';
+import { allCases, FAKE_ENGINE, HARNESS_FLAG, OVERRIDE_ENV, repoRoot, loadPolicy } from './contract.mjs';
 
 const harnessOverrides = {
   [HARNESS_FLAG]: '1',
@@ -13,6 +14,15 @@ const harnessOverrides = {
 };
 const io = {
   repoRoot, fakeEngine: FAKE_ENGINE, harnessOverrides, sleep,
+  isAlive(pid) {
+    if (process.platform === 'linux') {
+      const observed = readLinuxProcess(pid);
+      if (observed == null) throw new Error(`cannot establish fixture liveness for ${pid}`);
+      return observed.present;
+    }
+    try { process.kill(pid, 0); return true; }
+    catch (error) { if (error.code === 'ESRCH') return false; throw error; }
+  },
   readJsonIfPresent(file) {
     try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
   },
@@ -26,6 +36,28 @@ const io = {
   },
 };
 const policy = loadPolicy({ env: harnessOverrides });
+
+test('probe waits for delayed fixture startup before cooperative quit', { timeout: 180000 }, async () => {
+  const cooperativeQuit = allCases().find(c => c.id === 'quit-cooperative-records-requested-quit');
+  assert.ok(cooperativeQuit, 'the cooperative quit contract case exists');
+  let firstRunning;
+  const result = await runCase({
+    testCase: { ...cooperativeQuit, enginePlan: [{ mode: 'slow-start', slowStartMs: 30000 }] },
+    policy,
+    io: {
+      ...io,
+      readJsonIfPresent(file) {
+        const state = io.readJsonIfPresent(file);
+        if (state?.state === 'running') firstRunning ??= state;
+        return state;
+      },
+    },
+  });
+  assert.deepEqual(result.problems, []);
+  assert.ok(firstRunning, 'the probe observes its running trigger');
+  assert.equal(firstRunning.incarnation, 1, 'slow setup does not spend an incarnation');
+  assert.equal(firstRunning.restartCount, 0, 'slow setup does not spend the restart budget');
+});
 
 test('delayed fixture reaches its first running incarnation without spending the restart budget', { timeout: 160000 }, async () => {
   const testCase = { id: 'delayed-fixture-start', enginePlan: [

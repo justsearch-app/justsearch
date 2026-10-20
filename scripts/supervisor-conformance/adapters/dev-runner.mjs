@@ -47,7 +47,7 @@ const IDLE_FRONTEND = [process.execPath, '-e', 'setInterval(() => {}, 60000)'];
 // Allow that setup here only; explicit start-timeout cases and the restart policy stay bounded.
 const FIXTURE_START_TIMEOUT_MS = 60_000;
 // Discovery and HTTP readiness have separate budgets; include runner setup before both begin.
-const FIRST_RUNNING_TIMEOUT_MS = 2 * FIXTURE_START_TIMEOUT_MS + 20_000;
+export const FIRST_RUNNING_TIMEOUT_MS = 2 * FIXTURE_START_TIMEOUT_MS + 20_000;
 
 export async function available({ io }) {
   const devRunner = path.join(io.repoRoot, 'scripts', 'dev', 'dev-runner.cjs');
