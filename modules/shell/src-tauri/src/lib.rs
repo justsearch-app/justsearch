@@ -1366,39 +1366,173 @@ async fn get_file_metadata(path: String) -> Result<FileMetadata, String> {
     })
 }
 
-// Windows shell consumers require a DOS path, even though validation uses the canonical target.
+// Shell consumers need a plain path, while validation keeps the canonical target.
 #[cfg(windows)]
-fn shell_dispatch_path(target: &Path) -> Result<&Path, String> {
+fn shell_dispatch_path(target: &Path) -> Result<PathBuf, String> {
     let simplified = dunce::simplified(target);
-    if !matches!(simplified.components().next(), Some(std::path::Component::Prefix(prefix))
-        if matches!(prefix.kind(), std::path::Prefix::Disk(_)))
-    {
-        return Err(
-            "The resolved target cannot be represented as a non-verbatim Windows shell path".into(),
-        );
+    let mut components = simplified.components();
+    match components.next() {
+        Some(std::path::Component::Prefix(prefix)) => match prefix.kind() {
+            std::path::Prefix::Disk(_) => return Ok(simplified.to_path_buf()),
+            std::path::Prefix::VerbatimUNC(server, share) => {
+                let mut plain = std::ffi::OsString::from(r"\\");
+                plain.push(server);
+                plain.push(r"\");
+                plain.push(share);
+                plain.push(components.as_path());
+                let plain = PathBuf::from(plain);
+                // Check Win32's plain-path interpretation; Rust may add verbatim semantics itself.
+                use std::os::windows::ffi::{OsStrExt, OsStringExt};
+                use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
+                use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
+                use windows_sys::Win32::Storage::FileSystem::{
+                    CreateFileW, GetFinalPathNameByHandleW, FILE_FLAG_BACKUP_SEMANTICS,
+                    FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
+                    OPEN_EXISTING,
+                };
+                let file: Vec<u16> = plain.as_os_str().encode_wide().chain(Some(0)).collect();
+                let handle = unsafe {
+                    CreateFileW(
+                        file.as_ptr(),
+                        FILE_READ_ATTRIBUTES,
+                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                        std::ptr::null(),
+                        OPEN_EXISTING,
+                        FILE_FLAG_BACKUP_SEMANTICS,
+                        std::ptr::null_mut(),
+                    )
+                };
+                if handle == INVALID_HANDLE_VALUE {
+                    return Err(format!(
+                        "Cannot resolve plain UNC target '{}': {}",
+                        plain.display(),
+                        std::io::Error::last_os_error()
+                    ));
+                }
+                let handle = unsafe { OwnedHandle::from_raw_handle(handle) };
+                let size = unsafe {
+                    GetFinalPathNameByHandleW(handle.as_raw_handle(), std::ptr::null_mut(), 0, 0)
+                };
+                if size == 0 {
+                    return Err(format!(
+                        "Cannot identify plain UNC target: {}",
+                        std::io::Error::last_os_error()
+                    ));
+                }
+                let mut name = vec![0u16; size as usize + 1];
+                let size = unsafe {
+                    GetFinalPathNameByHandleW(
+                        handle.as_raw_handle(),
+                        name.as_mut_ptr(),
+                        name.len() as u32,
+                        0,
+                    )
+                };
+                if size == 0 || size as usize >= name.len() {
+                    return Err(format!(
+                        "Cannot identify plain UNC target: {}",
+                        std::io::Error::last_os_error()
+                    ));
+                }
+                let resolved = PathBuf::from(std::ffi::OsString::from_wide(&name[..size as usize]));
+                if resolved == target {
+                    return Ok(plain);
+                }
+            }
+            _ => {}
+        },
+        _ => {}
     }
-    Ok(simplified)
+    Err("The resolved target cannot be represented as a non-verbatim Windows shell path".into())
+}
+
+#[cfg(windows)]
+fn windows_shell_open(target: &std::ffi::OsStr) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::RPC_E_CHANGED_MODE;
+    use windows_sys::Win32::System::Com::{
+        CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
+    };
+    use windows_sys::Win32::UI::Shell::{
+        ShellExecuteExW, SEE_MASK_FLAG_NO_UI, SEE_MASK_NOASYNC, SHELLEXECUTEINFOW,
+    };
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    let file: Vec<u16> = target.encode_wide().chain(Some(0)).collect();
+    let verb: Vec<u16> = "open".encode_utf16().chain(Some(0)).collect();
+    let initialized = unsafe {
+        CoInitializeEx(
+            std::ptr::null(),
+            (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32,
+        )
+    };
+    if initialized < 0 && initialized != RPC_E_CHANGED_MODE {
+        return Err(format!(
+            "Could not initialize Windows shell COM: {initialized:#x}"
+        ));
+    }
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+        // The async IPC thread has no Windows message loop; finish shell/DDE work before returning.
+        fMask: SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI,
+        lpVerb: verb.as_ptr(),
+        lpFile: file.as_ptr(),
+        nShow: SW_SHOWNORMAL,
+        ..Default::default()
+    };
+    // No command parser, PATHEXT lookup, parameters, or environment expansion of the checked target.
+    let result = if unsafe { ShellExecuteExW(&mut info) } != 0 {
+        Ok(())
+    } else {
+        Err(format!(
+            "Windows could not open '{}': {}",
+            target.to_string_lossy(),
+            std::io::Error::last_os_error()
+        ))
+    };
+    if initialized >= 0 {
+        unsafe {
+            CoUninitialize();
+        }
+    }
+    result
 }
 
 // Return the exact path handed to the OS so native tests can observe the real dispatch boundary.
-fn dispatch_open_target(target: &Path) -> Result<&Path, String> {
+fn dispatch_open_target(target: &Path) -> Result<PathBuf, String> {
     #[cfg(windows)]
-    let target = shell_dispatch_path(target)?;
-    open::that(target).map_err(|e| format!("Failed to open '{}': {e}", target.display()))?;
-    Ok(target)
+    {
+        let target = shell_dispatch_path(target)?;
+        if target.is_dir() {
+            Command::new("explorer.exe")
+                .arg(&target)
+                .status()
+                .map_err(|e| format!("Failed to open folder '{}': {e}", target.display()))?;
+        } else {
+            windows_shell_open(target.as_os_str())?;
+        }
+        Ok(target)
+    }
+    #[cfg(not(windows))]
+    {
+        open::that(target).map_err(|e| format!("Failed to open '{}': {e}", target.display()))?;
+        Ok(target.to_path_buf())
+    }
 }
 
-fn dispatch_reveal_target<'a>(_item: &'a Path, directory: &'a Path) -> Result<&'a Path, String> {
+fn dispatch_reveal_target(_item: &Path, directory: &Path) -> Result<PathBuf, String> {
     #[cfg(windows)]
     {
         let target = if _item.is_file() { _item } else { directory };
         let target = shell_dispatch_path(target)?;
         let argument = if _item.is_file() {
-            format!("/select,{}", target.to_string_lossy()).into()
+            let mut argument = std::ffi::OsString::from("/select,");
+            argument.push(target.as_os_str());
+            argument
         } else {
             target.as_os_str().to_os_string()
         };
-        Command::new("explorer")
+        Command::new("explorer.exe")
             .arg(argument)
             .status()
             .map_err(|e| format!("Failed to reveal '{}': {e}", target.display()))?;
@@ -1408,7 +1542,7 @@ fn dispatch_reveal_target<'a>(_item: &'a Path, directory: &'a Path) -> Result<&'
     {
         open::that(directory)
             .map_err(|e| format!("Failed to reveal '{}': {e}", directory.display()))?;
-        Ok(directory)
+        Ok(directory.to_path_buf())
     }
 }
 
@@ -1421,7 +1555,14 @@ async fn open_file(path: String) -> Result<(), String> {
 #[tauri::command]
 async fn open_external_url(url: String) -> Result<(), String> {
     let target = validate_external_url(&url)?;
-    open::that(target.as_str()).map_err(|e| format!("Failed to open URL: {e}"))
+    #[cfg(windows)]
+    {
+        windows_shell_open(std::ffi::OsStr::new(target.as_str()))
+    }
+    #[cfg(not(windows))]
+    {
+        open::that(target.as_str()).map_err(|e| format!("Failed to open URL: {e}"))
+    }
 }
 
 #[tauri::command]
@@ -2894,6 +3035,8 @@ mod open_guard_tests {
             "\\/server/share/file.pdf",
             "\\\\?\\C:\\file.pdf",
             "\\\\.\\C:\\file.pdf",
+            r"\\?\GLOBALROOT\Device\HarddiskVolume1\file.pdf",
+            r"\\?\other-verbatim\file.pdf",
             "C:\\file.pdf:stream",
         ]
         .iter()
@@ -2962,7 +3105,7 @@ mod open_guard_tests {
     }
 
     #[cfg(windows)]
-    fn assert_plain_dispatched_path(result: Result<&Path, String>, expected: &Path) {
+    fn assert_plain_dispatched_path(result: Result<PathBuf, String>, expected: &Path) {
         assert_eq!(
             result.as_ref().map(|_| ()),
             Ok(()),
@@ -2974,7 +3117,7 @@ mod open_guard_tests {
             .to_string_lossy()
             .starts_with(r"\\?\"));
         assert_eq!(
-            fs::canonicalize(dispatched).unwrap(),
+            fs::canonicalize(&dispatched).unwrap(),
             fs::canonicalize(expected).unwrap()
         );
     }
@@ -3028,5 +3171,120 @@ mod open_guard_tests {
             dispatch_reveal_target(&target, parent),
         ];
         assert_eq!(results.iter().filter(|result| matches!(result, Err(message) if message.contains("non-verbatim Windows shell path"))).count(), 2, "{results:?}");
+    }
+    #[cfg(windows)]
+    fn windows_open_with_neighbor_cmd(name: &str, directory: bool) {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join(name);
+        if directory {
+            fs::create_dir(&target).unwrap();
+        } else {
+            fs::write(&target, "real document").unwrap();
+        }
+        let marker = dir.path().join("neighbor-ran.txt");
+        fs::write(
+            dir.path().join(format!("{name}.cmd")),
+            format!("@echo neighbor-ran>\"{}\"\r\n", marker.display()),
+        )
+        .unwrap();
+        let checked = local_open_target(target.to_str().unwrap()).unwrap();
+        let result = dispatch_open_target(&checked);
+        assert_eq!(
+            result.as_ref().map(|_| ()),
+            Ok(()),
+            "real dispatch: {result:?}"
+        );
+        let deadline = std::time::Instant::now() + Duration::from_secs(4);
+        while std::time::Instant::now() < deadline && !marker.exists() {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert_eq!(
+            marker.exists(),
+            false,
+            "neighbor .cmd executed for {}",
+            target.display()
+        );
+        assert_plain_dispatched_path(result, &target);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_folder_does_not_execute_neighbor_cmd() {
+        windows_open_with_neighbor_cmd("Invoice", true);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_document_does_not_execute_neighbor_cmd() {
+        windows_open_with_neighbor_cmd("report.txt", false);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_bracket_folder_does_not_execute_neighbor_cmd() {
+        windows_open_with_neighbor_cmd("Q3 [draft]", true);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_mapped_unc_drive_opens_document_and_refuses_launcher() {
+        use windows_sys::Win32::Storage::FileSystem::GetLogicalDrives;
+        let drives = unsafe { GetLogicalDrives() };
+        if drives == 0 {
+            panic!(
+                "Cannot enumerate drives: {}",
+                std::io::Error::last_os_error()
+            );
+        }
+        let letter = (b'P'..=b'Z')
+            .rev()
+            .find(|letter| drives & (1 << (letter - b'A')) == 0)
+            .expect("a free drive letter is required for the mapping check")
+            as char;
+        let drive = format!("{letter}:");
+        let mapped = Command::new("net.exe")
+            .args(["use", &drive, r"\\localhost\C$", "/persistent:no"])
+            .output()
+            .unwrap();
+        if !mapped.status.success() {
+            panic!("The UNC mapping check requires \\\\localhost\\C$; no subst fallback can prove VerbatimUNC behavior: {} {}",
+                String::from_utf8_lossy(&mapped.stdout), String::from_utf8_lossy(&mapped.stderr));
+        }
+        // Always remove only this test's successful mapping, including on assertion failure.
+        let result = std::panic::catch_unwind(|| {
+            let document = format!(r"{drive}\Windows\win.ini");
+            let target = local_open_target(&document).unwrap();
+            assert!(
+                matches!(target.components().next(), Some(std::path::Component::Prefix(prefix))
+                if matches!(prefix.kind(), std::path::Prefix::VerbatimUNC(_, _)))
+            );
+            let dispatched = dispatch_open_target(&target);
+            assert_plain_dispatched_path(dispatched, Path::new(&document));
+            let launcher = format!(r"{drive}\Windows\System32\cmd.exe");
+            assert!(
+                matches!(local_open_target(&launcher), Err(message) if message.contains(".exe"))
+            );
+            let folder = format!(r"{drive}\Windows");
+            let target = local_open_target(&folder).unwrap();
+            assert_plain_dispatched_path(dispatch_open_target(&target), Path::new(&folder));
+        });
+        let cleanup = Command::new("net.exe")
+            .args(["use", &drive, "/delete", "/y"])
+            .output()
+            .unwrap();
+        if let Err(failure) = result {
+            if !cleanup.status.success() {
+                eprintln!(
+                    "Mapping cleanup failed for {drive}: {}",
+                    String::from_utf8_lossy(&cleanup.stderr)
+                );
+            }
+            std::panic::resume_unwind(failure);
+        }
+        assert_eq!(
+            cleanup.status.code(),
+            Some(0),
+            "could not remove test mapping {drive}"
+        );
     }
 }

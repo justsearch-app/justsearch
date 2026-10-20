@@ -43,19 +43,19 @@
 +#[cfg(windows)]
 +use std::path::Path;
 +#[cfg(windows)]
-+fn dispatch_open_target(target: &Path) -> Result<&Path, String> {
++fn dispatch_open_target(target: &Path) -> Result<PathBuf, String> {
 +    open::that(target).map_err(|e| format!("Failed to open '{}': {e}", target.display()))?;
-+    Ok(target)
++    Ok(target.to_path_buf())
 +}
 +#[cfg(windows)]
-+fn dispatch_reveal_target<'a>(item: &'a Path, directory: &'a Path) -> Result<&'a Path, String> {
++fn dispatch_reveal_target<'a>(item: &'a Path, directory: &'a Path) -> Result<PathBuf, String> {
 +    if item.is_file() {
 +        Command::new("explorer")
 +            .arg(format!("/select,{}", item.to_string_lossy()))
 +            .status()
 +            .map_err(|e| format!("Failed to reveal '{}': {e}", item.display()))?;
-+        return Ok(item);
++        return Ok(item.to_path_buf());
 +    }
 +    open::that(directory).map_err(|e| format!("Failed to reveal '{}': {e}", directory.display()))?;
-+    Ok(directory)
++    Ok(directory.to_path_buf())
 +}
