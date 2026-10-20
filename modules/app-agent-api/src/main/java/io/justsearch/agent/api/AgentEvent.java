@@ -95,14 +95,41 @@ public sealed interface AgentEvent {
   }
 
   /**
-   * Tempdoc 565 §30 — the agent loop acknowledged a human mid-run STEERING directive (the DIRECTION
-   * authority's {@code interject}). Emitted at the step boundary when the loop drains a queued
-   * directive (POST /api/chat/agent/steer) and folds its text into the next LLM call. The FE renders
-   * it as a human-origin run-spine landmark ("Your direction: …"). Mirrors {@link ToolCallApproved}.
+   * Tempdoc 565 §30 — what happened to a human mid-run STEERING directive (the DIRECTION authority's
+   * {@code interject}, POST /api/chat/agent/steer). One direction is reported {@link #QUEUED} when
+   * the run accepts it, then exactly once more: {@link #APPLIED} when the model accepts a request
+   * carrying it, or {@link #NOT_APPLIED} with a {@code reason} when the run ended (or was interrupted)
+   * before that. {@code directiveId} ties the reports of one direction together, so a consumer must
+   * let the final report win whatever order the two arrive in. Records written before WP6.2 carry
+   * only {@code directiveText}; such an acknowledgement says nothing about whether the model saw it.
+   * The {@link #QUEUED} report also echoes the {@code clientRequestId} its sender gave the send
+   * (null when it gave none, and on every other report), so the sender can tell which of several
+   * sends with the same text produced it.
    */
-  record DirectiveAcknowledged(String directiveText, TraceContext trace) implements AgentEvent {
-    public DirectiveAcknowledged(String directiveText) {
-      this(directiveText, TraceContext.none());
+  record DirectiveAcknowledged(
+      String directiveText,
+      String directiveId,
+      String outcome,
+      String reason,
+      String clientRequestId,
+      TraceContext trace)
+      implements AgentEvent {
+    public static final String QUEUED = "queued";
+    public static final String APPLIED = "applied";
+    public static final String NOT_APPLIED = "not_applied";
+
+    /** {@link #NOT_APPLIED} reasons: how the run ended before the direction reached the model. */
+    public static final String REASON_RUN_FINISHED = "run_finished";
+
+    public static final String REASON_RUN_STOPPED = "run_stopped";
+    public static final String REASON_RUN_FAILED = "run_failed";
+    public static final String REASON_STEP_LIMIT = "step_limit";
+    public static final String REASON_BUDGET_LIMIT = "budget_limit";
+    public static final String REASON_RUN_INTERRUPTED = "run_interrupted";
+
+    public DirectiveAcknowledged(
+        String directiveText, String directiveId, String outcome, String reason) {
+      this(directiveText, directiveId, outcome, reason, null, TraceContext.none());
     }
   }
 
