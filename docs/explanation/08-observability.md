@@ -29,6 +29,16 @@ We use a lightweight, local-first implementation of **OpenTelemetry metrics**, a
 
 Key property: every metric is declared in a typed `MetricCatalog` (per [ADR-0027](../decisions/0027-metric-catalog-as-telemetry-contract.md)). The catalog's `MetricDefinition` carries the metric name, tag schema, bucket bounds, exemplar policy, RRD archive flag, and (optionally) the API status record field name it surfaces at. The SDK applies these as per-View `setAttributeFilter` + `setBucketBoundaries` before any reader sees data — so high-cardinality attributes (paths, doc IDs, raw queries, UUIDs) are stripped at the source, not at the exporter.
 
+### Trace export and privacy
+
+The metric tag filter above applies to metrics, not spans. `TracingBootstrap` reads
+`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` / `OTEL_EXPORTER_OTLP_ENDPOINT` from the Engine environment
+and enables an OTLP/HTTP span exporter when either is configured. The destination may be remote;
+there is no loopback restriction. Spans can carry file paths, and detailed index/search tracing
+can carry bounded document IDs/content (16 documents × 1024 characters). The local NDJSON exporter
+continues alongside OTLP. See the [search span contract](../reference/contracts/search-execution-spans.md)
+and [System Overview](01-system-overview.md#network-behavior) for other network paths.
+
 ### Metric catalog ownership
 
 Every emit path flows through a typed catalog. A non-exhaustive map of which catalog owns which namespace:
@@ -519,7 +529,7 @@ Key OperationalMetrics fields exposed via the `indexStatus` port call → `/api/
 
 #### GPU utilization metrics
 
-When NVML is available (NVIDIA GPUs on Windows), the Engine polls `nvmlDeviceGetUtilizationRates()` via FFM and registers OTel gauges with 5-second caching:
+When NVML is available (NVIDIA GPUs on Windows or Linux), the Engine polls `nvmlDeviceGetUtilizationRates()` via FFM and registers OTel gauges with 5-second caching:
 
 - `gpu.utilization.percent` — GPU core utilization (0-100%)
 - `gpu.memory.utilization.percent` — VRAM utilization (0-100%)
@@ -558,7 +568,7 @@ Pattern reference: ADR-0027 (telemetry catalog substrate), tempdoc 414. Adapter 
 A single user action (e.g., "Search for 'Invoice'") traverses multiple boundaries:
 1.  **Frontend:** User clicks button.
 2.  **API:** `LocalApiServer` receives request.
-3.  **AppFacade:** Business logic.
+3.  **CoreServices:** Application service access.
 4.  **Port call:** direct in-process call into the index half — since lane F stage A there is no IPC hop and no `x-trace-id` metadata to propagate: the caller's OTel context is already current on the callee's thread (except across a thread hand-off, which must wrap its tasks).
 5.  **Index half:** Lucene query.
 
@@ -708,10 +718,11 @@ viewer is **[`otel-desktop-viewer`](https://github.com/CtrlSpice/otel-desktop-vi
 Jaeger-quality waterfall UI. No backend storage; ephemeral
 in-memory. Ideal for "do a thing, see the trace tree" debugging.
 
-**Setup (Windows):**
+**Setup:**
 
-1. Download the latest `otel-desktop-viewer_windows_amd64.zip` from
-   the project's GitHub releases page; extract anywhere on PATH.
+1. Download the viewer release asset for your OS and architecture from
+   the project's GitHub releases page (for example, `otel-desktop-viewer_windows_amd64.zip`
+   on Windows or the corresponding Linux/macOS archive); extract anywhere on PATH.
 2. Run `otel-desktop-viewer` from a terminal. By default it listens
    on `localhost:4317` (native OTLP) and `localhost:4318` (HTTP), and opens
    a browser tab at `localhost:8000`.
@@ -1000,10 +1011,9 @@ attachment starts at its captured boundary. Numeric run cursors remain a separat
 zero replays the retained tail even after eviction, with the run's existing snapshot primer.
 
 ### The Ring Buffer (`EventBuffer`)
-We maintain a circular buffer of the last 50 significant events in memory.
-*   **Endpoint:** `/api/debug/events`
-*   **Usage:** The UI polling this endpoint to show the "Activity Feed" in the Health tab.
-*   **Performance:** Zero allocation (reuses objects) to avoid GC pressure.
+`EventBuffer` retains the last 50 significant events in a `ConcurrentLinkedDeque`.
+*   **Endpoint:** `/api/debug/events` (debug tooling; the current frontend does not poll it).
+*   **Allocation:** Each added event is a new record; this is not an object-reuse buffer.
 
 ### Status as the primary health signal (`/api/status`)
 
@@ -1189,7 +1199,7 @@ Invoke-RestMethod -Uri http://localhost:33221/api/inference/status | ConvertTo-J
 
 Creates a ZIP bundle for bug reports and support diagnostics:
 
-- `install-state.json` — AI runtime installation state
+- Installation/policy/log files that exist at export time. The exporter still attempts optional `install-state.json`, but Install AI does not write it; failed/incompatible install attempts persist in `install-attempts.json`.
 - `settings.json` — current user settings
 - `policy/` — enterprise policy files (if applicable)
 - `gpu/capabilities.json` — NVIDIA GPU snapshot
@@ -1222,13 +1232,22 @@ Requires Logback backend (returns 501 with clear error on non-Logback runtimes).
 
 For dashboard trend visualization, `RrdMetricStore` provides fixed-size time-series storage using [RRD4J](https://github.com/rrd4j/rrd4j):
 
-**Curated metrics** (~15 high-value counters and gauges from the ~70+ total):
-- Index half: `documentsIndexed`, `searchesTotal`, `jobQueueDepth`, `pendingEmbeddings`, `switchBufferDepth`
-- Application API: `httpInflightRequests`
-- JVM: `heapUsedBytes`, `threadsLive`, `gcCollectionCount` (per-process)
-- AI/LLM: `intentSuccessTotal`, `summarySuccessTotal`, `llmQueueDepth`
-- IPC: *(none — `grpcReconnect` / `circuitBreakerRejected` went with the wire client stack at lane F items A9-A11; see the IPC metrics note above)*
-- GPU: `gpu.utilization.percent`, `gpu.memory.utilization.percent`
+**Curated metrics** come from `MetricDefinition.archivedTo(...)` declarations plus the
+residual `LEGACY_CURATED_METRICS` set in `RrdMetricStore`:
+
+- Index half: `worker.documents.indexed.total`, `worker.documents.indexed.rate_per_sec`,
+  `worker.searches.total`, `worker.job_queue.depth`, `worker.index.pending_embeddings`,
+  `worker.switch_buffer.depth`.
+- Application API: `head.http.inflight_requests` (catalog-declared).
+- JVM: heap-used/max bytes and live threads (catalog-declared; `head.jvm.*` / `worker.jvm.*`
+  prefixes are retained identifiers for the same Engine JVM, not separate processes).
+- AI/LLM: `llm.queue_depth` (legacy list). `intentSuccessTotal` and `summarySuccessTotal`
+  are not curated metric names.
+- GPU: `gpu.utilization.percent`, `gpu.memory.utilization.percent` (catalog-declared).
+
+The store is catalog-dependent: an index-half archive does not automatically make a metric
+available through the application API's time-series endpoint (see the health projection gaps above).
+Use `/api/debug/metrics/timeseries/available` to see that store's actual metric set.
 
 **Archives** (3-tier consolidation, fixed total size ~50KB):
 
@@ -1262,34 +1281,13 @@ Practical note:
 - raw status fields remain additive and unchanged; the policy change is in
   readiness interpretation and UI health warnings, not in telemetry collection
 
-## Perf evidence artifacts (EBv1 suites)
+## Retired performance evidence tooling
 
-> **Removed (tempdoc 638):** the scripts/perf/ EBv1 perf-suite was deleted.
+The `scripts/perf/` EBv1 perf-suite and its scenario-artifact writers were deleted in tempdoc 638.
+The former Claim A/B suite runners, schemas and baseline directories under `scripts/bench/` were
+removed in commit `a9c484f59` (2026-03-16); see [Benchmarking Architecture](20-benchmarking-architecture.md)
+for the surviving benchmark surfaces.
 
-The perf tooling treats telemetry + scenario outputs as **reviewable artifacts**, not just console logs:
-
-- **EvidenceBundle v1 (per scenario)**: `tmp/agent-evidence/<scenario>/<timestamp>/...`
-  - Includes `attachments/perf/perf-report.json` + `attachments/perf/perf-report.md` (schema v1 KPIs/SLOs)
-- **Suite summaries**: `tmp/agent-evidence/_summaries/perf-suite-*.{json,md}`
-
-### Standalone benchmark results (Claims A/B)
-
-Separate from EBv1, the benchmarking infrastructure writes results to:
-
-- **Claim A/B results**: `tmp/bench/claim-a/` and `tmp/bench/claim-b/`
-- **Suite summaries**: `tmp/bench/_summaries/claim-{a,b}-suite-*.{json,md}`
-- **Baselines**: `scripts/bench/baselines/`
-
-Result schema (`bench-result.v1`):
-- `time_to_searchable_ms`, `docs_per_s`, `mb_per_s`
-- `sentinel_validated` (searchability confirmation)
-- `machine_fingerprint`, `git_sha` for reproducibility
-- Schema definition: `scripts/bench/schemas/bench-result.v1.schema.json`
-
-See the bench runners under `scripts/bench/` for usage.
-
-### Scenario C outputs (EBv1)
-
-The `scenario_c_ux_indexing` scenario writes:
-- `attachments/perf/scenario-c-ux-indexing.json` (time_to_first_hit_ms, keystroke_to_paint_p50/p95)
-- `attachments/perf/ui-perf.json` (per-iteration UI timing samples used for percentiles)
+`EngineIndexBench` still writes standalone Claim A `result.json` output under `--out-dir`
+(default `tmp/bench/claim-a/`), including throughput and sentinel validation. This Java output
+survives independently of the deleted suite summaries, schemas and baselines.

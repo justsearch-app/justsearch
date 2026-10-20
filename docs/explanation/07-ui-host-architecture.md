@@ -15,7 +15,7 @@ JustSearch uses a "Sidecar" UI architecture. The "Backend" (`HeadlessApp`) and t
 *   **Class:** `io.justsearch.ui.HeadlessApp`
 *   **Technology:** Java 25 + Javalin (Lightweight Web Framework).
 *   **Port policy:** The resolved `justsearch.api.port` controls the listener. A persisted `UiSettings.apiPort` value is a typed desired setting at ordinal 300: null leaves other configuration sources in charge, `0` requests an ephemeral listener for the next process incarnation, and `1..65535` requests that fixed port. JVM properties and environment variables override the persisted setting at ordinals 500 and 400.
-*   **Role:** Provides the REST API for the UI. It holds the active state, composes the index half in the same Engine process, and handles AI orchestration via `AppFacade`.
+*   **Role:** Provides the REST API for the UI. It holds the active state, composes the index half in the same Engine process, and handles AI orchestration via `CoreServices`.
 *   **Startup Priority:** It attempts to start the `KnowledgeServer` first. If that fails (e.g., lock contention, missing JAR), it keeps the HTTP server up so the UI can render a deterministic error state:
     * `GET /api/status` includes `knowledgeServerStartError` and reports `indexState=ERROR`.
 *   **Port Disclosure:** Publishes the positive port actually bound by this process in the runtime manifest at `<dataDir>/runtime/manifest.json` (`head.apiPort`). It also prints `JUSTSEARCH_API_PORT=<port>` to stdout as human-readable output for scripts and shells (e.g. `run-headless-api.ps1`). The observed endpoint is separate from the persisted desired policy.

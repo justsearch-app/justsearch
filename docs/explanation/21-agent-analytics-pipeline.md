@@ -7,7 +7,7 @@ description: "Behavioral tracking pipeline for session and cost analysis and LLM
 
 # Agent Analytics Pipeline
 
-The agent analytics pipeline tracks behavioral patterns — how agents use tools, which files they re-read, when they make rapid re-edits, and how often they misuse Bash for file operations. It also estimates per-session costs from transcript token data and optionally evaluates task outcomes via LLM-as-judge.
+The agent analytics pipeline tracks behavioral patterns — how agents use tools, which files they re-read, when they make rapid re-edits, and how often they misuse Bash for file operations. It also estimates per-session costs from transcript token data and can mine process friction via a CLI-backed LLM judge. The task-outcome evaluation scripts are retired.
 
 All scripts live under `scripts/agent-analytics/`. All data lives under `tmp/agent-telemetry/` (gitignored). The composite process-hygiene score that once sat on top of the session reports is retired — what it measured, and why it cannot be re-measured, is recorded below under [Retired: process-hygiene scoring](#retired-process-hygiene-scoring).
 
@@ -29,69 +29,15 @@ All scripts live under `scripts/agent-analytics/`. All data lives under `tmp/age
 
 Until its retirement on 2026-10-05, the `hooks/export-session-env.mjs` `SessionStart` hook wrote `JUSTSEARCH_AGENT_SESSION_ID` into `CLAUDE_ENV_FILE` so that session attribution is available to downstream tooling. Session attribution now comes from one rule without hooks, `scripts/dev/lib/agent-identity.cjs` (Python: `scripts/jseval/jseval/agent_identity.py`, which calls `scripts/dev/agent-identity.mjs`): the caller's nearest harness process (Claude Code or Codex) is the session, and that harness's own variable (`CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`) is the label. `record-merge.mjs` uses that label and skips the link when there is none. The leftover `tmp/agent-telemetry/current-session-id` files are never read; `node scripts/dev/cleanup-legacy-identity.mjs` lists them (dry run by default).
 
-## Architecture
+## Current architecture
 
-```text
-Claude/Codex hooks ──> NDJSON event stream ──> Session reports ──> Trend reports
-                       (append-only)           (per session)       (on demand)
-                                                    └──> Outcome evaluations (LLM-as-judge, optional)
-```
+On-demand transcript readers and the harness-neutral session ledger feed cost, context and
+friction analysis. The optional local OTLP sink records harness telemetry; no hook runs these
+analysis commands automatically.
 
-### Storage
-
-```text
-tmp/agent-telemetry/
-  events.ndjson                       # Append-only hook event stream
-  costs.ndjson                        # Per-session cost estimates from transcript tokens
-  read-counts-{sessionId}.json        # Per-session read count cache (for compact-save.mjs)
-  edit-counts-{sessionId}.json        # Per-session edit count cache (for compact-save.mjs)
-  turn-count-{sessionId}.txt          # Per-session tool-call counter (dispatch.mjs, cleaned on session end)
-  otlp/                               # Native OTLP capture (otlp-sink.py), rotated at 20 MB per stream
-    traces.ndjson                     # Decoded spans — 14 archives kept
-    metrics.ndjson                    # Decoded metric points + gen_ai.usage twins — every archive kept (cost baseline)
-    logs.ndjson                       # Decoded log records VERBATIM, request bodies included — 2 archives kept (~1 GB/active day)
-    ledger.ndjson                     # Body-free projection of logs.ndjson — 90 archives kept (~1 MB/day)
-  sessions/
-    {sessionId}.json                  # Per-session analysis report — NO PRODUCER since tempdoc 930
-                                      # deleted analyze-session.mjs. `cost-session --all` still
-                                      # reads the directory listing to pick which sessions to cost,
-                                      # so it costs 0 on a checkout with no pre-930 reports.
-```
-
-## Event Capture
-
-Every NDJSON line:
-
-```json
-{
-  "schema_version": 1,
-  "ts": "2026-02-03T12:00:00.000Z",
-  "event": "pre_tool_use",
-  "session_id": "...",
-  "tool_name": "Read",
-  "tool_use_id": "toolu_...",
-  "tool_call_number": 42,
-  "input_summary": {
-    "file_path": "modules/ui-web/src/components/BrainView.tsx",
-    "has_offset": false,
-    "has_limit": false
-  }
-}
-```
-
-`tool_call_number` is a monotonically increasing per-session counter, tracked via file-based counters in `tmp/agent-telemetry/turn-count-{sessionId}.txt`. Counter files are cleaned up on `session_end`.
-
-Content is never stored. Tool inputs are summarized to analytics-relevant fields only:
-
-| Tool | Extract | Strip |
-|------|---------|-------|
-| Read | file_path, has_offset, has_limit | — |
-| Edit | file_path, old_string length, new_string length | content |
-| Write | file_path, content length | content |
-| Bash | command first 200 chars | full output |
-| Grep/Glob | pattern, path, output_mode | — |
-| Task | subagent_type, prompt length | full prompt |
-| mcp__* | tool name only | all inputs |
+The former hook → event stream → session/trend-report pipeline, its event schema and compact-save
+caches were retired with the hook layer on 2026-10-05 and the session-report layer in tempdoc 930.
+Old event/cache files under `tmp/agent-telemetry/` do not imply a live producer.
 
 ## Retired (930): the session-report layer
 
@@ -106,7 +52,7 @@ With `analyze-session.mjs` gone, the `agent-session-report.v1` schema has **no e
 field-level reader**, so the schema block that documented it is removed too — read it out of git
 history (`git show <pre-930>:docs/explanation/21-agent-analytics-pipeline.md`) if you need to parse
 a pre-930 store. `outcomes.ndjson`, `judge-outcomes.ndjson` and `session-index.json` likewise have
-no producer. What survives is the live half of the pipeline: the hook layer, the friction miners
+no producer. What survives is the live analysis half of the pipeline: the friction miners
 (`mine-friction.mjs`, `aggregate-friction.mjs`, `friction-timeline.mjs`, `signature-census.mjs`)
 and the cost→merge join (`baseline-economics.mjs`, `cost-session.mjs`, `record-merge.mjs`,
 `merge-links.mjs`) — the two instruments with a recorded decision behind them.
@@ -171,7 +117,7 @@ declare a sufficiency floor from what you intend to conclude before you collect 
 
 `context-attribution.mjs` classifies every content block in Claude Code transcript JSONL files by category: tool outputs (broken down by tool name), assistant text, thinking, user messages, and system messages. Uses chars/4 as a token estimate — sufficient for proportional analysis without a tokenizer.
 
-Key findings across real sessions (N=41): tool outputs consume 80–85% of context (median), with `Read` alone at ~51%. Directly actionable for tuning `intervene.mjs` read limits.
+Key findings across real sessions (N=41): tool outputs consume 80–85% of context (median), with `Read` alone at ~51%. The `intervene.mjs` hook that once consumed this finding was retired on 2026-10-05.
 
 ## Harness-neutral session ledger
 
@@ -179,9 +125,9 @@ Key findings across real sessions (N=41): tool outputs consume 80–85% of conte
 
 Two harnesses are covered: **`claude-code`** (`lib/ledger/claude-adapter.mjs`, wrapping `lib/transcript-store.mjs` discovery) and **`codex-cli`** (`lib/ledger/codex-adapter.mjs`, reading `~/.codex/sessions/**/rollout-*.jsonl` directly — Codex has no equivalent shared substrate module yet). `lib/ledger/index.mjs`'s `listCalls()` merges both. `lib/ledger/tool-roles.mjs` maps each harness's tool names onto a shared role vocabulary (`read`/`edit`/`shell`/`search`/`spawn`/`wait`/`web`/`other`) so a reader can compare "how much shell use" across harnesses without a tool-name switch per harness. The Codex adapter also exposes paired raw tool exchanges for attribution readers that need content-level proof. That view is not part of the neutral ledger and must be reduced to aggregate facts in memory; consumers must not persist its prompts, commands, or outputs.
 
-**The boundary rule (886 §10.4):** this library is machine-level (every project on the machine could use it), while the hooks/gates elsewhere in this pipeline are repo-level policy. Nothing under `lib/ledger/` may read `governance/`, `CLAUDE.md`, or `tmp/agent-telemetry` paths, or resolve a repo root via a relative climb — enforced by `lib/ledger/boundary.test.mjs`, not just documented here. `cache-efficiency.mjs` is the first migrated consumer (its file discovery now comes from `lib/ledger/claude-adapter.mjs`'s `listClaudeTranscriptFiles`); `lib/input-summarizer.mjs`, `lib/transcript-cost.mjs`, `baseline-economics.mjs`, and `context-attribution.mjs` migrated in 886 §12 PR 5a; `analyze-session.mjs`, `evaluate-session.mjs`, `friction-timeline.mjs`, `mine-friction.mjs`, and `overhead-taxonomy.mjs` migrated in PR 5b (below), completing this pipeline's "migrate the ONE reader you're already touching" convention across every hand-rolled `.claude/projects` walk (see `lib/transcript-store.mjs`'s own module doc). Two readers shelled out to the `claude` CLI for LLM-as-judge work at the time — `evaluate-session.mjs` (task-completion verdicts, deleted in 930) and `mine-friction.mjs` (process-friction mining) — that boundary is unaffected by either PR: discovery moved onto the shared substrate, but the actual judging call stays a Layer 4 concern (886 §12's layer split) neither PR touches.
+**The boundary rule (886 §10.4):** this library is machine-level (every project on the machine could use it), while the hooks/gates elsewhere in this pipeline are repo-level policy. Nothing under `lib/ledger/` may read `governance/`, `CLAUDE.md`, or `tmp/agent-telemetry` paths, or resolve a repo root via a relative climb — enforced by `lib/ledger/boundary.test.mjs`, not just documented here. `cache-efficiency.mjs` is the first migrated consumer (its file discovery now comes from `lib/ledger/claude-adapter.mjs`'s `listClaudeTranscriptFiles`); `lib/input-summarizer.mjs` was subsequently deleted with the hook layer on 2026-10-05; `analyze-session.mjs`, `evaluate-session.mjs`, `friction-timeline.mjs`, `mine-friction.mjs`, and `overhead-taxonomy.mjs` migrated in PR 5b (below), completing this pipeline's "migrate the ONE reader you're already touching" convention across every hand-rolled `.claude/projects` walk (see `lib/transcript-store.mjs`'s own module doc). Two readers shelled out to the `claude` CLI for LLM-as-judge work at the time — `evaluate-session.mjs` (task-completion verdicts, deleted in 930) and `mine-friction.mjs` (process-friction mining) — that boundary is unaffected by either PR: discovery moved onto the shared substrate, but the actual judging call stays a Layer 4 concern (886 §12's layer split) neither PR touches.
 
-**PR 5a (886 §12):** `lib/input-summarizer.mjs`'s hardcoded `switch (toolName)` in `summarizeInput` now dispatches on `roleFor('claude-code', name)` first, refined by name only where a role's members disagree on output shape (Edit vs Write; Grep vs Glob; WebSearch vs WebFetch) — byte-identical output, proven by a snapshot test captured from the pre-migration switch. `lib/transcript-cost.mjs`'s `PRICING` rows gained a `provider` column (`'anthropic'` for every current row — Codex CLI runs on subscription, not metered API tokens, so there is no verified per-token rate to record for it) and an exported `providerOf(model)` (fails closed to `null`, same matching rule as `findPricing`). `baseline-economics.mjs`'s hand-rolled `.claude/projects` walk (`discoverSessions`/`findSessionTranscript`) now calls `lib/transcript-store.mjs`'s `discoverProjectDirs`/`listSubagentPaths`; its definitional per-file `firstTranscriptTimestamp` scan moved to `lib/transcript-store.mjs` (imported back and re-exported, since `record-merge.mjs` depends on both `findSessionTranscript` and `DEFAULT_PROJECTS_ROOT` resolving from `baseline-economics.mjs`). `context-attribution.mjs` sources per-`tool_result` NAME resolution from `callsFromClaudeTranscript`'s `ToolEvent`s (replacing a private `tool_use_id`→name join), but deliberately keeps its own local, image-inclusive char computation rather than `ToolEvent.outputChars` — a parity run against this repo's real corpus found `outputChars` (built on the ledger's shared, text-only `extractToolResultText`) undercounts image-heavy tools by 84–99% (`mcp__claude-in-chrome__computer`, `browser_batch`, screenshot `Read`s), which would silently break the one thing this instrument measures — reproduce with `node context-attribution.mjs --all --top 15` against the real corpus (before/after `outputChars` substitution). See tempdoc 886 §12's "PR 5a outcome" paragraph for the full parity evidence.
+**PR 5a (886 §12):** The input summarizer migrated to ledger tool roles, then was deleted with the hook layer on 2026-10-05. `lib/transcript-cost.mjs`'s `PRICING` rows gained a `provider` column (`'anthropic'` for every current row — Codex CLI runs on subscription, not metered API tokens, so there is no verified per-token rate to record for it) and an exported `providerOf(model)` (fails closed to `null`, same matching rule as `findPricing`). `baseline-economics.mjs`'s hand-rolled `.claude/projects` walk (`discoverSessions`/`findSessionTranscript`) now calls `lib/transcript-store.mjs`'s `discoverProjectDirs`/`listSubagentPaths`; its definitional per-file `firstTranscriptTimestamp` scan moved to `lib/transcript-store.mjs` (imported back and re-exported, since `record-merge.mjs` depends on both `findSessionTranscript` and `DEFAULT_PROJECTS_ROOT` resolving from `baseline-economics.mjs`). `context-attribution.mjs` sources per-`tool_result` NAME resolution from `callsFromClaudeTranscript`'s `ToolEvent`s (replacing a private `tool_use_id`→name join), but deliberately keeps its own local, image-inclusive char computation rather than `ToolEvent.outputChars` — a parity run against this repo's real corpus found `outputChars` (built on the ledger's shared, text-only `extractToolResultText`) undercounts image-heavy tools by 84–99% (`mcp__claude-in-chrome__computer`, `browser_batch`, screenshot `Read`s), which would silently break the one thing this instrument measures — reproduce with `node context-attribution.mjs --all --top 15` against the real corpus (before/after `outputChars` substitution). See tempdoc 886 §12's "PR 5a outcome" paragraph for the full parity evidence.
 
 **PR 5b (886 §12, "second half" of PR 5)** — dated history; `analyze-session.mjs` and `evaluate-session.mjs` were deleted in 930, the rest of this paragraph still describes live code: `analyze-session.mjs`'s hand-rolled cwd→project-hash fallback (`estimateDataCompleteness`) now calls `baseline-economics.mjs`'s `findSessionTranscript` (itself transcript-store-backed since PR 5a); its `Edit`/`Write`/`NotebookEdit`/`Read` tool-name literals (subagent-transcript tool_use scan and the OTLP `read`-role checks) now dispatch on `roleFor('claude-code', name)` — except the headline `file_edits.total` OTLP filter, deliberately left as a literal `'Edit'` check, since widening it to the `edit` role would also count `Write` and change that report's own most-consumed metric, which was out of scope here. `evaluate-session.mjs`'s directory-scan fallback (`findTranscriptByDirectoryScan`) and `summarizeToolUse`'s `switch(name)` migrated the same way (role-first, refined by name only where Edit/Write, Grep/Glob, or Bash/PowerShell disagree in shape) — `resolveClaudeBin`/the `claude` spawn itself is untouched. `friction-timeline.mjs` and `mine-friction.mjs` drop their single hand-slugged `--project-dir` default in favor of `lib/transcript-store.mjs`'s `discoverProjectDirs` — an explicit `--project-dir` still narrows to one directory, but the default now unions every `/justsearch/i`-matching project dir on the machine (main checkout + every worktree), fixing a real gap: the old single-dir default could only ever resolve a session recorded under the exact worktree the reader happened to run from. `overhead-taxonomy.mjs` deleted its own private `firstTranscriptTimestamp` copy (byte-identical to `lib/transcript-store.mjs`'s own, confirmed before deleting) in favor of importing it — the fourth copy of that scan the PR 5a review had flagged as the one item still outstanding. `context-attribution.mjs` picked up three review nits: its `'(zip-mismatch)'` fallback now calls `addTo` once per folded `tool_result` (count previously stuck at 1 while `chars` already held the full sum); its zip-safety comment now states the two joins cannot disagree BY CONSTRUCTION (structurally identical predicates), rather than citing a corpus scan as proof; and a note documents that an orphan/forward-referenced tool_result is labelled `'(unknown)'` by the ledger adapter, not the bare `'unknown'` this module's pre-PR-5a private join used — the adapter's label is kept as the one source of truth. See tempdoc 886 §12's "PR 5b outcome" paragraph for the full parity evidence.
 
@@ -221,97 +167,28 @@ The `hooks/*.mjs` entry points were retired on 2026-10-05; the rows below are th
 | `friction-timeline.mjs` | Timeline view over `mine-friction.mjs` output — friction category counts/weights bucketed by session date (day/3day/week). Session-date resolution is `lib/transcript-store.mjs`-backed (`discoverProjectDirs`/`firstTranscriptTimestamp`, 886 §12 PR 5b). CLI: `--project-dir`, `--bucket`, `--include-excluded`. |
 | `mine-friction.mjs` | Judges PROCESS friction (wasted turns/tokens) via a condense-then-judge-via-`claude`-CLI pass (still shells out, untouched by PR 5b). Its task-completion sibling `evaluate-session.mjs` was deleted in tempdoc 930, so this is the lane's only judge. Transcript discovery is `lib/transcript-store.mjs`-backed (`discoverProjectDirs`, 886 §12 PR 5b); output cached per-session in `tmp/agent-telemetry/friction-results/`. CLI: `--limit`, `--concurrency`, `--project-dir`. |
 
-### Hook Configuration
+### Retired hook machinery
 
-Historical (the manifest and both projections were retired on 2026-10-05):
-`governance/agent-hooks.v1.json` was the binding authority. Claude's generator
-projected `.claude/settings.json`; Codex's generator projected a single adapter
-entry per supported event into `.codex/hooks.json`. The single adapter preserved
-manifest order because Codex otherwise ran same-event command handlers
-concurrently.
-
-Claude-specific behavior:
-- Hook entries across multiple event types
-- `export-session-env.mjs` runs first on `SessionStart` so later Bash commands inherit `JUSTSEARCH_AGENT_SESSION_ID`
-- Analytics hooks (`dispatch.mjs`) use `"async": true` — never block the agent
-- Intervention hooks (`intervene.mjs`, `repeat-guard.mjs`, `build-counter.mjs`) are synchronous with matchers — only fire for matched tool calls
-- `build-counter.mjs` is also wired synchronously on `PostToolUse` (Bash, gradlew) to record pass/fail — so the next `PreToolUse` check reads a fresh count (tempdoc 520 P0f closed the prior async-write/sync-read race)
-- `compact-restore.mjs` is wired only on `SessionStart`; recovery context is one-shot
-- 5s timeout for hot-path hooks; 30s for SessionEnd
-- **Kill switch:** `JUSTSEARCH_DISABLE_HOOKS=1` disables all session-affecting hooks via `hook-base.runHook` / `hooksDisabled` (tempdoc 520 P1c)
-
-Codex-specific behavior:
-
-- `apply_patch`, unified shell execution, and native agent events are normalized to the shared Edit/Write, Bash, and Agent matchers.
-- `PostToolUseFailure`, `CwdChanged`, and `InstructionsLoaded` have no Codex event equivalent and are not generated.
-- `subagent-model-guard` is an explicit semantic exclusion, not a silent no-op.
-- `compact-restore` injects one-shot recovery context directly and does not write a rule file in either harness.
-- The same `JUSTSEARCH_DISABLE_HOOKS=1` kill switch applies.
-
-### Hook Interaction
-
-Hooks fire in registration order. For Bash tool calls, the public chain is
-`publication-merge-guard.mjs` → `agent-spawn-build-hint.mjs` → conditional
-`build-counter.mjs` → `repeat-guard.mjs`. A maintainer's full local projection
-prepends asynchronous `dispatch.mjs` to that chain.
-If a sync hook exits 2 (block), subsequent hooks likely do not fire (short-circuit).
-
-For `SessionStart`, the public chain is `compact-restore.mjs` followed by the
-asynchronous agent-spawn sweep hint. A maintainer's full local projection adds
-`export-session-env.mjs`, asynchronous `dispatch.mjs`, `otlp-sink-ensure.mjs`,
-and the same sweep hint around `compact-restore.mjs`, in manifest order.
-
-Subagent attribution in phase 1 is parent-owned. `subagent-guide.mjs` includes the parent
-`session_id` and instructs subagents to pass `--session-id <parent-session-id>` when invoking
-maintained workflow wrappers or DAG runners.
-
-Known interaction design decisions:
-- **repeat-guard excludes build commands** (`/gradlew/i`). Without this, repeat-guard
-  blocks the 3rd consecutive build before build-counter reaches its failure threshold.
-  Build-counter has purpose-built one-shot advisory logic; repeat-guard defers to it.
-- **build-counter owns its state synchronously.** Its PostToolUse invocation records
-  the result before the next PreToolUse check; asynchronous dispatch telemetry is not
-  part of the guard's decision path.
-- **Parallel tool calls** produce race conditions on state files (last writer wins).
-  Practical impact is low — parallel calls are typically different tools.
-
-### Process Overhead
-
-The public projection starts one synchronous `repeat-guard.mjs` process for every
-PreToolUse event, plus matcher-specific processes such as the Bash publication
-guard, build hint, and conditional Gradle build counter. The full local projection
-adds one asynchronous `dispatch.mjs` process to every PreToolUse event. Hook count
-therefore depends on the projection and tool matcher; startup cost should be
-measured on the active host rather than inferred from a fixed per-call estimate.
-
-### Error Isolation
-
-`dispatch.mjs` wraps each event handler in try/catch. A crash in one tool type's summarizer must not prevent other events from recording. Errors are logged to `tmp/agent-telemetry/errors.log`, not stderr.
+Hook configuration, dispatch, interventions, compact-save/restore and their process chains were
+removed at agent-system adoption on 2026-10-05 (tempdoc 965). Their ordering, kill switch,
+startup costs and dispatch error isolation no longer describe runnable tooling.
 
 ## Design Constraints
 
-- **No external services.** All data local, file-based, under `tmp/`.
+- **Local artifacts.** Analysis artifacts are file-based under `tmp/`; optional CLI-backed LLM judging can use the CLI's configured remote provider.
 - **No new dependencies.** Uses Node.js stdlib only.
-- **Async hooks for analytics, sync only for intervention.**
 - **Transcript parsing is best-effort.** ~50% of subagent transcripts are cleaned up by Claude Code. `transcript_coverage` quantifies the gap.
-- **Manual fallback for analysis.** `SessionEnd` may not fire on crashes — analyzers work as CLI tools.
+- **On-demand analysis.** Surviving analyzers run as CLI tools.
 
-## Risks
+## Retired hook/report risks
 
-| Risk | Severity | Mitigation |
-|------|----------|-----------|
-| Hook stops firing silently ([#6305](https://github.com/anthropics/claude-code/issues/6305)) | Medium | `data_completeness` detects missing events |
-| Transcript cleanup eliminates subagent data (~50%) | Medium | `transcript_coverage` quantifies; accepted |
-| SessionStart hooks break stdin on Windows ([#23083](https://github.com/anthropics/claude-code/issues/23083)) | Medium | Monitor |
-| 100% CPU hang with parallel instances + hooks ([#22172](https://github.com/anthropics/claude-code/issues/22172)) | Medium | Avoid parallel Claude Code instances |
-| `intervene.mjs` Node startup adds latency (30-80ms per Read) | Low | Acceptable; scoped via matcher |
-| Event rotation drops history a report was built from | Medium | Skip-if-degraded guard in `writeReport()`; rotation limit 10 MB |
-| Memory pressure from large session analysis | Low | Fine at 50+ sessions; may need streaming at 100+ |
+The hook-firing, intervention-latency and `writeReport()` degradation guards documented here
+belonged to the hook/session-report layers removed on 2026-10-05 and in tempdoc 930. They are
+not mitigations in the current on-demand tools.
 
 ## Known Limitations
 
 - **Self-monitoring paradox.** The agent exhibiting waste is also the one reading pipeline output. It was mitigated by always-loaded rules rather than mid-session analytics reads; since agent-system adoption the project knowledge carries that role.
-- **intervene.mjs effectiveness is untestable.** Analytics capture pre-intervention state. We know the hook fires but can't directly measure context savings.
 - **There is no composite quality number for a session.** The process-hygiene score that used to supply one is retired; the reasoning and its measurement are in [Retired: process-hygiene scoring](#retired-process-hygiene-scoring). Do not reintroduce one without reading that section first.
 
 ## Test Suite

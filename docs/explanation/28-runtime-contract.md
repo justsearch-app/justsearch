@@ -6,7 +6,7 @@ description: The JustSearch Runtime Contract — the small, versioned local surf
 # The JustSearch Runtime Contract
 
 JustSearch's public center is a **reusable local knowledge runtime that AI
-agents can target**. The Windows desktop app is the runtime's **first-party
+agents can target**. The desktop app is the runtime's **first-party
 reference client** — it demonstrates the runtime, it does not define it.
 
 External tools need *one stable object* to build against, not a bundle of
