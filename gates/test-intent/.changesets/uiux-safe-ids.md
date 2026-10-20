@@ -48,7 +48,7 @@ Review history: the independent audit rejected the batch-name preservation citat
 
 Review history: the latest acceptance rejection identified the missing batch/file-history scope amendment in the batch-name preservation entry. That entry, the generic undo and additional file-history device-name entries, and the batch-journal enumeration entry now cite the exact verifier-1 amendment as a delegated choice. The other batch/file-history entries already cite it. Existing review records and execution evidence remain unchanged.
 
-Review history: the third source rework adds the verifier-2 Windows-name and S9.2 ordering amendments, and the agreed N9.1 logging amendment, as delegated choices. An assertion-by-assertion sweep also adds the single-plain-name, preservation and invalid-name definitions where needed. Assertions whose exact expectations are not stated by a cited source or the agreed text are listed as open in the external sweep table; no source is invented for them. Product code, tests, execution evidence and review records remain unchanged. The source-sweep amendment now supplies the refusal signal (O1), unsafe-request error form (O2), absent-id no-op and legacy route behavior (O3/O4), and backup skipped-count field (O5); each affected entry cites its exact delegated choice, and the sweep has no remaining open source gaps.
+Review history: the third source rework adds the verifier-2 Windows-name and S9.2 ordering amendments, and the agreed N9.1 logging amendment, as delegated choices. An assertion-by-assertion sweep also adds the single-plain-name, preservation and invalid-name definitions where needed. Assertions whose exact expectations are not stated by a cited source or the agreed text are listed as open in the external sweep table; no source is invented for them. Product code, tests, execution evidence and review records remain unchanged. The source-sweep amendment now supplies the refusal signal (O1), unsafe-request error form (O2), absent-id no-op and legacy route behavior (O3/O4), and backup skipped-count field (O5); each affected entry cites its exact delegated choice, and the sweep has no remaining open source gaps. The latest acceptance and audit rejected the absent-ids choice because it incorrectly described blank-id dispatch and approval as prior behavior. All four citations now quote the corrected N9.3 absent-ids bullet verbatim; entry 11 remains repaired, and the sweep identifies its blank-to-absent normalization as the repair. The sweep also distinguishes preserved absent-field responses from blank-id normalization. The logging and source-sweep amendment headers now carry the agreed corrected times, 13:57 and 14:06. Every agreed-file delegated choice was checked verbatim; the existing restore-notice choice remains separately documented as absent from that file. Product code, tests, execution evidence and review records remain unchanged.
 
 ```json
 {
@@ -161,7 +161,7 @@ Review history: the third source rework adds the verifier-2 Windows-name and S9.
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
-          "choice": "N9.3 absent ids: appending a search event without a conversation id (null or blank) does nothing and returns null, as before; a request whose optional id is blank or absent gets exactly the status, dispatch, approval call and wording it got before.",
+          "choice": "N9.3 absent ids: appending a search event without a conversation id (null or blank) does nothing and returns null, as before; a request whose optional id is blank gets exactly what the same request with the id absent gets (the blank id reaches approval and dispatch as absent), and a request with the id absent gets exactly what it got before.",
           "label": "agent choice"
         }
       ],
@@ -473,7 +473,7 @@ Review history: the third source rework adds the verifier-2 Windows-name and S9.
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
-          "choice": "N9.3 absent ids: appending a search event without a conversation id (null or blank) does nothing and returns null, as before; a request whose optional id is blank or absent gets exactly the status, dispatch, approval call and wording it got before.",
+          "choice": "N9.3 absent ids: appending a search event without a conversation id (null or blank) does nothing and returns null, as before; a request whose optional id is blank gets exactly what the same request with the id absent gets (the blank id reaches approval and dispatch as absent), and a request with the id absent gets exactly what it got before.",
           "label": "agent choice"
         }
       ],
@@ -502,7 +502,7 @@ Review history: the third source rework adds the verifier-2 Windows-name and S9.
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
-          "choice": "N9.3 absent ids: appending a search event without a conversation id (null or blank) does nothing and returns null, as before; a request whose optional id is blank or absent gets exactly the status, dispatch, approval call and wording it got before.",
+          "choice": "N9.3 absent ids: appending a search event without a conversation id (null or blank) does nothing and returns null, as before; a request whose optional id is blank gets exactly what the same request with the id absent gets (the blank id reaches approval and dispatch as absent), and a request with the id absent gets exactly what it got before.",
           "label": "agent choice"
         }
       ],
@@ -611,7 +611,7 @@ Review history: the third source rework adds the verifier-2 Windows-name and S9.
           "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
           "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
-          "choice": "N9.3 absent ids: appending a search event without a conversation id (null or blank) does nothing and returns null, as before; a request whose optional id is blank or absent gets exactly the status, dispatch, approval call and wording it got before.",
+          "choice": "N9.3 absent ids: appending a search event without a conversation id (null or blank) does nothing and returns null, as before; a request whose optional id is blank gets exactly what the same request with the id absent gets (the blank id reaches approval and dispatch as absent), and a request with the id absent gets exactly what it got before.",
           "label": "agent choice"
         }
       ],
