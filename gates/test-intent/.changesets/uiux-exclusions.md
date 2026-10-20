@@ -343,3 +343,14 @@ checks are not claimed. No acceptance record is authored here.
   "note": "Both EX4 entries cite the pass-2 amendment 'Separately verify honest Preview/Apply outcomes for unindexed, missing, unreadable and offline entries', but no listed check exercises unindexed, missing, unreadable or offline entries (live: Preview counts an unindexed file, omits an unreadable one Apply removes, and reports 1 of 2 roots with no unchecked-scope message). EN1 cites 'existing pattern syntax' yet no check covers a list saved before the change; live, a before-state-saved list containing '[legacy' stops boot walk, watcher and periodic check on the candidate."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-p5qzauy2",
+  "verdict": "reject",
+  "digest": "sha256:695071faadbd875846fdd20fcea90847447eb6c3988aa4b7ac9dc70da31b0d6b",
+  "note": "Evidence re-run reproduces: 19 repaired checks fail on f9bd104d2 (assertion) and pass; 9 AX checks fail on 8cf789758 (assertion), not the base; 3 editor AX/AX2 checks fail on f9bd104d2; 10 preserved pass before and after. Reject: (1) two pre-existing tests are red with no entry: SettingsV2ProjectionTest.projectsEveryStoredFieldWithoutTrimmingPaths (invalidExcludePatterns [] vs null) and WorkerScanOpsRecordedTest.malformedRecordedGlobRefusesBeforeAnyQueueOrLedgerEffect; both pass on f9bd104d2. (2) EN1 names operator overrides as preserved, but no check covers a malformed JUSTSEARCH_UI_EXCLUDE_PATTERNS; live, the candidate then indexes nothing (boot walk, watcher, ingest fail), f9bd104d2 indexes normally."
+}
+```
