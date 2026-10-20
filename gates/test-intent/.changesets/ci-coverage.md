@@ -374,3 +374,13 @@ Independent verification remains outstanding. No acceptance record is authored h
   "note": "Entries 1 and 3 expand Windows tags and CI execution coverage; Adaptation requires the whole oracle, including tags and conditions, to be kept. Reclassify the new coverage and retain separate adaptations."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "ae1dc1409c1bf4f02",
+  "verdict": "accept",
+  "digest": "sha256:1c640b967fa01079c80ef38dbcdb226536aede1f0556e2f342022325efee8b24"
+}
+```
