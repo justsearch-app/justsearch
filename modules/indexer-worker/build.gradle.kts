@@ -201,7 +201,10 @@ tasks.register<Test>("queueScaleEvidence") {
     excludeTags.remove("evidence")
     includeTags("evidence")
   }
-  filter { includeTestsMatching("*QueueScaleEvidenceTest") }
+  filter {
+    includeTestsMatching("*QueueScaleEvidenceTest")
+    includeTestsMatching("*JobCountsTest")
+  }
   maxHeapSize = "1g"
   maxParallelForks = 1
   jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED",

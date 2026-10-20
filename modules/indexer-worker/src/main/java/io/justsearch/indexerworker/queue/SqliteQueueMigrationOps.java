@@ -115,6 +115,7 @@ final class SqliteQueueMigrationOps {
         }
       }
       ensureV6LedgerPrivacySchema(conn);
+      reconcileJobCounts(conn);
       setSchemaVersion(conn, targetVersion);
       conn.commit();
       transactionEnded = true;
@@ -364,7 +365,38 @@ final class SqliteQueueMigrationOps {
         addColumnIfMissing(conn, "ingestion_root", SqliteSchema.MIGRATE_V21_TO_V22_INGESTION_ROOT);
         log.info("V21 to V22: Persisted root-relative ingestion policy boundaries");
       }
+      case 23 -> {
+        try (Statement stmt = conn.createStatement()) {
+          for (String sql : SqliteSchema.MIGRATE_V22_TO_V23) stmt.execute(sql);
+        }
+        log.info("V22 to V23: Added transactional job counts and claim/readiness indexes");
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
+    }
+  }
+
+  /** One aggregate at open repairs drift inside the migration transaction, before readers attach. */
+  private static void reconcileJobCounts(Connection conn) throws SQLException {
+    record Counts(long n, long bytes, long unknown) {}
+    var actual = new java.util.HashMap<String, Counts>();
+    var kept = new java.util.HashMap<String, Counts>();
+    try (var stmt = conn.createStatement(); var rows = stmt.executeQuery(
+        "SELECT state,COUNT(*),COALESCE(SUM(size_bytes),0),SUM(size_bytes IS NULL) FROM jobs GROUP BY state")) {
+      while (rows.next()) actual.put(rows.getString(1), new Counts(rows.getLong(2),rows.getLong(3),rows.getLong(4)));
+    }
+    try (var stmt = conn.createStatement(); var rows = stmt.executeQuery(
+        "SELECT state,n,known_bytes,unknown_size FROM job_counts WHERE n<>0 OR known_bytes<>0 OR unknown_size<>0")) {
+      while (rows.next()) kept.put(rows.getString(1), new Counts(rows.getLong(2),rows.getLong(3),rows.getLong(4)));
+    }
+    if (actual.equals(kept)) return;
+    log.warn("Repairing job count drift at open: kept={}, actual={}", kept, actual);
+    try (var stmt = conn.createStatement()) { stmt.executeUpdate("DELETE FROM job_counts"); }
+    try (var insert = conn.prepareStatement("INSERT INTO job_counts VALUES(?,?,?,?)")) {
+      for (var entry : actual.entrySet()) {
+        insert.setString(1,entry.getKey()); insert.setLong(2,entry.getValue().n());
+        insert.setLong(3,entry.getValue().bytes()); insert.setLong(4,entry.getValue().unknown());
+        insert.executeUpdate();
+      }
     }
   }
 

@@ -633,12 +633,8 @@ public class IndexingLoop implements Closeable {
    * WorkerSignalBus.hasPendingIngest()} (tempdoc 798), memoized for {@link
    * #PENDING_INGEST_PROBE_TTL_MS}.
    *
-   * <p>Two tiers, cheapest first. {@link JobQueue#queueDepth()} is a {@code COUNT(*) WHERE state
-   * IN ('PENDING','PROCESSING')} served by {@code idx_jobs_state}, so the steady state — an empty
-   * ingest lane while backfill drains — costs one indexed count. Only when that is non-zero is
-   * {@link JobQueue#jobStateCounts()} consulted, which is the precise answer (PENDING-ready only:
-   * a job still in retry backoff cannot be claimed, so yielding backfill for it would buy
-   * nothing) but a full scan of {@code jobs} including DONE/FAILED rows.
+   * <p>The queue answers with indexed existence reads. Only runnable PENDING work yields
+   * backfill; retry-waiting rows do not, and the answer is refreshed after the short probe TTL.
    */
   private boolean hasPendingIngestWork() {
     long now = System.currentTimeMillis();
@@ -646,7 +642,7 @@ public class IndexingLoop implements Closeable {
       return pendingIngestCached;
     }
     boolean pending =
-        jobQueue.queueDepth() > 0 && jobQueue.jobStateCounts().pendingReadyCount() > 0;
+        jobQueue.hasPendingIngestWork();
     pendingIngestCached = pending;
     pendingIngestProbedAtMs = now;
     return pending;
@@ -699,6 +695,7 @@ public class IndexingLoop implements Closeable {
         List<JobQueue.IndexJob> jobs = jobQueue.pollPending(pacing().pollBatchSize());
 
         if (jobs.isEmpty()) {
+          if (jobQueue.pollPendingBudgetExhausted()) continue;
           // No work to do - log batch summary if we just finished one
           if (currentState == LoopState.RUNNING && batchStats.hasWork()) {
             long elapsed = batchStats.elapsedMillis(System.currentTimeMillis());

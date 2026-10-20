@@ -10,6 +10,9 @@ import static org.junit.jupiter.api.Assertions.fail;
 import io.justsearch.app.services.worker.RemoteIndexingJobsBridge;
 import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.indexerworker.loop.IndexingLoop;
+import io.justsearch.indexerworker.ingest.IngestionOutcome;
+import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
+import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
 import io.justsearch.ipc.IndexingJobsFrame;
 import io.justsearch.ipc.IndexingJobsSnapshot;
 import io.justsearch.ipc.IndexingJobsDelta;
@@ -33,7 +36,7 @@ import org.junit.jupiter.api.TestInstance;
 
 /**
  * Run with :modules:indexer-worker:queueScaleEvidence. Each Q gate can be selected with --tests.
- * Q4–Q6 are intentionally red until the status/claim assignment; they are never default tests.
+ * Evidence-tagged checks are never run by the default test task.
  * Uses real SQLite queues and the real head bridge, without starting an Engine or dev stack.
  */
 @Tag("evidence")
@@ -298,64 +301,182 @@ final class QueueScaleEvidenceTest {
   }
 
   @Test
-  void q6ClaimDeniedRetryHeadAndTimestampTies() throws Exception {
-    try (var queue = openCopy(backlog, "q6")) {
-      Runnable poll = () -> {
-        var batch = queue.pollPending(16);
-        assertEquals(16, batch.size());
-        for (var job : batch) {
-          assertTrue(job.scanId() == null || !"denied-walk".equals(job.scanId()), "denied row claimed");
-          assertTrue(Integer.parseInt(job.path().getFileName().toString().substring(0, 7)) > 60_000,
-              "retry-waiting or denied head claimed");
-          queue.markDone(job.path());
-        }
+  void q5PendingIngestProbeHistoryReadyAndRetryWaiting() throws Exception {
+    try (var queue = openCopy(history, "q5-history")) {
+      // Run the actual loop method, clearing only its 250ms answer cache between measurements.
+      var loop = org.mockito.Mockito.mock(IndexingLoop.class, org.mockito.Mockito.CALLS_REAL_METHODS);
+      setField(loop, "jobQueue", queue);
+      var probe = IndexingLoop.class.getDeclaredMethod("hasPendingIngestWork");
+      probe.setAccessible(true);
+      assertEquals(true, probe.invoke(loop));
+      var coldProbe = (Runnable) () -> {
+        try {
+          setField(loop, "pendingIngestProbedAtMs", 0L);
+          probe.invoke(loop);
+        } catch (ReflectiveOperationException e) { throw new IllegalStateException(e); }
       };
-      // Time only pollPending, with completion outside its measured interval.
-      var timings = new long[40];
-      for (int i = 0; i < timings.length; i++) {
-        long start = System.nanoTime();
-        var batch = queue.pollPending(16);
-        timings[i] = System.nanoTime() - start;
-        assertEquals(16, batch.size());
-        for (var job : batch) {
-          assertNotEquals("denied-walk", job.scanId());
-          queue.markDone(job.path());
-        }
-      }
+      double ready = p95(coldProbe);
       var conn = (Connection) field(queue, "connection");
       try (var stmt = conn.createStatement()) {
-        stmt.executeUpdate("UPDATE jobs SET last_updated=1 WHERE path IN (SELECT path FROM jobs WHERE state='PENDING' AND scan_id IS NULL AND retry_after IS NULL ORDER BY path LIMIT 100000)");
+        stmt.executeUpdate("UPDATE jobs SET retry_after=4000000000000 WHERE state='PENDING'");
       }
-      poll.run();
-      for (int i = 0; i < timings.length; i++) {
-        long start = System.nanoTime();
-        var batch = queue.pollPending(16);
-        long elapsed = System.nanoTime() - start;
-        timings[i] = Math.max(timings[i], elapsed);
-        assertEquals(16, batch.size());
-        for (var job : batch) queue.markDone(job.path());
-      }
-      Arrays.sort(timings);
-      double ms = timings[37] / 1e6;
-      System.out.printf("Q6 claim p95 (head + ties)=%.3fms%n", ms);
-      assertTrue(ms < 10, "Q6 pollPending(16) exceeds 10ms p95");
-      long drained = 40L * 16 + 16 + 40L * 16;
-      while (true) {
-        var batch = queue.pollPending(256);
-        if (batch.isEmpty()) break;
-        for (var job : batch) {
-          assertNotEquals("denied-walk", job.scanId());
-          assertTrue(Integer.parseInt(job.path().getFileName().toString().substring(0, 7)) > 60_000,
-              "backoff or denied row claimed while draining");
-          queue.markDone(job.path());
-        }
-        drained += batch.size();
-      }
-      assertEquals(640_000, drained, "every eligible row must drain without starvation");
-      assertEquals(60_000, queue.jobStateCountsStrict().pendingCount());
-      assertEquals(16, queue.jobStateCountsStrict().processingCount());
-      System.out.printf("Q6 drained all %d eligible rows; denied/backoff rows remain pending%n", drained);
+      setField(loop, "pendingIngestProbedAtMs", 0L);
+      assertEquals(false, probe.invoke(loop));
+      double waiting = p95(coldProbe);
+      System.out.printf("Q5 F2 ready=%.3fms retry-waiting=%.3fms p95%n", ready, waiting);
+      assertTrue(ready < 1 && waiting < 1, "Q5 cold pending probe exceeds 1ms");
     }
+  }
+
+  @Test
+  void q6ClaimDeniedRetryHeadAndTimestampTies() throws Exception {
+    measureClaims(backlog, false, 640_000, 10_000);
+    measureClaims(backlog, true, 640_000, 10_000);
+    measureClaims(history, false, 1_000, 0);
+  }
+
+  private void measureClaims(Path fixture, boolean ties, int eligible, int denied) throws Exception {
+    int scanBudget = 16 + 256;
+    int maxPolls = (eligible + 15) / 16 + (denied + scanBudget - 1) / scanBudget + 8;
+    try (var queue = openCopy(fixture, ties ? "q6-ties" : "q6");
+        var timing = new ClaimTimings(queue,maxPolls)) {
+      if (ties) {
+        try (var stmt = ((Connection) field(queue,"connection")).createStatement()) {
+          stmt.executeUpdate("UPDATE jobs SET last_updated=0 WHERE path IN (SELECT path FROM jobs "
+              + "WHERE state='PENDING' AND scan_id IS NULL AND retry_after IS NULL ORDER BY path LIMIT 100000)");
+        }
+      }
+
+      var returned = new java.util.HashSet<String>();
+      String previous = null;
+      long previousUpdated = Long.MIN_VALUE;
+      int polls = 0, empty = 0;
+      while (returned.size() < eligible && polls < maxPolls) {
+        var batch = timing.pollPending();
+        polls++;
+        if (batch.isEmpty()) empty++;
+        for (var job : batch) {
+          String path = job.path().toString();
+          assertTrue(returned.add(path), "row returned twice: " + path);
+          assertNotEquals("denied-walk", job.scanId(), "denied row claimed");
+          int number = Integer.parseInt(job.path().getFileName().toString().substring(0,7));
+          if (denied > 0) assertTrue(number > 60_000, "denied/backoff row claimed");
+          long updated = ties && number <= 160_000 ? 0 : number;
+          assertTrue(updated > previousUpdated || (updated == previousUpdated
+              && (previous == null || path.compareTo(previous) > 0)), "claim order within/across batches");
+          previous = path; previousUpdated = updated;
+
+        }
+        completeClaims(queue, batch);
+        // Fail a slow baseline before spending hours draining it; all candidate polls remain timed.
+        if (polls == 128) timing.assertLatency(fixture.getFileName()+" ties="+ties);
+      }
+      assertEquals(eligible,returned.size(), "all eligible rows drain within " + maxPolls + " polls");
+      timing.assertLatency(fixture.getFileName()+" ties="+ties);
+      assertEquals(denied > 0 ? 60_000 : 0, queue.jobStateCountsStrict().pendingCount());
+      assertEquals(denied > 0 ? 16 : 0, queue.jobStateCountsStrict().processingCount());
+      System.out.printf("Q6 %s ties=%s drained=%d polls=%d bound=%d empty=%d scanBudget=%d%n",
+          fixture.getFileName(),ties,returned.size(),polls,maxPolls,empty,scanBudget);
+    }
+  }
+
+  private static void completeClaims(SqliteJobQueue queue, List<JobQueue.IndexJob> batch) {
+    queue.markDoneTransitions(batch.stream().map(job -> new JobQueue.IngestionLedgerTransition(job, null)).toList(),
+        IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS", IngestionRetryPolicy.NONE));
+  }
+
+  @Test
+  void q6RetryDueWaitingAndInterleaved() throws Exception {
+    int samples = 512;
+    for (String mode : List.of("all-due", "all-waiting", "interleaved")) {
+      try (var queue = openCopy(backlog, "q6-" + mode);
+          var timing = new ClaimTimings(queue,samples)) {
+        try (var stmt = ((Connection) field(queue,"connection")).createStatement()) {
+          String retry = switch (mode) {
+            case "all-due" -> "0";
+            case "all-waiting" -> "4000000000000";
+            default -> "CASE WHEN last_updated%2=0 THEN 0 ELSE 4000000000000 END";
+          };
+          stmt.executeUpdate("UPDATE jobs SET scan_id=NULL,walk_seen_epoch=NULL,retry_after=" + retry + " WHERE state='PENDING'");
+        }
+
+        var returned = new java.util.HashSet<Path>();
+        int previous = 0;
+        for (int poll = 0; poll < samples + 32; poll++) {
+          if (poll == 32) timing.reset();
+          var batch = timing.pollPending();
+          assertEquals(mode.equals("all-waiting") ? 0 : 16, batch.size());
+          assertEquals(false,queue.pollPendingBudgetExhausted());
+          for (var job : batch) {
+            assertTrue(returned.add(job.path()),"row claimed twice");
+            int number = Integer.parseInt(job.path().getFileName().toString().substring(0,7));
+            assertTrue(number > previous,"retry source preserves age/path order");
+            if (mode.equals("interleaved")) assertEquals(0,number%2,"future retry claimed");
+            previous=number;
+          }
+          completeClaims(queue,batch);
+        }
+        timing.assertLatency("retry "+mode+" pending=700000");
+      }
+    }
+  }
+
+  /** Test-only commit interception leaves SQLite's WAL and durability settings untouched. */
+  private static final class ClaimTimings implements AutoCloseable {
+    private final SqliteJobQueue queue;
+    private final Connection original;
+    private final long[] wholePoll;
+    private final long[] selection;
+    private int size;
+    private long commitNanos;
+
+    ClaimTimings(SqliteJobQueue queue,int samples) throws ReflectiveOperationException {
+      this.queue=queue;
+      original=(Connection)field(queue,"connection");
+      wholePoll=new long[samples];
+      selection=new long[samples];
+      var observed=(Connection)java.lang.reflect.Proxy.newProxyInstance(Connection.class.getClassLoader(),
+          new Class<?>[]{Connection.class},(proxy,method,args)->{
+            boolean commit=method.getName().equals("commit");
+            long start=commit?System.nanoTime():0;
+            try {return method.invoke(original,args);}
+            catch(java.lang.reflect.InvocationTargetException failure) {throw failure.getCause();}
+            finally {if(commit)commitNanos+=System.nanoTime()-start;}
+          });
+      setField(queue,"connection",observed);
+    }
+
+    List<JobQueue.IndexJob> pollPending() {
+      commitNanos=0;
+      long start=System.nanoTime();
+      var batch=queue.pollPending(16);
+      long elapsed=System.nanoTime()-start;
+      // Conservative selection bound: all poll work except JDBC commit, including the
+      // claim UPDATE, cursor publication and ownership bookkeeping as well as reads/merge.
+      wholePoll[size]=elapsed;
+      selection[size]=elapsed-commitNanos;
+      size++;
+      return batch;
+    }
+
+    void reset() {size=0;}
+
+    void assertLatency(String label) {
+      double selectionMs=percentile(selection,size);
+      double wholeMs=percentile(wholePoll,size);
+      System.out.printf("Q6 %s selection p95=%.3fms whole-poll p95=%.3fms polls=%d%n",label,selectionMs,wholeMs,size);
+      assertAll(
+          ()->assertTrue(selectionMs<10,"Q6 "+label+" selection excluding commit exceeds 10ms p95"),
+          ()->assertTrue(wholeMs<20,"Q6 "+label+" whole poll including commit exceeds 20ms p95"));
+    }
+
+    private static double percentile(long[] times,int count) {
+      long[] sorted=Arrays.copyOf(times,count);
+      Arrays.sort(sorted);
+      return sorted[Math.max(0,(int)Math.ceil(count*.95)-1)]/1e6;
+    }
+
+    @Override public void close() throws ReflectiveOperationException {setField(queue,"connection",original);}
   }
 
   @Test
@@ -388,7 +509,13 @@ final class QueueScaleEvidenceTest {
         assertEquals(expectedCounts, queue.jobStateCountsStrict());
         assertEquals(expectedCounts, queue.jobStateCounts());
         assertEquals(expectedBytes, queue.pendingBytes());
-        assertEquals(expectedClaim, queue.pollPending(16).stream().map(job -> job.path().toString()).toList(),
+        var migratedClaims = new ArrayList<String>();
+        int maxClaimPolls = (10_000 + 255) / 256 + 8;
+        for (int poll = 0; poll < maxClaimPolls && migratedClaims.size() < 16; poll++) {
+          migratedClaims.addAll(queue.pollPending(16 - migratedClaims.size()).stream()
+              .map(job -> job.path().toString()).toList());
+        }
+        assertEquals(expectedClaim, migratedClaims,
             "claim order and eligibility must survive migration");
       }
       if (sourceVersion < SqliteSchema.TARGET_VERSION) {
@@ -413,6 +540,9 @@ final class QueueScaleEvidenceTest {
           queue.open();
           assertEquals(expectedCounts, queue.jobStateCountsStrict());
           assertEquals(before, digest((Connection) field(queue, "connection"), columns));
+          assertEquals(SqliteSchema.TARGET_VERSION,version((Connection) field(queue,"connection")));
+          System.out.printf("Q12 v%d crash exit=74 rollback version=%d, saved fields unchanged; reopen v%d counts and fields exact%n",
+              sourceVersion,sourceVersion,SqliteSchema.TARGET_VERSION);
         }
       }
     }

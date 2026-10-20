@@ -138,7 +138,8 @@ final class QueueProjectionCommitTest {
       queue.open();
       AtomicReference<JobQueue.IndexJob> claimed = new AtomicReference<>();
       queue.changeStream().subscribe(delta -> {
-        if (delta instanceof IndexingJobChangeFeed.Delta.Insert) {
+        if (delta instanceof IndexingJobChangeFeed.Delta.Insert
+            || delta instanceof IndexingJobChangeFeed.Delta.Update update && update.row().state().equals("PENDING")) {
           claimed.set(queue.pollPending(1).getFirst());
         }
       });

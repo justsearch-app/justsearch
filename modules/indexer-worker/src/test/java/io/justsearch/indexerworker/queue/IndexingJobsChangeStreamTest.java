@@ -104,7 +104,8 @@ final class IndexingJobsChangeStreamTest {
       assertEquals(2, rows.size(), "cache must track window rows, not replacement history: " + i);
     }
     assertEquals(1_000, sub.deltas.stream()
-        .filter(d -> d instanceof IndexingJobChangeFeed.Delta.Insert).count());
+        .filter(d -> d instanceof IndexingJobChangeFeed.Delta.Update update
+            && update.row().state().equals("PENDING")).count());
     assertTrue(sub.deltas.stream().anyMatch(d -> d instanceof IndexingJobChangeFeed.Delta.Update));
     var reverse = cachedRows(stream, "pathHashToRowId");
     assertEquals(2, reverse.size(), "reverse cache must also stay bounded");
