@@ -43,3 +43,14 @@ This entry retires the prior automatic suite repetition and advisory scheduling 
 Product test assertions and task membership are retained. Independent acceptance is pending.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-ci-light-queue-codex",
+  "verdict": "accept",
+  "digest": "sha256:c76eaa2a47e9facb672afbc7822e8524803b4d9859f0f9f62d4becddf31327ab",
+  "note": "Independent diff review: only the delegated merge-group test skips and dispatch-only advisory scheduling change execution; required contexts and PR/main required test commands are retained."
+}
+```
