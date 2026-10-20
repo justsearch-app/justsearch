@@ -153,13 +153,11 @@ The right panel (**Inspector Panel**) contains the preview + AI tools.
 Notes:
 - Multi-file summarize runs **full coverage** by default (slower). For best performance, keep it **≤ 3 files**.
 - You can cancel in-flight streaming from the Inspector when the **Cancel** button is shown.
-- `Ctrl+K` opens the command palette; see **Help → Keyboard Shortcuts** for the
-  [full list](../../SSOT/docs/help/keyboard-shortcuts.md).
+- `Ctrl+K` opens the command palette; **Help → Keyboard Shortcuts** in the app has the full list.
 
 ### Resetting the App
-For a full reset, use **Settings → Data → Delete all local data**. See
-[Help → Troubleshooting](../../SSOT/docs/help/troubleshooting.md#high-disk-usage)
-for what it removes and the backup steps.
+For a full reset, use **Settings → Data → Delete all local data**. **Help → Troubleshooting**
+in the app (High disk usage) explains what it removes and the backup steps.
 
 To rebuild only a stuck or corrupted index, quit JustSearch, then delete the
 `index` folder inside its data folder (Windows `%APPDATA%\io.justsearch.shell`,
