@@ -894,3 +894,14 @@ before worktrees below tmp/wp51-retry, removed by the official producer.
   "note": "Reject. Re-ran all four evidence files to scratch: every existing check matches its committed outcome and fail-before class (rs7_native_bin_link_is_removed... is now renamed; its successor passes in uiux-reset-boot-repair.json). Omissions: (1) Entries 7, 24 (first source), 25, 26 and 27 cite owner-adopted-scenario sources whose quotes are not in the agreed scenarios (area5.md): they quote orchestrator decisions ('Decision (orchestrator): ...') or repair-brief text ('Repair the defect at its cause ...'), which test-intent.md counts as no source; entries 25-27 have no valid expectation source. Cite the agreed text (RN1 'Models and the AI runtime are kept and keep working (Option A)') and/or a delegated-choice quoting the owner's grant with its scope. (2) Entry 7 is classified Adaptation but changes the oracle (link deleted -> kept) of a test absent at the before-state c00a0cb24; an oracle change is not an Adaptation. Reclassify as New with source, evidence (boot-repair evidence already holds its pass and 97dc55c62 assertion fail-before) and newChecks. Minor: RS4 quotes keep the superseded 'It never stops the app from starting.'; the boot-lockdown checks are not run in CI."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-4xxb6j6p",
+  "verdict": "reject",
+  "digest": "sha256:522167dfb13b783707c590a39bb1b47d1481831c07e80cc6268df65355deeb84",
+  "note": "Reject for one omission. Entry 6 (New, factory_reset::tests::rn1_models_and_runtime_keep_their_bytes): its behaviour and check assert that the OCR runtime native-bin/tesseract is removed ('while removing the rebuildable OCR runtime'), but its only source, RN1 'Models and the AI runtime are kept and keep working (Option A).', states only what is kept; no agreed scenario says the OCR runtime is deleted, and S51.1 lists what is deleted without it. Cite a source for that expectation or drop the tesseract assertion. Everything else checked: other entries' quotes match area5.md (S51.x, RS/RN, RA1-RA4, Pass-2 amendment); entry 24 Adaptation keeps the oracle (adds only an idle factory_reset_status mock); all evidence re-run to scratch on the candidate (c00a0cb24 with the seam patch, 97dc55c62, 769eb6ec6), with every check passing and fail-before classes matching the committed files. Note, not a rejection reason: entry 25 marks 'RN3 Engine recovery Retry...' and 'RN3 normal desktop ... debug routes mount' repaired against intermediate commit 97dc55c62; against c00a0cb24 they guard preserved behaviour."
+}
+```
