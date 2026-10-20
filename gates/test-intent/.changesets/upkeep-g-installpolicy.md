@@ -207,3 +207,14 @@ Follow-up 3 also pins fail-closed explicit activation and absent-service compati
   "note": "Sources verbatim at base; all 20 new checks fail on base by assertion for the reason under test, pass on candidate; preserved checks pass on both; delegation quote not checked against task record (verifier may not read it)"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "ce1cf9b3-bd9a-45a8-9ce5-5d44a43d73a6",
+  "verdict": "accept",
+  "digest": "sha256:766b595997a91a60e55c1c1970ab81c40bd7ff8d4b0349bb4425dd42cf1aa88c",
+  "note": "Delta 225fc3a43: owner-words verbatim at base; 2 repaired activation checks fail on d0500402b by assertion (no ISE thrown), pass on candidate; absent-service check passes on both; shard-policy change stricter only; delegation quote not checked against task record (verifier may not read it)"
+}
+```
