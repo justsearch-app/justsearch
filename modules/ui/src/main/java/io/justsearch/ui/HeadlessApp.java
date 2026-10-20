@@ -47,8 +47,11 @@ public class HeadlessApp {
     // All Engine tokenizer paths must start without DJL's EC2 telemetry or automatic CUDA
     // native-library download. Offline mode uses the bundled CPU tokenizer library.
     // DJL gives environment overrides precedence; preserve explicit system properties too.
-    System.getProperties().putIfAbsent("OPT_OUT_TRACKING", "true");
-    System.getProperties().putIfAbsent("ai.djl.offline", "true");
+    for (String key : new String[] {"OPT_OUT_TRACKING", "ai.djl.offline"}) {
+      if (SystemAccess.rawSysProp(key) == null) {
+        SystemAccess.setSysProp(key, "true");
+      }
+    }
   }
 
   private static final Logger log = LoggerFactory.getLogger(HeadlessApp.class);
