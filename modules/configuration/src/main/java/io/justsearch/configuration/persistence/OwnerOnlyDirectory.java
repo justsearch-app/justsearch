@@ -2,6 +2,7 @@
 package io.justsearch.configuration.persistence;
 
 import java.io.IOException;
+import java.nio.file.DirectoryIteratorException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -74,6 +75,11 @@ public final class OwnerOnlyDirectory {
         warnOnce(path, "Skipping owner-only directory repair on a link or reparse point: " + path, warning);
         return;
       }
+      if (attributes.isRegularFile() && path.getFileSystem().supportedFileAttributeViews().contains("unix")
+          && ((Number) Files.getAttribute(path, "unix:nlink", LinkOption.NOFOLLOW_LINKS)).longValue() > 1) {
+        warnOnce(path, "Skipping owner-only directory repair on a hard-linked file: " + path, warning);
+        return;
+      }
       // Protect a real directory before enumerating it. No traversal is attempted on a link.
       permissions.restrict(path);
       if (attributes.isDirectory()) {
@@ -89,7 +95,7 @@ public final class OwnerOnlyDirectory {
           }
         }
       }
-    } catch (IOException | UnsupportedOperationException | SecurityException failure) {
+    } catch (IOException | DirectoryIteratorException | UnsupportedOperationException | SecurityException failure) {
       warnOnce(root, "Could not protect owner-only directory " + path + ": " + failure, warning);
     }
   }

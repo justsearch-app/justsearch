@@ -77,9 +77,7 @@ final class WindowsOwnerOnlyDirectory {
       // FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS opens the entry itself.
       MemorySegment information = arena.allocate(52, 4); // BY_HANDLE_FILE_INFORMATION
       if ((int) Win32.INFORMATION.invokeExact(captured, handle, information) == 0) throw failure(path, captured);
-      if ((information.get(ValueLayout.JAVA_INT, 0) & 0x400) != 0) {
-        throw new IOException("Skipping security repair on a reparse point: " + path);
-      }
+      checkRepairEntry(path, information);
       MemorySegment present = arena.allocate(ValueLayout.JAVA_INT);
       MemorySegment dacl = arena.allocate(ValueLayout.ADDRESS);
       MemorySegment defaulted = arena.allocate(ValueLayout.JAVA_INT);
@@ -93,6 +91,17 @@ final class WindowsOwnerOnlyDirectory {
       if (error != 0) throw new IOException("Cannot set protected entry DACL for " + path + " (Windows error " + error + ")");
     } finally {
       int closed = (int) Win32.CLOSE.invokeExact(handle);
+    }
+  }
+
+  static void checkRepairEntry(Path path, MemorySegment information) throws IOException {
+    int attributes = information.get(ValueLayout.JAVA_INT, 0);
+    if ((attributes & 0x400) != 0) {
+      throw new IOException("Skipping security repair on a reparse point: " + path);
+    }
+    // BY_HANDLE_FILE_INFORMATION.nNumberOfLinks is an unsigned DWORD at offset 40.
+    if ((attributes & 0x10) == 0 && Integer.toUnsignedLong(information.get(ValueLayout.JAVA_INT, 40)) > 1) {
+      throw new IOException("Skipping security repair on a hard-linked file: " + path);
     }
   }
 

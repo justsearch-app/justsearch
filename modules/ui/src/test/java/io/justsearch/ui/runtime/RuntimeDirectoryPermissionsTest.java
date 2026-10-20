@@ -228,6 +228,65 @@ class RuntimeDirectoryPermissionsTest {
     assertEquals(targetMode, Files.getPosixFilePermissions(elsewhere));
   }
 
+  @Test void hardLinkedHistoryKeepsOutsidePermissionsAndWarnsOnceWhilePublishing() throws Exception {
+    assumeTrue(data.getFileSystem().supportedFileAttributeViews().contains("unix"));
+    var runtime = Files.createDirectory(data.resolve("runtime"));
+    var outside = Files.writeString(elsewhere.resolve("history.txt"), "restored-history");
+    Files.setPosixFilePermissions(outside, PosixFilePermissions.fromString("rw-rw-r--"));
+    var link = Files.createLink(runtime.resolve("x"), outside);
+    var parentMode = Files.getPosixFilePermissions(data);
+    var targetMode = Files.getPosixFilePermissions(elsewhere);
+    var warning = Mockito.mock(Logger.class);
+    try (var logging = Mockito.mockStatic(LoggerFactory.class, Mockito.CALLS_REAL_METHODS)) {
+      logging.when(() -> LoggerFactory.getLogger(Mockito.<Class<?>>argThat(type -> type != null
+          && type.getName().equals("io.justsearch.configuration.persistence.OwnerOnlyDirectory"))))
+          .thenReturn(warning);
+      try (var publisher = assertDoesNotThrow(() -> new RuntimeManifestPublisher(data))) {
+        publisher.publishHead(54321, "test-token");
+        publisher.publishWorkerReady("index", Instant.now());
+        assertPrivate(runtime);
+        assertEquals(PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(runtime.resolve("manifest.json")));
+      }
+      assertEquals(PosixFilePermissions.fromString("rw-rw-r--"), Files.getPosixFilePermissions(outside));
+      Mockito.verify(warning, Mockito.times(1)).warn(Mockito.startsWith("Skipping owner-only directory repair on a hard-linked file"));
+    }
+    assertTrue(Files.isSameFile(link, outside));
+    assertEquals("restored-history", Files.readString(outside));
+    assertEquals(parentMode, Files.getPosixFilePermissions(data));
+    assertEquals(targetMode, Files.getPosixFilePermissions(elsewhere));
+  }
+
+  @Test void failingDirectoryIteratorWarnsOnceAndStartupContinuesWithoutDeletingFiles() throws Exception {
+    assumeTrue(Files.getFileStore(data).supportsFileAttributeView("posix"));
+    var runtime = Files.createDirectory(data.resolve("runtime")).toAbsolutePath().normalize();
+    var marker = Files.writeString(runtime.resolve("old-history"), "keep");
+    var warning = Mockito.mock(Logger.class);
+    var stream = new DirectoryStream<Path>() {
+      @Override public java.util.Iterator<Path> iterator() {
+        return new java.util.Iterator<>() {
+          @Override public boolean hasNext() {
+            throw new DirectoryIteratorException(new java.io.IOException("injected iteration failure"));
+          }
+          @Override public Path next() { throw new java.util.NoSuchElementException(); }
+        };
+      }
+      @Override public void close() {}
+    };
+    try (var files = Mockito.mockStatic(Files.class, Mockito.CALLS_REAL_METHODS);
+         var logging = Mockito.mockStatic(LoggerFactory.class, Mockito.CALLS_REAL_METHODS)) {
+      files.when(() -> Files.newDirectoryStream(runtime)).thenReturn(stream);
+      logging.when(() -> LoggerFactory.getLogger(Mockito.<Class<?>>argThat(type -> type != null
+          && type.getName().equals("io.justsearch.configuration.persistence.OwnerOnlyDirectory"))))
+          .thenReturn(warning);
+      try (var publisher = assertDoesNotThrow(() -> new RuntimeManifestPublisher(data))) {
+        assertDoesNotThrow(() -> publisher.publishHead(54321, "test-token"));
+        assertTrue(Files.isRegularFile(runtime.resolve("manifest.json")));
+      }
+      Mockito.verify(warning, Mockito.times(1)).warn(Mockito.contains("injected iteration failure"));
+    }
+    assertEquals("keep", Files.readString(marker));
+  }
+
   private static void assertPrivate(Path runtime) throws Exception {
     assertEquals(PosixFilePermissions.fromString("rwx------"), Files.getPosixFilePermissions(runtime));
   }

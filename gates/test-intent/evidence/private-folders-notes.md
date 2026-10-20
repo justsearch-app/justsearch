@@ -26,7 +26,7 @@ creation permissions; existing link targets receive no repair.
 
 ## Compatible harness, not fabricated production
 
-Every before comparison uses 4975ceedf, as requested. The computed origin/main merge-base
+The original before comparisons use 4975ceedf, as requested. The computed origin/main merge-base
 in this checkout is c00a0cb24; these are not described as the same revision.
 No hand-written patch or production overlay is used. The prior patch files and receipts
 using them or bc2a09ede have been retired.
@@ -128,3 +128,53 @@ written by the unchanged producer and their check-file digests match the final f
 All shared before clones were removed. The existing rejection record and every
 previous token-bootstrap artifact remain byte-identical to HEAD. No Engine process
 was started; ~/.config/justsearch was confirmed absent after these runs.
+
+## Hard-link and iterator follow-up after 46816f593
+
+The owner delegated the hard-link repair exception under the existing autonomy wording.
+The changeset quotes that choice as an agent choice and cites P6/P7. Existing acceptance
+and rejection records, prior receipts, and token-bootstrap artifacts are unchanged.
+
+On Unix, a regular entry's `unix:nlink` is read with NOFOLLOW_LINKS before the permission
+setter. More than one link leaves that inode unchanged and warns once for that path per
+process. Windows uses nNumberOfLinks (unsigned DWORD at offset 40) from the already-opened
+handle's BY_HANDLE_FILE_INFORMATION, before extracting/applying the DACL. The existing
+FFM path still closes the handle on rejection. The Linux-runnable Windows guard check
+covers two links, the high unsigned count, single-link files, real directories and reparse
+points. It is a supplemental new API check; it does not execute Win32 on Linux.
+
+DirectoryIteratorException from hasNext/next is now caught by the repair failure handler.
+It warns once for the protected root, preserves existing entries and lets startup continue.
+The new publisher unit check injects an actual failing DirectoryStream iterator and checks
+construction, manifest publication, one warning and preservation of an old history marker.
+The hard-link publisher unit check uses a real hard link outside the data folder and
+checks the outside file's 0664 mode, bytes, same-inode relationship, unchanged parent/target
+modes and one warning over repeated publication, while the runtime and manifest are private.
+Neither test requires production scaffolding or new APIs at the before-state 46816f593.
+
+Only the changed test files need fresh receipts: the two new publisher expectations compare
+against 46816f593; the seven unchanged runtime repair controls and one unchanged runtime
+preservation control are replayed against 4975ceedf. Entries for unaffected checks continue
+to reference the original receipts. The Windows test file is replayed for its new guard API
+check and unchanged descriptor/mask/unavailable-native oracles. No pre-existing assertion
+or test selection was weakened. Each whole-producer job runs under js-gradle-slot; the execution-policy adapter uses
+shared before clones and isolates Java HOME/DATA/temp.
+
+The focused follow-up command was `js-gradle-slot ./gradlew spotlessApply
+:modules:configuration:test :modules:app-services:test --tests
+io.justsearch.app.services.encryption.EncryptionKeystorePermissionsTest :modules:ui:test
+--tests io.justsearch.ui.runtime.RuntimeDirectoryPermissionsTest --continue
+-PskipWebBuild=true`, with JAVA_TOOL_OPTIONS unset. It exited 0 (BUILD SUCCESSFUL in 25s):
+342 configuration cases, five encryption-folder cases and ten runtime-folder cases passed;
+none failed or skipped. No broad suite was rerun. All pre-existing assertions are retained.
+
+Follow-up receipt results: `private-folders-hardlinks-iterator-v3.json` was produced with
+exit 0: both candidate checks passed, and both failed by assertion at 46816f593. The hard-
+link failure reports expected 0664 permissions but actual 0600 on the outside inode; the
+iterator failure reports the unexpected DirectoryIteratorException wrapping the injected
+IOException. `private-folders-runtime-repair-v3.json` exited 0: all seven unchanged checks
+passed now and failed by assertion at 4975ceedf. Neither receipt has patches or overlays.
+The unchanged linked-runtime preservation replay exited 1 under the generic producer
+because its check passed on both revisions, correctly recorded as preservation.
+`private-folders-windows-api-v3.json` exited 0 with all four cases passing. This includes
+the new native-information guard API check; Windows native execution remains unverified.
