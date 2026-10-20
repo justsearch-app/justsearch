@@ -11,19 +11,34 @@ Owner adopted the E1–E21 scenarios on 2026-10-20. Entries below quote the rele
 scenarios verbatim. Engine-side queue scenarios E8–E15 belong to a later assignment.
 Coverage is against the merge-base with origin/main, c00a0cb24. There are eight flagged items;
 separate entries distinguish new assertions from unchanged test formatting in the same item.
-No acceptance record is written by the builder. The evidence runner adds --gradle-slot so both
-candidate and before-state Java executions use js-gradle-slot ./gradlew, including its exit status;
-non-Gradle checks acquire no slot. Its regression test uses synthetic subprocesses and no real slot.
+No acceptance record is written by the builder. Governance tooling is unchanged by this correction;
+no Java check source changed, so its existing execution evidence remains valid. No Gradle run was
+needed for this correction; the evidence runner's refreshed invocation contains Rust checks only.
 
-The startup-only dev-runner repair follows the owner's additional instruction: "an Engine that
-never became healthy at initial start still ends the runner with exit 1, as on main; the later
-retry applies to an Engine that had been healthy." Script tests are outside this gate's product
-scope; the existing real-process test and new deterministic regression both pass. The new check
-fails by assertion on the shared 876fec015 before clone. Both full conformance adapters pass.
+The owner's corrected decision after rejecting 89c6581d5 replaces the preceding prior-health rule:
+"the shared supervisor behaviour stays identical in both (delayed retry after exhaustion, whether
+or not the Engine was healthy before), so revert the `!s.firstReadyDone` condition."
 
-Evidence before-state worktrees were created inside a disposable shared candidate clone under
-TMPDIR, never registered in the source repository. Compatibility patches below are evidence-only
-fixtures, never production patches or substituted passing implementations.
+The default shared JS supervisor now retains unconditional transient delayed retry, matching Rust.
+The optional stopOnInitialExhaustion policy defaults to false and the production dev runner alone
+passes true, preserving main's failed-start exit-1 contract. The conformance adapter does not disable
+that CLI policy. A common conformance probe directly drives default JS supervision with the real
+Engine actuator/fixture and the existing Rust harness; both exhaust at incarnation 4, publish a retry
+deadline, start incarnation 5 with a fresh budget, and exhaust again at incarnation 8 without a
+healthy incarnation. Its shared case is recovery-never-healthy-delayed-retry (E4/E17).
+
+Script tests are outside this gate's product scope. The former default-loop startup regression now
+explicitly selects the CLI admission policy; an additional default-loop check requires delayed retry
+without prior readiness. That new check and the real-Engine parity probe fail by assertion on
+89c6581d5. The default-loop check passes on known-good 876fec015 and the candidate. The existing
+initial-exit process check passes five consecutive candidate runs. Evidence and commands for the
+correction are in gates/test-intent/evidence/engine-recovery-supervisor-parity.txt.
+
+Fresh Rust execution evidence covers the existing manual restart check unchanged, including the
+never-ready initial generation and delayed fifth spawn. Earlier Java/UI and repaired-behaviour
+fail-before evidence remains tied to the unchanged check-file content digests. The temporary shared
+before/known-good clones live under TMPDIR and are removed after the checks. Compatibility patches
+are evidence-only fixtures, never production patches or substituted passing implementations.
 
 ```json
 {
@@ -64,7 +79,7 @@ fixtures, never production patches or substituted passing implementations.
         "modules/shell/src-tauri/src/engine_host.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Two new host checks: after the exhausted actor has actually finished and its delayed replacement spawn failed, manual restart installs one fresh actor, reaches running with a new port/token/instance, and resets its budget (E3); restart refuses quit/update holds and admits no child (E5). This is the newly introduced manual-restart capability.",
+      "behaviour": "Two new host checks: after the exhausted actor has actually finished and its delayed replacement spawn failed, manual restart installs one fresh actor, reaches running with a new port/token/instance, and resets its budget (E3); restart refuses quit/update holds and admits no child (E5). This is the newly introduced manual-restart capability. The four initial incarnations in the first check never became ready: E4 still admits the delayed fifth spawn before its failure, so this test intentionally retains that prerequisite. The new default-JS conformance probe checks the same no-prior-health rule under E17; the dev CLI alone opts into terminating unsuccessful admission.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -79,6 +94,25 @@ fixtures, never production patches or substituted passing implementations.
           "scenario": "E5",
           "quote": "Repeated restart clicks racing the cooldown, quit or update preparation leave exactly one supervisor and one Engine, and no spawn after quit.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-51b072",
+          "scenario": "E4",
+          "quote": "Desktop, budget spent, nobody present: after 30 minutes a new Engine generation starts with a fresh budget; quitting during the wait ends cleanly; an update hold blocks the retry.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-51b072",
+          "scenario": "E17",
+          "quote": "The Rust shell supervisor and the JS supervisor (dev runner, conformance) behave the same for exhaustion, delayed retry, manual restart, hang detection, stability-budget reset and shutdown (conformance cases in both).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261020-51b072 user turn: independent rejection of 89c6581d5 and corrected decision",
+          "quote": "the shared supervisor behaviour stays identical in both (delayed retry after exhaustion, whether or not the Engine was healthy before), so revert the `!s.firstReadyDone` condition."
         }
       ],
       "evidence": "gates/test-intent/evidence/engine-recovery-rust.json",
@@ -116,7 +150,7 @@ fixtures, never production patches or substituted passing implementations.
         "purpose": "Apply rustfmt to the edited Rust file; preserve every existing test oracle. Only rustfmt array/assertion layout changes in essential_readiness_requires_the_engine_ready_epoch; the READY epoch, six non-READY states, six malformed timestamps and expected outcomes are byte-for-byte the same values.",
         "callersAndStateOwners": "Existing shell unit tests continue to own their temporary profiles and children; formatting changes no caller, saved state or ownership.",
         "indirectBehaviours": "No input, precondition, observation, assertion, tag, conditional disable or fixture lifetime changes.",
-        "evidence": "The complete extracted cfg(test) items at c00a0cb24 and candidate compare byte-identical after rustfmt, preserving literal contents and every assertion; proof: gates/test-intent/evidence/engine-recovery-formatting.txt. Both real supervisor conformance adapters pass, including health/readiness, exit-2, quit and child-ownership checks; see tmp/builder/initial-exit-fix/conformance-dev-runner.log and conformance-tauri.log. The independent prior checks at head 876fec015 also covered these unchanged tests.",
+        "evidence": "The complete extracted cfg(test) items at c00a0cb24 and candidate compare byte-identical after rustfmt, preserving literal contents and every assertion; proof: gates/test-intent/evidence/engine-recovery-formatting.txt. Both real supervisor conformance adapters pass, including health/readiness, exit-2, quit and child-ownership checks; see gates/test-intent/evidence/engine-recovery-supervisor-parity.txt. The independent prior checks at head 876fec015 also covered these unchanged tests.",
         "unresolvedRisks": "No unresolved semantic difference in these test-only formatting hunks. Linux evidence does not claim a new Windows execution."
       },
       "sources": [
@@ -138,7 +172,7 @@ fixtures, never production patches or substituted passing implementations.
         "purpose": "Apply rustfmt to the edited Rust file; preserve every existing test oracle. Only rustfmt layout in existing tests: manifest records, terminal outcome arguments, malformed and accepted schema fixtures. No test selection, timeout, fault, expected value or cleanup ownership changed.",
         "callersAndStateOwners": "Existing shell unit tests continue to own their temporary profiles and children; formatting changes no caller, saved state or ownership.",
         "indirectBehaviours": "No input, precondition, observation, assertion, tag, conditional disable or fixture lifetime changes.",
-        "evidence": "The complete extracted cfg(test) items at c00a0cb24 and candidate compare byte-identical after rustfmt, preserving literal contents and every assertion; proof: gates/test-intent/evidence/engine-recovery-formatting.txt. Both real supervisor conformance adapters pass, including health/readiness, exit-2, quit and child-ownership checks; see tmp/builder/initial-exit-fix/conformance-dev-runner.log and conformance-tauri.log. The independent prior checks at head 876fec015 also covered these unchanged tests.",
+        "evidence": "The complete extracted cfg(test) items at c00a0cb24 and candidate compare byte-identical after rustfmt, preserving literal contents and every assertion; proof: gates/test-intent/evidence/engine-recovery-formatting.txt. Both real supervisor conformance adapters pass, including health/readiness, exit-2, quit and child-ownership checks; see gates/test-intent/evidence/engine-recovery-supervisor-parity.txt. The independent prior checks at head 876fec015 also covered these unchanged tests.",
         "unresolvedRisks": "No unresolved semantic difference in these test-only formatting hunks. Linux evidence does not claim a new Windows execution."
       },
       "sources": [
@@ -160,7 +194,7 @@ fixtures, never production patches or substituted passing implementations.
         "purpose": "Apply rustfmt to the edited Rust file; preserve every existing test oracle. Only rustfmt layout in existing Linux identity and signalled-exit tests. Same real child signals, matching birth identity, deleted executable, REQUESTED/UNEXPECTED classification and no fabricated exit code. Platform conditions, timeouts and cleanup remain.",
         "callersAndStateOwners": "Existing shell unit tests continue to own their temporary profiles and children; formatting changes no caller, saved state or ownership.",
         "indirectBehaviours": "No input, precondition, observation, assertion, tag, conditional disable or fixture lifetime changes.",
-        "evidence": "The complete extracted cfg(test) items at c00a0cb24 and candidate compare byte-identical after rustfmt, preserving literal contents and every assertion; proof: gates/test-intent/evidence/engine-recovery-formatting.txt. Both real supervisor conformance adapters pass, including health/readiness, exit-2, quit and child-ownership checks; see tmp/builder/initial-exit-fix/conformance-dev-runner.log and conformance-tauri.log. The independent prior checks at head 876fec015 also covered these unchanged tests.",
+        "evidence": "The complete extracted cfg(test) items at c00a0cb24 and candidate compare byte-identical after rustfmt, preserving literal contents and every assertion; proof: gates/test-intent/evidence/engine-recovery-formatting.txt. Both real supervisor conformance adapters pass, including health/readiness, exit-2, quit and child-ownership checks; see gates/test-intent/evidence/engine-recovery-supervisor-parity.txt. The independent prior checks at head 876fec015 also covered these unchanged tests.",
         "unresolvedRisks": "No unresolved semantic difference in these test-only formatting hunks. Linux evidence does not claim a new Windows execution."
       },
       "sources": [
@@ -380,3 +414,14 @@ fixtures, never production patches or substituted passing implementations.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15866-a331-7452-b8b0-5d508a095b3d",
+  "verdict": "reject",
+  "digest": "sha256:74a3d93e3c85456c4e3bf1b0c3f02369ff9f5a314a24a8dd15556a66e88f96bf",
+  "note": "E17 fails: Rust retries a never-healthy Engine while JS exits, and the new Rust manual-restart test requires that forbidden delayed fifth spawn."
+}
+```

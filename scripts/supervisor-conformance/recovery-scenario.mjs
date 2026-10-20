@@ -2,10 +2,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { driveCase } from './adapters/dev-runner.mjs';
 import { binaryPath, runBinary } from './adapters/tauri.mjs';
 
 export async function runRecoveryCase({ name, testCase, io }) {
+  if (testCase.id === 'recovery-never-healthy-delayed-retry') return runNeverHealthyCase({ name, testCase, io });
   const env = { ...io.harnessOverrides,
     JUSTSEARCH_SUPERVISOR_EXHAUSTED_RETRY_DELAY_MS: testCase.id.includes('manual') && !testCase.id.includes('race') ? '5000' : '1000',
     JUSTSEARCH_SUPERVISOR_START_DEADLINE_MS: '600',
@@ -163,6 +166,81 @@ export async function runRecoveryCase({ name, testCase, io }) {
     return { problems: [] };
   } catch (error) { return { problems: [`${error.stack}\n${run.output.stderr.slice(-1800)}`] }; }
   finally {
+    await run.cleanup();
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+}
+
+// This checks the shared supervisor contract, independently of the dev CLI's admission policy.
+// Both implementations own a real fixture Engine; no adapter disables the CLI policy.
+async function runNeverHealthyCase({ name, testCase, io }) {
+  const require = createRequire(import.meta.url);
+  const { createSupervisionLoop, loadPolicy } = require('../dev/lib/engine-supervisor.cjs');
+  const { createEngineActuator } = require('../dev/lib/engine-actuator.cjs');
+  const host = require('../dev/dev-runner.cjs').__test;
+  const workDir = io.makeWorkDir(`${name}-${testCase.id}`);
+  const dataDir = path.join(workDir, 'data');
+  fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
+  const planPath = io.writeEnginePlan(workDir, testCase.enginePlan);
+  const env = { ...process.env, ...io.harnessOverrides, JUSTSEARCH_SUPERVISOR_EXHAUSTED_RETRY_DELAY_MS: '1000' };
+  const statePath = path.join(dataDir, 'runtime/supervisor.v1.json');
+  const seen = [];
+  let run;
+  if (name === 'dev-runner') {
+    const policy = loadPolicy({ env });
+    const actuator = createEngineActuator({ dataDir, runId: 'never-healthy', policy,
+      spawnChild: (_n, apiPort, incarnationEnv) => spawn(process.execPath, [io.fakeEngine], {
+        env: { ...env, ...incarnationEnv, JUSTSEARCH_DATA_DIR: dataDir,
+          JUSTSEARCH_API_PORT: String(apiPort), JUSTSEARCH_FAKE_ENGINE_PLAN: planPath,
+          JUSTSEARCH_FAKE_ENGINE_FAULT_GATE: '' },
+        stdio: 'ignore',
+      }),
+    });
+    const loop = createSupervisionLoop({ actuator, policy, timeouts: { initialPortMs: 4000, initialReadyMs: 4000 },
+      io: {
+        readManifest: () => io.readJsonIfPresent(path.join(dataDir, 'runtime/manifest.json')),
+        readRawManifest: () => io.readJsonIfPresent(path.join(dataDir, 'runtime/manifest.json')),
+        probeHealth: (port, ms) => host.checkHttp200(`http://127.0.0.1:${port}/api/health`, ms, true),
+        probeAlive: (port, ms) => host.checkHttp200(`http://127.0.0.1:${port}/api/health`, ms, true),
+        fetchStatus: (port, ms) => host.fetchJsonHttp(`http://127.0.0.1:${port}/api/status`, ms),
+        essentialReadyEpoch: host.essentialReadyEpoch,
+        waitForRelease: ({ pid }) => host.waitForEngineHandleRelease({ pid, dataDir }),
+        clearStaleDiscoveryFiles() {},
+      },
+      publish: async state => { seen.push(state); await host.writeSupervisorState(dataDir, state); },
+    });
+    const exited = loop.run();
+    run = { cleanup: async () => { await loop.hostQuit(); await exited; }, output: { stderr: '' } };
+  } else {
+    run = runBinary({ binary: binaryPath(io.repoRoot), workDir, dataDir, planPath, io, env,
+      stopAfterIncarnation: 0, stopOnExhausted: false });
+    run.cleanup = async () => {
+      if (run.child.exitCode === null) {
+        fs.writeFileSync(path.join(dataDir, 'shell-control.json'), JSON.stringify({ action: 'quit', nonce: 1 }));
+      }
+      await run.exited;
+    };
+  }
+  const waitState = predicate => io.waitFor(() => {
+    const state = io.readJsonIfPresent(statePath);
+    if (state) seen.push(state);
+    return state && predicate(state) ? state : null;
+  }, { timeoutMs: 15000, intervalMs: 10, what: `${name}: never-healthy delayed retry` });
+  try {
+    const exhausted = await waitState(state => state.state === 'exhausted');
+    assert.equal(exhausted.incarnation, 4);
+    assert.equal(exhausted.restartCount, 3);
+    assert.ok(exhausted.retryAt, 'default supervision must retry even without a healthy incarnation');
+    const successor = await waitState(state => state.state === 'starting' && state.incarnation === 5);
+    assert.equal(successor.restartCount, 0, 'the delayed retry must refill the budget');
+    await waitState(state => state.state === 'exhausted' && state.incarnation === 8);
+    assert(seen.every(state => state.state !== 'running'), 'no incarnation became healthy');
+    assert.equal(fs.existsSync(path.join(dataDir, 'runtime/manifest.json')), false);
+    assert.equal(io.readJsonIfPresent(`${planPath}.state.json`).next, 8);
+    return { problems: [] };
+  } catch (error) {
+    return { problems: [`${error.stack}\n${run.output.stderr.slice(-1800)}`] };
+  } finally {
     await run.cleanup();
     fs.rmSync(workDir, { recursive: true, force: true });
   }

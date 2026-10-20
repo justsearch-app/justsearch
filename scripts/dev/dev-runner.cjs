@@ -3107,6 +3107,8 @@ async function runAdmittedStart(opts, ctx) {
   const supervision = engineSupervisor.createSupervisionLoop({
     actuator,
     policy: supervisionPolicy,
+    // A failed CLI start must return its discovery error, rather than wait for desktop recovery.
+    stopOnInitialExhaustion: true,
     requestedApiPort: apiPortRequested,
     timeouts: { initialPortMs: portEmitTimeoutMs, initialReadyMs: backendReadyTimeoutMs },
     // Harness-only host input exercises the production request path after readiness.

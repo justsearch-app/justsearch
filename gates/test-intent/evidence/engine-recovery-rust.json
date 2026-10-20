@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-20T08:07:43.771Z",
-  "revision": "876fec015a8b95ec731856ad04473dba261367c9",
-  "tree": "cc7730f983b9b2e50e02ecb45cfe96fd7a3df0ed",
+  "createdAt": "2026-10-20T08:36:53.432Z",
+  "revision": "89c6581d5bd1e8209b53cd6c24965bc83a5a2332",
+  "tree": "5f724536b734ce1e6393aa8ad25711e76f11283e",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,37 +21,37 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::fresh_crash_folder_with_spaces_keeps_artifacts_across_boots\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5950
+      "durationMs": 9526
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::unavailable_crash_folder_reports_the_real_obstacle\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2757
+      "durationMs": 1565
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::fatal_summary_is_bounded_and_redacts_windows_paths_with_spaces\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2823
+      "durationMs": 1251
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::the_daily_count_survives_budget_reset_and_shell_relaunch\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3123
+      "durationMs": 1247
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::manual_restart_after_finished_exhaustion_reaches_ready_with_a_new_generation\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3777
+      "durationMs": 2255
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::manual_restart_refuses_quit_and_update_holds_without_admitting_a_child\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3343
+      "durationMs": 1223
     }
   ],
   "checks": [
@@ -147,5 +147,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:6eb589e43e9d490fcd38256d5afcfcf50eeb303ebebeec68be2295fd8f07c5df"
+  "digest": "sha256:0b7ed458c402b4b30e1edf6b82ad6d8ded9890afd9ad2ae72c5fcd4023bac343"
 }

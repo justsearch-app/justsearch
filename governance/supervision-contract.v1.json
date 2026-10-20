@@ -286,6 +286,14 @@
       ],
       "conformanceCases": [
         {
+          "id": "recovery-never-healthy-delayed-retry",
+          "drives": ["actuator"],
+          "enginePlan": [{"mode": "boot-fail", "exitCode": 23, "exitAfterMs": 50}],
+          "expect": {"action": "restart"},
+          "why": "E4/E17: default JS and Rust supervisors retry after exhaustion with a fresh budget even when no incarnation became healthy; the dev CLI admission policy is separate.",
+          "faultMode": "partial-boot"
+        },
+        {
           "id": "recovery-manual-retry-races-deadline-and-quit",
           "drives": [
             "actuator"

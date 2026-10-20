@@ -360,6 +360,7 @@ const HARNESS_REQUEST_REASONS = Object.freeze(['quit', 'restart', 'upgrade', 'ha
  * @param {(fields: object) => Promise<void>} options.publish writes the supervisor state record
  * @param {{initialPortMs: number, initialReadyMs: number}} options.timeouts the first boot's limits
  * @param {number} options.requestedApiPort the port the first incarnation is asked to bind
+ * @param {boolean} [options.stopOnInitialExhaustion] CLI admission policy; default hosts keep retrying
  * @param {{requestReason?: string|null}} [options.harness]
  * @param {object} [options.hooks] onSpawned, onReady, onIncarnationExit (awaited), onTerminal
  */
@@ -370,6 +371,7 @@ function createSupervisionLoop({
   publish,
   timeouts,
   requestedApiPort = 0,
+  stopOnInitialExhaustion = false,
   harness = {},
   hooks = {},
   log = () => {},
@@ -838,9 +840,7 @@ function createSupervisionLoop({
       return finish(STATES.STOPPED, code, decision.reason);
     }
     if (decision.action === ACTIONS.EXHAUSTED) {
-      // Startup admission must settle: a runner that never became healthy exits with failure.
-      // Only an admitted Engine receives unattended recovery after exhausting its budget.
-      if (!s.firstReadyDone || decision.exitClass !== 'TRANSIENT') {
+      if (decision.exitClass !== 'TRANSIENT' || (stopOnInitialExhaustion && !s.firstReadyDone)) {
         return finish(STATES.EXHAUSTED, code, `ENGINE_RESTART_EXHAUSTED:${decision.reason}`);
       }
       await io.waitForRelease({ pid: exit.pid });

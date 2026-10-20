@@ -6,7 +6,7 @@ import os from 'node:os';
 const require = createRequire(import.meta.url);
 const { createSupervisionLoop, loadPolicy } = require('./lib/engine-supervisor.cjs');
 
-function fixture({ failFirst = false, crashFirstFour = false, failAt = 0, neverReady = false } = {}) {
+function fixture({ failFirst = false, crashFirstFour = false, failAt = 0, neverReady = false, stopOnInitialExhaustion = false } = {}) {
   let now = 0, n = 0, exited = false, pendingExit = null, spawnedAt = 0;
   const records = [], ports = [];
   const actor = {
@@ -30,6 +30,7 @@ function fixture({ failFirst = false, crashFirstFour = false, failAt = 0, neverR
     waitOrWake: async ms => { now += ms; await new Promise(resolve => setImmediate(resolve)); },
   };
   const loop = createSupervisionLoop({ actuator: actor,
+    stopOnInitialExhaustion,
     policy: { ...loadPolicy(), exhaustedRetryDelayMs: 200, cooldownIncrementMs: 0, maxCooldownMs: 0, hangPollIntervalMs: 100, stabilityWindowMs: 500 },
     io: { readManifest: () => ({ apiPort: 8000 + n, instanceId: `instance-${n}` }), readRawManifest: () => null,
       probeHealth: async () => !neverReady, probeAlive: async () => true, fetchStatus: async () => ({}),
@@ -51,8 +52,8 @@ test('E6: a first spawn failure retains the actual missing-Java obstacle', async
   assert.match(f.records.at(-1).reason, /Java executable missing: C:\/Name With Spaces\/java.exe/);
 });
 
-test('initial startup exhaustion ends discovery instead of scheduling a delayed generation', async () => {
-  const f = fixture({ crashFirstFour: true, neverReady: true });
+test('dev-runner admission policy ends initial discovery instead of scheduling a delayed generation', async () => {
+  const f = fixture({ crashFirstFour: true, neverReady: true, stopOnInitialExhaustion: true });
   const done = f.loop.run();
   try {
     await until(() => f.records.at(-1)?.state === 'exhausted');
@@ -66,6 +67,25 @@ test('initial startup exhaustion ends discovery instead of scheduling a delayed 
   } finally {
     await f.loop.hostQuit();
     await done;
+  }
+});
+
+test('E4/E17: the default supervisor retries after exhaustion without any healthy incarnation', async () => {
+  const f = fixture({ crashFirstFour: true, neverReady: true });
+  const done = f.loop.run();
+  try {
+    await until(() => f.records.at(-1)?.state === 'exhausted');
+    const exhausted = f.records.at(-1);
+    assert.ok(exhausted.retryAt, 'default supervision must publish a retry deadline even before first readiness');
+    assert.equal(exhausted.incarnation, 4);
+    assert.equal(exhausted.restartCount, 3);
+    await until(() => f.records.at(-1)?.state === 'starting' && f.records.at(-1)?.incarnation === 5);
+    assert.equal(f.records.at(-1).restartCount, 0);
+    assert(f.records.every(state => state.state !== 'running'));
+  } finally {
+    await f.loop.hostQuit();
+    const outcome = await done;
+    assert.equal(outcome.firstReadyDone, false);
   }
 });
 
