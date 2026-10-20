@@ -450,3 +450,14 @@ The author has not accepted these entries; independent acceptance remains for th
   "note": "Verifier round 4 at 0c0114ac2, changeset wording at dec9f943b checked against run 39428698231 evidence: Linux S1-S7 attacks and real shell unchanged and safe; hosted Windows item-ID folder open/reveal fixes comma routing with controls, no neighbor .cmd runs, item-ID mutations are caught; real-desktop selection remains unobservable on hosted runners."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-aa814ea0ee38dde3e",
+  "verdict": "accept",
+  "digest": "sha256:4fec4a7c4997d19a501912d243e5719184e8c85792a232a1603110037968857c",
+  "note": "Verifier at e8be8f592: the GUI observer now compares GetLongPathNameW-expanded full paths for equality and never matches on expansion failure, so a different folder or its parent still fails; the store-recoverability entry is truthful and its check passes; PR CI run 39446626686 passed all 17 Windows open_guard tests with default TEMP; round-4 behavioural verification stands."
+}
+```
