@@ -620,3 +620,14 @@ Affected fixture evidence is refreshed separately by the evidence runner; unrela
   "note": "Reject EX5/current-policy across runtime transitions: on exact 9982cb522 a persisted legacy SYNC_ROOT replay during successful migration cutover rebinds the shared session policy to temporary replayService without watched roots. Live VDU/embedding/NER/SPLADE pending selections and cache recheck then allow excluded private/report.txt; KnowledgeClient pending-VDU confirms it. Ordinary cutover filters; restart restores filtering. Fourteen old generation cases pass unchanged; all named test-intent evidence reruns pass. Evidence: verifier-5 retained session s44myn7t/out/probe-candidate-replay-own.log and R1-runtime-replay.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "_kbrmiz7",
+  "verdict": "accept",
+  "digest": "sha256:7842de22514ffdd97f7439b2e122fe8f7b58fecb887afa7973305cb6f7bc27ba",
+  "note": "Accept on 56a3c58c5. Reviewed before-state tests, sources, then diff; Obsolete conflict search repeated (none). All 10 evidence files re-run to scratch: every attached check passes; fail-befores are assertions (f9bd104d2 or named intermediates); preserved checks also pass on f9bd104d2 (engine fixtures with the no-op compatibility patch). The 14 generation-boundary cases pass unchanged on both. R1 fixed live (in-process Engine): 9982cb522 fails 6 checks after legacy SYNC_ROOT replay; candidate passes all 67. Finding: EX5LegacySyncReplayKeepsServingPolicyAfterLiveCutover failed 1 of 7 runs under load with SQLITE_BUSY at line 81 (second SqliteJobQueue.open() schema write against the running Engine's jobs.db): fixture race, not product behaviour. EX5 replay quote not checked against the task record (no access); its expectation also follows from EX5 'not re-processed or re-enriched by later checks'."
+}
+```
