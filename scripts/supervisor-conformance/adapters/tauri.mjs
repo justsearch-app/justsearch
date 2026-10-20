@@ -263,8 +263,8 @@ export async function runCase({ testCase, policy, io }) {
             || summary.lastExit?.counted !== counted) {
           problems.push(`incorrect restart exit record: ${JSON.stringify(summary.lastExit)}`);
         }
-        if (!testCase.request && fs.existsSync(path.join(dataDir, 'runtime', 'shutdown-request.v1.json'))) {
-          problems.push('fileless restart left a shutdown request');
+        if (!testCase.request && summary.shutdownRequestAtCheckpoint !== false) {
+          problems.push('fileless restart left a shutdown request at the restart checkpoint');
         }
       }
       if (['local-handoff-bounds-responsive-close-with-churn',
