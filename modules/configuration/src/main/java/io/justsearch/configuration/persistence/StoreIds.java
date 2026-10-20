@@ -11,11 +11,16 @@ public final class StoreIds {
 
   private StoreIds() {}
 
-  public static void requireValid(String id) {
-    if (id == null || id.isBlank() || ".".equals(id) || "..".equals(id)
+  /** Checks a discovered store entry's name without accessing the filesystem. */
+  public static boolean isValid(String id) {
+    return !(id == null || id.isBlank() || ".".equals(id) || "..".equals(id)
         || id.indexOf('/') >= 0 || id.indexOf('\\') >= 0 || id.indexOf(':') >= 0
         || id.endsWith(".") || id.endsWith(" ") || WINDOWS_DEVICE_NAME.matcher(id).matches()
-        || id.codePoints().anyMatch(Character::isISOControl)) {
+        || id.codePoints().anyMatch(Character::isISOControl));
+  }
+
+  public static void requireValid(String id) {
+    if (!isValid(id)) {
       throw new IllegalArgumentException("Invalid store id: expected a single plain name");
     }
   }

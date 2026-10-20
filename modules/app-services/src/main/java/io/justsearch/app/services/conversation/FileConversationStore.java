@@ -269,16 +269,8 @@ public final class FileConversationStore implements ConversationStore {
     List<SessionSummary> summaries = new ArrayList<>();
     try (DirectoryStream<Path> dirs = Files.newDirectoryStream(rootDir)) {
       for (Path sessionDir : dirs) {
-        if (!Files.isDirectory(sessionDir)) continue;
+        if (!isValidSessionEntry(sessionDir) || !Files.isDirectory(sessionDir)) continue;
         String sessionId = sessionDir.getFileName().toString();
-        try {
-          StoreIds.requireValid(sessionId);
-        } catch (IllegalArgumentException invalid) {
-          if (SKIPPED_INVALID_FOLDERS.add(sessionDir.toAbsolutePath().normalize())) {
-            LOG.warn("Skipping conversation folder with invalid id: {}", sessionDir.toUri().toASCIIString());
-          }
-          continue;
-        }
         Path metaFile = sessionDir.resolve("meta.json");
         if (!Files.exists(metaFile)) continue;
         {
@@ -663,7 +655,7 @@ public final class FileConversationStore implements ConversationStore {
     List<String> children = new ArrayList<>();
     try (DirectoryStream<Path> dirs = Files.newDirectoryStream(rootDir)) {
       for (Path sessionDir : dirs) {
-        if (!Files.isDirectory(sessionDir)) continue;
+        if (!isValidSessionEntry(sessionDir) || !Files.isDirectory(sessionDir)) continue;
         Map<String, Object> meta = readMeta(sessionDir.getFileName().toString());
         if (meta != null && parentSessionId.equals(meta.get("parentSessionId"))) {
           children.add(sessionDir.getFileName().toString());
@@ -788,6 +780,14 @@ public final class FileConversationStore implements ConversationStore {
     } catch (IOException e) {
       LOG.warn("Failed to delete session directory {}", sessionDir, e);
     }
+  }
+
+  private static boolean isValidSessionEntry(Path sessionDir) {
+    if (StoreIds.isValid(sessionDir.getFileName().toString())) return true;
+    if (SKIPPED_INVALID_FOLDERS.add(sessionDir.toAbsolutePath().normalize())) {
+      LOG.warn("Skipping conversation folder with invalid id: {}", sessionDir.toUri().toASCIIString());
+    }
+    return false;
   }
 
   private Path resolveSessionDir(String sessionId) {

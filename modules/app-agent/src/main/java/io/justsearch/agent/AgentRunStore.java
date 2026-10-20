@@ -73,7 +73,8 @@ public final class AgentRunStore {
     this.events = new RunEventStore(rootDir, cipher);
     if (rootDir != null) {
       DiagnosticFileRetention.pruneDirectoriesBefore(
-          rootDir, Instant.now().minus(java.time.Duration.ofDays(30)));
+          rootDir, Instant.now().minus(java.time.Duration.ofDays(30)),
+          path -> StoreIds.isValid(path.getFileName().toString()));
     }
   }
 
@@ -386,6 +387,7 @@ public final class AgentRunStore {
     int safeLimit = Math.max(1, limit);
     try (var stream = Files.list(rootDir)) {
       return stream
+          .filter(path -> StoreIds.isValid(path.getFileName().toString()))
           .filter(Files::isDirectory)
           .sorted(
               java.util.Comparator.<Path, java.nio.file.attribute.FileTime>comparing(
@@ -447,6 +449,7 @@ public final class AgentRunStore {
     try (var stream = Files.list(rootDir)) {
       List<Path> dirs =
           stream
+              .filter(path -> StoreIds.isValid(path.getFileName().toString()))
               .filter(Files::isDirectory)
               .sorted(
                   java.util.Comparator.<Path, java.nio.file.attribute.FileTime>comparing(
@@ -635,6 +638,7 @@ public final class AgentRunStore {
     }
     try (var stream = Files.list(rootDir)) {
       return stream
+          .filter(path -> StoreIds.isValid(path.getFileName().toString()))
           .filter(Files::isDirectory)
           .map(p -> readMeta(p.getFileName().toString()))
           .filter(java.util.Objects::nonNull)
@@ -683,6 +687,7 @@ public final class AgentRunStore {
     }
     try (var stream = Files.list(rootDir)) {
       return stream
+          .filter(path -> StoreIds.isValid(path.getFileName().toString()))
           .filter(Files::isDirectory)
           .map(p -> p.getFileName().toString())
           .filter(

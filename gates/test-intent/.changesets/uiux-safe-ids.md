@@ -2,14 +2,15 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: agent-session-eplotgqg
+author-session: agent-session-e15wjfsg
 ---
 
 # Test-intent entries
 
 Gate-compatible aliases preserve the brief's scenario ids: PS1–PS3 mean S9.1–S9.3;
 PN1–PN3 mean N9.1–N9.3. PS1b and PS1w name the batch-id and Windows amendments;
-PS1l names the adopted invalid-folder listing amendment.
+PN1e names the adopted amendment after verifier-3 for every store enumeration.
+PS1x names the additional Windows-device amendment after verifier-2.
 The gate schema accepts letters/digits, without dots or hyphens; all quotes remain verbatim.
 
 Review history: verifier-1 rejected the removed blank-id no-op expectation. AgentRunStoreTest
@@ -29,6 +30,15 @@ without claiming identical historical storage behavior. The Unicode-extension en
 its base compile limitation. Uncited repair/preserve evidence was removed. New regressions
 cover generic undo before confirmation, invalid legacy-folder listings and additional Windows
 aliases, with assertion fail-before evidence against bcbbb6e5c. Acceptance records remain unchanged.
+
+Review history: verifier-3 rejected the listing amendment citation and the ordinary Windows-name
+citation, and reproduced valid deletion failing beside blank legacy folders. PN1e now quotes the
+agreed amendment after verifier-3 verbatim; the ordinary Windows-name entry cites the explicit
+reserved-name lists, including the later extension. New repaired checks cover all run scans,
+conversation child checks through HTTP, file-history enumeration and constructor retention, with
+assertion fail-before evidence against e7b4ceec7 in a separate evidence file. The previous
+reclassifications remain preservation checks. Existing acceptance and rejection records remain
+unchanged and require independent review of this candidate.
 
 ```json
 {
@@ -492,15 +502,8 @@ aliases, with assertion fail-before evidence against bcbbb6e5c. Acceptance recor
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
-          "scenario": "PS1l",
-          "quote": "The conversation list leaves out folders whose names are not valid ids (they cannot be addressed safely); their files stay on disk untouched (a data reset still removes them). Log one line per skipped folder at most once per start.",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "PS1",
-          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "scenario": "PN1e",
+          "quote": "a folder or file with a name that is not a valid id inside any store (blank-named conversation folders made by the old dispatch bug, or any other invalid name found on disk) is skipped by every operation that enumerates the store (conversation and session lists, branch and child checks, presence, thread views, run lists); it never makes an operation on a valid id fail, and its files stay on disk.",
           "label": "agent-drafted, owner-adopted"
         }
       ],
@@ -520,8 +523,15 @@ aliases, with assertion fail-before evidence against bcbbb6e5c. Acceptance recor
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
-          "scenario": "PN1",
-          "quote": "Every id format the app creates or has created (UUIDs, the throwaway title-session prefix, branch ids, run ids, ids in saved data from earlier versions) keeps working for every operation; saved data from before the change loads unchanged.",
+          "scenario": "PS1w",
+          "quote": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1x",
+          "quote": "S9.1 Windows names: also refuse superscript device names (COM¹-³, LPT¹-³), CONIN$, CONOUT$, and reserved names followed by spaces before an extension (\"NUL .txt\").",
           "label": "agent-drafted, owner-adopted"
         }
       ],
@@ -529,6 +539,100 @@ aliases, with assertion fail-before evidence against bcbbb6e5c. Acceptance recor
       "newChecks": [
         "modules/configuration/src/test/java/io/justsearch/configuration/persistence/StoreIdsWindowsAliasesTest.java#preservesOrdinaryNamesNearWindowsDevices"
       ]
+    },
+    {
+      "items": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/RunStoreEnumerationInvalidIdsTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Skip invalid run folders before reads in every run projection and scoped deletion, including startup retention; leave invalid files unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1e",
+          "quote": "a folder or file with a name that is not a valid id inside any store (blank-named conversation folders made by the old dispatch bug, or any other invalid name found on disk) is skipped by every operation that enumerates the store (conversation and session lists, branch and child checks, presence, thread views, run lists); it never makes an operation on a valid id fail, and its files stay on disk.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1",
+          "quote": "Every id format the app creates or has created (UUIDs, the throwaway title-session prefix, branch ids, run ids, ids in saved data from earlier versions) keeps working for every operation; saved data from before the change loads unchanged.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN2",
+          "quote": "Responses for valid ids are unchanged (status, body, timing class).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-safe-ids-enumeration-repair.json",
+      "newChecks": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/RunStoreEnumerationInvalidIdsTest.java#everyRunProjectionAndDeletionSkipsInvalidFolders",
+        "modules/app-agent/src/test/java/io/justsearch/agent/RunStoreEnumerationInvalidIdsTest.java#startupRetentionLeavesInvalidRunFoldersUntouched"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationLogEnumerationInvalidIdsTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Skip journals with invalid batch ids before reads and limits, including startup retention; leave invalid files unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1e",
+          "quote": "a folder or file with a name that is not a valid id inside any store (blank-named conversation folders made by the old dispatch bug, or any other invalid name found on disk) is skipped by every operation that enumerates the store (conversation and session lists, branch and child checks, presence, thread views, run lists); it never makes an operation on a valid id fail, and its files stay on disk.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-safe-ids-enumeration-repair.json",
+      "newChecks": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationLogEnumerationInvalidIdsTest.java#listSkipsInvalidBatchNamesBeforeReadingOrApplyingLimit",
+        "modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationLogEnumerationInvalidIdsTest.java#startupRetentionLeavesInvalidBatchFilesUntouched"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/StoreEnumerationInvalidIdsHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Through running HTTP handlers backed by real stores, retain valid conversation lists, branching, inherited history and child protection, deletion, sessions, presence and thread views beside invalid folders; preserve invalid files.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1e",
+          "quote": "a folder or file with a name that is not a valid id inside any store (blank-named conversation folders made by the old dispatch bug, or any other invalid name found on disk) is skipped by every operation that enumerates the store (conversation and session lists, branch and child checks, presence, thread views, run lists); it never makes an operation on a valid id fail, and its files stay on disk.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1",
+          "quote": "Every id format the app creates or has created (UUIDs, the throwaway title-session prefix, branch ids, run ids, ids in saved data from earlier versions) keeps working for every operation; saved data from before the change loads unchanged.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN2",
+          "quote": "Responses for valid ids are unchanged (status, body, timing class).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-safe-ids-enumeration-repair.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/StoreEnumerationInvalidIdsHttpTest.java#validConversationCanBranchReadAndDeleteBesideInvalidFolders",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StoreEnumerationInvalidIdsHttpTest.java#runListsPresenceThreadAndDeleteWorkBesideInvalidRunFolders"
+      ],
+      "repaired": true
     }
   ]
 }

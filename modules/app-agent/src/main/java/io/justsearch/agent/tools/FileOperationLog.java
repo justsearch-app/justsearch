@@ -52,7 +52,8 @@ public final class FileOperationLog {
       LOG.warn("Failed to create transaction log directory: {}", logDir, e);
     }
     DiagnosticFileRetention.pruneBefore(
-        logDir, "", Instant.now().minus(java.time.Duration.ofDays(30)));
+        logDir, "", Instant.now().minus(java.time.Duration.ofDays(30)),
+        FileOperationLog::hasValidBatchName);
   }
 
   void startBatch(String batchId, String explanation, List<FileOperation> operations) {
@@ -185,6 +186,7 @@ public final class FileOperationLog {
       try (var stream = Files.list(logDir)) {
         return stream
             .filter(p -> p.toString().endsWith(".json"))
+            .filter(FileOperationLog::hasValidBatchName)
             .sorted(
                 Comparator.<Path, FileTime>comparing(
                         p -> {
@@ -249,6 +251,12 @@ public final class FileOperationLog {
       throw new CorruptDurableStoreException(
           "file-operation-journal", "cannot update batch " + batchId, e);
     }
+  }
+
+  private static boolean hasValidBatchName(Path path) {
+    String name = path.getFileName().toString();
+    String id = name.endsWith(".json") ? name.substring(0, name.length() - 5) : name;
+    return StoreIds.isValid(id);
   }
 
   private Path batchPath(String batchId) {
