@@ -4,7 +4,6 @@ import org.gradle.kotlin.dsl.register
 plugins {
   id("base")
   jacoco
-  pmd
   alias(libs.plugins.spotless)
   alias(libs.plugins.licenseReport)
   alias(libs.plugins.dependencyAnalysis)
@@ -14,11 +13,6 @@ plugins {
   id("conventions.locking")
   id("conventions.build-attribution")
 }
-
-// Note: PMD toolVersion is configured in JvmBaseConventionsPlugin (currently 7.16.0).
-// The root `pmd` block above is applied because root build files were once
-// PMD-scanned, but root has no Java sources and the root extension has no
-// effect — version drift here was tempdoc 516 Slice 0 cleanup.
 
 jacoco {
   toolVersion = "0.8.14"
