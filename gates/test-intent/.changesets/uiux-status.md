@@ -372,3 +372,14 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp33-verifier-am01rzj3j2",
+  "verdict": "accept",
+  "digest": "sha256:6c698f97958057c9b6c32ec9082d8cefc86095fbf695463d6f79042d7d79530f",
+  "note": "Test expectations have scenario or delegated-choice sources. Named UI and Java checks passed independently and fail by assertion on f6a14b5a6; run-evidence rerun to retained scratch evidence. Fixture adds only an unknown optional observation. This accepts test intent only; the product verdict is fail for scheduler-path wording, old-client compatibility, Library zero-percent coverage, and the measured Library axe gate."
+}
+```
