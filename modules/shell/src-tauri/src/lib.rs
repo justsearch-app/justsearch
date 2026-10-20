@@ -1480,7 +1480,7 @@ fn windows_shell_open(target: &std::ffi::OsStr) -> Result<(), String> {
         nShow: SW_SHOWNORMAL,
         ..Default::default()
     };
-    // No command parser, PATHEXT lookup, parameters, or environment expansion of the checked target.
+    // Only validated documents and URLs use lpFile. Directories use item IDs below.
     let result = if unsafe { ShellExecuteExW(&mut info) } != 0 {
         Ok(())
     } else {
@@ -1499,14 +1499,19 @@ fn windows_shell_open(target: &std::ffi::OsStr) -> Result<(), String> {
 }
 
 #[cfg(windows)]
-fn windows_shell_reveal(target: &Path) -> Result<(), String> {
+fn windows_shell_item(target: &Path, select: bool) -> Result<(), String> {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Foundation::RPC_E_CHANGED_MODE;
     use windows_sys::Win32::System::Com::{
         CoInitializeEx, CoTaskMemFree, CoUninitialize, COINIT_APARTMENTTHREADED,
         COINIT_DISABLE_OLE1DDE,
     };
-    use windows_sys::Win32::UI::Shell::{SHOpenFolderAndSelectItems, SHParseDisplayName};
+    use windows_sys::Win32::UI::Shell::{
+        ILClone, ILFindLastID, ILFree, ILRemoveLastID, SHOpenFolderAndSelectItems,
+        SHParseDisplayName, ShellExecuteExW, SEE_MASK_FLAG_NO_UI, SEE_MASK_IDLIST,
+        SEE_MASK_NOASYNC, SHELLEXECUTEINFOW,
+    };
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
     let file: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
     let initialized = unsafe {
@@ -1530,22 +1535,61 @@ fn windows_shell_reveal(target: &Path) -> Result<(), String> {
             std::ptr::null_mut(),
         )
     };
-    let result = if parsed < 0 {
+    let result = if parsed < 0 || item.is_null() {
         Err(format!(
             "Could not identify shell item '{}': {parsed:#x}",
             target.display()
         ))
-    } else {
-        // With zero children, the absolute PIDL identifies the item to select in its parent.
-        // The checked path is one shell value; commas never become Explorer switches.
-        let opened = unsafe { SHOpenFolderAndSelectItems(item, 0, std::ptr::null(), 0) };
-        if opened < 0 {
-            Err(format!(
-                "Could not reveal '{}': {opened:#x}",
-                target.display()
-            ))
+    } else if select {
+        // Derive both parts from the item's own PIDL, keeping the selected child relative to
+        // precisely that parent. Neither a comma nor a neighboring PATHEXT name is parsed again.
+        let parent = unsafe { ILClone(item) };
+        if parent.is_null() {
+            Err("Could not allocate the parent shell item".into())
         } else {
+            let result = if unsafe { ILRemoveLastID(parent) } == 0 {
+                Err(format!(
+                    "Could not identify the parent of '{}'",
+                    target.display()
+                ))
+            } else {
+                let child = unsafe { ILFindLastID(item) };
+                let children = [child.cast_const()];
+                let opened = unsafe { SHOpenFolderAndSelectItems(parent, 1, children.as_ptr(), 0) };
+                if opened < 0 {
+                    Err(format!(
+                        "Could not reveal '{}': {opened:#x}",
+                        target.display()
+                    ))
+                } else {
+                    Ok(())
+                }
+            };
+            unsafe {
+                ILFree(parent);
+            }
+            result
+        }
+    } else {
+        let verb: Vec<u16> = "open".encode_utf16().chain(Some(0)).collect();
+        let mut info = SHELLEXECUTEINFOW {
+            cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+            fMask: SEE_MASK_IDLIST | SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI,
+            lpVerb: verb.as_ptr(),
+            lpIDList: item.cast(),
+            // lpFile stays NULL: the shell receives the identified directory, never a name
+            // it could resolve to Invoice.cmd or interpret as Explorer command-line switches.
+            nShow: SW_SHOWNORMAL,
+            ..Default::default()
+        };
+        if unsafe { ShellExecuteExW(&mut info) } != 0 {
             Ok(())
+        } else {
+            Err(format!(
+                "Windows could not open folder '{}': {}",
+                target.display(),
+                std::io::Error::last_os_error()
+            ))
         }
     };
     unsafe {
@@ -1562,7 +1606,11 @@ fn dispatch_open_target(target: &Path) -> Result<PathBuf, String> {
     #[cfg(windows)]
     {
         let target = shell_dispatch_path(target)?;
-        windows_shell_open(target.as_os_str())?;
+        if target.is_dir() {
+            windows_shell_item(&target, false)?;
+        } else {
+            windows_shell_open(target.as_os_str())?;
+        }
         Ok(target)
     }
     #[cfg(not(windows))]
@@ -1578,9 +1626,9 @@ fn dispatch_reveal_target(_item: &Path, directory: &Path) -> Result<PathBuf, Str
         let target = if _item.is_file() { _item } else { directory };
         let target = shell_dispatch_path(target)?;
         if _item.is_file() {
-            windows_shell_reveal(&target)?;
+            windows_shell_item(&target, true)?;
         } else {
-            windows_shell_open(target.as_os_str())?;
+            windows_shell_item(&target, false)?;
         }
         Ok(target)
     }
@@ -3243,7 +3291,7 @@ mod open_guard_tests {
         )
         .unwrap();
         let checked = local_open_target(target.to_str().unwrap()).unwrap();
-        let _gui = windows_probe::WindowsProbe::new(dir.path(), &[target.as_path()]);
+        let gui = windows_probe::WindowsProbe::new(dir.path(), &[target.as_path()]);
         let result = dispatch_open_target(&checked);
         assert_eq!(
             result.as_ref().map(|_| ()),
@@ -3261,6 +3309,22 @@ mod open_guard_tests {
             target.display()
         );
         assert_plain_dispatched_path(result, &target);
+        if directory {
+            gui.assert_folder(&target, None);
+            let (item, parent) = reveal_target(target.to_str().unwrap()).unwrap();
+            assert_plain_dispatched_path(dispatch_reveal_target(&item, &parent), &target);
+            let deadline = std::time::Instant::now() + Duration::from_secs(4);
+            while std::time::Instant::now() < deadline && !marker.exists() {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            assert_eq!(
+                marker.exists(),
+                false,
+                "neighbor .cmd executed on reveal of {}",
+                target.display()
+            );
+            gui.assert_folder(&target, None);
+        }
     }
 
     #[cfg(windows)]

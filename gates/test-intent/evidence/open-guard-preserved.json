@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-20T10:33:28.575Z",
-  "revision": "143fd387b3cef33b49dcf9f6fc684129a10606ba",
-  "tree": "891eb641c10027380ee870a41b0b5251ba70603d",
+  "createdAt": "2026-10-20T11:49:59.159Z",
+  "revision": "df947d57e9c6e9c2745f9c3e09fbc651632bdeea",
+  "tree": "e09f34a48396e6d92d851536795832d65a9c6d06",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,43 +21,43 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::urls_accept_only_web_and_mail\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5591
+      "durationMs": 10854
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_rejects_traversal\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 157
+      "durationMs": 264
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_rejects_unc\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 156
+      "durationMs": 215
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_rejects_executables\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 160
+      "durationMs": 211
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_allows_normal_files\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 156
+      "durationMs": 222
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_allows_exe_when_not_blocked\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 159
+      "durationMs": 273
     },
     {
-      "command": "npx vitest run \"src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts\" \"src/shell-v0/commands/searchResultActions.test.ts\" \"src/shell-v0/components/chat/CitationsPanel.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-vitest-197866-1792492407031.json\"",
+      "command": "npx vitest run \"src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts\" \"src/shell-v0/commands/searchResultActions.test.ts\" \"src/shell-v0/components/chat/CitationsPanel.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-vitest-1438710-1792496995976.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1539
+      "durationMs": 3178
     }
   ],
   "checks": [
@@ -65,7 +65,7 @@
       "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::urls_accept_only_web_and_mail",
       "file": "modules/shell/src-tauri/src/lib.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:875248955f58cac9ad5670444b8f27d14e4306d2faa461926e7796e88f54114a",
+      "contentDigest": "sha256:5063a8538113f4030b4ccf1fed1227f30ecfe25fff874978d556af9c2ac3392e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/shell/src-tauri/src/lib.rs#tests::test_validate_path_rejects_traversal",
       "file": "modules/shell/src-tauri/src/lib.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:875248955f58cac9ad5670444b8f27d14e4306d2faa461926e7796e88f54114a",
+      "contentDigest": "sha256:5063a8538113f4030b4ccf1fed1227f30ecfe25fff874978d556af9c2ac3392e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/shell/src-tauri/src/lib.rs#tests::test_validate_path_rejects_unc",
       "file": "modules/shell/src-tauri/src/lib.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:875248955f58cac9ad5670444b8f27d14e4306d2faa461926e7796e88f54114a",
+      "contentDigest": "sha256:5063a8538113f4030b4ccf1fed1227f30ecfe25fff874978d556af9c2ac3392e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -110,7 +110,7 @@
       "id": "modules/shell/src-tauri/src/lib.rs#tests::test_validate_path_rejects_executables",
       "file": "modules/shell/src-tauri/src/lib.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:875248955f58cac9ad5670444b8f27d14e4306d2faa461926e7796e88f54114a",
+      "contentDigest": "sha256:5063a8538113f4030b4ccf1fed1227f30ecfe25fff874978d556af9c2ac3392e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -125,7 +125,7 @@
       "id": "modules/shell/src-tauri/src/lib.rs#tests::test_validate_path_allows_normal_files",
       "file": "modules/shell/src-tauri/src/lib.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:875248955f58cac9ad5670444b8f27d14e4306d2faa461926e7796e88f54114a",
+      "contentDigest": "sha256:5063a8538113f4030b4ccf1fed1227f30ecfe25fff874978d556af9c2ac3392e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -140,7 +140,7 @@
       "id": "modules/shell/src-tauri/src/lib.rs#tests::test_validate_path_allows_exe_when_not_blocked",
       "file": "modules/shell/src-tauri/src/lib.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:875248955f58cac9ad5670444b8f27d14e4306d2faa461926e7796e88f54114a",
+      "contentDigest": "sha256:5063a8538113f4030b4ccf1fed1227f30ecfe25fff874978d556af9c2ac3392e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -382,5 +382,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:7a39106f8eeb43ef09da1068003b9a5fe7e3e33b2ccb1f966772c80413eccb57"
+  "digest": "sha256:a61e07e83f3a68196897a3b5407e52e19ca5ae9e62d6055df5a092c6b5b246d6"
 }

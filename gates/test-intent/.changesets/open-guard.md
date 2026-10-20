@@ -9,13 +9,15 @@ author-session: open-guard-builder
 
 All eleven earlier Windows checks **passed on hosted Windows at `e22910c2de10eb90232fff11cc9c3248f454a23c`**: [original refusals](../evidence/open-guard-windows-repaired.json), [round-3 dispatch](../evidence/open-guard-windows-round3-repaired.json), [round-4 repairs](../evidence/open-guard-windows-round4-repaired.json), and [round-4 preservation](../evidence/open-guard-windows-round4-preserved.json). Those committed results cover Invoice/PATHEXT, mapped UNC documents and folders, and document/bracket-folder markers. Their source-file digests are stale after round 5; all four reruns are in `tmp/open-guard/windows-evidence-command.txt`.
 
-Hosted [run 39412497810](https://github.com/justsearch-app/justsearch/actions/runs/39412497810) on `394392a8d` passed the plain-folder control before and after, and passed Q4,notes/Q6,root after their assertion failures on `143fd387b` (Documents). Reveal failed before (Desktop) and after: HWND 655838 was at the correct parent, but the old observer did not confirm a,b2.txt selection. Its failure output omitted selection Count and paths, so it cannot establish whether the product or observer was wrong. The final Explorer-windows step printed no locations; cleanup logged closure of HWND 655838. The script stopped before every older Windows rerun, and their e22910c2d evidence remains historical.
+Hosted [run 39415072540](https://github.com/justsearch-app/justsearch/actions/runs/39415072540) on `df947d57e` established a **round-5 security regression**: folder `lpFile` dispatch through ShellExecuteExW ran Invoice.cmd and Q3 [draft].cmd instead of opening their neighboring folders. The document marker check passed. The new selection trace also establishes a **product reveal failure**: HWND 917988 was at the correct parent, but native SelectionCount was 0 and both indexed and pipeline reads were empty after the unchanged 15-second poll. This supersedes round 6's uncertainty about the observer. The D: NTFS check failed because 8.3 generation was disabled; the hosted job now enables it, and the test is unchanged.
 
-Round 6 keeps the selection assertion and 15-second poll. The observer now reads the documented FolderItems Count/Item(index).Path interface and reports that data alongside the former pipeline enumeration, on both pass and timeout. The command prints persistent observation traces even for successful Rust checks (whose stdout the harness normally suppresses). It never sets a selection. Microsoft documents [SelectedItems](https://learn.microsoft.com/en-us/windows/win32/shell/shellfolderview-selecteditems) and [Item](https://learn.microsoft.com/en-us/windows/win32/shell/folderitems-item), so there is no basis to remove the assertion as unobservable. A hosted rerun is required to distinguish (a) an actually empty selection from (b) the old enumeration's empty/wrong projection. No product change or confirmed cause is claimed from the incomplete log.
+Round 7 parses only the checked plain path into a PIDL. Directory open and directory reveal use ShellExecuteExW with SEE_MASK_IDLIST, lpIDList set to that item, and lpFile NULL. Thus no folder filename is supplied for PATHEXT lookup or Explorer command-line parsing. File reveal clones that item's PIDL, removes its last ID to obtain the parent, and supplies ILFindLastID(item) as one child relative to that parent to SHOpenFolderAndSelectItems. It does not open a folder with an omitted selection. The previous full-item/zero-child call agreed with the documented shortcut but failed to select on this runner; round 7 uses the explicit parent/child form. PIDLs remain alive through the calls and are freed, and COM initialization stays balanced. Documents and URLs retain their existing validated lpFile dispatch.
 
-`tmp/open-guard/windows-evidence-command.txt` attempts every evidence file, copies failed artifacts too, and exits nonzero after all groups if any failed. Each evidence child still finishes its existing pass/unwind GUI cleanup before the next call. All updated Windows checks remain unverified until that hosted run; the plain control must still pass on both revisions. macOS is out of scope.
+The existing neighbor checks now exercise both folder open and folder reveal, require the actual expected Explorer location, and still poll for marker side effects. The selection assertion, 15-second observer polling, and pass/unwind cleanup guards remain. [SHELLEXECUTEINFOW](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/ns-shellapi-shellexecuteinfow) documents item-ID dispatch; [SHOpenFolderAndSelectItems](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shopenfolderandselectitems) documents relative children. No runtime Windows pass is claimed for this candidate: all item-ID changes and reruns remain **unverified until hosted**.
 
-D4 was generated in a shared scratch clone using `run-evidence.mjs --before` and an interface-only before patch. The patches expose old decisions and raw dispatch bodies under the new helper signatures; they add no validation, resolution or path simplification. Round-5 repairs use 143fd387b with unchanged dispatch signatures; round-4 repairs use c87d00139, round-3 repairs use d6b269468, and original repairs retain origin/main. The round-4 before patch only adapts dispatch return ownership; it preserves the original PowerShell/PATHEXT lookup and VerbatimUNC refusal. Every run sets TMPDIR to this worktree's tmp/ and keeps fixtures there. Cargo output stays in this worktree's target directory. The lower Linux layer is the actual command function with PATH-isolated, marker-writing xdg-open; plugin calls go through Tauri's IPC dispatcher and real ACLs on a mock webview. This does not claim a graphical shell run.
+`tmp/open-guard/windows-evidence-command.txt` runs the new Invoice/bracket/reveal regressions against `df947d57e`, retains the comma checks against `143fd387b`, and reruns all historical Windows evidence files. It attempts every group, copies failed artifacts and observer traces too, cleans windows between children, and exits nonzero after all groups if any failed. The hosted job owns core.longpaths and 8.3 setup; the command does not alter them. macOS is out of scope.
+
+D4 was generated in a shared scratch clone using `run-evidence.mjs --before` and an interface-only before patch. The patches expose old decisions and raw dispatch bodies under the new helper signatures; they add no validation, resolution or path simplification. Round-7 regressions use df947d57e and round-5 repairs use 143fd387b with unchanged dispatch signatures; round-4 repairs use c87d00139, round-3 repairs use d6b269468, and original repairs retain origin/main. The round-4 before patch only adapts dispatch return ownership; it preserves the original PowerShell/PATHEXT lookup and VerbatimUNC refusal. Every run sets TMPDIR to this worktree's tmp/ and keeps fixtures there. Cargo output stays in this worktree's target directory. The lower Linux layer is the actual command function with PATH-isolated, marker-writing xdg-open; plugin calls go through Tauri's IPC dispatcher and real ACLs on a mock webview. This does not claim a graphical shell run.
 
 The author has not accepted these entries; independent acceptance remains for the verifier.
 
@@ -242,7 +244,7 @@ The author has not accepted these entries; independent acceptance remains for th
         "modules/shell/src-tauri/src/lib.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Round-4 Windows regressions: real Invoice folder dispatch never runs Invoice.cmd; real mapped UNC document/folder dispatch succeeds while mapped launchers are refused. Both checks passed on hosted Windows at e22910c2d; round-5 reruns remain unverified.",
+      "behaviour": "Round-4 mapped UNC documents/folders dispatch while mapped launchers are refused; passed at e22910c2d. The Invoice regression introduced in round 5 now has separate round-7 fail-before evidence. All current Windows reruns remain unverified.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -255,7 +257,6 @@ The author has not accepted these entries; independent acceptance remains for th
       ],
       "evidence": "gates/test-intent/evidence/open-guard-windows-round4-repaired.json",
       "newChecks": [
-        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_folder_does_not_execute_neighbor_cmd",
         "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_mapped_unc_drive_opens_document_and_refuses_launcher"
       ],
       "repaired": true
@@ -265,7 +266,7 @@ The author has not accepted these entries; independent acceptance remains for th
         "modules/shell/src-tauri/src/lib.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Round-4 Windows preservation: actual document and bracket-folder dispatch never runs a same-named .cmd neighbor. Both checks passed on hosted Windows at e22910c2d; round-5 reruns remain unverified.",
+      "behaviour": "Document dispatch never executes report.txt.cmd; passed at e22910c2d and in run 39415072540 on df947d57e. Bracket-folder dispatch regressed in round 5 and now has separate round-7 repaired evidence. Current reruns remain unverified.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -278,8 +279,7 @@ The author has not accepted these entries; independent acceptance remains for th
       ],
       "evidence": "gates/test-intent/evidence/open-guard-windows-round4-preserved.json",
       "newChecks": [
-        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_document_does_not_execute_neighbor_cmd",
-        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd"
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_document_does_not_execute_neighbor_cmd"
       ]
     },
     {
@@ -289,7 +289,7 @@ The author has not accepted these entries; independent acceptance remains for th
         "modules/shell/src-tauri/src/open_guard_windows.ps1"
       ],
       "class": "New",
-      "behaviour": "Round-5/6 repairs: actual Explorer windows open the exact comma-containing folder, or the parent with a,b2.txt selected. Hosted run 39412497810 passed the two folder checks after assertion failures before; reveal reached the right parent but failed selection. Round 6 preserves selection, uses documented Count/Item indexed reads, and logs the old pipeline result too. Root cause remains unresolved until a hosted rerun; no pass is claimed.",
+      "behaviour": "The comma folders must reach the exact folder, and a,b2.txt reveal must show its parent with that file selected. Hosted df947d57e passed comma folder routing but still had native selection count zero for reveal. Round-7 PIDL dispatch keeps these original before assertions against 143fd387b; the candidate is unverified until hosted.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -346,6 +346,30 @@ The author has not accepted these entries; independent acceptance remains for th
         ],
         "scope": "Passed on 143fd387b in hosted run 39412497810; artifact provided under tmp/open-guard/round6/evidence/. A rerun with the changed observer is pending."
       }
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/lib.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "Round-7 regressions: Invoice and Q3 [draft] opening/reveal never run adjacent .cmd files and reach their actual folders; comma-file reveal selects a,b2.txt. All three checks must assertion-fail on df947d57e and pass with PIDL dispatch. Current Windows results are unverified until hosted.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "F4 round 7: repair the hosted round-5 folder security regression first. Resolve the checked plain folder to an item ID; open/reveal directories with SEE_MASK_IDLIST and lpIDList, with lpFile NULL, so no folder name enters command/PATHEXT lookup. Reveal a file with its parent PIDL and one relative child derived from that item PIDL. Keep documents/URLs on their existing validated dispatch. Native SelectionCount zero after polling confirms the reveal failure is in the product. Keep all marker, comma, plain-control, selection and cleanup checks. The hosted job enables 8.3 generation and long paths; do not weaken the NTFS check or configure those in the script. Attempt all evidence files, clean between calls, and fail the job at the end if any failed.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/open-guard-windows-round7-repaired.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_folder_does_not_execute_neighbor_cmd",
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd",
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_comma_reveal_window_and_selection"
+      ],
+      "repaired": true
     }
   ]
 }
