@@ -335,3 +335,14 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "4d74e1df-a83f-4bc8-a7c5-905e2d15dd0b",
+  "verdict": "reject",
+  "digest": "sha256:7f9b5dd43d65236eb6d7018bce04e7771e7e4823e2a6c06b030dac48cfbdde23",
+  "note": "Reject: the new 43-character base64url key-format expectation (ManagedLlamaAdoptionTest#lostBindRotatesCredentialsOnInitialAndRecoveryLaunches, NoDeviceCpuActivationTest, RuntimeActivationCpuDevicePlanTest) rests only on an owner-words source located in the task request ('Mint a key per launch (32 random bytes from SecureRandom, base64url) ... in LlamaServerOps') that is agent design text, not the owner's recorded words ('all as recommended', 'i agree, proceed accordingly'), so per test-intent.md it counts as nothing; cite it as a delegated-choice quoting the owner's delegation or drop the format pin (the 'user turn 4' owner-words quote has the same labelling problem but no expectation depends on it alone); all other entries, classes and evidence checked sound, including a rerun of the ignored-key fail-before on 673b54a1b."
+}
+```
