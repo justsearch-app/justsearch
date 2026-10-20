@@ -172,12 +172,18 @@ export function extractTestItems(src) {
   }
   const items = [];
   let covered = -1;
-  const re = /#\[/g;
+  const re = /\bfn(?=\s+[_\p{XID_Start}])|#\[/gu;
   let m;
   while ((m = re.exec(s)) !== null) {
     const start = m.index;
     if (start < covered) continue;
+    // Function-local test setup belongs to its enclosing body, not the module scope.
+    if (m[0] === 'fn') {
+      re.lastIndex = itemEnd(s, re.lastIndex);
+      continue;
+    }
     const close = matchBracket(s, start + 1);
+    re.lastIndex = close;
     const content = s.slice(start + 2, close - 1);
     if (!isTestAttribute(content)) continue;
     const end = itemEnd(s, close);

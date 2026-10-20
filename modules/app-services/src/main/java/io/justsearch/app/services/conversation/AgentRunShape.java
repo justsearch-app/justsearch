@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation;
 
+import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.agent.api.conversation.ExecutionMode;
 import io.justsearch.agent.api.conversation.IterationMode;
 import io.justsearch.agent.api.conversation.PersistenceMode;
@@ -91,8 +92,30 @@ public final class AgentRunShape {
               EventField.enumOf("risk", RISK_VALUES),
               EventField.string("gateBehavior").asOptional()),
           EventDescriptor.ofTraced("tool_call_approved", EventField.string("callId")),
-          // Tempdoc 565 §30 — the DIRECTION authority's mid-run steer acknowledgement.
-          EventDescriptor.ofTraced("directive_acknowledged", EventField.string("directiveText")),
+          // Tempdoc 565 §30 — the DIRECTION authority's mid-run steer acknowledgement. WP6.2: one
+          // direction is reported queued, then applied or not_applied (with a reason), by id; the
+          // queued report echoes the sender's clientRequestId when the send carried one.
+          EventDescriptor.ofTraced(
+              "directive_acknowledged",
+              EventField.string("directiveText"),
+              EventField.string("directiveId"),
+              EventField.enumOf(
+                  "outcome",
+                  List.of(
+                      AgentEvent.DirectiveAcknowledged.QUEUED,
+                      AgentEvent.DirectiveAcknowledged.APPLIED,
+                      AgentEvent.DirectiveAcknowledged.NOT_APPLIED)),
+              EventField.enumOf(
+                      "reason",
+                      List.of(
+                          AgentEvent.DirectiveAcknowledged.REASON_RUN_FINISHED,
+                          AgentEvent.DirectiveAcknowledged.REASON_RUN_STOPPED,
+                          AgentEvent.DirectiveAcknowledged.REASON_RUN_FAILED,
+                          AgentEvent.DirectiveAcknowledged.REASON_STEP_LIMIT,
+                          AgentEvent.DirectiveAcknowledged.REASON_BUDGET_LIMIT,
+                          AgentEvent.DirectiveAcknowledged.REASON_RUN_INTERRUPTED))
+                  .asOptional(),
+              EventField.string("clientRequestId").asOptional()),
           EventDescriptor.ofTraced(
               "tool_exec_started", EventField.string("callId"), EventField.string("toolName")),
           EventDescriptor.ofTraced(

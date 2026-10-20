@@ -17,6 +17,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Incidental requests are outside these render/event scenarios. Keep their
+// unavailable-backend behavior explicit, without contacting a real server.
+const originalFetch = globalThis.fetch;
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Test backend unavailable')));
+});
+afterEach(() => { globalThis.fetch = originalFetch; });
 import type { LitElement } from 'lit';
 import './UnifiedChatView.js';
 import type { UnifiedChatView } from './UnifiedChatView.js';
@@ -6696,6 +6704,154 @@ describe('UnifiedChatView resumed-thread shape provenance (tempdoc 941)', () => 
     expect(view.thread[0]?.standaloneQuestion).toBe(
       'What did the Q3 report say about churn?',
     );
+    view.remove();
+  });
+});
+
+// WP6.2 S8.2 / N8.4 — the old window's direction chip says what happened to the direction; an applied
+// one reads exactly as it always has.
+describe('a direction chip reports its outcome', () => {
+  it('keeps the applied chip unchanged and marks queued and not-applied directions', async () => {
+    __resetAgentSessionStore();
+    const view = mountView();
+    await view.updateComplete;
+    view.affordance = 'agent';
+    const steer = (id: string, content: string, attributes: Record<string, unknown>) => ({
+      id, occurredAt: `2026-01-01T00:00:0${id.slice(1)}Z`, kind: 'PROGRESS', originator: 'user', content,
+      attributes: { steer: true, ...attributes },
+    });
+    (view as unknown as { unifiedEvents: unknown[] }).unifiedEvents = [
+      { id: 'u0', occurredAt: '2026-01-01T00:00:00Z', kind: 'USER_MESSAGE', originator: 'user', content: 'q', attributes: {} },
+      steer('s1', 'Focus on Q3.', { directiveOutcome: 'applied' }),
+      steer('s2', 'Skip drafts.', { directiveOutcome: 'queued' }),
+      steer('s3', 'Too late.', { directiveOutcome: 'not_applied', directiveReason: 'run_stopped' }),
+    ];
+    view.requestUpdate();
+    await view.updateComplete;
+    const chips = [...view.shadowRoot!.querySelectorAll('.steer-directive')].map((chip) =>
+      (chip.textContent ?? '').replace(/\s+/g, ' ').trim(),
+    );
+    expect(chips).toEqual([
+      'Your direction Focus on Q3.',
+      "Your direction Skip drafts. Queued — applies at the agent's next step",
+      "Your direction Too late. Not applied — the run was stopped before the agent's next step",
+    ]);
+    __resetAgentSessionStore();
+    view.remove();
+  });
+
+  // N8.4 / S8.2 — a direction is durable progress: the record carries it as well as the live run. The
+  // merge shows each direction once (matched by its directive id), with the furthest-known outcome, and
+  // keeps one that only the live run or only the record has.
+  it('shows each direction once when the live run and the record both carry it', async () => {
+    __resetAgentSessionStore();
+    const view = mountView();
+    await view.updateComplete;
+    view.affordance = 'agent';
+    const ctrl = getAgentSessionController('http://localhost:5173');
+    const ack = (directiveId: string, directiveText: string, outcome: string, reason?: string) =>
+      ctrl.onDirectiveAcknowledged({ directiveId, directiveText, outcome, ...(reason ? { reason } : {}) });
+    ack('d1', 'Answer in French.', 'queued');
+    ack('d1', 'Answer in French.', 'applied');
+    ack('d2', 'Skip drafts.', 'queued');
+    ack('d2', 'Skip drafts.', 'not_applied', 'run_finished');
+    ack('d3', 'Answer in French.', 'queued'); // same words, a second direction: not merged with d1
+    (view as unknown as { agentCtrl: unknown }).agentCtrl = ctrl;
+    const recorded = (directiveId: string, second: number, content: string, attributes: Record<string, unknown>) => ({
+      id: `conv:direction:${directiveId}`, occurredAt: `2026-01-01T00:00:0${second}Z`, kind: 'PROGRESS',
+      originator: 'user', content,
+      attributes: { steer: true, phase: 'direction', directiveId, ...attributes },
+    });
+    const v = view as unknown as {
+      unifiedEvents: unknown[];
+      mergedTimeline: () => Array<{ content: string; attributes: Record<string, unknown> }>;
+    };
+    v.unifiedEvents = [
+      { id: 'u0', occurredAt: '2026-01-01T00:00:00Z', kind: 'USER_MESSAGE', originator: 'user', content: 'q', attributes: {} },
+      recorded('d0', 1, 'Focus on Q3.', { directiveOutcome: 'applied' }), // an earlier run's, record only
+      recorded('d1', 2, 'Answer in French.', { directiveOutcome: 'applied' }),
+      recorded('d2', 3, 'Skip drafts.', { directiveOutcome: 'queued' }), // read before its final outcome
+    ];
+
+    const directions = v.mergedTimeline().filter((it) => it.attributes.steer === true);
+    expect(directions.map((it) => [it.content, it.attributes.directiveOutcome])).toEqual([
+      ['Focus on Q3.', 'applied'],
+      ['Answer in French.', 'applied'],
+      ['Skip drafts.', 'not_applied'],
+      ['Answer in French.', 'queued'],
+    ]);
+    expect(directions[2]!.attributes.directiveReason).toBe('run_finished');
+
+    view.requestUpdate();
+    await view.updateComplete;
+    const chips = [...view.shadowRoot!.querySelectorAll('.steer-directive')].map((chip) =>
+      (chip.textContent ?? '').replace(/\s+/g, ' ').trim(),
+    );
+    expect(chips.filter((c) => c === 'Your direction Answer in French.')).toHaveLength(1);
+
+    // Restored without the live run: the record alone, still once each.
+    (view as unknown as { agentCtrl: unknown }).agentCtrl = null;
+    expect(v.mergedTimeline().filter((it) => it.attributes.steer === true).map((it) => it.content)).toEqual([
+      'Focus on Q3.',
+      'Answer in French.',
+      'Skip drafts.',
+    ]);
+    __resetAgentSessionStore();
+    view.remove();
+  });
+});
+
+// WP6.2 S8.2 (review 5) — the old window keeps an unconfirmed send's note through the run's completion
+// and the record that follows it; a report without this send's request id (another client's direction
+// with the same words) does not clear it.
+describe('an unconfirmed steer send keeps its note in the old window', () => {
+  const LOST =
+    'Could not confirm your direction reached the run — the connection to JustSearch failed. If it did, it shows here as your direction.';
+
+  it.each([
+    ['alone', false],
+    ["beside another client's direction with the same words", true],
+  ])('after the run completes and its record loads, %s', async (_case, otherClient) => {
+    __resetAgentSessionStore();
+    const view = mountView();
+    await view.updateComplete;
+    view.affordance = 'agent';
+    const ctrl = getAgentSessionController('http://localhost:5173');
+    ctrl.sessionId = 'run-1';
+    const fetchBefore = globalThis.fetch;
+    globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch;
+    try {
+      expect(await ctrl.steer('Answer in French.')).toBe(false);
+    } finally {
+      globalThis.fetch = fetchBefore;
+    }
+    if (otherClient) {
+      ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'queued' });
+      ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
+    }
+    ctrl.onDone({ finalResponse: 'The answer.', iterationsUsed: 1, toolCallsExecuted: 0 } as never);
+    (view as unknown as { agentCtrl: unknown }).agentCtrl = ctrl;
+    (view as unknown as { unifiedEvents: unknown[] }).unifiedEvents = [
+      { id: 'u0', occurredAt: '2026-01-01T00:00:00Z', kind: 'USER_MESSAGE', originator: 'user', content: 'q', attributes: {} },
+      ...(otherClient
+        ? [{
+            id: 'conv:direction:d1', occurredAt: '2026-01-01T00:00:01Z', kind: 'PROGRESS', originator: 'user',
+            content: 'Answer in French.',
+            attributes: { steer: true, phase: 'direction', directiveId: 'd1', directiveOutcome: 'applied' },
+          }]
+        : []),
+      { id: 'a0', occurredAt: '2026-01-01T00:00:02Z', kind: 'ASSISTANT_MESSAGE', originator: 'agent', content: 'The answer.', attributes: {} },
+    ];
+    view.requestUpdate();
+    await view.updateComplete;
+    const v = view as unknown as { mergedTimeline: () => Array<{ content: string; attributes: Record<string, unknown> }> };
+    expect(v.mergedTimeline().filter((it) => it.content === LOST)).toHaveLength(1);
+    expect((view.shadowRoot!.textContent ?? '').replace(/\s+/g, ' ')).toContain(LOST);
+    const chips = [...view.shadowRoot!.querySelectorAll('.steer-directive')].map((chip) =>
+      (chip.textContent ?? '').replace(/\s+/g, ' ').trim(),
+    );
+    expect(chips).toEqual(otherClient ? ['Your direction Answer in French.'] : []);
+    __resetAgentSessionStore();
     view.remove();
   });
 });

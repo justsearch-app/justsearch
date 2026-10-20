@@ -30,30 +30,47 @@ What it does:
 - Starts the backend (`:modules:ui:runHeadless`) on a free port near `33221`.
 - Starts the frontend at `http://127.0.0.1:5173`.
 - Sets `VITE_JUSTSEARCH_API_PORT=<port>` (and legacy `VITE_API_PORT=<port>`) so the UI connects immediately (no `?api_port=` needed).
-- If you started the backend separately (and didn’t set the Vite env var), the UI can also auto-discover by probing `33221..33250` on loopback and validating the `/api/status` payload.
+- For a separately started backend, set its port explicitly as shown below. There is no browser port-range scan.
 
-> Note: On macOS/Linux, use `npm --prefix ./modules/ui-web run dev:all`.
+> On Linux, use `npm --prefix ./modules/ui-web run dev:all`. macOS is outside the supported platforms.
 
 #### Split terminals (manual)
 For more control (or when debugging backend startup), run the Frontend and Backend separately.
 
-**Terminal 1 (Backend):**
+**Terminal 1 (Backend, Windows PowerShell):**
 
 ```powershell
-.\scripts\dev\run-headless-api.ps1
+.\scripts\dev\run-headless-api.ps1 -Port 33221
 ```
 
 **Windows note (memory safety):** If you hit Node/Vite “paging file / commit” issues during backend builds, you can skip bundling the web UI by passing `-PskipWebBuild=true` to Gradle. The `run-headless-api.ps1` script already uses this by default.
 
-**Terminal 2 (Frontend):**
+**Terminal 1 on Linux (from repo root):**
 
-```powershell
-cd modules\ui-web
-npm run dev
+```bash
+JUSTSEARCH_API_PORT=33221 node scripts/lib/tool-invoker.cjs gradle :modules:ui:runHeadless -PskipWebBuild=true
 ```
 
-Open `http://127.0.0.1:5173`. The frontend resolves the backend using `resolveApiEndpoint()` and will typically
-connect automatically (via `VITE_JUSTSEARCH_API_PORT` / `VITE_API_PORT`, or by probing `33221..33250` on loopback).
+**Terminal 2 (Frontend, Windows PowerShell, from repo root):**
+
+```powershell
+$env:VITE_JUSTSEARCH_API_PORT = "33221"
+npm --prefix modules/ui-web run dev
+```
+
+**Terminal 2 on Linux (from repo root):**
+
+```bash
+VITE_JUSTSEARCH_API_PORT=33221 npm --prefix modules/ui-web run dev
+```
+
+Open `http://127.0.0.1:5173`. The explicit port connects Vite and the browser to the backend started above.
+The frontend resolves the backend using `resolveApiEndpoint()`. Resolution order is `?api_port=`,
+the legacy JavaFX bridge, Tauri `invoke("api_port")`, `VITE_JUSTSEARCH_API_PORT` / `VITE_API_PORT`,
+then the browser Vite proxy. Without a port override, Vite reads runtime manifests from its discovery
+folders; the backend's default `modules/ui/build/applauncher-data` is not among them. To use manifest
+discovery for this split-terminal setup, set the same absolute `JUSTSEARCH_DATA_DIR` in both terminals
+before starting either process.
 
 Tip: If you started the backend on a non-default port, you can force the UI to use it via:
 
@@ -85,7 +102,6 @@ Notes:
 - The shell starts the backend with `-Djustsearch.prod=true`, so the Local API CORS allowlist is in **desktop/prod**
   mode (only `tauri://<loopback-host>` and `http(s)://tauri.localhost` are allowed). A browser UI
   (`http://127.0.0.1:5173`) cannot directly call that backend by design.
-- The current dev supervisor is **Windows-first** (it expects `runtime/bin/java.exe` and Windows classpath separators).
 
 ### Build the desktop installer (Windows)
 
@@ -109,17 +125,19 @@ This launches the staged headless bundle and asserts basic readiness (`/api/stat
 
 The app includes built-in introspection tools reachable via browser.
 
-> Replace `33221` with your actual API port. `run-headless-api.ps1` prints `JUSTSEARCH_API_PORT=<port>` to stdout,
-> and `npm --prefix modules/ui-web run dev:all` echoes the backend logs as it starts.
+> Replace `33221` with your actual API port. The Windows wrapper prints `API Port: <port>`;
+> the Engine prints `JUSTSEARCH_API_PORT=<port>`. `dev:all` echoes the backend logs as it starts.
+> `dev:all` picks a free port near `33221`; `jseval dev` defaults to `33221` (`--port` overrides it).
+> `scripts/dev/dev-runner.cjs start` defaults to port `0`, requesting an OS-assigned port.
 
 | Endpoint | URL | Purpose |
 | :--- | :--- | :--- |
 | **Dashboard** | `http://localhost:33221/api/debug/dashboard` | Visual status of Worker, Index, and Memory. |
 | **State JSON** | `http://localhost:33221/api/debug/state` | Raw JSON dump of the entire internal state. |
-| **Event Log** | `http://localhost:33221/api/debug/events` | Ring buffer of the last 50 system events. |
+| **Event Log** | `http://localhost:33221/api/debug/events` | Recent system events (20 by default; use `?limit=<N>`). |
 | **Engine Log Tail** | `http://localhost:33221/api/debug/engine-log` | Quick peek at recent engine logs (best-effort). |
 | **Health** | `http://localhost:33221/api/health` | Lightweight backend health check. |
-| **Inference Status** | `http://localhost:33221/api/inference/status` | Current AI mode + queues + effective runtime model/context (best-effort); includes external-server diagnostics when applicable. |
+| **Inference Status** | `http://localhost:33221/api/inference/status` | Current AI mode + queues + effective runtime model/context (best-effort); includes diagnostics for explicitly configured external servers and ignored unowned servers. |
 
 Note: `GET /api/debug/effective-config` exists for "effective config" debugging. See `docs/explanation/06-configuration-ssot.md` for configuration source-attribution rules.
 
@@ -134,35 +152,40 @@ Note: `GET /api/debug/effective-config` exists for "effective config" debugging.
 ### Forcing a Re-Index
 If the index seems out of sync:
 1.  Go to **Library** view.
-2.  Click **Reindex All** (top-right).
-3.  *Note:* This does not delete the index; it marks all files as "dirty" to force re-evaluation.
+2.  Use the header's reindex action to incrementally check all watched roots. Unchanged files can be skipped.
+3.  An unverified folder row shows **Reindex** (tooltip **Reindex to verify**). This forces
+    extraction checks across all watched roots; it is not limited to that row's folder.
 
-You can also reindex a single folder from the Library list (refresh icon per row).
+A full-generation rebuild for an embedding mismatch is a separate operation; an incremental reindex
+does not replace that recovery.
 
 ### Summarizing and Asking Questions (AI)
-The right panel (**Inspector Panel**) contains the preview + AI tools.
+Click a result row to open its document preview. Results have no checkboxes. To build a selection
+in the live results card, use **Ctrl-click** (or Meta-click) to toggle files, or
+**Shift-click** to select a range. Frozen results from earlier turns can be opened but not multi-selected.
 
-**Single-file**
-1. Click a result row (or the checkbox) to open the Inspector for that file.
-2. Use **Summarize** to stream a summary, or type a question in the Inspector input and press **Enter** to stream an answer.
+For selected files, use the selection menu's **Summarize all** or **Ask about all** action.
+For a single result, its context menu includes **Ask about this file**. AI actions require a running
+local chat model. Answers and summaries appear in the conversation, rather than a separate Inspector input.
 
-**Multi-file**
-1. Use the **checkboxes** in the result list to build a multi-selection.
-2. Use **Summarize** / **Ask** to run across the selected files.
-
-Notes:
-- Multi-file summarize runs **full coverage** by default (slower). For best performance, keep it **≤ 3 files**.
-- You can cancel in-flight streaming from the Inspector when the **Cancel** button is shown.
-- `Ctrl+K` opens the command palette; **Help → Keyboard Shortcuts** in the app has the full list.
+**Ctrl+K** opens the command palette. See **Help → Keyboard Shortcuts** for the current shortcuts.
 
 ### Resetting the App
-For a full reset, use **Settings → Data → Delete all local data**. **Help → Troubleshooting**
-in the app (High disk usage) explains what it removes and the backup steps.
 
-To rebuild only a stuck or corrupted index, quit JustSearch, then delete the
-`index` folder inside its data folder (Windows `%APPDATA%\io.justsearch.shell`,
-Linux default `~/.local/share/io.justsearch.shell`), and restart. If `XDG_DATA_HOME`
-is set on Linux, use `$XDG_DATA_HOME/io.justsearch.shell` instead.
+The desktop app's data folder is:
+
+- Windows: `%APPDATA%\io.justsearch.shell`
+- Linux: `~/.local/share/io.justsearch.shell` (or `$XDG_DATA_HOME/io.justsearch.shell` if set)
+
+Prefer **Settings → Data → Delete all local data**, then type **DELETE** to confirm. This closes the
+app and deletes the index, settings, logs, and chat history on next launch; AI models and the llama-server
+runtime are preserved. Export an encrypted backup of chat history, memories, and agent history first
+from **Security & Privacy** if you need to keep them.
+
+Inside that folder, `index` holds the search index and `jobs.db` holds the indexing queue.
+A browser dev stack uses its own data folder instead: `dev:all` defaults to `modules/ui-web/.dev-data`, Gradle `runHeadless`
+defaults to `modules/ui/build/applauncher-data`, and jseval records its selected folder in its run output.
+Use that stack's data folder rather than the desktop folder.
 
 ### Troubleshooting: GPU usage doesn't stop after a summary
 
@@ -180,6 +203,8 @@ Useful commands (Windows):
 # See llama-server processes (PID should be stable)
 Get-Process -Name llama-server -ErrorAction SilentlyContinue | Select-Object Id,StartTime,CPU
 
+# Read the actual llama-server port from /api/inference/status first.
+# Its initial default is 8081 (8082 when API port is 8081 or auto/0); managed launches may use a fresh port.
 # Find listening ports owned by llama-server processes
 Get-NetTCPConnection -State Listen | Where-Object { $_.OwningProcess -in (Get-Process -Name llama-server -ErrorAction SilentlyContinue).Id } | Select-Object LocalAddress,LocalPort,OwningProcess
 
@@ -190,10 +215,10 @@ nvidia-smi.exe pmon -c 1
 Stop-Process -Id <pid> -Force
 ```
 
-JustSearch uses a `llama-server` it did not start only when
-`justsearch.inference.external_endpoint` is set to its loopback HTTP URL with an
-explicit port (for example `http://127.0.0.1:8085`); otherwise it starts its own on
-a free loopback port.
+JustSearch uses a server it did not start only when `justsearch.inference.external_endpoint` names it,
+for example `http://127.0.0.1:8085`. This must be a loopback HTTP URL with an explicit port. Otherwise,
+it starts its own server and reports a healthy unowned server as `external_server_ignored`; it does
+not adopt it automatically. See ADR-0051.
 
 Tip: `GET /api/inference/status` is usually the fastest way to see if the app thinks it is Online/Indexing/Offline, plus any external-server diagnostics when an explicit endpoint is in use.
 
@@ -218,7 +243,8 @@ The app reads `?q=` from the URL and sets the query state directly, bypassing th
 
 ### Q&A Panel Doesn't Open After File Selection
 
-This issue is **fixed**: clicking a checkbox now also activates the row so the Inspector opens immediately (no “checkbox then click row” dance).
+Click a result row to open its document preview. For Q&A, use **Ask about this file** in the result
+context menu, or select files with Ctrl/Shift-click and use **Ask about all**.
 
 ### Accessibility Snapshot Limitations
 
@@ -241,19 +267,20 @@ Start the backend and frontend together:
 # Start backend + frontend together (recommended; cross-platform)
 npm --prefix .\modules\ui-web run dev:all
 
-# Windows convenience wrapper (also starts both)
+# Windows-only convenience wrapper (also starts both)
 .\scripts\dev\dev-all.ps1
 
-# Or start separately for more control:
+# Or start separately on Windows:
 # Terminal 1: Backend (rebuilds on each start unless -SkipBuild)
-.\scripts\dev\run-headless-api.ps1
+.\scripts\dev\run-headless-api.ps1 -Port 33221
 
-# Terminal 2: Frontend (hot-reloads automatically)
-cd modules\ui-web
-npm run dev
+# Terminal 2: Frontend (hot-reloads automatically; from repo root)
+$env:VITE_JUSTSEARCH_API_PORT = "33221"
+npm --prefix modules/ui-web run dev
 ```
 
-**Important:** Java backend changes require restart. Frontend (Lit/Vite) hot-reloads automatically.
+On Linux, use the split-terminal commands in Quick Start above; the `.ps1` wrappers call
+Windows Gradle launchers. Java backend changes require restart. Frontend (Lit/Vite) hot-reloads automatically.
 
 ### Verifying Backend Changes
 
@@ -262,7 +289,8 @@ After modifying Java code:
    - If you used `npm --prefix modules/ui-web run dev:all`, press **Ctrl+C** in that terminal.
    - If you used `run-headless-api.ps1`, press **Ctrl+C** in that terminal.
 2. Rebuild (Java-only, skips web bundle): `node scripts/lib/tool-invoker.cjs gradle :modules:ui:installDist -PskipWebBuild=true --no-daemon`
-3. Restart: `.\scripts\dev\run-headless-api.ps1 -SkipBuild`
+3. Restart on Windows: `.\scripts\dev\run-headless-api.ps1 -SkipBuild`. On Linux, rerun the
+   `runHeadless` command in Quick Start; with `dev:all`, rerun that npm command.
 
 **One distribution:** lane F stage A item A13 deleted the Worker distribution. `:modules:ui:installDist` builds the only tree the backend launches from, and the index half is in its `lib/` — there is no second artifact that can drift out of sync.
 
@@ -287,9 +315,10 @@ Invoke-RestMethod -Uri http://localhost:33221/api/inference/status
 # Refresh persisted inference settings (model/context/gpu layers) from Brain settings.
 # Use the Reload control, which submits an accepted settings operation with a fresh witness.
 
-# Detach from an explicitly configured external llama-server (starts a managed server on a free loopback port; leaves the external process running)
+# Detach from an explicitly configured external llama-server for this run.
+# Starts a managed server and leaves the user-owned external process running.
 Invoke-RestMethod -Method Post -Uri http://localhost:33221/api/inference/detach
-# Note: if the runtime is not Online with an external server, this is a no-op and returns "detached": false (ports unchanged).
+# If no external server is in use, returns "detached": false (ports unchanged).
 # Example response:
 # {
 #   "success": true,

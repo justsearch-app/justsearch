@@ -42,6 +42,9 @@ import {
   getUndoableOperation,
   __resetJournalForTest,
 } from '../substrates/effects/index.js';
+// WP6.2 — both windows' live projections, fed from this controller's state as the views feed them.
+import { projectSv3RunFeed } from '../views/search-v3/sv3-run.js';
+import { projectLiveAgentActivity } from '../views/unifiedThreadProjection.js';
 
 // ---------- SSE mock helpers ----------
 
@@ -1158,13 +1161,20 @@ describe('AgentSessionController interaction methods', () => {
   });
 
   it('onDirectiveAcknowledged appends a human-origin steer-directive entry', () => {
-    ctrl.onDirectiveAcknowledged({ directiveText: 'Focus only on Q3.' });
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Focus only on Q3.', directiveId: 'd1', outcome: 'applied' });
     const steer = ctrl.conversation.filter((e) => e.type === 'steer-directive');
     expect(steer.length).toBe(1);
     expect(steer[0]?.content).toBe('Focus only on Q3.');
     // a blank/absent text is ignored (no phantom entry)
     ctrl.onDirectiveAcknowledged({});
     expect(ctrl.conversation.filter((e) => e.type === 'steer-directive').length).toBe(1);
+  });
+
+  // WP6.2 S8.2 / N8.3 — as in the canonical thread record: an acknowledgement without an id (written
+  // before directions had outcomes) never proved the direction reached the model, so it shows nothing.
+  it('onDirectiveAcknowledged shows nothing for an acknowledgement without an id', () => {
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Old direction.' });
+    expect(ctrl.conversation.filter((e) => e.type === 'steer-directive')).toEqual([]);
   });
 
   // Tempdoc 565 §33 — a failed steer (404: the run finished) must surface a note, not be silent.
@@ -1178,6 +1188,298 @@ describe('AgentSessionController interaction methods', () => {
     );
     expect(notes.length).toBe(1);
     expect(notes[0]?.severity).toBe('warn');
+  });
+
+  // WP6.2 S8.2 — a direction's report follows what really happened to it, one entry per direction.
+  it('a queued direction becomes applied in place, one entry, keyed by its id', () => {
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Focus on Q3.', directiveId: 'd1', outcome: 'queued' });
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Focus on Q3.', directiveId: 'd2', outcome: 'queued' });
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Focus on Q3.', directiveId: 'd1', outcome: 'applied' });
+    const steer = ctrl.conversation.filter((e) => e.type === 'steer-directive');
+    expect(steer.map((e) => [e.content, e.directiveOutcome])).toEqual([
+      ['Focus on Q3.', 'applied'],
+      ['Focus on Q3.', 'queued'],
+    ]);
+  });
+
+  it('a not-applied direction keeps its reason, and a late queued report does not undo a final one', () => {
+    ctrl.onDirectiveAcknowledged({
+      directiveText: 'Too late.', directiveId: 'd9', outcome: 'not_applied', reason: 'run_finished',
+    });
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Too late.', directiveId: 'd9', outcome: 'queued' });
+    const steer = ctrl.conversation.filter((e) => e.type === 'steer-directive');
+    expect(steer).toHaveLength(1);
+    expect(steer[0]?.directiveOutcome).toBe('not_applied');
+    expect(steer[0]?.directiveReason).toBe('run_finished');
+  });
+
+  // WP6.2 S8.2 — the run's final report on a direction comes after `done` (the loop reports what it
+  // never sent once it has stopped); the live display must take it, not keep "queued" for ever.
+  it('a final outcome reported after done reaches the live display of both windows', async () => {
+    globalThis.fetch = mockFetchSse(
+      sseChunk('session_started', { sessionId: 'sess-late' }) +
+        sseChunk('directive_acknowledged', { directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'queued' }) +
+        sseChunk('done', { finalResponse: 'The answer.', iterationsUsed: 1, toolCallsExecuted: 0 }) +
+        sseChunk('directive_acknowledged', {
+          directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'not_applied', reason: 'run_finished',
+        }),
+    );
+    await ctrl.send('hello agent');
+
+    const steer = ctrl.conversation.filter((e) => e.type === 'steer-directive');
+    expect(steer.map((e) => [e.directiveOutcome, e.directiveReason])).toEqual([['not_applied', 'run_finished']]);
+    // Search v3's live feed, and the old window's live projection (its chip reads these attributes).
+    const notes = projectSv3RunFeed(ctrl, 0).items.filter((i) => i.kind === 'note');
+    expect(notes.map((n) => (n.kind === 'note' ? [n.label, n.text] : null))).toEqual([
+      ['Not applied', "Answer in French. (the run finished before the agent's next step)"],
+    ]);
+    const live = projectLiveAgentActivity(ctrl.conversation, ctrl.toolCalls).filter((i) => i.attributes.steer);
+    expect(live.map((i) => i.attributes)).toEqual([
+      { steer: true, directiveId: 'd1', directiveOutcome: 'not_applied', directiveReason: 'run_finished' },
+    ]);
+  });
+
+  it('after done, only direction reports still reach the display', async () => {
+    globalThis.fetch = mockFetchSse(
+      sseChunk('session_started', { sessionId: 'sess-after' }) +
+        sseChunk('done', { finalResponse: 'The answer.', iterationsUsed: 1, toolCallsExecuted: 0 }) +
+        sseChunk('chunk', { text: 'stray text' }) +
+        sseChunk('progress', { phase: 'llm', message: 'stray step' }),
+    );
+    await ctrl.send('hello agent');
+    expect(ctrl.conversation.map((e) => e.type)).toEqual(['user', 'assistant-text']);
+  });
+
+  // WP6.2 N8.3 / S8.2 — replaying a transcript exported before directions had outcomes agrees with
+  // the reloaded thread: its acknowledgement alone is not shown as a direction that steered the run.
+  it('a replayed old acknowledgement is not shown as Steered; a replayed applied direction still is', () => {
+    expect(
+      ctrl.loadReplayFromExport({
+        meta: { sessionId: 'old-run' },
+        events: [
+          { eventType: 'session_started', payload: { sessionId: 'old-run' } },
+          { eventType: 'directive_acknowledged', payload: { directiveText: 'Old direction.' } },
+          { eventType: 'error', payload: { error: 'The model failed.' } },
+        ],
+      }),
+    ).toBe(true);
+    expect(ctrl.conversation.filter((e) => e.type === 'steer-directive')).toEqual([]);
+    const oldNotes = projectSv3RunFeed(ctrl, 0).items.filter((i) => i.kind === 'note');
+    expect(oldNotes.some((n) => n.kind === 'note' && n.label === 'Steered')).toBe(false);
+
+    ctrl.exitReplay();
+    ctrl.loadReplayFromExport({
+      meta: { sessionId: 'new-run' },
+      events: [
+        { eventType: 'session_started', payload: { sessionId: 'new-run' } },
+        { eventType: 'directive_acknowledged', payload: { directiveText: 'Focus on Q3.', directiveId: 'd1', outcome: 'queued' } },
+        { eventType: 'directive_acknowledged', payload: { directiveText: 'Focus on Q3.', directiveId: 'd1', outcome: 'applied' } },
+        { eventType: 'done', payload: { finalResponse: 'The answer.', iterationsUsed: 1, toolCallsExecuted: 0 } },
+      ],
+    });
+    const notes = projectSv3RunFeed(ctrl, 0).items.filter((i) => i.kind === 'note');
+    expect(notes.map((n) => (n.kind === 'note' ? [n.label, n.text] : null))).toEqual([['Steered', 'Focus on Q3.']]);
+  });
+
+  // WP6.2 S8.2 — a send whose answer never arrived cannot say the direction was not applied: the run
+  // may have taken it (POST /api/chat/agent/steer answers 404 only when no live run took it; any other
+  // failure can follow the run queueing it). The run's own reports for that direction decide.
+  it('steer names a connection failure as such, not as a finished run, without claiming non-application', async () => {
+    ctrl.sessionId = 'sess-net';
+    globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch;
+    expect(await ctrl.steer('focus')).toBe(false);
+    const notes = ctrl.conversation.filter((e) => e.type === 'progress' && e.severity === 'warn');
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.content).toMatch(/connection to JustSearch failed/);
+    expect(notes[0]?.content).not.toMatch(/not applied|finished/i);
+  });
+
+  it('steer names an HTTP error other than 404 by its status, without claiming non-application', async () => {
+    ctrl.sessionId = 'sess-500';
+    globalThis.fetch = mockFetchError(500, 'boom');
+    expect(await ctrl.steer('focus')).toBe(false);
+    const notes = ctrl.conversation.filter((e) => e.type === 'progress' && e.severity === 'warn');
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.content).toMatch(/HTTP 500/);
+    expect(notes[0]?.content).not.toMatch(/not applied|finished/i);
+  });
+
+  /** Both windows' live display of a run: Search v3's feed notes and the old window's projected items. */
+  function bothWindows(c: AgentSessionController): { v3: string[][]; old: string[][] } {
+    const v3 = projectSv3RunFeed(c, 0).items.flatMap((i) => (i.kind === 'note' ? [[i.label, i.text]] : []));
+    const old = projectLiveAgentActivity(c.conversation, c.toolCalls).flatMap((i) =>
+      i.attributes.steer === true
+        ? [['direction', i.content, String(i.attributes.directiveOutcome)]]
+        : i.kind === 'progress'
+          ? [['note', i.content]]
+          : [],
+    );
+    return { v3, old };
+  }
+
+  it('a lost answer to a direction the run took shows only the run report, in both windows', async () => {
+    ctrl.sessionId = 'sess-lost';
+    // The run reports the direction queued, echoing the send's request id, while the POST is in
+    // flight; then the answer is lost.
+    globalThis.fetch = takenSteer(ctrl, 'd1', 'lost');
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
+    expect(bothWindows(ctrl)).toEqual({
+      v3: [['Steered', 'Answer in French.']],
+      old: [['direction', 'Answer in French.', 'applied']],
+    });
+  });
+
+  it('a 5xx answer is settled by the run report that follows it, in both windows', async () => {
+    ctrl.sessionId = 'sess-5xx';
+    let requestId: string | undefined;
+    globalThis.fetch = vi.fn((_url: string, init?: RequestInit) => {
+      requestId = (JSON.parse(String(init?.body)) as { clientRequestId?: string }).clientRequestId;
+      return Promise.resolve(new Response('bad gateway', { status: 502 }));
+    }) as unknown as typeof fetch;
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    expect(bothWindows(ctrl).v3).toHaveLength(1);
+    expect(bothWindows(ctrl).old).toHaveLength(1);
+    ctrl.onDirectiveAcknowledged({
+      directiveText: 'Answer in French.',
+      directiveId: 'd2',
+      outcome: 'queued',
+      clientRequestId: requestId,
+    });
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd2', outcome: 'applied' });
+    expect(bothWindows(ctrl)).toEqual({
+      v3: [['Steered', 'Answer in French.']],
+      old: [['direction', 'Answer in French.', 'applied']],
+    });
+  });
+
+  it('an unconfirmed send is not settled by an earlier direction with the same text', async () => {
+    ctrl.sessionId = 'sess-same';
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Focus.', directiveId: 'd0', outcome: 'queued' });
+    globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch;
+    await ctrl.steer('Focus.');
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Focus.', directiveId: 'd0', outcome: 'applied' });
+    const notes = ctrl.conversation.filter((e) => e.type === 'progress' && e.severity === 'warn');
+    expect(notes.map((e) => e.content)).toEqual([
+      'Could not confirm your direction reached the run — the connection to JustSearch failed. If it did, it shows here as your direction.',
+    ]);
+  });
+
+  // WP6.2 S8.2 (review 4) — two sends with the same words are two sends: the run's queued report
+  // echoes the request id of the send that produced it, and only that send's report settles it.
+  const LOST =
+    'Could not confirm your direction reached the run — the connection to JustSearch failed. If it did, it shows here as your direction.';
+
+  /** A steer POST that never reaches the server. */
+  const blockedSteer = (): typeof fetch =>
+    vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch;
+
+  /** A steer POST the server takes: it reports the direction queued, then answers 200 (or the answer is lost). */
+  function takenSteer(c: AgentSessionController, directiveId: string, answer: 'ok' | 'lost'): typeof fetch {
+    return vi.fn((_url: string, init?: RequestInit) => {
+      const { text, clientRequestId } = JSON.parse(String(init?.body)) as { text: string; clientRequestId?: string };
+      c.onDirectiveAcknowledged({ directiveText: text, directiveId, outcome: 'queued', clientRequestId });
+      return answer === 'ok'
+        ? Promise.resolve(new Response(JSON.stringify({ status: 'injected' }), { status: 200 }))
+        : Promise.reject(new TypeError('Failed to fetch'));
+    }) as unknown as typeof fetch;
+  }
+
+  it('a blocked send keeps its note when an identical later send is reported, in both windows', async () => {
+    ctrl.sessionId = 'sess-f2';
+    globalThis.fetch = blockedSteer();
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    globalThis.fetch = takenSteer(ctrl, 'd1', 'ok');
+    expect(await ctrl.steer('Answer in French.')).toBe(true);
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
+    expect(bothWindows(ctrl)).toEqual({
+      v3: [['Progress', LOST], ['Steered', 'Answer in French.']],
+      old: [['note', LOST], ['direction', 'Answer in French.', 'applied']],
+    });
+  });
+
+  it('a blocked send is not settled by an earlier identical send reported after it failed, in both windows', async () => {
+    ctrl.sessionId = 'sess-f2r';
+    // The first send is taken, but its queued report reaches the window only after the second failed.
+    let firstRequestId: string | undefined;
+    globalThis.fetch = vi.fn((_url: string, init?: RequestInit) => {
+      firstRequestId = (JSON.parse(String(init?.body)) as { clientRequestId?: string }).clientRequestId;
+      return Promise.resolve(new Response(JSON.stringify({ status: 'injected' }), { status: 200 }));
+    }) as unknown as typeof fetch;
+    expect(await ctrl.steer('Answer in French.')).toBe(true);
+    globalThis.fetch = blockedSteer();
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    ctrl.onDirectiveAcknowledged({
+      directiveText: 'Answer in French.',
+      directiveId: 'd1',
+      outcome: 'queued',
+      clientRequestId: firstRequestId,
+    });
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
+    expect(bothWindows(ctrl)).toEqual({
+      v3: [['Progress', LOST], ['Steered', 'Answer in French.']],
+      old: [['note', LOST], ['direction', 'Answer in French.', 'applied']],
+    });
+  });
+
+  it('two unconfirmed identical sends are each settled only by their own report, in both windows', async () => {
+    ctrl.sessionId = 'sess-two';
+    globalThis.fetch = blockedSteer();
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    globalThis.fetch = takenSteer(ctrl, 'd2', 'lost');
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd2', outcome: 'applied' });
+    // The second send's report settles the second send only; the first's note stays.
+    expect(bothWindows(ctrl)).toEqual({
+      v3: [['Progress', LOST], ['Steered', 'Answer in French.']],
+      old: [['note', LOST], ['direction', 'Answer in French.', 'applied']],
+    });
+  });
+
+  // WP6.2 S8.2 (review 5) — a report that echoes no request id belongs to another send: another
+  // client's (the id is optional), or one from before the echo. Whatever its words, it never settles
+  // this window's note.
+  it.each([
+    ['blocked', () => blockedSteer()],
+    ['5xx', () => mockFetchError(502, 'bad gateway')],
+  ] as const)(
+    "another client's report without a request id never settles this window's %s note, in both windows",
+    async (_failure, failedSend) => {
+      ctrl.sessionId = 'sess-other-client';
+      globalThis.fetch = failedSend();
+      expect(await ctrl.steer('Answer in French.')).toBe(false);
+      const note = bothWindows(ctrl).v3[0]!;
+      ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'queued' });
+      ctrl.onDirectiveAcknowledged({ directiveText: 'Answer in French.', directiveId: 'd1', outcome: 'applied' });
+      expect(bothWindows(ctrl)).toEqual({
+        v3: [note, ['Steered', 'Answer in French.']],
+        old: [['note', note[1]], ['direction', 'Answer in French.', 'applied']],
+      });
+    },
+  );
+
+  // The steer handler answers 404 only when no live run took the direction, so it is the one failure
+  // that is a known refusal, still named as the run having finished.
+  it('a 404 refusal of a direction still says the run already finished, in both windows', async () => {
+    ctrl.sessionId = 'gone';
+    globalThis.fetch = mockFetchJson({ error: 'session not found or finished' }, 404);
+    expect(await ctrl.steer('Answer in French.')).toBe(false);
+    expect(bothWindows(ctrl)).toEqual({
+      v3: [['Progress', 'Could not steer — the run already finished.']],
+      old: [['note', 'Could not steer — the run already finished.']],
+    });
+  });
+
+  it('steer before the run has a session says so instead of dropping the direction silently', async () => {
+    ctrl.sessionId = null;
+    const fetchSpy = vi.fn() as unknown as typeof fetch;
+    globalThis.fetch = fetchSpy;
+    expect(await ctrl.steer('go')).toBe(false);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const notes = ctrl.conversation.filter((e) => e.type === 'progress' && e.severity === 'warn');
+    expect(notes.map((e) => e.content)).toEqual([
+      'Could not send your direction — the run has not started yet. Try again in a moment.',
+    ]);
   });
 
   // Tempdoc 565 §33 — runKind: only an `agent` run is steerable; the view gates the steer input on it.

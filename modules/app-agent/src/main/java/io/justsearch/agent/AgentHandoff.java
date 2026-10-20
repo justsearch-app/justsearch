@@ -72,7 +72,8 @@ final class AgentHandoff {
    *
    * <p>Only messages between the user turn (index 1) and the handoff assistant message (index K)
    * are affected. The handoff call itself, the "Handoff from…" system message, and the "confirmed"
-   * tool result are all preserved.
+   * tool result are all preserved, and so are the user's directions and the resume warning in that
+   * range (WP6.2): they stay, in order, before the handoff call.
    */
   static void pruneHandoffMessages(AgentSession session) {
     List<Map<String, Object>> msgs = session.messages();
@@ -104,8 +105,13 @@ final class AgentHandoff {
 
     // Collect tool call/result content from indices [2 .. handoffAssistantIdx-1]
     var brief = new StringBuilder("Research findings:\n");
+    var kept = new java.util.ArrayList<Map<String, Object>>();
     for (int i = 2; i < handoffAssistantIdx; i++) {
       Map<String, Object> msg = msgs.get(i);
+      if (AgentModelMessages.isUserControlNote(msg)) {
+        kept.add(msg);
+        continue;
+      }
       String role = String.valueOf(msg.get("role"));
       if ("assistant".equals(role)) {
         Object toolCallsObj = msg.get("tool_calls");
@@ -130,6 +136,9 @@ final class AgentHandoff {
       }
     }
 
+    // Only directions before the handoff call: no exploration to brief, nothing to prune.
+    if (kept.size() == handoffAssistantIdx - 2) return;
+
     // Remove exploration messages in reverse order to preserve indices
     for (int i = handoffAssistantIdx - 1; i >= 2; i--) {
       msgs.remove(i);
@@ -137,7 +146,8 @@ final class AgentHandoff {
 
     // Inject the brief as a system message immediately after the user turn
     msgs.add(2, Map.of("role", "system", "content", brief.toString().trim()));
+    msgs.addAll(3, kept);
     LOG.debug("pruneHandoffMessages: stripped {} exploration messages, injected brief ({} chars)",
-        handoffAssistantIdx - 2, brief.length());
+        handoffAssistantIdx - 2 - kept.size(), brief.length());
   }
 }
