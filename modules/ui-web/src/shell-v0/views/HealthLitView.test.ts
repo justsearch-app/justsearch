@@ -3,7 +3,7 @@
 /**
  * Render tests for HealthLitView (slice 3a.2).
  *
- * Uses a fake EventSource so the substrate's SSE consumption is
+ * Uses controlled fetch SSE responses so the substrate's SSE consumption is
  * exercised end-to-end (frame parsing → reducer → re-render →
  * StatusCard mount) without a network.
  *
@@ -19,37 +19,23 @@
  *  - reset frame clears the local state.
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fetchSseHarness, flushStreamWork } from '../../test/fetchSse.js';
 import './HealthLitView.js';
 // Side-effect: register <jf-status-card> so the dispatched child mounts.
 import '../components/StatusCard.js';
 import type { HealthLitView } from './HealthLitView.js';
-import type { SseEnvelope } from '../streaming/envelope-types.js';
 import type { HealthEvent } from '../../api/domains/health.js';
 
-class FakeEventSource extends EventTarget {
-  url: string;
-  closed = false;
-  constructor(url: string) {
-    super();
-    this.url = url;
-    Object.defineProperty(globalThis, '__lastFakeES', {
-      value: this,
-      configurable: true,
-    });
-  }
-  emitFrame(env: SseEnvelope): void {
-    this.dispatchEvent(
-      new MessageEvent('frame', { data: JSON.stringify(env) }),
-    );
-  }
-  emitOpen(): void {
-    this.dispatchEvent(new Event('open'));
-  }
-  close(): void {
-    this.closed = true;
-  }
-}
+let streams: ReturnType<typeof fetchSseHarness>;
+beforeEach(() => {
+  streams = fetchSseHarness();
+  vi.stubGlobal('fetch', streams.fetch);
+});
+afterEach(() => {
+  document.body.replaceChildren();
+  vi.unstubAllGlobals();
+});
 
 const FAKE_SOURCE = {
   serviceName: 'head',
@@ -88,30 +74,12 @@ function occurrence(id: string, attrs: Record<string, unknown>): HealthEvent {
   };
 }
 
-async function mount(
-  apiBase: string,
-  fakeEs: FakeEventSource | null = null,
-): Promise<HealthLitView> {
+async function mount(apiBase: string): Promise<HealthLitView> {
   const el = document.createElement('jf-health-view') as HealthLitView;
-  if (apiBase) {
-    el.apiBase = apiBase;
-  }
-  // Inject a fake EventSource constructor only when the test wants
-  // to drive frames manually. Otherwise the real EventSource is
-  // attempted (and harmlessly fails in happy-dom).
-  if (fakeEs) {
-    const orig = (globalThis as { EventSource?: unknown }).EventSource;
-    (globalThis as { EventSource?: unknown }).EventSource = function (url: string) {
-      fakeEs.url = String(url);
-      return fakeEs;
-    } as unknown;
-    document.body.appendChild(el);
-    await el.updateComplete;
-    (globalThis as { EventSource?: unknown }).EventSource = orig;
-  } else {
-    document.body.appendChild(el);
-    await el.updateComplete;
-  }
+  if (apiBase) el.apiBase = apiBase;
+  document.body.appendChild(el);
+  await el.updateComplete;
+  await flushStreamWork();
   return el;
 }
 
@@ -124,16 +92,16 @@ describe('HealthLitView render', () => {
   });
 
   it('prefixes health SSE with api-base for Tauri asset origins', async () => {
-    const fake = new FakeEventSource('test');
-    const el = await mount('http://127.0.0.1:33221', fake);
+    const el = await mount('http://127.0.0.1:33221');
+    const fake = streams.connections.find((connection) => !connection.closed)!;
     expect(fake.url).toBe('http://127.0.0.1:33221/api/health/events/stream');
     el.remove();
   });
 
   it('snapshot frame populates Conditions list and renders one StatusCard per condition', async () => {
-    const fake = new FakeEventSource('test');
-    const el = await mount('http://test', fake);
-    fake.emitFrame({
+    const el = await mount('http://test');
+    const fake = streams.connections.find((connection) => !connection.closed)!;
+    await fake.emitFrame({
       streamId: 'health-event/v1',
       frameKind: 'LIFECYCLE',
       seq: 1,
@@ -155,10 +123,10 @@ describe('HealthLitView render', () => {
   });
 
   it('condition-added / condition-modified / condition-removed deltas keep state in sync', async () => {
-    const fake = new FakeEventSource('test');
-    const el = await mount('http://test', fake);
+    const el = await mount('http://test');
+    const fake = streams.connections.find((connection) => !connection.closed)!;
 
-    fake.emitFrame({
+    await fake.emitFrame({
       streamId: 'h/v1',
       frameKind: 'UPDATE',
       seq: 1,
@@ -172,7 +140,7 @@ describe('HealthLitView render', () => {
     await el.updateComplete;
     expect(el.shadowRoot?.querySelectorAll('jf-status-card').length).toBe(1);
 
-    fake.emitFrame({
+    await fake.emitFrame({
       streamId: 'h/v1',
       frameKind: 'UPDATE',
       seq: 2,
@@ -188,7 +156,7 @@ describe('HealthLitView render', () => {
     expect(cards?.length).toBe(1);
     expect(cards?.[0]?.getAttribute('subject')).toBe('SubjAModified');
 
-    fake.emitFrame({
+    await fake.emitFrame({
       streamId: 'h/v1',
       frameKind: 'UPDATE',
       seq: 3,
@@ -206,8 +174,8 @@ describe('HealthLitView render', () => {
   });
 
   it('blind-monitor UNKNOWN condition renders calm/info with legible wording (tempdoc 600 Design B)', async () => {
-    const fake = new FakeEventSource('test');
-    const el = await mount('http://test', fake);
+    const el = await mount('http://test');
+    const fake = streams.connections.find((connection) => !connection.closed)!;
     const blind: HealthEvent = {
       id: 'monitor.unobservable',
       timestamp: '2026-05-05T12:00:00Z',
@@ -222,7 +190,7 @@ describe('HealthLitView render', () => {
         lastTransitionTime: '2026-05-05T12:00:00Z',
       },
     };
-    fake.emitFrame({
+    await fake.emitFrame({
       streamId: 'h/v1',
       frameKind: 'UPDATE',
       seq: 1,
@@ -242,10 +210,10 @@ describe('HealthLitView render', () => {
   });
 
   it('occurrence-appended frames render under Recent occurrences', async () => {
-    const fake = new FakeEventSource('test');
-    const el = await mount('http://test', fake);
+    const el = await mount('http://test');
+    const fake = streams.connections.find((connection) => !connection.closed)!;
     for (let i = 0; i < 3; i++) {
-      fake.emitFrame({
+      await fake.emitFrame({
         streamId: 'h/v1',
         frameKind: 'UPDATE',
         seq: i + 1,
@@ -264,9 +232,9 @@ describe('HealthLitView render', () => {
   });
 
   it('reset frame clears local state', async () => {
-    const fake = new FakeEventSource('test');
-    const el = await mount('http://test', fake);
-    fake.emitFrame({
+    const el = await mount('http://test');
+    const fake = streams.connections.find((connection) => !connection.closed)!;
+    await fake.emitFrame({
       streamId: 'h/v1',
       frameKind: 'LIFECYCLE',
       seq: 1,
@@ -281,7 +249,7 @@ describe('HealthLitView render', () => {
     await el.updateComplete;
     expect(el.shadowRoot?.querySelectorAll('jf-status-card').length).toBe(1);
 
-    fake.emitFrame({
+    await fake.emitFrame({
       streamId: 'h/v1',
       frameKind: 'LIFECYCLE',
       seq: 2,
@@ -296,14 +264,14 @@ describe('HealthLitView render', () => {
   });
 
   it('connection badge debounces the SSE channel (no flicker to a hard down) — 604 Move B', async () => {
-    const fake = new FakeEventSource('test');
-    const el = await mount('http://test', fake);
+    const el = await mount('http://test');
+    const fake = streams.connections.find((connection) => !connection.closed)!;
     // 604 — the badge does NOT flip to a hard "down" the instant the channel isn't open yet: within
     // the debounce grace it stays "Connected" (info), so a fast self-heal never flickers the badge.
     let dot = el.shadowRoot?.querySelector('jf-status-dot');
     expect(dot?.getAttribute('tone')).toBe('info');
 
-    fake.emitOpen();
+    await fake.open();
     await el.updateComplete;
     dot = el.shadowRoot?.querySelector('jf-status-dot');
     expect(dot?.getAttribute('tone')).toBe('info');
@@ -311,9 +279,9 @@ describe('HealthLitView render', () => {
   });
 
   it('connection badge shows a soft "paused" (warning, not error) when SSE is down but the backend is reachable — 604 Move B', async () => {
-    const fake = new FakeEventSource('test');
-    const el = await mount('http://test', fake);
-    fake.emitOpen();
+    const el = await mount('http://test');
+    const fake = streams.connections.find((connection) => !connection.closed)!;
+    await fake.open();
     await el.updateComplete;
     // The SSE channel drops and stays down past the debounce window; the /api/status poll still
     // reports the backend reachable. This test asserts that condition directly rather than relying
@@ -325,7 +293,7 @@ describe('HealthLitView render', () => {
     // this test is actually about) without depending on that separate subsystem's startup state.
     el.backendReachable = true;
     await el.updateComplete;
-    fake.dispatchEvent(new Event('error'));
+    await fake.error();
     await new Promise((r) => setTimeout(r, 850)); // > DISCONNECT_DEBOUNCE_MS (750)
     await el.updateComplete;
     const dot = el.shadowRoot?.querySelector('jf-status-dot');
@@ -349,9 +317,9 @@ describe('HealthLitView render', () => {
         message: 'Memory usage above threshold',
       },
     };
-    const fake = new FakeEventSource('test');
-    const el = await mount('http://test', fake);
-    fake.emitFrame({
+    const el = await mount('http://test');
+    const fake = streams.connections.find((connection) => !connection.closed)!;
+    await fake.emitFrame({
       streamId: 'h/v1',
       frameKind: 'LIFECYCLE',
       seq: 1,

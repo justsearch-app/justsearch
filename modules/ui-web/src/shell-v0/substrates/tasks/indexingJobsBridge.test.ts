@@ -349,16 +349,15 @@ describe('§32 #1 — startIndexingJobsBridge (stream → reducer → tasks)', (
     }
   });
 
-  it('is a headless no-op when EventSource is unavailable and no factory given', () => {
-    const g = globalThis as { EventSource?: unknown };
-    const saved = g.EventSource;
-    Reflect.deleteProperty(globalThis, 'EventSource'); // simulate SSR/headless
+  it('is a headless no-op when fetch is unavailable and no factory given', () => {
+    vi.stubGlobal('fetch', undefined); // simulate an environment without the stream transport
     try {
       const stop = startIndexingJobsBridge('http://x');
       expect(listTasks()).toHaveLength(0);
+      expect(__poolSizeForTest()).toBe(0);
       stop(); // does not throw
     } finally {
-      g.EventSource = saved;
+      vi.unstubAllGlobals();
     }
   });
 

@@ -10,45 +10,14 @@
  * lives in Phase 8's integration test (live-stack smoke against
  * runHeadlessEval).
  *
- * The EnvelopeStream / EventSource path is NOT exercised here; that
- * runs against the real backend in Phase 8 verification.
+ * Stream-open checks use the default fetch transport with controlled HTTP responses.
  */
 
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import './ResourceView.js';
 
-// Stub EventSource at module level to a no-op that drops connections
-// silently. Avoids unhandled-error noise from happy-dom attempting a
-// real network call against /api/indexing-jobs/stream.
-class NoopEventSource extends EventTarget {
-  static urls: string[] = [];
-  readyState = 0;
-  url: string;
-  CONNECTING = 0;
-  OPEN = 1;
-  CLOSED = 2;
-  withCredentials = false;
-  onopen: ((this: EventSource, ev: Event) => unknown) | null = null;
-  onmessage: ((this: EventSource, ev: MessageEvent) => unknown) | null = null;
-  onerror: ((this: EventSource, ev: Event) => unknown) | null = null;
-  constructor(url: string | URL) {
-    super();
-    this.url = String(url);
-    NoopEventSource.urls.push(this.url);
-  }
-  close(): void {
-    this.readyState = this.CLOSED;
-  }
-}
+import { fetchSseHarness, flushStreamWork } from '../../test/fetchSse.js';
 
-beforeAll(() => {
-  vi.stubGlobal(
-    'EventSource',
-    function StubES(url: string | URL) {
-      return new NoopEventSource(url) as unknown as EventSource;
-    },
-  );
-});
 import type { ResourceView } from './ResourceView.js';
 import {
   __resetForTest as resetResourceCatalog,
@@ -58,6 +27,8 @@ import {
   __resetForTest as resetSchemaFetcher,
 } from '../../api/registry/schemaFetcher.js';
 import type { Resource, ResourceCatalog } from '../../api/types/registry.js';
+
+let streams: ReturnType<typeof fetchSseHarness>;
 
 function tabularResource(): Resource {
   return {
@@ -107,6 +78,7 @@ async function mountIsolated(resourceId: string): Promise<ResourceView> {
   // Wait one tick for connectedCallback's async bind() to settle.
   await Promise.resolve();
   await el.updateComplete;
+  await flushStreamWork();
   return el;
 }
 
@@ -114,12 +86,14 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {
   beforeEach(() => {
     resetResourceCatalog();
     resetSchemaFetcher();
-    NoopEventSource.urls = [];
+    streams = fetchSseHarness(async () => Response.json({ type: 'object', properties: {} }));
+    vi.stubGlobal('fetch', streams.fetch);
   });
   afterEach(() => {
     resetResourceCatalog();
     resetSchemaFetcher();
     document.body.innerHTML = '';
+    vi.unstubAllGlobals();
   });
 
   it('shows a placeholder when resource-id is unknown', async () => {
@@ -141,7 +115,7 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {
   it('renders header with localized label key when resource is found', async () => {
     seedResourceCatalog(catalogOf(tabularResource()));
     const el = await mountIsolated('core.indexing-jobs');
-    // The element starts the stream (real EventSource against
+    // The element starts the stream (real fetch SSE against
     // /api/indexing-jobs/stream) but we don't drive frames here; the
     // header renders synchronously from the Resource entry.
     const header = el.shadowRoot?.querySelector('h2');
@@ -154,7 +128,7 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {
   it('exposes connectionState as reactive property', async () => {
     seedResourceCatalog(catalogOf(tabularResource()));
     const el = await mountIsolated('core.indexing-jobs');
-    // Either 'connecting' (initial) or 'error' if EventSource fails;
+    // Either 'connecting' (initial) or 'error' if fetch SSE fails;
     // both demonstrate the state is a real lifecycle signal.
     expect(['idle', 'connecting', 'connected', 'error']).toContain(
       el.connectionState,
@@ -170,8 +144,9 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {
     document.body.appendChild(el);
     await Promise.resolve();
     await el.updateComplete;
+    await flushStreamWork();
 
-    expect(NoopEventSource.urls).toContain('http://127.0.0.1:8080/api/indexing-jobs/stream');
+    expect(streams.connections.map((connection) => connection.url)).toContain('http://127.0.0.1:8080/api/indexing-jobs/stream');
     el.remove();
   });
 
@@ -190,14 +165,16 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {
     // re-runs.
     seedResourceCatalog(catalogOf(tabularResource()));
     await el.updateComplete;
+    await flushStreamWork();
     // bind() is async; wait one more microtask for it to progress
     // past the lookup.
     await Promise.resolve();
     await el.updateComplete;
+    await flushStreamWork();
 
     // The view has progressed past the empty-catalog wait — either
     // 'connecting' (stream opening) or 'connected' / 'error' from
-    // the stub EventSource. The defining post-fix property: it is
+    // the stub fetch SSE. The defining post-fix property: it is
     // NOT in the "Resource not found" error state.
     expect(el.connectionState).not.toBe('error');
     expect(el.shadowRoot?.textContent ?? '').not.toContain('Resource not found');
@@ -215,7 +192,7 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {
     el.remove();
   });
 
-  it('727 F-4 — opens the api-base-prefixed EventSource for an operation-history-shaped resource', async () => {
+  it('727 F-4 — opens the api-base-prefixed fetch SSE for an operation-history-shaped resource', async () => {
     // Mirrors "prefixes SSE resource endpoints with api-base" above, for the exact
     // EVENT_STREAM×SSE_STREAM shape of core.operation-history. This isolated component-level
     // check passed even before the 727 F-4 fix — <jf-resource-view> itself was never buggy;
@@ -254,12 +231,12 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {
     document.body.appendChild(el);
     await Promise.resolve();
     await el.updateComplete;
+    await flushStreamWork();
 
-    expect(NoopEventSource.urls).toContain(
+    expect(streams.connections.map((connection) => connection.url)).toContain(
       'http://127.0.0.1:33221/api/operation-history/stream',
     );
-    // 'connecting' here (not 'connected') is expected and correct: NoopEventSource never fires
-    // 'open'/'frame'. The property under test is that the stream-open attempt happened at all,
+    // 'connecting' here is expected: the HTTP response is still pending. The property under test is that the stream-open attempt happened at all,
     // against the right URL — 'error' would mean bind() rejected before reaching that point.
     expect(el.connectionState).not.toBe('error');
     el.remove();
