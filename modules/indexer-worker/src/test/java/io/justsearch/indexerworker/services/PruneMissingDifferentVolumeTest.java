@@ -40,6 +40,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,7 @@ import org.junit.jupiter.api.io.TempDir;
  * over the same index and queue), to a folder of the same name on another volume. Every mapping
  * and folder the test creates is removed before it returns.
  */
+@Tag("windows")
 final class PruneMissingDifferentVolumeTest
     extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
   private static final boolean WINDOWS =
