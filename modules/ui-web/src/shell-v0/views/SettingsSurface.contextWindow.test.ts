@@ -20,6 +20,14 @@
  * (this section lives under AI -> Agent, not the default Appearance category).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+// Incidental requests are outside these render/event scenarios. Keep their
+// unavailable-backend behavior explicit, without contacting a real server.
+const originalFetch = globalThis.fetch;
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Test backend unavailable')));
+});
+afterEach(() => { globalThis.fetch = originalFetch; });
 import './SettingsSurface.js';
 import '../renderers/registry.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';

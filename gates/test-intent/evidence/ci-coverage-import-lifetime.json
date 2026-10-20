@@ -1,0 +1,73 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T15:50:42.985Z",
+  "revision": "b3f43bd6b512f5ef93386893e34409cd30181dbd",
+  "tree": "310e246e97506be13798082ce65b19bfe7230e59",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/__test-setup__/dynamicImportLifetime.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2603406-1792425040314.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 663
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/__test-setup__/dynamicImportLifetime.test.ts",
+      "file": "modules/ui-web/src/__test-setup__/dynamicImportLifetime.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d69bd6d4e0a5698ab1eeea3e65214349f5f206f563294a4ffbf0f5d0e803dd14",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "detached import lifetime starts deferred module work without awaiting it",
+          "status": "passed"
+        },
+        {
+          "name": "detached import lifetime finishes pending imports before the next test",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b3f43bd6b512f5ef93386893e34409cd30181dbd",
+    "revision": "b3f43bd6b512f5ef93386893e34409cd30181dbd",
+    "overlays": [
+      "modules/ui-web/src/__test-setup__/__fixtures__/delayedImport.ts"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/__test-setup__/dynamicImportLifetime.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2603406-1792425042078.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 699,
+        "output": "JSON report written to /tmp/test-intent-vitest-2603406-1792425042078.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/__test-setup__/dynamicImportLifetime.test.ts",
+        "classification": "assertion",
+        "detail": "detached import lifetime finishes pending imports before the next test:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/ci-coverage/tmp/ci-coverage/round4/evidence-before/test-intent-before-dM5ZEy/modules/ui-web/src/__test-setup__/dynamicImportLifetime.test.ts:16:23\n    at file:///home/elias/dev/justsea"
+      }
+    ]
+  },
+  "digest": "sha256:1b592d676a80cfc12d0d05a1875a4cf1b85407db8264715c2cf2328cac7e39cf"
+}
