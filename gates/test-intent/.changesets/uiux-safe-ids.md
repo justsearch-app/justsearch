@@ -42,6 +42,8 @@ unchanged and require independent review of this candidate.
 
 Review history: verifier-4 found invalid ids in saved branch parents, run/conversation links and backups still reaching request validation. PN1s quotes the agreed N9.1 amendment after verifier-4 (2026-10-20 07:00) verbatim. New HTTP checks cover those paths; additional repaired checks cover saved last-session pointers, session indexes and the restore notice. Invalid saved run references are filtered at the session-index producer before history reconciliation; its direct-id refusal remains unchanged. Evidence is against bf1713ab2. Existing review records remain unchanged.
 
+Review history: verifier-5 found that the invalid saved-parent HTTP check already passes on the real base 117e89be9. It is now a preservation entry, retaining its expectation and PN1s source, with candidate-only evidence generated without --before. Existing acceptance and rejection records remain unchanged.
+
 ```json
 {
   "entries": [
@@ -641,7 +643,27 @@ Review history: verifier-4 found invalid ids in saved branch parents, run/conver
         "modules/ui/src/test/java/io/justsearch/ui/api/SavedStoreIdsHttpTest.java"
       ],
       "class": "New",
-      "behaviour": "Over HTTP, valid branches with invalid saved parents retain their own history and thread events, valid conversation lists ignore runs naming invalid conversations while keeping those runs, and v1 backups restore valid conversations and report skipped invalid entries.",
+      "behaviour": "Over HTTP, valid branches with invalid saved parents retain their own history and thread events.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1s",
+          "quote": "An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-safe-ids-saved-parent-preserve.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/SavedStoreIdsHttpTest.java#branchWithInvalidSavedParentOpensLikeMissingParentOverHttp"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/SavedStoreIdsHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Over HTTP, valid conversation lists ignore runs naming invalid conversations while keeping those runs, and v1 backups restore valid conversations and report skipped invalid entries.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -653,7 +675,6 @@ Review history: verifier-4 found invalid ids in saved branch parents, run/conver
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-saved-data.json",
       "newChecks": [
-        "modules/ui/src/test/java/io/justsearch/ui/api/SavedStoreIdsHttpTest.java#branchWithInvalidSavedParentOpensLikeMissingParentOverHttp",
         "modules/ui/src/test/java/io/justsearch/ui/api/SavedStoreIdsHttpTest.java#conversationListIgnoresSavedRunsWithInvalidConversationIdsOverHttp",
         "modules/ui/src/test/java/io/justsearch/ui/api/SavedStoreIdsHttpTest.java#legacyFormatBackupRestoresValidConversationsAndReportsInvalidEntriesOverHttp"
       ],
