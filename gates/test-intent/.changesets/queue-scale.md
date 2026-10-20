@@ -1847,3 +1847,14 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
   "note": "All 33 entries preserve or explicitly supersede baseline intent under Q1–Q27 and the quoted delegation, with terminal-overflow and rail-responsiveness claims independently failing before and passing after."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a159b0-8e4d-7ab3-a7fa-57074c376fa5",
+  "verdict": "reject",
+  "digest": "sha256:b975b1709700e0cb2811fe3694af4cd3bc1e7a881029b3e7624894c6c1aa796c",
+  "note": "Entry 30 leaves the JVM-wide ConfigStore changed after teardown, violating the new-test isolation requirement; all other entries and the merged frontend reruns passed review."
+}
+```
