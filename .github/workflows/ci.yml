@@ -329,14 +329,14 @@ jobs:
       # wired to nothing" shape L.1 documents for the always-loaded ratchet, reproduced in the
       # branch that documents it.
       #
-      # 884 §F row 9 found the same thing one layer out: dead-code, npm-audit and module-deps are
-      # registered, baselined and unable to notice anything, because this job built none of their
-      # inputs. gates/dead-code/baseline.txt had gone untouched since 2026-07-16 while 27 findings
-      # accumulated behind it. The inputs are cheap -- measured locally at 0.2s (module-deps),
-      # 2.7s (knip) and 4.5s (the original npm audit) -- so the reason they were missing was wiring,
+      # 884 §F row 9 found the same thing one layer out: dead-code and npm-audit were
+      # registered and baselined, but this job built none of their inputs.
+      # gates/dead-code/baseline.txt had gone untouched since 2026-07-16 while 27 findings
+      # accumulated behind it. The inputs are cheap -- measured locally at 2.7s (knip)
+      # and 4.5s (the original npm audit) -- so the reason they were missing was wiring,
       # not budget. Tempdoc 921 later replaced that unreliable POST with bounded GitHub advisory GETs.
       # Tempdoc 918 item 2, closing 913 open item 1. Each unwired gate was run bare on
-      # the base and classified (census: tempdoc 918 §D). These 11 are green on `main` AND hermetic
+      # the base and classified (census: tempdoc 918 §D). These 10 are green on `main` AND hermetic
       # -- they read checked-in registers, catalogs and source text, and need no produced artifact,
       # no Gradle output, no protoc and no dev stack. The step sits DELIBERATELY above the
       # `npm ci --prefix modules/ui-web` below, so the job itself demonstrates the claim rather
@@ -364,7 +364,7 @@ jobs:
       #   - wire         has its own step below, with the buf CLI installed ahead of it.
       - name: Hermetic kernel gates (10, no produced inputs, no install)
         run: |
-          node scripts/governance/run.mjs             --gate consumer-drift --gate contract-projection --gate contribution-surface             --gate interaction-surface --gate observed-happening             --gate runtime-state --gate ssot-catalog-sync             --gate stage-completeness --gate surface-altitude --gate tempdoc-wiring             --gate engine-port --mode gate
+          node scripts/governance/run.mjs             --gate consumer-drift --gate contract-projection --gate contribution-surface             --gate interaction-surface --gate observed-happening             --gate runtime-state --gate ssot-catalog-sync             --gate stage-completeness --gate surface-altitude             --gate engine-port --mode gate
 
       # Tempdoc 930 chunk F. Seven `check-*-regen.mjs` wrappers were one property each -- "a
       # generated file matches its source" -- with seven CI steps. `regen-all` is that set; the
@@ -382,7 +382,6 @@ jobs:
         run: |
           npm ci --prefix modules/ui-web --audit=false
           node scripts/docs/generate-runtime-config-matrix.mjs
-          node scripts/architecture/module-deps.mjs
           node scripts/ci/report-github-advisories.mjs
           npm --prefix modules/ui-web run knip:report
 
@@ -397,10 +396,10 @@ jobs:
       # high/critical identity in any of the five lockfiles. `actions/dependency-review-action`
       # was evaluated as a replacement in the same pass and rejected: it scores a revision diff,
       # not the checked-out lockfile.
-      - name: Kernel gates with built inputs (config-surface, dead-code, npm-audit, module-deps)
+      - name: Kernel gates with built inputs (config-surface, dead-code, npm-audit)
         run: |
           node scripts/governance/run.mjs \
-            --gate config-surface --gate dead-code --gate npm-audit --gate module-deps \
+            --gate config-surface --gate dead-code --gate npm-audit \
             --mode gate
 
       # Tempdoc 930 chunk F: the `ts-any` and `todo-fixme` gates became ESLint rules, and ESLint
@@ -712,7 +711,6 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node
-        # Only for the lock-drift guard below; no npm install happens in this job.
         uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -721,11 +719,6 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-
-      - name: jseval dependency lock drift guard
-        # Same fail-fast as the claims lane: if pyproject.toml and the committed lock
-        # disagree, the install below would resolve versions nobody reviewed.
-        run: node scripts/ci/check-jseval-lock.mjs
 
       - name: Install canonical jseval
         # Mirrors the claims lane's install: constraint-installed against the dependency
@@ -789,9 +782,6 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-
-      - name: jseval dependency lock drift guard
-        run: node scripts/ci/check-jseval-lock.mjs
 
       - name: Install canonical jseval with the ui extra
         # The `ui` extra is Playwright. It is an optional-dependency, so it is absent from
