@@ -76,6 +76,12 @@ tests or production files are changed this round; their evidence is retained.
 All evidence uses two Cargo jobs, source-only frontend assets, and temporary
 before worktrees below tmp/wp51-retry, removed by the official producer.
 
+Review history: 2026-10-20 — builder agent-session-kx3eb62n added the agreed RA5
+source to entry 6 and split entry 25: its two RN3 checks are New preservation
+checks against c00a0cb24, without repaired: true; the two RS4 checks remain repaired.
+Existing candidate evidence remains valid and is retained unchanged; the gate does
+not require new fail-before evidence for preservation. Acceptance records are unchanged.
+
 ```json
 {
   "entries": [
@@ -280,6 +286,13 @@ before worktrees below tmp/wp51-retry, removed by the official producer.
           "task": "t-20261019-bd718f",
           "scenario": "RN1",
           "quote": "Models and the AI runtime are kept and keep working (Option A).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RA5",
+          "quote": "Copies of files that the app restores from its own installation at every start (the bundled OCR runtime, native-bin/tesseract) are removed by the reset like other app data and are restored at the next start; they are not user data and need not be named before or after the reset. Models and the AI runtime stay kept as before.",
           "label": "agent-drafted, owner-adopted"
         }
       ],
@@ -729,20 +742,13 @@ before worktrees below tmp/wp51-retry, removed by the official producer.
         "modules/ui-web/src/boot/boot-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "The real production boot and SES lockdown mount reset/recovery/normal/debug surfaces on cold starts and actual page reloads. Reset completion Continue, status error Try again, Engine recovery Retry, supervisor recovery and backend-restart events all reload to a mounted surface; incomplete reset and storage cleanup block normal UI/API discovery.",
+      "behaviour": "The real production boot and SES lockdown mount reset surfaces on cold starts and actual page reloads. Reset completion Continue and status error Try again reload to a mounted surface; incomplete reset and storage cleanup block normal UI/API discovery.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261019-bd718f",
           "scenario": "RA4",
           "quote": "Every reload or restart path of the window (reset outcome screens, Engine recovery) shows the app again; none leaves an empty window.",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "RN3",
-          "quote": "A normal start with no pending reset deletes nothing and starts as quickly as before.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -756,9 +762,7 @@ before worktrees below tmp/wp51-retry, removed by the official producer.
       "evidence": "gates/test-intent/evidence/uiux-reset-boot-repair.json",
       "newChecks": [
         "modules/ui-web/src/boot/boot-lockdown.test.ts#RS4 reset Continue and Try again reload into a mounted app under real lockdown",
-        "modules/ui-web/src/boot/boot-lockdown.test.ts#RN3 Engine recovery Retry and both desktop event reloads mount under real lockdown",
-        "modules/ui-web/src/boot/boot-lockdown.test.ts#RS4 incomplete and storage-cleanup starts stay gated under real lockdown",
-        "modules/ui-web/src/boot/boot-lockdown.test.ts#RN3 normal desktop and browser starts and debug routes mount after lockdown"
+        "modules/ui-web/src/boot/boot-lockdown.test.ts#RS4 incomplete and storage-cleanup starts stay gated under real lockdown"
       ],
       "repaired": true
     },
@@ -866,6 +870,34 @@ before worktrees below tmp/wp51-retry, removed by the official producer.
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra3_retries_storage_recreated_by_a_previous_session_process"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/boot/boot-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "New preservation checks relative to c00a0cb24: Engine recovery Retry and both desktop event reloads mount under real lockdown, and normal desktop/browser starts and debug routes mount after lockdown. The retained evidence establishes candidate passes; its assertion failures against intermediate commit 97dc55c62 do not classify these checks as repaired against c00a0cb24.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RA4",
+          "quote": "Every reload or restart path of the window (reset outcome screens, Engine recovery) shows the app again; none leaves an empty window.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RN3",
+          "quote": "A normal start with no pending reset deletes nothing and starts as quickly as before.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-boot-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/boot/boot-lockdown.test.ts#RN3 Engine recovery Retry and both desktop event reloads mount under real lockdown",
+        "modules/ui-web/src/boot/boot-lockdown.test.ts#RN3 normal desktop and browser starts and debug routes mount after lockdown"
+      ]
     }
   ]
 }
