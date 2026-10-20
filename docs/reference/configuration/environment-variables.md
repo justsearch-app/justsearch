@@ -49,7 +49,7 @@ Scope:
 | `JUSTSEARCH_HEAD_TRACING_LEVEL` | `justsearch.head.tracing_level` | String | Engine API-side OTel tracing level: `none` (default), `sample`, or `detailed`. The Engine `HeadlessApp` initializes `TracingBootstrap` when enabled and emits `traces.ndjson` plus optional OTLP output. |
 | **Index-half / Build Info** | | | |
 | `JUSTSEARCH_INDEXER_WORKER_VERSION` | `indexer.worker.version` | String | Retained pre-merge identifier after lane F for the index-half build/version value; it does not identify a separate process. |
-| `JUSTSEARCH_BUILD_STAMP` | | | SHA-256 content hash of the Engine distribution. Used for stale-JVM detection; the retired Worker distribution and WorkerSpawner injector are historical references only. |
+| `JUSTSEARCH_BUILD_STAMP` | `justsearch.build.stamp` | String | Compatibility declaration for the Engine distribution's SHA-256 content hash. Index status reads the system property, which dev hot-reload sets; this declaration alone does not populate it at fresh startup. |
 | **AI (inference + embeddings)** | | | |
 | `JUSTSEARCH_AI_AUTOSTART_ENABLED` | `justsearch.ai.autostart.enabled` | Bool | Auto-start llama-server on backend startup. Used by eval runs (`-Pllm=true`). (369) |
 | `JUSTSEARCH_AI_AUTOSTART_DISABLED` | `justsearch.ai.autostart.disabled` | Bool | Explicitly disable LLM auto-start, overriding `AI_AUTOSTART_ENABLED`. (369) |
@@ -60,11 +60,9 @@ Scope:
 | `JUSTSEARCH_LLM_MODEL_PATH` | `justsearch.llm.model_path` | Path | Path to the main chat/VLM GGUF model used by `llama-server`. |
 | `JUSTSEARCH_CHAT_PROFILE` | `justsearch.chat.profile` | String | Chat-model profile (tempdoc 842): selects the llama-server `(model, mmproj)` pair. `standard` (default) is the user-facing Qwen3.5-9B pair; `compact` is the dev-tier small sibling (its own files under `models/compact/`), never part of a user install plan. Unknown values warn-fall-back to `standard`. The dev runner defaults dev stacks to `compact`; packaged/user launches default `standard`. An explicit `JUSTSEARCH_LLM_MODEL_PATH`/`justsearch.llm.model_path` override still wins over the profile. |
 | `JUSTSEARCH_EMBED_BACKEND` | `justsearch.embed.backend` | String | Embedding backend selector: `auto` (default) or `onnx`. Does NOT control GPU/CPU — use `JUSTSEARCH_EMBED_GPU_ENABLED` for GPU offload. |
-| `JUSTSEARCH_MODEL_PATH` | `justsearch.model.path` | Path | Legacy embedding model path. It is not consumed by current ONNX embedding discovery; use `JUSTSEARCH_EMBED_ONNX_MODEL_PATH` for an explicit model override. |
 | `JUSTSEARCH_EMBED_ONNX_MODEL_PATH` | `justsearch.embed.onnx.model_path` | Path | Explicit ONNX embedding model directory (overrides auto-discovery). When unset, `EmbeddingOnnxModelDiscovery` tries `embeddinggemma-300m/` then `embedding/`. |
-| `JUSTSEARCH_EMBED_GPU_ENABLED` | `justsearch.embed.gpu.enabled` | Bool | Enable GPU acceleration for ONNX embedding inference (default `false`). Preferred over legacy `JUSTSEARCH_EMBED_GPU_LAYERS`. |
+| `JUSTSEARCH_EMBED_GPU_ENABLED` | `justsearch.embed.gpu.enabled` | Bool | Enable GPU acceleration for ONNX embedding inference; when unset, follows the master GPU switch, then policy/device availability gates. `JUSTSEARCH_EMBED_GPU_LAYERS` does not enable runtime GPU offload. |
 | `JUSTSEARCH_EMBED_GPU_MEM_MB` | `justsearch.embed.gpu_mem_mb` | Int | GPU arena size in MB for ONNX embedding CUDA sessions (default `6144` since 691 §N/F-031 — the default-on long-doc single-pass fragments smaller arenas; 6144 measured zero-OOM and delivers the full dense-revival ceiling. History: 2048 → 3072 (391) → 6144 (691)). |
-| `JUSTSEARCH_EMBED_GPU_LAYERS` | `justsearch.embed.gpu.layers` | Int | Legacy alias for `EMBED_GPU_ENABLED`: any value > 0 is treated as `EMBED_GPU_ENABLED=true`. Use `EMBED_GPU_ENABLED` for new configurations. |
 | `JUSTSEARCH_EMBED_GPU_DEVICE_ID` | `justsearch.embed.gpu.device_id` | Int | CUDA device ID for ONNX embedding sessions (default 0). |
 | `JUSTSEARCH_EMBED_CONTEXT_LENGTH` | `justsearch.embed.context_length` | Int | Max embedding context length in tokens for the base batch embed path (default `2048`). |
 | `JUSTSEARCH_EMBED_LATE_CHUNKING_ENABLED` | `justsearch.embed.late_chunking_enabled` | Bool | Long-doc single-pass VECTOR embed path for chunked parent docs (tempdoc 691 Phase 2/4). **Default `true`** (default-on since 691 §Phase N: quality gates green — legal-clerc `vector` nDCG@10 0.0597→0.3401 at defaults (6144MB embed arena is the default since 691 §N/F-031); enron +7% vector, +1.3% hybrid; scifact neutral). When on, a chunked parent doc's `VECTOR` is embedded in one batch-1 pass at `JUSTSEARCH_EMBED_LATE_CHUNKING_CONTEXT_LENGTH` tokens instead of the base `JUSTSEARCH_EMBED_CONTEXT_LENGTH` window-mean. Measured cost: background enrichment is slower on long-doc corpora (enron 7.7→4.5 docs/s measured at a 3072MB arena — long single passes cost more GPU than windowed batches; the 6144 default removes the OOM-fallback double-pays). Set `false` to restore the pre-691 windowed-mean behavior (throughput-first). The per-span `CHUNK_VECTOR` half was DROPPED per §Phase M's offline CLS measurement (nDCG@10 −0.2329) — chunk docs keep their separate per-chunk embed path regardless of this flag. |
@@ -266,7 +264,6 @@ system-property precedence rule above does not apply to them.
 | `JUSTSEARCH_INDEX_BASE_PATH` | `justsearch.index.base_path` | Path | Overrides the effective index root (contains `state.json` and `indices/`). |
 | `JUSTSEARCH_INDEX_SCHEMA_MISMATCH_POLICY` | `index.schema_mismatch.policy` | String | Policy for schema incompatibility (`FAIL_CLOSED`, `REBUILD_BACKUP_FIRST`, `BLUE_GREEN_MIGRATE`). Default depends on mode: `BLUE_GREEN_MIGRATE` in production (rebuild beside the live index, which keeps serving reads), `REBUILD_BACKUP_FIRST` in dev (back up and rebuild empty — faster, and destructive by design). Tempdoc 915. |
 | `JUSTSEARCH_INDEX_MIGRATION_CUTOVER_MAX_FAILED_JOBS` | `index.migration.cutover.max_failed_jobs` | Int | Optional failure budget to block auto-cutover during migration. |
-| `JUSTSEARCH_LLM_ACCEL` |  | String | Selects the native llama backend variant for in-process llama.cpp (embeddings). Values: `cuda`, `metal`, `vulkan`, `cpu`. If unset, JustSearch chooses based on detected hardware (prefers CUDA, then Metal, else CPU). |
 | `JUSTSEARCH_POLICY_GPU_ACCELERATION_ENABLED` | `policy.gpu_acceleration_enabled` | Bool | System-wide GPU policy gate (forces CPU-only behavior when false). |
 | **RAG retrieval** | | | |
 | `JUSTSEARCH_RAG_RETRIEVE_MODE` | `rag.retrieve.mode` | String | Retrieval mode: `auto` (prefer hybrid), `hybrid`, or `bm25`. |
@@ -342,15 +339,7 @@ of the long-lived app runtime configuration contract. They are retained here as 
 
 ## Examples
 
-### 1) Mode 1 (CPU embeddings)
-
-```powershell
-$env:JUSTSEARCH_MODEL_PATH = "C:\\AI\\models\\nomic-embed-text-v1.5.Q4_K_M.gguf"
-$env:JUSTSEARCH_EMBED_GPU_LAYERS = "0"
-powershell -ExecutionPolicy Bypass -File scripts/bench/run-claim-b-suite-win.ps1
-```
-
-### 2) Online inference GPU offload (llama-server)
+### Online inference GPU offload (llama-server)
 
 ```powershell
 $env:JUSTSEARCH_LLM_MODEL_PATH = "C:\\AI\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf"
@@ -363,6 +352,16 @@ Notes:
 
 
 ## Retired inert configuration
+
+`JUSTSEARCH_MODEL_PATH` / `justsearch.model.path` and `JUSTSEARCH_LLM_ACCEL`
+have no current runtime reader. The in-process llama embedding backend is retired;
+use `JUSTSEARCH_EMBED_ONNX_MODEL_PATH` for an explicit ONNX embedding directory.
+
+`JUSTSEARCH_EMBED_GPU_LAYERS` / `justsearch.embed.gpu.layers` is not a runtime
+alias for `JUSTSEARCH_EMBED_GPU_ENABLED`. The dev runner still reads the
+environment variable only to select a longer readiness timeout, and jseval's
+legacy `gpu.embed.layers` mapping still exports it. Neither turns on GPU
+embeddings. Use `JUSTSEARCH_EMBED_GPU_ENABLED` to control runtime offload.
 
 The Engine no longer declares the singular `JUSTSEARCH_INDEX_COLLECTION` /
 `justsearch.index.collection` override. Configure the supported collection list
