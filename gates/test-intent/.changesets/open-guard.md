@@ -7,9 +7,9 @@ author-session: open-guard-builder
 
 # Test-intent entries
 
-Windows NTFS, 8.3, trailing-dot/space, ADS, symlink and junction checks are `#[cfg(windows)]` and **unverified here**. Run the exact hosted command in `tmp/open-guard/windows-evidence-command.txt`; real Windows launcher side effects remain unverified. macOS is out of scope.
+Windows NTFS, 8.3, trailing-dot/space, ADS, symlink and junction checks are `#[cfg(windows)]` and **unverified here**. Run the exact hosted command in `tmp/open-guard/windows-evidence-command.txt`; real Windows launcher side effects and the four round-3 dispatch checks remain unverified here. macOS is out of scope.
 
-D4 was generated in a shared scratch clone using `run-evidence.mjs --before` and an interface-only before patch. The patch exposes the old decisions under the new helper signatures; it adds no validation or resolution. Cargo output stays in this worktree's target directory. The lower Linux layer is the actual command function with PATH-isolated, marker-writing xdg-open; plugin calls go through Tauri's IPC dispatcher and real ACLs on a mock webview. This does not claim a graphical shell run.
+D4 was generated in a shared scratch clone using `run-evidence.mjs --before` and an interface-only before patch. The patches expose old decisions and raw dispatch bodies under the new helper signatures; they add no validation, resolution or path simplification. Round-3 repairs use d6b269468 as the before-state; original repairs retain origin/main. Every run sets TMPDIR to this worktree's tmp/ and keeps fixtures there. Cargo output stays in this worktree's target directory. The lower Linux layer is the actual command function with PATH-isolated, marker-writing xdg-open; plugin calls go through Tauri's IPC dispatcher and real ACLs on a mock webview. This does not claim a graphical shell run.
 
 The author has not accepted these entries; independent acceptance remains for the verifier.
 
@@ -28,7 +28,7 @@ The author has not accepted these entries; independent acceptance remains for th
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
           "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
           "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
-          "choice": "D1: local opening allows exactly pdf, doc, docx, xls, xlsx, ppt, pptx, odt, ods, odp, rtf, epub, txt, md, csv, tsv, log, json, xml, html, htm, eml, msg, png, jpg, jpeg, gif, bmp, webp, tif, tiff, svg, mp3, wav, m4a, flac, mp4, mov, mkv, webm. Unknown types, scripts, sources and launchers, including macro-enabled Office, mht and mhtml, are refused with the type named and Show in folder offered.",
+          "choice": "D1, revised by F4 round 3: local files allow exactly pdf, doc, docx, xls, xlsx, ppt, pptx, odt, ods, odp, rtf, epub, txt, md, csv, tsv, log, json, xml, html, htm, eml, msg, png, jpg, jpeg, gif, bmp, webp, tif, tiff, svg, mp3, wav, m4a, flac, mp4, mov, mkv, webm, markdown, mdx, yaml, yml, toml, ini, conf, rst, tex, srt, vtt, ics, vcf, mbox, odg, dotx, ppsx, vsdx, xps, mobi, djvu, cbz, heic, avif, ico, psd, raw, ogg, opus, aac, wma, avi, wmv, m4v, mpg, mpeg, zip, 7z. Code, scripts, launchers, macro-enabled Office, mht, mhtml and unknown formats stay refused. Existing directories open in the file manager whatever their names, after resolution. The extension policy is one constant with an explicit test.",
           "label": "agent choice"
         },
         {
@@ -36,7 +36,7 @@ The author has not accepted these entries; independent acceptance remains for th
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
           "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
           "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
-          "choice": "D4/S1/S2/S7: resolve the path, check the resolved target extension and dispatch the resolved target. A document symlink to an allowed type opens. An allowed-name symlink to a refused target, missing, dangling and looping paths are refused. Preserve UNC, traversal and the original executable refusals. Windows drive letters are not URL schemes; Linux colons are legal. Windows rejects network/device forms and alternate streams before canonicalization, resolves 8.3 and trailing-dot/space names, and accepts only the extended prefix produced by canonicalization. Replacement between validation and dispatch remains a residual.",
+          "choice": "D4/S1/S2/S7: resolve the path, check the resolved target extension and dispatch the resolved target. A document symlink to an allowed type opens. An allowed-name symlink to a refused target, missing, dangling and looping paths are refused. Preserve UNC, traversal and the original executable refusals. Windows drive letters are not URL schemes; Linux colons are legal. Windows rejects network/device forms and alternate streams before canonicalization, resolves 8.3 and trailing-dot/space names, and accepts the extended prefix produced by canonicalization only internally. For Windows shell dispatch, simplify the checked canonical target with dunce::simplified; refuse rather than dispatch if simplification is impossible. Never hand a verbatim path to open or Explorer. Replacement between validation and dispatch remains a residual.",
           "label": "agent choice"
         },
         {
@@ -95,14 +95,14 @@ The author has not accepted these entries; independent acceptance remains for th
         "modules/shell/src-tauri/src/lib.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "All D1 formats (both cases) and allowed web/mail links still validate; the D1 allow-list constant equals the stated list. The existing path/executable preservation tests remain unchanged.",
+      "behaviour": "Allowed web/mail links still validate; the existing path/executable preservation tests remain unchanged. The revised format policy has separate repaired evidence against d6b269468.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
           "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
           "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
-          "choice": "D1: local opening allows exactly pdf, doc, docx, xls, xlsx, ppt, pptx, odt, ods, odp, rtf, epub, txt, md, csv, tsv, log, json, xml, html, htm, eml, msg, png, jpg, jpeg, gif, bmp, webp, tif, tiff, svg, mp3, wav, m4a, flac, mp4, mov, mkv, webm. Unknown types, scripts, sources and launchers, including macro-enabled Office, mht and mhtml, are refused with the type named and Show in folder offered.",
+          "choice": "D1, revised by F4 round 3: local files allow exactly pdf, doc, docx, xls, xlsx, ppt, pptx, odt, ods, odp, rtf, epub, txt, md, csv, tsv, log, json, xml, html, htm, eml, msg, png, jpg, jpeg, gif, bmp, webp, tif, tiff, svg, mp3, wav, m4a, flac, mp4, mov, mkv, webm, markdown, mdx, yaml, yml, toml, ini, conf, rst, tex, srt, vtt, ics, vcf, mbox, odg, dotx, ppsx, vsdx, xps, mobi, djvu, cbz, heic, avif, ico, psd, raw, ogg, opus, aac, wma, avi, wmv, m4v, mpg, mpeg, zip, 7z. Code, scripts, launchers, macro-enabled Office, mht, mhtml and unknown formats stay refused. Existing directories open in the file manager whatever their names, after resolution. The extension policy is one constant with an explicit test.",
           "label": "agent choice"
         },
         {
@@ -110,7 +110,7 @@ The author has not accepted these entries; independent acceptance remains for th
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
           "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
           "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
-          "choice": "D4/S1/S2/S7: resolve the path, check the resolved target extension and dispatch the resolved target. A document symlink to an allowed type opens. An allowed-name symlink to a refused target, missing, dangling and looping paths are refused. Preserve UNC, traversal and the original executable refusals. Windows drive letters are not URL schemes; Linux colons are legal. Windows rejects network/device forms and alternate streams before canonicalization, resolves 8.3 and trailing-dot/space names, and accepts only the extended prefix produced by canonicalization. Replacement between validation and dispatch remains a residual.",
+          "choice": "D4/S1/S2/S7: resolve the path, check the resolved target extension and dispatch the resolved target. A document symlink to an allowed type opens. An allowed-name symlink to a refused target, missing, dangling and looping paths are refused. Preserve UNC, traversal and the original executable refusals. Windows drive letters are not URL schemes; Linux colons are legal. Windows rejects network/device forms and alternate streams before canonicalization, resolves 8.3 and trailing-dot/space names, and accepts the extended prefix produced by canonicalization only internally. For Windows shell dispatch, simplify the checked canonical target with dunce::simplified; refuse rather than dispatch if simplification is impossible. Never hand a verbatim path to open or Explorer. Replacement between validation and dispatch remains a residual.",
           "label": "agent choice"
         },
         {
@@ -124,7 +124,6 @@ The author has not accepted these entries; independent acceptance remains for th
       ],
       "evidence": "gates/test-intent/evidence/open-guard-preserved.json",
       "newChecks": [
-        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::documents_allow_exact_d1_formats",
         "modules/shell/src-tauri/src/lib.rs#open_guard_tests::urls_accept_only_web_and_mail"
       ]
     },
@@ -156,7 +155,7 @@ The author has not accepted these entries; independent acceptance remains for th
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
           "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
           "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
-          "choice": "D1: local opening allows exactly pdf, doc, docx, xls, xlsx, ppt, pptx, odt, ods, odp, rtf, epub, txt, md, csv, tsv, log, json, xml, html, htm, eml, msg, png, jpg, jpeg, gif, bmp, webp, tif, tiff, svg, mp3, wav, m4a, flac, mp4, mov, mkv, webm. Unknown types, scripts, sources and launchers, including macro-enabled Office, mht and mhtml, are refused with the type named and Show in folder offered.",
+          "choice": "D1, revised by F4 round 3: local files allow exactly pdf, doc, docx, xls, xlsx, ppt, pptx, odt, ods, odp, rtf, epub, txt, md, csv, tsv, log, json, xml, html, htm, eml, msg, png, jpg, jpeg, gif, bmp, webp, tif, tiff, svg, mp3, wav, m4a, flac, mp4, mov, mkv, webm, markdown, mdx, yaml, yml, toml, ini, conf, rst, tex, srt, vtt, ics, vcf, mbox, odg, dotx, ppsx, vsdx, xps, mobi, djvu, cbz, heic, avif, ico, psd, raw, ogg, opus, aac, wma, avi, wmv, m4v, mpg, mpeg, zip, 7z. Code, scripts, launchers, macro-enabled Office, mht, mhtml and unknown formats stay refused. Existing directories open in the file manager whatever their names, after resolution. The extension policy is one constant with an explicit test.",
           "label": "agent choice"
         }
       ],
@@ -190,6 +189,36 @@ The author has not accepted these entries; independent acceptance remains for th
       "evidence": "gates/test-intent/evidence/open-guard-preserved.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts#keeps browser opening outside Tauri"
+      ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/lib.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "Repair d6b269468: all 78 approved file extensions validate, directories with any name open, and the actual Linux command dispatches folders. Windows real open/reveal checks observe the exact path sent to the OS, refuse unsimplifiable targets, and remain unverified here.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "F4 round 3: check the canonical Windows target, but dispatch and reveal the simplified non-verbatim form; refuse if that is impossible. Add real dispatch tests for a .txt file, open/Explorer receiving no \\\\?\\ prefix, and bracket/question-like names. Restore opening of existing directories with any name, and reveal folders via Explorer on Windows. D1, revised by F4 round 3: local files allow exactly pdf, doc, docx, xls, xlsx, ppt, pptx, odt, ods, odp, rtf, epub, txt, md, csv, tsv, log, json, xml, html, htm, eml, msg, png, jpg, jpeg, gif, bmp, webp, tif, tiff, svg, mp3, wav, m4a, flac, mp4, mov, mkv, webm, markdown, mdx, yaml, yml, toml, ini, conf, rst, tex, srt, vtt, ics, vcf, mbox, odg, dotx, ppsx, vsdx, xps, mobi, djvu, cbz, heic, avif, ico, psd, raw, ogg, opus, aac, wma, avi, wmv, m4v, mpg, mpeg, zip, 7z. Code, scripts, launchers, macro-enabled Office, mht, mhtml and unknown formats stay refused. Existing directories open in the file manager whatever their names, after resolution. The extension policy is one constant with an explicit test.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/open-guard-round3-repaired.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::documents_allow_exact_d1_formats",
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::directories_open_regardless_of_name",
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::linux_commands_open_folders_of_any_name"
+      ],
+      "repaired": true,
+      "unverifiedChecks": [
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_real_open_uses_plain_dispatch_path",
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_real_reveal_uses_plain_dispatch_path_for_file_and_folder",
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_real_dispatch_handles_brackets_and_question_like_names",
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_refuses_verbatim_only_dispatch"
       ]
     }
   ]

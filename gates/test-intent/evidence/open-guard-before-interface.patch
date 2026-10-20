@@ -1,6 +1,6 @@
 --- a/modules/shell/src-tauri/src/lib.rs
 +++ b/modules/shell/src-tauri/src/lib.rs
-@@ -2144,3 +2144,37 @@
+@@ -2144,3 +2144,58 @@
          assert!(res.is_err());
      }
  }
@@ -37,4 +37,25 @@
 +}
 +async fn open_external_url(url: String) -> Result<(), String> {
 +    open_file(url).await
++}
++
++// Interface-only adapter for the native dispatch tests: d6b269468 passed raw canonical paths.
++#[cfg(windows)]
++use std::path::Path;
++#[cfg(windows)]
++fn dispatch_open_target(target: &Path) -> Result<&Path, String> {
++    open::that(target).map_err(|e| format!("Failed to open '{}': {e}", target.display()))?;
++    Ok(target)
++}
++#[cfg(windows)]
++fn dispatch_reveal_target<'a>(item: &'a Path, directory: &'a Path) -> Result<&'a Path, String> {
++    if item.is_file() {
++        Command::new("explorer")
++            .arg(format!("/select,{}", item.to_string_lossy()))
++            .status()
++            .map_err(|e| format!("Failed to reveal '{}': {e}", item.display()))?;
++        return Ok(item);
++    }
++    open::that(directory).map_err(|e| format!("Failed to reveal '{}': {e}", directory.display()))?;
++    Ok(directory)
 +}

@@ -1,0 +1,138 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T05:57:53.380Z",
+  "revision": "d6b2694688d04eb402a95dc7f5a75f9ca44e56ff",
+  "tree": "2b909fb0cc2254a8c07eee38e5af9e39d020836f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::documents_allow_exact_d1_formats\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4962
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::directories_open_regardless_of_name\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 168
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::linux_commands_open_folders_of_any_name\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 165
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::documents_allow_exact_d1_formats",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:1494de9951561014d16251186ed7478754163aa6a01cca3f7852155c7445e12f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::documents_allow_exact_d1_formats",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::directories_open_regardless_of_name",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:1494de9951561014d16251186ed7478754163aa6a01cca3f7852155c7445e12f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::directories_open_regardless_of_name",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::linux_commands_open_folders_of_any_name",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:1494de9951561014d16251186ed7478754163aa6a01cca3f7852155c7445e12f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::linux_commands_open_folders_of_any_name",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d6b2694688d04eb402a95dc7f5a75f9ca44e56ff",
+    "revision": "d6b2694688d04eb402a95dc7f5a75f9ca44e56ff",
+    "overlays": [
+      "modules/shell/src-tauri/Cargo.toml",
+      "modules/shell/src-tauri/Cargo.lock",
+      "modules/ui/build/install/ui/native/linux-x86_64/justsearch-bound-exec",
+      "modules/shell/src-tauri/resources/headless/.ci-placeholder"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::documents_allow_exact_d1_formats\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 4954,
+        "output": "\nrunning 1 test\ntest open_guard_tests::documents_allow_exact_d1_formats ... FAILED\n\nfailures:\n\n---- open_guard_tests::documents_allow_exact_d1_formats stdout ----\n\nthread 'open_guard_tests::documents_allow_exact_d1_formats' (3389958) panicked at src/lib.rs:2253:9:\nassertion `left == right` failed\n  left: [\"pdf\", \"doc\", \"docx\", \"xls\", \"xlsx\", \"ppt\", \"pptx\", \"odt\", \"ods\", \"odp\", \"rtf\", \"epub\", \"txt\", \"md\", \"csv\", \"tsv\", \"log\", \"json\", \"xml\", \"html\", \"htm\", \"eml\", \"msg\", \"png\", \"jpg\", \"jpeg\", \"gif\", \"bmp\", \"webp\", \"tif\", \"tiff\", \"svg\", \"mp3\", \"wav\", \"m4a\", \"flac\", \"mp4\", \"mov\", \"mkv\", \"webm\"]\n right: [\"pdf\", \"doc\", \"docx\", \"xls\", \"xlsx\", \"ppt\", \"pptx\", \"odt\", \"ods\", \"odp\", \"rtf\", \"epub\", \"txt\", \"md\", \"csv\", \"tsv\", \"log\", \"json\", \"xml\", \"html\", \"htm\", \"eml\", \"msg\", \"png\", \"jpg\", \"jpeg\", \"gif\", \"bmp\", \"webp\", \"tif\", \"tiff\", \"svg\", \"mp3\", \"wav\", \"m4a\", \"flac\", \"mp4\", \"mov\", \"mkv\", \"webm\", \"markdown\", \"mdx\", \"yaml\", \"yml\", \"toml\", \"ini\", \"conf\", \"rst\", \"tex\", \"srt\", \"vtt\", \"ics\", \"vcf\", \"mbox\", \"odg\", \"dotx\", \"ppsx\", \"vsdx\", \"xps\", \"mobi\", \"djvu\", \"cbz\", \"heic\", \"avif\", \"ico\", \"psd\", \"raw\", \"ogg\", \"opus\", \"aac\", \"wma\", \"avi\", \"wmv\", \"m4v\", \"mpg\", \"mpeg\", \"zip\", \"7z\"]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::documents_allow_exact_d1_formats\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 172 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-before-0PSXKe/modules/shell/src-tauri)\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n    --> src/lib.rs:1035:15\n     |\n1035 | pub(crate) fn restart_headless_backend(\n     |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.91s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::directories_open_regardless_of_name\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 162,
+        "output": "\nrunning 1 test\ntest open_guard_tests::directories_open_regardless_of_name ... FAILED\n\nfailures:\n\n---- open_guard_tests::directories_open_regardless_of_name stdout ----\n\nthread 'open_guard_tests::directories_open_regardless_of_name' (3389980) panicked at src/lib.rs:2907:13:\nassertion `left == right` failed\n  left: Err(\"Only document files can be opened. Use Show in folder instead.\")\n right: Ok(\"/home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/.tmpNu6nhv/folder\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::directories_open_regardless_of_name\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 172 filtered out; finished in 0.00s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n    --> src/lib.rs:1035:15\n     |\n1035 | pub(crate) fn restart_headless_backend(\n     |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::linux_commands_open_folders_of_any_name\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 165,
+        "output": "\nrunning 1 test\ntest open_guard_tests::linux_commands_open_folders_of_any_name ... FAILED\n\nfailures:\n\n---- open_guard_tests::linux_commands_open_folders_of_any_name stdout ----\n\nthread 'open_guard_tests::linux_commands_open_folders_of_any_name' (3390018) panicked at src/lib.rs:2568:9:\nassertion `left == right` failed: actual command dispatch case folders:\n\nrunning 1 test\ntest open_guard_tests::linux_commands_open_folders_of_any_name ... FAILED\n\nfailures:\n\nfailures:\n    open_guard_tests::linux_commands_open_folders_of_any_name\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 172 filtered out; finished in 0.00s\n\n\n\nthread 'open_guard_tests::linux_commands_open_folders_of_any_name' (3390020) panicked at src/lib.rs:2660:17:\nassertion `left == right` failed\n  left: [Err(\"Only document files can be opened. Use Show in folder instead.\"), Ok(()), Err(\"Only document files can be opened. Use Show in folder instead.\"), Ok(()), Err(\"Only document files can be opened. Use Show in folder instead.\"), Ok(())]\n right: [Ok(()), Ok(()), Ok(()), Ok(()), Ok(()), Ok(())]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  left: Some(101)\n right: Some(0)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    open_guard_tests::linux_commands_open_folders_of_any_name\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 172 filtered out; finished in 0.01s\n\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n    --> src/lib.rs:1035:15\n     |\n1035 | pub(crate) fn restart_headless_backend(\n     |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/open-guard/modules/shell/src-tauri/target/debug/deps/shell_lib-b7a1d38e06742952)\nerror: test failed, to rerun pass `--lib`\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::documents_allow_exact_d1_formats",
+        "classification": "assertion",
+        "detail": "open_guard_tests::documents_allow_exact_d1_formats:  ---- open_guard_tests::documents_allow_exact_d1_formats stdout ----\n\nthread 'open_guard_tests::documents_allow_exact_d1_formats' (3389958) panicked at src/lib.rs:2253:9:\nassertion `left == right` failed\n  left: [\"pdf\", \"doc\", \"docx\", \"xls\", \"xlsx\", \"ppt\", \"pptx\", \"odt\", \"ods\", \"odp\", \"rtf\", \"epub\", \"txt\", \"md\", \"csv\", \"tsv\", \"log\", \"json\", \"xml\", \"html\", \"htm\", \"eml\", \"msg\", \"png\", \"jpg\", \"jpeg\", \"gif\", \"bmp\", \"webp\", \"tif\", \"tiff\", \"svg\", \"mp"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::directories_open_regardless_of_name",
+        "classification": "assertion",
+        "detail": "open_guard_tests::directories_open_regardless_of_name:  ---- open_guard_tests::directories_open_regardless_of_name stdout ----\n\nthread 'open_guard_tests::directories_open_regardless_of_name' (3389980) panicked at src/lib.rs:2907:13:\nassertion `left == right` failed\n  left: Err(\"Only document files can be opened. Use Show in folder instead.\")\n right: Ok(\"/home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/.tmpNu6nhv/folder\")\nnote: run with `RUST_BACKTRACE=1` environment variable to displa"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::linux_commands_open_folders_of_any_name",
+        "classification": "assertion",
+        "detail": "open_guard_tests::linux_commands_open_folders_of_any_name:  ---- open_guard_tests::linux_commands_open_folders_of_any_name stdout ----\n\nthread 'open_guard_tests::linux_commands_open_folders_of_any_name' (3390018) panicked at src/lib.rs:2568:9:\nassertion `left == right` failed: actual command dispatch case folders:\n\nrunning 1 test\ntest open_guard_tests::linux_commands_open_folders_of_any_name ... FAILED\n\nfailures:\n\nfailures:\n    open_guard_tests::linux_commands_open_folders_of_any_name\n\ntest resu"
+      }
+    ]
+  },
+  "digest": "sha256:c7d77049a0f4c7606b23f254a844247ce7979ccf4976d6c2640a3a8bf2cb63d0"
+}

@@ -24,7 +24,7 @@ use engine_host::{EngineHost, PreparedCommand};
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -307,7 +307,10 @@ const OPEN_DOCUMENT_EXTENSIONS: &[&str] = &[
     "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf", "epub", "txt",
     "md", "csv", "tsv", "log", "json", "xml", "html", "htm", "eml", "msg", "png", "jpg", "jpeg",
     "gif", "bmp", "webp", "tif", "tiff", "svg", "mp3", "wav", "m4a", "flac", "mp4", "mov", "mkv",
-    "webm",
+    "webm", "markdown", "mdx", "yaml", "yml", "toml", "ini", "conf", "rst", "tex", "srt", "vtt",
+    "ics", "vcf", "mbox", "odg", "dotx", "ppsx", "vsdx", "xps", "mobi", "djvu", "cbz", "heic",
+    "avif", "ico", "psd", "raw", "ogg", "opus", "aac", "wma", "avi", "wmv", "m4v", "mpg", "mpeg",
+    "zip", "7z",
 ];
 
 fn validate_document_type(path: &std::path::Path) -> Result<(), String> {
@@ -363,10 +366,14 @@ fn resolve_local_path(path: &str) -> Result<PathBuf, String> {
 
 fn local_open_target(path: &str) -> Result<PathBuf, String> {
     let resolved = resolve_local_path(path)?;
-    if !resolved.is_file() {
-        return Err("Only document files can be opened. Use Show in folder instead.".into());
+    if !resolved.is_dir() {
+        if !resolved.is_file() {
+            return Err(
+                "Only documents and directories can be opened. Use Show in folder instead.".into(),
+            );
+        }
+        validate_document_type(&resolved)?;
     }
-    validate_document_type(&resolved)?;
     // Residual: the target can still be replaced between this check and OS dispatch.
     Ok(resolved)
 }
@@ -1359,10 +1366,56 @@ async fn get_file_metadata(path: String) -> Result<FileMetadata, String> {
     })
 }
 
+// Windows shell consumers require a DOS path, even though validation uses the canonical target.
+#[cfg(windows)]
+fn shell_dispatch_path(target: &Path) -> Result<&Path, String> {
+    let simplified = dunce::simplified(target);
+    if !matches!(simplified.components().next(), Some(std::path::Component::Prefix(prefix))
+        if matches!(prefix.kind(), std::path::Prefix::Disk(_)))
+    {
+        return Err(
+            "The resolved target cannot be represented as a non-verbatim Windows shell path".into(),
+        );
+    }
+    Ok(simplified)
+}
+
+// Return the exact path handed to the OS so native tests can observe the real dispatch boundary.
+fn dispatch_open_target(target: &Path) -> Result<&Path, String> {
+    #[cfg(windows)]
+    let target = shell_dispatch_path(target)?;
+    open::that(target).map_err(|e| format!("Failed to open '{}': {e}", target.display()))?;
+    Ok(target)
+}
+
+fn dispatch_reveal_target<'a>(_item: &'a Path, directory: &'a Path) -> Result<&'a Path, String> {
+    #[cfg(windows)]
+    {
+        let target = if _item.is_file() { _item } else { directory };
+        let target = shell_dispatch_path(target)?;
+        let argument = if _item.is_file() {
+            format!("/select,{}", target.to_string_lossy()).into()
+        } else {
+            target.as_os_str().to_os_string()
+        };
+        Command::new("explorer")
+            .arg(argument)
+            .status()
+            .map_err(|e| format!("Failed to reveal '{}': {e}", target.display()))?;
+        Ok(target)
+    }
+    #[cfg(not(windows))]
+    {
+        open::that(directory)
+            .map_err(|e| format!("Failed to reveal '{}': {e}", directory.display()))?;
+        Ok(directory)
+    }
+}
+
 #[tauri::command]
 async fn open_file(path: String) -> Result<(), String> {
     let target = local_open_target(&path)?;
-    open::that(&target).map_err(|e| format!("Failed to open '{}': {e}", target.display()))
+    dispatch_open_target(&target).map(|_| ())
 }
 
 #[tauri::command]
@@ -1373,18 +1426,8 @@ async fn open_external_url(url: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn reveal_in_explorer(path: String) -> Result<(), String> {
-    let (_item, directory) = reveal_target(&path)?;
-    #[cfg(windows)]
-    {
-        if _item.is_file() {
-            Command::new("explorer")
-                .arg(format!("/select,{}", _item.to_string_lossy()))
-                .status()
-                .map_err(|e| format!("Failed to reveal '{path}' in Explorer: {e}"))?;
-            return Ok(());
-        }
-    }
-    open::that(directory).map_err(|e| format!("Failed to reveal '{path}': {e}"))
+    let (item, directory) = reveal_target(&path)?;
+    dispatch_reveal_target(&item, &directory).map(|_| ())
 }
 
 /// Phase 1: Generate a single-use token for confirming factory reset.
@@ -2246,7 +2289,10 @@ mod open_guard_tests {
             "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf", "epub",
             "txt", "md", "csv", "tsv", "log", "json", "xml", "html", "htm", "eml", "msg", "png",
             "jpg", "jpeg", "gif", "bmp", "webp", "tif", "tiff", "svg", "mp3", "wav", "m4a", "flac",
-            "mp4", "mov", "mkv", "webm",
+            "mp4", "mov", "mkv", "webm", "markdown", "mdx", "yaml", "yml", "toml", "ini", "conf",
+            "rst", "tex", "srt", "vtt", "ics", "vcf", "mbox", "odg", "dotx", "ppsx", "vsdx", "xps",
+            "mobi", "djvu", "cbz", "heic", "avif", "ico", "psd", "raw", "ogg", "opus", "aac",
+            "wma", "avi", "wmv", "m4v", "mpg", "mpeg", "zip", "7z",
         ];
         assert_eq!(OPEN_DOCUMENT_EXTENSIONS, expected);
         for ext in expected {
@@ -2539,6 +2585,7 @@ mod open_guard_tests {
                 "open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory"
             }
             "plugin" => "open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel",
+            "folders" => "open_guard_tests::linux_commands_open_folders_of_any_name",
             _ => unreachable!(),
         };
         use std::os::unix::fs::PermissionsExt;
@@ -2639,6 +2686,22 @@ mod open_guard_tests {
                     assert!(runtime.block_on(open_external_url(url.into())).is_ok());
                 }
                 let expected = format!("{document}\n{}\n{}\nhttp://example.com/?q=1#f\nhttps://example.com/?q=1#f\nmailto:user@example.com?subject=Hi\n", dir.display(), dir.display());
+                assert_eq!(fs::read_to_string(marker).unwrap(), expected);
+            }
+            "folders" => {
+                let mut expected = String::new();
+                let mut results = Vec::new();
+                for name in ["folder", "folder.exe", "folder.desktop"] {
+                    let folder = dir.join(name);
+                    fs::create_dir(&folder).unwrap();
+                    results
+                        .push(runtime.block_on(open_file(folder.to_string_lossy().into_owned())));
+                    results.push(
+                        runtime.block_on(reveal_in_explorer(folder.to_string_lossy().into_owned())),
+                    );
+                    expected.push_str(&format!("{}\n{}\n", folder.display(), folder.display()));
+                }
+                assert_eq!(results, vec![Ok(()); 6]);
                 assert_eq!(fs::read_to_string(marker).unwrap(), expected);
             }
             "plugin" => {
@@ -2878,5 +2941,92 @@ mod open_guard_tests {
             0,
             "{outcomes:?}"
         );
+    }
+    #[test]
+    fn directories_open_regardless_of_name() {
+        let dir = tempdir().unwrap();
+        for name in ["folder", "folder.exe", "folder.desktop", "folder.unknown"] {
+            let folder = dir.path().join(name);
+            fs::create_dir(&folder).unwrap();
+            assert_eq!(
+                local_open_target(folder.to_str().unwrap()),
+                Ok(fs::canonicalize(folder).unwrap())
+            );
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_commands_open_folders_of_any_name() {
+        run_dispatch_case("folders");
+    }
+
+    #[cfg(windows)]
+    fn assert_plain_dispatched_path(result: Result<&Path, String>, expected: &Path) {
+        assert_eq!(
+            result.as_ref().map(|_| ()),
+            Ok(()),
+            "real dispatch failed: {result:?}"
+        );
+        let dispatched = result.unwrap();
+        assert!(!dispatched
+            .as_os_str()
+            .to_string_lossy()
+            .starts_with(r"\\?\"));
+        assert_eq!(
+            fs::canonicalize(dispatched).unwrap(),
+            fs::canonicalize(expected).unwrap()
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_real_open_uses_plain_dispatch_path() {
+        let dir = tempdir().unwrap();
+        let path = fixture(dir.path(), "real-document.txt");
+        let target = local_open_target(&path).unwrap();
+        assert_plain_dispatched_path(dispatch_open_target(&target), Path::new(&path));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_real_reveal_uses_plain_dispatch_path_for_file_and_folder() {
+        let dir = tempdir().unwrap();
+        let path = fixture(dir.path(), "real-document.txt");
+        let (item, parent) = reveal_target(&path).unwrap();
+        assert_plain_dispatched_path(dispatch_reveal_target(&item, &parent), Path::new(&path));
+        let folder = dir.path().to_str().unwrap();
+        let (item, directory) = reveal_target(folder).unwrap();
+        assert_plain_dispatched_path(dispatch_reveal_target(&item, &directory), Path::new(folder));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_real_dispatch_handles_brackets_and_question_like_names() {
+        let dir = tempdir().unwrap();
+        let folder = dir.path().join("folder [draft] ？");
+        fs::create_dir(&folder).unwrap();
+        let path = fixture(&folder, "notes[1]？.txt");
+        let target = local_open_target(&path).unwrap();
+        assert_plain_dispatched_path(dispatch_open_target(&target), Path::new(&path));
+        let (item, directory) = reveal_target(&path).unwrap();
+        assert_plain_dispatched_path(dispatch_reveal_target(&item, &directory), Path::new(&path));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_refuses_verbatim_only_dispatch() {
+        let dir = tempdir().unwrap();
+        // A real NTFS name whose trailing dot requires verbatim path semantics.
+        let folder = fs::canonicalize(dir.path()).unwrap().join("verbatim-only.");
+        fs::create_dir(&folder).unwrap();
+        let path = fixture(&folder, "document.txt");
+        let target = fs::canonicalize(path).unwrap();
+        let parent = target.parent().unwrap();
+        let results = [
+            dispatch_open_target(&target),
+            dispatch_reveal_target(&target, parent),
+        ];
+        assert_eq!(results.iter().filter(|result| matches!(result, Err(message) if message.contains("non-verbatim Windows shell path"))).count(), 2, "{results:?}");
     }
 }
