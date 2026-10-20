@@ -395,3 +395,13 @@ Independent verification remains outstanding. No acceptance record is authored h
   "note": "Re-audit 7d7961e8f: Windows coverage is New with valid Java D4 evidence; fixture canonicalization is separate Adaptation; the explicit CI blocking/ownership predicate is stricter and meets Structural rule kept. Signed negative D4 probes are rejected; unchanged runtime mutations carry forward."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "ae1dc1409c1bf4f02",
+  "verdict": "accept",
+  "digest": "sha256:c6f381b4e8f7cb32b6dcfd5a99f4d4e63cd3e86e37381f22b8d7a3d778afd4fa"
+}
+```
