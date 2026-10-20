@@ -354,10 +354,11 @@ export async function runCase({ testCase, policy, io }) {
   } finally {
     try { run.child.kill(); } catch { /* already gone */ }
     await io.sleep(150);
-    if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1' || io.timings) {
-      if (!io.timings) process.stderr.write(`[keep] ${workDir}\n`);
-    } else {
+    const remove = () => {
       try { fs.rmSync(workDir, { recursive: true, force: true, maxRetries: 5 }); } catch { /* windows handles */ }
-    }
+    };
+    if (io.deferCleanup) io.deferCleanup(workDir, remove);
+    else if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') process.stderr.write(`[keep] ${workDir}\n`);
+    else remove();
   }
 }

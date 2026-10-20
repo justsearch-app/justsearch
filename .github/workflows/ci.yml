@@ -175,6 +175,12 @@ jobs:
       - name: Required hosted governance production coverage
         run: node scripts/ci/check-governance-ci-coverage.mjs
 
+      - name: Windows contracts diagnostics regression tests
+        run: node --test scripts/ci/test-windows-contract-diagnostics.mjs
+
+      - name: Unit-test shard policy regression tests
+        run: node --test scripts/ci/test-verify-unit-test-shard-policy.mjs
+
       - name: E2E child-log collection regression tests
         run: node --test scripts/ci/collect-e2e-child-logs.test.mjs
 

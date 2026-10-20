@@ -144,6 +144,8 @@ export async function runLifecycle({ name, testCase, policy, io }) {
         if(run.child.exitCode===null&&run.child.signalCode===null) { run.child.kill(); await run.exited; }
       }
     }
-    if(process.env.SUPERVISOR_CONFORMANCE_KEEP!=='1'&&!io.timings)fs.rmSync(workDir,{recursive:true,force:true,maxRetries:5});
+    const remove=()=>fs.rmSync(workDir,{recursive:true,force:true,maxRetries:5});
+    if(io.deferCleanup)io.deferCleanup(workDir,remove);
+    else if(process.env.SUPERVISOR_CONFORMANCE_KEEP!=='1')remove();
   }
 }

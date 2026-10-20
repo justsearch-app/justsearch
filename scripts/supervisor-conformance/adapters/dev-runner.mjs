@@ -220,7 +220,8 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
       }
     }
     if (!ended) throw new Error('fixture runner exit unconfirmed; artifacts retained');
-    if (keepWorkDir || io.timings) return;
+    if (keepWorkDir) return;
+    if (io.deferCleanup) { io.deferCleanup(workDir, () => removeFixtureDirectory(workDir)); return; }
     if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {
       process.stderr.write(`[keep] ${workDir}\n`);
       return;
@@ -684,8 +685,10 @@ async function runLifecycleCase({ testCase, policy, io }) {
       // eslint-disable-next-line no-await-in-loop
       await run.cleanup();
     }
-    if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1' || io.timings) {
-      if (!io.timings) process.stderr.write(`[keep] ${workDir}\n`);
+    if (io.deferCleanup) {
+      io.deferCleanup(workDir, () => removeFixtureDirectory(workDir));
+    } else if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {
+      process.stderr.write(`[keep] ${workDir}\n`);
     } else {
       removeFixtureDirectory(workDir);
     }

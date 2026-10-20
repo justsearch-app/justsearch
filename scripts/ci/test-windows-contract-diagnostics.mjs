@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { load } from 'js-yaml';
 
 const root = path.resolve(import.meta.dirname, '../..');
+fs.mkdirSync(path.join(root, 'tmp'), { recursive: true });
 const job = load(fs.readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8')).jobs['windows-native-contracts'];
 const coverage = job.steps.find(step => step.name.startsWith('Windows coverage'));
 const check = job.steps.find(step => step.name === 'Require Windows safety class execution');

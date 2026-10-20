@@ -44,9 +44,10 @@ export function caseTimings({ adapter, testCase, policy, root }) {
       const statePath = run.statePath ?? path.join(run.workDir, 'data/runtime/supervisor.v1.json');
       const timer = setInterval(() => {
         let state;
-        try { state = JSON.parse(fs.readFileSync(statePath, 'utf8')); }
-        catch { return; } // Atomic replacement may briefly leave no readable live record.
-        this.state(state, statePath);
+        try {
+          state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+          if (state) this.state(state, statePath);
+        } catch { /* Atomic replacement may briefly leave no readable live record. */ }
       }, 25);
       timer.unref();
       samplers.push(timer);

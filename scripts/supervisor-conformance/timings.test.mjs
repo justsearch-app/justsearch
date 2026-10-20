@@ -133,3 +133,17 @@ test('readiness is retained while the adapter waits for a terminal process exit'
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('spawn timing write failure warns while preserving the child exit status', () => {
+  const root = fs.mkdtempSync(path.join(tmp, 'timing-spawn-write-failure-'));
+  try {
+    const result = spawnSync(process.execPath, ['--require', path.join(import.meta.dirname, 'timings-preload.cjs'), '-e', `
+      const { spawn } = require('node:child_process');
+      const child = spawn(process.execPath, ['-e', 'process.exit(7)'], {
+        env: { ...process.env, JUSTSEARCH_ENGINE_INCARNATION: 'run/1' }, stdio: 'ignore' });
+      child.on('exit', code => process.exit(code));
+    `], { env: { ...process.env, JUSTSEARCH_CONFORMANCE_TIMINGS: path.join(root, 'missing', 'spawn.jsonl') }, encoding: 'utf8' });
+    assert.equal(result.status, 7, result.stderr);
+    assert.match(result.stderr, /timing warning.*ENOENT/);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
