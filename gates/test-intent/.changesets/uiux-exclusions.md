@@ -488,3 +488,14 @@ No frontend edit is required by D4/D5.
   "note": "Reject: 14 existing generation-boundary cases pass f9bd104d2 and fail 99878e36a after constructor policy registration: EngineGenerationCaptureTest (7), EngineVduGenerationRefusalTest (1), VduGenerationBoundaryTest (6). No applicable test-intent entry. D1-D3, live exclusion/upgrade checks and all named evidence reruns pass."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "s44myn7t",
+  "verdict": "reject",
+  "digest": "sha256:8f5fc3e08c2144b42a53f0fe8d41c0ba2e267e14ca22e44a52233aab4df2ed7a",
+  "note": "Reject EX5/current-policy across runtime transitions: on exact 9982cb522 a persisted legacy SYNC_ROOT replay during successful migration cutover rebinds the shared session policy to temporary replayService without watched roots. Live VDU/embedding/NER/SPLADE pending selections and cache recheck then allow excluded private/report.txt; KnowledgeClient pending-VDU confirms it. Ordinary cutover filters; restart restores filtering. Fourteen old generation cases pass unchanged; all named test-intent evidence reruns pass. Evidence: verifier-5 retained session s44myn7t/out/probe-candidate-replay-own.log and R1-runtime-replay.md."
+}
+```
