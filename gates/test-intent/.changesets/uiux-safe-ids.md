@@ -48,6 +48,8 @@ Review history: the independent audit rejected the batch-name preservation citat
 
 Review history: the latest acceptance rejection identified the missing batch/file-history scope amendment in the batch-name preservation entry. That entry, the generic undo and additional file-history device-name entries, and the batch-journal enumeration entry now cite the exact verifier-1 amendment as a delegated choice. The other batch/file-history entries already cite it. Existing review records and execution evidence remain unchanged.
 
+Review history: the third source rework adds the verifier-2 Windows-name and S9.2 ordering amendments, and the agreed N9.1 logging amendment, as delegated choices. An assertion-by-assertion sweep also adds the single-plain-name, preservation and invalid-name definitions where needed. Assertions whose exact expectations are not stated by a cited source or the agreed text are listed as open in the external sweep table; no source is invented for them. Product code, tests, execution evidence and review records remain unchanged. The source-sweep amendment now supplies the refusal signal (O1), unsafe-request error form (O2), absent-id no-op and legacy route behavior (O3/O4), and backup skipped-count field (O5); each affected entry cites its exact delegated choice, and the sweep has no remaining open source gaps.
+
 ```json
 {
   "entries": [
@@ -71,6 +73,14 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "scenario": "PS3",
           "quote": "A sentinel file and folder next to and above the store root survive every attempt (delete, read, write, branch, fork, resume) through every entry point.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 refusal signal: a store refuses an unsafe id by throwing IllegalArgumentException synchronously, before any filesystem access, never through an error callback.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-rework-original.json",
@@ -101,6 +111,14 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "scenario": "PS3",
           "quote": "A sentinel file and folder next to and above the store root survive every attempt (delete, read, write, branch, fork, resume) through every entry point.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 refusal signal: a store refuses an unsafe id by throwing IllegalArgumentException synchronously, before any filesystem access, never through an error callback.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-rework-original.json",
@@ -129,6 +147,22 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "scenario": "PS3",
           "quote": "A sentinel file and folder next to and above the store root survive every attempt (delete, read, write, branch, fork, resume) through every entry point.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 refusal signal: a store refuses an unsafe id by throwing IllegalArgumentException synchronously, before any filesystem access, never through an error callback.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.3 absent ids: appending a search event without a conversation id (null or blank) does nothing and returns null, as before; a request whose optional id is blank or absent gets exactly the status, dispatch, approval call and wording it got before.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-rework-original.json",
@@ -157,6 +191,29 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "scenario": "PS3",
           "quote": "A sentinel file and folder next to and above the store root survive every attempt (delete, read, write, branch, fork, resume) through every entry point.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.2: the id check on every route precedes any approval, confirmation or wait.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.2 error form: a route answers an unsafe id with HTTP 400 and errorCode INVALID_REQUEST, the existing response for an invalid request.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-rework-original.json",
@@ -269,6 +326,14 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "scenario": "PS3",
           "quote": "A sentinel file and folder next to and above the store root survive every attempt (delete, read, write, branch, fork, resume) through every entry point.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 refusal signal: a store refuses an unsafe id by throwing IllegalArgumentException synchronously, before any filesystem access, never through an error callback.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-amendments.json",
@@ -292,6 +357,21 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
           "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 refusal signal: a store refuses an unsafe id by throwing IllegalArgumentException synchronously, before any filesystem access, never through an error callback.",
           "label": "agent choice"
         }
       ],
@@ -339,6 +419,29 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "scenario": "PS3",
           "quote": "A sentinel file and folder next to and above the store root survive every attempt (delete, read, write, branch, fork, resume) through every entry point.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.2: the id check on every route precedes any approval, confirmation or wait.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.2 error form: a route answers an unsafe id with HTTP 400 and errorCode INVALID_REQUEST, the existing response for an invalid request.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-amendments.json",
@@ -364,6 +467,14 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
           "choice": "N9.3 An optional id field in a request body that is empty or blank is treated as absent, exactly as before (not refused); stores still refuse a blank id.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.3 absent ids: appending a search event without a conversation id (null or blank) does nothing and returns null, as before; a request whose optional id is blank or absent gets exactly the status, dispatch, approval call and wording it got before.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-amendments.json",
@@ -385,6 +496,14 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "scenario": "PS1",
           "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.3 absent ids: appending a search event without a conversation id (null or blank) does nothing and returns null, as before; a request whose optional id is blank or absent gets exactly the status, dispatch, approval call and wording it got before.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-review-preserve.json",
@@ -449,6 +568,21 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
           "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 refusal signal: a store refuses an unsafe id by throwing IllegalArgumentException synchronously, before any filesystem access, never through an error callback.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-unicode-extensions.json",
@@ -470,6 +604,14 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
           "choice": "N9.3 An optional id field in a request body that is empty or blank is treated as absent, exactly as before (not refused); stores still refuse a blank id.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.3 absent ids: appending a search event without a conversation id (null or blank) does nothing and returns null, as before; a request whose optional id is blank or absent gets exactly the status, dispatch, approval call and wording it got before.",
           "label": "agent choice"
         }
       ],
@@ -498,6 +640,45 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
           "choice": "S9.1 covers every id from a request that becomes a path, including batch/file-history ids on agent routes (the file-history route still read any .json by a traversal id; undo uses the same lookup).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse superscript device names (COM¹-³, LPT¹-³), CONIN$, CONOUT$, and reserved names followed by spaces before an extension (\"NUL .txt\").",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.2: the id check on every route precedes any approval, confirmation or wait.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.2 error form: a route answers an unsafe id with HTTP 400 and errorCode INVALID_REQUEST, the existing response for an invalid request.",
           "label": "agent choice"
         }
       ],
@@ -538,6 +719,37 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
           "choice": "S9.1 covers every id from a request that becomes a path, including batch/file-history ids on agent routes (the file-history route still read any .json by a traversal id; undo uses the same lookup).",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse superscript device names (COM¹-³, LPT¹-³), CONIN$, CONOUT$, and reserved names followed by spaces before an extension (\"NUL .txt\").",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 refusal signal: a store refuses an unsafe id by throwing IllegalArgumentException synchronously, before any filesystem access, never through an error callback.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.2 error form: a route answers an unsafe id with HTTP 400 and errorCode INVALID_REQUEST, the existing response for an invalid request.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-review-repair.json",
@@ -561,6 +773,36 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
           "choice": "N9.1: a folder or file with a name that is not a valid id inside any store (blank-named conversation folders made by the old dispatch bug, or any other invalid name found on disk) is skipped by every operation that enumerates the store (conversation and session lists, branch and child checks, presence, thread views, run lists); it never makes an operation on a valid id fail, and its files stay on disk.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1",
+          "quote": "Every id format the app creates or has created (UUIDs, the throwaway title-session prefix, branch ids, run ids, ids in saved data from earlier versions) keeps working for every operation; saved data from before the change loads unchanged.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "N9.1 logging: each skipped invalid conversation folder is logged as one warning \"Skipping conversation folder with invalid id\" per folder per app run, however often the store is listed or reopened, and the logged name contains no control or line-separator characters.",
           "label": "agent choice"
         }
       ],
@@ -592,6 +834,13 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
           "choice": "S9.1 Windows names: also refuse superscript device names (COM¹-³, LPT¹-³), CONIN$, CONOUT$, and reserved names followed by spaces before an extension (\"NUL .txt\").",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-review-preserve.json",
@@ -627,6 +876,21 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "scenario": "PN2",
           "quote": "Responses for valid ids are unchanged (status, body, timing class).",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-enumeration-repair.json",
@@ -658,6 +922,28 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
           "choice": "S9.1 covers every id from a request that becomes a path, including batch/file-history ids on agent routes (the file-history route still read any .json by a traversal id; undo uses the same lookup).",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1",
+          "quote": "Every id format the app creates or has created (UUIDs, the throwaway title-session prefix, branch ids, run ids, ids in saved data from earlier versions) keeps working for every operation; saved data from before the change loads unchanged.",
+          "label": "agent-drafted, owner-adopted"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-enumeration-repair.json",
@@ -695,6 +981,21 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "scenario": "PN2",
           "quote": "Responses for valid ids are unchanged (status, body, timing class).",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-enumeration-repair.json",
@@ -718,6 +1019,35 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
           "choice": "N9.1 (after verifier-4, 2026-10-20 07:00; orchestrator decision under the user's delegation) An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1",
+          "quote": "Every id format the app creates or has created (UUIDs, the throwaway title-session prefix, branch ids, run ids, ids in saved data from earlier versions) keeps working for every operation; saved data from before the change loads unchanged.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN2",
+          "quote": "Responses for valid ids are unchanged (status, body, timing class).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-safe-ids-saved-parent-preserve.json",
@@ -738,6 +1068,43 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
           "choice": "N9.1 (after verifier-4, 2026-10-20 07:00; orchestrator decision under the user's delegation) An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1",
+          "quote": "Every id format the app creates or has created (UUIDs, the throwaway title-session prefix, branch ids, run ids, ids in saved data from earlier versions) keeps working for every operation; saved data from before the change loads unchanged.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN2",
+          "quote": "Responses for valid ids are unchanged (status, body, timing class).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "Saved ids, backup: a legacy-backup restore reports the number of entries it skipped in a \"skipped\" field of its response.",
           "label": "agent choice"
         }
       ],
@@ -761,6 +1128,28 @@ Review history: the latest acceptance rejection identified the missing batch/fil
           "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
           "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
           "choice": "N9.1 (after verifier-4, 2026-10-20 07:00; orchestrator decision under the user's delegation) An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1",
+          "quote": "Every id format the app creates or has created (UUIDs, the throwaway title-session prefix, branch ids, run ids, ids in saved data from earlier versions) keeps working for every operation; saved data from before the change loads unchanged.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PS1",
+          "quote": "Every store that maps a conversation, session or run id to a folder or file (at least FileConversationStore, AgentRunStore, RunEventStore; find any other) refuses an id that is not a single plain name: empty or blank, \".\" or \"..\", containing a path separator (/ or \\) or a drive or stream colon or a control character, absolute, or resolving outside its root after normalisation. The refusal happens before any filesystem access, for every operation that takes the id (read, write, append, list by id, branch, fork, delete).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19",
+          "delegationScope": "designs and agreed scenarios of the UI/UX work, areas 1-5",
+          "choice": "S9.1 Windows names: also refuse ids that Windows would alter or treat specially: trailing dot or space (e.g. \"...\", \"a.\"), and reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9, with or without extension, any case).",
           "label": "agent choice"
         }
       ],
