@@ -606,3 +606,25 @@ are recorded separately. A separate session must review these entries and append
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "819f272e-ce2b-447a-8b75-d3d0f7979ed4",
+  "verdict": "accept",
+  "digest": "sha256:fa42f76320a00a1123cd59be2dfb238f7dc399aa4e25e72ca8a9b272f46eaed3",
+  "note": "Reran the Rust (13 fail-before by assertion, 3 preservation pass) and web (9 fail-before, 1 preservation pass) receipts and the full candidate suites; the commit-transport shim is honestly classified and disclosed, and the AgentSessionController change is really an Obsolete drop of the no-binding retry sourced by C5 with no conflicting decision record."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "819f272e-ce2b-447a-8b75-d3d0f7979ed4",
+  "verdict": "accept",
+  "digest": "sha256:7744c2449045cfe7007c2da81e684887d0e89d32054a72fc59565996e16f5b0e",
+  "note": "Same review bound to the stacked PR base origin/worktree-token-bootstrap: Rust and web fail-before receipts reproduced, the commit-transport shim is honestly classified and disclosed, and the AgentSessionController change is an Obsolete drop of the no-binding retry sourced by C5 with no conflicting decision record."
+}
+```
