@@ -21,10 +21,10 @@ public final class ExcludeGlobs {
 
   public static ExcludeGlobs empty() { return new ExcludeGlobs(ExclusionPatterns.empty()); }
   public boolean isEmpty() { return patterns.isEmpty(); }
-  public List<String> patterns() { return patterns.patterns(); }
+  public List<String> patterns() { return patterns.savedPatterns(); }
   public boolean isExcludedDirectory(Path root, Path dir) { return patterns.isExcludedDirectory(root, dir); }
   public boolean isExcludedPath(Path root, Path path) { return patterns.isExcludedPath(root, path); }
-  public int matchingDirectoryPatternIndex(Path root, Path dir) { return patterns.matchingDirectoryPatternIndex(root, dir); }
-  public int matchingPatternIndex(Path root, Path path) { return patterns.matchingPatternIndex(root, path); }
+  public int matchingDirectoryPatternIndex(Path root, Path dir) { return patterns.matchingSavedPatternIndex(root, dir.resolve("_")); }
+  public int matchingPatternIndex(Path root, Path path) { return patterns.matchingSavedPatternIndex(root, path); }
   static List<String> expandBarePattern(String pattern) { return ExclusionPatterns.expandBarePattern(pattern); }
 }

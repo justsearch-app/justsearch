@@ -2,13 +2,13 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: agent-session-a6k7nkou
+author-session: agent-session-2xmru_je
 ---
 
 # Test-intent entries
 
 WP3.1 only. S31.n maps to EXn and N31.n to ENn. The EX4 sources include the adopted
-pass-2 limit and readable-fixture amendments. Preservation checks in the Deliver scenario
+pass-2 limit amendment; finding 8 belongs to WP3.2 (AX3). Preservation checks in the Deliver scenario
 retain already working subcases; the other EX4 entry carries the fail-before repairs.
 Editor checks exercise existing API-refusal presentation; real Windows desktop and live-stack
 checks are not claimed. No acceptance record is authored here.
@@ -174,13 +174,6 @@ checks are not claimed. No acceptance record is authored here.
           "scenario": "EX4",
           "quote": "Exceeding input or expanded-pattern limits is explicitly refused without changing saved policy; test both limits through the editor and API.",
           "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "EX4",
-          "quote": "Check matching parity on a readable, fully indexed fixture with unchanged files and policy. Separately verify honest Preview/Apply outcomes for unindexed, missing, unreadable and offline entries.",
-          "label": "agent-drafted, owner-adopted"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-exclusions-preserved.json",
@@ -210,13 +203,6 @@ checks are not claimed. No acceptance record is authored here.
           "task": "t-20261019-bd718f",
           "scenario": "EX4",
           "quote": "Exceeding input or expanded-pattern limits is explicitly refused without changing saved policy; test both limits through the editor and API.",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "EX4",
-          "quote": "Check matching parity on a readable, fully indexed fixture with unchanged files and policy. Separately verify honest Preview/Apply outcomes for unindexed, missing, unreadable and offline entries.",
           "label": "agent-drafted, owner-adopted"
         }
       ],
@@ -253,10 +239,97 @@ checks are not claimed. No acceptance record is authored here.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EX5SavedPolicyRetainsIndexedTextButStopsFurtherEnrichment"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/LegacyExclusionUpgradeTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java",
+        "modules/app-services/src/test/resources/io/justsearch/app/services/settings/legacy-exclusions-f9bd104d2.json"
+      ],
+      "class": "New",
+      "behaviour": "EN1/AX1/AX2: a settings list actually written by f9bd104d2 survives upgrade and restart; malformed entries match literal names, valid entries retain the current class/alternative meaning, replay can recompile captured lists, and Preview/Apply preserve exact saved labels and file membership. The fixture is portable, immutable before-version output.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AX1",
+          "quote": "an invalid saved entry is matched as a literal name, never stops indexing, the other entries keep working, Preview/editor show the saved list and the editor warns about each such entry",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AX2",
+          "quote": "the new meaning of [ ] and { } applies to old lists and the editor's pattern help says so",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-exclusions-ax-repaired.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/LegacyExclusionUpgradeTest.java#EN1AX1ListWrittenByBeforeVersionKeepsLiteralAndValidMatchesAfterRestart",
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/LegacyExclusionUpgradeTest.java#AX1EditorProjectionNamesEveryInvalidEntryWithoutReplacingSavedList",
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/LegacyExclusionUpgradeTest.java#AX1PreviewApplyKeepTheSavedListAndLiteralMembership",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsTest.java#AX1QueuedWorkUsesCurrentPolicyAndEN1BuiltInSkipsRemain",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java#AX1AllScanModesUseSavedPolicyAndEN2KeepOtherFiles",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java#AX1CandidateReconcileHonoursUserExclusions",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java#AX1LiveCreatesChangesAndMovesUseSavedPolicy",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#AX1ExplicitIngestOfWatchedPathCannotBypassPolicy",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#AX1RecordedEnumerationReplayedAfterRestartUsesCurrentPolicy"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "AX1: the editor retains the saved list, names every invalid entry with a literal-name warning, and Preview/Apply can use that unchanged saved list without trying to save invalid syntax. The fail-before schema overlay only admits the new diagnostic response field to isolate editor behavior from parser compatibility.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AX1",
+          "quote": "an invalid saved entry is matched as a literal name, never stops indexing, the other entries keep working, Preview/editor show the saved list and the editor warns about each such entry",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-exclusions-ax-editor-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#AX1 editor preserves the saved list and names every literal fallback warning",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#AX1 unchanged legacy list can be previewed and applied without replacing the saved policy"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "AX2: editor help explains listed characters, ranges, negated character classes and brace alternatives, explicitly including lists saved by earlier versions.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AX2",
+          "quote": "the new meaning of [ ] and { } applies to old lists and the editor's pattern help says so",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-exclusions-ax-editor-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#AX2 pattern help explains character classes and alternatives for previously saved lists"
+      ],
+      "repaired": true
     }
   ]
 }
 ```
+
+## Review history
+
+- 2026-10-20: Reworked after verifier rejection 8cf789758. Removed finding-8 claims from both EX4 entries (AX3); added before-version-written upgrade data and EN1/AX1 admission, replay, Preview/Apply and editor checks, plus AX2 pattern help. Existing rejection record retained below. Builder session agent-session-2xmru_je.
 
 ## Acceptance records
 

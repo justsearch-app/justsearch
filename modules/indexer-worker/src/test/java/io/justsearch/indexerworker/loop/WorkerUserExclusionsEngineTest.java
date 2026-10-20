@@ -38,6 +38,64 @@ import org.junit.jupiter.api.io.TempDir;
 class WorkerUserExclusionsEngineTest extends LuceneExecutorTestBase {
   private static final String KEY = "01994180-0000-7000-8000-000000003101";
   private static final String PLAN = "b".repeat(64);
+  @Test
+  void AX1ExplicitIngestOfWatchedPathCannotBypassPolicy() throws Exception {
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> {
+      Path root = Files.createDirectory(temp.resolve("source"));
+      Path file = Files.writeString(Files.createDirectory(root.resolve("private")).resolve("file.txt"), "private");
+      ConfigStore previous = ConfigStore.globalOrNull();
+      ConfigStore installed = install("[\"[legacy\",\"{broken\",\"private/**\"]");
+      try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"))) {
+        queue.open();
+        var service = new WorkerIngestService(queue, mock(IndexingLoop.class), null,
+            IndexingPacing.unthrottled(), null, null, null, null, null, 0L);
+        assertTrue(service.watchRoot(WatchRootRequest.newBuilder()
+            .setRootPath(root.toString()).setRootAdded(true).build(), CallContext.none()).getWatching());
+        service.submitBatch(BatchRequest.newBuilder().addFilePaths(file.toString())
+            .setRootAdded(true).build(), CallContext.none());
+        assertEquals(0, queue.queueDepth(), "EX1: explicit watched files use the saved root policy");
+      } finally {
+        ConfigStore.restoreGlobal(installed, previous);
+      }
+    }, "AX1: invalid saved entries must never stop this admission path");
+  }
+
+  @Test
+  void AX1RecordedEnumerationReplayedAfterRestartUsesCurrentPolicy() throws Exception {
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> {
+      Path root = Files.createDirectory(temp.resolve("source"));
+      Files.writeString(root.resolve("private.txt"), "private");
+      Path keep = Files.writeString(root.resolve("public.txt"), "public");
+      Path base = temp.resolve("index");
+      var layout = new IndexGenerationManager(base).initializeOrLoad();
+      long epoch;
+      try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"))) {
+        queue.open();
+        epoch = queue.beginRecordedWalk(KEY, PLAN, true).enumerationEpoch();
+      }
+      var prepared = new WorkerIngestService.RecordedRootScan(ScanRootRequest.newBuilder()
+          .setRootPath(root.toString()).setMode(ScanMode.SCAN_MODE_FORCE_REINDEX).build(),
+          KEY, epoch, layout.activeGenerationId(), false, List.of());
+      ConfigStore previous = ConfigStore.globalOrNull();
+      ConfigStore installed = install("[\"[legacy\",\"{broken\",\"private.txt\"]");
+      try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+        queue.open();
+        var runtime = mock(RunningRuntime.class);
+        var service = new WorkerIngestService(queue, mock(IndexingLoop.class), null,
+            IndexingPacing.unthrottled(), base, layout.activeGenerationPath(), runtime, runtime, null, 0L);
+        assertTrue(service.watchRoot(WatchRootRequest.newBuilder()
+            .setRootPath(root.toString()).setRootAdded(true).build(), CallContext.none()).getWatching());
+        List<ScanRootProgress> frames = new ArrayList<>();
+        service.scanRecordedRoot(prepared, frames::add, CallContext.none());
+        assertEquals("", frames.getLast().getTerminalReasonCode());
+        assertEquals(List.of(keep), queue.pollPending(10).stream().map(JobQueue.IndexJob::path).toList(),
+            "EX2: frozen empty globs cannot override current policy after reopening jobs.db");
+      } finally {
+        ConfigStore.restoreGlobal(installed, previous);
+      }
+    }, "AX1: invalid saved entries must never stop this admission path");
+  }
+
   @TempDir Path temp;
 
   @Test

@@ -5,6 +5,7 @@ import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.settings.LlmSettingsV2;
 import io.justsearch.app.api.settings.SettingsV2;
 import io.justsearch.app.api.settings.UiSettingsV2;
+import io.justsearch.configuration.excludes.ExclusionPatterns;
 import java.util.List;
 import java.util.Locale;
 
@@ -23,7 +24,8 @@ public final class SettingsV2Projection {
         settings.isVimMode(), settings.getDefaultAction(),
         settings.getInspectorWidth() > 0 ? settings.getInspectorWidth() : null,
         settings.isPauseIndexingDuringAi(), settings.getMode(), settings.isTrustLoopNudgeSeen(),
-        List.copyOf(settings.getExcludePatterns()), settings.getChatEnabled());
+        List.copyOf(settings.getExcludePatterns()), settings.getChatEnabled(),
+        ExclusionPatterns.fromPatterns(settings.getExcludePatterns()).invalidPatterns());
     var llm = new LlmSettingsV2(
         blankToNull(settings.getServerExecutablePath()), settings.getContextLength(),
         settings.getMaxTokens(), settings.configuredGpuLayers(),

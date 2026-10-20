@@ -37,6 +37,56 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => { document.body.innerHTML = ''; vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe('Library retained-base exclusions', () => {
+  it('AX1 editor preserves the saved list and names every literal fallback warning', async () => {
+    const { library, send } = fixture();
+    const patterns = ['[legacy', 'private', '{broken'];
+    send.mockResolvedValueOnce(json({ ui: { excludePatterns: patterns,
+      invalidExcludePatterns: ['[legacy', '{broken'] }, witness: observed }));
+    await library.loadExcludes();
+    document.body.appendChild(library);
+    await library.updateComplete;
+    expect(library.shadowRoot?.querySelector('textarea')?.value).toBe(patterns.join('\n'));
+    const warnings = library.shadowRoot?.querySelectorAll('[role="status"] li');
+    expect(Array.from(warnings ?? [], (node) => node.textContent)).toEqual([
+      '“[legacy” has invalid pattern syntax and is matched as a literal name. Correct or remove it.',
+      '“{broken” has invalid pattern syntax and is matched as a literal name. Correct or remove it.',
+    ]);
+    library.remove();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('AX1 unchanged legacy list can be previewed and applied without replacing the saved policy', async () => {
+    const { library, send, invoke } = fixture();
+    send.mockResolvedValueOnce(json({ ui: { excludePatterns: ['[legacy', 'private'],
+      invalidExcludePatterns: ['[legacy'] }, witness: observed }));
+    await library.loadExcludes();
+    await library.handlePreviewExcludes();
+    await library.handleApplyExcludes();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenNthCalledWith(1, 'core.preview-excludes', {});
+    expect(invoke).toHaveBeenNthCalledWith(2, 'core.apply-excludes', {});
+    expect(library.excludesText).toBe('[legacy\nprivate');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('AX2 pattern help explains character classes and alternatives for previously saved lists', async () => {
+    const { library, send } = fixture();
+    send.mockResolvedValueOnce(json({ ui: { excludePatterns: ['report[1].txt'] }, witness: observed }));
+    await library.loadExcludes();
+    document.body.appendChild(library);
+    await library.updateComplete;
+    const help = library.shadowRoot?.textContent?.replace(/\s+/g, ' ');
+    expect(help).toContain('[ab] matches one listed character');
+    expect(help).toContain('[a-z] matches a range');
+    expect(help).toContain('[!ab] matches a character not listed');
+    expect(help).toContain('{draft,final} matches either alternative');
+    expect(help).toContain('These meanings also apply to patterns saved by earlier versions.');
+    library.remove();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('keeps the witness read with the draft and never refreshes it before saving', async () => {
     const { library, send, invoke } = fixture();
     send.mockResolvedValueOnce(json({ ui: { excludePatterns: ['old'] }, witness: observed }))

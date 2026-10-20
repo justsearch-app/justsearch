@@ -12,6 +12,30 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class WorkerUserExclusionsTest {
+  @Test
+  void AX1QueuedWorkUsesCurrentPolicyAndEN1BuiltInSkipsRemain() throws Exception {
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> {
+      Path file = Files.writeString(root.resolve("private.txt"), "private");
+      Path publicFile = Files.writeString(root.resolve("public.txt"), "public");
+      Path system = Files.writeString(root.resolve("Thumbs.db"), "system");
+      var claim = new JobQueue.IndexJob(file, null, null, null, null, null, false, null, root);
+      var authority = new WorkerIngestionAuthority();
+      ConfigStore previous = ConfigStore.globalOrNull();
+      ConfigStore installed = new ConfigStore(config("[]"));
+      ConfigStore.setGlobal(installed);
+      try {
+        assertEquals(SourceAdmissionAction.ADMIT, authority.admit(claim).action());
+        installed.update(config("[\"[legacy\",\"{broken\",\"private.txt\"]"));
+        assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(claim).action(),
+            "EX2: a queued file must obey policy saved after enqueue");
+        assertEquals(SourceAdmissionAction.ADMIT, authority.admit(publicFile, root).action());
+        assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(system, root).action());
+      } finally {
+        ConfigStore.restoreGlobal(installed, previous);
+      }
+    }, "AX1: invalid saved entries must never stop this admission path");
+  }
+
   @TempDir Path root;
 
   @Test

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-20T02:25:57.378Z",
-  "revision": "f9bd104d228c80173d58068cfe0f24c6d9ced149",
-  "tree": "2e4306d98d66098298a68bc87786e672ef5dfb4d",
+  "createdAt": "2026-10-20T04:19:24.707Z",
+  "revision": "8cf7897584558633c36d27bbe092c2cef0cb7973",
+  "tree": "a2dd9e7e212e37064faa4a34e5250cc211ce22fd",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.WorkerUserExclusionsTest.EN1BuiltInSkipsAndExplicitExemptionsRemain\" --tests \"io.justsearch.indexerworker.services.WorkerUserExclusionsAdmissionTest.EX4RootLevelAndNestedGlobMembershipAgree\" --tests \"io.justsearch.indexerworker.services.WorkerUserExclusionsAdmissionTest.EN3NoPatternsPreserveEveryScanMode\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2935
+      "durationMs": 3119
     },
     {
       "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.ExclusionLimitTest.EN1ResolvedOperatorOverridesPreserveBareNameMatching\" --tests \"io.justsearch.app.services.settings.ExclusionLimitTest.EN1PatternLimitsKeepCompleteSupportedLists\" --tests \"io.justsearch.app.services.settings.ExclusionLimitTest.EX4SeparatorsAndNativeCaseRuleArePreserved\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1897
+      "durationMs": 1808
     },
     {
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.WorkerUserExclusionsEngineTest.EN2VerifiedDeletionStillRemovesParentAndChunks\" --tests \"io.justsearch.indexerworker.loop.WorkerUserExclusionsEngineTest.EN2DeclaredNoFileProjectionKeepsEnrichmentEligibility\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3743
+      "durationMs": 5421
     },
     {
-      "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/agent-method/sessions/agent-session-a6k7nkou/tmp/test-intent-vitest-4162385-1792463155981.json\"",
+      "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-exclusions/tmp/wp31-ax/test-intent-vitest-1894160-1792469962590.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1397
+      "durationMs": 2116
     }
   ],
   "checks": [
@@ -47,7 +47,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsTest.java#EN1BuiltInSkipsAndExplicitExemptionsRemain",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:10a3dd59f3e9ec6eed64808ceeaae48cd9ea64aa442ba66ef6c738de3ca844fa",
+      "contentDigest": "sha256:831538ac918a2c0869428d217431f812073255df79f9be8b040cf381d80a45d1",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -92,7 +92,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java#EX4RootLevelAndNestedGlobMembershipAgree",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5c0ce057ce2cefeb7c8f005a6c830150380e07758a29696e3de86f3196c4b80b",
+      "contentDigest": "sha256:414f1649f51ca6a883a6cc5144d0c84a136fa442de8df3e63ab036361d3ffecb",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -122,7 +122,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#EX4 editor reports input limit refusal without applying or discarding the draft",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:79ac738c2f7ae86dd4bce91bb86aabe739c477c56d645cc582896a311046df9e",
+      "contentDigest": "sha256:7fadf6b4fdc5ef9d0ed1aec5f6d168cda7efeeb4e386dd52bf2a7afc8a38d286",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -137,7 +137,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#EX4 editor reports expanded limit refusal without applying or discarding the draft",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:79ac738c2f7ae86dd4bce91bb86aabe739c477c56d645cc582896a311046df9e",
+      "contentDigest": "sha256:7fadf6b4fdc5ef9d0ed1aec5f6d168cda7efeeb4e386dd52bf2a7afc8a38d286",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -152,7 +152,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java#EN3NoPatternsPreserveEveryScanMode",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerUserExclusionsAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5c0ce057ce2cefeb7c8f005a6c830150380e07758a29696e3de86f3196c4b80b",
+      "contentDigest": "sha256:414f1649f51ca6a883a6cc5144d0c84a136fa442de8df3e63ab036361d3ffecb",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -167,7 +167,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EN2VerifiedDeletionStillRemovesParentAndChunks",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:70b7b65255ab804fc3638344abea05562de1ae885d0b3aef5976db8359f33754",
+      "contentDigest": "sha256:44d0dff25685f7041ad38b0c9ef474a1fdb0bbcc04b13483f97f35a1a0e9c58c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -182,7 +182,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java#EN2DeclaredNoFileProjectionKeepsEnrichmentEligibility",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WorkerUserExclusionsEngineTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:70b7b65255ab804fc3638344abea05562de1ae885d0b3aef5976db8359f33754",
+      "contentDigest": "sha256:44d0dff25685f7041ad38b0c9ef474a1fdb0bbcc04b13483f97f35a1a0e9c58c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -195,5 +195,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:dbb0e0524e1d994ff5fe6d5c3991d71414a0938cc362ff9026cfd55a0dcb3631"
+  "digest": "sha256:e5ef5c3742539813049bbede1916c6841a1084845217f1df493dee7749c77446"
 }

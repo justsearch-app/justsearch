@@ -48,7 +48,11 @@ public final class ExclusionPatterns {
   public static void validateSavedPatterns(List<String> patterns) {
     if (patterns == null) return;
     if (patterns.size() > 512) throw new IllegalArgumentException("At most 512 exclude patterns are allowed");
-    if (fromPatterns(patterns).patterns().size() > 512) {
+    ExclusionPatterns compiled = fromPatterns(patterns);
+    if (!compiled.invalidPatterns().isEmpty()) {
+      throw new IllegalArgumentException("Invalid exclude pattern: " + compiled.invalidPatterns().getFirst());
+    }
+    if (compiled.patterns().size() > 512) {
       throw new IllegalArgumentException("Exclude patterns expand beyond the limit of 512");
     }
   }
@@ -67,10 +71,17 @@ public final class ExclusionPatterns {
 
   private final List<String> patterns;
   private final List<Pattern> fileMatchers;
+  private final List<String> savedPatterns;
+  private final List<Integer> savedPatternIndices;
+  private final List<String> invalidPatterns;
 
-  private ExclusionPatterns(List<String> patterns, List<Pattern> fileMatchers) {
+  private ExclusionPatterns(List<String> patterns, List<Pattern> fileMatchers,
+      List<String> savedPatterns, List<Integer> savedPatternIndices, List<String> invalidPatterns) {
     this.patterns = patterns;
     this.fileMatchers = fileMatchers;
+    this.savedPatterns = savedPatterns;
+    this.savedPatternIndices = savedPatternIndices;
+    this.invalidPatterns = invalidPatterns;
   }
 
   /** Parses an optional operator-provided JSON list for observational callers. */
@@ -88,7 +99,7 @@ public final class ExclusionPatterns {
   }
 
   public static ExclusionPatterns empty() {
-    return new ExclusionPatterns(List.of(), List.of());
+    return new ExclusionPatterns(List.of(), List.of(), List.of(), List.of(), List.of());
   }
 
   public static ExclusionPatterns fromPatterns(List<String> patterns) {
@@ -97,39 +108,55 @@ public final class ExclusionPatterns {
 
   public static ExclusionPatterns fromPatterns(List<String> patterns, boolean win) {
     if (patterns == null || patterns.isEmpty()) {
-      return new ExclusionPatterns(List.of(), List.of());
+      return new ExclusionPatterns(List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
+    List<String> saved = patterns.stream().filter(java.util.Objects::nonNull).toList();
     LinkedHashSet<String> cleaned = new LinkedHashSet<>();
-    for (String p : patterns) {
-      if (p == null) continue;
-      String s = p.trim();
-      if (s.isBlank()) continue;
-      // Normalize separators to forward slashes to keep matching deterministic across OSes.
-      s = s.replace('\\', '/');
-      // Expand bare patterns for .gitignore-like convenience:
-      //   "dist"   → "**/dist/**" + "**/dist"  (name at any depth, file or directory)
-      //   "dist/"  → "**/dist/**"              (directory at any depth)
-      //   "*.log"  → "**/*.log"                (glob without slash → any depth)
-      for (String expanded : expandBarePattern(s)) {
-        cleaned.add(expanded);
+    List<Pattern> matchers = new ArrayList<>();
+    List<Integer> indices = new ArrayList<>();
+    List<String> invalid = new ArrayList<>();
+    int flags = win ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE : 0;
+    for (int index = 0; index < saved.size(); index++) {
+      String original = saved.get(index);
+      String normalized = original.trim().replace('\\', '/');
+      if (normalized.isBlank()) continue;
+      List<String> expanded = expandBarePattern(normalized);
+      List<Pattern> compiled = new ArrayList<>();
+      try {
+        for (String glob : expanded) compiled.add(Pattern.compile(globToRegex(glob), flags));
+      } catch (IllegalArgumentException syntax) {
+        // Keep the original invalid entry in captured plans: recompiling an expanded invalid glob
+        // would turn the injected **/ into part of a literal name on boot or recorded replay.
+        invalid.add(original);
+        expanded = List.of(normalized);
+        compiled = List.of(Pattern.compile(literalNameRegex(normalized), flags));
+      }
+      for (int i = 0; i < expanded.size(); i++) {
+        if (cleaned.add(expanded.get(i))) {
+          matchers.add(compiled.get(i));
+          indices.add(index);
+        }
       }
     }
+    return new ExclusionPatterns(List.copyOf(cleaned), List.copyOf(matchers), saved,
+        List.copyOf(indices), List.copyOf(invalid));
+  }
 
-    if (cleaned.isEmpty()) {
-      return empty();
-    }
+  /** Diagnostics and labels come from the same compiler used by every admission path. */
+  public List<String> invalidPatterns() { return invalidPatterns; }
+  public List<String> savedPatterns() { return savedPatterns; }
 
-    List<String> expanded = List.copyOf(cleaned);
+  public int matchingSavedPatternIndex(Path root, Path path) {
+    int index = matchingPatternIndex(root, path);
+    return index < 0 ? -1 : savedPatternIndices.get(index);
+  }
 
-    int flags = win ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE : 0;
-    List<Pattern> fileMatchers = new ArrayList<>();
-    for (String glob : expanded) {
-      Pattern re = Pattern.compile(globToRegex(glob), flags);
-      fileMatchers.add(re);
-    }
-
-    return new ExclusionPatterns(expanded, fileMatchers);
+  private static String literalNameRegex(String name) {
+    boolean directory = name.endsWith("/");
+    String base = directory ? name.substring(0, name.length() - 1) : name;
+    return "^" + (base.contains("/") ? "" : "(?:.*/)?") + Pattern.quote(base)
+        + (directory ? "/.*" : "(?:/.*)?") + "$";
   }
 
   public boolean isEmpty() {

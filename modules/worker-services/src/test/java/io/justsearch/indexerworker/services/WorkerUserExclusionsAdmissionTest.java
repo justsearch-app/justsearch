@@ -23,6 +23,74 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class WorkerUserExclusionsAdmissionTest {
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.EnumSource(WorkerScanOps.ScanMode.class)
+  void AX1AllScanModesUseSavedPolicyAndEN2KeepOtherFiles(WorkerScanOps.ScanMode mode) throws Exception {
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> {
+      Files.writeString(root.resolve("private.txt"), "private");
+      Path keep = Files.writeString(root.resolve("public.txt"), "public");
+      ConfigStore previous = ConfigStore.globalOrNull();
+      ConfigStore installed = store("[\"[legacy\",\"{broken\",\"private.txt\"]");
+      try {
+        List<Path> admitted = new ArrayList<>();
+        JobQueue queue = queue(admitted);
+        new WorkerScanOps(queue).scan(new WorkerScanOps.ScanRequest(
+            root, null, mode, List.of()), progress -> {});
+        assertEquals(List.of(keep), admitted, "EX1: saved policy on " + mode);
+      } finally {
+        ConfigStore.restoreGlobal(installed, previous);
+      }
+    }, "AX1: invalid saved entries must never stop this admission path");
+  }
+
+  @Test
+  void AX1CandidateReconcileHonoursUserExclusions() throws Exception {
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> {
+      Files.writeString(root.resolve("private.txt"), "private");
+      Path keep = Files.writeString(root.resolve("public.txt"), "public");
+      ReadPathOps reads = mock(ReadPathOps.class);
+      when(reads.search(any(), anyInt(), anySet(), any(), nullable(String.class)))
+          .thenReturn(new LuceneRuntimeTypes.SearchResult(List.of(), 0, 0L));
+      ConfigStore previous = ConfigStore.globalOrNull();
+      ConfigStore installed = store("[\"[legacy\",\"{broken\",\"private.txt\"]");
+      try {
+        var ops = new SyncDirectoryOps(reads, null, null, null,
+            IndexingPacing.unthrottled(), null);
+        try (var difference = ops.discoverCandidateDifference(root.toString(), true, () -> false)) {
+          assertEquals(List.of(keep), difference.additions(),
+              "EX1: per-folder reconciliation cannot admit excluded files");
+          assertEquals(List.of(), difference.deletions());
+        }
+      } finally {
+        ConfigStore.restoreGlobal(installed, previous);
+      }
+    }, "AX1: invalid saved entries must never stop this admission path");
+  }
+
+  @Test
+  void AX1LiveCreatesChangesAndMovesUseSavedPolicy() throws Exception {
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> {
+      Path file = Files.writeString(root.resolve("private.txt"), "private");
+      Path keep = Files.writeString(root.resolve("public.txt"), "public");
+      List<Path> admitted = new ArrayList<>();
+      ConfigStore previous = ConfigStore.globalOrNull();
+      ConfigStore installed = store("[\"[legacy\",\"{broken\",\"private.txt\"]");
+      try (var watcher = new WorkerMethvinWatcher(
+          io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
+          queue(admitted), null, path -> {})) {
+        var subscription = new RootWatcherRegistry.Subscription(
+            root, "docs", new Object(), RootIdentity.capture(root));
+        watcher.dispatchEvent(subscription, WorkerMethvinWatcher.Kind.CREATE, file);
+        watcher.dispatchEvent(subscription, WorkerMethvinWatcher.Kind.MODIFY, file);
+        watcher.dispatchEvent(subscription, WorkerMethvinWatcher.Kind.CREATE, keep);
+        assertEquals(List.of(keep), admitted,
+            "EX1: create/modify and rename/move destination upserts obey saved policy");
+      } finally {
+        ConfigStore.restoreGlobal(installed, previous);
+      }
+    }, "AX1: invalid saved entries must never stop this admission path");
+  }
+
   @TempDir Path root;
 
   @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")

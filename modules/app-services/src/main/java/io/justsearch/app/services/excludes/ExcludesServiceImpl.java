@@ -49,14 +49,14 @@ private static final int MAX_WALK_FILES = 500_000;
     ConfigStore store = ConfigStore.globalOrNull();
     ExcludeGlobs excludes =
         ExcludeGlobs.fromRawJsonArray(store == null ? "" : store.get().ui().excludePatterns());
-    List<String> expandedPatterns = excludes.patterns();
+    List<String> savedPatterns = excludes.patterns();
 
     if (excludes.isEmpty()) {
       return new ExcludesResult(
           dryRun, 0, 0, 0, 0, 0, List.of(), false, "No exclude patterns configured");
     }
 
-    int[] perPatternCount = new int[expandedPatterns.size()];
+    int[] perPatternCount = new int[savedPatterns.size()];
     int rootsProcessed = 0;
     AtomicInteger deletedByPathJobs = new AtomicInteger();
     AtomicInteger deletedById = new AtomicInteger();
@@ -114,13 +114,13 @@ private static final int MAX_WALK_FILES = 500_000;
       }
     }
 
-    List<ExcludesResult.PatternMatch> perPattern = new ArrayList<>(expandedPatterns.size());
-    for (int i = 0; i < expandedPatterns.size(); i++) {
-      perPattern.add(new ExcludesResult.PatternMatch(expandedPatterns.get(i), perPatternCount[i]));
+    List<ExcludesResult.PatternMatch> perPattern = new ArrayList<>(savedPatterns.size());
+    for (int i = 0; i < savedPatterns.size(); i++) {
+      perPattern.add(new ExcludesResult.PatternMatch(savedPatterns.get(i), perPatternCount[i]));
     }
     return new ExcludesResult(
         dryRun,
-        expandedPatterns.size(),
+        savedPatterns.size(),
         rootsProcessed,
         deletedByPathJobs.get(),
         deletedById.get(),
