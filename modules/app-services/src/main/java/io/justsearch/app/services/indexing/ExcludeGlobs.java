@@ -26,5 +26,4 @@ public final class ExcludeGlobs {
   public boolean isExcludedPath(Path root, Path path) { return patterns.isExcludedPath(root, path); }
   public int matchingDirectoryPatternIndex(Path root, Path dir) { return patterns.matchingSavedPatternIndex(root, dir.resolve("_")); }
   public int matchingPatternIndex(Path root, Path path) { return patterns.matchingSavedPatternIndex(root, path); }
-  static List<String> expandBarePattern(String pattern) { return ExclusionPatterns.expandBarePattern(pattern); }
 }

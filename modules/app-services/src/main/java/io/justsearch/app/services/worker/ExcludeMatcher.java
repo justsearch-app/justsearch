@@ -24,10 +24,4 @@ final class ExcludeMatcher {
   static ExcludeMatcher fromRawJsonStrict(String rawJson, boolean windows) {
     return new ExcludeMatcher(ExclusionPatterns.fromRawJsonStrict(rawJson, windows));
   }
-
-  static ExcludeMatcher fromPatterns(List<String> globs, boolean windows) {
-    return new ExcludeMatcher(ExclusionPatterns.fromPatterns(globs, windows));
-  }
-
-  static List<String> expandBarePattern(String pattern) { return ExclusionPatterns.expandBarePattern(pattern); }
 }
