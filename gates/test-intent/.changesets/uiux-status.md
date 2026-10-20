@@ -446,3 +446,14 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
   "note": "Intent follows S33.1-S33.6, N33.3 and the explicit compatibility repair brief. Independently reran named checks; 25 UI assertions fail on f6a14b5a6 and pass on dbcd1c111. Compatibility passes f6a14b5a6 and dbcd1c111 and fails by assertion on 8237e63d9. Scratch run-evidence retained. Qualified CPU/GPU and idle/interleaved scopes match scheduler probes. Acceptance is of test intent only; hardware and full-suite verification limits are reported separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp33-verifier-omzh4wns",
+  "verdict": "accept",
+  "digest": "sha256:aa33ccd3247f4abc97a03f401897296019a288b60254d22268fac26a596c786b",
+  "note": "Expectations follow S33.1-S33.6, N33.3 and the supplied compatibility requirement. Independently reran run-evidence and before-state assertions; live partial-status loss and recovery pass on 46952a486 and fail on f6a14b5a6. Compatibility also fails by assertion on 8237e63d9. Acceptance concerns test intent only: product verdict remains fail for Brain ignoring explicit stale flags and registered measured gates timing out on old fixture timestamps."
+}
+```
