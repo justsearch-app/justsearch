@@ -451,3 +451,14 @@ are evidence-only fixtures, never production patches or substituted passing impl
   "note": "Behavioral checks pass, but the brief omits independently verifiable sources for E1/E2/E3/E5/E6/E16/E19/E20/E21 and the redaction and heap-retention decisions."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15887-dba4-7ca2-8a4e-922ca5ba9319",
+  "verdict": "accept",
+  "digest": "sha256:6cf6736e3dd607a3232f92536c5b510be1687172ae1dad6f7910a682a6002832",
+  "note": "The entries match agreed intent and scoped delegation, with valid evidence and independently reproduced retry failures before and passes after."
+}
+```
