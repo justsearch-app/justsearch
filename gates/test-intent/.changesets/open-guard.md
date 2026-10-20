@@ -439,3 +439,14 @@ The author has not accepted these entries; independent acceptance remains for th
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-aa814ea0ee38dde3e",
+  "verdict": "accept",
+  "digest": "sha256:e4239ca35f1bd683f2610ecdd61081b6280277767d6386d91d96741bd7cec838",
+  "note": "Verifier round 4 at 0c0114ac2, changeset wording at dec9f943b checked against run 39428698231 evidence: Linux S1-S7 attacks and real shell unchanged and safe; hosted Windows item-ID folder open/reveal fixes comma routing with controls, no neighbor .cmd runs, item-ID mutations are caught; real-desktop selection remains unobservable on hosted runners."
+}
+```
