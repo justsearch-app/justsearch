@@ -14,6 +14,8 @@ related: "847 (citation correctness — S1-S3 shipped in #488; 852-S1 is sequenc
 
 ## Status
 
+**2026-10-20:** The 2026-11-30 cutover deadline became report-only: incomplete promotion warns at every date because finishing the promotion is an estimated 16–32 h product change, not done yet; this CI change does not promote the window.
+
 | Slice | What | State |
 |---|---|---|
 | **S0** | FE↔Java surface-parity leg on `check-surface-composition` | **implemented (merged, #493)** |
