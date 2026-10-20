@@ -808,9 +808,15 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   /** Own an already-retained reference, so orderly cleanup need not reopen admission. */
   private <T> T withOwnedBudget(String operation, long budgetMs,
       io.justsearch.app.api.EngineWorkHandle work, boolean inference, Function<Budget, T> body) {
+    return withOwnedBudget(operation, budgetMs, work, inference, true, body);
+  }
+
+  private <T> T withOwnedBudget(String operation, long budgetMs,
+      io.justsearch.app.api.EngineWorkHandle work, boolean inference, boolean serving,
+      Function<Budget, T> body) {
     CallView view;
     try {
-      view = captureCallView();
+      view = serving ? captureCallView() : new CallView(null, true);
     } catch (RuntimeException | Error failure) {
       work.close();
       throw failure;
@@ -995,6 +1001,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   protected <T> T executeIngestRpc(
       String operation, RpcDeadlineCategory category, Function<IngestServiceCalls, T> rpc,
       EngineContext engineContext) {
+    if ("reloadRuntime".equals(operation)) {
+      // Reload drains serving holders itself. Keep the normal Engine task ownership and budget,
+      // but resolve its lifecycle trigger on execution without retaining a view it must drain.
+      return withOwnedBudget(operation, deadline(category), admission.attach(engineContext),
+          false, false,
+          budget -> rpc.apply(new WorkerIngestCalls(
+              requireService(WorkerAppServices::ingestService), budget.context())));
+    }
     return withBudget(
         operation,
         deadline(category),

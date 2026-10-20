@@ -3603,10 +3603,25 @@ public final class KnowledgeServer implements Closeable {
       if (closeStarted || encoderRecoveryReservation != null) {
         throw new IllegalStateException("Runtime reload refused during encoder recovery or close");
       }
+      var migration = indexGenerationManager == null ? null
+          : indexGenerationManager.readStateBestEffort();
+      if (indexGenerationManager != null && migration == null) {
+        throw new IllegalStateException("Runtime reload refused: migration state is unavailable");
+      }
+      if (buildingIndexPath != null || searchLifecycle != ingestLifecycle
+          || (migration != null && (migration.building_generation() != null
+              || "MIGRATING".equals(migration.migration_state())
+              || "SWITCHING".equals(migration.migration_state())))) {
+        throw new IllegalStateException("Runtime reload refused during migration");
+      }
       try {
         retireServingView();
       } catch (IOException refusal) {
         throw new IllegalStateException("Runtime reload retains active serving holders", refusal);
+      }
+      if (closeStarted || Thread.currentThread().isInterrupted()) {
+        if (servingView != null) restoreServingViewAfterRefusedRetirement(servingView);
+        throw new IllegalStateException("Runtime reload refused during close or interruption");
       }
       long startNanos = System.nanoTime();
       LuceneRuntime old = this.ingestLifecycle;
@@ -7518,7 +7533,12 @@ public final class KnowledgeServer implements Closeable {
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
     IOException refusal = null;
     synchronized (servingViewMonitor) {
-      while (retiring.holders != 0) {
+      // Older issued views can share this physical runtime (for example after query settings
+      // publication). Draining only the current view would close their runtime underneath them.
+      while (retiring.holders != 0 || retiredServingViews.stream().anyMatch(view ->
+          (view.holders != 0 || view.cleanupRunning)
+              && (referencesRuntime(view, retiring.ingestRuntime)
+                  || referencesRuntime(view, retiring.searchRuntime)))) {
         long remaining = deadline - System.nanoTime();
         if (remaining <= 0) {
           refusal = new IOException("Index serving view still has active holders; owner retained");
