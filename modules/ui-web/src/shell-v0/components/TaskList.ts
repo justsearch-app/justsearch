@@ -577,9 +577,13 @@ export class TaskList extends JfElement {
       `;
     }
     if (p.phase === 'enriching' && p.activity.enrichmentDeferred) {
-      return html`<div class="counts" data-testid="task-aggregate-counts">${
-        p.enrichingPercent === null ? '' : `${p.enrichingPercent}% · `
-      }${formatCount(p.enrichingPending)} enrichment steps waiting</div>`;
+      return html`
+        <div class="aggregate" data-testid="task-aggregate" data-phase="enriching">
+          <div class="counts" data-testid="task-aggregate-counts">${
+            p.enrichingPercent === null ? '' : `${p.enrichingPercent}% · `
+          }${formatCount(p.enrichingPending)} enrichment steps waiting</div>
+        </div>
+      `;
     }
     if (p.phase === 'enriching') {
       const pct = p.enrichingPercent;

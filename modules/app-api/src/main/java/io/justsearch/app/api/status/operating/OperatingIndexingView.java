@@ -10,9 +10,10 @@ import java.util.Objects;
  * The {@code operating.indexing} block. {@code reasons} is ordered by {@link IndexingReason}
  * precedence; its first entry is the primary reason. It is listed even when {@code state} is IDLE,
  * so readers can describe the hold even when the file queue is empty. Automatic PAUSED reasons
- * describe enrichment/GPU bulk holds, not a stop of text indexing: energy saver defers CPU/GPU
- * enrichment; game/external GPU holds defer the idle cycle only when its aggregate placement is
- * GPU-bound (worker.enrichment.backfillGpuBound). The state vocabulary is unchanged.
+ * describe enrichment/GPU bulk holds, not a stop of text indexing. Energy saver defers idle
+ * CPU/GPU enrichment; sparse work interleaved between files may continue. Game/external GPU
+ * holds defer GPU-bound idle cycles and all interleaved sparse work, including CPU sparse work;
+ * CPU-only idle cycles may continue. The state vocabulary and scheduling are unchanged.
  */
 public record OperatingIndexingView(
     IndexingState state,

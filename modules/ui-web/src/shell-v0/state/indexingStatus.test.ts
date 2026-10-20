@@ -10,7 +10,8 @@ function snapshot(jobs: number, pending: number, reasons: string[] = [], gpuBoun
     worker: {
       core: { indexState: jobs ? 'INDEXING' : 'IDLE', pendingJobs: jobs },
       enrichment: { embeddingEnabled: true, embeddingDocCount: 1000, embeddingPendingCount: pending,
-        spladeEnabled: false, nerEnabled: false, backfillGpuBound: gpuBound },
+        spladeEnabled: false, nerEnabled: false },
+      gpu: { embedOrtCuda: { available: gpuBound, attempted: true } },
     },
     operating: { indexing: { state: 'PAUSED', reasons }, freshness: { staleSources: [] } },
   } as unknown as StatusResponse;
@@ -26,50 +27,40 @@ function activity(status: StatusResponse | null, live = true): unknown {
 }
 
 describe('WP3.3 shared indexing activity', () => {
-  it('S33.2 the status validator preserves observed GPU, CPU and unknown placement', () => {
-    for (const placement of [true, false, null, undefined]) {
-      const wire = { ...statusFixture, worker: { ...statusFixture.worker,
-        enrichment: { ...statusFixture.worker.enrichment,
-          backfillGpuBound: placement } } };
-      const parsed = statusResponseSchema.safeParse(wire);
-      expect(parsed.success).toBe(true);
-      if (parsed.success) expect(parsed.data.worker?.enrichment?.backfillGpuBound).toBe(placement);
-    }
+  it('S33.2 the strict status shape adds no placement key that old clients reject', () => {
+    const enrichment = statusResponseSchema.shape.worker.unwrap().shape.enrichment.unwrap();
+    expect(Object.keys(enrichment.shape)).not.toContain('backfillGpuBound');
+    expect(statusResponseSchema.safeParse(statusFixture).success).toBe(true);
   });
-  it('S33.1 names energy-deferred enrichment while text indexing continues', () => {
+
+  it('S33.1 scopes energy deferral to idle enrichment while sparse work can continue between files', () => {
     expect(activity(snapshot(8, 80, ['energy_saver']))).toMatchObject({
       summary: 'Text indexing continues',
-      detail: 'Enrichment deferred to save energy.',
-      confirmed: true,
-      enrichmentDeferred: true,
+      detail: 'Idle enrichment deferred to save energy. Sparse enrichment can continue between files.',
+      confirmed: true, enrichmentDeferred: true,
     });
     expect(activity(snapshot(0, 80, ['energy_saver']))).toMatchObject({
-      summary: 'Enrichment deferred', detail: 'Enrichment deferred to save energy.',
+      summary: 'Enrichment deferred', detail: 'Idle enrichment deferred to save energy.',
     });
   });
 
-  it('S33.2 distinguishes GPU-bound enrichment from CPU work under game and external GPU holds', () => {
+  it('S33.2 scopes GPU holds to GPU idle work and all between-file sparse work without guessing placement', () => {
     for (const [reason, cause] of [['game_mode', 'a game is running'], ['gpu_busy_external', 'another app is using the GPU']]) {
-      expect(activity(snapshot(4, 80, [reason!], true))).toMatchObject({
-        summary: 'Text indexing continues',
-        detail: `Enrichment deferred while ${cause} (GPU bulk hold).`,
-        enrichmentDeferred: true,
-      });
-      expect(activity(snapshot(0, 80, [reason!], false))).toMatchObject({
-        summary: 'Search is ready — still improving',
-        detail: `GPU bulk work deferred while ${cause}. CPU enrichment continues.`,
-        enrichmentDeferred: false,
-      });
-      expect(activity(snapshot(0, 80, [reason!]))).toMatchObject({
-        detail: `GPU bulk work deferred while ${cause}; enrichment placement unconfirmed.`,
-        enrichmentDeferred: false,
-      });
+      for (const placement of [true, false, undefined]) {
+        for (const jobs of [0, 4]) {
+          expect(activity(snapshot(jobs, 80, [reason!], placement))).toMatchObject({
+            summary: jobs ? 'Text indexing continues' : 'Enrichment pending',
+            detail: `GPU-bound idle enrichment deferred while ${cause}. CPU-only idle enrichment can continue. Sparse enrichment between files also waits, including on CPU.`,
+            enrichmentDeferred: true,
+          });
+        }
+      }
     }
   });
 
   it('S33.3 names only a present chat reason and S33.4 clears it on the next observation', () => {
     expect(activity(snapshot(0, 80, ['chat_generating'], true))).toMatchObject({
-      detail: 'Enrichment shares GPU time with chat.', enrichmentDeferred: false,
+      detail: 'Indexing shares time with chat.', enrichmentDeferred: false,
     });
     expect(activity(snapshot(0, 80, [], true))).toMatchObject({ detail: null, enrichmentDeferred: false });
   });

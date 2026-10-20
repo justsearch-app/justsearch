@@ -19,7 +19,8 @@ function status(jobs = 4, reasons = ['energy_saver'], gpuBound = true): StatusSn
     worker: {
       core: { indexState: jobs ? 'INDEXING' : 'IDLE', pendingJobs: jobs, indexHealthy: true },
       enrichment: { embeddingEnabled: true, embeddingDocCount: 1000, embeddingPendingCount: 80,
-        spladeEnabled: false, nerEnabled: false, backfillGpuBound: gpuBound },
+        spladeEnabled: false, nerEnabled: false },
+      gpu: { embedOrtCuda: { available: gpuBound, attempted: true } },
     },
     power: { energyReduced: reasons.includes('energy_saver') },
     operating: { indexing: { state: 'PAUSED', reasons }, freshness: { staleSources: [] } },
@@ -79,7 +80,7 @@ describe('WP3.3 shared status surfaces', () => {
     await mountAll();
     for (const [i, text] of texts().entries()) {
       expect(text, surfaces[i]!.localName).toContain('Text indexing continues');
-      expect(text, surfaces[i]!.localName).toContain('Enrichment deferred to save energy.');
+      expect(text, surfaces[i]!.localName).toContain('Idle enrichment deferred to save energy. Sparse enrichment can continue between files.');
       expect(text, surfaces[i]!.localName).not.toMatch(/queue[^.]*paused|Paused — saving energy|Batch Processing Active/);
     }
   });
@@ -90,7 +91,7 @@ describe('WP3.3 shared status surfaces', () => {
     feed(status(4, ['game_mode']));
     await flush();
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).toContain('Enrichment deferred while a game is running (GPU bulk hold).');
+      expect(text, surfaces[i]!.localName).toContain('GPU-bound idle enrichment deferred while a game is running.');
       expect(text, surfaces[i]!.localName).not.toContain('save energy');
     }
     feed(status(4, []));
@@ -130,7 +131,7 @@ describe('WP3.3 shared status surfaces', () => {
       feed(status(0, [reason], false));
       await flush();
       for (const [i, text] of texts().entries()) {
-        expect(text, surfaces[i]!.localName).toContain('CPU enrichment continues.');
+        expect(text, surfaces[i]!.localName).toContain('CPU-only idle enrichment can continue.');
         expect(text, surfaces[i]!.localName).not.toContain('Enrichment deferred while');
       }
     }
@@ -140,11 +141,32 @@ describe('WP3.3 shared status surfaces', () => {
     feed(status(0, ['chat_generating']));
     await mountAll();
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).toContain('Enrichment shares GPU time with chat.');
+      expect(text, surfaces[i]!.localName).toContain('Indexing shares time with chat.');
     }
     feed(status(0, []));
     await flush();
-    for (const text of texts()) expect(text).not.toContain('shares GPU time with chat');
+    for (const text of texts()) expect(text).not.toContain('shares time with chat');
+  });
+
+  it('N33.3 deferred enrichment retains the measured aggregate without an active progress bar', async () => {
+    feed(status(0));
+    await mountAll();
+    const tasks = surfaces[1]!.shadowRoot!;
+    const aggregate = tasks.querySelector('[data-testid="task-aggregate"]');
+    expect(aggregate).not.toBeNull();
+    expect(aggregate?.getAttribute('data-phase')).toBe('enriching');
+    expect(aggregate?.querySelector('[data-testid="task-aggregate-counts"]')?.textContent).toContain('enrichment steps waiting');
+    expect(aggregate?.querySelector('[role="progressbar"]')).toBeNull();
+  });
+
+  it('S33.5 Library with no settled documents stays enriching without inventing a percentage', async () => {
+    feed(status(0, []));
+    await mountAll();
+    const library = surfaces[4] as LibrarySurface;
+    library.roots = library.roots.map(root => ({ ...root, inFlightCount: 0 }));
+    await flush();
+    expect(library.shadowRoot!.textContent).toContain('semantic search still catching up');
+    expect(library.shadowRoot!.textContent).not.toContain('0%');
   });
 
   it('S33.6 announces one semantic change once across identical polls', async () => {
@@ -153,7 +175,7 @@ describe('WP3.3 shared status surfaces', () => {
     const deck = surfaces[0]!;
     const announcer = deck.shadowRoot?.querySelector('[data-testid="indexing-announcer"]');
     expect(announcer).not.toBeNull();
-    expect(announcer?.textContent).toContain('Enrichment deferred to save energy.');
+    expect(announcer?.textContent).toContain('Idle enrichment deferred to save energy. Sparse enrichment can continue between files.');
     const mutations: MutationRecord[] = [];
     const observer = new MutationObserver((records) => mutations.push(...records));
     observer.observe(announcer!, { childList: true, characterData: true, subtree: true });

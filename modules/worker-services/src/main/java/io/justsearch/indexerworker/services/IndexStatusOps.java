@@ -821,7 +821,7 @@ final class IndexStatusOps {
       available = BackfillScheduler.StageAvailability.NONE;
     }
 
-    var enrichment = EnrichmentCoverage.newBuilder()
+    return EnrichmentCoverage.newBuilder()
         .setEmbedding(
             FeatureCoverage.newBuilder()
                 .setDocCount(emb == null ? 0L : emb.total())
@@ -894,10 +894,8 @@ final class IndexStatusOps {
                 .build())
         .putAllEncoderProfiles(buildEncoderProfilesProto())
         // Tempdoc 710 Move 2 item 4: which backfill pass ran last idle cycle.
-        .setBackfillMode(metrics.getBackfillMode());
-    // An absent loop is unknown placement, never proof that enrichment runs on CPU.
-    if (indexingLoop != null) enrichment.setBackfillGpuBound(indexingLoop.backfillGpuBound());
-    return enrichment.build();
+        .setBackfillMode(metrics.getBackfillMode())
+        .build();
   }
 
   /**

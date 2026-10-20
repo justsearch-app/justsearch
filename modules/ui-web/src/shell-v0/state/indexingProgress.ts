@@ -654,30 +654,32 @@ function indexingActivity(
       status.operating?.freshness?.staleSources?.includes('indexing')) return EMPTY.activity;
 
   const reasons = new Set(status.operating?.indexing?.reasons ?? []);
-  const gpuBound = status.worker?.enrichment?.backfillGpuBound;
   // Power is the assembler's authority for this reason; older snapshots can lack operating.
   const energy = reasons.has('energy_saver') || status.power?.energyReduced === true;
   const gpuCauses = [
     ...(reasons.has('game_mode') ? ['a game is running'] : []),
     ...(reasons.has('gpu_busy_external') ? ['another app is using the GPU'] : []),
   ];
-  const enrichmentDeferred = enrichingPending > 0 && (energy || (gpuCauses.length > 0 && gpuBound === true));
+  // Withhold active estimates when an idle cycle may wait; wire placement is unreported.
+  const enrichmentDeferred = enrichingPending > 0 && (energy || gpuCauses.length > 0);
   const details: string[] = [];
-  if (energy) details.push('Enrichment deferred to save energy.');
+  if (energy) {
+    details.push('Idle enrichment deferred to save energy.');
+    if (phase === 'indexing' && gpuCauses.length === 0) details.push('Sparse enrichment can continue between files.');
+  }
   if (gpuCauses.length > 0) {
     const cause = gpuCauses.join(' and ');
-    if (gpuBound === true) details.push(`Enrichment deferred while ${cause} (GPU bulk hold).`);
-    else if (gpuBound === false) details.push(`GPU bulk work deferred while ${cause}.${
-      enrichingPending > 0 && !energy ? ' CPU enrichment continues.' : ''}`);
-    else details.push(`GPU bulk work deferred while ${cause}; enrichment placement unconfirmed.`);
+    details.push(`GPU-bound idle enrichment deferred while ${cause}.`);
+    if (!energy) details.push('CPU-only idle enrichment can continue.');
+    details.push('Sparse enrichment between files also waits, including on CPU.');
   }
   if (reasons.has('chat_generating') && !enrichmentDeferred) {
-    details.push(gpuBound === true ? 'Enrichment shares GPU time with chat.' : 'Indexing shares time with chat.');
+    details.push('Indexing shares time with chat.');
   }
   const summary = phase === 'indexing'
     ? energy || gpuCauses.length > 0 ? 'Text indexing continues' : 'Indexing'
     : phase === 'enriching'
-      ? enrichmentDeferred ? 'Enrichment deferred' : 'Search is ready — still improving'
+      ? energy ? 'Enrichment deferred' : gpuCauses.length > 0 ? 'Enrichment pending' : 'Search is ready — still improving'
       : phase === 'blocked' ? 'Semantic search waiting for AI install'
         : status.worker?.core?.indexHealthy === true ? 'Ready — fully searchable' : 'Indexing queue empty';
   return { summary, detail: details.join(' ') || null, confirmed: true, enrichmentDeferred };

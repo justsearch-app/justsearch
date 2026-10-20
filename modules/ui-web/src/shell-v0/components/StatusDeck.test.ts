@@ -236,7 +236,7 @@ describe('StatusDeck (slice 461)', () => {
     });
     await el.updateComplete;
     expect(queueText(el)).toContain('Text indexing continues');
-    expect(queueText(el)).toContain('Enrichment deferred to save energy.');
+    expect(queueText(el)).toContain('Idle enrichment deferred to save energy.');
     expect(queueText(el)).not.toContain('paused');
   });
 

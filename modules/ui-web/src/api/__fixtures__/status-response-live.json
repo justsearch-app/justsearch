@@ -158,8 +158,7 @@
       "embeddedAndSparseCount" : 0,
       "embeddingAvailable" : true,
       "spladeAvailable" : true,
-      "nerAvailable" : true,
-      "backfillGpuBound" : null
+      "nerAvailable" : true
     },
     "gpu" : {
       "rerankerOrtCuda" : {

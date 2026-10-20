@@ -86,21 +86,32 @@ GPU bulk hold; it does not mean that text indexing stopped. Consumers describe
 the reason by the work it holds, rather than displaying the state name alone:
 
 - `energy_saver` defers idle enrichment on both CPU and GPU. Text indexing
-  continues. An empty file queue with enrichment waiting is deferred enrichment,
-  not Ready.
-- `game_mode` and `gpu_busy_external` hold GPU bulk work. The worker reports
-  `worker.enrichment.backfillGpuBound`: `true` if the embedding provider uses GPU
-  or any sparse/NER encoder is GPU-available, exactly the placement inputs to the
-  idle-cycle hold. A mixed CPU/GPU cycle is also held as a whole. `false` means
-  CPU enrichment is unaffected by those GPU holds. Null or absent means placement
-  is unconfirmed; GPU profile or the last backfill pass is not a substitute.
+  continues, and sparse enrichment interleaved between files may continue: that
+  path does not check energy saver. An empty file queue with enrichment waiting
+  is deferred idle enrichment, not Ready.
+- `game_mode` and `gpu_busy_external` defer GPU-bound idle enrichment cycles,
+  including mixed CPU/GPU cycles, and **all** sparse enrichment interleaved
+  between files, including CPU sparse work. CPU-only idle enrichment cycles may
+  continue. Placement is not reported in public status, so consumers state these
+  scopes without claiming that a particular idle cycle is on CPU or GPU.
 - `chat_generating` names shared time with chat, not an automatic stop. Only a
   present reason supports that explanation.
 
 Reasons can be present with `IDLE`; neither that state nor an empty file queue
-proves enrichment is complete. The placement field is read-only, optional in
-worker IPC, nullable in the status projection, and never changes scheduling.
-An absent loop leaves it unreported rather than asserting CPU placement.
+proves enrichment is complete. These explanations do not change scheduling.
+
+### Compatibility
+
+Optional field additions are patch changes (ADR-0039, evolution rules), and
+`docs/reference/contributing/common-workflows.md`, "Add a field to a record",
+requires generated boundary validation and preserves the manual compatibility
+baselines for ordinary additions. There is no lockstep-only exception for status
+consumers. Older generated status validators are strict: adding
+`worker.enrichment.backfillGpuBound` would reject the entire observation. WP3.3
+therefore retains the existing public status shape and reports the scheduling
+scopes above using existing reasons. GPU profiles and the previous backfill mode
+are not evidence of the current aggregate idle-cycle placement. Consumers must
+not loosen their local validator to hide drift (ADR-0039).
 
 The UI's shared indexing-progress projection supplies activity wording to the
 status deck, task list, Health (including Now), Library rows and indexing overlay.

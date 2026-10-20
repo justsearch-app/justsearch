@@ -54,10 +54,7 @@ public record EnrichmentProgressView(
     // saying the stage is stuck is read as working on it, never as idle.
     Boolean embeddingAvailable,
     Boolean spladeAvailable,
-    Boolean nerAvailable,
-    // WP3.3: exact aggregate placement predicate used by the idle-cycle GPU hold. Null means
-    // unreported, false means CPU only, true includes mixed CPU/GPU encoders.
-    Boolean backfillGpuBound) {
+    Boolean nerAvailable) {
   public EnrichmentProgressView {
     backfillMode = backfillMode == null ? "idle" : backfillMode;
     completeness = completeness == null ? List.of() : List.copyOf(completeness);

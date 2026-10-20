@@ -293,7 +293,12 @@ export class HealthSurface extends JfElement {
   static styles = [
     surfaceLayoutStyles,
     css`
+    :host {
+      min-width: 0;
+      max-width: 100%;
+    }
     .header {
+      flex-wrap: wrap;
       flex-shrink: 0;
       display: flex;
       align-items: center;
@@ -325,6 +330,7 @@ export class HealthSurface extends JfElement {
        (the global button{}/.icon-btn fork is deleted). Tempdoc 571 §11 / 578 — the §11.8 Health|Logs
        tab strip + embedded-log rules are RETIRED (Logs is a sibling System member now). */
     .body {
+      min-width: 0;
       flex: 1;
       overflow-y: auto;
       padding: 1rem 1.5rem;
