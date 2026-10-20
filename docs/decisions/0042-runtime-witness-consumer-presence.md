@@ -2,7 +2,7 @@
 title: "ADR-0042: Live-registry witness — consumer-presence over the live ContributionRegistry"
 type: decision
 status: accepted
-description: "The live-registry tier of tempdoc 560 §4b/§5: a delivered contribution must carry a consumer, checked over the LIVE ContributionRegistry (not the static snapshot) so runtime-composed contributions are covered — closing the DR-D gap the two static tiers cannot reach. Resolves the four §E.2.1 decisions that gated it with defensible defaults."
+description: "A delivered contribution must carry a consumer, checked by LiveWitnessTest over the live ContributionRegistry, covering runtime-composed MCP and plugin contributions the static snapshot cannot see; core workflow operations are included in the static snapshot."
 date: 2026-06-11
 probes:
   - adr-0042-live-witness-checked
