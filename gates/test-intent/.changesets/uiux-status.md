@@ -489,3 +489,14 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
   "note": "Expectations follow S33.1-S33.6, N33.3 and the supplied compatibility requirement. Independently reran run-evidence and before-state assertions; live partial-status loss and recovery pass on 46952a486 and fail on f6a14b5a6. Compatibility also fails by assertion on 8237e63d9. Acceptance concerns test intent only: product verdict remains fail for Brain ignoring explicit stale flags and registered measured gates timing out on old fixture timestamps."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp33-verifier-qpaxzu4",
+  "verdict": "accept",
+  "digest": "sha256:d2836f07164192020ce52a2bf740b62065c8f5c5bb89d3611d5a860cd281d92a",
+  "note": "Expectations follow the supplied agreed scenarios and compatibility obligation. Independent UI evidence rerun passed; transplanted tests fail by assertion on f6a14b5a6, and serialization compatibility fails by assertion on 8237e63d9 while passing both original and candidate. Fixture changes only active observation timestamps; registered assertions and baselines are identical. Acceptance concerns test intent only: product verification fails for uncaveated stale Health index-state values and Brain animating energy-deferred idle enrichment."
+}
+```
