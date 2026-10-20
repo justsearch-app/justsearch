@@ -360,7 +360,7 @@ public final class AgentRunStore {
       return null;
     }
     String sessionId = readLastSessionId();
-    if (sessionId == null || sessionId.isBlank()) {
+    if (!StoreIds.isValid(sessionId)) {
       return null;
     }
     return readMeta(sessionId);
@@ -401,6 +401,7 @@ public final class AgentRunStore {
                   .reversed())
           .map(p -> readMeta(p.getFileName().toString()))
           .filter(java.util.Objects::nonNull)
+          .filter(meta -> meta.get("sessionId") instanceof String id && StoreIds.isValid(id))
           // Tempdoc 565 §15.C fix — the Sessions view is agent-run-only; exclude workflow runs that now
           // share the run-event root (filter BEFORE the limit so it bounds AGENT runs, not all runs).
           .filter(AgentRunStore::isAgentRun)
@@ -468,7 +469,7 @@ public final class AgentRunStore {
           continue;
         }
         if (!(meta.get("conversationId") instanceof String conversationId)
-            || conversationId.isBlank()) {
+            || !StoreIds.isValid(conversationId)) {
           continue; // a standalone run is its own thread; it is not a conversation of the sidebar's
         }
         Map<String, Object> row = byConversation.get(conversationId);
@@ -642,6 +643,7 @@ public final class AgentRunStore {
           .filter(Files::isDirectory)
           .map(p -> readMeta(p.getFileName().toString()))
           .filter(java.util.Objects::nonNull)
+          .filter(meta -> meta.get("sessionId") instanceof String id && StoreIds.isValid(id))
           // Tempdoc 565 §15.C fix — presence is the agent-run inbox; exclude workflow runs (defense in
           // depth — workflow also sets background=false, but the shape filter is the explicit invariant).
           .filter(AgentRunStore::isAgentRun)
@@ -917,7 +919,7 @@ public final class AgentRunStore {
       return null;
     }
     try {
-      return Files.readString(lastSessionPath(), StandardCharsets.UTF_8).trim();
+      return Files.readString(lastSessionPath(), StandardCharsets.UTF_8);
     } catch (Exception e) {
       LOG.warn("Failed to read last session pointer", e);
       return null;

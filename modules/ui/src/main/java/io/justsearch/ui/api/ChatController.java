@@ -14,6 +14,7 @@ import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.services.conversation.AgentRunShape;
 import io.justsearch.app.services.conversation.ConversationEngine;
+import io.justsearch.configuration.persistence.StoreIds;
 import io.justsearch.telemetry.Telemetry;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -493,7 +494,7 @@ public final class ChatController {
     List<Map<String, Object>> rows = new ArrayList<>();
     for (Map<String, Object> run : agent.conversationSummaries(limit)) {
       Object conversationId = run.get("conversationId");
-      if (!(conversationId instanceof String id) || id.isBlank() || hasStoreSession(id, inThisWindow)) {
+      if (!(conversationId instanceof String id) || !StoreIds.isValid(id) || hasStoreSession(id, inThisWindow)) {
         continue;
       }
       Map<String, Object> m = new LinkedHashMap<>();
@@ -578,11 +579,13 @@ public final class ChatController {
         response.put("parentSessionId", s.parentSessionId());
         // Slice 515 FIX-8 — surface the parent's first-message preview so the
         // FE branch indicator can name the parent without a second roundtrip.
-        conversationStore.getSessionMeta(s.parentSessionId()).ifPresent(parent -> {
-          if (parent.firstUserMessage() != null && !parent.firstUserMessage().isEmpty()) {
-            response.put("parentFirstUserMessage", parent.firstUserMessage());
-          }
-        });
+        if (StoreIds.isValid(s.parentSessionId())) {
+          conversationStore.getSessionMeta(s.parentSessionId()).ifPresent(parent -> {
+            if (parent.firstUserMessage() != null && !parent.firstUserMessage().isEmpty()) {
+              response.put("parentFirstUserMessage", parent.firstUserMessage());
+            }
+          });
+        }
       }
       if (s.branchPointMessageId() != null) {
         response.put("branchPointMessageId", s.branchPointMessageId());

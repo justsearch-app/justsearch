@@ -98,7 +98,8 @@ public final class FileConversationStore implements ConversationStore {
     if (meta != null) {
       Object parent = meta.get("parentSessionId");
       Object branchPoint = meta.get("branchPointMessageId");
-      if (parent instanceof String parentId && !parentId.isBlank()) {
+      // Saved links can predate portable id validation. An unaddressable parent is missing.
+      if (parent instanceof String parentId && StoreIds.isValid(parentId)) {
         List<Map<String, Object>> parentHistory = loadHistory(parentId, seen);
         if (branchPoint instanceof String bp && EMPTY_PREFIX_SENTINEL.equals(bp)) {
           // Tempdoc 610 Phase A — empty-prefix branch: inherit nothing from the

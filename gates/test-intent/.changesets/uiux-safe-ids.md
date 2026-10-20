@@ -40,6 +40,8 @@ assertion fail-before evidence against e7b4ceec7 in a separate evidence file. Th
 reclassifications remain preservation checks. Existing acceptance and rejection records remain
 unchanged and require independent review of this candidate.
 
+Review history: verifier-4 found invalid ids in saved branch parents, run/conversation links and backups still reaching request validation. PN1s quotes the agreed N9.1 amendment after verifier-4 (2026-10-20 07:00) verbatim. New HTTP checks cover those paths; additional repaired checks cover saved last-session pointers, session indexes and the restore notice. Invalid saved run references are filtered at the session-index producer before history reconciliation; its direct-id refusal remains unchanged. Evidence is against bf1713ab2. Existing review records remain unchanged.
+
 ```json
 {
   "entries": [
@@ -631,6 +633,73 @@ unchanged and require independent review of this candidate.
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/StoreEnumerationInvalidIdsHttpTest.java#validConversationCanBranchReadAndDeleteBesideInvalidFolders",
         "modules/ui/src/test/java/io/justsearch/ui/api/StoreEnumerationInvalidIdsHttpTest.java#runListsPresenceThreadAndDeleteWorkBesideInvalidRunFolders"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/SavedStoreIdsHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Over HTTP, valid branches with invalid saved parents retain their own history and thread events, valid conversation lists ignore runs naming invalid conversations while keeping those runs, and v1 backups restore valid conversations and report skipped invalid entries.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1s",
+          "quote": "An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-safe-ids-saved-data.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/SavedStoreIdsHttpTest.java#branchWithInvalidSavedParentOpensLikeMissingParentOverHttp",
+        "modules/ui/src/test/java/io/justsearch/ui/api/SavedStoreIdsHttpTest.java#conversationListIgnoresSavedRunsWithInvalidConversationIdsOverHttp",
+        "modules/ui/src/test/java/io/justsearch/ui/api/SavedStoreIdsHttpTest.java#legacyFormatBackupRestoresValidConversationsAndReportsInvalidEntriesOverHttp"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/SavedRunIdsTest.java"
+      ],
+      "class": "New",
+      "behaviour": "An invalid saved last-session pointer reads as missing, without trimming it into another valid id or changing its bytes; session and presence indexes skip invalid saved session references and retain valid runs.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1s",
+          "quote": "An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-safe-ids-saved-data.json",
+      "newChecks": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/SavedRunIdsTest.java#invalidLastSessionPointerReadsAsMissingWithoutChangingSavedBytes",
+        "modules/app-agent/src/test/java/io/justsearch/agent/SavedRunIdsTest.java#sessionIndexesSkipInvalidSavedSessionReferences"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SecuritySurface.restore-skipped.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The existing restore notice states both restored and skipped counts, handles singular skipped entries, and does not claim invalid entries already exist when all entries are skipped.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "PN1s",
+          "quote": "An invalid id read from saved data (a branch's parent link, a run's conversation id, an entry in a backup) is treated as missing, never as a request error: the item that names it keeps working exactly as when that id does not exist (a branch with an invalid parent opens as when its parent is gone; the conversation list ignores a run with an invalid conversation id), and restoring a backup restores every valid conversation and skips the invalid ones, saying how many were skipped. Ids from requests are still refused.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-safe-ids-saved-data.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SecuritySurface.restore-skipped.test.ts#reports restored and skipped counts when saved backup entries have invalid ids",
+        "modules/ui-web/src/shell-v0/views/SecuritySurface.restore-skipped.test.ts#does not say everything already exists when all backup entries have invalid ids"
       ],
       "repaired": true
     }
