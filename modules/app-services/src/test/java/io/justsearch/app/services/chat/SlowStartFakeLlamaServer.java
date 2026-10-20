@@ -139,7 +139,8 @@ public final class SlowStartFakeLlamaServer {
       exchange.close();
     });
     String key = System.getenv("LLAMA_API_KEY");
-    if (key != null || (home != null && Files.exists(Path.of(home, "require-api-key")))) {
+    if (!(home != null && Files.exists(Path.of(home, "ignore-api-key")))
+        && (key != null || (home != null && Files.exists(Path.of(home, "require-api-key"))))) {
       String expected = key == null ? "missing-engine-key" : key;
       for (var context : List.of(props, chat)) {
         context.getFilters().add(new com.sun.net.httpserver.Filter() {

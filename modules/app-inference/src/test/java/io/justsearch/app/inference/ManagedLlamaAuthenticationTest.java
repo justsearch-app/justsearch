@@ -92,6 +92,37 @@ final class ManagedLlamaAuthenticationTest {
   }
 
   @Test
+  void aRuntimeIgnoringTheKeyIsStoppedBeforeGoingOnline() throws Exception {
+    create("--ignore-api-key");
+    var failure = assertTimeoutPreemptively(Duration.ofSeconds(15),
+        () -> assertThrows(ModeTransitionException.class, manager::switchToOnlineMode));
+    assertTrue(failure.getMessage().contains("this llama-server ignores its API key"));
+    assertFalse(manager.isOnline());
+    assertEquals(1, launches.size(), "no unauthenticated retry");
+    key(0);
+    assertTrue(control.list().isEmpty(), "unprotected child must be stopped before failure returns");
+  }
+
+  @Test
+  void aRecoveryRuntimeIgnoringTheKeyIsStoppedBeforeReady() throws Exception {
+    create("--require-api-key");
+    manager.switchToOnlineMode();
+    var field = InferenceLifecycleManager.class.getDeclaredField("serverOps");
+    field.setAccessible(true);
+    var ops = (LlamaServerOps) field.get(manager);
+    var request = ops.recoveryStartRequest().orElseThrow();
+    manager.switchToIndexingMode();
+    HealthyFakeLlamaServer.install(tmp.resolve("fake"), "--ignore-api-key");
+    var start = ops.startLlamaServer(request);
+    var failure = assertTimeoutPreemptively(Duration.ofSeconds(15),
+        () -> assertThrows(ModeTransitionException.class, () -> ops.waitForServerHealthOnce(start)));
+    assertTrue(failure.getMessage().contains("this llama-server ignores its API key"));
+    assertFalse(manager.isOnline());
+    assertEquals(2, launches.size(), "one protected initial launch and one failed recovery");
+    assertTrue(control.list().isEmpty(), "unprotected recovery child must be stopped");
+  }
+
+  @Test
   void anEnvironmentRejectedByTheLauncherFailsBeforeSpawning() throws Exception {
     create("--require-api-key");
     doAnswer(call -> {

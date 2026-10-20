@@ -28,6 +28,7 @@ import io.justsearch.app.api.chat.Hold;
 import io.justsearch.app.api.chat.SelfTestSession;
 import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.inference.LlamaDevicePlan;
+import io.justsearch.app.inference.LlamaServerAuthentication;
 import io.justsearch.app.inference.chat.ChildSelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestRun;
 import io.justsearch.app.inference.chat.SelfTestSpec;
@@ -1272,6 +1273,7 @@ public final class RuntimeActivationService
 
       @Override
       public void exercise(int candidatePort) throws Exception {
+        LlamaServerAuthentication.requireEnforcement(http, candidatePort, Duration.ofSeconds(2));
         sendTinyChatRequest(candidatePort, modelId, apiKey);
         if (devices.gpuLayers() > 0) {
           // Measure GPU allocation only for a GPU probe, while its child lives.

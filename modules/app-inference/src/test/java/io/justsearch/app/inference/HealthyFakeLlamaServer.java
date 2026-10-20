@@ -327,7 +327,8 @@ public final class HealthyFakeLlamaServer {
         exchange.close();
       }));
     }
-    if (behaviour.contains("--require-api-key") || apiKey != null) {
+    if (!behaviour.contains("--ignore-api-key")
+        && (behaviour.contains("--require-api-key") || apiKey != null)) {
       String expected = apiKey == null ? "missing-engine-key" : apiKey;
       for (var context : contexts) {
         context.getFilters().add(new com.sun.net.httpserver.Filter() {

@@ -28,6 +28,8 @@ import io.justsearch.app.api.runtime.child.DefaultChildControl;
 import io.justsearch.app.api.runtime.child.ExitClass;
 import io.justsearch.app.api.runtime.child.ExitOutcome;
 import io.justsearch.app.api.runtime.child.StopRequest;
+import io.justsearch.app.api.runtime.child.StopReason;
+import io.justsearch.app.api.runtime.child.StopMode;
 import io.justsearch.app.inference.telemetry.InferenceTelemetryEvents;
 import java.io.IOException;
 import java.util.Objects;
@@ -133,8 +135,8 @@ final class LlamaServerOps {
       "Managed llama-server exited, descendants unverified; retry cleanup";
   /** Retries a survivor's stop; ChildControl keeps the survivor's first intent and reason. */
   private static final StopRequest SURVIVOR_RETRY = StopRequest.of(
-      io.justsearch.app.api.runtime.child.StopReason.ROLLBACK,
-      io.justsearch.app.api.runtime.child.StopMode.NOW, "chat-controller");
+      StopReason.ROLLBACK,
+      StopMode.NOW, "chat-controller");
   private static final Duration STARTUP_HEALTH_PROBE_TIMEOUT = Duration.ofSeconds(2);
   private static final Duration HEALTH_PROBE_TIMEOUT = Duration.ofSeconds(1);
   private static final Duration PROPS_PROBE_TIMEOUT = Duration.ofSeconds(2);
@@ -1271,6 +1273,7 @@ final class LlamaServerOps {
               ModeTransitionException.Reason.PROCESS_EXITED,
               "Managed llama-server exited during startup health verification");
         }
+        verifyManagedAuthentication(expected);
         LOG.info("Server healthy");
         // The build accepted --reasoning-budget: it started and serves with the flag present.
         if (reasoningBudgetRequested) {
@@ -1298,6 +1301,26 @@ final class LlamaServerOps {
     throw new ModeTransitionException(
         ModeTransitionException.Reason.HEALTH_CHECK_TIMEOUT,
         "Server health check timeout after " + HEALTH_CHECK_TIMEOUT_MS + "ms");
+  }
+
+  private void verifyManagedAuthentication(ActiveServer expected) throws ModeTransitionException {
+    if (expected.child() == null) return; // Explicit external endpoints keep their own policy.
+    try {
+      LlamaServerAuthentication.requireEnforcement(httpClient, expected.port(), PROPS_PROBE_TIMEOUT);
+    } catch (IOException | InterruptedException rejected) {
+      LOG.error("Managed llama-server authentication failed: {}", rejected.getMessage());
+      var failure = new ModeTransitionException(ModeTransitionException.Reason.ONLINE_START_FAILED,
+          "Managed llama-server authentication failed: " + rejected.getMessage(), rejected);
+      if (isActive(expected)) {
+        try {
+          stopLlamaServer(StopRequest.of(StopReason.ROLLBACK, StopMode.NOW, "chat-controller"));
+        } catch (RuntimeException cleanup) {
+          failure.addSuppressed(cleanup);
+        }
+      }
+      if (rejected instanceof InterruptedException) Thread.currentThread().interrupt();
+      throw failure;
+    }
   }
 
   /**

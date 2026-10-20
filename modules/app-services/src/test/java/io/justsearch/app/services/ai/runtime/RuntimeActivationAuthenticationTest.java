@@ -91,6 +91,51 @@ final class RuntimeActivationAuthenticationTest {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void activationRejectsARuntimeIgnoringTheKeyBeforeChat(boolean throughSession) throws Exception {
+    Path home = tmp.resolve("fake");
+    Path executable = SlowStartFakeLlamaServer.install(home, 0);
+    Files.writeString(home.resolve("ignore-api-key"), "ignored");
+    Path model = Files.createFile(tmp.resolve("model.gguf"));
+    String oldHome = System.getProperty("justsearch.home");
+    var oldConfig = ConfigStore.globalOrNull();
+    var config = new ConfigStore(TestResolvedConfigHelper.fromEntries(Map.of(
+        "justsearch.gpu.enabled", "false", "justsearch.gpu.layers", "0")));
+    System.setProperty("justsearch.home", tmp.toString());
+    ConfigStore.setGlobal(config);
+    AtomicReference<String> failure = new AtomicReference<>();
+    try (var executors = new TestEngineExecutors();
+        var control = DefaultChildControl.unrecorded(ManagedChildRegistry.noop());
+        var service = new RuntimeActivationService(executors, OnlineAiService.unavailable(),
+            new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+                tmp.resolve("settings.json")), null, null)) {
+      SelfTestSession<SelfTestSpec, SelfTestRun> session = new SelfTestSession<>() {
+        @Override public SelfTestRun run(SelfTestSpec spec) {
+          var result = new ChildSelfTestLauncher(control).run(spec);
+          failure.set(result.failure());
+          return result;
+        }
+        @Override public void close() {}
+      };
+      var run = RuntimeActivationService.class.getDeclaredMethod("runSelfTest",
+          SelfTestSession.class, Path.class, Path.class, UiSettings.class);
+      run.setAccessible(true);
+      var result = assertTimeoutPreemptively(Duration.ofSeconds(15),
+          () -> (RuntimeActivationService.SelfTestResult) run.invoke(service,
+              throughSession ? session : null, executable, model, new UiSettings()));
+      assertEquals("failed", result.result(), "an unprotected server must never pass activation");
+      if (throughSession) assertTrue(failure.get().contains("this llama-server ignores its API key"));
+      assertTrue(SlowStartFakeLlamaServer.noneAlive(home), "unprotected self-test child must end");
+      assertFalse(Files.exists(home.resolve("requests.txt")), "do not execute the chat probe");
+    } finally {
+      SlowStartFakeLlamaServer.endAll(home);
+      ConfigStore.restoreGlobal(config, oldConfig);
+      if (oldHome == null) System.clearProperty("justsearch.home");
+      else System.setProperty("justsearch.home", oldHome);
+    }
+  }
+
   private static int status(int port, String key) throws Exception {
     var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/props"))
         .timeout(Duration.ofSeconds(2));
