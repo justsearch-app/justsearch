@@ -16,6 +16,14 @@
  * the click to the class EXCEPT Shell's own event registration, which `Shell` owns.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+// Incidental requests are outside these render/event scenarios. Keep their
+// unavailable-backend behavior explicit, without contacting a real server.
+const originalFetch = globalThis.fetch;
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Test backend unavailable')));
+});
+afterEach(() => { globalThis.fetch = originalFetch; });
 import './SettingsSurface.js';
 // Fix-round F1 — the declared-path swatch tests below drill through the REAL nested renderer chain
 // (`jf-declared-surface` → `jf-vertical-layout` → `jf-x-ui-renderer-control` → the leaf control), so

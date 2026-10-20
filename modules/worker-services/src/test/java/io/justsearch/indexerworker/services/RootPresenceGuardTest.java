@@ -19,6 +19,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -28,6 +29,7 @@ import org.junit.jupiter.api.io.TempDir;
  * drive letter unmapped, or a different folder mapped at the same letter all stop it vouching.
  * Real conditions only (rename and SUBST); every mapping is removed before the test returns.
  */
+@Tag("cross-platform")
 final class RootPresenceGuardTest {
   private static final boolean WINDOWS =
       System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
