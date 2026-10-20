@@ -77,3 +77,14 @@ Baseline signature preservation is also run on the unchanged production sources 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "a14d8eec-a719-404b-b61f-c7416f59788c",
+  "verdict": "accept",
+  "digest": "sha256:76e078fa3c1368365b6340e7bcbb51d46596d9608e622b24a82fcf0ec45559bb",
+  "note": "Sources and fail-before reproduced (no-op initializer: No provider set -> assertion); delegation quote taken from brief; child-name vacuity noted in report"
+}
+```
