@@ -52,6 +52,7 @@ import {
 } from '../state/indexingProgress.js';
 import { humanizeSeconds } from '../state/startupEstimate.js';
 import { ENRICHMENT_BLOCKED_BODY, ENRICHMENT_BODY } from '../state/enrichmentCoverage.js';
+import { indexingQueueCounts } from '../state/indexingQueueCounts.js';
 import { formatBytes, formatCount } from '../display/format.js';
 
 /**
@@ -168,6 +169,7 @@ export class TaskList extends JfElement {
     tasks: { state: true },
     feedStalled: { state: true },
     progress: { state: true },
+    queueCounts: { state: true },
     filesOpen: { state: true },
     showingReady: { state: true },
   };
@@ -189,6 +191,7 @@ export class TaskList extends JfElement {
 
   constructor() {
     super();
+    this.queueCounts = null;
     this.tasks = listTasks();
     this.feedStalled = false;
     this.progress = NO_PROGRESS;
@@ -206,6 +209,7 @@ export class TaskList extends JfElement {
       this.feedStalled = stalled;
     });
     this.aiUnsub = subscribeAiState((s) => {
+      this.queueCounts = indexingQueueCounts(s.status);
       this.applyProgress(
         selectIndexingProgress(
           s.status,
@@ -479,7 +483,8 @@ export class TaskList extends JfElement {
    */
   private isEmpty(): boolean {
     return (
-      this.tasks.length === 0 && !isActivePhase(this.progress.phase) && !this.showingReady
+      this.tasks.length === 0 && !(this.queueCounts &&
+        (this.queueCounts.queued + this.queueCounts.processing + this.queueCounts.failed > 0)) && !isActivePhase(this.progress.phase) && !this.showingReady
     );
   }
 
@@ -522,6 +527,8 @@ export class TaskList extends JfElement {
       </div>
     `;
   }
+
+  private declare queueCounts: ReturnType<typeof indexingQueueCounts>;
 
   private counts(): Map<TaskStatus, number> {
     // Projection-layer primitive (tempdoc 550 thesis III(b)); shared with the Activity timeline.
@@ -656,6 +663,16 @@ export class TaskList extends JfElement {
             : nothing}
         </div>
         ${this.renderAggregate()}
+        ${this.queueCounts ? html`
+          <div class="counts" data-testid="task-queue-totals">
+            ${this.progress.live ? '' : 'Last reported: '}${formatCount(this.queueCounts.processing)} processing · ${formatCount(this.queueCounts.failed)} failed
+          </div>
+          ${this.queueCounts.queued > 0 ? html`
+            <div class="task-row" data-testid="task-queued-aggregate">
+              <span class="status queued">queued</span>
+              <span>${this.progress.live ? '' : 'Last reported: '}${formatCount(this.queueCounts.queued)} files queued</span>
+            </div>` : nothing}
+        ` : nothing}
         <!-- 595 §4.4: when the live feed stalls, say so — don't show stale counts
              as if they were live (the §1.3 freeze). -->
         ${stalled
@@ -694,6 +711,9 @@ export class TaskList extends JfElement {
                 : nothing}
               ${this.tasks.length > 0
                 ? html`
+                    <div class="counts" data-testid="task-window-notice">
+                      File details are a live window, showing up to 8 tasks; queue totals include files outside it.
+                    </div>
                     <!-- Bounded summary: one count chip per non-empty status (550 Thesis III).
                          Absorbed into the disclosure by 813 §5 — inside, they label the row SETS
                          (which rows are listed, which are collapsed), not the panel. -->

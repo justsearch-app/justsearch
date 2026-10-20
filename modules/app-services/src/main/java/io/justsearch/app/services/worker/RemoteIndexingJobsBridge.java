@@ -111,6 +111,7 @@ public final class RemoteIndexingJobsBridge {
   private static final int FAILURE_WINDOW_SIZE = 200;
   private final AtomicBoolean started = new AtomicBoolean(false);
   private volatile boolean stopped = false;
+  private Long nextOverflowReconnectAt;
 
   /**
    * Re-subscribe backoff. The first retry is immediate-ish and they lengthen to
@@ -310,7 +311,17 @@ public final class RemoteIndexingJobsBridge {
     int failures = consecutiveFailures.incrementAndGet();
 
     long delay = Math.min(RECONNECT_MAX_DELAY_MS, RECONNECT_BASE_DELAY_MS * (1L << Math.min(failures - 1, 16)));
-    if (attemptsThisMinute > RECONNECT_MAX_PER_MINUTE) {
+    if (cause instanceof StreamOverflowException) {
+      // Snapshot success resets ordinary failures, but never this overload pacing.
+      // First recovery is immediate; a sustained snapshot/overflow cycle gets at
+      // most four starts per second, with no minute-long stale-cache cooldown.
+      synchronized (this) {
+        delay = nextOverflowReconnectAt == null ? 0L : Math.max(0L, nextOverflowReconnectAt - now);
+        nextOverflowReconnectAt = now + delay + RECONNECT_BASE_DELAY_MS;
+      }
+      log.warn("RemoteIndexingJobsBridge: indexing-jobs overflow (attempt {} since snapshot); re-subscribing in {}ms",
+          failures, delay);
+    } else if (attemptsThisMinute > RECONNECT_MAX_PER_MINUTE) {
       // Exhaustion throttles the one pending reconnect; it must not discard that obligation.
       // Leave a slot for the next attempt, including the failures beyond the cap. A timestamp
       // remains in the rolling window at its exact expiry, hence the +1.
@@ -330,9 +341,9 @@ public final class RemoteIndexingJobsBridge {
           cause);
     } else {
       log.warn(
-          "RemoteIndexingJobsBridge: indexing-jobs flow failed (attempt {} this minute); re-subscribing"
+          "RemoteIndexingJobsBridge: indexing-jobs flow failed (attempt {} since snapshot); re-subscribing"
               + " in {}ms. A fresh snapshot will replace the listeners' state.",
-          attemptsThisMinute,
+          failures,
           delay,
           cause);
     }
@@ -426,7 +437,8 @@ public final class RemoteIndexingJobsBridge {
                   applyStatePresence(frame);
                   List<IndexingJobView> immutable = latestSnapshot();
                   // Separate overload bursts must not exhaust a lifetime cap after recovery.
-                  // Keep the delay backoff: snapshot-then-immediate-failure must not busy-loop.
+                  // Overflow pacing is independent and survives a successful snapshot.
+                  consecutiveFailures.set(0);
                   recentAttempts.clear();
                   emit(new Delta.SnapshotReplaced(frame.getSeq(), immutable));
                   if (!snapshotDelivered.isDone()) {

@@ -62,6 +62,24 @@ public final class ResourceSubstrateInit {
       CoreSurfaceCatalog coreSurfaceCatalog) {}
 
   public static Output run(RuntimeContext initialRuntimeContext) {
+    return run(initialRuntimeContext, new IndexingJobsChangeRegistry());
+  }
+
+  public static Output run(RuntimeContext initialRuntimeContext,
+      io.justsearch.core.execution.EngineExecutorRegistry executors) {
+    var delivery = executors.register(io.justsearch.core.execution.EngineExecutorSpec.virtual(
+        "head.indexing-jobs-sse-delivery", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, 1));
+    try {
+      return run(initialRuntimeContext, new IndexingJobsChangeRegistry(
+          new io.justsearch.app.observability.stream.SseStreamChannel(
+              IndexingJobsChangeRegistry.STREAM_ID, delivery.openVirtual(), delivery::close)));
+    } catch (RuntimeException | Error failure) {
+      delivery.close();
+      throw failure;
+    }
+  }
+
+  private static Output run(RuntimeContext initialRuntimeContext, IndexingJobsChangeRegistry indexingJobsChangeRegistry) {
     ResourceCatalog resourceCatalog = new HealthResourceCatalog();
     RuntimeContextResourceCatalog runtimeContextResourceCatalog =
         new RuntimeContextResourceCatalog();
@@ -81,7 +99,6 @@ public final class ResourceSubstrateInit {
     AiInstallResourceCatalog aiInstallResourceCatalog = new AiInstallResourceCatalog();
     AiPackImportResourceCatalog aiPackImportResourceCatalog = new AiPackImportResourceCatalog();
     IndexingJobsResourceCatalog indexingJobsResourceCatalog = new IndexingJobsResourceCatalog();
-    IndexingJobsChangeRegistry indexingJobsChangeRegistry = new IndexingJobsChangeRegistry();
     FailedIndexingJobsResourceCatalog failedIndexingJobsResourceCatalog =
         new FailedIndexingJobsResourceCatalog();
     IndexedRootsResourceCatalog indexedRootsResourceCatalog = new IndexedRootsResourceCatalog();

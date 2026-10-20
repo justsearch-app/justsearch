@@ -234,7 +234,7 @@ final class BoundedHandoff<T> implements AutoCloseable {
         queue.size(),
         backpressure);
     fail(
-        new IllegalStateException(
+        new io.justsearch.app.services.worker.StreamOverflowException(
             name
                 + ": flow bound of "
                 + (queue.remainingCapacity() + queue.size())

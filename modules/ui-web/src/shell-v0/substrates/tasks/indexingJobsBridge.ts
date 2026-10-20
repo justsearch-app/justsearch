@@ -12,18 +12,10 @@
  * (which owns CANCEL_OP / RETRY_OP) — the tray must not duplicate that control
  * surface. The bridge only OBSERVES.
  *
- * Reconcile (STATELESS — the substrate is the source of truth; privacy-safe,
- * raw paths never on the wire, only pathHash):
- *   - job present, state != FAILED → ensure a running Task (id
- *     `idxjob:<pathHash>`); revives a stale terminal task if the same pathHash
- *     re-appears non-FAILED (e.g. an in-place retry).
- *   - job present, state == FAILED → ensure a failed Task.
- *   - job-task in the substrate but ABSENT from the live set → removeTask
- *     (the job finished / was cleared / the stream reset). It VANISHES rather
- *     than being marked 'succeeded' — correct for a "what's running now" tray
- *     (job history lives in the core.indexing-jobs Resource view), and removal
- *     (vs a guarded terminal transition) is what lets a re-appearing job re-add
- *     cleanly instead of being stranded in a terminal status after a reset.
+ * The live window contains active files and recent failures. Waiting files are
+ * represented by one status-derived queued entry in TaskList, never one task
+ * or path-label request per pending file. DONE and departed rows disappear;
+ * a failed file retried to PENDING joins the aggregate until it is claimed.
  *
  * Reuses the canonical TABULAR reducer (`subscriptionStrategy.indexingJobsStrategy`)
  * so frame parsing (snapshot / insert / update / delete / snapshot-replaced) is
@@ -93,7 +85,10 @@ function taskIdFor(pathHash: string): string {
  */
 const resolvedLabel = new Map<string, string>(); // pathHash → "parentFolder/fileName"
 const resolvingHashes = new Set<string>();
+const attemptedLabels = new Set<string>();
 let reproject: (() => void) | null = null;
+let visibleHashes = new Set<string>();
+const MAX_LABEL_REQUESTS = 16;
 
 /** Injectable resolver (default = the real lazy hash resolver), for focused tests. */
 let resolveHashFn: (resourceId: string, pathHash: string) => Promise<string | null> = (
@@ -112,6 +107,8 @@ export function __setResolveHashForTest(
 export function __resetResolvedLabelsForTest(): void {
   resolvedLabel.clear();
   resolvingHashes.clear();
+  attemptedLabels.clear();
+  visibleHashes.clear();
 }
 
 
@@ -134,13 +131,15 @@ function labelFor(job: IndexingJobRow): string {
  * not-found / unreachable resolve leaves the short-hash fallback untouched.
  */
 function ensureResolvedLabel(pathHash: string): void {
-  if (resolvedLabel.has(pathHash) || resolvingHashes.has(pathHash)) return;
+  if (resolvedLabel.has(pathHash) || resolvingHashes.has(pathHash) || attemptedLabels.has(pathHash)
+      || resolvingHashes.size >= MAX_LABEL_REQUESTS) return;
   resolvingHashes.add(pathHash);
+  attemptedLabels.add(pathHash);
   void resolveHashFn(INDEXING_JOBS_RESOURCE, pathHash)
     .then((path) => {
-      if (path) {
+      // A result for a departed row must not grow the cache or revive a task.
+      if (path && visibleHashes.has(pathHash)) {
         resolvedLabel.set(pathHash, friendlyPathName(path));
-        reproject?.();
       }
     })
     .catch(() => {
@@ -148,6 +147,7 @@ function ensureResolvedLabel(pathHash: string): void {
     })
     .finally(() => {
       resolvingHashes.delete(pathHash);
+      reproject?.();
     });
 }
 
@@ -326,8 +326,7 @@ function warnUnknownState(state: string): void {
  * its TRUE lifecycle state (queued / running / failed); a DONE job vanishes
  * (success is history, not live work); a job ABSENT from the live set vanishes
  * too. `running` is asserted only for jobs actually in PROCESSING — so a backlog
- * of PENDING jobs renders as `queued` (bounded + grouped by <jf-task-list>),
- * never as a wall of perpetual RUNNING pills (the F-1 cure).
+ * of PENDING jobs belongs to TaskList's status-derived aggregate queued entry.
  *
  * Deriving the existing set from `listTasks()` each call means a fresh bridge
  * instance (after a remount) reconciles against whatever tasks already exist —
@@ -336,8 +335,18 @@ function warnUnknownState(state: string): void {
 export function projectJobsToTasks(
   items: ReadonlyMap<string, IndexingJobRow>,
 ): void {
+  visibleHashes = new Set([...items].filter(([, job]) =>
+    ['PROCESSING', 'FAILED', JOB_STATE_RETRY_EXHAUSTED].includes(job.state.toUpperCase()),
+  ).map(([hash]) => hash));
+  for (const hash of attemptedLabels) {
+    if (!visibleHashes.has(hash)) attemptedLabels.delete(hash);
+  }
+  for (const hash of resolvedLabel.keys()) {
+    if (!visibleHashes.has(hash)) resolvedLabel.delete(hash);
+  }
   const present = new Set<string>();
   for (const [pathHash, job] of items) {
+    if (!visibleHashes.has(pathHash)) continue;
     const id = taskIdFor(pathHash);
     const status = statusFor(job);
     if (status === null) {
@@ -410,6 +419,7 @@ export function startIndexingJobsBridge(
     // 595 §4.4: a fresh frame stamps liveness and clears any stall. 798 B4: only a GENUINE frame
     // does — a connection-state broadcast re-delivers the same seq (see `lastFrameSeq`).
     if (snap.seq !== lastFrameSeq) {
+      attemptedLabels.clear();
       lastFrameSeq = snap.seq;
       lastFrameAtMs = Date.now();
       setFeedStalled(false);
@@ -455,6 +465,7 @@ export function startIndexingJobsBridge(
     ? () => multiplex.nudgeReconnect()
     : () => nudgePooledStream(url);
   const tick = setInterval(() => {
+    attemptedLabels.clear();
     projectJobsToTasks(latestItems);
     // 595 §4.4: the same tick re-evaluates feed-staleness — if in-flight work
     // exists but no frame has arrived within the window, mark the feed stalled.
@@ -468,6 +479,9 @@ export function startIndexingJobsBridge(
   return () => {
     clearInterval(tick);
     reproject = null;
+    visibleHashes.clear();
+    resolvedLabel.clear();
+    attemptedLabels.clear();
     stopSub();
   };
 }

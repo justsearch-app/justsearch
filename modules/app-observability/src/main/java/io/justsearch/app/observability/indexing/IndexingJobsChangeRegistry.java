@@ -73,6 +73,12 @@ public final class IndexingJobsChangeRegistry {
     channel.publish(SseFrameKind.UPDATE, DeltaEnvelope.of(delta));
   }
 
+  /** Assigns the cursor now, delivering SSE observers on the channel's owned executor. */
+  public void broadcastAsync(Delta delta) {
+    Objects.requireNonNull(delta, "delta");
+    channel.publishAsync(SseFrameKind.UPDATE, DeltaEnvelope.of(delta));
+  }
+
   /** Subscribes an envelope-shaped listener for raw SSE frames. */
   public SseStreamChannel.Subscription subscribe(Consumer<SseEnvelope> listener) {
     return channel.subscribe(listener);

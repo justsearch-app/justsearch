@@ -63,20 +63,20 @@ public final class IndexingJobsBridgeWiring {
         bridge.subscribe(delta -> {
           switch (delta) {
             case RemoteIndexingJobsBridge.Delta.SnapshotReplaced sr ->
-                indexingJobsChangeRegistry.broadcast(
+                indexingJobsChangeRegistry.broadcastAsync(
                     new IndexingJobsChangeRegistry.Delta.SnapshotReplaced(sr.items()));
             case RemoteIndexingJobsBridge.Delta.Insert ins -> {
-              indexingJobsChangeRegistry.broadcast(
+              indexingJobsChangeRegistry.broadcastAsync(
                   new IndexingJobsChangeRegistry.Delta.Insert(ins.row()));
               emitTerminalOutcome(actionLedgerChangeRegistry, ins.row());
             }
             case RemoteIndexingJobsBridge.Delta.Update upd -> {
-              indexingJobsChangeRegistry.broadcast(
+              indexingJobsChangeRegistry.broadcastAsync(
                   new IndexingJobsChangeRegistry.Delta.Update(upd.row()));
               emitTerminalOutcome(actionLedgerChangeRegistry, upd.row());
             }
             case RemoteIndexingJobsBridge.Delta.Delete del ->
-                indexingJobsChangeRegistry.broadcast(
+                indexingJobsChangeRegistry.broadcastAsync(
                     new IndexingJobsChangeRegistry.Delta.Delete(del.pathHash()));
           }
         });
@@ -84,7 +84,7 @@ public final class IndexingJobsBridgeWiring {
   }
 
   private static void emitTerminalOutcome(ActionLedgerChangeRegistry registry, IndexingJobView row) {
-    terminalIndexEvent(row).ifPresent(registry::broadcastActionEvent);
+    terminalIndexEvent(row).ifPresent(registry::broadcastActionEventAsync);
   }
 
   /**

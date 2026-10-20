@@ -265,3 +265,35 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {
     el.remove();
   });
 });
+
+
+describe('Q14 — indexing Resource window and queue totals', () => {
+  it('names the bounded window and reads totals outside it from status', async () => {
+    const { __feedForTest, __resetAiStateForTest } = await import('../state/aiStateStore.js');
+    const { formatCount } = await import('../display/format.js');
+    resetResourceCatalog();
+    seedResourceCatalog(catalogOf(tabularResource()));
+    const el = await mountIsolated('core.indexing-jobs');
+    try {
+      __feedForTest({ status: { worker: {
+        core: { indexState: 'INDEXING' },
+        migration: { pendingJobsCount: 700000, processingJobsCount: 16 },
+        failure: { failedJobs: 1001 },
+      } } });
+      await Promise.resolve(); await Promise.resolve(); await el.updateComplete;
+      expect(el.shadowRoot?.querySelector('[data-testid="indexing-window-notice"]')?.textContent).toContain('window');
+      const totals = el.shadowRoot?.querySelector('[data-testid="indexing-queue-totals"]')?.textContent;
+      expect(totals).toContain(`${formatCount(700000)} queued`);
+      expect(totals).toContain('16 processing');
+      expect(totals).toContain(`${formatCount(1001)} failed`);
+      __feedForTest({ status: { worker: { core: { indexState: 'UNAVAILABLE' },
+        migration: { pendingJobsCount: 0, processingJobsCount: 0 }, failure: { failedJobs: 0 },
+      } } });
+      await Promise.resolve(); await Promise.resolve(); await el.updateComplete;
+      expect(el.shadowRoot?.textContent).toContain('Queue totals unavailable');
+      __feedForTest({ status: null });
+      await Promise.resolve(); await Promise.resolve(); await el.updateComplete;
+      expect(el.shadowRoot?.textContent).toContain('Queue totals unavailable');
+    } finally { el.remove(); __resetAiStateForTest(); resetResourceCatalog(); }
+  });
+});

@@ -686,7 +686,7 @@
       "pathVerificationNote": "Only the base name is a literal (modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:589, dataDir.resolve(\"jobs.db\")). SQLite creates the -wal and -shm sidecars; corruption triage derives their sibling paths from dbPath (KnowledgeServer.java:2982-2985). Backup creation and restore also derive .bak paths from dbPath (SqliteJobQueue.java:2768-2769; KnowledgeServer.java:2972-2975); these are composed paths, not independent configured roots.",
       "encryption": "UNSEALED_DERIVED_OS_DISK_ENCRYPTION",
       "encryptionNote": "Plaintext SQLite: jobs.path and path_resolution.normalized_path store the user's paths (SqliteSchema.java:152-166, 273-280); document_identity stores only a path hash, random uid, and timestamps (SqliteSchema.java:300-305). StoreCatalog classifies JOBS_DB as DERIVED/OPAQUE, whose stated policy is OS disk encryption only (StoreCatalog.java:25-37); this is UNSEALED_DERIVED_OS_DISK_ENCRYPTION because the queue is rebuildable from watched roots. The separate watched-roots row is authored JSON and remains UNSEALED_GAP because nothing structural prevents sealing it (this register:568-572).",
-      "corruptionNote": "document_identity is restored indirectly: the existing pre-migration jobs.db backup can predate schema v11, so after backup restore (or a fresh queue rebuild when no backup exists) the Worker imports missing parent doc_id/doc_uid pairs from the serving Lucene index before indexing starts (KnowledgeServer.java:992-999,394-413; DocumentIdentityBootImport.java:30-31,50-114; SqliteDocumentIdentityStore.java:158-187), streaming them in transactions of 1000. Existing identity rows remain authoritative during normal and mid-migration restarts. Since v12 the scan is a seeding step, not a per-boot pass: it runs only when document_identity is empty or document_identity_import has no row for the serving generation, because every later parent resolves its uid through the store. A live parent whose doc_id/doc_uid docvalues are missing or blank is counted in parents_skipped and re-mints at its next admission rather than failing the boot. Recovery limit: if the identity rows and their backup are lost and the serving Lucene index is also lost or unreadable, the old random uids cannot be reconstructed; later admission mints new uids, so uid-keyed derived or feedback links to the lost identities can become orphaned. That is a total-data-loss boundary, not a recoverable migration case.",
+      "corruptionNote": "document_identity is restored indirectly: the existing pre-migration jobs.db backup can predate schema v11, so after backup restore (or a fresh queue rebuild when no backup exists) the Worker imports missing parent doc_id/doc_uid pairs from the serving Lucene index before indexing starts (KnowledgeServer.java:992-999,394-413; DocumentIdentityBootImport.java:30-31,50-114; SqliteDocumentIdentityStore.java:158-187), streaming them in transactions of 1000. Existing identity rows remain authoritative during normal and mid-migration restarts. Since v12 the scan is a seeding step, not a per-boot pass: it runs only when document_identity is empty or document_identity_import has no row for the serving generation, because every later parent resolves its uid through the store. A live parent whose doc_id/doc_uid docvalues are missing or blank is counted in parents_skipped and re-mints at its next admission rather than failing the boot. Recovery limit: if the identity rows and their backup are lost and the serving Lucene index is also lost or unreadable, the old random uids cannot be reconstructed; later admission mints new uids, so uid-keyed derived or feedback links to the lost identities can become orphaned. That is a total-data-loss boundary, not a recoverable migration case. Since v23, job_counts is derived bookkeeping maintained by transactional jobs triggers and reconciled from jobs at open; count drift is repaired without changing job metadata or ownership.",
       "catalogDirName": "jobs.db",
       "owner": "WORKER",
       "note": "Lane F F-5: pre-merge owner identity retained because the installed updater compares it; index execution is in the Engine.",
@@ -699,8 +699,8 @@
       ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
-      "format": "SQLite WAL schema v22",
-      "currentVersion": 22,
+      "format": "SQLite WAL schema v23",
+      "currentVersion": 23,
       "readableLegacyVersions": [
         0,
         1,
@@ -723,7 +723,8 @@
         18,
         19,
         20,
-        21
+        21,
+        22
       ],
       "versionAuthority": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
       "versionSource": { "file": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java", "symbol": "TARGET_VERSION" },
@@ -734,6 +735,8 @@
       "reconciliation": "RUN_EXISTING_SQLITE_MIGRATIONS_OR_REBUILD",
       "status": "READY",
       "implementationSources": [
+        "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
+        "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteQueueMigrationOps.java",
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteJobQueue.java",
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteCapturedWalkOps.java",
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqlitePathResolutionStore.java",
@@ -742,6 +745,8 @@
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/DocumentIdentityBootImport.java"
       ],
       "tests": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/CapturedWalkPlanTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/CapturedWalkSettlementTest.java",

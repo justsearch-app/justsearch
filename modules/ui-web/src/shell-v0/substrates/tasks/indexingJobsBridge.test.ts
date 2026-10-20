@@ -43,21 +43,21 @@ beforeEach(() => {
 });
 
 describe('§32 #1 — projectJobsToTasks (stateless reconcile)', () => {
-  // Tempdoc 550 Thesis II: each job renders its TRUE state. PENDING is `queued`
-  // (waiting, NOT running) — the F-1 cure. `running` is asserted only for a job
+  // Pending files are one status-derived queued entry (covered through both streams
+  // in indexingJobsQueueRail.test). `running` is asserted only for a job
   // actually in PROCESSING (an authoritative running-signal), never for mere
   // membership in the live set.
-  it('a PENDING job → queued Task (NOT running); read-only (not cancellable)', () => {
+  it('PENDING belongs to the aggregate queued entry, with no per-file task', () => {
     projectJobsToTasks(rows({ pathHash: 'h1', state: 'PENDING', collection: 'docs' }));
-    const t = getTask('idxjob:h1');
-    expect(t?.status).toBe('queued');
-    expect(t?.cancellable).toBe(false); // cancel stays in the Resource view
-    expect(t?.label).toContain('docs');
+    expect(getTask('idxjob:h1')).toBeUndefined();
+    expect(listTasks()).toHaveLength(0);
   });
 
   it('a PROCESSING job with a FRESH heartbeat → running (575 §14 live owner)', () => {
     projectJobsToTasks(rows({ pathHash: 'h1p', state: 'PROCESSING', collection: 'docs' }));
     expect(getTask('idxjob:h1p')?.status).toBe('running');
+    expect(getTask('idxjob:h1p')?.cancellable).toBe(false);
+    expect(getTask('idxjob:h1p')?.label).toContain('docs');
   });
 
   // Tempdoc 575 §14: the badge derives from a LIVE owner (heartbeat freshness),
@@ -104,8 +104,8 @@ describe('§32 #1 — projectJobsToTasks (stateless reconcile)', () => {
   });
 
   it('a job that leaves the live set → REMOVED (not marked succeeded)', () => {
-    projectJobsToTasks(rows({ pathHash: 'h3', state: 'PENDING', collection: 'docs' }));
-    expect(getTask('idxjob:h3')?.status).toBe('queued');
+    projectJobsToTasks(rows({ pathHash: 'h3', state: 'PROCESSING', collection: 'docs' }));
+    expect(getTask('idxjob:h3')?.status).toBe('running');
     projectJobsToTasks(new Map()); // h3 gone
     expect(getTask('idxjob:h3')).toBeUndefined(); // vanishes, not 'succeeded'
   });
@@ -120,7 +120,8 @@ describe('§32 #1 — projectJobsToTasks (stateless reconcile)', () => {
   });
 
   it('a running job that transitions to FAILED → failed (no duplicate task)', () => {
-    projectJobsToTasks(rows({ pathHash: 'h5', state: 'PENDING', collection: 'docs' }));
+    projectJobsToTasks(rows({ pathHash: 'h5', state: 'PROCESSING', collection: 'docs' }));
+    expect(getTask('idxjob:h5')?.status).toBe('running');
     projectJobsToTasks(rows({ pathHash: 'h5', state: 'FAILED', collection: 'docs' }));
     expect(listTasks().filter((t) => t.id === 'idxjob:h5')).toHaveLength(1);
     expect(getTask('idxjob:h5')?.status).toBe('failed');
@@ -129,12 +130,12 @@ describe('§32 #1 — projectJobsToTasks (stateless reconcile)', () => {
   // 1A regression: a reset (empty items) must NOT strand a still-running job as
   // a terminal status. With removeTask-on-departure, the job vanishes and the
   // next snapshot cleanly re-adds it as running.
-  it('1A: reset (empty) then re-appear → queued again, NOT stuck terminal', () => {
-    projectJobsToTasks(rows({ pathHash: 'h6', state: 'PENDING', collection: 'docs' }));
+  it('1A: reset (empty) then re-appear → running again, NOT stuck terminal', () => {
+    projectJobsToTasks(rows({ pathHash: 'h6', state: 'PROCESSING', collection: 'docs' }));
     projectJobsToTasks(new Map()); // stream reset → items empty
     expect(getTask('idxjob:h6')).toBeUndefined();
-    projectJobsToTasks(rows({ pathHash: 'h6', state: 'PENDING', collection: 'docs' }));
-    expect(getTask('idxjob:h6')?.status).toBe('queued'); // not stuck succeeded
+    projectJobsToTasks(rows({ pathHash: 'h6', state: 'PROCESSING', collection: 'docs' }));
+    expect(getTask('idxjob:h6')?.status).toBe('running'); // not stuck succeeded
   });
 
   // 1B regression: the projection is stateless — it reconciles against whatever
@@ -152,11 +153,11 @@ describe('§32 #1 — projectJobsToTasks (stateless reconcile)', () => {
 
   // F1.2: a same-pathHash retry that flips FAILED → non-FAILED in place (no
   // intervening departure) must revive the task to running, not stay failed.
-  it('an in-place FAILED → PENDING flip revives the task to queued', () => {
+  it('an in-place FAILED → PENDING retry leaves the per-file window for the queued aggregate', () => {
     projectJobsToTasks(rows({ pathHash: 'h9', state: 'FAILED', collection: 'docs' }));
     expect(getTask('idxjob:h9')?.status).toBe('failed');
     projectJobsToTasks(rows({ pathHash: 'h9', state: 'PENDING', collection: 'docs' }));
-    expect(getTask('idxjob:h9')?.status).toBe('queued');
+    expect(getTask('idxjob:h9')).toBeUndefined();
   });
 
   it('does not touch non-job tasks (idxjob: prefix scoping)', () => {
@@ -185,9 +186,9 @@ describe('602 R5 — resolved file/folder labels (Tasks tray)', () => {
 
   it('keeps the short-hash fallback when the hash cannot be resolved (found:false)', async () => {
     __setResolveHashForTest(async () => null);
-    projectJobsToTasks(rows({ pathHash: 'hx', state: 'PENDING', collection: 'docs' }));
+    projectJobsToTasks(rows({ pathHash: 'hx', state: 'PROCESSING', collection: 'docs' }));
     await flush();
-    projectJobsToTasks(rows({ pathHash: 'hx', state: 'PENDING', collection: 'docs' }));
+    projectJobsToTasks(rows({ pathHash: 'hx', state: 'PROCESSING', collection: 'docs' }));
     expect(getTask('idxjob:hx')?.label).toBe('Indexing · docs (hx)');
   });
 

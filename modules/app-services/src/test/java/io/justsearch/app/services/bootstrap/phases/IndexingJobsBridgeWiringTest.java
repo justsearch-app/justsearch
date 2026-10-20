@@ -42,9 +42,18 @@ final class IndexingJobsBridgeWiringTest {
         return (io.justsearch.app.services.worker.KnowledgeClient.IndexingJobsStream) () -> {};
       }).when(client).subscribeIndexingJobs(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
           org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
-      var ledger = new io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry();
+      var ledger = new io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry(
+          io.justsearch.app.observability.ledger.ActionEventJournal.disabled(),
+          new io.justsearch.app.observability.stream.SseStreamChannel(
+              io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry.STREAM_ID,
+              executors.register(io.justsearch.core.execution.EngineExecutorSpec.virtual("test.ledger-delivery",
+                  io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, 1)).openVirtual()));
       var wired = IndexingJobsBridgeWiring.wire(executors, () -> client,
-          new io.justsearch.app.observability.indexing.IndexingJobsChangeRegistry(), ledger);
+          new io.justsearch.app.observability.indexing.IndexingJobsChangeRegistry(
+              new io.justsearch.app.observability.stream.SseStreamChannel(
+                  io.justsearch.app.observability.indexing.IndexingJobsChangeRegistry.STREAM_ID,
+                  executors.register(io.justsearch.core.execution.EngineExecutorSpec.virtual("test.jobs-delivery",
+                      io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, 1)).openVirtual())), ledger);
       try {
         wired.bridge().start().get(2, java.util.concurrent.TimeUnit.SECONDS);
         long seq = 2;
@@ -115,4 +124,62 @@ final class IndexingJobsBridgeWiringTest {
     assertTrue(IndexingJobsBridgeWiring.terminalIndexEvent(job("h6", "queued", 0, "")).isEmpty());
     assertTrue(IndexingJobsBridgeWiring.terminalIndexEvent(null).isEmpty());
   }
+  @Test void terminalLedgerObserversCannotBlockJobDeliveryAndSnapshotsNeverReplayThem() throws Exception {
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
+      var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+      var sink = new java.util.concurrent.atomic.AtomicReference<java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame>>();
+      org.mockito.Mockito.doAnswer(call -> {
+        sink.set(call.getArgument(0));
+        sink.get().accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(1)
+            .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.getDefaultInstance()).build());
+        return (io.justsearch.app.services.worker.KnowledgeClient.IndexingJobsStream) () -> {};
+      }).when(client).subscribeIndexingJobs(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+      var ledger = new io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry(
+          io.justsearch.app.observability.ledger.ActionEventJournal.disabled(), testChannel(executors,
+              io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry.STREAM_ID, "test.ledger"));
+      var jobs = new io.justsearch.app.observability.indexing.IndexingJobsChangeRegistry(testChannel(executors,
+          io.justsearch.app.observability.indexing.IndexingJobsChangeRegistry.STREAM_ID, "test.jobs"));
+      var wired = IndexingJobsBridgeWiring.wire(executors, () -> client, jobs, ledger);
+      var entered = new java.util.concurrent.CountDownLatch(1);
+      var release = new java.util.concurrent.CountDownLatch(1);
+      var subscriber = ledger.subscribe(frame -> {
+        entered.countDown();
+        try { release.await(); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+      });
+      try {
+        wired.bridge().start().get(1, java.util.concurrent.TimeUnit.SECONDS);
+        for (int i = 2; i <= 3; i++) {
+          int seq = i;
+          var row = io.justsearch.ipc.IndexingJobView.newBuilder().setPathHash("terminal-" + i)
+              .setState("DONE").setLastUpdatedMs(i).setScanId("scan-outside-window");
+          var frame = io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(i)
+              .setDelta(io.justsearch.ipc.IndexingJobsDelta.newBuilder().setUpdate(row)).build();
+          java.util.concurrent.CompletableFuture.runAsync(() -> sink.get().accept(frame),
+              executors.register(io.justsearch.core.execution.EngineExecutorSpec.virtual("test.commit-" + seq,
+                  io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, 1)).openVirtual())
+              .get(1, java.util.concurrent.TimeUnit.SECONDS);
+          assertTrue(entered.await(1, java.util.concurrent.TimeUnit.SECONDS));
+        }
+        assertEquals(2, ledger.store().recent().size());
+        assertTrue(ledger.store().recent().stream().allMatch(event -> ((ActionEvent.Index) event).scanId().equals("scan-outside-window")));
+        sink.get().accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(4)
+            .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.getDefaultInstance()).build());
+        assertEquals(2, ledger.store().recent().size(), "snapshots never replay terminal activity");
+      } finally {
+        release.countDown(); subscriber.unsubscribe(); wired.subscription().close(); wired.bridge().stop();
+        jobs.channel().close(); ledger.channel().close();
+      }
+    }
+  }
+
+  private static io.justsearch.app.observability.stream.SseStreamChannel testChannel(
+      io.justsearch.core.execution.TestEngineExecutors executors,
+      io.justsearch.app.api.stream.StreamId id, String name) {
+    var owner = executors.register(io.justsearch.core.execution.EngineExecutorSpec.virtual(name,
+        io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, 1));
+    return new io.justsearch.app.observability.stream.SseStreamChannel(id, owner.openVirtual(), owner::close);
+  }
+
 }
