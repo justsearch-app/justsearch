@@ -1,7 +1,7 @@
 # AI Features
 
 JustSearch includes optional AI capabilities that run entirely on your
-machine. JustSearch itself sends none of your data to external servers.
+machine. Downloads, update checks, and optional trace export are described below.
 
 ## What gets installed
 
@@ -16,6 +16,30 @@ on your hardware, and the confirmation dialog shows the exact size:
   reranking work; chat, questions with cited answers, summarization, and query
   expansion are not available, and the AI Brain view says why the chat model
   was skipped.
+
+Install AI downloads from github.com and huggingface.co, including their download
+redirects. On Windows with supported NVIDIA hardware it also downloads a CUDA
+build of llama-server and selects it automatically, unless you configured your
+own executable. Repair and upgrades may download files again.
+
+## Network activity and privacy
+
+Desktop builds with an embedded release URL check GitHub for updates on launch.
+CI-built installers embed the repository's configured URL, including branch
+candidates and pre-releases. GitHub sees your IP address and request
+time; the check sends no document content or queries. There is no off switch
+yet. Builds without an embedded URL do not check; development builds can use
+an explicitly configured URL.
+
+Trace export is off by default. If you enable API or index tracing and also
+set an OTLP endpoint, the Engine sends traces there. Traces can include file
+paths and bounded document excerpts. An endpoint by itself does not
+enable tracing. See the repository's environment-variable reference for the
+tracing levels and OTEL_EXPORTER_OTLP endpoint variables.
+
+External MCP clients receive the passages and paths you retrieve. Optional
+MCP host tools are user-chosen programs and may use the network. Links opened
+in your browser follow that browser's network behavior.
 
 ## Semantic search
 
@@ -81,8 +105,8 @@ Claude Desktop can connect to your running instance and search, retrieve
 context, and ask questions over your files. This works with or without the AI
 models installed.
 
-JustSearch listens only on your own machine and uploads nothing itself, but
-the passages it returns go to the client you connected. A cloud-hosted
+JustSearch's MCP server listens only on your own machine; the passages and
+file paths it returns go to the client you connected. A cloud-hosted
 assistant, such as Claude Code or Claude Desktop, forwards them to its model
 provider like any other tool result.
 

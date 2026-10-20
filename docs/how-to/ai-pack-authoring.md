@@ -18,6 +18,19 @@ An offline AI Pack is a **zip** with:
 
 The app **allowlists packs by the SHA-256 of the exact `pack-manifest.v1.json` bytes** stored in the pack.
 
+## Legacy format limits
+
+This guide's authoring tool is **Windows PowerShell-only**. The v2 importer still requires both
+`model.chat` and `model.embedding` assets. The embedding GGUF is a legacy format requirement:
+current embeddings use ONNX models, and Install AI does not download the old embedding GGUF.
+Importing this pack does not install the current ONNX search-model stack.
+
+Supply your own existing legacy embedding GGUF separately, and pass its actual path explicitly;
+the example's `legacy-models` folder is a placeholder you create, not a repo asset. Pass a chat
+GGUF path explicitly too: the script's auto-discovery expects two GGUFs in AI Home and cannot infer
+a legacy embedding file from a current Install AI setup. The command below packages those two
+existing files; it does not fetch them.
+
 ## Tooling (PowerShell)
 
 Use:
@@ -37,13 +50,16 @@ From repo root (Windows PowerShell):
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/ai/pack-author.ps1 `
   -ChatModelPath .\models\Qwen_Qwen3.5-9B-Q4_K_M.gguf `
-  -EmbeddingModelPath .\models\nomic-embed-text-v1.5.Q4_K_M.gguf `
+  -EmbeddingModelPath .\legacy-models\embedding.gguf `
   -PackId justsearch.ai-pack.v2.models.default `
   -PackVersion 2.0.0 `
-  -RequiresAppMin 1.0.0 `
+  -RequiresAppMin 0.3.0 `
   -OutputZip .\dist\ai-pack.v2.models.default-2.0.0.zip `
   -Force
 ```
+
+Set `RequiresAppMin` to the oldest app version you have actually validated for this pack;
+`0.3.0` above is an example, not a claim of pack compatibility.
 
 ## Where to paste the printed policy snippet
 

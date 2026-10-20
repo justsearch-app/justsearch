@@ -22,8 +22,8 @@ import { TEST_SUPPORT_PATHS_FILE, renderTestSupportList } from './test-support.m
 
 // ---- the base tree every case starts from --------------------------------------------------------
 export const P = {
-  calc: 'modules/core/src/main/java/io/x/Calc.java',
-  test: 'modules/core/src/test/java/io/x/CalcTest.java',
+  calc: 'modules/core/src/main/java/io/justsearch/x/Calc.java',
+  test: 'modules/core/src/test/java/io/justsearch/x/CalcTest.java',
   golden: 'modules/core/src/test/resources/golden/calc.json',
   contract: 'docs/contracts/calc-contract.md',
   decision: 'docs/decisions/0001-calc-adds.md',
@@ -49,7 +49,7 @@ export const P = {
   uiPackage: 'modules/ui-web/package.json',
   uiHelper: 'modules/ui-web/src/shell-v0/plugin-api/testHostApi.ts',
   supportList: TEST_SUPPORT_PATHS_FILE,
-  oracle: 'modules/system-tests/src/main/java/io/x/judge/AnswerJudge.java',
+  oracle: 'modules/system-tests/src/main/java/io/justsearch/x/judge/AnswerJudge.java',
   junitMain: 'modules/app-util/src/main/resources/junit-platform.properties',
   workflow: '.github/workflows/ci.yml',
   shardPolicy: 'scripts/ci/unit-test-shard-policy.v1.json',
@@ -201,7 +201,7 @@ const WITH_CI = {
 };
 
 const TEST_V1 = [
-  'package io.x;',
+  'package io.justsearch.x;',
   'import static org.junit.jupiter.api.Assertions.assertEquals;',
   'import org.junit.jupiter.api.Test;',
   'class CalcTest {',
@@ -214,15 +214,15 @@ const TEST_V1 = [
 const edit = (from, to) => TEST_V1.replace(from, to);
 
 export const BASE = {
-  [P.calc]: 'package io.x;\nclass Calc {\n  static int add(int a, int b) { return a + b; }\n  static double ratio(int a, int b) { return (double) a / b; }\n}\n',
+  [P.calc]: 'package io.justsearch.x;\nclass Calc {\n  static int add(int a, int b) { return a + b; }\n  static double ratio(int a, int b) { return (double) a / b; }\n}\n',
   [P.test]: TEST_V1,
   [P.golden]: '{ "sum": 3 }\n',
   [P.contract]: '# Calc contract\n\nThe calculator adds two numbers.\n',
   [P.decision]: '# ADR-0001\n\nOwner decision (owner words, 2026-01-02): "Calc.add returns the arithmetic sum."\n',
   [P.ownerDoc]: '# 100\n\nThe owner wrote: "ratios are reported to three decimals" (2026-01-03).\n',
-  [P.suppression]: '{ "version": 1, "files": { "modules/core/src/test/java/io/x/CalcTest.java": 0 } }\n',
+  [P.suppression]: '{ "version": 1, "files": { "modules/core/src/test/java/io/justsearch/x/CalcTest.java": 0 } }\n',
   [P.strength]: '{ "schema": "pit-strength-baseline.v1", "seams": { "calc": { "minStrength": 0.9 } } }\n',
-  [P.seams]: JSON.stringify({ version: 1, seams: [{ id: 'calc', law: 'add is the arithmetic sum', targetTests: ['io.x.CalcTest'], guard: 'test:CalcTest' }] }, null, 2) + '\n',
+  [P.seams]: JSON.stringify({ version: 1, seams: [{ id: 'calc', law: 'add is the arithmetic sum', targetTests: ['io.justsearch.x.CalcTest'], guard: 'test:CalcTest' }] }, null, 2) + '\n',
   [P.archunit]: 'rule-a=store-a\n',
   [P.evidencePolicy]: '{ "version": 1, "lanes": [] }\n',
   [P.rustLib]: 'pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n    #[test]\n    fn adds() {\n        assert_eq!(add(1, 2), 3);\n    }\n}\n',
@@ -241,7 +241,7 @@ export const BASE = {
   [P.uiPackage]: UI_PACKAGE,
   [P.uiHelper]: 'export const testHost = () => ({ ok: true });\n',
   [P.supportList]: renderTestSupportList([P.uiHelper], 'corpus'),
-  [P.oracle]: 'package io.x.judge;\nclass AnswerJudge {\n  static final double PASS_SCORE = 0.8;\n}\n',
+  [P.oracle]: 'package io.justsearch.x.judge;\nclass AnswerJudge {\n  static final double PASS_SCORE = 0.8;\n}\n',
 };
 
 // ---- entry and record helpers --------------------------------------------------------------------
@@ -272,7 +272,7 @@ export function evidenceText({ checks, failBefore = null, tamper = false }) {
     revision: '0'.repeat(40),
     tree: '1'.repeat(40),
     environment: { platform: 'corpus', node: process.version },
-    runs: [{ command: './gradlew :modules:core:test --tests io.x.CalcTest --rerun', exitCode: 0 }],
+    runs: [{ command: './gradlew :modules:core:test --tests io.justsearch.x.CalcTest --rerun', exitCode: 0 }],
     checks: checks.map((c) => ({
       id: c.id,
       file: c.id.split('#')[0],
@@ -290,8 +290,8 @@ export function evidenceText({ checks, failBefore = null, tamper = false }) {
   return JSON.stringify(ev, null, 2) + '\n';
 }
 
-const NEW_TEST = 'modules/core/src/test/java/io/x/CalcNegTest.java';
-const NEW_TEST_TEXT = 'package io.x;\nclass CalcNegTest {\n  @Test void negatives() { assertEquals(-3, Calc.add(-1, -2)); }\n}\n';
+const NEW_TEST = 'modules/core/src/test/java/io/justsearch/x/CalcNegTest.java';
+const NEW_TEST_TEXT = 'package io.justsearch.x;\nclass CalcNegTest {\n  @Test void negatives() { assertEquals(-3, Calc.add(-1, -2)); }\n}\n';
 const NEW_CHECK = `${NEW_TEST}#negatives`;
 const EVIDENCE = 'gates/test-intent/evidence/calc-neg.json';
 const newEntry = (extra = {}) => ({
@@ -362,11 +362,11 @@ export const CASES = [
     scenario: {
       main: BASE,
       branch: [
-        { move: [[P.test, 'modules/core/src/test/java/io/x/CalcAddTest.java']] },
-        { write: { 'modules/core/src/test/java/io/x/CalcAddTest.java': edit('class CalcTest', 'class CalcAddTest').replace('0.001', '0.01') } },
+        { move: [[P.test, 'modules/core/src/test/java/io/justsearch/x/CalcAddTest.java']] },
+        { write: { 'modules/core/src/test/java/io/justsearch/x/CalcAddTest.java': edit('class CalcTest', 'class CalcAddTest').replace('0.001', '0.01') } },
       ],
     },
-    expect: 'fail', rules: ['uncovered'], flagged: ['modules/core/src/test/java/io/x/CalcAddTest.java', P.test],
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/core/src/test/java/io/justsearch/x/CalcAddTest.java', P.test],
   },
   {
     name: 'd1-04 assertEquals -> assertNotNull',
@@ -395,7 +395,7 @@ export const CASES = [
   },
   {
     name: 'd1-09 a byte-identical move passes',
-    scenario: { main: BASE, branch: [{ move: [[P.test, 'modules/core/src/test/java/io/x/calc/CalcTest.java']] }] },
+    scenario: { main: BASE, branch: [{ move: [[P.test, 'modules/core/src/test/java/io/justsearch/x/calc/CalcTest.java']] }] },
     expect: 'pass', flagged: [],
     check: (r) => assert.equal(r.moves.length, 1),
   },
@@ -676,7 +676,7 @@ export const CASES = [
   },
 
   // S8 execution evidence.
-  { name: 's8 a New entry with script evidence passes', scenario: newCase(), expect: 'pass', flagged: [NEW_TEST] },
+  { name: 's8 a New entry with script evidence passes', scenario: newCase(), expect: 'pass', flagged: [] },
   {
     name: 's8 a New entry without evidence fails',
     scenario: newCase({ entry: newEntry({ evidence: undefined }) }),
@@ -866,7 +866,7 @@ export const CASES = [
   // P5 / P6.
   {
     name: 'p6 removing test-only production code with its test needs only the removal as source (removed members)',
-    scenario: removalCase({ calc: 'package io.x;\nclass Calc {}\n', removed: [`${P.calc}#add`, `${P.calc}#ratio`] }),
+    scenario: removalCase({ calc: 'package io.justsearch.x;\nclass Calc {}\n', removed: [`${P.calc}#add`, `${P.calc}#ratio`] }),
     expect: 'pass', flagged: [P.test],
   },
   { name: 'p5 a PR touching nothing in scope sees no failure', scenario: { main: BASE, branch: [{ write: { [P.calc]: BASE[P.calc].replace('a + b', 'b + a') } }] }, expect: 'pass', flagged: [] },
@@ -901,7 +901,7 @@ export const CASES = [
   },
   {
     name: 'removal: a member that never occurred at the base fails',
-    scenario: removalCase({ calc: 'package io.x;\nclass Calc {}\n', removed: [`${P.calc}#subtract`] }),
+    scenario: removalCase({ calc: 'package io.justsearch.x;\nclass Calc {}\n', removed: [`${P.calc}#subtract`] }),
     expect: 'fail', rules: ['source-unresolved'],
   },
   {
@@ -913,8 +913,8 @@ export const CASES = [
   // Hole 2: a byte-identical move passes only within one execution context.
   {
     name: 'move: src/test -> src/testFixtures (another source set) is flagged on both sides',
-    scenario: { main: BASE, branch: [{ move: [[P.test, 'modules/core/src/testFixtures/java/io/x/CalcTest.java']] }] },
-    expect: 'fail', rules: ['uncovered'], flagged: ['modules/core/src/testFixtures/java/io/x/CalcTest.java', P.test],
+    scenario: { main: BASE, branch: [{ move: [[P.test, 'modules/core/src/testFixtures/java/io/justsearch/x/CalcTest.java']] }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/core/src/testFixtures/java/io/justsearch/x/CalcTest.java', P.test],
     check: (r) => {
       assert.equal(r.moves.length, 0);
       assert.ok(r.findings.some((f) => f.ruleId === 'test-intent/move-changes-execution' && /jvm:core:test -> jvm:core:testFixtures/.test(f.message)));
@@ -932,8 +932,8 @@ export const CASES = [
   },
   {
     name: 'move: a JVM test moved into another module is flagged',
-    scenario: { main: BASE, branch: [{ move: [[P.test, 'modules/app/src/test/java/io/x/CalcTest.java']] }] },
-    expect: 'fail', rules: ['uncovered'], flagged: ['modules/app/src/test/java/io/x/CalcTest.java', P.test],
+    scenario: { main: BASE, branch: [{ move: [[P.test, 'modules/app/src/test/java/io/justsearch/x/CalcTest.java']] }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/app/src/test/java/io/justsearch/x/CalcTest.java', P.test],
   },
   {
     name: 'move: a vitest file moved within the default selection passes',
@@ -950,7 +950,7 @@ export const CASES = [
   },
   {
     name: 'build: a Gradle excludeTestsMatching filter is flagged',
-    scenario: { main: BASE, branch: [{ write: { [P.coreBuild]: CORE_BUILD.replace('  maxHeapSize = "256m"\n', '  maxHeapSize = "256m"\n  filter { excludeTestsMatching("io.x.Calc*") }\n') } }] },
+    scenario: { main: BASE, branch: [{ write: { [P.coreBuild]: CORE_BUILD.replace('  maxHeapSize = "256m"\n', '  maxHeapSize = "256m"\n  filter { excludeTestsMatching("io.justsearch.x.Calc*") }\n') } }] },
     expect: 'fail', rules: ['uncovered'], flagged: [P.coreBuild],
   },
   {
@@ -995,7 +995,7 @@ export const CASES = [
     name: 'build: a JUnit Platform post-discovery filter registered under src/main META-INF/services is flagged',
     scenario: {
       main: { ...BASE, ...WITH_CI },
-      branch: [{ write: { 'modules/app-util/src/main/resources/META-INF/services/org.junit.platform.launcher.PostDiscoveryFilter': 'io.x.SkipEverythingFilter\n' } }],
+      branch: [{ write: { 'modules/app-util/src/main/resources/META-INF/services/org.junit.platform.launcher.PostDiscoveryFilter': 'io.justsearch.x.SkipEverythingFilter\n' } }],
     },
     expect: 'fail', rules: ['uncovered'], flagged: ['modules/app-util/src/main/resources/META-INF/services/org.junit.platform.launcher.PostDiscoveryFilter'],
   },
@@ -1123,7 +1123,392 @@ export const CASES = [
     scenario: { main: BASE, branch: [{ write: { [P.oracle]: BASE[P.oracle].replace('0.8', '0.6') } }] },
     expect: 'fail', rules: ['uncovered'], flagged: [P.oracle],
   },
+
+  // Isolated additions: no changeset or acceptance record is required.
+  {
+    name: 'isolated-new preservation: N1 third-party DynamicTest stays gated',
+    scenario: { main: BASE, branch: [{ write: {
+      'modules/configuration/src/test/java/org/junit/jupiter/api/DynamicTest.java':
+        'package org.junit.jupiter.api; public class DynamicTest {}\n',
+    } }] },
+    expect: 'fail', rules: ['uncovered'],
+    flagged: ['modules/configuration/src/test/java/org/junit/jupiter/api/DynamicTest.java'],
+    check: (r) => assert.deepEqual(r.exempt, []),
+  },
+  ...[
+    ['N4 JVM', NEW_TEST, '../../../../../../../../shared/test-template.txt', NEW_TEST_TEXT],
+    ['frontend', 'modules/ui-web/src/new.test.ts', '../../../shared/test-template.txt', '// test template\n'],
+  ].flatMap(([label, file, target, content]) => [false, true].map((untracked) => ({
+    name: `isolated-new preservation: ${label} ${untracked ? 'untracked' : 'committed'} symlink stays gated`,
+    scenario: {
+      main: { ...BASE, 'shared/test-template.txt': content },
+      ...(untracked ? { uncommitted: { symlink: { [file]: target } } }
+        : { branch: [{ symlink: { [file]: target } }] }),
+    },
+    expect: 'fail', rules: ['uncovered'], flagged: [file],
+    check: (r, root) => {
+      assert.deepEqual(r.exempt, []);
+      if (!untracked) {
+        // core.symlinks=false checkouts materialize the index's link as an ordinary file.
+        const abs = path.join(root, file);
+        fs.unlinkSync(abs);
+        fs.writeFileSync(abs, content);
+        const materialized = analyzeTestIntent({ repoRoot: root, env: {} });
+        assert.deepEqual(materialized.exempt, []);
+        assert.ok(materialized.flagged.some((f) => f.id === file));
+      }
+    },
+  }))),
+  ...['main', 'test', 'testFixtures', 'integrationTest', 'systemTest', 'generated'].flatMap((sourceSet) =>
+    ['base', 'change'].map((side) => {
+      const other = `modules/other/src/${sourceSet}/kotlin/io/justsearch/x/CalcNegTest.kt`;
+      const existing = { [other]: 'package io.justsearch.x; class CalcNegTest {}\n' };
+      return {
+        name: `isolated-new preservation: duplicate JVM type in ${sourceSet} at ${side} stays gated`,
+        scenario: {
+          main: { ...BASE, ...(side === 'base' ? existing : {}) },
+          branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT, ...(side === 'change' ? existing : {}) } }],
+        },
+        expect: 'fail', rules: ['uncovered'],
+        check: (r) => {
+          assert.ok(r.flagged.some((f) => f.id === NEW_TEST));
+          assert.deepEqual(r.exempt, []);
+        },
+      };
+    })),
+  ...[
+    ['case-insensitive type', 'modules/other/src/main/java/IO/JUSTSEARCH/X/calcnegtest.java',
+      'package IO.JUSTSEARCH.X; class calcnegtest {}'],
+    ['extra type in differently named file', 'modules/other/src/main/java/io/justsearch/x/Helper.java',
+      'package io.justsearch.x; class Helper {} class CalcNegTest {}'],
+    ['package differs from directory', 'modules/other/generated/java/unrelated/Helper.java',
+      'package io.justsearch.x; class CalcNegTest {}'],
+    ['deleted production type', 'modules/other/src/main/java/io/justsearch/x/CalcNegTest.java',
+      'package io.justsearch.x; class CalcNegTest { int value = 1; }'],
+  ].map(([label, other, content]) => ({
+    name: `isolated-new preservation: ${label} collision stays gated`,
+    scenario: {
+      main: { ...BASE, [other]: content },
+      branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT }, ...(label.startsWith('deleted') ? { delete: [other] } : {}) }],
+    },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+    check: (r) => assert.deepEqual(r.exempt, []),
+  })),
+  {
+    name: 'isolated-new preservation: k3 extra top-level Java type stays gated',
+    scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT + 'class Calc { static int add(int a, int b) { return 3; } }\n' } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+    check: (r) => assert.deepEqual(r.exempt, []),
+  },
+  {
+    name: 'isolated-new preservation: k4 Java static initializer stays gated',
+    scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT.replace('class CalcNegTest {', 'class CalcNegTest { static { java.util.Locale.setDefault(java.util.Locale.US); System.setProperty("mode", "test"); }') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+    check: (r) => assert.deepEqual(r.exempt, []),
+  },
+  {
+    name: 'isolated-new preservation: k7 edited production move into test-named file stays gated',
+    scenario: { main: BASE, branch: [{ move: [[P.calc, NEW_TEST]], replaceIn: { [NEW_TEST]: ['return a + b;', 'return 3;'] } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+    check: (r) => assert.deepEqual(r.exempt, []),
+  },
+  {
+    name: 'isolated-new preservation: k10 case collision with base path stays gated',
+    scenario: { main: BASE, branch: [{ write: { 'modules/core/src/test/java/io/justsearch/x/calcTest.java': TEST_V1.replace('class CalcTest', 'class calcTest') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/core/src/test/java/io/justsearch/x/calcTest.java'],
+    check: (r) => assert.deepEqual(r.exempt, []),
+  },
+  {
+    name: 'isolated-new preservation: case-only byte-identical move stays gated',
+    scenario: { main: BASE, branch: [{ move: [[P.test, 'modules/core/src/test/java/io/justsearch/x/calcTest.java']] }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test, 'modules/core/src/test/java/io/justsearch/x/calcTest.java'],
+    check: (r) => assert.deepEqual(r.moves, []),
+  },
+  {
+    name: 'isolated-new preservation: case collision between two new paths stays gated',
+    scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT, 'modules/core/src/test/java/io/justsearch/x/calcNegTest.java': NEW_TEST_TEXT.replace('class CalcNegTest', 'class calcNegTest') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST, 'modules/core/src/test/java/io/justsearch/x/calcNegTest.java'],
+    check: (r) => assert.deepEqual(r.exempt, []),
+  },
+  {
+    name: 'isolated-new preservation: frontend case collision with base path stays gated',
+    scenario: { main: BASE, branch: [{ write: { 'modules/ui-web/src/views/LIST.test.ts': BASE[P.uiTest] } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/ui-web/src/views/LIST.test.ts'],
+  },
+  ...[
+    ['n01 long-s filename', 'modules/ui-web/src/activity/idleSurfaces.test.ts', 'modules/ui-web/src/activity/idleSurface\u017f.test.ts'],
+    ['n02 folder collides with file', 'modules/ui-web/src/activity/presenceSignal.test.ts', 'modules/ui-web/src/activity/presencesignal.test.ts/probe.test.ts'],
+    ['folder case collision', 'modules/ui-web/src/Activity/existing.ts', 'modules/ui-web/src/activity/probe.test.ts'],
+    ['file collides with folder', 'modules/ui-web/src/Probe.test.ts/existing.ts', 'modules/ui-web/src/probe.test.ts'],
+  ].flatMap(([label, existing, added]) => ['base', 'change'].map((side) => ({
+    name: `isolated-new preservation: ${label} at ${side} stays gated`,
+    scenario: {
+      main: { ...BASE, ...(side === 'base' ? { [existing]: BASE[P.uiTest] } : {}) },
+      branch: [{ write: { [added]: BASE[P.uiTest], ...(side === 'change' ? { [existing]: BASE[P.uiTest] } : {}) } }],
+    },
+    expect: 'fail', rules: ['uncovered'],
+    check: (r) => {
+      assert.ok(r.flagged.some((f) => f.id === added));
+      assert.deepEqual(r.exempt, label.startsWith('n01') && side === 'change' ? [existing] : []);
+    },
+  }))),
+  ...[
+    'modules/ui-web/src/caf\u00e9/probe.test.ts',
+    'modules/ui-web/src/with space/probe.test.ts',
+    'modules/ui-web/src/probe+.test.ts',
+  ].map((file) => ({
+    name: `isolated-new preservation: non-ASCII or unsupported path component ${file} stays gated`,
+    scenario: { main: BASE, branch: [{ write: { [file]: BASE[P.uiTest] } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [file],
+    check: (r) => assert.deepEqual(r.exempt, []),
+  })),
+  {
+    name: 'isolated-new: identical shared folders and plain ASCII punctuation allow new tests',
+    scenario: { main: BASE, branch: [{ write: {
+      'modules/ui-web/src/views/new_folder-2.0/one.test.ts': BASE[P.uiTest],
+      'modules/ui-web/src/views/new_folder-2.0/two.test.ts': BASE[P.uiTest],
+    } }] },
+    expect: 'pass', flagged: [],
+    check: (r) => assert.equal(r.exempt.length, 2),
+  },
+  ...['base', 'change'].flatMap((side) => ['normalization', 'normalization and case'].map((kind) => {
+    const existing = 'modules/ui-web/src/views/caf\u00e9.test.ts';
+    const added = `modules/ui-web/src/views/${kind === 'normalization' ? 'cafe\u0301' : 'CAFE\u0301'}.test.ts`;
+    return {
+      name: `isolated-new preservation: own9 Unicode ${kind} collision with ${side} path stays gated`,
+      scenario: {
+        main: { ...BASE, ...(side === 'base' ? { [existing]: BASE[P.uiTest] } : {}) },
+        branch: [{ write: { [added]: BASE[P.uiTest], ...(side === 'change' ? { [existing]: BASE[P.uiTest] } : {}) } }],
+      },
+      expect: 'fail', rules: ['uncovered'], flagged: side === 'base' ? [added] : [existing, added],
+      check: (r) => assert.deepEqual(r.exempt, []),
+    };
+  })),
+  {
+    name: 'isolated-new preservation: own9 Unicode normalization byte-identical move stays gated',
+    scenario: {
+      main: { ...BASE, 'modules/ui-web/src/views/caf\u00e9.test.ts': BASE[P.uiTest] },
+      branch: [{ move: [['modules/ui-web/src/views/caf\u00e9.test.ts', 'modules/ui-web/src/views/cafe\u0301.test.ts']] }],
+    },
+    expect: 'fail', rules: ['uncovered'],
+    flagged: ['modules/ui-web/src/views/caf\u00e9.test.ts', 'modules/ui-web/src/views/cafe\u0301.test.ts'],
+    check: (r) => { assert.deepEqual(r.exempt, []); assert.deepEqual(r.moves, []); },
+  },
+  ...[
+    ['missing package', 'class CalcNegTest {}'],
+    ['mismatched package', 'package io.other; class CalcNegTest {}'],
+    ['mismatched class name', 'package io.justsearch.x; class OtherTest {}'],
+    ['unclosed body', 'package io.justsearch.x; class CalcNegTest {'],
+  ].map(([label, content]) => ({
+    name: `isolated-new preservation: JVM ${label} stays gated`,
+    scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: content } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+  })),
+  ...[
+    ['extra class', 'class Calc {}'],
+    ['top-level function', 'fun helper() = 3'],
+    ['top-level property', 'val helper = 3'],
+    ['top-level object', 'object Calc {}'],
+    ['companion initializer', '', 'companion object { init { System.setProperty("mode", "test") } }'],
+    ['top-level init', 'init { System.setProperty("mode", "test") }'],
+  ].map(([label, extra, body = '']) => ({
+    name: `isolated-new preservation: Kotlin ${label} stays gated`,
+    scenario: { main: BASE, branch: [{ write: { 'modules/core/src/test/kotlin/io/justsearch/x/CalcNegTest.kt': `package io.justsearch.x\nclass CalcNegTest { ${body} }\n${extra}\n` } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/core/src/test/kotlin/io/justsearch/x/CalcNegTest.kt'],
+  })),
+  {
+    name: 'isolated-new: added JVM Test.java needs no entry',
+    scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT } }] },
+    expect: 'pass', flagged: [],
+    check: (r) => assert.match(formatReport(r), /\[exempt\].*CalcNegTest\.java/),
+  },
+  {
+    name: 'isolated-new: added frontend .test.ts needs no entry',
+    scenario: { main: BASE, branch: [{ write: { 'modules/ui-web/src/new.test.ts': BASE[P.uiTest] } }] },
+    expect: 'pass', flagged: [],
+    check: (r) => assert.match(formatReport(r), /\[exempt\].*new\.test\.ts/),
+  },
+  {
+    name: 'isolated-new preservation: adding a case to an existing file stays gated',
+    scenario: { main: BASE, branch: [{ write: { [P.test]: TEST_V1.replace('  @Test void ratio()', '  @Test void zero() { assertEquals(0, Calc.add(0, 0)); }\n  @Test void ratio()') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test],
+  },
+  {
+    name: 'isolated-new: a new test never excuses an existing weakened assertion',
+    scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT, [P.test]: edit('0.001', '0.5') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test],
+  },
+  {
+    name: 'isolated-new preservation: delete-plus-add with different content stays gated',
+    scenario: { main: BASE, branch: [{ delete: [P.test], write: { [NEW_TEST]: NEW_TEST_TEXT } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test, NEW_TEST],
+  },
+  {
+    name: 'isolated-new preservation: byte-identical delete-plus-add across modules stays gated',
+    scenario: { main: BASE, branch: [{ delete: [P.test], write: { 'modules/other/src/test/java/io/justsearch/x/CalcTest.java': TEST_V1 } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test, 'modules/other/src/test/java/io/justsearch/x/CalcTest.java'],
+  },
+  ...[
+    ['JVM helper without a test name', 'modules/core/src/test/java/io/justsearch/x/Helper.java', 'class Helper {}\n'],
+    ['test-named resource', 'modules/core/src/test/resources/ResourceTest.java', 'class ResourceTest {}\n'],
+    ['fixture', 'modules/ui-web/src/__fixtures__/new.test.ts', 'export const rows = [];\n'],
+    ['snapshot', 'modules/ui-web/src/__snapshots__/new.test.ts.snap', 'snapshot\n'],
+    ['testFixtures source', 'modules/core/src/testFixtures/java/io/justsearch/x/HelperTest.java', 'class HelperTest {}\n'],
+    ['modules/test-support source', 'modules/test-support/src/test/java/io/justsearch/x/HelperTest.java', 'class HelperTest {}\n'],
+    ['app-api TCK source', 'modules/app-api-tck/src/test/java/io/justsearch/x/HelperTest.java', 'class HelperTest {}\n'],
+    ['mock with a test name', 'modules/ui-web/src/mocks/new.test.ts', 'export const rows = [];\n'],
+    ['setup with a test name', 'modules/ui-web/src/__test-setup__/new.test.ts', 'export {};\n'],
+    ['system-tests source', 'modules/system-tests/src/test/java/io/justsearch/x/JudgeTest.java', 'class JudgeTest {}\n'],
+    ['unselected frontend source', 'modules/ui-web/e2e/new.test.ts', BASE[P.uiTest]],
+    ['Rust integration test', 'modules/shell/src-tauri/tests/new.rs', '#[test]\nfn new_test() {}\n'],
+    ['Rust integration helper', 'modules/shell/src-tauri/tests/common/mod.rs', 'pub fn helper() {}\n'],
+    ['JUnit dry-run resource', 'modules/core/src/test/resources/junit-platform.properties', 'junit.platform.execution.dryRun.enabled=true\n'],
+    ['build configuration', 'modules/other/build.gradle.kts', 'tasks.withType<Test> { enabled = false }\n'],
+    ['test selection configuration', 'modules/ui-web/vitest.config.new.ts', 'export default { test: { exclude: ["**/*"] } };\n'],
+    ['test-named build configuration', 'modules/ui-web/src/vitest.config.test.ts', 'export default { test: { exclude: ["**/*"] } };\n'],
+    ['baseline', 'gates/dead-code/baseline.txt', 'modules/ui-web/src/unused.ts\n'],
+  ].flatMap(([label, file, content]) => [
+    {
+      name: `isolated-new preservation: added ${label} stays gated`,
+      scenario: { main: BASE, branch: [{ write: { [file]: content } }] },
+      expect: 'fail', rules: ['uncovered'], flagged: [file],
+    },
+    {
+      name: `isolated-new preservation: changed ${label} stays gated`,
+      scenario: { main: { ...BASE, [file]: content }, branch: [{ write: { [file]: content + (label === 'build configuration' ? 'tasks.withType<Test> { enabled = true }\n' : '// changed\n') } }] },
+      expect: 'fail', rules: ['uncovered'], flagged: [file],
+    },
+  ]),
+  ...['base', 'head'].map((side) => {
+    const file = 'modules/ui-web/src/listed.test.ts';
+    return {
+      name: `isolated-new preservation: test-named helper listed at ${side} stays gated`,
+      scenario: {
+        main: { ...BASE, ...(side === 'base' ? { [P.supportList]: renderTestSupportList([file], 'corpus') } : {}) },
+        branch: [{ write: { [file]: BASE[P.uiTest], ...(side === 'head' ? { [P.supportList]: renderTestSupportList([P.uiHelper, file], 'corpus') } : {}) } }],
+      },
+      expect: 'fail', rules: ['uncovered'], flagged: [file, ...(side === 'head' ? [P.supportList] : [])],
+    };
+  }),
+  {
+    name: 'isolated-new preservation: added embedded Rust test stays gated',
+    scenario: { main: BASE, branch: [{ write: { 'modules/shell/src-tauri/src/new.rs': '#[cfg(test)]\nmod tests { #[test] fn check() {} }\n' } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/shell/src-tauri/src/new.rs#cfg(test)'],
+  },
+  {
+    name: 'isolated-new preservation: added Rust test module stays gated',
+    scenario: { main: { ...BASE, [P.rustUpdater]: BASE[P.rustUpdater] + '#[cfg(test)]\n#[path = "extra.rs"]\nmod extra;\n' }, branch: [{ write: { 'modules/shell/src-tauri/src/extra.rs': '#[test]\nfn check() {}\n' } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/shell/src-tauri/src/extra.rs'],
+  },
+  {
+    name: 'isolated-new preservation: new logic-seam register stays gated',
+    scenario: { main: { README: 'scratch\n' }, branch: [{ write: { [P.seams]: BASE[P.seams] } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [`${P.seams}#law-targetTests`],
+  },
+  ...['local', 'pull_request', 'merge_group', 'push', 'workflow_dispatch'].flatMap((name) => [
+    {
+      name: `isolated-new: ${name} exempts additions`,
+      scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT } }], event: { name } },
+      expect: 'pass', flagged: [],
+    },
+    {
+      name: `isolated-new preservation: ${name} still gates weakened assertions`,
+      scenario: { main: BASE, branch: [{ write: { [P.test]: edit('0.001', '0.5') } }], event: { name } },
+      expect: 'fail', rules: ['uncovered'], flagged: [P.test],
+    },
+  ]),
+  ...[
+    ['JVM Tests.java', 'modules/core/src/test/java/io/justsearch/x/CalcTests.java'],
+    ['JVM integration IT.java', 'modules/core/src/integrationTest/java/io/justsearch/x/CalcIT.java'],
+    ['Kotlin Test.kt', 'modules/core/src/test/kotlin/io/justsearch/x/CalcKotlinTest.kt'],
+    ['Kotlin Tests.kt', 'modules/core/src/test/kotlin/io/justsearch/x/CalcTests.kt'],
+    ['Kotlin integration IT.kt', 'modules/core/src/integrationTest/kotlin/io/justsearch/x/CalcIT.kt'],
+    ['frontend spec.tsx', 'modules/ui-web/src/new.spec.tsx'],
+    ['frontend lockdown', 'modules/ui-web/src/new-lockdown.test.ts'],
+  ].map(([label, file]) => ({
+    name: `isolated-new: added ${label} needs no entry`,
+    scenario: { main: BASE, branch: [{ write: { [file]: /\.(java|kt)$/.test(file) ? `package io.justsearch.x;\nclass ${path.basename(file).replace(/\.(java|kt)$/, '')} {}\n` : '// new test\n' } }] },
+    expect: 'pass', flagged: [],
+    check: (r) => assert.deepEqual(r.exempt, [file]),
+  })),
+  {
+    name: 'isolated-new: untracked JVM test needs no entry',
+    scenario: { main: BASE, uncommitted: { write: { [NEW_TEST]: NEW_TEST_TEXT } } },
+    expect: 'pass', flagged: [],
+    check: (r) => assert.deepEqual(r.exempt, [NEW_TEST]),
+  },
+  {
+    name: 'isolated-new: exact move from production is not a new test',
+    scenario: { main: { ...BASE, 'modules/core/src/main/java/io/justsearch/x/CalcNegTest.java': NEW_TEST_TEXT }, branch: [{ move: [['modules/core/src/main/java/io/justsearch/x/CalcNegTest.java', NEW_TEST]] }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+  },
+  {
+    name: 'isolated-new: a separate deletion remains ambiguous even after pairing another move',
+    scenario: { main: BASE, branch: [{ move: [[P.test, 'modules/core/src/test/java/io/justsearch/x/MovedTest.java']], write: { [NEW_TEST]: NEW_TEST_TEXT } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+  },
+  {
+    name: 'isolated-new: rebase keeping item content preserves an existing accepted entry',
+    scenario: { ...newCase(), mainMoves: [contractEdit], rebase: true },
+    expect: 'pass', flagged: [],
+    check: (r) => assert.deepEqual(r.exempt, [NEW_TEST]),
+  },
+  {
+    name: 'isolated-new preservation: rebase changing before content stales existing acceptance',
+    scenario: { ...newCase(), mainMoves: [{ write: { [NEW_TEST]: NEW_TEST_TEXT } }], rebase: true },
+    expect: 'fail', rules: ['acceptance-stale'], flagged: [],
+  },
+  {
+    name: 'isolated-new preservation: an added file becomes existing at the rebased base',
+    scenario: {
+      main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT } }],
+      mainMoves: [{ write: { [NEW_TEST]: NEW_TEST_TEXT } }], rebase: true,
+      uncommitted: { write: { [NEW_TEST]: NEW_TEST_TEXT.replace('-3', '-4') } },
+    },
+    expect: 'fail', rules: ['uncovered'], flagged: [NEW_TEST],
+  },
+  {
+    name: 'isolated-new preservation: removing a test stays gated',
+    scenario: { main: BASE, branch: [{ delete: [P.test] }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test],
+  },
+  {
+    name: 'isolated-new preservation: weakening an assertion stays gated',
+    scenario: { main: BASE, branch: [{ write: { [P.test]: edit('assertEquals(3, Calc.add(1, 2))', 'assertNotNull(Calc.add(1, 2))') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test],
+  },
+  {
+    name: 'isolated-new preservation: changing an expected value stays gated',
+    scenario: { main: BASE, branch: [{ write: { [P.test]: edit('assertEquals(3,', 'assertEquals(4,') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.test],
+  },
+  {
+    name: 'isolated-new preservation: new tests never cover a weakened existing assertion',
+    scenario: { main: BASE, branch: [{ write: { [NEW_TEST]: NEW_TEST_TEXT, [P.test]: edit('0.001', '0.5') } }] },
+    expect: 'fail', rules: ['uncovered'],
+    check: (r) => assert.ok(r.uncovered.some((f) => f.id === P.test)),
+  },
+  {
+    name: 'isolated-new preservation: changing embedded Rust tests stays gated',
+    scenario: { main: BASE, branch: [{ replaceIn: { [P.rustLib]: ['assert_eq!(add(1, 2), 3)', 'assert_eq!(add(1, 2), 4)'] } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [`${P.rustLib}#cfg(test)`],
+  },
+  ...['environment', 'compile'].map((classification) => ({
+    name: `isolated-new preservation: an existing entry rejects ${classification} fail-before`,
+    scenario: newCase({
+      entry: newEntry({ repaired: true }),
+      evidence: evidenceText({ checks: [{ id: NEW_CHECK, content: NEW_TEST_TEXT }], failBefore: { ref: 'main', checks: [{ id: NEW_CHECK, classification }] } }),
+    }),
+    expect: 'fail', rules: ['evidence-invalid'],
+  })),
 ];
+
+// The same preservation cases exercise each real CI base, without changing their assertions.
+// Local-only rebases are checked above; the explicit event cases already cover their own event.
+const preservation = CASES.filter((c) => c.name.startsWith('isolated-new preservation:') && !c.scenario.rebase && !c.scenario.event && !c.scenario.uncommitted);
+for (const name of ['pull_request', 'merge_group', 'push', 'workflow_dispatch']) {
+  CASES.push(...preservation.map((c) => ({ ...c, name: `${c.name} (${name})`, scenario: { ...c.scenario, event: { name } } })));
+}
 
 /** Assert one case's outcome; throws with a readable message. */
 export function assertCase(c, result, root) {

@@ -2,7 +2,7 @@
 title: "ADR-0032: Frontend rendering — Lit web components"
 type: decision
 status: accepted
-description: "The frontend is authored as Lit web components (the React stack was retired in the rewrite). Components are projected from typed catalogs."
+description: "The frontend is authored as Lit web components; the React stack was retired in the rewrite."
 date: 2026-06-09
 probes:
   - adr-0032-no-react
