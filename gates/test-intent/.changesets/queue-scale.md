@@ -7,7 +7,7 @@ author-session: 01a1562b-b2e9-7510-832f-04ea6ad6da28
 
 # Test-intent entries
 
-Author: builder Codex session 01a1562b-b2e9-7510-832f-04ea6ad6da28. Scope is the final branch diff against merge-base c00a0cb24 with origin/main, not intermediate commit diffs. The user adopted scenarios Q1–Q27 on2026-10-20: “i agree, proceed accordingly”. Every scenario source below is **agent-drafted, owner-adopted**; no brief text is attributed as owner words. Choices are **agent choice** under the separately quoted delegation. Q20 uses its aggregate-queued amendment; Q25–Q27 are included. Q6 retains the agreed whole-call limit: pollPending(16) under10ms p95, including its durable commit. Selection-only timing is additional reporting, not a substitute threshold. Q24 packaged-system verification belongs to the independent verifier, not this test-intent delivery.
+Author: builder Codex session 01a1562b-b2e9-7510-832f-04ea6ad6da28. Scope is the final branch diff against merge-base f6a14b5a6 with origin/main, not intermediate commit diffs. The user adopted scenarios Q1–Q27 on2026-10-20: “i agree, proceed accordingly”. Every scenario source below is **agent-drafted, owner-adopted**; no brief text is attributed as owner words. Choices are **agent choice** under the separately quoted delegation. Q20 uses its aggregate-queued amendment; Q25–Q27 are included. Q6 retains the agreed whole-call limit: pollPending(16) under10ms p95, including its durable commit. Selection-only timing is additional reporting, not a substitute threshold. Q24 packaged-system verification belongs to the independent verifier, not this test-intent delivery.
 
 For modified files with both retired oracles and added checks, separate entries name the portions. All full-table and per-file-PENDING state/input changes are Obsolete, not hidden as adaptations. Old→new assertion inventories are attached to those entries; remaining original assertions stay unchanged. The two Adaptation entries identify exactly unchanged assertions and old/new transport encoding. Repaired checks require an assertion fail-before; new instrumentation and preservation checks are explicitly identified and do not pretend a missing old API/table was a defect.
 
@@ -1073,11 +1073,10 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
     {
       "items": [
         "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts",
-        "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts",
-        "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts"
+        "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts"
       ],
       "class": "New",
-      "behaviour": "Appended Resource window notice/exact outside-window totals/unavailable status; bounded long-run label LRU retains Windows/UNC identities; standalone/multiplexed aggregate700k queued and retry-until-claim, fresh/stale processing, DONE/delete/cancel/resync, distinct failures; max8file rows, bounded outstanding requests, ignore departed late replies, prune long-run labels. Existing Resource/resolver assertions unchanged.",
+      "behaviour": "Appended Resource window notice/exact outside-window totals/unavailable status; bounded long-run label LRU retains Windows/UNC identities. Existing Resource/resolver assertions unchanged, including merged main cases.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1130,11 +1129,10 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/queue-scale-repairs-e890.json",
+      "evidence": "gates/test-intent/evidence/queue-scale-merge-f6a14b5a6.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts#names the bounded window and reads totals outside it from status",
-        "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts#bounds the label cache over a long run, retaining recent Windows and UNC identities",
-        "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts"
+        "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts#bounds the label cache over a long run, retaining recent Windows and UNC identities"
       ],
       "repaired": true
     },
@@ -1735,6 +1733,70 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "label": "agent-drafted, owner-adopted"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Standalone/multiplexed aggregate700k queued and retry-until-claim, fresh/stale processing, DONE/delete/cancel/resync, distinct failures; max8file rows, bounded outstanding requests, ignore departed late replies, prune long-run labels. Split from entry 20 solely to retain its valid existing evidence without rerunning unaffected checks.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q14",
+          "quote": "A bounded view says it is bounded: the rail and Resource view show accurate queue totals from status, and never present the window as the complete queue, including when PROCESSING or FAILED rows fall outside it. The API contract map records the windowed snapshot.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q15",
+          "quote": "Live, reloaded and reconnected clients converge: concurrent writes during snapshot, more than 256 initial deltas, a reconnect and a browser reload all end with the same rows and no phantom jobs.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q19",
+          "quote": "Browser at 700k pending: the rail shows accurate totals, renders at most a bounded number of per-file tasks, sends at most window + concurrency path-label requests, and stays responsive; label caches stay bounded over a long run.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q20",
+          "quote": "Rail behavior (amended 2026-10-20, agreed by the user: waiting files show as one aggregate queued entry with the status count, see Q19; a retried task is counted there until claimed): PENDING shows queued, fresh PROCESSING runs, stale PROCESSING demotes, DONE disappears, failures stay distinguishable, retry and cancel revive or stop the task; through both standalone and multiplexed SSE.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q21",
+          "quote": "/api/status, fresh status, /api/knowledge/status and the MCP status tool agree during indexing and restart; stale/unavailable reporting and corpus document counts keep their meaning (not derived from the window).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q23",
+          "quote": "Windows drive and UNC paths keep their identities through replacement, deletion, reload and label resolution; feed payloads stay hashed.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Cap bridge label resolution at 16 simultaneous requests, the shared label LRU at 512 entries, shared in-flight requests at 216, and rendered per-file task rows at eight.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/queue-scale-repairs-e890.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts"
+      ],
+      "repaired": true
     }
   ]
 }
