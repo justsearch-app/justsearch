@@ -475,3 +475,14 @@ No frontend edit is required by D4/D5.
   "note": "Evidence re-run reproduces: 19 repaired checks fail on f9bd104d2 (assertion) and pass; 9 AX checks fail on 8cf789758 (assertion), not the base; 3 editor AX/AX2 checks fail on f9bd104d2; 10 preserved pass before and after. Reject: (1) two pre-existing tests are red with no entry: SettingsV2ProjectionTest.projectsEveryStoredFieldWithoutTrimmingPaths (invalidExcludePatterns [] vs null) and WorkerScanOpsRecordedTest.malformedRecordedGlobRefusesBeforeAnyQueueOrLedgerEffect; both pass on f9bd104d2. (2) EN1 names operator overrides as preserved, but no check covers a malformed JUSTSEARCH_UI_EXCLUDE_PATTERNS; live, the candidate then indexes nothing (boot walk, watcher, ingest fail), f9bd104d2 indexes normally."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a158be-4693-77a3-8700-58907e56d027",
+  "verdict": "reject",
+  "digest": "sha256:bdd7b10aaa434b510248dd06c590786774c62b1c1dc32705a072492121bf143f",
+  "note": "Reject: 14 existing generation-boundary cases pass f9bd104d2 and fail 99878e36a after constructor policy registration: EngineGenerationCaptureTest (7), EngineVduGenerationRefusalTest (1), VduGenerationBoundaryTest (6). No applicable test-intent entry. D1-D3, live exclusion/upgrade checks and all named evidence reruns pass."
+}
+```
