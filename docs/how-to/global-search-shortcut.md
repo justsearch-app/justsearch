@@ -1,3 +1,10 @@
+---
+title: Summon JustSearch from the Desktop
+type: how-to
+status: stable
+description: "Use the global shortcut or --focus-search to bring JustSearch forward with the cursor in the search bar."
+---
+
 # Summon JustSearch from the desktop
 
 While JustSearch is running, **Alt + Shift + Space** shows its main window and
