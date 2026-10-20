@@ -78,14 +78,20 @@ class EncryptionKeystorePermissionsTest {
     new DataKeyManager(new EncryptionKeystore(missing)).unlock("passphrase".toCharArray());
   }
 
-  @Test void refusesLinkedEncryptionFolder() throws Exception {
+  @Test void linkedEncryptionStillUnlocksWithoutChangingTargetOrParentPermissions() throws Exception {
     assumeTrue(Files.getFileStore(data).supportsFileAttributeView("posix"));
     var outside = elsewhere;
     Files.setPosixFilePermissions(outside, PosixFilePermissions.fromString("rwxrwxr-x"));
     var mode = Files.getPosixFilePermissions(outside);
     Files.createSymbolicLink(data.resolve("encryption"), outside);
-    assertThrows(UncheckedIOException.class, this::restart);
+    var parentMode = Files.getPosixFilePermissions(data);
+    var keys = restart();
+    keys.setup("passphrase".toCharArray());
+    var next = restart();
+    next.unlock("passphrase".toCharArray());
+    assertArrayEquals(keys.dek(), next.dek());
+    assertEquals(parentMode, Files.getPosixFilePermissions(data));
     assertEquals(mode, Files.getPosixFilePermissions(outside));
-    try (var paths = Files.list(outside)) { assertEquals(0, paths.count()); }
+    assertTrue(Files.isSymbolicLink(data.resolve("encryption")));
   }
 }

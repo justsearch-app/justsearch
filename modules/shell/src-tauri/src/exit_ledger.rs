@@ -580,6 +580,13 @@ fn warn_owner_only_directory(path: &Path, error: &str) {
     }
 }
 
+#[cfg(any(windows, test))]
+const OWNER_ONLY_DIRECTORY_SDDL: &str = "D:P(A;OICI;FA;;;OW)(A;OICI;FA;;;SY)";
+
+// DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION.
+#[cfg(any(windows, test))]
+const OWNER_ONLY_DIRECTORY_SECURITY_INFORMATION: u32 = 0x00000004 | 0x80000000;
+
 #[cfg(windows)]
 fn private_windows_directory(path: &Path, create: bool) -> io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
@@ -587,13 +594,13 @@ fn private_windows_directory(path: &Path, create: bool) -> io::Result<()> {
         Foundation::LocalFree,
         Security::{
             Authorization::ConvertStringSecurityDescriptorToSecurityDescriptorW, SetFileSecurityW,
-            DACL_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, SECURITY_ATTRIBUTES,
+            SECURITY_ATTRIBUTES,
         },
         Storage::FileSystem::CreateDirectoryW,
     };
     let path: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
     // OW is the object's owner; protect the DACL against later changes to the data parent's ACL.
-    let sddl: Vec<u16> = "D:P(A;OICI;FA;;;OW)(A;OICI;FA;;;SY)"
+    let sddl: Vec<u16> = OWNER_ONLY_DIRECTORY_SDDL
         .encode_utf16()
         .chain(Some(0))
         .collect();
@@ -618,7 +625,7 @@ fn private_windows_directory(path: &Path, create: bool) -> io::Result<()> {
         } else {
             SetFileSecurityW(
                 path.as_ptr(),
-                DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+                OWNER_ONLY_DIRECTORY_SECURITY_INFORMATION,
                 descriptor,
             )
         };
@@ -901,6 +908,17 @@ impl LedgerWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn windows_directory_descriptor_is_protected_and_only_owner_and_system_inherit_full_control() {
+        let parts: Vec<_> = OWNER_ONLY_DIRECTORY_SDDL.split('(').collect();
+        assert_eq!(
+            parts[0], "D:P",
+            "disable parent DACL inheritance at creation"
+        );
+        assert_eq!(parts.len(), 3, "exactly two explicit access entries");
+        assert_eq!(&parts[1..], &["A;OICI;FA;;;OW)", "A;OICI;FA;;;SY)"]);
+        assert_eq!(OWNER_ONLY_DIRECTORY_SECURITY_INFORMATION, 0x80000004);
+    }
     fn fixtures() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../governance/fixtures/exit-ledger")
     }

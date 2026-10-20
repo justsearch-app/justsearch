@@ -3,7 +3,6 @@ package io.justsearch.configuration.persistence;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
-import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
@@ -50,14 +49,17 @@ class OwnerOnlyDirectoryTest {
     assertEquals(1, warnings.size());
   }
 
-  @Test void linkIsRefusedWithoutCallingPermissionSetterOrChangingTarget() throws Exception {
+  @Test void linkWarnsOnceAndContinuesWithoutCallingPermissionSetterOrChangingTarget() throws Exception {
     assumeTrue(Files.getFileStore(data).supportsFileAttributeView("posix"));
     var outside = elsewhere;
     Files.setPosixFilePermissions(outside, PosixFilePermissions.fromString("rwxrwxr-x"));
     var runtime = Files.createSymbolicLink(data.resolve("runtime"), outside);
     var warnings = new ArrayList<String>();
-    assertThrows(IOException.class, () -> OwnerOnlyDirectory.ensure(runtime,
-        path -> fail("must not repair a link"), warnings::add));
+    var parentMode = Files.getPosixFilePermissions(data);
+    for (int i = 0; i < 2; i++) {
+      OwnerOnlyDirectory.ensure(runtime, path -> fail("must not repair a link"), warnings::add);
+    }
+    assertEquals(parentMode, Files.getPosixFilePermissions(data));
     assertEquals(1, warnings.size());
     assertEquals(PosixFilePermissions.fromString("rwxrwxr-x"), Files.getPosixFilePermissions(outside));
     assertTrue(Files.isSymbolicLink(runtime));
