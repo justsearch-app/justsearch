@@ -37,3 +37,14 @@ author-session: builder-index-deletes-round3-20261020
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-r5",
+  "verdict": "accept",
+  "digest": "sha256:1fdb2deb0d06e9876db09249eeb0693691dc9514d9323a014ecda99a53cf832a",
+  "note": "Accepted under narrowed scope. The missing-root-sync replay-uncertainty latch and follow-on rebuild HTTP 500 move to migration recovery; the shared help-document drop moves to follow-up. Verification limits remain in tmp/verify-r5/scenario-matrix.json."
+}
+```

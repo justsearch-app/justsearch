@@ -134,3 +134,14 @@ The builder does not supply acceptance. New checks include real-file, SQLite/Luc
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-r5",
+  "verdict": "accept",
+  "digest": "sha256:7e95d0978edc9e1b25849028c4f0b4c6d9d24dc65c5ce1af7a81b79e480e01b4",
+  "note": "Accepted under narrowed scope. The missing-root-sync replay-uncertainty latch and follow-on rebuild HTTP 500 move to migration recovery; the shared help-document drop moves to follow-up. Verification limits remain in tmp/verify-r5/scenario-matrix.json."
+}
+```

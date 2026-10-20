@@ -48,3 +48,14 @@ changeset's evidence (b81d05-lane-b.json) was regenerated with its original comm
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-r5",
+  "verdict": "accept",
+  "digest": "sha256:9ed588b9f97ab01dd2eedad087763cf7a2770bd848698a7731080684319c5fc8",
+  "note": "Accepted under narrowed scope. The missing-root-sync replay-uncertainty latch and follow-on rebuild HTTP 500 move to migration recovery; the shared help-document drop moves to follow-up. Verification limits remain in tmp/verify-r5/scenario-matrix.json."
+}
+```
