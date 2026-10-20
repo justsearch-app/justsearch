@@ -752,3 +752,14 @@ Review history: verifier-4 found invalid ids in saved branch parents, run/conver
   "note": "Re-ran run-evidence on 78837eb65 to scratch (verifier-4 evidence/run-evidence/): the 6 enumeration checks fail by assertion on e7b4ceec7, the 20 S9 checks on 117e89be9 and the 2 StoreIds unit checks on b359747af, and all pass on the candidate; the 7 preservation checks pass. Every cited quote is verbatim in the agreed text; classes New and New/repaired fit. Reject for omissions: the PN1/PN1e entries claim valid ids keep working beside invalid saved names, but no check covers three paths where they do not, each reproduced live or over HTTP against 117e89be9: (1) restoring an encrypted backup exported by the before build that holds the blank-named conversations of the old dispatch bug answers 400 and restores none of the valid conversations (before: all restored; ConversationApiAssembly import sink -> appendMessage -> StoreIds); (2) a valid branch whose saved parentSessionId is invalid (\" \" from the old bug, or \"a.\", \"CON\") cannot be opened: history 400, thread 500 (before: 200; ChatController.handleLoadHistory getSessionMeta(parent), FileConversationStore.loadHistory parent walk); (3) with the agent service present, one saved run whose conversationId is \"a.\", \"CON\" or \"x:y\" makes GET /api/chat/conversations answer 500 (before: 200; ChatController.hasStoreSession -> getSessionMeta). Each needs a fix and a repaired check with assertion fail-before."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-kzvxqr09",
+  "verdict": "reject",
+  "digest": "sha256:abfb00771caf84cf9dce9591d5feb0848d3e7c093be63cd9022b6909fbc56c21",
+  "note": "Re-ran run-evidence on f498321a9 to scratch for the 7 saved-data checks (verifier-5 evidence/run-evidence/): vs bf1713ab2 all 7 fail by assertion and pass on the candidate; vs the real base 117e89be9, 6 fail by assertion. The PN1s quote is verbatim in the agreed text and supports each expectation; class New fits. Verifier-4's three N9.1 failures are fixed live (backup restore, invalid-parent branches) and in a scratch HTTP check (run join). Omission: SavedStoreIdsHttpTest#branchWithInvalidSavedParentOpensLikeMissingParentOverHttp is entered repaired:true, but it passes on 117e89be9: its fixture never saves the parent conversation, so the base already treats the parent as missing. Its only fail-before is against bf1713ab2, an intermediate commit of this change, which the second rejection on this changeset ruled out (preservation check, needs an entry without repaired and evidence without --before). Fix: either split it into a preservation entry, or save the parent under the invalid name as the before build does (live on 117e89be9 the branch then shows the parent turns), so it fails on 117e89be9 by assertion."
+}
+```
