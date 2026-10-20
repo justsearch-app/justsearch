@@ -1149,3 +1149,14 @@ tmp/wp51-ra7. Real packaged Windows behavior remains unverified.
   "note": "Accept. RA6 entries 32-34 (New) cite the agreed RA6 text verbatim (area5.md, last line); each expectation follows from it: future marker kept byte-for-byte with data and staging, never acted on by status/startup/retry/request/storage acknowledgement/dismiss, plain newer-version reason in the status, Cancel to a versioned idle tombstone; legacy one-line and unversioned JSON read as before (preservation, passes before); every write carries format_version 1. Re-ran run-evidence for the three RA6 checks on 13c334f2b with --before 7252f42c7 to a scratch path: all passed, same content digest; future-version and versioned-write checks fail before with assertions for the reason under test, legacy check passes before - identical to uiux-reset-version-ra6.json. The three refreshed files' check digests match the candidate source and their committed outcomes; the test-module diff only adds tests. Verifier differential corpus (19 legacy/odd marker forms) found no behaviour change except one parse-error wording. Outside test intent: the recovery screen frames the newer-version case as 'Some data could not be removed' (reported separately)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-fq38pf24",
+  "verdict": "accept",
+  "digest": "sha256:761869455f0ba3d4ce98b6a144449d02b1f1651d26d4f639a7644796e39cf5c7",
+  "note": "RA7 entries (two Rust, one frontend) are New/repaired, quote RA7 verbatim from the agreed area-5 text, and each expectation follows from it (newer_version reason for requested and cancelled newer files, neutral message, no deletion claims, no Retry, working Cancel). Re-ran run-evidence for uiux-reset-ra7.json with --before 5737dd426: same check digests, all three executed and passed, all three fail-before are assertion failures for the reason under test (missing reason, old 'requested this reset' text, 'Reset incomplete' heading). The four refresh files pass the gate's evidence checks; repaired checks fail before by assertion, preservation checks pass before. Verifier's own checks: newer files in every phase including unknown, missing and non-string phases carry the reason and cancel to idle; a version-1 file cannot forge the reason; the ordinary incomplete screen markup is byte-identical before and after. Non-blocking: the candidate's RA7 Rust test covers only requested and idle phases; the RA6 entry's behaviour sentence still says 'requested the reset', qualified by its RA7 note."
+}
+```
