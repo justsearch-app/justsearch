@@ -21,7 +21,7 @@ fn credential_waits_for_both_fields_and_keeps_their_incarnation_together() {
     });
     assert!(
         session_credential(&state).is_none(),
-        "token alone must not be issued"
+        "assertion failed: token alone must not be issued"
     );
     state.observe_manifest(&ManifestFields {
         instance_id: Some("first".into()),
@@ -44,7 +44,7 @@ fn credential_waits_for_both_fields_and_keeps_their_incarnation_together() {
     });
     assert!(
         session_credential(&state).is_none(),
-        "new port must not inherit the predecessor token"
+        "assertion failed: new port must not inherit the predecessor token"
     );
     state.observe_manifest(&ManifestFields {
         instance_id: Some("next".into()),

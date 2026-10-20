@@ -11,7 +11,7 @@ fn shutdown_impostor_gets_zero_bytes_and_quit_can_force_kill() {
         .unwrap();
     assert!(
         reader.join().unwrap().is_empty(),
-        "shutdown disclosed bytes to an impostor"
+        "assertion failed: shutdown disclosed bytes to an impostor"
     );
     assert!(fixture
         .dir
@@ -33,12 +33,24 @@ fn shutdown_impostor_gets_zero_bytes_and_quit_can_force_kill() {
 fn commit_impostor_is_not_marked_sent_or_allowed_to_run_send_hook() {
     let (port, reader) = impostor();
     let fixture = Fixture::sleeper(port);
+    let hook_called = std::cell::Cell::new(false);
     let (result, sent) = post_before_send(
         &fixture.host,
         "/api/upgrade/commit-shutdown",
         &json!({}),
         1000,
-        || panic!("unproven connection reached commit send boundary"),
+        || {
+            hook_called.set(true);
+            true
+        },
+    );
+    assert!(
+        !hook_called.get(),
+        "assertion failed: unproven connection reached commit send boundary"
+    );
+    assert!(
+        result.is_err(),
+        "assertion failed: commit must reject an unproven server"
     );
     assert!(result.unwrap_err().contains("not proven"));
     assert!(!sent);
@@ -49,11 +61,12 @@ fn commit_impostor_is_not_marked_sent_or_allowed_to_run_send_hook() {
 fn every_reconnect_requires_fresh_proof() {
     let (first, reader) = impostor();
     let fixture = Fixture::sleeper(first);
+    let result = post(&fixture.host, "/api/upgrade/prepare", &json!({}), 1000);
     assert!(
-        post(&fixture.host, "/api/upgrade/prepare", &json!({}), 1000)
-            .unwrap_err()
-            .contains("not proven")
+        result.is_err(),
+        "assertion failed: upgrade must reject an unproven server"
     );
+    assert!(result.unwrap_err().contains("not proven"));
     assert!(reader.join().unwrap().is_empty());
     let (second, reader) = impostor();
     let predecessor = fixture.host.child_pid();
@@ -78,11 +91,12 @@ fn every_reconnect_requires_fresh_proof() {
         fixture.host.binding_snapshot().token.as_deref(),
         Some("successor-token")
     );
+    let result = post(&fixture.host, "/api/upgrade/prepare", &json!({}), 1000);
     assert!(
-        post(&fixture.host, "/api/upgrade/prepare", &json!({}), 1000)
-            .unwrap_err()
-            .contains("not proven")
+        result.is_err(),
+        "assertion failed: upgrade must reject an unproven server"
     );
+    assert!(result.unwrap_err().contains("not proven"));
     assert!(reader.join().unwrap().is_empty());
 }
 
@@ -134,11 +148,12 @@ fn takeover_after_a_successful_health_probe_is_rejected_on_the_actual_send_conne
         stream.read_to_end(&mut bytes).unwrap();
         bytes
     });
+    let result = post(&fixture.host, "/api/upgrade/prepare", &json!({}), 1000);
     assert!(
-        post(&fixture.host, "/api/upgrade/prepare", &json!({}), 1000)
-            .unwrap_err()
-            .contains("not proven")
+        result.is_err(),
+        "assertion failed: upgrade must reject an unproven server"
     );
+    assert!(result.unwrap_err().contains("not proven"));
     assert!(reader.join().unwrap().is_empty());
 }
 

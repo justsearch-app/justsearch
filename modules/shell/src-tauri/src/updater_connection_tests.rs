@@ -9,6 +9,10 @@ async fn rejects_impostor(path: &str) {
     backend.host = fixture.host.clone();
     let result: Result<serde_json::Value, _> =
         post_head(&backend, path, Some(serde_json::json!({}))).await;
+    assert!(
+        result.is_err(),
+        "assertion failed: {path} must reject an unproven server"
+    );
     assert!(result.unwrap_err().contains("not proven"), "{path}");
     assert!(
         reader.join().unwrap().is_empty(),

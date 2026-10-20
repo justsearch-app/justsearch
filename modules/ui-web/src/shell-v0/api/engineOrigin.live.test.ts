@@ -46,7 +46,9 @@ describe('Engine origin on real HTTP connections', () => {
     });
     mocks.invoke.mockResolvedValue({ origin, token: 'fixture-credential' });
     const { authorizedFetch } = await import('./authorizedFetch.js');
-    await expect(authorizedFetch(`${origin}/redirect`, { method: 'POST', body: 'private query' })).rejects.toThrow();
+    const result = await authorizedFetch(`${origin}/redirect`, { method: 'POST', body: 'private query' })
+      .catch((error: unknown) => error);
+    expect(result).toBeInstanceOf(Error);
     expect(redirected).toBe(0);
   });
 });

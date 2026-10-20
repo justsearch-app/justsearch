@@ -14,7 +14,12 @@ fn exact_connection_is_proven_again_after_port_takeover() {
         }
     });
     drop(connect_proven(port, std::process::id(), Duration::from_secs(1)).unwrap());
-    let error = connect_proven(port, u32::MAX, Duration::from_secs(1)).unwrap_err();
+    let result = connect_proven(port, u32::MAX, Duration::from_secs(1));
+    assert!(
+        result.is_err(),
+        "assertion failed: connection to a different process must not be proven"
+    );
+    let error = result.unwrap_err();
     assert!(error.contains("not proven"));
     reader.join().unwrap();
 }
@@ -23,7 +28,12 @@ fn exact_connection_is_proven_again_after_port_takeover() {
 fn accepted_socket_must_belong_to_expected_pid_and_timeout_writes_nothing() {
     let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
     let port = listener.local_addr().unwrap().port();
-    let error = connect_proven(port, std::process::id(), Duration::from_millis(20)).unwrap_err();
+    let result = connect_proven(port, std::process::id(), Duration::from_millis(20));
+    assert!(
+        result.is_err(),
+        "assertion failed: an unaccepted socket must time out without proof"
+    );
+    let error = result.unwrap_err();
     assert!(error.contains("not proven") && error.contains("timed out"));
     let (mut stream, _) = listener.accept().unwrap();
     assert_eq!(stream.read(&mut [0; 1]).unwrap(), 0);

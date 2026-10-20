@@ -1,0 +1,572 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T12:46:16.108Z",
+  "revision": "51f6ba6e1a1cbf13a8cbce4092b460ae6bc81364",
+  "tree": "68286b9f321f8b7579681294cfad7b580cec15b2",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_conn::tests::exact_connection_is_proven_again_after_port_takeover\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6293
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_conn::tests::accepted_socket_must_belong_to_expected_pid_and_timeout_writes_nothing\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2341
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_conn::tests::chunked_engine_json_is_decoded_and_truncated_chunks_fail\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1704
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_conn::tests::proven_sender_accepts_content_length_and_chunked_responses\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1221
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::connection_tests::shutdown_impostor_gets_zero_bytes_and_quit_can_force_kill\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1279
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::connection_tests::commit_impostor_is_not_marked_sent_or_allowed_to_run_send_hook\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1710
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::connection_tests::every_reconnect_requires_fresh_proof\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2106
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::connection_tests::takeover_after_a_successful_health_probe_is_rejected_on_the_actual_send_connection\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2448
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::connection_tests::supervisor_successors_use_the_new_pid_and_coherent_binding_on_same_and_new_ports\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2057
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::connection_tests::prepare_rejects_impostor\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1315
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::connection_tests::cancel_rejects_impostor\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1110
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::connection_tests::commit_rejects_impostor\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1151
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::connection_tests::reconcile_rejects_impostor\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1113
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"session_credential_tests::credential_waits_for_both_fields_and_keeps_their_incarnation_together\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1428
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::connect_failure_and_observed_exit_send_no_commit_bytes\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1131
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::request_written_then_missing_receipt_is_ambiguous_delivery\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1140
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/engine_conn_tests.rs#engine_conn::tests::exact_connection_is_proven_again_after_port_takeover",
+      "file": "modules/shell/src-tauri/src/engine_conn_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:bcfc74bd3f5275822680c58da5c390a2d7c05299162d7992312e23ce807f1559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_conn::tests::exact_connection_is_proven_again_after_port_takeover",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_conn_tests.rs#engine_conn::tests::accepted_socket_must_belong_to_expected_pid_and_timeout_writes_nothing",
+      "file": "modules/shell/src-tauri/src/engine_conn_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:bcfc74bd3f5275822680c58da5c390a2d7c05299162d7992312e23ce807f1559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_conn::tests::accepted_socket_must_belong_to_expected_pid_and_timeout_writes_nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_conn_tests.rs#engine_conn::tests::chunked_engine_json_is_decoded_and_truncated_chunks_fail",
+      "file": "modules/shell/src-tauri/src/engine_conn_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:bcfc74bd3f5275822680c58da5c390a2d7c05299162d7992312e23ce807f1559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_conn::tests::chunked_engine_json_is_decoded_and_truncated_chunks_fail",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_conn_tests.rs#engine_conn::tests::proven_sender_accepts_content_length_and_chunked_responses",
+      "file": "modules/shell/src-tauri/src/engine_conn_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:bcfc74bd3f5275822680c58da5c390a2d7c05299162d7992312e23ce807f1559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_conn::tests::proven_sender_accepts_content_length_and_chunked_responses",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::shutdown_impostor_gets_zero_bytes_and_quit_can_force_kill",
+      "file": "modules/shell/src-tauri/src/shell_connection_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:404bf56f5a662d147460b20708787cb91e952433003575fc4492b7815f04a0c0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::connection_tests::shutdown_impostor_gets_zero_bytes_and_quit_can_force_kill",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::commit_impostor_is_not_marked_sent_or_allowed_to_run_send_hook",
+      "file": "modules/shell/src-tauri/src/shell_connection_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:404bf56f5a662d147460b20708787cb91e952433003575fc4492b7815f04a0c0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::connection_tests::commit_impostor_is_not_marked_sent_or_allowed_to_run_send_hook",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::every_reconnect_requires_fresh_proof",
+      "file": "modules/shell/src-tauri/src/shell_connection_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:404bf56f5a662d147460b20708787cb91e952433003575fc4492b7815f04a0c0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::connection_tests::every_reconnect_requires_fresh_proof",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::takeover_after_a_successful_health_probe_is_rejected_on_the_actual_send_connection",
+      "file": "modules/shell/src-tauri/src/shell_connection_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:404bf56f5a662d147460b20708787cb91e952433003575fc4492b7815f04a0c0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::connection_tests::takeover_after_a_successful_health_probe_is_rejected_on_the_actual_send_connection",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::supervisor_successors_use_the_new_pid_and_coherent_binding_on_same_and_new_ports",
+      "file": "modules/shell/src-tauri/src/shell_connection_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:404bf56f5a662d147460b20708787cb91e952433003575fc4492b7815f04a0c0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::connection_tests::supervisor_successors_use_the_new_pid_and_coherent_binding_on_same_and_new_ports",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_connection_tests.rs#updater::connection_tests::prepare_rejects_impostor",
+      "file": "modules/shell/src-tauri/src/updater_connection_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:b02d925c83422fff11e35d3bf994d9e3f2ef4829723db12cc6c191fc9dd6372e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::connection_tests::prepare_rejects_impostor",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_connection_tests.rs#updater::connection_tests::cancel_rejects_impostor",
+      "file": "modules/shell/src-tauri/src/updater_connection_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:b02d925c83422fff11e35d3bf994d9e3f2ef4829723db12cc6c191fc9dd6372e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::connection_tests::cancel_rejects_impostor",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_connection_tests.rs#updater::connection_tests::commit_rejects_impostor",
+      "file": "modules/shell/src-tauri/src/updater_connection_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:b02d925c83422fff11e35d3bf994d9e3f2ef4829723db12cc6c191fc9dd6372e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::connection_tests::commit_rejects_impostor",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_connection_tests.rs#updater::connection_tests::reconcile_rejects_impostor",
+      "file": "modules/shell/src-tauri/src/updater_connection_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:b02d925c83422fff11e35d3bf994d9e3f2ef4829723db12cc6c191fc9dd6372e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::connection_tests::reconcile_rejects_impostor",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/session_credential_tests.rs#session_credential_tests::credential_waits_for_both_fields_and_keeps_their_incarnation_together",
+      "file": "modules/shell/src-tauri/src/session_credential_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:2caace9391e985ca1287dc03bbf592e976c941a83b03787fb2e5f71f0e015173",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "session_credential_tests::credential_waits_for_both_fields_and_keeps_their_incarnation_together",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::connect_failure_and_observed_exit_send_no_commit_bytes",
+      "file": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:70318e2ea3349d8c08bef87f744884b4a80f1a92e5199fe9f158dfb1cfc920e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::commit_transport_tests::connect_failure_and_observed_exit_send_no_commit_bytes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::request_written_then_missing_receipt_is_ambiguous_delivery",
+      "file": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:70318e2ea3349d8c08bef87f744884b4a80f1a92e5199fe9f158dfb1cfc920e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::commit_transport_tests::request_written_then_missing_receipt_is_ambiguous_delivery",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7df82d2ef0944cef399db3daf0f8765442e487d4",
+    "revision": "7df82d2ef0944cef399db3daf0f8765442e487d4",
+    "overlays": [
+      "modules/shell/src-tauri/src/engine_conn_test_support.rs",
+      "modules/shell/src-tauri/src/engine_conn_tests.rs",
+      "modules/shell/src-tauri/src/shell_connection_tests.rs",
+      "modules/shell/src-tauri/src/updater_connection_tests.rs",
+      "modules/shell/src-tauri/src/session_credential_tests.rs",
+      "modules/shell/src-tauri/src/shell_commit_transport_tests.rs",
+      "modules/ui/build/install/ui/native/linux-x86_64/justsearch-bound-exec"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/shell-proof-before-compat.patch",
+        "contentDigest": "sha256:a9841087e5a9bd05fe182d4d4dbaad517edaa96d8003234c911157d3c1ddde34"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_conn::tests::exact_connection_is_proven_again_after_port_takeover\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5619,
+        "output": "\nrunning 1 test\ntest engine_conn::tests::exact_connection_is_proven_again_after_port_takeover ... FAILED\n\nfailures:\n\n---- engine_conn::tests::exact_connection_is_proven_again_after_port_takeover stdout ----\n\nthread 'engine_conn::tests::exact_connection_is_proven_again_after_port_takeover' (2281586) panicked at src/engine_conn_tests.rs:18:5:\nassertion failed: connection to a different process must not be proven\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_conn::tests::exact_connection_is_proven_again_after_port_takeover\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 167 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/justsearch-shell-proof-builder/test-intent/test-intent-before-IU94rf/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.56s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/shell-proof/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_conn::tests::accepted_socket_must_belong_to_expected_pid_and_timeout_writes_nothing\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1328,
+        "output": "\nrunning 1 test\ntest engine_conn::tests::accepted_socket_must_belong_to_expected_pid_and_timeout_writes_nothing ... FAILED\n\nfailures:\n\n---- engine_conn::tests::accepted_socket_must_belong_to_expected_pid_and_timeout_writes_nothing stdout ----\n\nthread 'engine_conn::tests::accepted_socket_must_belong_to_expected_pid_and_timeout_writes_nothing' (2282115) panicked at src/engine_conn_tests.rs:32:5:\nassertion failed: an unaccepted socket must time out without proof\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_conn::tests::accepted_socket_must_belong_to_expected_pid_and_timeout_writes_nothing\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 167 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/justsearch-shell-proof-builder/test-intent/test-intent-before-IU94rf/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.26s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/shell-proof/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_conn::tests::chunked_engine_json_is_decoded_and_truncated_chunks_fail\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1418,
+        "output": "\nrunning 1 test\ntest engine_conn::tests::chunked_engine_json_is_decoded_and_truncated_chunks_fail ... FAILED\n\nfailures:\n\n---- engine_conn::tests::chunked_engine_json_is_decoded_and_truncated_chunks_fail stdout ----\n\nthread 'engine_conn::tests::chunked_engine_json_is_decoded_and_truncated_chunks_fail' (2282514) panicked at src/engine_conn_tests.rs:44:5:\nassertion `left == right` failed\n  left: [50, 13, 10, 123, 125, 13, 10, 48, 13, 10, 13, 10]\n right: [123, 125]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_conn::tests::chunked_engine_json_is_decoded_and_truncated_chunks_fail\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 167 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/justsearch-shell-proof-builder/test-intent/test-intent-before-IU94rf/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.36s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/shell-proof/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_conn::tests::proven_sender_accepts_content_length_and_chunked_responses\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 2713,
+        "output": "\nrunning 1 test\ntest engine_conn::tests::proven_sender_accepts_content_length_and_chunked_responses ... FAILED\n\nfailures:\n\n---- engine_conn::tests::proven_sender_accepts_content_length_and_chunked_responses stdout ----\n\nthread 'engine_conn::tests::proven_sender_accepts_content_length_and_chunked_responses' (2284745) panicked at src/engine_conn_tests.rs:77:9:\nassertion `left == right` failed\n  left: Object {\"accepted\": Bool(true)}\n right: Object {}\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_conn::tests::proven_sender_accepts_content_length_and_chunked_responses\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 167 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/justsearch-shell-proof-builder/test-intent/test-intent-before-IU94rf/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.62s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/shell-proof/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::connection_tests::shutdown_impostor_gets_zero_bytes_and_quit_can_force_kill\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 2707,
+        "output": "\nrunning 1 test\ntest shell_actuator::connection_tests::shutdown_impostor_gets_zero_bytes_and_quit_can_force_kill ... FAILED\n\nfailures:\n\n---- shell_actuator::connection_tests::shutdown_impostor_gets_zero_bytes_and_quit_can_force_kill stdout ----\n\nthread 'shell_actuator::connection_tests::shutdown_impostor_gets_zero_bytes_and_quit_can_force_kill' (2286353) panicked at src/shell_connection_tests.rs:12:5:\nassertion failed: shutdown disclosed bytes to an impostor\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    shell_actuator::connection_tests::shutdown_impostor_gets_zero_bytes_and_quit_can_force_kill\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 167 filtered out; finished in 0.01s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/justsearch-shell-proof-builder/test-intent/test-intent-before-IU94rf/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.59s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/shell-proof/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::connection_tests::commit_impostor_is_not_marked_sent_or_allowed_to_run_send_hook\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 2721,
+        "output": "\nrunning 1 test\ntest shell_actuator::connection_tests::commit_impostor_is_not_marked_sent_or_allowed_to_run_send_hook ... FAILED\n\nfailures:\n\n---- shell_actuator::connection_tests::commit_impostor_is_not_marked_sent_or_allowed_to_run_send_hook stdout ----\n\nthread 'shell_actuator::connection_tests::commit_impostor_is_not_marked_sent_or_allowed_to_run_send_hook' (2287831) panicked at src/shell_connection_tests.rs:47:5:\nassertion failed: unproven connection reached commit send boundary\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    shell_actuator::connection_tests::commit_impostor_is_not_marked_sent_or_allowed_to_run_send_hook\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 167 filtered out; finished in 0.01s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/justsearch-shell-proof-builder/test-intent/test-intent-before-IU94rf/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.58s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/shell-proof/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::connection_tests::every_reconnect_requires_fresh_proof\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 2842,
+        "output": "\nrunning 1 test\ntest shell_actuator::connection_tests::every_reconnect_requires_fresh_proof ... FAILED\n\nfailures:\n\n---- shell_actuator::connection_tests::every_reconnect_requires_fresh_proof stdout ----\n\nthread 'shell_actuator::connection_tests::every_reconnect_requires_fresh_proof' (2289228) panicked at src/shell_connection_tests.rs:65:5:\nassertion failed: upgrade must reject an unproven server\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    shell_actuator::connection_tests::every_reconnect_requires_fresh_proof\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 167 filtered out; finished in 0.01s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/justsearch-shell-proof-builder/test-intent/test-intent-before-IU94rf/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.71s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/shell-proof/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::connection_tests::takeover_after_a_successful_health_probe_is_rejected_on_the_actual_send_connection\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 3897,
+        "output": "\nrunning 1 test\ntest shell_actuator::connection_tests::takeover_after_a_successful_health_probe_is_rejected_on_the_actual_send_connection ... FAILED\n\nfailures:\n\n---- shell_actuator::connection_tests::takeover_after_a_successful_health_probe_is_rejected_on_the_actual_send_connection stdout ----\n\nthread 'shell_actuator::connection_tests::takeover_after_a_successful_health_probe_is_rejected_on_the_actual_send_connection' (2291033) panicked at src/shell_connection_tests.rs:156:5:\nassertion failed: result.unwrap_err().contains(\"not proven\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    shell_actuator::connection_tests::takeover_after_a_successful_health_probe_is_rejected_on_the_actual_send_connection\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 167 filtered out; finished in 1.07s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/justsearch-shell-proof-builder/test-intent/test-intent-before-IU94rf/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.70s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/shell-proof/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::connection_tests::supervisor_successors_use_the_new_pid_and_coherent_binding_on_same_and_new_ports\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 2719
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::connection_tests::prepare_rejects_impostor\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1831,
+        "output": "\nrunning 1 test\ntest updater::connection_tests::prepare_rejects_impostor ... FAILED\n\nfailures:\n\n---- updater::connection_tests::prepare_rejects_impostor stdout ----\n\nthread 'updater::connection_tests::prepare_rejects_impostor' (2293936) panicked at src/updater_connection_tests.rs:12:5:\nassertion failed: /api/upgrade/prepare must reject an unproven server\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::connection_tests::prepare_rejects_impostor\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 167 filtered out; finished in 0.04s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/justsearch-shell-proof-builder/test-intent/test-intent-before-IU94rf/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.73s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/shell-proof/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::connection_tests::cancel_rejects_impostor\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1950,
+        "output": "\nrunning 1 test\ntest updater::connection_tests::cancel_rejects_impostor ... FAILED\n\nfailures:\n\n---- updater::connection_tests::cancel_rejects_impostor stdout ----\n\nthread 'updater::connection_tests::cancel_rejects_impostor' (2294427) panicked at src/updater_connection_tests.rs:12:5:\nassertion failed: /api/upgrade/cancel must reject an unproven server\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::connection_tests::cancel_rejects_impostor\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 167 filtered out; finished in 0.03s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/justsearch-shell-proof-builder/test-intent/test-intent-before-IU94rf/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.85s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/shell-proof/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::connection_tests::commit_rejects_impostor\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 2251,
+        "output": "\nrunning 1 test\ntest updater::connection_tests::commit_rejects_impostor ... FAILED\n\nfailures:\n\n---- updater::connection_tests::commit_rejects_impostor stdout ----\n\nthread 'updater::connection_tests::commit_rejects_impostor' (2295201) panicked at src/updater_connection_tests.rs:12:5:\nassertion failed: /api/upgrade/commit-shutdown must reject an unproven server\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::connection_tests::commit_rejects_impostor\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 167 filtered out; finished in 0.04s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/justsearch-shell-proof-builder/test-intent/test-intent-before-IU94rf/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.12s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/shell-proof/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::connection_tests::reconcile_rejects_impostor\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1399,
+        "output": "\nrunning 1 test\ntest updater::connection_tests::reconcile_rejects_impostor ... FAILED\n\nfailures:\n\n---- updater::connection_tests::reconcile_rejects_impostor stdout ----\n\nthread 'updater::connection_tests::reconcile_rejects_impostor' (2295649) panicked at src/updater_connection_tests.rs:12:5:\nassertion failed: /api/upgrade/reconcile must reject an unproven server\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::connection_tests::reconcile_rejects_impostor\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 167 filtered out; finished in 0.03s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/justsearch-shell-proof-builder/test-intent/test-intent-before-IU94rf/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.31s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/shell-proof/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"session_credential_tests::credential_waits_for_both_fields_and_keeps_their_incarnation_together\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1270,
+        "output": "\nrunning 1 test\ntest session_credential_tests::credential_waits_for_both_fields_and_keeps_their_incarnation_together ... FAILED\n\nfailures:\n\n---- session_credential_tests::credential_waits_for_both_fields_and_keeps_their_incarnation_together stdout ----\n\nthread 'session_credential_tests::credential_waits_for_both_fields_and_keeps_their_incarnation_together' (2295986) panicked at src/session_credential_tests.rs:22:5:\nassertion failed: token alone must not be issued\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    session_credential_tests::credential_waits_for_both_fields_and_keeps_their_incarnation_together\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 167 filtered out; finished in 0.01s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/justsearch-shell-proof-builder/test-intent/test-intent-before-IU94rf/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.21s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/shell-proof/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::connect_failure_and_observed_exit_send_no_commit_bytes\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1493
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::request_written_then_missing_receipt_is_ambiguous_delivery\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1315
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/engine_conn_tests.rs#engine_conn::tests::exact_connection_is_proven_again_after_port_takeover",
+        "classification": "assertion",
+        "detail": "engine_conn::tests::exact_connection_is_proven_again_after_port_takeover:  ---- engine_conn::tests::exact_connection_is_proven_again_after_port_takeover stdout ----\n\nthread 'engine_conn::tests::exact_connection_is_proven_again_after_port_takeover' (2281586) panicked at src/engine_conn_tests.rs:18:5:\nassertion failed: connection to a different process must not be proven\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_conn::tests::exact_connecti"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/engine_conn_tests.rs#engine_conn::tests::accepted_socket_must_belong_to_expected_pid_and_timeout_writes_nothing",
+        "classification": "assertion",
+        "detail": "engine_conn::tests::accepted_socket_must_belong_to_expected_pid_and_timeout_writes_nothing:  ---- engine_conn::tests::accepted_socket_must_belong_to_expected_pid_and_timeout_writes_nothing stdout ----\n\nthread 'engine_conn::tests::accepted_socket_must_belong_to_expected_pid_and_timeout_writes_nothing' (2282115) panicked at src/engine_conn_tests.rs:32:5:\nassertion failed: an unaccepted socket must time out without proof\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/engine_conn_tests.rs#engine_conn::tests::chunked_engine_json_is_decoded_and_truncated_chunks_fail",
+        "classification": "assertion",
+        "detail": "engine_conn::tests::chunked_engine_json_is_decoded_and_truncated_chunks_fail:  ---- engine_conn::tests::chunked_engine_json_is_decoded_and_truncated_chunks_fail stdout ----\n\nthread 'engine_conn::tests::chunked_engine_json_is_decoded_and_truncated_chunks_fail' (2282514) panicked at src/engine_conn_tests.rs:44:5:\nassertion `left == right` failed\n  left: [50, 13, 10, 123, 125, 13, 10, 48, 13, 10, 13, 10]\n right: [123, 125]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrac"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/engine_conn_tests.rs#engine_conn::tests::proven_sender_accepts_content_length_and_chunked_responses",
+        "classification": "assertion",
+        "detail": "engine_conn::tests::proven_sender_accepts_content_length_and_chunked_responses:  ---- engine_conn::tests::proven_sender_accepts_content_length_and_chunked_responses stdout ----\n\nthread 'engine_conn::tests::proven_sender_accepts_content_length_and_chunked_responses' (2284745) panicked at src/engine_conn_tests.rs:77:9:\nassertion `left == right` failed\n  left: Object {\"accepted\": Bool(true)}\n right: Object {}\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::shutdown_impostor_gets_zero_bytes_and_quit_can_force_kill",
+        "classification": "assertion",
+        "detail": "shell_actuator::connection_tests::shutdown_impostor_gets_zero_bytes_and_quit_can_force_kill:  ---- shell_actuator::connection_tests::shutdown_impostor_gets_zero_bytes_and_quit_can_force_kill stdout ----\n\nthread 'shell_actuator::connection_tests::shutdown_impostor_gets_zero_bytes_and_quit_can_force_kill' (2286353) panicked at src/shell_connection_tests.rs:12:5:\nassertion failed: shutdown disclosed bytes to an impostor\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::commit_impostor_is_not_marked_sent_or_allowed_to_run_send_hook",
+        "classification": "assertion",
+        "detail": "shell_actuator::connection_tests::commit_impostor_is_not_marked_sent_or_allowed_to_run_send_hook:  ---- shell_actuator::connection_tests::commit_impostor_is_not_marked_sent_or_allowed_to_run_send_hook stdout ----\n\nthread 'shell_actuator::connection_tests::commit_impostor_is_not_marked_sent_or_allowed_to_run_send_hook' (2287831) panicked at src/shell_connection_tests.rs:47:5:\nassertion failed: unproven connection reached commit send boundary\nnote: run with `RUST_BACKTRACE=1` environment variable "
+      },
+      {
+        "id": "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::every_reconnect_requires_fresh_proof",
+        "classification": "assertion",
+        "detail": "shell_actuator::connection_tests::every_reconnect_requires_fresh_proof:  ---- shell_actuator::connection_tests::every_reconnect_requires_fresh_proof stdout ----\n\nthread 'shell_actuator::connection_tests::every_reconnect_requires_fresh_proof' (2289228) panicked at src/shell_connection_tests.rs:65:5:\nassertion failed: upgrade must reject an unproven server\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    shell_actuator::connection_tests::every_reconnect"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::takeover_after_a_successful_health_probe_is_rejected_on_the_actual_send_connection",
+        "classification": "assertion",
+        "detail": "shell_actuator::connection_tests::takeover_after_a_successful_health_probe_is_rejected_on_the_actual_send_connection:  ---- shell_actuator::connection_tests::takeover_after_a_successful_health_probe_is_rejected_on_the_actual_send_connection stdout ----\n\nthread 'shell_actuator::connection_tests::takeover_after_a_successful_health_probe_is_rejected_on_the_actual_send_connection' (2291033) panicked at src/shell_connection_tests.rs:156:5:\nassertion failed: result.unwrap_err().contains(\"not proven\")\n"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::supervisor_successors_use_the_new_pid_and_coherent_binding_on_same_and_new_ports",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/updater_connection_tests.rs#updater::connection_tests::prepare_rejects_impostor",
+        "classification": "assertion",
+        "detail": "updater::connection_tests::prepare_rejects_impostor:  ---- updater::connection_tests::prepare_rejects_impostor stdout ----\n\nthread 'updater::connection_tests::prepare_rejects_impostor' (2293936) panicked at src/updater_connection_tests.rs:12:5:\nassertion failed: /api/upgrade/prepare must reject an unproven server\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::connection_tests::prepare_rejects_impostor\n\ntest result: FAILED. 0 passed; 1 faile"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/updater_connection_tests.rs#updater::connection_tests::cancel_rejects_impostor",
+        "classification": "assertion",
+        "detail": "updater::connection_tests::cancel_rejects_impostor:  ---- updater::connection_tests::cancel_rejects_impostor stdout ----\n\nthread 'updater::connection_tests::cancel_rejects_impostor' (2294427) panicked at src/updater_connection_tests.rs:12:5:\nassertion failed: /api/upgrade/cancel must reject an unproven server\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::connection_tests::cancel_rejects_impostor\n\ntest result: FAILED. 0 passed; 1 failed; 0 "
+      },
+      {
+        "id": "modules/shell/src-tauri/src/updater_connection_tests.rs#updater::connection_tests::commit_rejects_impostor",
+        "classification": "assertion",
+        "detail": "updater::connection_tests::commit_rejects_impostor:  ---- updater::connection_tests::commit_rejects_impostor stdout ----\n\nthread 'updater::connection_tests::commit_rejects_impostor' (2295201) panicked at src/updater_connection_tests.rs:12:5:\nassertion failed: /api/upgrade/commit-shutdown must reject an unproven server\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::connection_tests::commit_rejects_impostor\n\ntest result: FAILED. 0 passed; 1 f"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/updater_connection_tests.rs#updater::connection_tests::reconcile_rejects_impostor",
+        "classification": "assertion",
+        "detail": "updater::connection_tests::reconcile_rejects_impostor:  ---- updater::connection_tests::reconcile_rejects_impostor stdout ----\n\nthread 'updater::connection_tests::reconcile_rejects_impostor' (2295649) panicked at src/updater_connection_tests.rs:12:5:\nassertion failed: /api/upgrade/reconcile must reject an unproven server\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::connection_tests::reconcile_rejects_impostor\n\ntest result: FAILED. 0 passe"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/session_credential_tests.rs#session_credential_tests::credential_waits_for_both_fields_and_keeps_their_incarnation_together",
+        "classification": "assertion",
+        "detail": "session_credential_tests::credential_waits_for_both_fields_and_keeps_their_incarnation_together:  ---- session_credential_tests::credential_waits_for_both_fields_and_keeps_their_incarnation_together stdout ----\n\nthread 'session_credential_tests::credential_waits_for_both_fields_and_keeps_their_incarnation_together' (2295986) panicked at src/session_credential_tests.rs:22:5:\nassertion failed: token alone must not be issued\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtr"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::connect_failure_and_observed_exit_send_no_commit_bytes",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::request_written_then_missing_receipt_is_ambiguous_delivery",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:8cec6421594e2a50427a4e8b64644c579cef2cf9e7539e8267f9656e2410e825"
+}
