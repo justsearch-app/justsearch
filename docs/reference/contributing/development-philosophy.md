@@ -39,10 +39,11 @@ posture-adjudication findings (tempdoc 680's routing lanes). Add a row when a so
 made deliberately; remove it when the revisit condition fires and the seam is hardened or the
 softness re-affirmed.
 
+Governance kernel gates run inside the required **Public claims** check; that former softness row is retired.
+
 | Seam | Deliberate posture | Reason | Revisit when |
 |------|--------------------|--------|--------------|
-| PIT mutation ratchet (`test-efficacy` gate) | `workflow_dispatch`-only, not per-PR CI | Self-hosted-runner availability (ADR-0026) | A hosted lane can carry the PIT run within budget |
-| Governance kernel gates in public CI | Not in the required-check set | Runner-availability constraint (ADR-0026 / ADR-0044); local-first verification remains primary | A hosted kernel lane proves stable — then add to required checks |
+| PIT mutation ratchet (`test-efficacy` gate) | Manual local execution only; no workflow invokes it. Run `node scripts/ci/report-pit-strength.mjs --run`, then `node scripts/governance/run.mjs --gate test-efficacy --mode gate` | PIT wall-time and on-demand report input | A hosted lane can carry the PIT run within budget |
 | FE runtime schema validation (`parseWireContract` / `validateWithFallback`) | Degrade-and-log in production rather than crash | Crashing the user's UI on wire drift punishes the user, not the developer | A dev/CI-throws split lands, or a real-use drift incident shows logging alone is insufficient |
 
 ## Upgrade-safe defaults

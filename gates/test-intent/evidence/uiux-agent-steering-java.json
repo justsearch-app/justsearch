@@ -1,0 +1,845 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T17:23:14.435Z",
+  "revision": "44b5a6d4348175080f5271aa63631c7e581591a8",
+  "tree": "c87dc807d84689ab8b0f791af17c7e777b89bab7",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.AgentDirectionRecordTest.reloadedThreadShowsEachDirectionOnceWithItsFinalOutcome\" --tests \"io.justsearch.agent.AgentDirectionRecordTest.legacyAcknowledgementWithoutOutcomeIsNotShownAsApplied\" --tests \"io.justsearch.agent.AgentDirectionRecordTest.interruptedRunReportsItsUnappliedDirectionsAsNotApplied\" --tests \"io.justsearch.agent.AgentDirectionRecordTest.recoveryReportsADirectionLeftQueuedByAnyInterruption\" --tests \"io.justsearch.agent.AgentDirectionRecordTest.recoveryLeavesAFinishedRunWhoseOutcomesWereAllWrittenAlone\" --tests \"io.justsearch.agent.AgentModelMessagesTest.directionsAfterToolRoundsGoOutAsUserTurnsAfterTheLastToolResult\" --tests \"io.justsearch.agent.AgentModelMessagesTest.savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel\" --tests \"io.justsearch.agent.AgentModelMessagesTest.resumedApprovalStillRequiresAFreshDecision\" --tests \"io.justsearch.agent.AgentModelMessagesTest.profileKeepsDirectionsAndResumeWarningAndHandoffSendsValidList\" --tests \"io.justsearch.agent.AgentModelMessagesTest.everyCompletionPathSendsLaterSystemEntriesAsUserTurns\" --tests \"io.justsearch.agent.AgentModelMessagesTest.tokenCountAfterCompactionMeasuresTheSentList\" --tests \"io.justsearch.agent.AgentModelMessagesTest.unsteeredMessagesAndToolIdsReachTheModelUnchanged\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.severalDirectionsBeforeOneStepAllReachTheModelOnceInOrder\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.concurrentDirectionsDuringStepsAreNeitherLostNorDuplicated\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.directionIsReportedQueuedThenAppliedWhenTheModelAcceptsItsRequest\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.directionInARequestTheModelRefusesIsNotReportedApplied\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.directionArrivingDuringTheLastModelCallIsReportedNotApplied\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.directionAfterTheRunStoppedTakingThemIsRefusedNotAcceptedAndDropped\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.firstHandoffAfterSteeringKeepsTheDirectionForTheReceivingAgent\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.secondHandoffAndReturnKeepTheDirections\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.resumeAfterHandoffKeepsTheDirectionAndAddsTheResumeWarning\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.compactionKeepsOlderDirectionsAndTheResumeWarning\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.compactOlderTurnsReportsOnlyWhatItDropped\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.pendingWriteRunsOnlyAfterAFreshValidApproval\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.snapshotWrittenBeforeTheChangeResumesWithItsStraySystemsAndDanglingCall\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.forkOfASteeredResumedRunKeepsDirectionsAndSendsValidCalls\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.unsteeredApprovalRunSendsAndSavesTheSameMessages\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.unsteeredHandoffPrunesAndBriefsAsBefore\" --tests \"io.justsearch.agent.AgentLoopServiceTest.steeringDirective_blankIsIgnored\" --tests \"io.justsearch.agent.AgentLoopServiceTest.steeringDirective_afterLastBoundary_reportedNotApplied\" --tests \"io.justsearch.agent.AgentDirectionRecordTest.recoveryWhileTheRunIsLiveLeavesItsDirectionsToTheLoop\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6095
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java#reloadedThreadShowsEachDirectionOnceWithItsFinalOutcome",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5d3f1e6284dd168055e91d93573fc42816cc8b17d6fc05307e46f88cc79ff5b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reloadedThreadShowsEachDirectionOnceWithItsFinalOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java#legacyAcknowledgementWithoutOutcomeIsNotShownAsApplied",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5d3f1e6284dd168055e91d93573fc42816cc8b17d6fc05307e46f88cc79ff5b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacyAcknowledgementWithoutOutcomeIsNotShownAsApplied()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java#interruptedRunReportsItsUnappliedDirectionsAsNotApplied",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5d3f1e6284dd168055e91d93573fc42816cc8b17d6fc05307e46f88cc79ff5b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptedRunReportsItsUnappliedDirectionsAsNotApplied()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java#recoveryReportsADirectionLeftQueuedByAnyInterruption",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5d3f1e6284dd168055e91d93573fc42816cc8b17d6fc05307e46f88cc79ff5b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) [1] unfinished run, READY_FOR_LLM, false, run_interrupted",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) [2] unfinished run stamped by an interrupted recovery, WAITING_APPROVAL, true, run_interrupted",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) [3] run that finished, DONE, false, run_finished",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) [4] run that was stopped, CANCELLED, false, run_stopped",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) [5] run that failed, ERROR, false, run_failed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java#recoveryLeavesAFinishedRunWhoseOutcomesWereAllWrittenAlone",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5d3f1e6284dd168055e91d93573fc42816cc8b17d6fc05307e46f88cc79ff5b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recoveryLeavesAFinishedRunWhoseOutcomesWereAllWrittenAlone()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java#directionsAfterToolRoundsGoOutAsUserTurnsAfterTheLastToolResult",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b27b644ebe1154a4e76989c7088995ed30773d581d8ddc27589c43b9abfe1022",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "directionsAfterToolRoundsGoOutAsUserTurnsAfterTheLastToolResult()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java#savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b27b644ebe1154a4e76989c7088995ed30773d581d8ddc27589c43b9abfe1022",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) [1] READY_FOR_LLM, true",
+          "status": "passed"
+        },
+        {
+          "name": "savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) [2] READY_FOR_LLM, false",
+          "status": "passed"
+        },
+        {
+          "name": "savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) [3] AFTER_TOOL_RESULT, true",
+          "status": "passed"
+        },
+        {
+          "name": "savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) [4] AFTER_TOOL_RESULT, false",
+          "status": "passed"
+        },
+        {
+          "name": "savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) [5] WAITING_APPROVAL, true",
+          "status": "passed"
+        },
+        {
+          "name": "savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) [6] WAITING_APPROVAL, false",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java#resumedApprovalStillRequiresAFreshDecision",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b27b644ebe1154a4e76989c7088995ed30773d581d8ddc27589c43b9abfe1022",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "resumedApprovalStillRequiresAFreshDecision(boolean) [1] true",
+          "status": "passed"
+        },
+        {
+          "name": "resumedApprovalStillRequiresAFreshDecision(boolean) [2] false",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java#profileKeepsDirectionsAndResumeWarningAndHandoffSendsValidList",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b27b644ebe1154a4e76989c7088995ed30773d581d8ddc27589c43b9abfe1022",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "profileKeepsDirectionsAndResumeWarningAndHandoffSendsValidList()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java#everyCompletionPathSendsLaterSystemEntriesAsUserTurns",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b27b644ebe1154a4e76989c7088995ed30773d581d8ddc27589c43b9abfe1022",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String) [1] ordinary",
+          "status": "passed"
+        },
+        {
+          "name": "everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String) [2] retry",
+          "status": "passed"
+        },
+        {
+          "name": "everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String) [3] budget-finalize",
+          "status": "passed"
+        },
+        {
+          "name": "everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String) [4] step-finalize",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java#tokenCountAfterCompactionMeasuresTheSentList",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b27b644ebe1154a4e76989c7088995ed30773d581d8ddc27589c43b9abfe1022",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tokenCountAfterCompactionMeasuresTheSentList()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java#unsteeredMessagesAndToolIdsReachTheModelUnchanged",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b27b644ebe1154a4e76989c7088995ed30773d581d8ddc27589c43b9abfe1022",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unsteeredMessagesAndToolIdsReachTheModelUnchanged()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#severalDirectionsBeforeOneStepAllReachTheModelOnceInOrder",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "severalDirectionsBeforeOneStepAllReachTheModelOnceInOrder()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#concurrentDirectionsDuringStepsAreNeitherLostNorDuplicated",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrentDirectionsDuringStepsAreNeitherLostNorDuplicated()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#directionIsReportedQueuedThenAppliedWhenTheModelAcceptsItsRequest",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "directionIsReportedQueuedThenAppliedWhenTheModelAcceptsItsRequest()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#directionInARequestTheModelRefusesIsNotReportedApplied",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "directionInARequestTheModelRefusesIsNotReportedApplied()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#directionArrivingDuringTheLastModelCallIsReportedNotApplied",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "directionArrivingDuringTheLastModelCallIsReportedNotApplied(String) [1] completed",
+          "status": "passed"
+        },
+        {
+          "name": "directionArrivingDuringTheLastModelCallIsReportedNotApplied(String) [2] llm-failure",
+          "status": "passed"
+        },
+        {
+          "name": "directionArrivingDuringTheLastModelCallIsReportedNotApplied(String) [3] step-limit",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied(String, String) [1] context-stop, run_stopped",
+          "status": "passed"
+        },
+        {
+          "name": "directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied(String, String) [2] budget-stop, budget_limit",
+          "status": "passed"
+        },
+        {
+          "name": "directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied(String, String) [3] cancel, run_stopped",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#directionAfterTheRunStoppedTakingThemIsRefusedNotAcceptedAndDropped",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "directionAfterTheRunStoppedTakingThemIsRefusedNotAcceptedAndDropped()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming(String) [1] approve",
+          "status": "passed"
+        },
+        {
+          "name": "directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming(String) [2] reject",
+          "status": "passed"
+        },
+        {
+          "name": "directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming(String) [3] stop",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#firstHandoffAfterSteeringKeepsTheDirectionForTheReceivingAgent",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "firstHandoffAfterSteeringKeepsTheDirectionForTheReceivingAgent(boolean) [1] true",
+          "status": "passed"
+        },
+        {
+          "name": "firstHandoffAfterSteeringKeepsTheDirectionForTheReceivingAgent(boolean) [2] false",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#secondHandoffAndReturnKeepTheDirections",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "secondHandoffAndReturnKeepTheDirections(String) [1] reviewer",
+          "status": "passed"
+        },
+        {
+          "name": "secondHandoffAndReturnKeepTheDirections(String) [2] planner",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#resumeAfterHandoffKeepsTheDirectionAndAddsTheResumeWarning",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "resumeAfterHandoffKeepsTheDirectionAndAddsTheResumeWarning(boolean) [1] true",
+          "status": "passed"
+        },
+        {
+          "name": "resumeAfterHandoffKeepsTheDirectionAndAddsTheResumeWarning(boolean) [2] false",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#compactionKeepsOlderDirectionsAndTheResumeWarning",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "compactionKeepsOlderDirectionsAndTheResumeWarning()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#compactOlderTurnsReportsOnlyWhatItDropped",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "compactOlderTurnsReportsOnlyWhatItDropped()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) [1] WAITING_APPROVAL, true",
+          "status": "passed"
+        },
+        {
+          "name": "resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) [2] WAITING_APPROVAL, false",
+          "status": "passed"
+        },
+        {
+          "name": "resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) [3] READY_FOR_LLM, true",
+          "status": "passed"
+        },
+        {
+          "name": "resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) [4] READY_FOR_LLM, false",
+          "status": "passed"
+        },
+        {
+          "name": "resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) [5] AFTER_TOOL_RESULT, true",
+          "status": "passed"
+        },
+        {
+          "name": "resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) [6] AFTER_TOOL_RESULT, false",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#pendingWriteRunsOnlyAfterAFreshValidApproval",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingWriteRunsOnlyAfterAFreshValidApproval(String) [1] approve",
+          "status": "passed"
+        },
+        {
+          "name": "pendingWriteRunsOnlyAfterAFreshValidApproval(String) [2] reject",
+          "status": "passed"
+        },
+        {
+          "name": "pendingWriteRunsOnlyAfterAFreshValidApproval(String) [3] stale",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#snapshotWrittenBeforeTheChangeResumesWithItsStraySystemsAndDanglingCall",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "snapshotWrittenBeforeTheChangeResumesWithItsStraySystemsAndDanglingCall()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#forkOfASteeredResumedRunKeepsDirectionsAndSendsValidCalls",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "forkOfASteeredResumedRunKeepsDirectionsAndSendsValidCalls()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#unsteeredApprovalRunSendsAndSavesTheSameMessages",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unsteeredApprovalRunSendsAndSavesTheSameMessages()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#unsteeredHandoffPrunesAndBriefsAsBefore",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73d5681941091104fbc37dc748c685f3f5cbc4d48729052b1313fc650de998fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unsteeredHandoffPrunesAndBriefsAsBefore()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentLoopServiceTest.java#steeringDirective_blankIsIgnored",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentLoopServiceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:da5a9f3ced466f3f4c8219867e4bd65411e5b29ae3d90ec3145d48e701121194",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "steeringDirective_blankIsIgnored()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentLoopServiceTest.java#steeringDirective_afterLastBoundary_reportedNotApplied",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentLoopServiceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:da5a9f3ced466f3f4c8219867e4bd65411e5b29ae3d90ec3145d48e701121194",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "steeringDirective_afterLastBoundary_reportedNotApplied()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java#recoveryWhileTheRunIsLiveLeavesItsDirectionsToTheLoop",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5d3f1e6284dd168055e91d93573fc42816cc8b17d6fc05307e46f88cc79ff5b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recoveryWhileTheRunIsLiveLeavesItsDirectionsToTheLoop()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "485fe86b8",
+    "revision": "485fe86b82b0bc8dc42ca0c1ebfa9d2fb71a136d",
+    "overlays": [
+      "modules/app-agent/src/test/java/io/justsearch/agent/ModelRequestFixtures.java"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.AgentDirectionRecordTest.reloadedThreadShowsEachDirectionOnceWithItsFinalOutcome\" --tests \"io.justsearch.agent.AgentDirectionRecordTest.legacyAcknowledgementWithoutOutcomeIsNotShownAsApplied\" --tests \"io.justsearch.agent.AgentDirectionRecordTest.interruptedRunReportsItsUnappliedDirectionsAsNotApplied\" --tests \"io.justsearch.agent.AgentDirectionRecordTest.recoveryReportsADirectionLeftQueuedByAnyInterruption\" --tests \"io.justsearch.agent.AgentDirectionRecordTest.recoveryLeavesAFinishedRunWhoseOutcomesWereAllWrittenAlone\" --tests \"io.justsearch.agent.AgentModelMessagesTest.directionsAfterToolRoundsGoOutAsUserTurnsAfterTheLastToolResult\" --tests \"io.justsearch.agent.AgentModelMessagesTest.savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel\" --tests \"io.justsearch.agent.AgentModelMessagesTest.resumedApprovalStillRequiresAFreshDecision\" --tests \"io.justsearch.agent.AgentModelMessagesTest.profileKeepsDirectionsAndResumeWarningAndHandoffSendsValidList\" --tests \"io.justsearch.agent.AgentModelMessagesTest.everyCompletionPathSendsLaterSystemEntriesAsUserTurns\" --tests \"io.justsearch.agent.AgentModelMessagesTest.tokenCountAfterCompactionMeasuresTheSentList\" --tests \"io.justsearch.agent.AgentModelMessagesTest.unsteeredMessagesAndToolIdsReachTheModelUnchanged\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.severalDirectionsBeforeOneStepAllReachTheModelOnceInOrder\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.concurrentDirectionsDuringStepsAreNeitherLostNorDuplicated\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.directionIsReportedQueuedThenAppliedWhenTheModelAcceptsItsRequest\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.directionInARequestTheModelRefusesIsNotReportedApplied\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.directionArrivingDuringTheLastModelCallIsReportedNotApplied\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.directionAfterTheRunStoppedTakingThemIsRefusedNotAcceptedAndDropped\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.firstHandoffAfterSteeringKeepsTheDirectionForTheReceivingAgent\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.secondHandoffAndReturnKeepTheDirections\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.resumeAfterHandoffKeepsTheDirectionAndAddsTheResumeWarning\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.compactionKeepsOlderDirectionsAndTheResumeWarning\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.compactOlderTurnsReportsOnlyWhatItDropped\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.pendingWriteRunsOnlyAfterAFreshValidApproval\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.snapshotWrittenBeforeTheChangeResumesWithItsStraySystemsAndDanglingCall\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.forkOfASteeredResumedRunKeepsDirectionsAndSendsValidCalls\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.unsteeredApprovalRunSendsAndSavesTheSameMessages\" --tests \"io.justsearch.agent.AgentSteeringResumeTest.unsteeredHandoffPrunesAndBriefsAsBefore\" --tests \"io.justsearch.agent.AgentLoopServiceTest.steeringDirective_blankIsIgnored\" --tests \"io.justsearch.agent.AgentLoopServiceTest.steeringDirective_afterLastBoundary_reportedNotApplied\" --tests \"io.justsearch.agent.AgentDirectionRecordTest.recoveryWhileTheRunIsLiveLeavesItsDirectionsToTheLoop\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 41817,
+        "output": "Calculating task graph as no cached configuration is available for tasks: :modules:app-agent:test --tests io.justsearch.agent.AgentDirectionRecordTest.reloadedThreadShowsEachDirectionOnceWithItsFinalOutcome --tests io.justsearch.agent.AgentDirectionRecordTest.legacyAcknowledgementWithoutOutcomeIsNotShownAsApplied --tests io.justsearch.agent.AgentDirectionRecordTest.interruptedRunReportsItsUnappliedDirectionsAsNotApplied --tests io.justsearch.agent.AgentDirectionRecordTest.recoveryReportsADirectionLeftQueuedByAnyInterruption --tests io.justsearch.agent.AgentDirectionRecordTest.recoveryLeavesAFinishedRunWhoseOutcomesWereAllWrittenAlone --tests io.justsearch.agent.AgentModelMessagesTest.directionsAfterToolRoundsGoOutAsUserTurnsAfterTheLastToolResult --tests io.justsearch.agent.AgentModelMessagesTest.savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel --tests io.justsearch.agent.AgentModelMessagesTest.resumedApprovalStillRequiresAFreshDecision --tests io.justsearch.agent.AgentModelMessagesTest.profileKeepsDirectionsAndResumeWarningAndHandoffSendsValidList --tests io.justsearch.agent.AgentModelMessagesTest.everyCompletionPathSendsLaterSystemEntriesAsUserTurns --tests io.justsearch.agent.AgentModelMessagesTest.tokenCountAfterCompactionMeasuresTheSentList --tests io.justsearch.agent.AgentModelMessagesTest.unsteeredMessagesAndToolIdsReachTheModelUnchanged --tests io.justsearch.agent.AgentSteeringResumeTest.severalDirectionsBeforeOneStepAllReachTheModelOnceInOrder --tests io.justsearch.agent.AgentSteeringResumeTest.concurrentDirectionsDuringStepsAreNeitherLostNorDuplicated --tests io.justsearch.agent.AgentSteeringResumeTest.directionIsReportedQueuedThenAppliedWhenTheModelAcceptsItsRequest --tests io.justsearch.agent.AgentSteeringResumeTest.directionInARequestTheModelRefusesIsNotReportedApplied --tests io.justsearch.agent.AgentSteeringResumeTest.directionArrivingDuringTheLastModelCallIsReportedNotApplied --tests io.justsearch.agent.AgentSteeringResumeTest.directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied --tests io.justsearch.agent.AgentSteeringResumeTest.directionAfterTheRunStoppedTakingThemIsRefusedNotAcceptedAndDropped --tests io.justsearch.agent.AgentSteeringResumeTest.directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming --tests io.justsearch.agent.AgentSteeringResumeTest.firstHandoffAfterSteeringKeepsTheDirectionForTheReceivingAgent --tests io.justsearch.agent.AgentSteeringResumeTest.secondHandoffAndReturnKeepTheDirections --tests io.justsearch.agent.AgentSteeringResumeTest.resumeAfterHandoffKeepsTheDirectionAndAddsTheResumeWarning --tests io.justsearch.agent.AgentSteeringResumeTest.compactionKeepsOlderDirectionsAndTheResumeWarning --tests io.justsearch.agent.AgentSteeringResumeTest.compactOlderTurnsReportsOnlyWhatItDropped --tests io.justsearch.agent.AgentSteeringResumeTest.resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite --tests io.justsearch.agent.AgentSteeringResumeTest.pendingWriteRunsOnlyAfterAFreshValidApproval --tests io.justsearch.agent.AgentSteeringResumeTest.snapshotWrittenBeforeTheChangeResumesWithItsStraySystemsAndDanglingCall --tests io.justsearch.agent.AgentSteeringResumeTest.forkOfASteeredResumedRunKeepsDirectionsAndSendsValidCalls --tests io.justsearch.agent.AgentSteeringResumeTest.unsteeredApprovalRunSendsAndSavesTheSameMessages --tests io.justsearch.agent.AgentSteeringResumeTest.unsteeredHandoffPrunesAndBriefsAsBefore --tests io.justsearch.agent.AgentLoopServiceTest.steeringDirective_blankIsIgnored --tests io.justsearch.agent.AgentLoopServiceTest.steeringDirective_afterLastBoundary_reportedNotApplied --tests io.justsearch.agent.AgentDirectionRecordTest.recoveryWhileTheRunIsLiveLeavesItsDirectionsToTheLoop --rerun\n> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :build-logic:compileKotlin FROM-CACHE\n> Task :build-logic:compileJava NO-SOURCE\n> Task :build-logic:pluginDescriptors\n> Task :build-logic:processResources\n> Task :build-logic:classes\n> Task :build-logic:jar\n\n> Configure project :\nThe com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.\nThe 'val name by creating { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = create(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:194)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:adapters-lucene\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:48)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:88)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ai-backend\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:27)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:40)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:22)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:39)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:141)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api-tck\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:34)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-config\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:15)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-engine\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:86)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-inference\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:31)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-launcher\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$12$1.execute(build.gradle.kts:189)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-observability\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:59)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:103)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-util\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:17)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:dead-code-audit\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:58)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:gpu-bridge\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:16)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexer-worker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:137)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexing\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:52)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:infra-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:24)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ort-common\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:prompt-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:18)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:reranker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ssot-tools\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:system-tests\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:119)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:123)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:131)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:telemetry\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:42)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:test-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$8$1.execute(build.gradle.kts:377)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ui\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:94)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:196)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:217)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:225)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:240)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:265)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:314)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:340)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:359)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:464)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:481)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:536)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:618)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:683)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:734)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:832)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:873)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:945)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:964)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1028)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1074)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1139)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1194)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1260)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1347)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1408)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1532)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1557)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.6.1/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:191)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:app-agent:processResources NO-SOURCE\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:app-util:processResources NO-SOURCE\n> Task :modules:app-config:processResources NO-SOURCE\n> Task :modules:configuration:processTestFixturesResources NO-SOURCE\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:prompt-support:processResources NO-SOURCE\n> Task :modules:infra-core:processResources NO-SOURCE\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:app-observability:processResources\n> Task :modules:telemetry:processTestFixturesResources NO-SOURCE\n> Task :modules:app-agent:processTestResources\n> Task :modules:configuration:processResources\n> Task :modules:api-contract-projection-java:extractProto\n> Task :modules:ipc-common:extractProto\n> Task :modules:extension-substrate:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos\n> Task :modules:prompt-support:compileJava FROM-CACHE\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:prompt-support:classes UP-TO-DATE\n> Task :modules:core-contracts:compileJava FROM-CACHE\n> Task :modules:infra-core:compileJava FROM-CACHE\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:infra-core:classes UP-TO-DATE\n> Task :modules:extension-substrate:jar\n> Task :modules:infra-core:jar\n> Task :modules:prompt-support:jar\n> Task :modules:ipc-common:processProtoResources\n> Task :modules:core-contracts:jar\n> Task :modules:api-contract-projection-java:processProtoResources\n> Task :modules:ipc-common:processResources\n> Task :modules:core:compileJava FROM-CACHE\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:api-contract-projection-java:processResources\n> Task :modules:core:jar\n> Task :modules:api-contract-projection-java:extractIncludeProto\n> Task :modules:configuration:compileJava FROM-CACHE\n> Task :modules:configuration:classes\n> Task :modules:core:compileTestFixturesJava FROM-CACHE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:telemetry:compileJava FROM-CACHE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:core:testFixturesJar\n> Task :modules:telemetry:jar\n> Task :modules:telemetry:compileTestFixturesJava FROM-CACHE\n> Task :modules:telemetry:testFixturesClasses UP-TO-DATE\n> Task :modules:configuration:jar\n> Task :modules:telemetry:testFixturesJar\n> Task :modules:app-config:compileJava FROM-CACHE\n> Task :modules:configuration:compileTestFixturesJava FROM-CACHE\n> Task :modules:configuration:testFixturesClasses UP-TO-DATE\n> Task :modules:app-config:classes UP-TO-DATE\n> Task :modules:app-util:compileJava FROM-CACHE\n> Task :modules:app-util:classes UP-TO-DATE\n> Task :modules:configuration:testFixturesJar\n> Task :modules:app-config:jar\n> Task :modules:app-util:jar\n> Task :modules:app-agent-api:compileJava FROM-CACHE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:api-contract-projection-java:generateProto FROM-CACHE\n> Task :modules:app-agent-api:jar\n> Task :modules:app-api:buildLinuxBoundExec\n> Task :modules:app-api:processResources\n> Task :modules:ipc-common:extractIncludeProto\n> Task :modules:ipc-common:generateProto FROM-CACHE\n> Task :modules:api-contract-projection-java:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:classes\n> Task :modules:api-contract-projection-java:jar\n> Task :modules:app-api:compileJava FROM-CACHE\n> Task :modules:app-api:classes\n> Task :modules:app-api:jar\n> Task :modules:app-agent:compileJava FROM-CACHE\n> Task :modules:app-agent:classes UP-TO-DATE\n> Task :modules:app-agent:jar\n> Task :modules:ipc-common:compileJava FROM-CACHE\n> Task :modules:ipc-common:classes\n> Task :modules:app-observability:compileJava FROM-CACHE\n> Task :modules:app-observability:classes\n> Task :modules:ipc-common:jar\n> Task :modules:app-observability:jar\n\n> Task :modules:app-agent:compileTestJava\n\n> Task :modules:app-agent:testClasses\n\n> Task :modules:app-agent:test\n\nAgentDirectionRecordTest > recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) > recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) [1] unfinished run, READY_FOR_LLM, false, run_interrupted FAILED\n    org.opentest4j.AssertionFailedError at AgentDirectionRecordTest.java:134\n\nAgentDirectionRecordTest > recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) > recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) [2] unfinished run stamped by an interrupted recovery, WAITING_APPROVAL, true, run_interrupted FAILED\n    org.opentest4j.AssertionFailedError at AgentDirectionRecordTest.java:134\n\nAgentDirectionRecordTest > recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) > recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) [3] run that finished, DONE, false, run_finished FAILED\n    org.opentest4j.AssertionFailedError at AgentDirectionRecordTest.java:134\n\nAgentDirectionRecordTest > recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) > recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) [4] run that was stopped, CANCELLED, false, run_stopped FAILED\n    org.opentest4j.AssertionFailedError at AgentDirectionRecordTest.java:134\n\nAgentDirectionRecordTest > recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) > recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) [5] run that failed, ERROR, false, run_failed FAILED\n    org.opentest4j.AssertionFailedError at AgentDirectionRecordTest.java:134\n\nAgentDirectionRecordTest > interruptedRunReportsItsUnappliedDirectionsAsNotApplied() FAILED\n    org.opentest4j.AssertionFailedError at AgentDirectionRecordTest.java:87\n\nAgentDirectionRecordTest > reloadedThreadShowsEachDirectionOnceWithItsFinalOutcome() FAILED\n    org.opentest4j.AssertionFailedError at AgentDirectionRecordTest.java:47\n\nAgentDirectionRecordTest > recoveryWhileTheRunIsLiveLeavesItsDirectionsToTheLoop() FAILED\n    org.opentest4j.AssertionFailedError at AgentDirectionRecordTest.java:197\n\nAgentLoopServiceTest > steeringDirective_afterLastBoundary_reportedNotApplied() FAILED\n    org.opentest4j.AssertionFailedError at AgentLoopServiceTest.java:1293\n\nAgentModelMessagesTest > profileKeepsDirectionsAndResumeWarningAndHandoffSendsValidList() FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:175\n\nAgentModelMessagesTest > directionsAfterToolRoundsGoOutAsUserTurnsAfterTheLastToolResult() FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:53\n\nAgentModelMessagesTest > resumedApprovalStillRequiresAFreshDecision(boolean) > resumedApprovalStillRequiresAFreshDecision(boolean) [1] true FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:144\n\nAgentModelMessagesTest > resumedApprovalStillRequiresAFreshDecision(boolean) > resumedApprovalStillRequiresAFreshDecision(boolean) [2] false FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:144\n\nAgentModelMessagesTest > tokenCountAfterCompactionMeasuresTheSentList() FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:247\n\nAgentModelMessagesTest > everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String) > everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String) [1] ordinary FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:209\n        Caused by: java.lang.RuntimeException at AgentModelMessagesTest.java:210\n            Caused by: java.lang.IllegalStateException at AgentModelMessagesTest.java:210\n\nAgentModelMessagesTest > everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String) > everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String) [2] retry FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:211\n        Caused by: java.lang.RuntimeException at AgentModelMessagesTest.java:211\n            Caused by: java.lang.IllegalStateException at AgentModelMessagesTest.java:211\n\nAgentModelMessagesTest > everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String) > everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String) [3] budget-finalize FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:212\n\nAgentModelMessagesTest > everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String) > everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String) [4] step-finalize FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:213\n\nAgentModelMessagesTest > savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) > savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) [1] READY_FOR_LLM, true FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:103\n\nAgentModelMessagesTest > savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) > savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) [2] READY_FOR_LLM, false FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:103\n\nAgentModelMessagesTest > savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) > savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) [3] AFTER_TOOL_RESULT, true FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:103\n\nAgentModelMessagesTest > savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) > savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) [4] AFTER_TOOL_RESULT, false FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:103\n\nAgentModelMessagesTest > savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) > savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) [5] WAITING_APPROVAL, true FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:103\n\nAgentModelMessagesTest > savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) > savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) [6] WAITING_APPROVAL, false FAILED\n    org.opentest4j.AssertionFailedError at AgentModelMessagesTest.java:103\n\nAgentSteeringResumeTest > severalDirectionsBeforeOneStepAllReachTheModelOnceInOrder() FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:54\n\nAgentSteeringResumeTest > directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming(String) > directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming(String) [1] approve FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:282\n\nAgentSteeringResumeTest > directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming(String) > directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming(String) [2] reject FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:282\n\nAgentSteeringResumeTest > directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming(String) > directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming(String) [3] stop FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:282\n\nAgentSteeringResumeTest > directionArrivingDuringTheLastModelCallIsReportedNotApplied(String) > directionArrivingDuringTheLastModelCallIsReportedNotApplied(String) [1] completed FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:189\n\nAgentSteeringResumeTest > directionArrivingDuringTheLastModelCallIsReportedNotApplied(String) > directionArrivingDuringTheLastModelCallIsReportedNotApplied(String) [2] llm-failure FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:189\n\nAgentSteeringResumeTest > directionArrivingDuringTheLastModelCallIsReportedNotApplied(String) > directionArrivingDuringTheLastModelCallIsReportedNotApplied(String) [3] step-limit FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:189\n\nAgentSteeringResumeTest > directionInARequestTheModelRefusesIsNotReportedApplied() FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:167\n\nAgentSteeringResumeTest > firstHandoffAfterSteeringKeepsTheDirectionForTheReceivingAgent(boolean) > firstHandoffAfterSteeringKeepsTheDirectionForTheReceivingAgent(boolean) [1] true FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:317\n\nAgentSteeringResumeTest > firstHandoffAfterSteeringKeepsTheDirectionForTheReceivingAgent(boolean) > firstHandoffAfterSteeringKeepsTheDirectionForTheReceivingAgent(boolean) [2] false FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:317\n\nAgentSteeringResumeTest > directionAfterTheRunStoppedTakingThemIsRefusedNotAcceptedAndDropped() FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:249\n\nAgentSteeringResumeTest > forkOfASteeredResumedRunKeepsDirectionsAndSendsValidCalls() FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:581\n\nAgentSteeringResumeTest > resumeAfterHandoffKeepsTheDirectionAndAddsTheResumeWarning(boolean) > resumeAfterHandoffKeepsTheDirectionAndAddsTheResumeWarning(boolean) [1] true FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:377\n\nAgentSteeringResumeTest > resumeAfterHandoffKeepsTheDirectionAndAddsTheResumeWarning(boolean) > resumeAfterHandoffKeepsTheDirectionAndAddsTheResumeWarning(boolean) [2] false FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:377\n\nAgentSteeringResumeTest > snapshotWrittenBeforeTheChangeResumesWithItsStraySystemsAndDanglingCall() FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:552\n\nAgentSteeringResumeTest > concurrentDirectionsDuringStepsAreNeitherLostNorDuplicated() FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:104\n\nAgentSteeringResumeTest > pendingWriteRunsOnlyAfterAFreshValidApproval(String) > pendingWriteRunsOnlyAfterAFreshValidApproval(String) [1] approve FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:527\n\nAgentSteeringResumeTest > pendingWriteRunsOnlyAfterAFreshValidApproval(String) > pendingWriteRunsOnlyAfterAFreshValidApproval(String) [2] reject FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:527\n\nAgentSteeringResumeTest > pendingWriteRunsOnlyAfterAFreshValidApproval(String) > pendingWriteRunsOnlyAfterAFreshValidApproval(String) [3] stale FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:527\n\nAgentSteeringResumeTest > directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied(String, String) > directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied(String, String) [1] context-stop, run_stopped FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:229\n\nAgentSteeringResumeTest > directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied(String, String) > directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied(String, String) [2] budget-stop, budget_limit FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:229\n\nAgentSteeringResumeTest > directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied(String, String) > directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied(String, String) [3] cancel, run_stopped FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:229\n\nAgentSteeringResumeTest > compactionKeepsOlderDirectionsAndTheResumeWarning() FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:424\n\nAgentSteeringResumeTest > compactOlderTurnsReportsOnlyWhatItDropped() FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:440\n\nAgentSteeringResumeTest > secondHandoffAndReturnKeepTheDirections(String) > secondHandoffAndReturnKeepTheDirections(String) [1] reviewer FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:347\n\nAgentSteeringResumeTest > secondHandoffAndReturnKeepTheDirections(String) > secondHandoffAndReturnKeepTheDirections(String) [2] planner FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:347\n\nAgentSteeringResumeTest > resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) > resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) [1] WAITING_APPROVAL, true FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:474\n\nAgentSteeringResumeTest > resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) > resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) [2] WAITING_APPROVAL, false FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:474\n\nAgentSteeringResumeTest > resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) > resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) [3] READY_FOR_LLM, true FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:474\n\nAgentSteeringResumeTest > resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) > resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) [4] READY_FOR_LLM, false FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:474\n\nAgentSteeringResumeTest > resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) > resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) [5] AFTER_TOOL_RESULT, true FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:474\n\nAgentSteeringResumeTest > resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) > resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) [6] AFTER_TOOL_RESULT, false FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:474\n\nAgentSteeringResumeTest > directionIsReportedQueuedThenAppliedWhenTheModelAcceptsItsRequest() FAILED\n    org.opentest4j.AssertionFailedError at AgentSteeringResumeTest.java:144\n\n> Task :modules:app-agent:test FAILED\n> Task :modules:app-agent:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r/before/test-intent-before-gBdwdu/build/reports/problems/problems-report.html\n58 actionable tasks: 37 executed, 21 from cache\nConfiguration cache entry stored.\n\nNote: Some input files use or override a deprecated API.\nNote: Recompile with -Xlint:deprecation for details.\n\n63 tests completed, 57 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:app-agent:test'.\n> There were failing tests. See the report at: file:///home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/tmp/wp62r/before/test-intent-before-gBdwdu/modules/app-agent/build/reports/tests/test/index.html\n\nBUILD FAILED in 41s\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java#reloadedThreadShowsEachDirectionOnceWithItsFinalOutcome",
+        "classification": "assertion",
+        "detail": "reloadedThreadShowsEachDirectionOnceWithItsFinalOutcome(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[Focus on Q3., Answer in French., Still waiting.]> but was: <[]>"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java#legacyAcknowledgementWithoutOutcomeIsNotShownAsApplied",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java#interruptedRunReportsItsUnappliedDirectionsAsNotApplied",
+        "classification": "assertion",
+        "detail": "interruptedRunReportsItsUnappliedDirectionsAsNotApplied(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [{directiveText=Applied one., directiveId=d1, outcome=queued}, {directiveText=Applied one., directiveId=d1, outcome=applied}, {directiveText=Pending one., directiveId=d2, outcome=queued}] ==> expected: <4> but was: <3>"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java#recoveryReportsADirectionLeftQueuedByAnyInterruption",
+        "classification": "assertion",
+        "detail": "recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) [1] unfinished run, READY_FOR_LLM, false, run_interrupted: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[Applied one., Answer in French.]> but was: <[]> | recoveryReportsADirectionLeftQueuedByAnyInterruption(String, String, boolean, String) [2] unfinished run stamped by an interrupted recovery, WAITING_APPROVAL, true, run_interrupted: org.opentest4j.AssertionFailedError or"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java#recoveryLeavesAFinishedRunWhoseOutcomesWereAllWrittenAlone",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java#directionsAfterToolRoundsGoOutAsUserTurnsAfterTheLastToolResult",
+        "classification": "assertion",
+        "detail": "directionsAfterToolRoundsGoOutAsUserTurnsAfterTheLastToolResult(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [SessionStarted[sessionId=e3b434c8-ac97-4242-aa5e-8f3bb1b51f47, samplingTemperature=0.7, samplingTopP=0.8, samplingSeed=null, trace=TraceContext[traceId=e3b434c8-ac97-4242-aa5e-8f3bb1b51f47, stepId=session:start, spanId=span-000001, parentSpanId=null, agentId=pri"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java#savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel",
+        "classification": "assertion",
+        "detail": "savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel(String, boolean) [1] READY_FOR_LLM, true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [SessionStarted[sessionId=cfc1b3c1-811d-4cdb-9812-8e8c94f07d28, samplingTemperature=0.7, samplingTopP=0.8, samplingSeed=null, trace=TraceContext[traceId=cfc1b3c1-811d-4cdb-9812-8e8c94f07d28, stepId=session:start, spanId=span-000001, parentSpanId=null, agentId=pri | savedTrailingNotesResumeAndSteeringAfterResumeReachTheModel"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java#resumedApprovalStillRequiresAFreshDecision",
+        "classification": "assertion",
+        "detail": "resumedApprovalStillRequiresAFreshDecision(boolean) [1] true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [SessionStarted[sessionId=0b38b675-d97b-4438-80e8-1e9cf6a45543, samplingTemperature=0.7, samplingTopP=0.8, samplingSeed=null, trace=TraceContext[traceId=0b38b675-d97b-4438-80e8-1e9cf6a45543, stepId=session:start, spanId=span-000001, parentSpanId=null, agentId=pri | resumedApprovalStillRequiresAFreshDecision(boolean) [2] false: org.opentest4j.AssertionFailedError "
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java#profileKeepsDirectionsAndResumeWarningAndHandoffSendsValidList",
+        "classification": "assertion",
+        "detail": "profileKeepsDirectionsAndResumeWarningAndHandoffSendsValidList(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [SessionStarted[sessionId=ccadcd48-4b66-48a7-81c5-7913512efbba, samplingTemperature=0.7, samplingTopP=0.8, samplingSeed=null, trace=TraceContext[traceId=ccadcd48-4b66-48a7-81c5-7913512efbba, stepId=session:start, spanId=span-000001, parentSpanId=null, agentId=pla"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java#everyCompletionPathSendsLaterSystemEntriesAsUserTurns",
+        "classification": "assertion",
+        "detail": "everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String) [1] ordinary: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: java.lang.RuntimeException: LLM call failed | everyCompletionPathSendsLaterSystemEntriesAsUserTurns(String) [2] retry: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: java.lang.RuntimeException: LLM call failed | everyCompletionPathSendsLaterSystemEntriesAsUserTurns(S"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java#tokenCountAfterCompactionMeasuresTheSentList",
+        "classification": "assertion",
+        "detail": "tokenCountAfterCompactionMeasuresTheSentList(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [SessionStarted[sessionId=8ed913d5-612d-4bfd-8218-dbe42965a4b2, samplingTemperature=0.7, samplingTopP=0.8, samplingSeed=null, trace=TraceContext[traceId=8ed913d5-612d-4bfd-8218-dbe42965a4b2, stepId=session:start, spanId=span-000001, parentSpanId=null, agentId=pri"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentModelMessagesTest.java#unsteeredMessagesAndToolIdsReachTheModelUnchanged",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#severalDirectionsBeforeOneStepAllReachTheModelOnceInOrder",
+        "classification": "assertion",
+        "detail": "severalDirectionsBeforeOneStepAllReachTheModelOnceInOrder(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [SessionStarted[sessionId=ecbc4e7a-12d6-4e1a-bf46-080cd3f156bf, samplingTemperature=0.7, samplingTopP=0.8, samplingSeed=null, trace=TraceContext[traceId=ecbc4e7a-12d6-4e1a-bf46-080cd3f156bf, stepId=session:start, spanId=span-000001, parentSpanId=null, agentId=pri"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#concurrentDirectionsDuringStepsAreNeitherLostNorDuplicated",
+        "classification": "assertion",
+        "detail": "concurrentDirectionsDuringStepsAreNeitherLostNorDuplicated(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [SessionStarted[sessionId=f56fcf3e-888a-4e92-8021-f51f09aecca8, samplingTemperature=0.7, samplingTopP=0.8, samplingSeed=null, trace=TraceContext[traceId=f56fcf3e-888a-4e92-8021-f51f09aecca8, stepId=session:start, spanId=span-000001, parentSpanId=null, agentId=pri"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#directionIsReportedQueuedThenAppliedWhenTheModelAcceptsItsRequest",
+        "classification": "assertion",
+        "detail": "directionIsReportedQueuedThenAppliedWhenTheModelAcceptsItsRequest(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [SessionStarted[sessionId=973bc22b-03cf-4dc5-8e87-4f30e25164b0, samplingTemperature=0.7, samplingTopP=0.8, samplingSeed=null, trace=TraceContext[traceId=973bc22b-03cf-4dc5-8e87-4f30e25164b0, stepId=session:start, spanId=span-000001, parentSpanId=null, agentId=pri"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#directionInARequestTheModelRefusesIsNotReportedApplied",
+        "classification": "assertion",
+        "detail": "directionInARequestTheModelRefusesIsNotReportedApplied(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[queued, not_applied]> but was: <[null]>"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#directionArrivingDuringTheLastModelCallIsReportedNotApplied",
+        "classification": "assertion",
+        "detail": "directionArrivingDuringTheLastModelCallIsReportedNotApplied(String) [1] completed: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[queued, not_applied]> but was: <[null]> | directionArrivingDuringTheLastModelCallIsReportedNotApplied(String) [2] llm-failure: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[queued, not_applied]> but was: <[null]> | directionArrivingDuringTheLastModelCallIsReportedNotApplied(String) [3] step-l"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied",
+        "classification": "assertion",
+        "detail": "directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied(String, String) [1] context-stop, run_stopped: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[queued, not_applied]> but was: <[null]> | directionDrainedButEndedBeforeTheModelCallIsReportedNotApplied(String, String) [2] budget-stop, budget_limit: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[queued, not_applied]> but was: <[null]> | directionDrainedButEndedBe"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#directionAfterTheRunStoppedTakingThemIsRefusedNotAcceptedAndDropped",
+        "classification": "assertion",
+        "detail": "directionAfterTheRunStoppedTakingThemIsRefusedNotAcceptedAndDropped(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: once the run has reported its last outcomes it must refuse, not accept and drop ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming",
+        "classification": "assertion",
+        "detail": "directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming(String) [1] approve: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <queued> but was: <null> | directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming(String) [2] reject: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <queued> but was: <null> | directionWhileApprovalIsHeldNeitherDecidesItNorClaimsEarlierTiming(String) [3] stop: org.opentest4j.Asser"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#firstHandoffAfterSteeringKeepsTheDirectionForTheReceivingAgent",
+        "classification": "assertion",
+        "detail": "firstHandoffAfterSteeringKeepsTheDirectionForTheReceivingAgent(boolean) [1] true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [SessionStarted[sessionId=17c9c2d8-657e-47e9-9ec6-c876d46e26f2, samplingTemperature=0.7, samplingTopP=0.8, samplingSeed=null, trace=TraceContext[traceId=17c9c2d8-657e-47e9-9ec6-c876d46e26f2, stepId=session:start, spanId=span-000001, parentSpanId=null, agentId=pla | firstHandoffAfterSteeringKeepsTheDirectionForTheReceivingAgent(boolean) [2] fal"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#secondHandoffAndReturnKeepTheDirections",
+        "classification": "assertion",
+        "detail": "secondHandoffAndReturnKeepTheDirections(String) [1] reviewer: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [SessionStarted[sessionId=ac785883-22fd-4ca8-86f0-56628eb06873, samplingTemperature=0.7, samplingTopP=0.8, samplingSeed=null, trace=TraceContext[traceId=ac785883-22fd-4ca8-86f0-56628eb06873, stepId=session:start, spanId=span-000001, parentSpanId=null, agentId=pla | secondHandoffAndReturnKeepTheDirections(String) [2] planner: org.opentest4j.AssertionFailedError or"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#resumeAfterHandoffKeepsTheDirectionAndAddsTheResumeWarning",
+        "classification": "assertion",
+        "detail": "resumeAfterHandoffKeepsTheDirectionAndAddsTheResumeWarning(boolean) [1] true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the run reaches the write's approval after the handoff ==> expected: not <null> | resumeAfterHandoffKeepsTheDirectionAndAddsTheResumeWarning(boolean) [2] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the run reaches the write's approval after the handoff ==> expected: not <null>"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#compactionKeepsOlderDirectionsAndTheResumeWarning",
+        "classification": "assertion",
+        "detail": "compactionKeepsOlderDirectionsAndTheResumeWarning(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[Older direction.]> but was: <[]>"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#compactOlderTurnsReportsOnlyWhatItDropped",
+        "classification": "assertion",
+        "detail": "compactOlderTurnsReportsOnlyWhatItDropped(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <6> but was: <7>"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite",
+        "classification": "assertion",
+        "detail": "resumeWithOutstandingCallsSendsAValidConversationAndRepeatsNoWrite(String, boolean) [1] WAITING_APPROVAL, true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [SessionStarted[sessionId=b8d52d35-9bc7-4931-b242-b0afe6915b62, samplingTemperature=0.7, samplingTopP=0.8, samplingSeed=null, trace=TraceContext[traceId=b8d52d35-9bc7-4931-b242-b0afe6915b62, stepId=session:start, spanId=span-000001, parentSpanId=null, agentId=pri | resumeWithOutstandingCallsSendsAValidConversation"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#pendingWriteRunsOnlyAfterAFreshValidApproval",
+        "classification": "assertion",
+        "detail": "pendingWriteRunsOnlyAfterAFreshValidApproval(String) [1] approve: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [SessionStarted[sessionId=de3ab8bb-e345-4baa-9660-b790084d3a87, samplingTemperature=0.7, samplingTopP=0.8, samplingSeed=null, trace=TraceContext[traceId=de3ab8bb-e345-4baa-9660-b790084d3a87, stepId=session:start, spanId=span-000001, parentSpanId=null, agentId=pri | pendingWriteRunsOnlyAfterAFreshValidApproval(String) [2] reject: org.opentest4j.AssertionFailed"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#snapshotWrittenBeforeTheChangeResumesWithItsStraySystemsAndDanglingCall",
+        "classification": "assertion",
+        "detail": "snapshotWrittenBeforeTheChangeResumesWithItsStraySystemsAndDanglingCall(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [SessionStarted[sessionId=032258f9-d8e0-44a4-adcb-d14e7e8cddb8, samplingTemperature=0.7, samplingTopP=0.8, samplingSeed=null, trace=TraceContext[traceId=032258f9-d8e0-44a4-adcb-d14e7e8cddb8, stepId=session:start, spanId=span-000001, parentSpanId=null, agentId=pri"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#forkOfASteeredResumedRunKeepsDirectionsAndSendsValidCalls",
+        "classification": "assertion",
+        "detail": "forkOfASteeredResumedRunKeepsDirectionsAndSendsValidCalls(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [SessionStarted[sessionId=82e7e15b-c804-4e98-a34d-711cdd633a8c, samplingTemperature=0.7, samplingTopP=0.8, samplingSeed=null, trace=TraceContext[traceId=82e7e15b-c804-4e98-a34d-711cdd633a8c, stepId=session:start, spanId=span-000001, parentSpanId=null, agentId=pri"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#unsteeredApprovalRunSendsAndSavesTheSameMessages",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSteeringResumeTest.java#unsteeredHandoffPrunesAndBriefsAsBefore",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentLoopServiceTest.java#steeringDirective_blankIsIgnored",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentLoopServiceTest.java#steeringDirective_afterLastBoundary_reportedNotApplied",
+        "classification": "assertion",
+        "detail": "steeringDirective_afterLastBoundary_reportedNotApplied(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a late steer is recorded, and recorded as not applied ==> expected: <[queued, not_applied]> but was: <[null]>"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentDirectionRecordTest.java#recoveryWhileTheRunIsLiveLeavesItsDirectionsToTheLoop",
+        "classification": "assertion",
+        "detail": "recoveryWhileTheRunIsLiveLeavesItsDirectionsToTheLoop(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: recovery must not decide a direction the live run still holds ==> expected: <[[queued]]> but was: <[[]]>"
+      }
+    ]
+  },
+  "digest": "sha256:da1f98b7a592980f1e7ae60acdafa0ff5d2b73a53d9fee2a447a004a6e5129b5"
+}

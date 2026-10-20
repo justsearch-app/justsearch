@@ -2,7 +2,7 @@
 title: "ADR-0018: VLM PDF Extraction via Chat Model"
 type: decision
 status: stable
-description: "Use existing chat model's vision capability (Qwen 3.5 VLM) for PDF layout extraction instead of adding Docling as a Python sidecar."
+description: "Reuse the chat model's vision path, without a Docling sidecar, for visual extraction of PDFs and images; on by default as the second fallback tier."
 date: 2026-03-23
 probes:
   - adr-0018-layout-flag-absent
@@ -12,7 +12,9 @@ last_reviewed: 2026-09-02
 # ADR-0018: VLM PDF Extraction via Chat Model
 
 ## Status
-Accepted
+Accepted. GPU sharing and extraction pacing are subsequently governed by
+[ADR-0048](0048-extraction-isolation-and-indexing-pacing.md) and
+[ADR-0050](0050-gpu-co-residence-by-prevention.md).
 
 ## Context
 Tika extracts text from PDFs but loses layout and table structure. Complex PDFs (scientific papers, financial reports) need structural understanding for quality retrieval. The system already runs a chat model (Qwen 3.5 VLM with mmproj) via llama-server for AI features.

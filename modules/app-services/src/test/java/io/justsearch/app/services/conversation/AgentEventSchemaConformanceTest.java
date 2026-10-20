@@ -35,7 +35,7 @@ final class AgentEventSchemaConformanceTest {
           new AgentEvent.ToolBatchProposed(List.of()),
           new AgentEvent.ToolCallPendingApproval(null, null, null, (RiskTier) null),
           new AgentEvent.ToolCallApproved((String) null),
-          new AgentEvent.DirectiveAcknowledged((String) null),
+          new AgentEvent.DirectiveAcknowledged(null, null, null, null),
           new AgentEvent.ToolExecutionStarted(null, null),
           new AgentEvent.ToolExecutionCompleted(null, null),
           new AgentEvent.ToolCallRejected(null, null),

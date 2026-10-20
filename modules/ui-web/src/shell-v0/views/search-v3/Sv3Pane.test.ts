@@ -15,7 +15,15 @@
  * would be exactly the fork the register exists to prevent, and nothing else in the suite is
  * positioned to see it.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+// Incidental requests are outside these render/event scenarios. Keep their
+// unavailable-backend behavior explicit, without contacting a real server.
+const originalFetch = globalThis.fetch;
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Test backend unavailable')));
+});
+afterEach(() => { globalThis.fetch = originalFetch; });
 import { Sv3Pane, SV3_PANE_CLOSE } from './Sv3Pane.js';
 import { citationHeader, type CitationHeader } from '../../components/chat/evidenceProjection.js';
 import type { DocumentCitationAnchor } from '../../components/documentPane/DocumentPane.js';
