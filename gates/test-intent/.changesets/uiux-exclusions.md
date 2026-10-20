@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: agent-session-2xmru_je
+author-session: 01a15819-2a8c-73e1-84af-4f19e90308d0
 ---
 
 # Test-intent entries
@@ -12,6 +12,24 @@ pass-2 limit amendment; finding 8 belongs to WP3.2 (AX3). Preservation checks in
 retain already working subcases; the other EX4 entry carries the fail-before repairs.
 Editor checks exercise existing API-refusal presentation; real Windows desktop and live-stack
 checks are not claimed. No acceptance record is authored here.
+
+D1-D5 below are agent-adopted orchestrator decisions under the user's delegation, as given in
+the builder assignment; they are not new owner quotations. D1 and D3 restore regressions against
+47e8d1e79. D2 changes the old recorded-glob refusal expectation under AX1 and compares with f9bd104d2.
+
+Agent-adopted D4: "if the counting code is in this change, files excluded by the user's list are
+counted under the user-exclusion reason, not the temporary/system one (if no such reason exists on
+f9bd104d2, leave it and say so)." No user-exclusion reason exists on f9bd104d2: its reason-code list
+only has SKIPPED_TEMP_OR_SYSTEM for this case. This conditional leaves that classification unchanged.
+
+Agent-adopted D5: "check whether JustSearch's own settings UI ever sends the exclusion list back
+unchanged with another setting. If it does and that save fails while invalid entries are saved,
+make a save that sends the saved list unchanged succeed (newly added invalid entries are still
+refused). If only foreign clients can hit it, leave it and say so." Own UI writes are narrow patches:
+SettingsSurface dispatches APPEARANCE_FLOW's literal individual-field effects, Brain writes llm,
+adaptation writes highContrast and uiMode writes mode. Library skips a POST for unchanged invalid
+saved patterns. A whole-object echo is only a foreign-client case; its refusal is left unchanged.
+No frontend edit is required by D4/D5.
 
 ```json
 {
@@ -322,6 +340,107 @@ checks are not claimed. No acceptance record is authored here.
         "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#AX2 pattern help explains character classes and alternatives for previously saved lists"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/MalformedOperatorExclusionOverrideTest.java"
+      ],
+      "class": "New",
+      "behaviour": "EN1/D1 (agent-adopted under the user's delegation): malformed live operator JSON produces an empty exclusion policy, rather than the GUI list or an exception, restoring f9bd104d2. Repeated reads of the unchanged policy emit one warning. The legacy optional JSON list parser is preserved; recorded JSON-shape validation remains strict. The test was first run in ExclusionLimitTest before being moved unchanged into this standalone file to retain the existing ExclusionLimitTest evidence.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "EN1",
+          "quote": "Built-in skips (`IngestionSkipPolicy`), existing pattern syntax (a bare name matches at any depth), environment and `-D` overrides of the GUI list (`ExcludesServiceImpl.java:28-31`).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "D1",
+          "quote": "a malformed operator override behaves exactly as on f9bd104d2 (find what that is and keep it), and is logged once as a warning; it never stops indexing. A check reproduces R1 and fails on 47e8d1e79.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-exclusions-d1-d3-repaired.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/MalformedOperatorExclusionOverrideTest.java#D1MalformedOperatorOverrideIsIgnoredAndWarnsOnce"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsV2ProjectionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "D3 (agent-adopted choice under the user's delegation): omit invalidExcludePatterns when no entry is invalid, represented as null in the Java projection. This restores the existing full-record expectation and adds an explicit null assertion. NON_EMPTY already omits the empty collection on the wire, the schema permits omission/null, and the editor defaults an omitted field to []. Nonempty diagnostics remain covered by the existing AX1 checks.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "D3",
+          "quote": "decide whether the projected invalidExcludePatterns should be [] or absent when there are none, keep it consistent with the schema and the UI, and enter the projection test change with its reason.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-exclusions-d1-d3-repaired.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsV2ProjectionTest.java#projectsEveryStoredFieldWithoutTrimmingPaths",
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsV2ProjectionTest.java#preservesUnsetAndAutomaticValuesWithoutInventingAnIndexPath"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerScanOpsRecordedTest.java"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AX1",
+          "quote": "an invalid saved entry is matched as a literal name and never stops indexing, on every path including replay of recorded work.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "D2",
+          "quote": "AX1 covers replay, so a recorded scan whose excludes hold an invalid entry is no longer refused; it matches that entry literally. Rewrite that test to AX1's expectation and enter it as a changed check citing AX1 (it must fail on f9bd104d2 for the reason under test, or be classified as the docs require).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "conflictSearch": "Decision records searched for a conflict: none. Under the agent-adopted D2 decision and AX1, the old malformedRecordedGlobRefusesBeforeAnyQueueOrLedgerEffect expectation is retired: invalid saved glob entries in recorded scans match literally instead of refusing replay. JSON-shape and recorded admission ownership/cancellation guards remain."
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerScanOpsRecordedTest.java"
+      ],
+      "class": "New",
+      "behaviour": "AX1/D2 (agent-adopted under the user's delegation): recorded scans exclude invalid entries as literal names at the root and nested levels, keep valid entries working, and admit unrelated files with their frozen key, epoch and collection. This is the intentional replacement of the old refusal expectation: it already passes on unchanged 47e8d1e79, so its assertion fail-before is against the real base f9bd104d2, not claimed as a new failure on 47e8d1e79.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "AX1",
+          "quote": "an invalid saved entry is matched as a literal name and never stops indexing, on every path including replay of recorded work.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "D2",
+          "quote": "AX1 covers replay, so a recorded scan whose excludes hold an invalid entry is no longer refused; it matches that entry literally. Rewrite that test to AX1's expectation and enter it as a changed check citing AX1 (it must fail on f9bd104d2 for the reason under test, or be classified as the docs require).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-exclusions-recorded-ax1.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerScanOpsRecordedTest.java#AX1MalformedRecordedGlobMatchesLiteralNameAndKeepsOtherEntriesWorking"
+      ],
+      "repaired": true
     }
   ]
 }
@@ -330,6 +449,8 @@ checks are not claimed. No acceptance record is authored here.
 ## Review history
 
 - 2026-10-20: Reworked after verifier rejection 8cf789758. Removed finding-8 claims from both EX4 entries (AX3); added before-version-written upgrade data and EN1/AX1 admission, replay, Preview/Apply and editor checks, plus AX2 pattern help. Existing rejection record retained below. Builder session agent-session-2xmru_je.
+
+- 2026-10-20: Reworked after verifier rejection 47e8d1e79 under agent-adopted D1-D5: restore malformed operator override fallback with a once-per-policy warning (EN1 evidence); retain omitted empty diagnostics and the original projection oracle; replace recorded invalid-glob refusal under AX1 with real-base fail-before evidence; document the D4/D5 conditional no-change findings. Both rejection records retained byte-identical. Builder session 01a15819-2a8c-73e1-84af-4f19e90308d0.
 
 ## Acceptance records
 

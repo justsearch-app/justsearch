@@ -19,13 +19,14 @@ public final class SettingsV2Projection {
 
   public static SettingsV2 toSettingsV2(UiSettings settings, UiSettingsStore.PersistenceMode persistenceMode,
       io.justsearch.app.api.settings.SettingsWitness witness) {
+    var invalidPatterns = ExclusionPatterns.fromPatterns(settings.getExcludePatterns()).invalidPatterns();
     var ui = new UiSettingsV2(
         settings.getTheme(), settings.isHighContrast(), settings.getDensity(),
         settings.isVimMode(), settings.getDefaultAction(),
         settings.getInspectorWidth() > 0 ? settings.getInspectorWidth() : null,
         settings.isPauseIndexingDuringAi(), settings.getMode(), settings.isTrustLoopNudgeSeen(),
         List.copyOf(settings.getExcludePatterns()), settings.getChatEnabled(),
-        ExclusionPatterns.fromPatterns(settings.getExcludePatterns()).invalidPatterns());
+        invalidPatterns.isEmpty() ? null : invalidPatterns);
     var llm = new LlmSettingsV2(
         blankToNull(settings.getServerExecutablePath()), settings.getContextLength(),
         settings.getMaxTokens(), settings.configuredGpuLayers(),

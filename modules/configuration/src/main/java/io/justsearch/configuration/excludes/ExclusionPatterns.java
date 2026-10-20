@@ -11,6 +11,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * ExclusionPatterns
@@ -29,6 +31,7 @@ import java.util.regex.Pattern;
  */
 public final class ExclusionPatterns {
 
+  private static final Logger log = LoggerFactory.getLogger(ExclusionPatterns.class);
   private static final ObjectMapper JSON = new ObjectMapper();
   private record Cached(String raw, ExclusionPatterns patterns) {}
   private static volatile Cached cached = new Cached("", empty());
@@ -39,9 +42,22 @@ public final class ExclusionPatterns {
     String raw = store == null ? "" : store.get().ui().excludePatterns();
     Cached observed = cached;
     if (java.util.Objects.equals(raw, observed.raw())) return observed.patterns();
-    ExclusionPatterns compiled = fromRawJsonStrict(raw, isWindows());
-    cached = new Cached(raw, compiled);
-    return compiled;
+    synchronized (ExclusionPatterns.class) {
+      observed = cached;
+      if (java.util.Objects.equals(raw, observed.raw())) return observed.patterns();
+      ExclusionPatterns compiled;
+      try {
+        // Live operator overrides keep the optional parser's legacy fail-open semantics.
+        compiled = raw == null || raw.isBlank() ? empty()
+            : fromPatterns(JSON.readValue(raw, new TypeReference<List<String>>() {}));
+      } catch (RuntimeException invalid) {
+        compiled = empty();
+        log.warn("Ignoring malformed justsearch.ui.exclude_patterns; continuing without user exclusions");
+      }
+      // Cache malformed values too: concurrent admission paths warn once for this policy.
+      cached = new Cached(raw, compiled);
+      return compiled;
+    }
   }
 
   /** Validate new saves without changing how older settings files deserialize. */
