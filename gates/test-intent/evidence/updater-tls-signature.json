@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T12:06:47.290Z",
+  "revision": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
+  "tree": "c3657ddc6e0c3c120c9f069fd80d26d85ff808eb",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::metadata_signature_rejects_wrong_signature\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5330
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::metadata_signature_rejects_wrong_signature",
+      "file": "modules/shell/src-tauri/src/updater.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:1bc60048ec67175893c17269a4a4c2b4eddbc9dbc4744628b616977312fc129a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::tests::metadata_signature_rejects_wrong_signature",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:dcdc5a4fe79b5a5e1a7fb3c50abe50ff59ddf3a71cc385347ba5630ef3fe9b3a"
+}

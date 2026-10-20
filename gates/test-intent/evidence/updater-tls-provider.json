@@ -1,0 +1,72 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T12:06:36.242Z",
+  "revision": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
+  "tree": "c3657ddc6e0c3c120c9f069fd80d26d85ff808eb",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::startup_provider_builds_release_and_backend_clients\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5262
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::startup_provider_builds_release_and_backend_clients",
+      "file": "modules/shell/src-tauri/src/updater.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:1bc60048ec67175893c17269a4a4c2b4eddbc9dbc4744628b616977312fc129a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::tests::startup_provider_builds_release_and_backend_clients",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
+    "revision": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "tmp/evidence/noop-initializer.patch",
+        "contentDigest": "sha256:70613cfe08d37d891ce4360023f05c173bd4a277dfc9f546d327e09e7ca13a82"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::startup_provider_builds_release_and_backend_clients\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5333,
+        "output": "\nrunning 1 test\ntest updater::tests::startup_provider_builds_release_and_backend_clients ... FAILED\n\nfailures:\n\n---- updater::tests::startup_provider_builds_release_and_backend_clients stdout ----\n\nthread 'updater::tests::startup_provider_builds_release_and_backend_clients' (2244) panicked at src/updater.rs:2273:9:\nassertion `left == right` failed: fresh-process check failed:\n\nrunning 1 test\ntest updater::tests::startup_provider_builds_release_and_backend_clients ... FAILED\n\nfailures:\n\nfailures:\n    updater::tests::startup_provider_builds_release_and_backend_clients\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 154 filtered out; finished in 0.00s\n\n\n\nthread 'updater::tests::startup_provider_builds_release_and_backend_clients' (2246) panicked at /home/elias/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.13.2/src/async_impl/client.rs:2461:5:\nNo provider set\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\nthread 'updater::tests::startup_provider_builds_release_and_backend_clients' (2246) panicked at src/updater.rs:2298:13:\nclient construction must not panic or fail\n\n  left: false\n right: true\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::tests::startup_provider_builds_release_and_backend_clients\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 154 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/am/2exdsekq/tmp/test-intent-before-mANzqZ/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:947:15\n    |\n947 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.30s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/upkeep-g-updater-tls/tmp/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::startup_provider_builds_release_and_backend_clients",
+        "classification": "assertion",
+        "detail": "updater::tests::startup_provider_builds_release_and_backend_clients:  ---- updater::tests::startup_provider_builds_release_and_backend_clients stdout ----\n\nthread 'updater::tests::startup_provider_builds_release_and_backend_clients' (2244) panicked at src/updater.rs:2273:9:\nassertion `left == right` failed: fresh-process check failed:\n\nrunning 1 test\ntest updater::tests::startup_provider_builds_release_and_backend_clients ... FAILED\n\nfailures:\n\nfailures:\n    updater::tests::startup_provider_buil"
+      }
+    ]
+  },
+  "digest": "sha256:2da42c83c3f1013801545ecf0141b9e57a4393cbf818aa484c7d8ac1b8062b56"
+}
