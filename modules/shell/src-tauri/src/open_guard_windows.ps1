@@ -21,6 +21,17 @@ if ($Mode -eq 'snapshot') {
     exit 0
 }
 $before = Get-Content -Raw -LiteralPath $env:OPEN_GUARD_SNAPSHOT | ConvertFrom-Json
+function Observation($entries) {
+    $json = $entries | Select-Object Hwnd, Path,
+        @{ Name = 'ExpectedPath'; Expression = { $env:OPEN_GUARD_EXPECTED } },
+        @{ Name = 'ExpectedSelection'; Expression = { $env:OPEN_GUARD_SELECTED } },
+        SelectionCount, Selected, PipelineSelected |
+        ConvertTo-Json -Depth 4 -Compress
+    if ($env:OPEN_GUARD_OBSERVATIONS) {
+        Add-Content -LiteralPath $env:OPEN_GUARD_OBSERVATIONS -Value $json -Encoding UTF8
+    }
+    Write-Output $json
+}
 if ($Mode -eq 'observe') {
     $last = @()
     $deadline = [DateTime]::UtcNow.AddSeconds(15)
@@ -28,16 +39,26 @@ if ($Mode -eq 'observe') {
         $last = @(Windows)
         foreach ($entry in $last) {
             if ($entry.Path -ieq $env:OPEN_GUARD_EXPECTED) {
-                $selected = @($entry.Window.Document.SelectedItems() | ForEach-Object { [string]$_.Path })
+                # SelectedItems returns a FolderItems collection. Read its documented Count/Item
+                # interface explicitly, retaining the old pipeline result only as a diagnostic.
+                # Never call SelectItem here: that would repair the product's result in the test.
+                $items = $entry.Window.Document.SelectedItems()
+                $selected = @(for ($index = 0; $index -lt $items.Count; $index++) {
+                    [string]$items.Item($index).Path
+                })
+                $pipeline = @($items | ForEach-Object { [string]$_.Path })
+                $entry | Add-Member -NotePropertyName SelectionCount -NotePropertyValue $items.Count
+                $entry | Add-Member -NotePropertyName Selected -NotePropertyValue $selected
+                $entry | Add-Member -NotePropertyName PipelineSelected -NotePropertyValue $pipeline
                 if (!$env:OPEN_GUARD_SELECTED -or $selected -icontains $env:OPEN_GUARD_SELECTED) {
-                    @{ Hwnd = $entry.Hwnd; Path = $entry.Path; Selected = $selected } | ConvertTo-Json -Compress
+                    Observation @($entry)
                     exit 0
                 }
             }
         }
         Start-Sleep -Milliseconds 200
     } while ([DateTime]::UtcNow -lt $deadline)
-    $last | Select-Object Hwnd, Path | ConvertTo-Json -Compress | Write-Output
+    Observation $last
     [Console]::Error.WriteLine("No actual Explorer window at '$env:OPEN_GUARD_EXPECTED' with selection '$env:OPEN_GUARD_SELECTED'")
     exit 1
 }

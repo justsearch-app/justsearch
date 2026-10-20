@@ -9,7 +9,11 @@ author-session: open-guard-builder
 
 All eleven earlier Windows checks **passed on hosted Windows at `e22910c2de10eb90232fff11cc9c3248f454a23c`**: [original refusals](../evidence/open-guard-windows-repaired.json), [round-3 dispatch](../evidence/open-guard-windows-round3-repaired.json), [round-4 repairs](../evidence/open-guard-windows-round4-repaired.json), and [round-4 preservation](../evidence/open-guard-windows-round4-preserved.json). Those committed results cover Invoice/PATHEXT, mapped UNC documents and folders, and document/bracket-folder markers. Their source-file digests are stale after round 5; all four reruns are in `tmp/open-guard/windows-evidence-command.txt`.
 
-The four round-5 window-observation checks are **unverified until the next hosted run**. The plain-folder control must pass on both `143fd387b` and the candidate. Q4,notes, Q6,root, and a,b2.txt reveal must assertion-fail before and pass after; reveal also checks the actual selection. An unavailable desktop fails the control. Folder open uses ShellExecuteExW, and file reveal uses SHParseDisplayName/SHOpenFolderAndSelectItems, with the checked plain path as one value. Every dispatching Windows test uses serialized snapshots and a cleanup guard on pass and unwind: only newly observed Explorer windows and fixture-owned new viewer PIDs are closed, with creation-time checks before stopping a PID. The GUI lane refuses a preexisting Notepad rather than taking ownership of someone else's tabs. The real net use mapping is removed even on assertion failure. macOS is out of scope.
+Hosted [run 39412497810](https://github.com/justsearch-app/justsearch/actions/runs/39412497810) on `394392a8d` passed the plain-folder control before and after, and passed Q4,notes/Q6,root after their assertion failures on `143fd387b` (Documents). Reveal failed before (Desktop) and after: HWND 655838 was at the correct parent, but the old observer did not confirm a,b2.txt selection. Its failure output omitted selection Count and paths, so it cannot establish whether the product or observer was wrong. The final Explorer-windows step printed no locations; cleanup logged closure of HWND 655838. The script stopped before every older Windows rerun, and their e22910c2d evidence remains historical.
+
+Round 6 keeps the selection assertion and 15-second poll. The observer now reads the documented FolderItems Count/Item(index).Path interface and reports that data alongside the former pipeline enumeration, on both pass and timeout. The command prints persistent observation traces even for successful Rust checks (whose stdout the harness normally suppresses). It never sets a selection. Microsoft documents [SelectedItems](https://learn.microsoft.com/en-us/windows/win32/shell/shellfolderview-selecteditems) and [Item](https://learn.microsoft.com/en-us/windows/win32/shell/folderitems-item), so there is no basis to remove the assertion as unobservable. A hosted rerun is required to distinguish (a) an actually empty selection from (b) the old enumeration's empty/wrong projection. No product change or confirmed cause is claimed from the incomplete log.
+
+`tmp/open-guard/windows-evidence-command.txt` attempts every evidence file, copies failed artifacts too, and exits nonzero after all groups if any failed. Each evidence child still finishes its existing pass/unwind GUI cleanup before the next call. All updated Windows checks remain unverified until that hosted run; the plain control must still pass on both revisions. macOS is out of scope.
 
 D4 was generated in a shared scratch clone using `run-evidence.mjs --before` and an interface-only before patch. The patches expose old decisions and raw dispatch bodies under the new helper signatures; they add no validation, resolution or path simplification. Round-5 repairs use 143fd387b with unchanged dispatch signatures; round-4 repairs use c87d00139, round-3 repairs use d6b269468, and original repairs retain origin/main. The round-4 before patch only adapts dispatch return ownership; it preserves the original PowerShell/PATHEXT lookup and VerbatimUNC refusal. Every run sets TMPDIR to this worktree's tmp/ and keeps fixtures there. Cargo output stays in this worktree's target directory. The lower Linux layer is the actual command function with PATH-isolated, marker-writing xdg-open; plugin calls go through Tauri's IPC dispatcher and real ACLs on a mock webview. This does not claim a graphical shell run.
 
@@ -285,7 +289,7 @@ The author has not accepted these entries; independent acceptance remains for th
         "modules/shell/src-tauri/src/open_guard_windows.ps1"
       ],
       "class": "New",
-      "behaviour": "Round-5 repairs: actual Explorer windows open the exact comma-containing folder, or the containing folder with the comma-containing file selected. Unverified until hosted; must assertion-fail on 143fd387b.",
+      "behaviour": "Round-5/6 repairs: actual Explorer windows open the exact comma-containing folder, or the parent with a,b2.txt selected. Hosted run 39412497810 passed the two folder checks after assertion failures before; reveal reached the right parent but failed selection. Round 6 preserves selection, uses documented Count/Item indexed reads, and logs the old pipeline result too. Root cause remains unresolved until a hosted rerun; no pass is claimed.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -293,6 +297,14 @@ The author has not accepted these entries; independent acceptance remains for th
           "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
           "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
           "choice": "F4 round 5: Windows folder open and reveal pass the checked non-verbatim target as one shell API value, never through Explorer command-line parsing. Keep ShellExecuteExW for documents/URLs, mapped-drive resolution, and neighboring .cmd marker refusals. Observe the actual Explorer location for a plain control, Q4,notes, Q6,root, and a,b2.txt reveal, checking selection too. Comma cases must assertion-fail on 143fd387b; the plain control passes on both. Every Windows dispatch test closes only its own observed windows and recorded new viewer PIDs on pass and failure. Hosted round-4 evidence at e22910c2d is historical; round-5 execution remains unverified until hosted.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "F4 round 6: distinguish product selection failure from observer failure using the actual local Explorer view. Keep the a,b2.txt selection assertion and the fail-before requirement on 143fd387b. Read SelectedItems through its documented Count/Item interface and record count, indexed paths, and the original pipeline result; never set selection in the observer. The hosted log omits selection diagnostics, so do not invent a confirmed cause. Attempt every Windows evidence group after failures, preserve cleanup between calls, and exit nonzero at the end if any failed.",
           "label": "agent choice"
         }
       ],
@@ -311,7 +323,7 @@ The author has not accepted these entries; independent acceptance remains for th
         "modules/shell/src-tauri/src/open_guard_windows.ps1"
       ],
       "class": "New",
-      "behaviour": "Round-5 GUI control: a real Explorer window opens the exact plain folder on both 143fd387b and the candidate. An unavailable GUI is a failure. Unverified until hosted.",
+      "behaviour": "Round-5 GUI control passed on 143fd387b and 394392a8d in hosted run 39412497810. It must pass again with the changed observer; an unavailable GUI is a failure.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -332,7 +344,7 @@ The author has not accepted these entries; independent acceptance remains for th
         "checks": [
           "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_folder_window_control"
         ],
-        "scope": "Pending hosted control execution on the unchanged production dispatch; only cfg(test) items and helper files are transplanted. No pass is claimed."
+        "scope": "Passed on 143fd387b in hosted run 39412497810; artifact provided under tmp/open-guard/round6/evidence/. A rerun with the changed observer is pending."
       }
     }
   ]
