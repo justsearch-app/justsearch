@@ -36,3 +36,16 @@ author-session: witness-reserve-flake-builder-20261020
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-witness-reserve-20261020",
+  "verdict": "accept",
+  "digest": "sha256:7aa14fc8b5c0069af860af3c9881f3c3ba7df34ae4c4df3ae657af1a21d13b37",
+  "note": "Same contract with a stricter oracle and latch ordering; hosted Windows logs show 200/200 idle and loaded passes, both mutations killed at the right assertions, and Linux compile/Spotless/PMD pass."
+}
+```
