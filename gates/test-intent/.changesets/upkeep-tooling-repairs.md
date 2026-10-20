@@ -29,3 +29,14 @@ selections are unchanged. Script self-tests are outside the gate's product-test 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-j6bl87as",
+  "verdict": "accept",
+  "digest": "sha256:4e24bfd79180d980d53145027cb487d9bb05bca651266a5d646250ded243169d",
+  "note": "ci.yml diff is +8/-0: one new step running four script self-tests; every product test selection unchanged; Structural rule kept holds"
+}
+```
