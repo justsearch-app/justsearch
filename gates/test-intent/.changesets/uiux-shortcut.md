@@ -370,3 +370,14 @@ a legacy composer change. No exception, acceptance record or legacy edit is auth
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-pr7tmwgs",
+  "verdict": "accept",
+  "digest": "sha256:9648b21382b3e6cfcccc6b538cf8ff02540ae35742763c94c81d9498c464b851",
+  "note": "Accept. Classes fit: 6 New entries, each with agreed-scenario sources quoted verbatim (S14.2-S14.13, N14.1/N14.3/N14.6, pass-2 amendments); expectations follow from those sources, not from code. Re-ran run-evidence to a scratch path: 20 frontend New checks pass on 49f33e980 and fail on c00a0cb24 with assertion failures; 2 preservation checks pass before and after (not claimed as repairs); 8 Rust checks pass (no fail-before claimed; new private API). The help entry keeps the old check's inputs and once-only oracle and moves its expected marker v3->v4 as S14.12's version bump requires; it fails before with an assertion. Notes, not omissions: repaired:true on new behaviour is stricter than needed; the prose still calls the legacy-streaming decision pending (resolved by the 2026-10-20 amendment); rename/confirmation-dialog/indexing-overlay protections rest on the shared modal and typing guards plus existing sv3-focus refusal tests, not a summon-specific check; unit checks with a fake registrar cannot see the live X11 off-switch defect reported separately. This record covers test intent only, not the behaviour verdict."
+}
+```
