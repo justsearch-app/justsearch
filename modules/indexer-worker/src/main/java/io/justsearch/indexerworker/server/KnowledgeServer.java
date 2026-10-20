@@ -3600,19 +3600,42 @@ public final class KnowledgeServer implements Closeable {
     final long elapsed;
     runtimeSwapLock.lock();
     try {
-      if (closeStarted || encoderRecoveryReservation != null) {
-        throw new IllegalStateException("Runtime reload refused during encoder recovery or close");
-      }
-      var migration = indexGenerationManager == null ? null
-          : indexGenerationManager.readStateBestEffort();
-      if (indexGenerationManager != null && migration == null) {
-        throw new IllegalStateException("Runtime reload refused: migration state is unavailable");
-      }
-      if (buildingIndexPath != null || searchLifecycle != ingestLifecycle
-          || (migration != null && (migration.building_generation() != null
-              || "MIGRATING".equals(migration.migration_state())
-              || "SWITCHING".equals(migration.migration_state())))) {
-        throw new IllegalStateException("Runtime reload refused during migration");
+      for (;;) {
+        if (closeStarted || encoderRecoveryReservation != null) {
+          throw new IllegalStateException("Runtime reload refused during encoder recovery or close");
+        }
+        var migration = indexGenerationManager == null ? null
+            : indexGenerationManager.readStateBestEffort();
+        if (indexGenerationManager != null && migration == null) {
+          throw new IllegalStateException("Runtime reload refused: migration state is unavailable");
+        }
+        if (buildingIndexPath != null || searchLifecycle != ingestLifecycle
+            || (migration != null && (migration.building_generation() != null
+                || "MIGRATING".equals(migration.migration_state())
+                || "SWITCHING".equals(migration.migration_state())))) {
+          throw new IllegalStateException("Runtime reload refused during migration");
+        }
+        ServingView current;
+        publicationLock.writeLock().lock();
+        try {
+          synchronized (servingViewMonitor) {
+            current = servingView;
+            if (current == null || current.retirementListeners.isEmpty()) {
+              // Stop new captures atomically with the last listener check. A subscription whose
+              // registration is still in flight observes retiring and ends itself on registration.
+              if (current != null) current.retiring = true;
+              break;
+            }
+          }
+        } finally {
+          publicationLock.writeLock().unlock();
+        }
+        // Idle observers retain the view. Their existing callbacks must be able to re-enter
+        // lifecycle operations, so notify outside both locks, then recheck the selected owner and
+        // admission guards. Another reload, migration or shutdown may have won while unlocked.
+        runtimeSwapLock.unlock();
+        try { notifyServingViewRetirement(current); }
+        finally { runtimeSwapLock.lock(); }
       }
       try {
         retireServingView();

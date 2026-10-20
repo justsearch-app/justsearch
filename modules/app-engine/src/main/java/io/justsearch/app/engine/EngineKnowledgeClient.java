@@ -705,7 +705,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       return new CallView(child);
     }
     var task = taskServingView.get();
-    if (task != null) {
+    // A lifecycle dispatch has no physical view to lend to an ordinary nested RPC.
+    if (task != null && !task.deferredServices) {
       return task.fork();
     }
     if (servingLeaseSupplier == null) return new CallView(services.get());
