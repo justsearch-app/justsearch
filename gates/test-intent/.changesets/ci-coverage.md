@@ -324,3 +324,14 @@ Independent verification remains outstanding. No acceptance record is authored h
   "digest": "sha256:5bdedb5d976ea25144d5eafad34b75dff5a16ff34276433a0b54e27f6d347473"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "auditor-ci-coverage-cc6d91b2",
+  "verdict": "reject",
+  "digest": "sha256:5bdedb5d976ea25144d5eafad34b75dff5a16ff34276433a0b54e27f6d347473",
+  "note": "Entries 1 and 3 expand Windows tags and CI execution coverage; Adaptation requires the whole oracle, including tags and conditions, to be kept. Reclassify the new coverage and retain separate adaptations."
+}
+```
