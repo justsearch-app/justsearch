@@ -1973,6 +1973,7 @@ async function recoveryHeldWhileReplaced(t) {
   run.child.stdin.write(INITIALIZED_LINE);
   await handshakeDone(a);
   await a.close();
+  await pause(300); // the idle bridge handles the close
   const b = await startService(t, { port: a.port, mcpSessions: true });
   const held = b.hold('/mcp', { rpc: 'initialize' });
   run.child.stdin.write(callLine(2)); // refused on B's connection before writing: the bridge recovers
@@ -2053,7 +2054,7 @@ for (const client of ['production MCP', 'bundle']) {
     if (client === 'production MCP') {
       const prod = await startProdMcp(t, m, PINS['--port'](first.port));
       await first.close();
-      await pause(100);
+      await pause(300); // the idle client handles the close
       second = await startService(t, { port: first.port, noToken: true, mcpSessions: true });
       answer = await prod.call('justsearch_ingest', { paths: [path.join(root, 'doc.txt')] }); // the first call
       assert.match(answer, /NO_TOKEN/, `${answer}\n${prod.stderr}`);
