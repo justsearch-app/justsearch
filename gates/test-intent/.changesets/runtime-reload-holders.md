@@ -105,3 +105,14 @@ The delegated builder brief supplied scenarios v2, R1–R8. This adds checks wit
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-c93a81d9c-20261021",
+  "verdict": "accept",
+  "digest": "sha256:e9e9ba80425a9cba3a7f21bfafb5120fb596ec4ed69a25fae20585fb19a54f20",
+  "note": "Verified c93a81d9c: 216 candidate checks, 167 predecessor preservation checks, native HTTP reload/ingestion/backfill/restart/migration checks; tmp/verify-http/c93a81d9c/report.md"
+}
+```

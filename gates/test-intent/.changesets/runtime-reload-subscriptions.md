@@ -85,3 +85,14 @@ The independent real-system rejection identified missing composition coverage. T
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-c93a81d9c-20261021",
+  "verdict": "accept",
+  "digest": "sha256:cd77bbd04fdb28881a696ebf38018112764fe1601ffd35cfa3b76aad75d0b2b3",
+  "note": "Verified c93a81d9c: 216 candidate checks, 167 predecessor preservation checks, native HTTP reload/ingestion/backfill/restart/migration checks; tmp/verify-http/c93a81d9c/report.md"
+}
+```
