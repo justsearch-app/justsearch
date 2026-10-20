@@ -7,9 +7,9 @@ author-session: upkeep-privacy-optouts-builder
 
 # Test-intent entries
 
-The outcome and C1/C2 below come from the owner-adopted task request, as directed by the
-orchestrator's 2026-10-20 follow-up 4. Only the added privacy expectation in the existing
-frontend test file changes; its recovery expectations remain intact.
+The entries below cite the owner's privacy invariant in NON-GOALS.md:8 and the scope
+of task t-20261019-9d870e. Only the added privacy expectation in the existing frontend
+test file changes; its recovery expectations remain intact.
 
 Both D4 evidence files below were written by run-evidence.mjs against c00a0cb24. The named
 frontend C2 check passed on the candidate and failed an assertion on the before-state. All
@@ -50,16 +50,14 @@ Existing C2 observations (not substitutes for D4):
       "behaviour": "C2: the raw app entry HTML contains neither fonts.googleapis.com nor fonts.gstatic.com (case insensitive), preventing its Google Fonts stylesheet and preconnect links from returning. The existing desktop recovery/binding assertions are retained unchanged.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "upkeep-privacy-optouts",
-          "scenario": "C2",
-          "quote": "JustSearch's own code stops two network contacts the user never asked for, so the product matches its promise that nothing leaves the machine except user-initiated downloads.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "owner-words",
+          "quote": "**No telemetry, analytics, or phone-home.** The product does not report usage anywhere.",
+          "location": "NON-GOALS.md:8"
         },
         {
           "kind": "owner-words",
-          "location": "task upkeep-privacy-optouts request, builder brief, Checks C2",
-          "quote": "C2 a check that index.html contains no fonts.googleapis.com / fonts.gstatic.com reference after (and does before); add it to an existing ui-web test or guard if one fits, rather than a new script."
+          "quote": "nothing on the machine or network is exposed by accident",
+          "location": "task t-20261019-9d870e request"
         }
       ],
       "evidence": "gates/test-intent/evidence/upkeep-privacy-optouts-ui.json",
@@ -78,24 +76,14 @@ Existing C2 observations (not substitutes for D4):
       "behaviour": "C1 entry guard: initializing actual HeadlessApp in a fresh child JVM sets absent OPT_OUT_TRACKING and ai.djl.offline properties to true. Four parameterized combinations cover both absent, both explicitly false, and each independently absent; explicit false values survive. The child must finish within 30 seconds and exit successfully; any still-running child is forcibly stopped and must exit within five seconds. The real tokenizer/strace probe separately verifies loading and network behavior.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "upkeep-privacy-optouts",
-          "scenario": "C1",
-          "quote": "JustSearch's own code stops two network contacts the user never asked for, so the product matches its promise that nothing leaves the machine except user-initiated downloads.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "owner-words",
+          "quote": "**No telemetry, analytics, or phone-home.** The product does not report usage anywhere.",
+          "location": "NON-GOALS.md:8"
         },
         {
           "kind": "owner-words",
-          "location": "task upkeep-privacy-optouts request, builder brief, Checks C1",
-          "quote": "or a JUnit test that asserts the opt-out is set by the shared entry code before tokenizer construction, plus the strace evidence."
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "Then set the switch(es) in the product so they are in force before any tokenizer is constructed in every JVM that loads one (find every entry point: the Engine main, the worker if it is a separate JVM, test harnesses are not required). Prefer one small shared place in code over launcher flags, so headless, desktop and dev starts all get it.",
-          "delegationLocation": "task upkeep-privacy-optouts request, builder brief, item 1",
-          "delegationScope": "Select confirmed DJL opt-out switches and their shared Java initialization before tokenizer construction.",
-          "choice": "Install true defaults in HeadlessApp class initialization with putIfAbsent, preserving explicit JVM property choices. Check independent defaults and explicit-value preservation in fresh bounded JVMs so earlier tests cannot supply initialization accidentally.",
-          "label": "agent choice"
+          "quote": "nothing on the machine or network is exposed by accident",
+          "location": "task t-20261019-9d870e request"
         }
       ],
       "evidence": "gates/test-intent/evidence/upkeep-privacy-optouts-java.json",
@@ -106,5 +94,3 @@ Existing C2 observations (not substitutes for D4):
   ]
 }
 ```
-
-## Acceptance records
