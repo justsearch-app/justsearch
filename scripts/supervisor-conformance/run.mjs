@@ -547,7 +547,7 @@ async function runAdapter(name) {
     try { timingRecord = timings?.finish(problems); } catch (err) { timingWarning(err); }
     try {
       for (const { dir, remove } of cleanups) {
-        if (process.env.CI || (problems.length && process.env.SUPERVISOR_CONFORMANCE_KEEP === '1')) {
+        if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1' || (problems.length && process.env.CI)) {
           if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') process.stderr.write(`[keep] ${dir}\n`);
         } else remove(); // The adapter's callback preserves its original deletion-error handling.
       }

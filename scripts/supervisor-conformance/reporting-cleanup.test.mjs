@@ -94,6 +94,20 @@ for (const cleanup of ['tauri', 'updater', 'dev-runner']) {
     complete(run({ adapter, fault: 'delete', cleanup }), adapter, cleanup === 'dev-runner' ? 1 : 0);
   });
 }
+test('CI passing-case deletion failure preserves the base dev-runner verdict', () => {
+  reset();
+  const result = run({ adapter: 'dev-runner', ci: 'true', fault: 'delete' });
+  complete(result, 'dev-runner', 1);
+  assert.match(result.stdout, /injected delete failure/);
+});
+test('KEEP=1 retains every passing case folder and prints every keep message', () => {
+  reset();
+  const result = run({ adapter: 'dev-runner', keep: '1' });
+  complete(result, 'dev-runner');
+  const folders = fs.readdirSync(suiteDir()).filter(name => name !== 'records');
+  assert.equal(folders.length, count('dev-runner'));
+  assert.equal((result.stderr.match(/^\[keep\] /gm) ?? []).length, count('dev-runner'));
+});
 for (const fail of [false, true]) {
   test(`record write failure warns without changing a ${fail ? 'failing' : 'passing'} scenario`, () => {
     reset();
@@ -116,7 +130,7 @@ for (const options of [{}, { fail: true }, { keep: '1' }, { fail: true, keep: '1
     const result = run(options);
     complete(result, 'tauri', options.fail ? 1 : 0);
     const folders = fs.readdirSync(suiteDir()).filter(name => name !== 'records');
-    const retained = options.ci ? count('tauri') : options.fail && options.keep ? 1 : 0;
+    const retained = options.keep ? count('tauri') : options.ci && options.fail ? 1 : 0;
     assert.equal(folders.length, retained);
     assert.equal(fs.readdirSync(path.join(suiteDir(), 'records')).length, count('tauri'));
     if (options.keep && retained) assert.match(result.stderr, /\[keep\]/);
