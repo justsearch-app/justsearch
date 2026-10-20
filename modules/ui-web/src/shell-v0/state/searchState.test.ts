@@ -5,6 +5,7 @@ import {
   setQuery,
   submitSearch,
   getSearchState,
+  resetSearchState,
   setSearchApiBase,
   subscribeSearch,
   buildSearchIntent,
@@ -30,6 +31,8 @@ describe('searchState (slice 463)', () => {
   });
 
   afterEach(() => {
+    resetSearchState();
+    vi.useRealTimers();
     __resetSearchFiltersForTest();
   });
 
@@ -68,6 +71,7 @@ describe('searchState (slice 463)', () => {
     // debounce timer, not in the same tick. Async timer advance flushes that tick.
     await vi.advanceTimersByTimeAsync(250);
     expect(fetchMock).toHaveBeenCalled();
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -85,6 +89,7 @@ describe('searchState (slice 463)', () => {
     // 577 Phase 5: the keystroke path issues the QUICK pass first.
     expect(body).toEqual({ query: 'test', limit: 50, mode: 'text', pipeline: QUICK_PIPELINE });
     expect(body.filters).toBeUndefined();
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -99,6 +104,7 @@ describe('searchState (slice 463)', () => {
     await vi.advanceTimersByTimeAsync(250);
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(body.filters).toEqual({ modifiedAt: { fromMs: 1000, toMs: 2000 } });
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -113,6 +119,7 @@ describe('searchState (slice 463)', () => {
     await vi.advanceTimersByTimeAsync(250);
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
     expect(body.filters).toEqual({ modifiedAt: { fromMs: 1000 } });
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -130,6 +137,7 @@ describe('searchState (slice 463)', () => {
     await vi.advanceTimersByTimeAsync(250);
     const body = JSON.parse(fetchMock.mock.calls[1]![1].body);
     expect(body.filters).toBeUndefined();
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -162,6 +170,7 @@ describe('searchState (slice 463)', () => {
     expect(getSearchState().searchTrace).toEqual(
       searchTraceSchema.parse(searchTrace),
     );
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -185,6 +194,7 @@ describe('searchState (slice 463)', () => {
     const results = getSearchState().results;
     expect(results.find((r) => r.id === 'h')?.collection).toBe('justsearch-help');
     expect(results.find((r) => r.id === 'u')?.collection).toBeUndefined();
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -206,6 +216,7 @@ describe('searchState (slice 463)', () => {
     setQuery('second');
     await vi.runAllTimersAsync();
     expect(getSearchState().searchTrace).toBeNull();
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -230,6 +241,7 @@ describe('searchState (slice 463)', () => {
     const wall = getSearchState().processingTimeMs;
     expect(typeof wall).toBe('number');
     expect(wall).toBeGreaterThanOrEqual(0);
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -250,6 +262,7 @@ describe('searchState (slice 463)', () => {
     setQuery('');
     expect(getSearchState().searchTrace).toBeNull();
     expect(getSearchState().processingTimeMs).toBeNull();
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -270,6 +283,7 @@ describe('searchState (slice 463)', () => {
     expect(getSearchState().results[0]?.trace).toEqual(
       trace.map((s) => hitStageSchema.parse(s)),
     );
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -348,6 +362,7 @@ describe('searchState (slice 463)', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(getSearchState().facets).toEqual(facets);
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -367,6 +382,7 @@ describe('searchState (slice 463)', () => {
     expect(second.includeExcerpts).toBe(true);
     expect(getSearchState().passStage).toBe('refined');
     expect(getSearchState().isRefining).toBe(false);
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -383,6 +399,7 @@ describe('searchState (slice 463)', () => {
     expect(first.includeExcerpts).toBe(true);
     expect(first.pipeline).toBeUndefined();
     expect(getSearchState().passStage).toBe('refined');
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -395,6 +412,7 @@ describe('searchState (slice 463)', () => {
     vi.advanceTimersByTime(500); // past SLOW_HINT_MS
     expect(getSearchState().slowSearch).toBe(true);
     setQuery(''); // cleanup: supersede the hung request
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -417,6 +435,7 @@ describe('searchState (slice 463)', () => {
     });
     expect(refinedFirst).toHaveLength(0);
     expect(bodies[bodies.length - 1]).toBe('second');
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 });
@@ -430,6 +449,7 @@ describe('searchState — DWELLED (tempdoc 580 §17 P3)', () => {
   });
   afterEach(() => {
     recordInspectorClose(); // ensure no timer leaks between tests
+    resetSearchState();
     vi.unstubAllGlobals();
   });
 
@@ -524,6 +544,7 @@ describe('collection enumeration observation', () => {
       expect(init.method).toBe('POST');
       expect(JSON.parse(init.body)).toEqual({ maxDocsScanned: 50_000 });
     } finally {
+      resetSearchState();
       vi.unstubAllGlobals();
     }
   });
@@ -536,6 +557,7 @@ describe('collection enumeration observation', () => {
     try {
       await expect(fetchCollectionFacet(50_000, 'http://test')).rejects.toThrow('HTTP 503');
     } finally {
+      resetSearchState();
       vi.unstubAllGlobals();
     }
   });

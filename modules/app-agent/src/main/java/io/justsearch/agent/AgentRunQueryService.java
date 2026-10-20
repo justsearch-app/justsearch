@@ -380,7 +380,8 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
   /**
    * Tempdoc 585 §D Phase 3 (C2) — truncate a conversation at its last user turn (a clean boundary)
    * and replace that question with {@code editedMessage} (or keep the original when blank, a re-roll).
-   * Everything BEFORE the last user turn is preserved as context; the prior run's response is dropped.
+   * Everything BEFORE the last user turn is preserved as context; the prior run's response is dropped
+   * except the user's directions and the resume warning in it, which follow the new question.
    * Returns empty when there is no user turn to fork from.
    */
   static List<Map<String, Object>> forkMessages(
@@ -401,6 +402,13 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
             ? editedMessage
             : String.valueOf(messages.get(lastUser).getOrDefault("content", ""));
     forked.add(Map.of("role", "user", "content", content));
+    // WP6.2 — the user's directions and the resume warning given during the replaced response
+    // still govern the fork; only the response is redone.
+    for (var message : messages.subList(lastUser + 1, messages.size())) {
+      if (AgentModelMessages.isUserControlNote(message)) {
+        forked.add(message);
+      }
+    }
     return forked;
   }
 

@@ -2,7 +2,7 @@
 title: "ADR-0036: Resource Category axis"
 type: decision
 status: accepted
-description: "Resource is one primitive with a typed Category axis (status, history, timeseries, …) rather than a primitive-per-kind, so new information shapes are typed values, not new primitives."
+description: "Resource is one primitive with a typed Category axis (STATE, EVENT_STREAM, HISTORY, TABULAR, TIMESERIES) rather than a primitive per kind, so new information shapes are typed values, not new primitives."
 date: 2026-06-09
 probes:
   - adr-0036-observed-happening-gate

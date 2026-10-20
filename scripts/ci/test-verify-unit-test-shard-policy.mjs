@@ -179,7 +179,7 @@ console.log('test-verify-unit-test-shard-policy: PASS');
   const original = read('.github/workflows/ci.yml');
   const check = (workflowText) => validate({ policyDoc, signalDoc, workflowText });
   assert.equal(check(original).ok, true, check(original).issues.join('\n'));
-  for (const part of policyDoc.windowsParts) {
+  for (const part of [...policyDoc.windowsParts, ...policyDoc.lanes.filter((lane) => lane.commands)]) {
     for (const command of part.commands) {
       const start = original.indexOf(`  ${part.jobId}:\n`);
       const altered = original.slice(0, start) + original.slice(start).replace(command, '# omitted by counterexample');

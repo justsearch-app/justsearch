@@ -46,6 +46,7 @@ import { subscribeMemberTab } from '../router/memberTabIntent.js';
 import {
   restoreSearch,
   serializeSearch,
+  resetSearchState,
 } from '../state/searchState.js';
 import { getInspectorState, resetInspectorState } from '../state/inspectorState.js';
 import type { SettingsWindow } from './SettingsWindow.js';
@@ -186,6 +187,7 @@ describe('Shell — slice 492 substrate integration', () => {
 
   afterEach(() => {
     document.querySelectorAll('jf-shell').forEach((el) => el.remove());
+    resetSearchState();
     __resetAiStateForTest();
     resetSurfaceCatalog();
     __resetUserConfigForTest();
@@ -265,6 +267,8 @@ describe('Shell — slice 492 substrate integration', () => {
     opts()[0]!.click();
     await shell.updateComplete;
     expect(getUiMode()).toBe('simple');
+    // Finish the click's queued write while its transport fixture is still installed.
+    await enqueueUiModePersistence(async () => undefined);
   });
 
   it('923 review — topbar persistence joins the shared cross-control mode queue', async () => {

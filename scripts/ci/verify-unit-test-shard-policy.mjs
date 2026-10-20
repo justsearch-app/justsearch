@@ -250,7 +250,7 @@ export function validateUnitTestShardPolicy({ policy, workflowText, workflowSign
       }
     }
   }
-  for (const part of policy.windowsParts ?? []) {
+  for (const part of [...(policy.windowsParts ?? []), ...policyLanes.filter((lane) => lane.commands)]) {
     const job = jobs.find((j) => j.id === part.jobId);
     const commands = job?.runs.map((r) => r.text).join('\n') ?? '';
     const commandLines = commands.split('\n').map((line) => line.trim());
@@ -258,7 +258,7 @@ export function validateUnitTestShardPolicy({ policy, workflowText, workflowSign
       if (commandLines.filter((line) => line === command).length !== 1) issues.push(`${part.jobId}: expected command exactly once: ${command}`);
     }
     const actualTasks = [...commands.matchAll(/:modules:[\w-]+:test\b/g)].map((m) => m[0]);
-    if (!sameList(actualTasks, part.gradleTasks)) issues.push(`${part.jobId}: Windows Gradle task ownership differs`);
+    if (!sameList(actualTasks, part.gradleTasks)) issues.push(`${part.jobId}: Gradle task ownership differs`);
   }
 
   const workflowLanes = parseUnitTestMatrix(workflowText);

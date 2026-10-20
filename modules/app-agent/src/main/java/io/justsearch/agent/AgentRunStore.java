@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -59,6 +61,9 @@ public final class AgentRunStore {
    */
   private final RunEventStore events;
   private final StoreCipher cipher; // tempdoc 629 (LAYER) — seals meta.json when enabled
+
+  /** WP6.2 — runs a loop in THIS process is still running; see {@link #markLive}. */
+  private final Set<String> liveRuns = ConcurrentHashMap.newKeySet();
 
   public AgentRunStore(Path rootDir) {
     this(rootDir, StoreCipher.disabled());
@@ -589,6 +594,26 @@ public final class AgentRunStore {
     } catch (Exception e) {
       LOG.warn("Failed to mark run {} background", sessionId, e);
     }
+  }
+
+  /**
+   * WP6.2 — the running loop owns {@code sessionId} from before its first write until after its last
+   * ({@link #clearLive}). Recovery ({@link AgentRunReconciler}) can run while this process still runs
+   * agents — the unlock listener re-runs it — and must leave an owned run alone: it is not
+   * interrupted, and its loop reports its directions' outcomes itself.
+   */
+  void markLive(String sessionId) {
+    liveRuns.add(sessionId);
+  }
+
+  /** WP6.2 — the loop made its last write for {@code sessionId}; see {@link #markLive}. */
+  void clearLive(String sessionId) {
+    liveRuns.remove(sessionId);
+  }
+
+  /** WP6.2 — whether a loop in this process still owns {@code sessionId}; see {@link #markLive}. */
+  boolean isLive(String sessionId) {
+    return liveRuns.contains(sessionId);
   }
 
   /**

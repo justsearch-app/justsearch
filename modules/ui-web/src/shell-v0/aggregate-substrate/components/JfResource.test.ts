@@ -7,6 +7,14 @@
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Incidental requests are outside these render/event scenarios. Keep their
+// unavailable-backend behavior explicit, without contacting a real server.
+const originalFetch = globalThis.fetch;
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Test backend unavailable')));
+});
+afterEach(() => { globalThis.fetch = originalFetch; });
+
 // ResourceView's connectedCallback opens an EnvelopeStream backed by
 // EventSource. happy-dom has no EventSource; stub it to a no-op so
 // the inner <jf-resource-view> mounts without blowing up the test.

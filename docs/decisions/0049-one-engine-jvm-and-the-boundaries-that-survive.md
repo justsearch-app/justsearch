@@ -24,6 +24,8 @@ processes) and [ADR-0002](0002-grpc-mmf-hybrid-ipc.md) (historical gRPC + MMF hy
 of the decision this replaces and are marked `superseded`.
 
 Implemented across lane F stage A (tempdoc 936, design `docs/design/lane-f-engine-jvm/design.md`).
+Amended by [ADR-0051](0051-held-process-lifetimes-and-owner-exit-records.md): held process
+lifetimes and owner-recorded exits; chat servers are no longer adopted across Engine restarts.
 
 ## Context
 
