@@ -48,6 +48,17 @@ class GenerationPointerPreviousRepairTest {
   }
 
   @Test
+  void previousRepairRefusesChangedEffectiveFingerprintBeforePublishing() throws Exception {
+    var owner = prepare();
+    byte[] previous = Files.readAllBytes(base.resolve("state.json.prev"));
+    var failure = assertThrows(IOException.class, () -> new IndexGenerationManager(base)
+        .initializeForBoot(owner, "c".repeat(64)));
+    assertTrue(failure.getMessage().startsWith("index.generation_previous_unproven:"));
+    assertFalse(Files.exists(base.resolve("state.json")), "refusal must precede pointer repair");
+    assertArrayEquals(previous, Files.readAllBytes(base.resolve("state.json.prev")));
+  }
+
+  @Test
   void presentMalformedPointerCannotBeReplacedByHistoricalEvidence() throws Exception {
     var owner = prepare();
     Files.writeString(base.resolve("state.json"), "{torn after a later decision");

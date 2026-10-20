@@ -312,6 +312,7 @@ public final class IndexGenerationManager {
 
       State state = loadStateBestEffort();
       if (state != null) {
+        cleanupAbandonedStateTemps();
         return resolveFromState(state);
       }
       // Task t-20261013-ef3c41, round 3: neither state.json nor its backup can be read, yet one of
@@ -423,6 +424,7 @@ public final class IndexGenerationManager {
                 + " and recorded generation evidence forbids native fallback", unreadable);
           }
         }
+        if (observed != null) cleanupAbandonedStateTemps();
         if (observed != null && isRecordedIdentity(observed.active_generation())) {
           boolean noBuilding = observed.building_generation() == null || observed.building_generation().isBlank();
           boolean nativeMigration = !noBuilding && !isRecordedIdentity(observed.building_generation())
@@ -448,6 +450,7 @@ public final class IndexGenerationManager {
         throw new IOException("index.generation_previous_unproven: recorded receipts do not prove the previous pointer");
       }
       IndexLayout layout = strictBootLayout(readRecordedState());
+      cleanupAbandonedStateTemps();
       if (ownership instanceof BootOwnership.Fenced) {
         return new BootLayout(layout, BootDisposition.FENCED);
       }
@@ -2585,6 +2588,20 @@ public final class IndexGenerationManager {
     } catch (Exception e) {
       log.warn("Failed to read index state from {}", p, e);
       return null;
+    }
+  }
+
+  /** Called under stateControl only after reading or repairing a pointer, never before recovery. */
+  private void cleanupAbandonedStateTemps() {
+    try (var entries = Files.list(basePath)) {
+      for (Path entry : entries.filter(path -> path.getFileName().toString()
+          .matches("state[.]json[.][0-9]+[.]tmp"))
+          .filter(path -> Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)).toList()) {
+        try { Files.deleteIfExists(entry); }
+        catch (IOException failure) { log.warn("Could not remove abandoned generation temp {}", entry, failure); }
+      }
+    } catch (IOException failure) {
+      log.warn("Could not inspect abandoned generation temps at {}", basePath, failure);
     }
   }
 

@@ -18,7 +18,7 @@ The scenarios are delegated orchestrator choices, not owner words. Linux and Win
         "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/GenerationPointerPreviousRepairTest.java"
       ],
       "class": "New",
-      "behaviour": "R1/R2 pointer publication and validated previous-pointer repair, with counterexamples for stale scratch paths, torn recovery, conflicting receipts, orphan generations and missing metadata; R3 preservation cases remain exercised.",
+      "behaviour": "R1/R2 pointer publication and validated previous-pointer repair, with counterexamples for stale scratch paths, torn recovery, conflicting receipts, orphan generations and missing metadata; R3 preservation cases remain exercised. Startup reaps only numeric state.json writer temps after a pointer is read or repaired; refusal preserves potential sole copies. M05 separately tests effective fingerprint disagreement with otherwise matching receipts and metadata.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -108,7 +108,7 @@ The scenarios are delegated orchestrator choices, not owner words. Linux and Win
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecordedIngestionTest.java"
       ],
       "class": "New",
-      "behaviour": "An interrupted quarantine or partially written restore uses its recorded backup before fresh tables can be opened, preserves its original quarantine, and keeps constructor-bound claim authority. Existing ownership fixtures explicitly seed intact journals for their healthy unfinished migrations; their assertions are unchanged.",
+      "behaviour": "An interrupted quarantine or partially written restore uses its recorded backup before fresh tables can be opened, preserves its original quarantine, and keeps constructor-bound claim authority. Existing ownership fixtures explicitly seed intact journals for their healthy unfinished migrations; their assertions are unchanged. M22 proves a second completed triage preserves its predecessor. M23 interrupts the backup-copy I/O after a partial output and requires the prior live target, backup and quarantine to remain intact.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -342,6 +342,34 @@ The scenarios are delegated orchestrator choices, not owner words. Linux and Win
           "label": "agent choice"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "M09/M26: the rendered search notice names the missing migration journal, retains the refusal through repeated renders and status updates, and clears when readiness resolves. Mutation checks remove the rendered wording or clear the notice after its first render.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "R9 and R9b-v3: refuse missing, zero-byte, corrupt, triage-replaced or witness-stale migration journals without replacing queue evidence; show a named refusal in the UI. Future switch-buffer acknowledgements need a durable monotonic admission witness outside jobs.db. Existing unfinished migrations without a witness resume as today, with their historical completeness gap recorded. R9c: index-root lock and authority precede triage. R10: healthy legacy migrations, import, path readers and conditional replay removal remain intact.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "defect-source",
+          "safeguard": "no data loss",
+          "reproduction": "Project index.migration_journal_unavailable through the original readiness notice: consequence is unknown and the journal repair cause is absent."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/restart-worker-rendered-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts#M09 names the migration journal refusal in the rendered user notice",
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts#M26 keeps the journal refusal visible across renders and repeated status updates until resolved"
+      ],
+      "repaired": true
     }
   ]
 }

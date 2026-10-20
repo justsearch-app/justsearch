@@ -42,6 +42,48 @@ class GenerationPointerDurabilityTest {
   }
 
   @ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void bootRemovesOnlyOwnScratchAfterReadingOrRepairingAuthority(boolean repair) throws Exception {
+    var manager = new IndexGenerationManager(temporary);
+    manager.initializeOrLoad();
+    manager.setMigrationPaused(true, "keep previous");
+    if (repair) Files.writeString(temporary.resolve("state.json"), "{torn");
+    Path scratch = temporary.resolve("state.json.123456789.tmp");
+    Files.writeString(scratch, "{interrupted publication");
+    var retained = java.util.List.of("state.json.tmp", "state.json.foreign.tmp",
+        "state.json.prev.123.tmp", "other.json.123.tmp");
+    for (String name : retained) Files.writeString(temporary.resolve(name), "other writer");
+    Path directory = Files.createDirectory(temporary.resolve("state.json.456.tmp"));
+    Path link = temporary.resolve("state.json.789.tmp");
+    boolean supportsSymlinks = !System.getProperty("os.name").startsWith("Windows");
+    if (supportsSymlinks) Files.createSymbolicLink(link, temporary.resolve("other.json.123.tmp"));
+    var boot = new IndexGenerationManager(temporary).initializeForBoot(
+        new IndexGenerationManager.BootOwnership.Native(), FINGERPRINT);
+    assertNotNull(boot.layout().state());
+    assertFalse(Files.exists(scratch), "a completed boot must reap this writer's interrupted temp");
+    for (String name : retained) assertEquals("other writer", Files.readString(temporary.resolve(name)));
+    assertTrue(Files.isDirectory(directory));
+    if (supportsSymlinks) assertTrue(Files.isSymbolicLink(link));
+  }
+
+  @Test
+  void refusedBootKeepsScratchWhenItCouldBeTheOnlyPointerCopy() throws Exception {
+    var manager = new IndexGenerationManager(temporary);
+    var initial = manager.initializeOrLoad();
+    manager.startRecordedMigration(KEY, "recorded-crash-test", FINGERPRINT);
+    byte[] pointer = Files.readAllBytes(temporary.resolve("state.json"));
+    Path scratch = temporary.resolve("state.json.123.tmp");
+    Files.write(scratch, pointer);
+    Files.delete(temporary.resolve("state.json"));
+    Files.deleteIfExists(temporary.resolve("state.json.prev"));
+    var owner = new IndexGenerationManager.BootOwnership.Recorded(
+        KEY, initial.activeGenerationId(), "recorded-crash-test", FINGERPRINT, true);
+    assertThrows(java.io.IOException.class, () -> new IndexGenerationManager(temporary)
+        .initializeForBoot(owner, FINGERPRINT));
+    assertArrayEquals(pointer, Files.readAllBytes(scratch));
+  }
+
+  @ParameterizedTest
   @CsvSource({"first,before-backup", "first,after-backup", "first,after-publication",
       "replacement,before-backup", "replacement,after-backup", "replacement,after-publication",
       "recovery,before-backup", "recovery,after-backup", "recovery,after-publication"})

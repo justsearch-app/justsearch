@@ -1413,6 +1413,87 @@ final class KnowledgeServerRecordedIngestionTest {
   }
 
   @Test
+  void secondTriageKeepsFirstQuarantineBytes(@TempDir Path tempDir) throws Exception {
+    var layout = preparedLayout(tempDir);
+    seedProcessingRecordedClaim(layout.dataDir(), tempDir.resolve("watched/two-triages.txt"));
+    Path database = layout.dataDir().resolve("jobs.db");
+    Files.copy(database, layout.dataDir().resolve("jobs.db.bak"));
+    byte[] firstQuarantine = null;
+    for (int triage = 0; triage < 2; triage++) {
+      try (var file = new java.io.RandomAccessFile(database.toFile(), "rw")) {
+        file.seek(100L);
+        byte[] garbage = new byte[512];
+        java.util.Arrays.fill(garbage, (byte) (0xAB + triage));
+        file.write(garbage);
+      }
+      byte[] corrupt = Files.readAllBytes(database);
+      var lifecycle = new BootLifecycle();
+      try (var executors = new TestEngineExecutors();
+          var server = withoutDeferredModels(new KnowledgeServer(executors,
+              WorkerBootFixture.workerConfig(layout.dataDir()), null,
+              io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle))) {
+        lifecycle.server.set(server);
+        server.start();
+        assertEquals(1L, server.jobQueueForTests().jobStateCounts().processingCount());
+      }
+      Path receiptPath = layout.dataDir().resolve("jobs.db.triage");
+      assertTrue(Files.isRegularFile(receiptPath), "a completed triage must persist its receipt");
+      var receipt = tools.jackson.databind.json.JsonMapper.builder().build()
+          .readTree(Files.readAllBytes(receiptPath));
+      assertTrue(receipt.get("complete").asBoolean());
+      String quarantine = receipt.get("quarantine").asText();
+      assertArrayEquals(corrupt, Files.readAllBytes(layout.dataDir().resolve(quarantine)));
+      if (triage == 0) firstQuarantine = corrupt;
+      else assertNotEquals("jobs.db.corrupt", quarantine);
+      assertArrayEquals(firstQuarantine, Files.readAllBytes(layout.dataDir().resolve("jobs.db.corrupt")),
+          "the second triage must retain the first damaged database byte for byte");
+    }
+  }
+
+  @Test
+  void interruptedBackupCopyCannotPartiallyReplaceLiveTarget(@TempDir Path tempDir) throws Exception {
+    var layout = preparedLayout(tempDir);
+    seedProcessingRecordedClaim(layout.dataDir(), tempDir.resolve("watched/atomic-restore.txt"));
+    Path database = layout.dataDir().resolve("jobs.db");
+    Path backup = layout.dataDir().resolve("jobs.db.bak");
+    Files.copy(database, backup);
+    byte[] backupBytes = Files.readAllBytes(backup);
+    Files.move(database, layout.dataDir().resolve("jobs.db.corrupt"));
+    Files.writeString(database, "existing interrupted target");
+    byte[] prior = Files.readAllBytes(database);
+    Files.writeString(layout.dataDir().resolve("jobs.db.triage"),
+        "{\"quarantine\":\"jobs.db.corrupt\",\"backup\":true,\"unfinished\":false,\"complete\":false}");
+    var interrupted = new AtomicBoolean();
+    var lifecycle = new BootLifecycle();
+    try (var executors = new TestEngineExecutors();
+        var server = withoutDeferredModels(new KnowledgeServer(executors,
+            WorkerBootFixture.workerConfig(layout.dataDir()), null,
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle));
+        var files = org.mockito.Mockito.mockStatic(Files.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+      lifecycle.server.set(server);
+      files.when(() -> Files.copy(org.mockito.ArgumentMatchers.eq(backup),
+          org.mockito.ArgumentMatchers.any(Path.class),
+          org.mockito.ArgumentMatchers.eq(java.nio.file.StandardCopyOption.REPLACE_EXISTING)))
+          .thenAnswer(call -> {
+            Path destination = call.getArgument(1);
+            Files.writeString(destination, "partial backup copy");
+            interrupted.set(true);
+            throw new IOException("injected interrupted backup copy");
+          });
+      assertThrows(IOException.class, server::start);
+    }
+    assertTrue(interrupted.get(), "the real boot must reach the backup copy");
+    assertArrayEquals(prior, Files.readAllBytes(database), "failed copy must leave the live target untouched");
+    assertArrayEquals(backupBytes, Files.readAllBytes(backup));
+    assertArrayEquals(backupBytes, Files.readAllBytes(layout.dataDir().resolve("jobs.db.corrupt")));
+    assertTrue(Files.readString(layout.dataDir().resolve("jobs.db.triage")).contains("\"complete\":false"));
+    try (var entries = Files.list(layout.dataDir())) {
+      assertFalse(entries.anyMatch(path -> path.getFileName().toString().startsWith("jobs.db.restore-")),
+          "a failed copy must clean its temporary output");
+    }
+  }
+
+  @Test
   void corruptionRestoreKeepsConstructorBoundAuthority(@TempDir Path tempDir) throws Exception {
     var layout = preparedLayout(tempDir);
     seedProcessingRecordedClaim(layout.dataDir(), tempDir.resolve("watched/restored.txt"));
