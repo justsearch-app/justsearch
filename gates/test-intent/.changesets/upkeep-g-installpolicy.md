@@ -9,6 +9,8 @@ author-session: installpolicy-builder
 
 New isolated test files are exempt at this base, so the skeleton command wrote no file. This explicit changeset is supplied as requested. The policy document is unchanged by this PR; its promises predate the change. Exact deferred documentation replacements are in ignored tmp/docs-pending.md. The real-API CPU-preview check is repaired behaviour; its other three integration cases are preserved and certified in the preservation evidence, alongside the null-service compatibility case. Windows-native execution and acceptance belong to separate sessions; the builder records neither as passed.
 
+Follow-up 3 also pins fail-closed explicit activation and absent-service compatibility, and strengthens the Windows class-execution requirement. The preserved activation check also passed on the unchanged production base; the producer record is `gates/test-intent/evidence/upkeep-g-installpolicy-activation-preserved-base.json`. The earlier acceptance record is retained and stale for the final acceptor.
+
 ```json
 {
   "entries": [
@@ -116,9 +118,92 @@ New isolated test files are exempt at this base, so the skeleton command wrote n
         "modules/ui/src/integrationTest/java/io/justsearch/ui/api/AiInstallPolicyIntegrationTest.java#allowlistedOfflineImportStillWorksWithDownloadsDisabled",
         "modules/ui/src/integrationTest/java/io/justsearch/ui/api/AiInstallPolicyIntegrationTest.java#corruptDetectedMachinePolicyKeepsFailClosedDefaults"
       ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Explicit runtime activation fails closed with the GPU-policy denial message and code when a configured policy service throws or returns null.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "docs/explanation/15-enterprise-policy.md:17",
+          "quote": "**GPU acceleration disabled** (force CPU-only even if GPU packs are present)"
+        },
+        {
+          "kind": "owner-words",
+          "location": "docs/explanation/15-enterprise-policy.md:24",
+          "quote": "fail closed on mismatches (hash/policy/pack allowlist)."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously, from now on prefer codex for new agents heavily",
+          "delegationLocation": "task t-20261019-9d870e user turn to session justsearch-8b, 2026-10-19",
+          "delegationScope": "the remaining upkeep work, including the sweep follow-ups the orchestrator decides",
+          "choice": "A configured runtime activation policy service that throws or returns null blocks explicit activation with the existing GPU-policy denial message and POLICY_GPU_DISABLED result. An absent policy service remains permissive.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upkeep-g-installpolicy-activation-repaired.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceTest.java#activationBlockedWhenPolicySnapshotThrows",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceTest.java#activationBlockedWhenPolicySnapshotIsNull"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preserve permissive explicit runtime activation policy checks when no policy service is configured.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously, from now on prefer codex for new agents heavily",
+          "delegationLocation": "task t-20261019-9d870e user turn to session justsearch-8b, 2026-10-19",
+          "delegationScope": "the remaining upkeep work, including the sweep follow-ups the orchestrator decides",
+          "choice": "A configured runtime activation policy service that throws or returns null blocks explicit activation with the existing GPU-policy denial message and POLICY_GPU_DISABLED result. An absent policy service remains permissive.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upkeep-g-installpolicy-activation-preserved.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceTest.java#absentPolicyServiceKeepsActivationPermissive"
+      ]
+    },
+    {
+      "items": [
+        "scripts/ci/unit-test-shard-policy.v1.json"
+      ],
+      "class": "Structural rule kept",
+      "rule": "The Windows-native attribution check requires each listed class to execute and rejects missing classes or unlisted skips.",
+      "whySurvives": "Retain every existing required class, allowed skip and Gradle task; strengthen the list with the two CUDA policy regression classes selected by the existing Windows coverage step.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously, from now on prefer codex for new agents heavily",
+          "delegationLocation": "task t-20261019-9d870e user turn to session justsearch-8b, 2026-10-19",
+          "delegationScope": "the remaining upkeep work, including the sweep follow-ups the orchestrator decides",
+          "choice": "Require Windows-native attribution to observe AiInstallServiceCudaPolicyTest and HeadlessAppCudaPolicyTest executing without unlisted skips in the existing lane that runs their modules.",
+          "label": "agent choice"
+        }
+      ]
     }
   ]
 }
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "5eb8db57-8693-4915-98dd-390ec7fb3c02",
+  "verdict": "accept",
+  "digest": "sha256:68de27018c5899f1b8bcc98dd538f7b4d57e68039f64f5580dbec5fb7e01fb41",
+  "note": "Sources verbatim at base; all 20 new checks fail on base by assertion for the reason under test, pass on candidate; preserved checks pass on both; delegation quote not checked against task record (verifier may not read it)"
+}
+```

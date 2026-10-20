@@ -3,10 +3,12 @@ package io.justsearch.app.services.ai.runtime;
 import io.justsearch.app.api.AiRuntimeStatusResponse;
 import io.justsearch.app.api.AiRuntimeActivationStatus;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -122,6 +124,43 @@ class RuntimeActivationServiceTest {
     assertFalse(
         Files.readString(tmp.resolve("ai/runtime-activation-state.json"))
             .contains("\"state\" : \"running\""));
+  }
+
+  @Test
+  void activationBlockedWhenPolicySnapshotThrows() throws Exception {
+    setHome(tmp);
+    assertFailedPolicyReadBlocksActivation(() -> {
+      throw new IllegalStateException("policy unavailable");
+    });
+  }
+
+  @Test
+  void activationBlockedWhenPolicySnapshotIsNull() throws Exception {
+    setHome(tmp);
+    assertFailedPolicyReadBlocksActivation(() -> null);
+  }
+
+  private void assertFailedPolicyReadBlocksActivation(EnterprisePolicyService policy)
+      throws Exception {
+    var service = new RuntimeActivationService(processExecutors,
+        OnlineAiService.unavailable(),
+        new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY), null, policy);
+    assertEquals("GPU acceleration is disabled by administrator policy.",
+        assertThrows(IllegalStateException.class, service::enforceActivationPolicy).getMessage());
+    service.startActivate("cuda-12.4");
+    var status = awaitDone(service);
+    assertEquals("failed", status.state);
+    assertEquals("POLICY_GPU_DISABLED", status.errorCode);
+    assertEquals("GPU acceleration is disabled by administrator policy.", status.message);
+  }
+
+  @Test
+  void absentPolicyServiceKeepsActivationPermissive() throws Exception {
+    setHome(tmp);
+    var service = new RuntimeActivationService(processExecutors,
+        OnlineAiService.unavailable(),
+        new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY), null, null);
+    assertDoesNotThrow(service::enforceActivationPolicy);
   }
 
   @Test
