@@ -6,7 +6,7 @@ import os from 'node:os';
 const require = createRequire(import.meta.url);
 const { createSupervisionLoop, loadPolicy } = require('./lib/engine-supervisor.cjs');
 
-function fixture({ failFirst = false, crashFirstFour = false, failAt = 0 } = {}) {
+function fixture({ failFirst = false, crashFirstFour = false, failAt = 0, neverReady = false } = {}) {
   let now = 0, n = 0, exited = false, pendingExit = null, spawnedAt = 0;
   const records = [], ports = [];
   const actor = {
@@ -32,7 +32,7 @@ function fixture({ failFirst = false, crashFirstFour = false, failAt = 0 } = {})
   const loop = createSupervisionLoop({ actuator: actor,
     policy: { ...loadPolicy(), exhaustedRetryDelayMs: 200, cooldownIncrementMs: 0, maxCooldownMs: 0, hangPollIntervalMs: 100, stabilityWindowMs: 500 },
     io: { readManifest: () => ({ apiPort: 8000 + n, instanceId: `instance-${n}` }), readRawManifest: () => null,
-      probeHealth: async () => true, probeAlive: async () => true, fetchStatus: async () => ({}),
+      probeHealth: async () => !neverReady, probeAlive: async () => true, fetchStatus: async () => ({}),
       essentialReadyEpoch: () => 'epoch', clearStaleDiscoveryFiles() {}, waitForRelease: async () => ({ released: true }) },
     timeouts: { initialPortMs: 1000, initialReadyMs: 1000 }, monotonic: () => now,
     publish: async state => { records.push(state); },
@@ -49,6 +49,24 @@ test('E6: a first spawn failure retains the actual missing-Java obstacle', async
   const result = await f.loop.run();
   assert.equal(result.state, 'exhausted');
   assert.match(f.records.at(-1).reason, /Java executable missing: C:\/Name With Spaces\/java.exe/);
+});
+
+test('initial startup exhaustion ends discovery instead of scheduling a delayed generation', async () => {
+  const f = fixture({ crashFirstFour: true, neverReady: true });
+  const done = f.loop.run();
+  try {
+    await until(() => f.records.at(-1)?.state === 'exhausted');
+    const exhausted = f.records.at(-1);
+    assert.equal(exhausted.retryAt ?? null, null, 'an Engine that never became healthy must not wait for a later retry');
+    const outcome = await done;
+    assert.equal(outcome.state, 'exhausted');
+    assert.equal(outcome.firstReadyDone, false);
+    assert.equal(f.spawnCount(), 4);
+    await assert.rejects(f.loop.firstReady, error => error.code === 'ENGINE_EXITED_DURING_DISCOVERY');
+  } finally {
+    await f.loop.hostQuit();
+    await done;
+  }
 });
 
 test('E3/E5: terminal manual restart has one owner and quit wins before admission', async () => {

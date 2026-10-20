@@ -1,0 +1,18 @@
+--- a/modules/shell/src-tauri/src/updater.rs
++++ b/modules/shell/src-tauri/src/updater.rs
+@@ -2983,3 +2983,15 @@
+ #[cfg(test)]
+ #[path = "updater_actor_hold_witness_tests.rs"]
+ mod actor_hold_witness_tests;
++
++// Evidence-only extraction of the baseline inline download acceptance; production callers are
++// unchanged. Deliberately leaves the coordinator in "downloading" on the old error path.
++fn checked_installer_bytes(_coordinator: &UpdateCoordinator, descriptor: &ReleaseDescriptor, downloaded: Result<Vec<u8>, String>) -> Result<Vec<u8>, String> {
++    let bytes = downloaded?;
++    let digest = sha256_bytes(&bytes);
++    if digest != descriptor.artifact.sha256.to_ascii_lowercase() || bytes.len() as u64 != descriptor.artifact.size {
++        return Err("Downloaded installer bytes do not match release descriptor".into());
++    }
++    if bytes.get(0..2) != Some(b"MZ") { return Err("Authenticated updater artifact is not a Windows NSIS executable".into()); }
++    Ok(bytes)
++}

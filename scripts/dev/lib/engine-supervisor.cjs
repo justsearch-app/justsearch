@@ -838,7 +838,9 @@ function createSupervisionLoop({
       return finish(STATES.STOPPED, code, decision.reason);
     }
     if (decision.action === ACTIONS.EXHAUSTED) {
-      if (decision.exitClass !== 'TRANSIENT') {
+      // Startup admission must settle: a runner that never became healthy exits with failure.
+      // Only an admitted Engine receives unattended recovery after exhausting its budget.
+      if (!s.firstReadyDone || decision.exitClass !== 'TRANSIENT') {
         return finish(STATES.EXHAUSTED, code, `ENGINE_RESTART_EXHAUSTED:${decision.reason}`);
       }
       await io.waitForRelease({ pid: exit.pid });
