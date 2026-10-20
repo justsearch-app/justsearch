@@ -26,21 +26,41 @@ author-session: 01a153ce-3f19-7fa0-a7cf-5b554794f7f8
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation"
-      ],
-      "whatMoved": "Add the explicitly named cross-platform/windows class tags from CC4. All assertions, OS guards, assumptions, prerequisites and timeouts remain byte-identical. Canonicalize AppInstanceLockFailureTest\u2019s temporary directory before each test so FileChannel.open injection matches the production toRealPath path on Windows as well as Linux. Portable classes retain their normal Linux coverage; native-only classes keep their OS-specific prerequisites. Windows scheduling expands to configuration and indexer-worker.",
+      "class": "New",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
           "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
           "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
-          "choice": "No test removed or weakened; Linux selections unchanged except CC1\u2019s added steps.",
+          "choice": "Add the thirteen named deletion-safety, persistence and process-control classes to Windows CI using cross-platform tags for portable classes and windows tags for native-only classes. Preserve their assertions, fault injections, OS guards, assumptions and timeouts; retain existing Linux execution.",
           "label": "agent choice"
         }
-      ]
+      ],
+      "behaviour": "New execution coverage: these thirteen existing classes are selected by Windows CI, without changing their oracles. The Java D4 evidence and newChecks cover the Linux-runnable checks in ten tagged classes; method IDs exclude existing Windows-only assumptions rather than counting skipped cases as passes. The remaining Windows-only checks, including WindowsJobWitnessBoundTest, WindowsJobWitnessReserveTest and PruneMissingDifferentVolumeTest, have real Windows execution proof from hosted run 39339963464 (https://github.com/justsearch-app/justsearch/actions/runs/39339963464), job 118358773145: AtomicFileWritesTest: 12 executed, 0 skipped; ContendedFileReadsTest: 6 executed, 1 skipped; PlatformPathsTest: 7 executed, 0 skipped; AppInstanceLockExclusionTest: 4 executed, 0 skipped; AppInstanceLockFailureTest: 5 executed, 0 skipped; DefaultChildControlTest: 25 executed, 0 skipped; WindowsJobWitnessBoundTest: 1 executed, 0 skipped; WindowsJobWitnessReserveTest: 1 executed, 0 skipped; ExtractionSandboxCommandTest: 13 executed, 0 skipped; RootPresenceGuardTest: 5 executed, 0 skipped; UncertainAbsenceGatesTest: 9 executed, 0 skipped; PruneUncertainAbsenceTest: 5 executed, 0 skipped; PruneMissingDifferentVolumeTest: 3 executed, 0 skipped. The only Windows skip is ContendedFileReadsTest.reopensAfterContentionWhenWriterRotatesThePathBeforePublishingReplacement(), which is @EnabledOnOs(OS.LINUX); it executes in the Linux D4 run. All three PruneMissingDifferentVolumeTest cases executed on Windows, so the second-volume prerequisite was met. No repaired product behaviour or assertion fail-before is claimed. The path-canonicalization fixture adaptation is recorded separately.",
+      "repaired": false,
+      "newChecks": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aRootRenamedAwayBeforeThePruneLosesNoDocuments",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aRootRenamedAwayMidPruneStopsTheRemovals",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aGenuinelyDeletedFileIsStillPrunedInOneRun",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aStoredPathThisSystemCannotParseDoesNotHaltGenuineDeletions",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
+        "modules/app-util/src/test/java/io/justsearch/app/util/AppInstanceLockExclusionTest.java",
+        "modules/app-util/src/test/java/io/justsearch/app/util/AppInstanceLockFailureTest.java",
+        "modules/configuration/src/test/java/io/justsearch/configuration/PlatformPathsTest.java",
+        "modules/configuration/src/test/java/io/justsearch/configuration/persistence/AtomicFileWritesTest.java",
+        "modules/configuration/src/test/java/io/justsearch/configuration/persistence/ContendedFileReadsTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxCommandTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#admissionKeepsTheSourceWhenItsRootWasRenamedAway",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#admissionStillRetiresAGenuinelyDeletedSource",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#aFileReplacedByADirectoryIsRetired",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#theFreshnessCheckKeepsTheDocumentWhenTheRootWasRenamedAway",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#theFreshnessCheckStillRetiresAGenuinelyDeletedSource",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aPresentRootVouchesUntilItIsRenamedAway",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aRootMissingAtCaptureNeverVouches",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aRecordedVolumeIsForgottenWhenTheRootIsRemoved"
+      ],
+      "evidence": "gates/test-intent/evidence/ci-coverage-java.json"
     },
     {
       "items": [
@@ -89,21 +109,19 @@ author-session: 01a153ce-3f19-7fa0-a7cf-5b554794f7f8
         ".github/workflows/ci.yml",
         "scripts/ci/unit-test-shard-policy.v1.json"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation"
-      ],
-      "whatMoved": "Schedule the complete existing ui-web Vitest and lockdown suites as blocking steps in app-ui-ui. Add configuration/indexer-worker Windows tasks and match the task inventory; Linux Gradle lists and all timeouts stay unchanged. Frontend steps use four workers; Windows Gradle uses --continue. Restore both original E2E upload steps exactly from pinned main, including whole writer-junit fixture trees, under always(). The bounded child-log artifact is additional; collection and its upload also use always(). Pinned upload-path/condition checks prevent loss of existing diagnostics. The Windows reporter requires execution in every listed class and rejects every unnamed skip. Only the named Linux-only ContendedFileReadsTest rotation and the two explicit missing-second-volume prune cases may skip. The preflight inventory includes both frontend commands.",
+      "class": "Structural rule kept",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
           "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
           "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
-          "choice": "No test removed or weakened; Linux selections unchanged except CC1\u2019s added steps.",
+          "choice": "Schedule the full frontend suites and thirteen Windows safety classes as required coverage, preserve existing Linux selections and timeouts, retain every original E2E diagnostic upload, and enforce exact task ownership, class execution and the explicit skip list.",
           "label": "agent choice"
         }
-      ]
+      ],
+      "rule": "Existing required CI test steps remain blocking, inventories own every command/task, original integration and lifecycle diagnostics retain their exact upload paths and always() conditions, and no existing test assertion, selection or timeout is weakened. Every Windows safety class must execute; only the explicitly named prerequisite skips are allowed.",
+      "whySurvives": "The predicates are unchanged or stricter: full ui-web Vitest and lockdown become additional blocking Linux steps with four workers; configuration and indexer-worker are added to the Windows task inventory, with --continue so other modules execute after a failure. Existing Linux Gradle selections and job timeouts remain unchanged. Both original E2E upload steps are preserved exactly from pinned main, including whole writer-junit fixture trees under always(); the bounded child-log collector and upload also run always() as additional artifacts. The pinned upload-list policy forbids removing paths or narrowing conditions. The Windows reporter adds an execution requirement for each of thirteen classes and rejects all unlisted skips, including when allowedSkips is absent; only the named Linux-only ContendedFileReadsTest rotation and the two named missing-second-volume prune cases may skip. The inventories and preflight commands include the added tasks and both frontend suites; no existing constraint is relaxed."
     },
     {
       "items": [
@@ -147,6 +165,27 @@ author-session: 01a153ce-3f19-7fa0-a7cf-5b554794f7f8
         "modules/ui-web/src/__test-setup__/dynamicImportLifetime.test.ts"
       ],
       "evidence": "gates/test-intent/evidence/ci-coverage-import-lifetime.json"
+    },
+    {
+      "items": [
+        "modules/app-util/src/test/java/io/justsearch/app/util/AppInstanceLockFailureTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding",
+        "instrumentation"
+      ],
+      "whatMoved": "Only the fixture path representation moves: the @BeforeEach hook canonicalizes the existing @TempDir with toRealPath(), matching acquire() before FileChannel.open failure injection. This still names the same temporary directory and lock file, including Windows temporary-directory aliases. Each existing test body, assertion, native lock boundary, injected error, expected outcome and prerequisite is retained. The cross-platform class tag is the separate New execution-coverage change in entry 1.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "Canonicalize AppInstanceLockFailureTest temporary-directory aliases so its existing FileChannel.open failure injection reaches the same native lock boundary on Windows and Linux without weakening any assertion.",
+          "label": "agent choice"
+        }
+      ]
     }
   ]
 }

@@ -1,0 +1,604 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T00:23:49.248Z",
+  "revision": "f8dfcde7ca902b8051509df2a431bdecae2a0afc",
+  "tree": "b4ea215f4d04693ab660a19e07d96711c13dcb5b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.aRootRenamedAwayBeforeThePruneLosesNoDocuments\" --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.aRootRenamedAwayMidPruneStopsTheRemovals\" --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.aGenuinelyDeletedFileIsStillPrunedInOneRun\" --tests \"io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest.aStoredPathThisSystemCannotParseDoesNotHaltGenuineDeletions\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7028
+    },
+    {
+      "command": "./gradlew :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8845
+    },
+    {
+      "command": "./gradlew :modules:app-util:test --tests \"io.justsearch.app.util.AppInstanceLockExclusionTest\" --tests \"io.justsearch.app.util.AppInstanceLockFailureTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2633
+    },
+    {
+      "command": "./gradlew :modules:configuration:test --tests \"io.justsearch.configuration.PlatformPathsTest\" --tests \"io.justsearch.configuration.persistence.AtomicFileWritesTest\" --tests \"io.justsearch.configuration.persistence.ContendedFileReadsTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4340
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.ExtractionSandboxCommandTest\" --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.admissionKeepsTheSourceWhenItsRootWasRenamedAway\" --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.admissionStillRetiresAGenuinelyDeletedSource\" --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.aFileReplacedByADirectoryIsRetired\" --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.theFreshnessCheckKeepsTheDocumentWhenTheRootWasRenamedAway\" --tests \"io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest.theFreshnessCheckStillRetiresAGenuinelyDeletedSource\" --tests \"io.justsearch.indexerworker.services.RootPresenceGuardTest.aPresentRootVouchesUntilItIsRenamedAway\" --tests \"io.justsearch.indexerworker.services.RootPresenceGuardTest.aRootMissingAtCaptureNeverVouches\" --tests \"io.justsearch.indexerworker.services.RootPresenceGuardTest.aRecordedVolumeIsForgottenWhenTheRootIsRemoved\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5207
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aRootRenamedAwayBeforeThePruneLosesNoDocuments",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b80e9aaeb8f3ce964120b6a6d9fccacecfa0e0f56aef65c609991c527b48404",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRootRenamedAwayBeforeThePruneLosesNoDocuments()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aRootRenamedAwayMidPruneStopsTheRemovals",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b80e9aaeb8f3ce964120b6a6d9fccacecfa0e0f56aef65c609991c527b48404",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRootRenamedAwayMidPruneStopsTheRemovals()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aGenuinelyDeletedFileIsStillPrunedInOneRun",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b80e9aaeb8f3ce964120b6a6d9fccacecfa0e0f56aef65c609991c527b48404",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aGenuinelyDeletedFileIsStillPrunedInOneRun()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java#aStoredPathThisSystemCannotParseDoesNotHaltGenuineDeletions",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/PruneUncertainAbsenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b80e9aaeb8f3ce964120b6a6d9fccacecfa0e0f56aef65c609991c527b48404",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStoredPathThisSystemCannotParseDoesNotHaltGenuineDeletions()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:54ed733074205657740419719a88b41c5f42db5eeb73fe55890725965d60cf7c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Manifest adapter: a child is registered while it runs and removed at its exit",
+          "status": "passed"
+        },
+        {
+          "name": "T7: a terminator that never kills gives SURVIVED after 10 s; the retry succeeds",
+          "status": "passed"
+        },
+        {
+          "name": "aSelfTestThatSurvivedItsStopBlocksTheMainServer()",
+          "status": "passed"
+        },
+        {
+          "name": "T9: a throwing ledger never blocks the stop; the outcome says the record was lost",
+          "status": "passed"
+        },
+        {
+          "name": "pathPrefixGoesInFrontOfTheInheritedPath()",
+          "status": "passed"
+        },
+        {
+          "name": "childStartRecordsWhetherTheChildIsInTheEngineJob()",
+          "status": "passed"
+        },
+        {
+          "name": "T13: with no probe the release is UNMEASURED",
+          "status": "passed"
+        },
+        {
+          "name": "T8: the stop-intent is on disk before terminate() is called",
+          "status": "passed"
+        },
+        {
+          "name": "T13: QUIT, UPGRADE and ENGINE_RESTART skip the GPU poll",
+          "status": "passed"
+        },
+        {
+          "name": "T2: a child that exits by itself between the intent and the terminate is UNEXPECTED",
+          "status": "passed"
+        },
+        {
+          "name": "aChatServerStartWaitsForAStopStillRunning()",
+          "status": "passed"
+        },
+        {
+          "name": "T13: no release within 5 s is TIMEOUT, and fails nothing",
+          "status": "passed"
+        },
+        {
+          "name": "T4: eight concurrent stops write one intent and share one outcome; the first wins",
+          "status": "passed"
+        },
+        {
+          "name": "T6: stopAll of three children shares one 2 s grace (under 3 s in total)",
+          "status": "passed"
+        },
+        {
+          "name": "Manifest adapter: a refused registration stops the child (ROLLBACK) and throws",
+          "status": "passed"
+        },
+        {
+          "name": "T3: stopping an exited child returns its recorded UNEXPECTED exit and writes nothing",
+          "status": "passed"
+        },
+        {
+          "name": "T5: COOPERATIVE stops: eof:0 is REQUESTED unforced, ignore-eof forced, eof:3 UNEXPECTED",
+          "status": "passed"
+        },
+        {
+          "name": "T9: a failed intent write is a ledger-gap on the next write; the stop proceeds",
+          "status": "passed"
+        },
+        {
+          "name": "T4: NOW escalates a pending COOPERATIVE stop at once, with stop-escalate",
+          "status": "passed"
+        },
+        {
+          "name": "T13: without an expected size, two stable samples after a drop are a recovery",
+          "status": "passed"
+        },
+        {
+          "name": "T13: the GPU poll recovers at sample 3 (75% of the expected release)",
+          "status": "passed"
+        },
+        {
+          "name": "aChatServerRollbackSurvivorBlocksEveryChatServerStart()",
+          "status": "passed"
+        },
+        {
+          "name": "T14: start(gpu) and awaitGpuRelease wait for a pending poll",
+          "status": "passed"
+        },
+        {
+          "name": "exitWhileRegisteringRemovesTheEntry()",
+          "status": "passed"
+        },
+        {
+          "name": "T1: stop(NOW) is REQUESTED with our code, one intent before the terminate, one exit",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-util/src/test/java/io/justsearch/app/util/AppInstanceLockExclusionTest.java",
+      "file": "modules/app-util/src/test/java/io/justsearch/app/util/AppInstanceLockExclusionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:54a131ed5d3ad1a07ffb53a4145968838530700fc643e72b7be6c5d69a2af3cb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unlockedStaleMetadataDoesNotPreventAcquisition()",
+          "status": "passed"
+        },
+        {
+          "name": "rejectedSameJvmContenderCannotReleaseTheOwnersProcessLock()",
+          "status": "passed"
+        },
+        {
+          "name": "processDeathReleasesLockWithoutDeletingItsFile()",
+          "status": "passed"
+        },
+        {
+          "name": "metadataNamesProcessStartRatherThanAcquisitionTime()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-util/src/test/java/io/justsearch/app/util/AppInstanceLockFailureTest.java",
+      "file": "modules/app-util/src/test/java/io/justsearch/app/util/AppInstanceLockFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:31d31ce4976723655becfba5d7f66dbee0d076835cf9119953fd77abe07a4074",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "metadataFailureThatClosesChannelRefusesAcquisition()",
+          "status": "passed"
+        },
+        {
+          "name": "failedAcquisitionRetainsReservationWhenChannelCleanupFails()",
+          "status": "passed"
+        },
+        {
+          "name": "closeFailureAfterNativeCloseCannotBeClearedByANoopRetry()",
+          "status": "passed"
+        },
+        {
+          "name": "metadataFailureIsToleratedWhileNativeLockRemainsValid()",
+          "status": "passed"
+        },
+        {
+          "name": "failedChannelCloseRetainsExclusionAndCanRetryWhileOpen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/PlatformPathsTest.java",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/PlatformPathsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eee6ff070f45c87330ed777ba97703738d092447ceae32e1e566ce740ec09b90",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "getPlatformDefault_isPlatformAppropriate()",
+          "status": "passed"
+        },
+        {
+          "name": "resolveDataDir_respectsSystemProperty()",
+          "status": "passed"
+        },
+        {
+          "name": "resolveDataDir_containsJustSearchComponent()",
+          "status": "passed"
+        },
+        {
+          "name": "resolveIndexPath_appendsCollectionName()",
+          "status": "passed"
+        },
+        {
+          "name": "resolveIndexPath_defaultCollection()",
+          "status": "passed"
+        },
+        {
+          "name": "getPlatformDefault_returnsNonNullPath()",
+          "status": "passed"
+        },
+        {
+          "name": "resolveDataDir_returnsNonNullPath()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/AtomicFileWritesTest.java",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/AtomicFileWritesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e6f4fea6e036cf6770432e8007aff5505cda2142f1930141d927db384327e0d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "createsParentDirectories()",
+          "status": "passed"
+        },
+        {
+          "name": "strictReplacementForcesBytesBeforeMove()",
+          "status": "passed"
+        },
+        {
+          "name": "retriesAccessDeniedOnTheSamePreparedTempBeforePublishing()",
+          "status": "passed"
+        },
+        {
+          "name": "strictReplacementRefusesFallbackAndPreservesTarget()",
+          "status": "passed"
+        },
+        {
+          "name": "cleanupFailureDoesNotHideReplacementFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "fallsBackWhenAtomicMoveIsUnsupported()",
+          "status": "passed"
+        },
+        {
+          "name": "replacesExistingBytesAndCleansTemporaryFile()",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedAccessDeniedRetryRestoresFlagAndCleansTemp()",
+          "status": "passed"
+        },
+        {
+          "name": "writeFailurePreservesOriginalAndDeletesTemp()",
+          "status": "passed"
+        },
+        {
+          "name": "exhaustedAccessDeniedPreservesOriginalFailureAndCleansTemp()",
+          "status": "passed"
+        },
+        {
+          "name": "moveFailurePreservesOriginalAndDeletesTemp()",
+          "status": "passed"
+        },
+        {
+          "name": "forceFailureDoesNotAttemptMove()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/ContendedFileReadsTest.java",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/ContendedFileReadsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3ffa967909ab46588fbc6c18419ed422d2acb2a89101f8d620d9a24d958ef813",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readsWhileAnExternalSharedLockIsHeld()",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedContentionRestoresTheReadersInterruptFlag()",
+          "status": "passed"
+        },
+        {
+          "name": "waitsForAnExternalExclusiveLockThenReadsTheExactBytes()",
+          "status": "passed"
+        },
+        {
+          "name": "concurrentAtomicReplacementsExposeOnlyWholeVersionsAndPropagateWriterFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "missingFilePropagatesImmediatelyInsteadOfBecomingLockContention()",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingLockInThisJvmHasABoundedContentionFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "reopensAfterContentionWhenWriterRotatesThePathBeforePublishingReplacement()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxCommandTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxCommandTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dea051060b04005ac8cde2ea325dce8e506f2774f81a797e1b6c62409f7a1ea5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aTrailingSeparatorBeforeTheClosingQuoteEscapesIt()",
+          "status": "passed"
+        },
+        {
+          "name": "publicEntryPointPicksTheFormThatFitsThisRunnersClasspath()",
+          "status": "passed"
+        },
+        {
+          "name": "switchesToAnArgfileWhenTheCommandLineWouldExceedTheWindowsLimit()",
+          "status": "passed"
+        },
+        {
+          "name": "heapFlagIsPresentAndSizedFromThePolicysLargestAcceptedInput()",
+          "status": "passed"
+        },
+        {
+          "name": "aQuotedPathWithSpacesIsOneArgument()",
+          "status": "passed"
+        },
+        {
+          "name": "argFileTokenQuotesSpacesAndEscapesBackslashes()",
+          "status": "passed"
+        },
+        {
+          "name": "defaultCommandLaunchesTheChildOnThisJvmAndClasspath()",
+          "status": "passed"
+        },
+        {
+          "name": "anUnterminatedQuoteIsRefusedRatherThanMisSplit()",
+          "status": "passed"
+        },
+        {
+          "name": "unquotedCommandsSplitOnWhitespaceExactlyAsBefore()",
+          "status": "passed"
+        },
+        {
+          "name": "escapesInsideDoubleQuotesAreQuoteAndBackslashOnly()",
+          "status": "passed"
+        },
+        {
+          "name": "aotCacheIsOnlyInheritedWhenTheWorkerHasOneAndTheFileExists()",
+          "status": "passed"
+        },
+        {
+          "name": "inlineFormIsKeptBelowTheThreshold()",
+          "status": "passed"
+        },
+        {
+          "name": "quotesGroupWithinAnArgumentAndAnEmptyQuotedArgumentSurvives()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#admissionKeepsTheSourceWhenItsRootWasRenamedAway",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e7e6665d572db15aeebf5e87a9ea737bdf4c233eb9fea6cd2abddf68a742c90",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "admissionKeepsTheSourceWhenItsRootWasRenamedAway()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#admissionStillRetiresAGenuinelyDeletedSource",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e7e6665d572db15aeebf5e87a9ea737bdf4c233eb9fea6cd2abddf68a742c90",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "admissionStillRetiresAGenuinelyDeletedSource()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#aFileReplacedByADirectoryIsRetired",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e7e6665d572db15aeebf5e87a9ea737bdf4c233eb9fea6cd2abddf68a742c90",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFileReplacedByADirectoryIsRetired()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#theFreshnessCheckKeepsTheDocumentWhenTheRootWasRenamedAway",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e7e6665d572db15aeebf5e87a9ea737bdf4c233eb9fea6cd2abddf68a742c90",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theFreshnessCheckKeepsTheDocumentWhenTheRootWasRenamedAway()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#theFreshnessCheckStillRetiresAGenuinelyDeletedSource",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e7e6665d572db15aeebf5e87a9ea737bdf4c233eb9fea6cd2abddf68a742c90",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theFreshnessCheckStillRetiresAGenuinelyDeletedSource()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aPresentRootVouchesUntilItIsRenamedAway",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:707bcfd02b5327fea5ef0ef53891f8cf604e576079e898aa2f5c46a55e184f7c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPresentRootVouchesUntilItIsRenamedAway()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aRootMissingAtCaptureNeverVouches",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:707bcfd02b5327fea5ef0ef53891f8cf604e576079e898aa2f5c46a55e184f7c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRootMissingAtCaptureNeverVouches()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aRecordedVolumeIsForgottenWhenTheRootIsRemoved",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:707bcfd02b5327fea5ef0ef53891f8cf604e576079e898aa2f5c46a55e184f7c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRecordedVolumeIsForgottenWhenTheRootIsRemoved()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:da7c6cce762468809fca7ba117eacc343ce3279846558d342cdb289a7eb56f45"
+}
