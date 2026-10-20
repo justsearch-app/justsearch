@@ -1526,6 +1526,64 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
         "unresolvedRisks": "No packaged Engine/Q24 claim; native byte accounting and SQL fixture generation are test instrumentation only."
       },
       "evidence": "gates/test-intent/evidence/queue-scale-harness-current.json"
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsRetiredDeliveryTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/IndexingJobsSubscriptionFenceTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IndexingJobsSubscriberRetirementTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/BoundedHandoffTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Retired-subscription repair: hold a real PROCESSING handoff after its close check, overflow/resubscribe, advance and finish current claims, then release the old callback; store window, head cursor and state-presence signal stay unchanged. Also fence higher-sequence retired callbacks, old error/completion callbacks, out-of-order active snapshots/deltas/presence and terminal replay, worker-local cursor resets, a late subscribe return after synchronous failure, completed callbacks, worker COW subscriber cancellation/feed closure, and delivery at the closed handoff consumer boundary. Only a new method/import are added to BoundedHandoffTest; all pre-existing inputs, assertions and tags are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q15",
+          "quote": "Live, reloaded and reconnected clients converge: concurrent writes during snapshot, more than 256 initial deltas, a reconnect and a browser reload all end with the same rows and no phantom jobs.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q26",
+          "quote": "An overflow of the head's indexing-jobs handoff (a typed cause, not exception-text matching) resubscribes immediately and bounded (no tight loop under sustained overload); real indexing of a 3k-file corpus ends with the head matching jobs.db within 5 s of the last commit. Fails today (up to 30 s stale).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "fence every delivery to the subscription that produced it, so a callback from a retired or closed subscription is dropped even if it passed the close check before; and the head never applies a frame whose sequence is older than its current snapshot (the cursor never moves backward).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Rebase each replacement subscription's local wire sequence at its first snapshot so the head cursor remains monotonic without changing the worker wire protocol.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Skip retired subscribers in captured copy-on-write batches and recheck closure immediately before a handoff invokes its consumer.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/queue-scale-retired-subscription.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsRetiredDeliveryTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/IndexingJobsSubscriptionFenceTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IndexingJobsSubscriberRetirementTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/BoundedHandoffTest.java#closeAfterOuterDrainCheckStillFencesTheConsumerCall"
+      ],
+      "repaired": true
     }
   ]
 }

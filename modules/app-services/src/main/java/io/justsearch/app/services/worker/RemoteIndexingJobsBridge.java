@@ -94,7 +94,14 @@ public final class RemoteIndexingJobsBridge {
   private final EngineExecutorRegistry.Registration reconnectRetryRegistration;
   private final java.util.concurrent.ExecutorService reconnectRetries;
   private final AtomicBoolean reconnectPending = new AtomicBoolean();
-  private volatile KnowledgeClient.IndexingJobsStream stream;
+  private final Object subscriptionLock = new Object();
+  private volatile StreamAttempt activeSubscription;
+
+  private static final class StreamAttempt {
+    KnowledgeClient.IndexingJobsStream stream; // Owned under subscriptionLock.
+    boolean receivedFrame; // Cursor translation is owned under the bridge monitor.
+    long sequenceOffset;
+  }
   private final List<Consumer<Delta>> listeners = new CopyOnWriteArrayList<>();
   /**
    * The cached (seq, items) pair, updated ATOMICALLY together (tempdoc 550 §B.2 fix-pass). A new
@@ -217,13 +224,21 @@ public final class RemoteIndexingJobsBridge {
    */
   public CompletableFuture<Void> start() {
     CompletableFuture<Void> snapshotDelivered = new CompletableFuture<>();
-    if (!started.compareAndSet(false, true)) {
-      // Already started; return an already-completed future to avoid hanging callers.
-      // Real "is the current snapshot loaded?" check is via latestSnapshotSeq() > 0.
-      snapshotDelivered.complete(null);
-      return snapshotDelivered;
+    StreamAttempt attempt;
+    synchronized (subscriptionLock) {
+      if (stopped) {
+        snapshotDelivered.completeExceptionally(new IllegalStateException("bridge stopped"));
+        return snapshotDelivered;
+      }
+      if (!started.compareAndSet(false, true)) {
+        // Already started; return an already-completed future to avoid hanging callers.
+        snapshotDelivered.complete(null);
+        return snapshotDelivered;
+      }
+      attempt = new StreamAttempt();
+      activeSubscription = attempt;
     }
-    openStream(snapshotDelivered);
+    openStream(attempt, snapshotDelivered);
     return snapshotDelivered;
   }
 
@@ -266,13 +281,18 @@ public final class RemoteIndexingJobsBridge {
    * the underlying call, and the stream only ended when the channel was shut down.
    */
   public void stop() {
-    stopped = true;
+    KnowledgeClient.IndexingJobsStream open;
+    synchronized (subscriptionLock) {
+      stopped = true;
+      var attempt = activeSubscription;
+      activeSubscription = null;
+      open = attempt == null ? null : attempt.stream;
+      if (attempt != null) attempt.stream = null;
+    }
     reconnectPending.set(false);
     reconnectRetries.shutdownNow();
     reconnects.shutdownNow();
     listeners.clear();
-    KnowledgeClient.IndexingJobsStream open = stream;
-    stream = null;
     if (open != null) {
       try {
         open.close();
@@ -290,7 +310,7 @@ public final class RemoteIndexingJobsBridge {
   /**
    * Re-opens the flow after a failure, on a bounded backoff.
    *
-   * <p>Resetting {@link #started} is the load-bearing line: {@link #start} is a
+   * <p>The failed attempt resets {@link #started} before scheduling: {@link #start} is a
    * compare-and-set on it, so without the reset a re-subscribe would take the
    * "already started" branch and complete immediately without opening anything —
    * a reconnect that reports success and reconnects nothing.
@@ -315,7 +335,7 @@ public final class RemoteIndexingJobsBridge {
       // Snapshot success resets ordinary failures, but never this overload pacing.
       // First recovery is immediate; a sustained snapshot/overflow cycle gets at
       // most four starts per second, with no minute-long stale-cache cooldown.
-      synchronized (this) {
+      synchronized (subscriptionLock) {
         delay = nextOverflowReconnectAt == null ? 0L : Math.max(0L, nextOverflowReconnectAt - now);
         nextOverflowReconnectAt = now + delay + RECONNECT_BASE_DELAY_MS;
       }
@@ -347,18 +367,6 @@ public final class RemoteIndexingJobsBridge {
           delay,
           cause);
     }
-
-    KnowledgeClient.IndexingJobsStream dead = stream;
-    stream = null;
-    if (dead != null) {
-      try {
-        dead.close();
-      } catch (RuntimeException e) {
-        log.debug("RemoteIndexingJobsBridge: closing the failed flow threw", e);
-      }
-    }
-    // The reset that makes start() actually re-open. See this method's javadoc.
-    started.set(false);
 
     if (!stopped && reconnectPending.compareAndSet(false, true)) {
       long reconnectDelay = delay;
@@ -406,7 +414,7 @@ public final class RemoteIndexingJobsBridge {
     reconnectPending.set(false);
   }
 
-  private void openStream(CompletableFuture<Void> snapshotDelivered) {
+  private void openStream(StreamAttempt attempt, CompletableFuture<Void> snapshotDelivered) {
     if (stopped) {
       snapshotDelivered.completeExceptionally(new IllegalStateException("bridge stopped"));
       return;
@@ -415,90 +423,127 @@ public final class RemoteIndexingJobsBridge {
     if (source == null) {
       // Allow start() to be retried once the worker is up. Reset the started
       // flag so a follow-up start() will try again.
-      started.set(false);
+      synchronized (subscriptionLock) {
+        if (activeSubscription == attempt) {
+          activeSubscription = null;
+          started.set(false);
+        }
+      }
       snapshotDelivered.completeExceptionally(
           new IllegalStateException(
               "Worker not connected yet; retry start() after prepareKnowledgeServerBinding."));
       return;
     }
-    Consumer<IndexingJobsFrame> onFrame =
-        new Consumer<>() {
-          @Override
-          public void accept(IndexingJobsFrame frame) {
-            if (stopped) return;
-            try {
-              switch (frame.getBodyCase()) {
-                case SNAPSHOT -> {
-                  var items = new ArrayList<IndexingJobView>(frame.getSnapshot().getItemsCount());
-                  for (var view : frame.getSnapshot().getItemsList()) {
-                    items.add(toView(view));
-                  }
-                  replaceSnapshot(frame.getSeq(), items);
-                  applyStatePresence(frame);
-                  List<IndexingJobView> immutable = latestSnapshot();
-                  // Separate overload bursts must not exhaust a lifetime cap after recovery.
-                  // Overflow pacing is independent and survives a successful snapshot.
-                  consecutiveFailures.set(0);
-                  recentAttempts.clear();
-                  emit(new Delta.SnapshotReplaced(frame.getSeq(), immutable));
-                  if (!snapshotDelivered.isDone()) {
-                    snapshotDelivered.complete(null);
-                  }
-                }
-                case DELTA -> {
-                  IndexingJobsDelta d = frame.getDelta();
-                  // Keep the bounded snapshot current for new and reconnected clients.
-                  // Terminal rows still flow to the activity ledger through live listeners.
-                  applyStatePresence(frame);
-                  switch (d.getChangeCase()) {
-                    case INSERT -> {
-                      IndexingJobView view = toView(d.getInsert());
-                      upsertSnapshot(view, frame.getSeq());
-                      emit(new Delta.Insert(frame.getSeq(), view));
-                    }
-                    case UPDATE -> {
-                      IndexingJobView view = toView(d.getUpdate());
-                      upsertSnapshot(view, frame.getSeq());
-                      emit(new Delta.Update(frame.getSeq(), view));
-                    }
-                    case DELETE_PATH_HASH -> {
-                      removeFromSnapshot(d.getDeletePathHash(), frame.getSeq());
-                      emit(new Delta.Delete(frame.getSeq(), d.getDeletePathHash()));
-                    }
-                    case CHANGE_NOT_SET -> log.warn(
-                        "RemoteIndexingJobsBridge: empty delta change in frame seq={}",
-                        frame.getSeq());
-                  }
-                }
-                case BODY_NOT_SET -> log.warn(
-                    "RemoteIndexingJobsBridge: empty body in frame seq={}", frame.getSeq());
+    Consumer<IndexingJobsFrame> onFrame = frame -> {
+      // Keep publications ordered across attempts, without making retirement wait for listeners.
+      synchronized (RemoteIndexingJobsBridge.this) {
+        try {
+          Delta delivery;
+          synchronized (subscriptionLock) {
+            if (stopped || activeSubscription != attempt) return;
+            if (!attempt.receivedFrame) {
+              // Worker cursors restart per subscription. Rebase the fresh snapshot, retaining
+              // relative ordering while the head cursor stays monotonic across reconnects.
+              attempt.sequenceOffset = frame.hasSnapshot() ? Math.max(0L, snapshotSeq - frame.getSeq()) : 0L;
+              attempt.receivedFrame = true;
+            }
+            long sequence = frame.getSeq() + attempt.sequenceOffset;
+            if (sequence < snapshotSeq) return;
+            switch (frame.getBodyCase()) {
+              case SNAPSHOT -> {
+                var items = new ArrayList<IndexingJobView>(frame.getSnapshot().getItemsCount());
+                for (var view : frame.getSnapshot().getItemsList()) items.add(toView(view));
+                replaceSnapshot(sequence, items);
+                applyStatePresence(frame);
+                consecutiveFailures.set(0);
+                recentAttempts.clear();
+                delivery = new Delta.SnapshotReplaced(sequence, latestSnapshot());
               }
-            } catch (RuntimeException e) {
-              log.error("RemoteIndexingJobsBridge.onNext failed", e);
+              case DELTA -> {
+                var delta = frame.getDelta();
+                applyStatePresence(frame);
+                delivery = switch (delta.getChangeCase()) {
+                  case INSERT -> {
+                    var view = toView(delta.getInsert());
+                    upsertSnapshot(view, sequence);
+                    yield new Delta.Insert(sequence, view);
+                  }
+                  case UPDATE -> {
+                    var view = toView(delta.getUpdate());
+                    upsertSnapshot(view, sequence);
+                    yield new Delta.Update(sequence, view);
+                  }
+                  case DELETE_PATH_HASH -> {
+                    removeFromSnapshot(delta.getDeletePathHash(), sequence);
+                    yield new Delta.Delete(sequence, delta.getDeletePathHash());
+                  }
+                  case CHANGE_NOT_SET -> {
+                    log.warn("RemoteIndexingJobsBridge: empty delta change in frame seq={}", frame.getSeq());
+                    yield null;
+                  }
+                };
+              }
+              case BODY_NOT_SET -> {
+                log.warn("RemoteIndexingJobsBridge: empty body in frame seq={}", frame.getSeq());
+                delivery = null;
+              }
+              default -> throw new IllegalStateException("Unknown indexing-jobs frame body");
             }
           }
+          if (delivery != null) emit(attempt, delivery);
+          if (frame.hasSnapshot()) snapshotDelivered.complete(null);
+        } catch (RuntimeException failure) {
+          log.error("RemoteIndexingJobsBridge.onNext failed", failure);
+        }
+      }
+    };
 
-        };
+    Consumer<Throwable> onError = t -> {
+      KnowledgeClient.IndexingJobsStream dead;
+      synchronized (subscriptionLock) {
+        if (stopped || activeSubscription != attempt) return;
+        activeSubscription = null;
+        dead = attempt.stream;
+        attempt.stream = null;
+        started.set(false);
+        scheduleResubscribe(t);
+      }
+      snapshotDelivered.completeExceptionally(t);
+      closeRetiredStream(dead);
+    };
 
-    Consumer<Throwable> onError =
-        t -> {
-          if (stopped) return;
-          if (!snapshotDelivered.isDone()) {
-            snapshotDelivered.completeExceptionally(t);
-          }
-          scheduleResubscribe(t);
-        };
-
+    Runnable onCompleted = () -> {
+      KnowledgeClient.IndexingJobsStream dead;
+      synchronized (subscriptionLock) {
+        if (stopped || activeSubscription != attempt) return;
+        activeSubscription = null;
+        dead = attempt.stream;
+        attempt.stream = null;
+        started.set(false);
+      }
+      closeRetiredStream(dead);
+      log.info("RemoteIndexingJobsBridge stream completed by producer");
+    };
     try {
-      stream =
-          source.subscribe(
-              onFrame,
-              onError,
-              () -> log.info("RemoteIndexingJobsBridge stream completed by producer"));
+      var opened = source.subscribe(onFrame, onError, onCompleted);
+      synchronized (subscriptionLock) {
+        if (!stopped && activeSubscription == attempt) {
+          attempt.stream = opened;
+          return;
+        }
+      }
+      // A synchronous failure or completion may retire this attempt before subscribe returns.
+      closeRetiredStream(opened);
     } catch (RuntimeException failure) {
-      // Bounded admission/executor refusal happens before a subscription can report onError.
-      // Preserve the failed start future and use the same retry budget as asynchronous failures.
       onError.accept(failure);
+    }
+  }
+
+  private void closeRetiredStream(KnowledgeClient.IndexingJobsStream retired) {
+    if (retired == null) return;
+    try { retired.close(); }
+    catch (RuntimeException failure) {
+      log.debug("RemoteIndexingJobsBridge: closing the retired flow threw", failure);
     }
   }
 
@@ -551,8 +596,9 @@ public final class RemoteIndexingJobsBridge {
     presentStates = next;
   }
 
-  private void emit(Delta delta) {
+  private void emit(StreamAttempt attempt, Delta delta) {
     for (var listener : listeners) {
+      if (stopped || activeSubscription != attempt) return;
       try {
         listener.accept(delta);
       } catch (RuntimeException e) {

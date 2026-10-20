@@ -101,7 +101,7 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
 
   private record CommittedDelta(long sequence, Delta delta) {}
 
-  private record Subscriber(long afterSequence, Consumer<Delta> consumer) {}
+  private record Subscriber(long afterSequence, Consumer<Delta> consumer, AtomicBoolean active) {}
 
   /**
    * Attaches update + commit hooks to {@code conn}. Row identities are retained only for
@@ -210,9 +210,10 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
   }
 
   private Subscription addSubscriber(Consumer<Delta> consumer) {
-    Subscriber subscriber = new Subscriber(seq.get(), consumer);
+    Subscriber subscriber = new Subscriber(seq.get(), consumer, new AtomicBoolean(true));
     subscribers.add(subscriber);
     return () -> {
+      subscriber.active().set(false);
       subscribers.remove(subscriber);
       // Cancellation can hold a downstream emission lock while a writer holds ownerLock.
       // Never wait here. A busy writer's commitSucceeded() clears this bounded cache instead.
@@ -426,7 +427,7 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
         committed.clear();
         for (CommittedDelta change : batch) {
           for (Subscriber subscriber : subscribers) {
-            if (change.sequence() <= subscriber.afterSequence()) continue;
+            if (closed || !subscriber.active().get() || change.sequence() <= subscriber.afterSequence()) continue;
             try {
               subscriber.consumer().accept(change.delta());
             } catch (RuntimeException e) {

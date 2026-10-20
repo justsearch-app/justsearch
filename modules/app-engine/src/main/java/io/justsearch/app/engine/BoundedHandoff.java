@@ -447,6 +447,8 @@ final class BoundedHandoff<T> implements AutoCloseable {
   }
 
   private boolean deliverFrame(T frame) {
+    // A queued delivery can enter here after the outer drain passed its close check.
+    if (closed.get()) return false;
     try {
       sink.accept(frame);
       delivered.incrementAndGet();

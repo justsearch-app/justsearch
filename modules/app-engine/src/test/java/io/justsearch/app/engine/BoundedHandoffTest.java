@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -68,6 +69,18 @@ final class BoundedHandoffTest {
       return t;
     });
     return threads;
+  }
+
+  @Test
+  void closeAfterOuterDrainCheckStillFencesTheConsumerCall() throws Exception {
+    var calls = new java.util.concurrent.atomic.AtomicInteger();
+    var flow = new BoundedHandoff<Integer>("retired-entry", value -> calls.incrementAndGet(),
+        failure -> fail(failure), task -> {}, BoundedHandoff.Backpressure.FAIL_FAST);
+    flow.close();
+    var delivery = BoundedHandoff.class.getDeclaredMethod("deliverFrame", Object.class);
+    delivery.setAccessible(true);
+    assertEquals(false, delivery.invoke(flow, 1), "an already-entered drain must observe closure at delivery");
+    assertEquals(0, calls.get());
   }
 
   @Test
