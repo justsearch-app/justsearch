@@ -78,7 +78,8 @@ pack builder accepts upstream ZIP inputs separately; its manifest describes the 
 
 `tools/build-gpu-booster-pack.ps1` assembles a Windows runtime pack from a llama runtime ZIP
 and CUDA redistributables. It includes `llama-server.exe`, adjacent runtime DLLs and available
-license/notice files, and writes a size/hash-pinned manifest. The former exhaustive upstream-ZIP
+license/notice files, generates `runtime-version.txt` (variant ID and creation timestamp), and
+writes a size/hash-pinned manifest. The former exhaustive upstream-ZIP
 inventory described the b8157 payload; the current pin is b8571, so use the actual input ZIP
 and emitted manifest for its contents.
 
@@ -86,7 +87,8 @@ and emitted manifest for its contents.
 
 ### 3.1 Driver requirements (Windows)
 
-We gate GPU plan recommendation/activation by NVIDIA driver version.
+Explicit activation uses the policy check and runtime self-test described in §6.2;
+it does not separately gate on NVIDIA driver version.
 
 CUDA 12.4 (specific Windows minimums):
 
@@ -288,7 +290,8 @@ See: `docs/explanation/14-ai-pack-spec.md` and `docs/explanation/15-enterprise-p
 Rules:
 
 - A pack can be **imported** even if hardware is incompatible/unknown (useful for staging); import does not activate it. Startup CUDA selection is a separate path (§5.1).
-- Explicit activation requires policy to allow Online AI and GPU use, the hardware gate to pass, and the GPU self-test to pass.
+- Explicit activation checks that the effective policy allows Online AI and GPU use when a policy snapshot is available. If the policy service is absent, returns null or throws, this check is skipped. There is no separate hardware gate in this path.
+- Activation requires the runtime self-test to pass. For GPU offload it requires NVML to be available, a healthy candidate server to complete a tiny chat request, and a measured VRAM increase of at least 64 MiB; missing NVML or an insufficient/unknown increase is inconclusive and does not activate the variant. An explicit zero-GPU-layer configuration tests CPU execution without requiring a VRAM increase.
 
 ### 6.3 Shadow install + self-test
 

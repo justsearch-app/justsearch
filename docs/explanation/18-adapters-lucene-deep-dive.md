@@ -338,7 +338,7 @@ applies this optimization to dense-only search or direct RAG. For current thresh
 
 ### 4B.1 Indexing
 
-SPLADE-v3 encodes documents as sparse term-weight vectors. `FieldMapper`
+The shipped `opensearch-neural-sparse-encoding-multilingual-v1` model encodes documents as sparse term-weight vectors. `FieldMapper`
 stores these as Lucene `FeatureField` entries — one per non-zero term:
 
 ```java
@@ -397,7 +397,7 @@ this flag.
 
 ### 4B.4 Known Limitation
 
-SPLADE-v3 uses a BERT-base encoder with a 512-token max sequence length
+The shipped multilingual sparse model uses a BERT-multilingual encoder with a 512-token max sequence length
 (configurable via `JUSTSEARCH_SPLADE_MAX_SEQ_LEN`, default 512).
 Documents longer than ~512 tokens lose body terms from the SPLADE
 representation. The search pipeline compensates via parent-length

@@ -15,7 +15,7 @@ JustSearch uses a "Sidecar" UI architecture. The "Backend" (`HeadlessApp`) and t
 *   **Class:** `io.justsearch.ui.HeadlessApp`
 *   **Technology:** Java 25 + Javalin (Lightweight Web Framework).
 *   **Port policy:** The resolved `justsearch.api.port` controls the listener. A persisted `UiSettings.apiPort` value is a typed desired setting at ordinal 300: null leaves other configuration sources in charge, `0` requests an ephemeral listener for the next process incarnation, and `1..65535` requests that fixed port. JVM properties and environment variables override the persisted setting at ordinals 500 and 400.
-*   **Role:** Provides the REST API for the UI. It holds the active state, composes the index half in the same Engine process, and handles AI orchestration via `CoreServices`.
+*   **Role:** Provides the REST API for the UI. It holds the active state and composes the index half in the same Engine process. `CoreServices` holds settings, policy, diagnostics and agent orchestration; `InferenceServices` separately holds inference runtime control, pack import and AI installation.
 *   **Startup Priority:** It attempts to start the `KnowledgeServer` first. If that fails (e.g., lock contention, missing JAR), it keeps the HTTP server up so the UI can render a deterministic error state:
     * `GET /api/status` includes `knowledgeServerStartError` and reports `indexState=ERROR`.
 *   **Port Disclosure:** Publishes the positive port actually bound by this process in the runtime manifest at `<dataDir>/runtime/manifest.json` (`head.apiPort`). It also prints `JUSTSEARCH_API_PORT=<port>` to stdout as human-readable output for scripts and shells (e.g. `run-headless-api.ps1`). The observed endpoint is separate from the persisted desired policy.
@@ -48,22 +48,13 @@ The UI resolves the backend base URL using `resolveApiEndpoint()` (`modules/ui-w
 2. **Legacy bridge:** `window.justSearch.getApiPort()` (kept for parity with the old JavaFX shell; never matches in Tauri builds since the Tauri shell does not install the bridge)
 3. **Tauri:** `invoke("api_port")` — the production desktop path. The Tauri command waits up to 15 s for the backend's manifest watcher to observe the current incarnation's bound port.
 4. **Vite env:** `VITE_JUSTSEARCH_API_PORT` (or legacy `VITE_API_PORT`) — used when the frontend is built against a fixed port at compile time.
+5. **Browser development fallback:** outside Tauri, Vite dev mode uses `window.location.origin` so relative API requests go through the dev server's proxy.
 
 If none of those resolve, the source is `unresolved` and the connection-attempt loop in `useApiConnection` will retry up to 10 times before showing "Unable to connect."
 
-> **Note (2026-04-28):** Earlier versions of this chain included two
-> additional steps — a loopback port-range auto-probe (`33221..33250`)
-> and a Vite proxy fallback (empty base URL → Vite dev server proxies to
-> the backend). Both were deleted by tempdoc 326 (`feat(ui-web):
-> frontend dead code cleanup — Knip triage`, 2026-03-19). The deletion
-> was a regression — Knip flagged the exports as unused and the agent
-> extended that to "delete the functions." The Tauri-invoke path was
-> restored after the sandbox validation in tempdoc 374 surfaced a
-> "Connection Error" on every fresh install. Auto-probe and Vite proxy
-> fallback are not currently restored; running `npm run dev` against a
-> real backend without `VITE_JUSTSEARCH_API_PORT` set will fail to
-> discover the port. `npm run dev:mock` is unaffected (MSW intercepts
-> fetches in the browser).
+The former loopback port-range auto-probe (`33221..33250`) is removed. The Vite proxy
+fallback is available in browser development only; a Tauri host whose Engine has not
+published a bound port stays unresolved, including in Tauri dev mode.
 
 Once resolved, the frontend performs a fast `GET /api/status` check and then polls for health periodically.
 

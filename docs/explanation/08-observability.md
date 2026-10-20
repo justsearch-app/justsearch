@@ -568,7 +568,7 @@ Pattern reference: ADR-0027 (telemetry catalog substrate), tempdoc 414. Adapter 
 A single user action (e.g., "Search for 'Invoice'") traverses multiple boundaries:
 1.  **Frontend:** User clicks button.
 2.  **API:** `LocalApiServer` receives request.
-3.  **CoreServices:** Application service access.
+3.  **Application search:** `KnowledgeHttpApiAdapter` delegates to `KnowledgeSearchEngine`.
 4.  **Port call:** direct in-process call into the index half — since lane F stage A there is no IPC hop and no `x-trace-id` metadata to propagate: the caller's OTel context is already current on the callee's thread (except across a thread hand-off, which must wrap its tasks).
 5.  **Index half:** Lucene query.
 

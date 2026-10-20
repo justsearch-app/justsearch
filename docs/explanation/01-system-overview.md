@@ -150,7 +150,7 @@ zero outbound connections. Current network paths are:
   [search span contract](../reference/contracts/search-execution-spans.md).
 - **Tokenizer dependency:** DJL 0.36.0's tokenizer initialization calls `Ec2Utils.callHome`.
   Unless `OPT_OUT_TRACKING=true` or DJL offline mode is supplied, it attempts a link-local
-  `169.254.169.254` metadata probe (at most once per day per JVM); if instance metadata answers,
+  `169.254.169.254` metadata probe; if instance metadata answers,
   it sends the instance ID, region and library version to DJL's S3 telemetry endpoint. On Linux,
   CUDA-flavor tokenizer initialization can also download JNI libraries from `publish.djl.ai`.
   Preparing the bundled CPU cache does not force DJL's flavor. These are dependency code paths;
