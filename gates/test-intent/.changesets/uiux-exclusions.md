@@ -259,3 +259,14 @@ checks are not claimed. No acceptance record is authored here.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-h7b04h41",
+  "verdict": "reject",
+  "digest": "sha256:cb95dd5a74780e60cbf28b96244ab22b0a2731595a4fab6c3e45fce894de6fbe",
+  "note": "Both EX4 entries cite the pass-2 amendment 'Separately verify honest Preview/Apply outcomes for unindexed, missing, unreadable and offline entries', but no listed check exercises unindexed, missing, unreadable or offline entries (live: Preview counts an unindexed file, omits an unreadable one Apply removes, and reports 1 of 2 roots with no unchecked-scope message). EN1 cites 'existing pattern syntax' yet no check covers a list saved before the change; live, a before-state-saved list containing '[legacy' stops boot walk, watcher and periodic check on the candidate."
+}
+```
