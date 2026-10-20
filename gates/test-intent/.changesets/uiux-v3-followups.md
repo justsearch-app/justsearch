@@ -48,6 +48,8 @@ Review history. Cross-conversation send and honest refusal (2026-10-20): verifie
 
 Review history. Post-main-merge evidence refresh (2026-10-20): uiux-v3-followups.json was regenerated on merged head 9c3251ff1 for its 69 currently cited checks, against the original 117e89be9 before-state with the unchanged uiux-v3-followups-compat.patch and no overlays. All 69 pass on the candidate; all outcomes, execution statuses, selected cases and fail-before classes match the previous file (57 assertion, 12 passed). The aggregate producer exit is 1 because the 12 preservation checks pass before. Its 23 historical context check records no longer cited here are omitted: 19 unchanged checks already live in uiux-v3-followups-context-send-refusal-preserved-1.json; the four retired expectations are already superseded by Obsolete entries 37/39. The old Include all/Restore saved-state fallbacks and overlapping-response check have their unconfirmed-state/serialized-write replacements in uiux-v3-followups-context-send-refusal-preserved-2.json; the old send-without-readable-context check has its refusal replacement in uiux-v3-followups-context-send-refusal-preserved-3.json. Replacement entries 38/40 already point to that evidence, so no entry changes are needed. Every currently cited name resolves, including sv3-context.test.ts's "keeps a turn saved after the last /history read in context, below a floor not shown here". Main's WP6.2 "a reloaded direction" block is identical to the gate base (origin/main 0b423f968), so it adds no new expectation in this changeset. The gate flags the whole sv3-record.test.ts file and validates its named checks' whole-file content digests; the merged block required refreshing those digests, not adding an entry for main's test. Classes, sources, expectations, repaired flags and all acceptance/rejection records remain unchanged; acceptance must be renewed by the acceptor.
 
+Review history. Agreed source for the refusal notice (2026-10-20): verifier-8 rejected entry 42 because its notice expectation cited an orchestrator instruction as owner words. The orchestrator recorded that decision as agreed amendment FA5 (under the user's delegation of design decisions), and entry 42 now cites FA5 in place of that quote. No check, evidence file or other entry changed.
+
 No acceptance record is supplied by the builder.
 
 ```json
@@ -1385,9 +1387,11 @@ No acceptance record is supplied by the builder.
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "quote": "once the saved context is confirmed again, the refusal notice no longer claims something untrue (for example, it is cleared or reworded when the composer no longer holds the refused text). Simplest honest form.",
-          "location": "task t-20261019-bd718f request"
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "FA5",
+          "quote": "A refused question's notice says only what is true: once the saved context is confirmed again, it keeps the refused question available to copy and does not claim the draft is kept when the composer no longer holds it.",
+          "label": "agent-drafted, owner-adopted"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-v3-followups-context-send-refusal.json",
