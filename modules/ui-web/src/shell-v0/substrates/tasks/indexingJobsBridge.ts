@@ -31,6 +31,7 @@ import {
   type StrategyState,
 } from '../../strategies/subscriptionStrategy.js';
 import {
+  batchTaskChanges,
   upsertMirroredTask,
   listTasks,
   removeTask,
@@ -335,6 +336,7 @@ function warnUnknownState(state: string): void {
 export function projectJobsToTasks(
   items: ReadonlyMap<string, IndexingJobRow>,
 ): void {
+  batchTaskChanges(() => {
   visibleHashes = new Set([...items].filter(([, job]) =>
     ['PROCESSING', 'FAILED', JOB_STATE_RETRY_EXHAUSTED].includes(job.state.toUpperCase()),
   ).map(([hash]) => hash));
@@ -364,11 +366,12 @@ export function projectJobsToTasks(
   // Job-tasks no longer in the live set → remove (vanish), regardless of their
   // current status. Derived from the substrate so this is correct after a
   // remount (no reliance on per-instance closure state).
-  for (const t of listTasks()) {
+  for (const t of listTasks(TASK_ID_PREFIX)) {
     if (t.id.startsWith(TASK_ID_PREFIX) && !present.has(t.id)) {
       removeTask(t.id);
     }
   }
+  });
 }
 
 /**
@@ -410,7 +413,14 @@ export function startIndexingJobsBridge(
   let latestItems: ReadonlyMap<string, IndexingJobRow> = new Map();
   // 602 R5 — a late pathHash resolve relabels in place by re-projecting the
   // latest rows (so the task keeps its CURRENT status, not a stale captured one).
-  reproject = () => projectJobsToTasks(latestItems);
+  let labelFrame: number | undefined;
+  reproject = () => {
+    if (labelFrame !== undefined) return;
+    labelFrame = requestAnimationFrame(() => {
+      labelFrame = undefined;
+      projectJobsToTasks(latestItems);
+    });
+  };
   const onSnapshot = (snap: {
     payload: StrategyState<TabularData<IndexingJobRow>>;
     seq: number;
@@ -478,6 +488,7 @@ export function startIndexingJobsBridge(
   }, RE_EVAL_INTERVAL_MS);
   return () => {
     clearInterval(tick);
+    if (labelFrame !== undefined) cancelAnimationFrame(labelFrame);
     reproject = null;
     visibleHashes.clear();
     resolvedLabel.clear();

@@ -1584,6 +1584,72 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
         "modules/app-engine/src/test/java/io/justsearch/app/engine/BoundedHandoffTest.java#closeAfterOuterDrainCheckStillFencesTheConsumerCall"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsResponsiveness.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Retain all 216 externally mirrored processing/failure rows, publish reconciliation once, and suppress all listener churn across 100 identical projections. Reconcile only the indexing task namespace even with 10,000 unrelated live tasks; preserve remount cleanup. This proves the task-store mechanism, not the outstanding five-minute production responsiveness check. No pre-existing test is rewritten.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q19",
+          "quote": "Browser at 700k pending: the rail shows accurate totals, renders at most a bounded number of per-file tasks, sends at most window + concurrency path-label requests, and stays responsive; label caches stay bounded over a long run.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Keep externally mirrored terminal rows until their bounded source removes them, batch task notifications per reconciliation, and index task ids by namespace so indexing never enumerates unrelated tasks.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/queue-scale-browser-drain.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsResponsiveness.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsEnqueueBurstTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Hold a real Engine subscription delivery and submit 2,005 actual files through the real ingest client. Invisible newly inserted PENDING rows must not fill the handoff. This repairs the enqueue portion only: installed Engine DONE bursts still overflow, so Q27 remains incomplete. No pre-existing test or 256-slot capacity changes.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q27",
+          "quote": "SSE serialization and sending do not run on the thread that drains the handoff: a slow or stalled SSE observer does not make the handoff overflow during a 2000-row enqueue burst. Fails today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Omit newly inserted PENDING rows before the head handoff unless they carry state_presence; retain all updates, terminal outcomes and state-presence barriers.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "a larger buffer alone is not a fix",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/queue-scale-browser-drain.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsEnqueueBurstTest.java"
+      ],
+      "repaired": true
     }
   ]
 }

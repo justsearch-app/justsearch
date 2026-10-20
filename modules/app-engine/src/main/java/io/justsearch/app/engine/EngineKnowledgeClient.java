@@ -1717,6 +1717,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
               ingest.subscribeIndexingJobs(
                       SubscribeIndexingJobsRequest.newBuilder().build(),
                       frame -> {
+                        // A newly inserted PENDING row cannot already be in the bounded head
+                        // window. Its queue total comes from status. Do not spend handoff slots
+                        // forwarding thousands of no-op enqueues; preserve presence barriers and
+                        // all updates (a retry can remove a formerly visible failure), plus every
+                        // terminal event for the activity ledger.
+                        if (frame.hasDelta() && frame.getDelta().hasInsert()
+                            && "PENDING".equals(frame.getDelta().getInsert().getState())
+                            && !frame.hasStatePresence()) return;
                         if (!flow.publish(frame)) {
                           // Closed, or the consumer stopped draining: stop the producer. The worker
                           // reads this through ctx.cancelled() on its next delta and closes its
