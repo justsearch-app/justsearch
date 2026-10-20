@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import cp from 'node:child_process';
 import crypto from 'node:crypto';
 import ts from '../../../modules/ui-web/node_modules/typescript/lib/typescript.js';
-const baseline = 'c00a0cb24b4c6000e090d5d09054c1e7e1d24e2f';
+const baseline = 'fe3753d37e585f35c61ae5f1488a909739d4b47c';
 const web = [
   'src/activity/idleSurfaces.test.ts',
   'src/shell-v0/components/ResourceView.history-reconnect.test.ts',
@@ -93,7 +93,7 @@ const report = { schema: 'token-bootstrap-adaptation-audit.v1', baseline,
   candidate: cp.execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
   producerSourceSha256: digest(fs.readFileSync(new URL(import.meta.url), 'utf8')),
   executionAdapter: fs.readFileSync('gates/test-intent/evidence/token-bootstrap-execution-adapter.cjs', 'utf8'),
-  executionEvidence: ['web-preservation', 'engine', 'original-preservation'].map(name => {
+  executionEvidence: ['merged-web', 'engine', 'merged-base-preservation'].map(name => {
     const file = `gates/test-intent/evidence/token-bootstrap-${name}.json`;
     return { file, evidence: JSON.parse(fs.readFileSync(file, 'utf8')) };
   }),
