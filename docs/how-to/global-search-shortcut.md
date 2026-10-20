@@ -2,7 +2,7 @@
 title: Summon JustSearch from the desktop
 type: how-to
 status: stable
-description: "Use the global shortcut or --focus-search to bring JustSearch forward with the cursor in the search bar."
+description: "Use the global shortcut or --focus-search to bring JustSearch forward and focus the default search bar."
 ---
 
 # Summon JustSearch from the desktop
@@ -11,8 +11,10 @@ While JustSearch is running, **Alt + Shift + Space** shows its main window and
 focuses the default search bar. Settings → Desktop lets you turn this shortcut
 on or off and reports whether registration succeeded. Another application may
 already own the chord. It is on by default on a fresh install or after deleting
-all app data. Settings, dialogs (including indexing), command palettes, session
-renaming and ordinary text edits keep their focus when summoned.
+all app data. Settings, modal dialogs, indexing overlays and command palettes
+keep focus when summoned. Session renaming and text edits keep focus when the
+default search is visible; a summon from another view returns to Search. In the
+old window, the search bar cannot take focus while an answer is streaming.
 
 You can also run the desktop shell with `--focus-search`, even when the built-in
 shortcut is off or unavailable. Use the installed **desktop executable**, not the
