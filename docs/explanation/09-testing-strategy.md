@@ -246,7 +246,8 @@ the pure seams declared in `governance/logic-seams.v1.json`. Because PIT re-runs
 it is **not** in `check` or the public hosted `CI` fact lanes. Produce the opt-in evidence manually with
 `node scripts/ci/report-pit-strength.mjs --run`, then gate it with
 `node scripts/governance/run.mjs --gate test-efficacy --mode gate`. The register's integrity is guarded
-cheaply on every run by `scripts/ci/check-logic-seams.mjs`. See
+by `scripts/ci/check-logic-seams.mjs`, which no workflow invokes; run
+`node scripts/ci/check-logic-seams.mjs --mode gate` locally after editing a registered seam. See
 `docs/reference/contributing/discipline-gate-kernel.md`.
 
 ## Tier 4: AI Judge (Semantic Eval)
@@ -277,9 +278,7 @@ Gated by `-PincludeAgentTests=true` to avoid adding live-LLM latency to the defa
 
 ### Lane 2: Live-Model Nightly Battery — RETIRED 2026-05-12
 
-The legacy nightly battery (`scripts/ci/dag-runner-agent-battery.mjs` + harness) was retired in slice 3a-1-8f §B.14. The DAG-runner-based harness had been broken since 2026-03-16 (commit `a9c484f59` deleted its `scripts/lib/` dependencies); slice 487/491 already built a focused replacement (`scripts/ci/agent-battery-url-probe.mjs`) for the URL-emission probe specifically. Broader agent-quality evaluation now flows through jseval's `agent-eval` subcommand.
-
-**Surviving artifacts:** `scripts/ci/build-agent-live-scorecard.mjs` + `scripts/ci/evaluate-agent-live-gate.mjs` + `scripts/ci/agent-battery-url-probe.mjs` + `scripts/ci/agent-battery-url-scorer.mjs` + the scenario JSON files. The DAG harness, its core, and the workflow yaml that drove it are gone.
+The legacy nightly battery (`scripts/ci/dag-runner-agent-battery.mjs` + harness) was retired in slice 3a-1-8f §B.14. The DAG-runner-based harness had been broken since 2026-03-16 (commit `a9c484f59` deleted its `scripts/lib/` dependencies). Its unused URL-emission probe, scorer, live gate and scenario files have also been retired. Agent-quality evaluation flows through jseval's `utility-run` subcommand.
 
 ### Evaluation Analytics
 

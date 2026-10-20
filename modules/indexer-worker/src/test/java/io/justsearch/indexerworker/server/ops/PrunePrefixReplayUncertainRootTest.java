@@ -87,6 +87,7 @@ final class PrunePrefixReplayUncertainRootTest
       runtime.commitOps().commitAndTrack();
       runtime.commitOps().maybeRefreshBlocking();
       assertTrue(queue.putSwitchBuffer("prune_prefix:" + root, "PRUNE_PREFIX", root.toString()));
+      addedByThePerson(tempDir.resolve("base"), root);
       Files.delete(gone);
 
       KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(
@@ -99,5 +100,20 @@ final class PrunePrefixReplayUncertainRootTest
       assertNull(runtime.documentFieldOps().getDocumentField(id, SchemaFields.CONTENT));
       assertEquals(0, queue.switchBufferDepth());
     }
+  }
+
+  /**
+   * The person's add of {@code root}, which records the root's volume under {@code
+   * indexBasePath}: a replayed prune is vouched for as a direct one is, and only the add records a
+   * root's volume (task t-20261019-24fb14, RP4).
+   */
+  private static void addedByThePerson(Path indexBasePath, Path root) {
+    var adding = new io.justsearch.indexerworker.services.WorkerIngestService(null, null, null,
+        IndexingPacing.unthrottled(), indexBasePath, null, null, null, null, 0L);
+    var added = adding.watchRoot(io.justsearch.ipc.WatchRootRequest.newBuilder()
+            .setRootPath(root.toString()).setRootAdded(true).build(),
+        io.justsearch.indexerworker.services.CallContext.none());
+    assertTrue(added.getWatching(),
+        "precondition: the person adds " + root + ": " + added.getErrorMessage());
   }
 }

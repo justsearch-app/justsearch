@@ -47,9 +47,9 @@ land in always-loaded prose (`CLAUDE.md`/`.claude/rules/`) — the always-loaded
 the guard against that self-poisoning failure mode. Falsifier: two consecutive mining passes
 whose dispositions nobody implements means the loop is dead weight — stop running it.
 
-Shares its transcript discovery/parse substrate (`lib/transcript-store.mjs`) with the rescued
-`overhead-taxonomy.mjs` (T1 overhead measurement) and `transcript-spine.mjs` (evidence-lane
-per-turn condenser) — see that module's header for the discovery-layout caveat.
+Shares its transcript discovery/parse substrate (`lib/transcript-store.mjs`) with
+`overhead-taxonomy.mjs` (T1 overhead measurement) — see that module's header for the
+discovery-layout caveat.
 
 ## Cache efficiency (841)
 

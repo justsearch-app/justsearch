@@ -2,7 +2,7 @@
 title: "ADR-0006: Two-Pronged Citation Strategy"
 type: decision
 status: stable
-description: "LLM-generated citations backed by RAG metadata, supplemented by CPU cross-encoder post-hoc matching."
+description: "LLM-generated citations with CPU cross-encoder verification; in grounded answers with a known source list, source labels without verifier backing are removed."
 date: 2026-02-07
 probes:
   - adr-0006-citation-scorer-wired

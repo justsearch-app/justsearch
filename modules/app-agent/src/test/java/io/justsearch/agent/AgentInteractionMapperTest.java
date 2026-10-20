@@ -922,7 +922,8 @@ final class AgentInteractionMapperTest {
    * explicit non-projecting cases. That is a legibility change and nothing else, so it needs a test
    * that would fail if any of them started projecting — the risk of writing a name down is that
    * someone later gives it a body, and "no existing kind's durability changes" is the whole contract
-   * this hunk was allowed under.
+   * this hunk was allowed under. ({@code directive_acknowledged} left the list deliberately in
+   * WP6.2: a direction's outcome is now on the record.)
    */
   @Test
   @DisplayName("865 §7.7: every explicitly non-projecting kind still projects nothing")
@@ -935,7 +936,6 @@ final class AgentInteractionMapperTest {
             "tool_batch_proposed",
             "tool_call_approved",
             "tool_call_virtual",
-            "directive_acknowledged",
             "handoff_proposed",
             "budget_update",
             "budget_gate",

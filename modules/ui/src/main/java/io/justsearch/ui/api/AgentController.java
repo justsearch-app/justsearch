@@ -53,6 +53,9 @@ final class AgentController {
   private static final Logger LOG = LoggerFactory.getLogger(AgentController.class);
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final String AUDIENCE_HEADER = "X-JustSearch-Audience";
+  /** WP6.2 — a steer send's own id (the window sends a UUID), echoed in its direction's queued report. */
+  private static final java.util.regex.Pattern CLIENT_REQUEST_ID =
+      java.util.regex.Pattern.compile("[A-Za-z0-9_-]{1,64}");
 
   /**
    * Tempdoc 508-followup §β1 — whitelist of shape ids dispatchable through {@code
@@ -634,8 +637,10 @@ final class AgentController {
   /**
    * POST /api/chat/agent/steer — Tempdoc 565 §30 (the DIRECTION authority's {@code interject}):
    * queue a free-form human steering directive for a running session. Body:
-   * {@code {"sessionId": "...", "text": "..."}}. The loop drains it at the next step boundary and
-   * folds it into the next LLM call; a {@code directive_acknowledged} SSE event echoes back. Mirrors
+   * {@code {"sessionId": "...", "text": "...", "clientRequestId": "..."}}. The loop drains it at the
+   * next step boundary and folds it into the next LLM call; a {@code directive_acknowledged} SSE event
+   * echoes back. WP6.2 — the optional {@code clientRequestId} names this send; the direction's queued
+   * report echoes it, so the window can tell its own send from another with the same text. Mirrors
    * {@link #handleAutonomy} (the {@code set-posture} sibling). 404 if the session is unknown/finished.
    */
   void handleSteeringDirective(Context ctx) {
@@ -646,9 +651,18 @@ final class AgentController {
         ctx.status(400).json(Map.of("error", "sessionId and text are required"));
         return;
       }
+      JsonNode requestIdNode = body.path("clientRequestId");
+      String clientRequestId = requestIdNode.isTextual() ? requestIdNode.asText() : null;
+      boolean requestIdGiven = !requestIdNode.isMissingNode() && !requestIdNode.isNull();
+      if (requestIdGiven
+          && (clientRequestId == null || !CLIENT_REQUEST_ID.matcher(clientRequestId).matches())) {
+        ctx.status(400)
+            .json(Map.of("error", "clientRequestId must be 1-64 letters, digits, '-' or '_'"));
+        return;
+      }
       okOr404(
           ctx,
-          agentService().injectSteeringDirective(sessionId, text),
+          agentService().injectSteeringDirective(sessionId, text, clientRequestId),
           "injected",
           "session not found or finished");
     });

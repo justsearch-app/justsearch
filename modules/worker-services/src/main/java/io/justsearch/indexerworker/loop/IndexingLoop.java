@@ -59,7 +59,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -108,8 +107,8 @@ public class IndexingLoop implements Closeable {
   private final CommitOps commitOps;
   /** The active generation's lexical projection; Green remains the only queue producer. */
   private final AtomicReference<RunningRuntime> activeLexicalSource = new AtomicReference<>();
-  /** Serializes a claimed A/B write with direct deletion of its durable queue row. */
-  private final ReentrantLock fileMutationFence = new ReentrantLock(true);
+  /** Serializes a claimed A/B write with direct deletion of its durable queue row and prunes. */
+  private final FileMutationFence fileMutationFence = new FileMutationFence();
   // Tempdoc 516 Slice 4d (W6): indexingCoordinator / documentFieldOps / indexCountOps are
   // consumed only by the extracted collaborators (writer, extractor, backfillScheduler,
   // embeddingLifecycle). Local ctor params pass them through directly — no IndexingLoop field
@@ -1079,9 +1078,12 @@ public class IndexingLoop implements Closeable {
 
   /** Direct source deletions hold this through A/B effects and queue removal. */
   public <T> T withFileMutationFence(Supplier<T> mutation) {
-    fileMutationFence.lock();
-    try { return mutation.get(); }
-    finally { fileMutationFence.unlock(); }
+    return fileMutationFence.guard(mutation);
+  }
+
+  /** The fence itself, for a prune that must also judge the files written while it scanned. */
+  public FileMutationFence fileMutationFence() {
+    return fileMutationFence;
   }
 
   /** Called only after the final fence has paused the Green producer. */

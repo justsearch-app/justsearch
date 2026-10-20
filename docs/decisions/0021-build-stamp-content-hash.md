@@ -1,8 +1,8 @@
 ---
 title: "ADR-0021: Build-Stamp Content-Hash Design"
 type: decision
-status: stable
-description: "Use SHA-256 content hash of the Engine distribution to detect stale JVM processes during development."
+status: accepted - startup injection gap; owner review open
+description: "The Engine distribution content hash is generated, but normal startup does not inject it into the running JVM; hot reload sets it. The dev-runner uses a separate mtime-based head stamp for startup freshness. Owner review of the content-hash startup gap remains open."
 date: 2026-04-06
 probes: none - the build-stamp hash is verified by its own runtime staleness check, which fails at boot rather than at gate time.
 last_reviewed: 2026-09-02
@@ -11,7 +11,14 @@ last_reviewed: 2026-09-02
 # ADR-0021: Build-Stamp Content-Hash Design
 
 ## Status
-Accepted — amended by lane F stage A item A13 (2026-09-07). The decision (SHA-256 content hash over a distribution's `lib/`, 16 hex chars, SNAPSHOT-content vs third-party-name+size) is unchanged; the *subject* moved. There is one JVM and one distribution now, so `generateBuildStamp` was re-homed from `modules/indexer-worker` (`build/install/indexer-worker/build-stamp.txt`) to `modules/ui` (`build/install/ui/build-stamp.txt`), still `finalizedBy` its module's `installDist`. Two consequences below are also resolved by A13: the `WorkerSpawner` injection step (item 3) is gone with that class, and the "Head process staleness is not detected" negative no longer holds — the stamp now describes the Engine's own distribution, which is what the dev-runner launches. The body below is left as written on 2026-04-06; read it against this note.
+Historically accepted; owner review of the startup injection gap remains open.
+Lane F stage A item A13 moved `generateBuildStamp` to `modules/ui`
+(`build/install/ui/build-stamp.txt`, finalized by `installDist`). The deleted `WorkerSpawner`
+was not replaced as a startup injector of `justsearch.build.stamp`; the current setter is in
+`DevReloadManager` after hot reload. With no property set, the status mapper sets `buildStamp` to null
+and jseval skips its content-hash comparison. The dev-runner instead checks a separate,
+mtime-based `justsearch.head.stamp` at startup. Read the historical body below against
+this implementation gap.
 
 ## Historical Context (pre-ADR-0049)
 
