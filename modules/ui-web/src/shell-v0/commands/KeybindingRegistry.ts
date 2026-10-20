@@ -59,7 +59,7 @@ function parseKey(combo: string): ParsedKey {
     else if (p === 'cmd' || p === 'meta' || p === 'command') out.meta = true;
     else if (p === 'alt' || p === 'option') out.alt = true;
     else if (p === 'shift') out.shift = true;
-    else out.key = p === 'space' ? ' ' : p;
+    else out.key = p;
   }
   return out;
 }

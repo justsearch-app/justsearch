@@ -3844,6 +3844,7 @@ name = "shell"
 version = "0.3.0"
 dependencies = [
  "base64 0.22.1",
+ "gtk",
  "open",
  "reqwest",
  "ring",

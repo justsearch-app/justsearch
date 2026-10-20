@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: agent-session-svef4avy
+author-session: agent-session-7rm1w6nw
 ---
 
 # WP2.2a implementation inventory and plan
@@ -75,7 +75,7 @@ a legacy composer change. No exception, acceptance record or legacy edit is auth
         "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts"
       ],
       "class": "New",
-      "behaviour": "Shared native handoff targets only the default search composer, reuses a visible secondary pane, preserves composer overrides or falls back without rewriting them (including a non-callable focus property), keeps same-surface draft/URL/journal, navigates once from another non-modal view, consumes pending requests once, works independently of schema fetch, preserves explicit link destinations, and suppresses overlapping bindings only while native registration is active. Late subscription cleanup from a disconnected view cannot disable native chord suppression in a reloaded view. The real Search v3 composer receives focus without a chat model and keeps its draft; a missing override target uses the core composer without rewriting the override. A subsequent override change clears a temporary core fallback and targets the newly configured composer.",
+      "behaviour": "Shared native handoff targets only the default search composer, reuses a visible secondary pane, preserves composer overrides or falls back without rewriting them (including a non-callable focus property), keeps same-surface draft/URL/journal, navigates once from another non-modal view, consumes pending requests once, works independently of schema fetch, preserves explicit link destinations. Late subscription cleanup from a disconnected view cannot disable native chord suppression in a reloaded view. The real Search v3 composer receives focus without a chat model and keeps its draft; a missing override target uses the core composer without rewriting the override. A subsequent override change clears a temporary core fallback and targets the newly configured composer.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -141,7 +141,7 @@ a legacy composer change. No exception, acceptance record or legacy edit is auth
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-shortcut-frontend-new.json",
+      "evidence": "gates/test-intent/evidence/uiux-shortcut-repairs-existing-ui.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 SC3 focuses the current default once without changing draft, URL or journal",
         "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC4 navigates from a non-modal view once with the prior view one Back away",
@@ -151,7 +151,6 @@ a legacy composer change. No exception, acceptance record or legacy edit is auth
         "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 reuses a secondary search pane and never focuses the other composer",
         "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC9 a pending explicit deep link keeps its destination instead of focusing Search",
         "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC5 does not wait for the Engine schema request before consuming a ready focus request",
-        "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC11 native registration takes precedence and an overlapping saved binding resumes when inactive",
         "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC5 SC6 late subscription cleanup cannot disable the reloaded view shortcut guard",
         "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 ignores a missing override target without changing the saved override",
         "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 targets the real Search v3 composer with no chat model and preserves its draft",
@@ -242,7 +241,7 @@ a legacy composer change. No exception, acceptance record or legacy edit is auth
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-shortcut-frontend-preservation.json",
+      "evidence": "gates/test-intent/evidence/uiux-shortcut-repairs-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC4 leaves a modal and an ordinary field in charge, including a modal button"
       ]
@@ -331,7 +330,7 @@ a legacy composer change. No exception, acceptance record or legacy edit is auth
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-shortcut-shell-new.json",
+      "evidence": "gates/test-intent/evidence/uiux-shortcut-repairs-preservation.json",
       "newChecks": [
         "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc8_reads_off_before_registration_and_preserves_future_or_corrupt_bytes",
         "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc9_focus_flag_beats_minimized_and_deep_links_keep_their_destination",
@@ -364,10 +363,87 @@ a legacy composer change. No exception, acceptance record or legacy edit is auth
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/HelpIngestMarkerRecoveryTest.java#v3MarkerReingestsOnceAndWritesV4"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/search_shortcut.rs#cfg(test)",
+        "modules/shell/src-tauri/tests/shortcut_x11_probe.py"
+      ],
+      "class": "New",
+      "behaviour": "The Settings-facing registration reason excludes internal error text. Against a private real X server, disabling and exiting release every lock-mask variant to a competing client, and re-enabling owns the chord again. Cold never-shown and warm hidden summon/deep-link paths send EWMH activation requests. The fixture only observes requests: it starts no window manager and cannot establish real-desktop activation, minimized restoration, or Windows behavior.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "SC1",
+          "quote": "2. (2): activate the window on every summon path (unminimize, show, focus, and the activation request X11 and Windows window managers honour), cold and warm; keep focus rules S14.4.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "SC7",
+          "quote": "3. (3): plain-language reason, no internal text.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "SC8",
+          "quote": "**S14.8 On/off preference.**\n  - **Showing it.** Settings shows the shortcut (keys written out) and an on/off switch.\n  - **Switching.** Turning it off releases the chord at once, so another app can take it without a restart. Turning it on registers at once and reports failure as in S14.7.\n  - **Toggles that fail or overlap.** A failed save puts the switch back to the real state and says so. Slow or overlapping toggles never leave disk, shell and UI disagreeing, and reopening Settings or reloading the UI shows the shell's current state.\n  - **Boot and restart.** The choice survives restart, including autostart launches. It is applied before registration, so a chord turned off is never grabbed briefly at boot.\n  - **Writes and defaults.** A kill during a write leaves a complete, readable preference. A missing file (fresh install) gives the default (decision 5). After factory reset or \"delete all data\", the next start uses the default (reset runs in setup, before registration).\n  - **Unreadable or future-version file.** Decision 6. The recommendation: chord not registered, Settings explains, the file's bytes are kept until the user changes the setting.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "SC9",
+          "quote": "**S14.9 Command line** (`--focus-search`, task record).\n  - It works whether the shortcut is on, off or not active, on Windows, Linux X11 and Linux Wayland.\n  - **App running:** it does what S14.1 does (including from hidden and minimized), and the second process exits without a second app or Engine.\n  - **App not running:** it starts the app with the window shown and focus in the search bar. This holds even though cold boot otherwise restores the last view, and even with autostart on.\n  - **Mixed arguments** (decision 7):\n    - `--focus-search --minimized` performs the summon, cold and warm;\n    - a `justsearch://` deep link given with the flag keeps the link's destination, with the window shown;\n    - a deep link alone and other arguments work as today.\n  - A second request arriving while the first instance is still starting causes neither a second Engine nor a lost summon.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-shortcut-repairs-shell.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc7_registration_reason_contains_no_internal_error_text",
+        "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client",
+        "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The native chord still suppresses an overlapping saved user binding while registered. Disabling it removes that suppression without activating the historically inert space spelling, and the saved binding is retained. This retires the previous expectation that disabling would make that binding dispatch; the extra parseKey normalization was unnecessary for native chord interception.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "SC11",
+          "quote": "**S14.11 No collisions.**\n  - The chord is none of the in-app bindings. That covers the stock ones (`HelpSurface.ts:73`, `keyboard-shortcuts.md`), and also a user override or plugin binding of the same chord loaded from saved state (`KeybindingRegistry.ts` `loadPersistedKeybindings`). With such an override present, one press does only the global summon.\n  - It cannot be produced with AltGr (so not Ctrl+Alt+…).\n  - Holding and releasing it types no character, activates no focused control and, with two input languages installed on Windows, does not switch the input language.\n  - Checked on at least US and one AltGr layout (e.g. German), plus one IME (decision 9).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "SC11",
+          "quote": "4. (4): if the \"space\" change is needed for the chord, keep it and add a preservation note; otherwise revert it.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-shortcut-repairs-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC11 native registration takes precedence without activating previously inert space bindings"
+      ],
+      "repaired": true
     }
   ]
 }
 ```
+
+## Review history
+
+2026-10-20: builder agent-session-7rm1w6nw added regression entries for the X11 release, summon activation, plain reason, and retired space normalization. The prior acceptance record is preserved verbatim and is stale; independent review of this candidate is required. Round checks use before 8ab5d0fab. Existing repaired checks retain c00a0cb24 fail-before evidence; preservation checks compare 8ab5d0fab.
 
 ## Acceptance records
 

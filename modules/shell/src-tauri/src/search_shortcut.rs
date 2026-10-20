@@ -159,8 +159,8 @@ fn register(state: &mut ShortcutState, registration: &mut impl FnMut(bool) -> Re
                 state.status.active = true;
                 state.status.reason = None;
             }
-            Err(error) => {
-                state.status.reason = Some(format!("The desktop refused Alt + Shift + Space (another application may be using it): {error}"));
+            Err(_) => {
+                state.status.reason = Some("The desktop refused Alt + Shift + Space (another application may be using it, or your desktop may not allow global shortcuts).".into());
             }
         }
     }
@@ -211,7 +211,7 @@ pub(crate) fn initialize(app: &tauri::AppHandle) {
             .build();
         app.plugin(plugin)
             .err()
-            .map(|error| format!("The desktop shortcut service could not start: {error}"))
+            .map(|_| "The desktop shortcut service could not start. Try restarting JustSearch, or use a desktop custom shortcut.".into())
     };
     match preference {
         Preference::Choice(enabled) => {
@@ -264,6 +264,40 @@ pub(crate) fn foreground(app: &tauri::AppHandle) {
             }
         }
         let _ = window.set_focus();
+        // Tao may discard set_focus while show/unminimize is still queued. Request
+        // activation unconditionally on the UI thread, where native restoration
+        // and activation can happen together, including a never-shown window.
+        #[cfg(any(target_os = "linux", windows))]
+        {
+            let window = window.clone();
+            let _ = app.run_on_main_thread(move || {
+                #[cfg(target_os = "linux")]
+                if let Ok(native) = window.gtk_window() {
+                    use gtk::prelude::{GtkWindowExt, WidgetExt};
+                    native.present_with_time(0);
+                    // On the first map GTK's present may only show the widget.
+                    // Ask GDK explicitly so X11 receives _NET_ACTIVE_WINDOW too.
+                    if let Some(surface) = native.window() {
+                        surface.focus(0);
+                    }
+                }
+                #[cfg(windows)]
+                if let Ok(hwnd) = window.hwnd() {
+                    use windows_sys::Win32::UI::WindowsAndMessaging::{
+                        IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE, SW_SHOW,
+                    };
+                    // The summon is an explicit user action. Preserve maximized
+                    // geometry when restoring a window that is merely hidden.
+                    unsafe {
+                        if IsIconic(hwnd.0.cast()) != 0 {
+                            ShowWindow(hwnd.0.cast(), SW_RESTORE);
+                        }
+                        ShowWindow(hwnd.0.cast(), SW_SHOW);
+                        SetForegroundWindow(hwnd.0.cast());
+                    }
+                }
+            });
+        }
     }
 }
 
@@ -325,7 +359,7 @@ pub(crate) async fn set_search_shortcut_enabled(
         if register {
             app.global_shortcut().register(chord())
         } else {
-            app.global_shortcut().unregister(chord())
+            unregister_chord(app.global_shortcut())
         }
         .map_err(|error| error.to_string())
     });
@@ -342,8 +376,21 @@ pub(crate) fn release(app: &tauri::AppHandle) {
     if let Some(shortcuts) =
         app.try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>>()
     {
-        let _ = shortcuts.unregister(chord());
+        let _ = unregister_chord(&shortcuts);
     }
+}
+
+fn unregister_chord(
+    shortcuts: &tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>,
+) -> Result<(), tauri_plugin_global_shortcut::Error> {
+    // global-hotkey 0.7's X11 ungrab requests are buffered. Its second
+    // unregister performs a keyboard-mapping round trip on that SAME connection,
+    // flushing the first ungrabs before returning. Repeating an X11 ungrab is
+    // harmless; on Windows unregister once (UnregisterHotKey is not idempotent).
+    #[cfg(target_os = "linux")]
+    return shortcuts.unregister_multiple([chord(), chord()]);
+    #[cfg(not(target_os = "linux"))]
+    shortcuts.unregister(chord())
 }
 
 fn apply_choice(
@@ -385,6 +432,170 @@ fn apply_choice(
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn sc7_registration_reason_contains_no_internal_error_text() {
+        let mut state = ShortcutState {
+            unavailable: None,
+            ..ShortcutState::default()
+        };
+        register(&mut state, &mut |_| {
+            Err("HotKey { mods: Modifiers(ALT | SHIFT), key: Space, id: 123 }".into())
+        });
+        assert!(!state.status.active);
+        let reason = state.status.reason.unwrap();
+        assert!(reason.contains("another application"));
+        assert!(!reason.contains("HotKey"));
+        assert!(!reason.contains("Modifiers"));
+    }
+
+    #[cfg(target_os = "linux")]
+    fn native_probe(test: &str, check: impl FnOnce(&mut tauri::App)) {
+        let test = format!("search_shortcut::tests::{test}");
+        if std::env::var("JUSTSEARCH_SHORTCUT_PROBE").as_deref() != Ok(&test) {
+            let output = std::process::Command::new("python3")
+                .arg(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/shortcut_x11_probe.py"
+                ))
+                .arg(&test)
+                .arg(std::env::current_exe().unwrap())
+                .env_remove("DISPLAY")
+                .env_remove("WAYLAND_DISPLAY")
+                .env("CUDA_VISIBLE_DEVICES", "-1")
+                .output()
+                .expect("Python 3 and Xvfb are required for the native shortcut probes");
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            // Surface a child's actual assertion before its libtest transcript.
+            // Infrastructure failures keep their original non-assertion text.
+            let failure = stderr
+                .lines()
+                .find(|line| line.starts_with("assertion failed:"))
+                .unwrap_or("native probe failed");
+            assert!(
+                output.status.success(),
+                "{failure}\n{}\n{stderr}",
+                String::from_utf8_lossy(&output.stdout),
+            );
+            return;
+        }
+        let mut context = tauri::generate_context!();
+        context.config_mut().app.windows.clear();
+        let mut app = tauri::Builder::default()
+            .any_thread()
+            .manage(SearchShortcut::default())
+            .build(context)
+            .unwrap();
+        tauri::WebviewWindowBuilder::new(
+            &app,
+            "main",
+            tauri::WebviewUrl::External("about:blank".parse().unwrap()),
+        )
+        .visible(false)
+        .focused(false)
+        .build()
+        .unwrap();
+        pump(&mut app);
+        check(&mut app);
+        app.cleanup_before_exit();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[allow(deprecated)] // Tauri's bounded event-loop pump is for this native harness only.
+    fn pump(app: &mut tauri::App) {
+        for _ in 0..30 {
+            app.run_iteration(|_, _| {});
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn sc8_x11_off_releases_all_lock_variants_to_another_client() {
+        native_probe(
+            "sc8_x11_off_releases_all_lock_variants_to_another_client",
+            |app| {
+                initialize(app.handle());
+                let runtime = app.state::<SearchShortcut>();
+                assert!(runtime.state.lock().unwrap().status.active);
+                let probe = || {
+                    std::process::Command::new("python3")
+                        .args([
+                            concat!(env!("CARGO_MANIFEST_DIR"), "/tests/shortcut_x11_probe.py"),
+                            "grab",
+                        ])
+                        .output()
+                        .unwrap()
+                };
+                assert!(!probe().status.success(), "active chord must be owned");
+                let off = tauri::async_runtime::block_on(set_search_shortcut_enabled(
+                    app.handle().clone(),
+                    app.get_webview_window("main").unwrap(),
+                    runtime,
+                    false,
+                ))
+                .unwrap();
+                assert!(!off.enabled && !off.active);
+                assert!(probe().status.success());
+                let on = tauri::async_runtime::block_on(set_search_shortcut_enabled(
+                    app.handle().clone(),
+                    app.get_webview_window("main").unwrap(),
+                    app.state::<SearchShortcut>(),
+                    true,
+                ))
+                .unwrap();
+                assert!(on.enabled && on.active);
+                assert!(
+                    !probe().status.success(),
+                    "turning on must own the chord again"
+                );
+                release(app.handle());
+                assert!(
+                    probe().status.success(),
+                    "normal exit must release the chord too"
+                );
+            },
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden() {
+        native_probe(
+            "sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden",
+            |app| {
+                let activations =
+                    PathBuf::from(std::env::var_os("JUSTSEARCH_SHORTCUT_PROBE_DIR").unwrap())
+                        .join("activations");
+                let count = || {
+                    std::fs::read_to_string(&activations)
+                        .unwrap_or_default()
+                        .parse::<u32>()
+                        .unwrap_or(0)
+                };
+                for request in 0..2 {
+                    let before = count();
+                    if request == 0 {
+                        summon(app.handle());
+                    } else {
+                        summon_deep_link(
+                            app.handle(),
+                            "justsearch://surface/core.help-surface".into(),
+                        );
+                    }
+                    pump(app);
+                    assert!(app
+                        .get_webview_window("main")
+                        .unwrap()
+                        .is_visible()
+                        .unwrap());
+                    assert!(count() > before);
+                    app.get_webview_window("main").unwrap().hide().unwrap();
+                    pump(app);
+                }
+            },
+        );
+    }
 
     #[test]
     fn sc8_reads_off_before_registration_and_preserves_future_or_corrupt_bytes() {

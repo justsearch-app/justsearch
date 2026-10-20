@@ -277,7 +277,7 @@ describe('native search summon shared destination', () => {
     }
   });
 
-  it('SC11 native registration takes precedence and an overlapping saved binding resumes when inactive', async () => {
+  it('SC11 native registration takes precedence without activating previously inert space bindings', async () => {
     const called = vi.fn();
     const shell = await mount();
     registerCommand({ id: 'test.overlap', label: 'overlap', source: 'plugin', provenance: CORE_PROVENANCE, handler: called });
@@ -291,8 +291,8 @@ describe('native search summon shared destination', () => {
     expect(press().defaultPrevented).toBe(true);
     expect(called).not.toHaveBeenCalled();
     nativeListeners.get('justsearch://search-shortcut-status')?.({ payload: { enabled: false, active: false, reason: null, revision: 2 } });
-    expect(press().defaultPrevented).toBe(true);
-    expect(called).toHaveBeenCalledTimes(1);
+    expect(press().defaultPrevented).toBe(false);
+    expect(called).not.toHaveBeenCalled();
     expect(listKeybindings().find((entry) => entry.commandId === 'test.overlap')).toEqual(saved);
     shell.remove();
   });
