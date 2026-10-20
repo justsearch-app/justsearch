@@ -7,11 +7,11 @@ author-session: open-guard-builder
 
 # Test-intent entries
 
-The seven earlier Windows checks **passed on hosted Windows** at revision `89dc9907d5400ac55e102e7cff94c53f29e0b8cf`: see [original refusals](../evidence/open-guard-windows-repaired.json) and [round-3 dispatch](../evidence/open-guard-windows-round3-repaired.json). These are historical results, not runs of the changed round-4 candidate. Their source-file digests are now stale, and both reruns are included in `tmp/open-guard/windows-evidence-command.txt`.
+All eleven earlier Windows checks **passed on hosted Windows at `e22910c2de10eb90232fff11cc9c3248f454a23c`**: [original refusals](../evidence/open-guard-windows-repaired.json), [round-3 dispatch](../evidence/open-guard-windows-round3-repaired.json), [round-4 repairs](../evidence/open-guard-windows-round4-repaired.json), and [round-4 preservation](../evidence/open-guard-windows-round4-preserved.json). Those committed results cover Invoice/PATHEXT, mapped UNC documents and folders, and document/bracket-folder markers. Their source-file digests are stale after round 5; all four reruns are in `tmp/open-guard/windows-evidence-command.txt`.
 
-The four new round-4 Windows checks are **unverified until the next hosted run**. Their two expected D4 files are intentionally absent rather than invented: the Invoice/mapped-drive repair checks need assertion failures on `c87d00139`, and document/bracket-folder marker checks are preservation. The exact commands run all four evidence groups in one hosted job. The mapped-drive check uses a real `net use` mapping to the available loopback administrative share; it removes only its own mapping even on assertion failure. It does not substitute a local drive and claim the UNC defect was exercised. macOS is out of scope.
+The four round-5 window-observation checks are **unverified until the next hosted run**. The plain-folder control must pass on both `143fd387b` and the candidate. Q4,notes, Q6,root, and a,b2.txt reveal must assertion-fail before and pass after; reveal also checks the actual selection. An unavailable desktop fails the control. Folder open uses ShellExecuteExW, and file reveal uses SHParseDisplayName/SHOpenFolderAndSelectItems, with the checked plain path as one value. Every dispatching Windows test uses serialized snapshots and a cleanup guard on pass and unwind: only newly observed Explorer windows and fixture-owned new viewer PIDs are closed, with creation-time checks before stopping a PID. The GUI lane refuses a preexisting Notepad rather than taking ownership of someone else's tabs. The real net use mapping is removed even on assertion failure. macOS is out of scope.
 
-D4 was generated in a shared scratch clone using `run-evidence.mjs --before` and an interface-only before patch. The patches expose old decisions and raw dispatch bodies under the new helper signatures; they add no validation, resolution or path simplification. Round-4 repairs use c87d00139, round-3 repairs use d6b269468, and original repairs retain origin/main. The round-4 before patch only adapts dispatch return ownership; it preserves the original PowerShell/PATHEXT lookup and VerbatimUNC refusal. Every run sets TMPDIR to this worktree's tmp/ and keeps fixtures there. Cargo output stays in this worktree's target directory. The lower Linux layer is the actual command function with PATH-isolated, marker-writing xdg-open; plugin calls go through Tauri's IPC dispatcher and real ACLs on a mock webview. This does not claim a graphical shell run.
+D4 was generated in a shared scratch clone using `run-evidence.mjs --before` and an interface-only before patch. The patches expose old decisions and raw dispatch bodies under the new helper signatures; they add no validation, resolution or path simplification. Round-5 repairs use 143fd387b with unchanged dispatch signatures; round-4 repairs use c87d00139, round-3 repairs use d6b269468, and original repairs retain origin/main. The round-4 before patch only adapts dispatch return ownership; it preserves the original PowerShell/PATHEXT lookup and VerbatimUNC refusal. Every run sets TMPDIR to this worktree's tmp/ and keeps fixtures there. Cargo output stays in this worktree's target directory. The lower Linux layer is the actual command function with PATH-isolated, marker-writing xdg-open; plugin calls go through Tauri's IPC dispatcher and real ACLs on a mock webview. This does not claim a graphical shell run.
 
 The author has not accepted these entries; independent acceptance remains for the verifier.
 
@@ -88,13 +88,13 @@ The author has not accepted these entries; independent acceptance remains for th
       "repaired": true,
       "hostedEvidence": {
         "file": "gates/test-intent/evidence/open-guard-windows-repaired.json",
-        "revision": "89dc9907d5400ac55e102e7cff94c53f29e0b8cf",
+        "revision": "e22910c2de10eb90232fff11cc9c3248f454a23c",
         "checks": [
           "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_ntfs_short_names_trailing_dots_ads_and_junctions",
           "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_refuses_mixed_network_device_and_ads_inputs",
           "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_symlinks_resolve_document_and_refuse_disguised_launcher"
         ],
-        "scope": "Passed on hosted Windows at the recorded revision; rerun required for the round-4 candidate."
+        "scope": "Passed on hosted Windows at e22910c2d; source digest changed and rerun required for round 5."
       }
     },
     {
@@ -203,7 +203,7 @@ The author has not accepted these entries; independent acceptance remains for th
         "modules/shell/src-tauri/src/lib.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Repair d6b269468: all 78 approved file extensions validate, directories with any name open, and the actual Linux command dispatches folders. Windows real open/reveal checks observe the exact path sent to the OS, refuse unsimplifiable targets, and passed on hosted Windows at 89dc9907; round-4 dispatch changes require a rerun.",
+      "behaviour": "Repair d6b269468: all 78 approved file extensions validate, directories with any name open, and the actual Linux command dispatches folders. Windows real open/reveal checks observe the exact path sent to the OS, refuse unsimplifiable targets, and passed on hosted Windows at e22910c2d; round-5 dispatch changes require a rerun.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -223,14 +223,14 @@ The author has not accepted these entries; independent acceptance remains for th
       "repaired": true,
       "hostedEvidence": {
         "file": "gates/test-intent/evidence/open-guard-windows-round3-repaired.json",
-        "revision": "89dc9907d5400ac55e102e7cff94c53f29e0b8cf",
+        "revision": "e22910c2de10eb90232fff11cc9c3248f454a23c",
         "checks": [
           "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_real_open_uses_plain_dispatch_path",
           "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_real_reveal_uses_plain_dispatch_path_for_file_and_folder",
           "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_real_dispatch_handles_brackets_and_question_like_names",
           "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_refuses_verbatim_only_dispatch"
         ],
-        "scope": "Passed on hosted Windows at the recorded revision; rerun required for the round-4 candidate."
+        "scope": "Passed on hosted Windows at e22910c2d; source digest changed and rerun required for round 5."
       }
     },
     {
@@ -238,7 +238,7 @@ The author has not accepted these entries; independent acceptance remains for th
         "modules/shell/src-tauri/src/lib.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Round-4 Windows regressions: real Invoice folder dispatch never runs Invoice.cmd; real mapped UNC document/folder dispatch succeeds while mapped launchers are refused. Both checks are unverified until the next hosted run.",
+      "behaviour": "Round-4 Windows regressions: real Invoice folder dispatch never runs Invoice.cmd; real mapped UNC document/folder dispatch succeeds while mapped launchers are refused. Both checks passed on hosted Windows at e22910c2d; round-5 reruns remain unverified.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -261,7 +261,7 @@ The author has not accepted these entries; independent acceptance remains for th
         "modules/shell/src-tauri/src/lib.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Round-4 Windows preservation: actual document and bracket-folder dispatch never runs a same-named .cmd neighbor. Both checks are unverified until the next hosted run; the earlier hosted probe observed no marker for these cases.",
+      "behaviour": "Round-4 Windows preservation: actual document and bracket-folder dispatch never runs a same-named .cmd neighbor. Both checks passed on hosted Windows at e22910c2d; round-5 reruns remain unverified.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -277,6 +277,63 @@ The author has not accepted these entries; independent acceptance remains for th
         "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_document_does_not_execute_neighbor_cmd",
         "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd"
       ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/lib.rs#cfg(test)",
+        "modules/shell/src-tauri/src/open_guard_windows.rs",
+        "modules/shell/src-tauri/src/open_guard_windows.ps1"
+      ],
+      "class": "New",
+      "behaviour": "Round-5 repairs: actual Explorer windows open the exact comma-containing folder, or the containing folder with the comma-containing file selected. Unverified until hosted; must assertion-fail on 143fd387b.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "F4 round 5: Windows folder open and reveal pass the checked non-verbatim target as one shell API value, never through Explorer command-line parsing. Keep ShellExecuteExW for documents/URLs, mapped-drive resolution, and neighboring .cmd marker refusals. Observe the actual Explorer location for a plain control, Q4,notes, Q6,root, and a,b2.txt reveal, checking selection too. Comma cases must assertion-fail on 143fd387b; the plain control passes on both. Every Windows dispatch test closes only its own observed windows and recorded new viewer PIDs on pass and failure. Hosted round-4 evidence at e22910c2d is historical; round-5 execution remains unverified until hosted.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/open-guard-windows-round5-repaired.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_comma_folder_window_notes",
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_comma_folder_window_root",
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_comma_reveal_window_and_selection"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/lib.rs#cfg(test)",
+        "modules/shell/src-tauri/src/open_guard_windows.rs",
+        "modules/shell/src-tauri/src/open_guard_windows.ps1"
+      ],
+      "class": "New",
+      "behaviour": "Round-5 GUI control: a real Explorer window opens the exact plain folder on both 143fd387b and the candidate. An unavailable GUI is a failure. Unverified until hosted.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 request; task t-20261018-6108b0, owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "F4 round 5: Windows folder open and reveal pass the checked non-verbatim target as one shell API value, never through Explorer command-line parsing. Keep ShellExecuteExW for documents/URLs, mapped-drive resolution, and neighboring .cmd marker refusals. Observe the actual Explorer location for a plain control, Q4,notes, Q6,root, and a,b2.txt reveal, checking selection too. Comma cases must assertion-fail on 143fd387b; the plain control passes on both. Every Windows dispatch test closes only its own observed windows and recorded new viewer PIDs on pass and failure. Hosted round-4 evidence at e22910c2d is historical; round-5 execution remains unverified until hosted.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/open-guard-windows-round5-preserved.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_folder_window_control"
+      ],
+      "hostedEvidence": {
+        "file": "gates/test-intent/evidence/open-guard-windows-round5-control-before.json",
+        "revision": "143fd387b3cef33b49dcf9f6fc684129a10606ba",
+        "checks": [
+          "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_folder_window_control"
+        ],
+        "scope": "Pending hosted control execution on the unchanged production dispatch; only cfg(test) items and helper files are transplanted. No pass is claimed."
+      }
     }
   ]
 }

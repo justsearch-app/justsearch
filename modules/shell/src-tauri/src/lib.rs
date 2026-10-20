@@ -1498,19 +1498,71 @@ fn windows_shell_open(target: &std::ffi::OsStr) -> Result<(), String> {
     result
 }
 
+#[cfg(windows)]
+fn windows_shell_reveal(target: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::RPC_E_CHANGED_MODE;
+    use windows_sys::Win32::System::Com::{
+        CoInitializeEx, CoTaskMemFree, CoUninitialize, COINIT_APARTMENTTHREADED,
+        COINIT_DISABLE_OLE1DDE,
+    };
+    use windows_sys::Win32::UI::Shell::{SHOpenFolderAndSelectItems, SHParseDisplayName};
+
+    let file: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
+    let initialized = unsafe {
+        CoInitializeEx(
+            std::ptr::null(),
+            (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32,
+        )
+    };
+    if initialized < 0 && initialized != RPC_E_CHANGED_MODE {
+        return Err(format!(
+            "Could not initialize Windows shell COM: {initialized:#x}"
+        ));
+    }
+    let mut item = std::ptr::null_mut();
+    let parsed = unsafe {
+        SHParseDisplayName(
+            file.as_ptr(),
+            std::ptr::null_mut(),
+            &mut item,
+            0,
+            std::ptr::null_mut(),
+        )
+    };
+    let result = if parsed < 0 {
+        Err(format!(
+            "Could not identify shell item '{}': {parsed:#x}",
+            target.display()
+        ))
+    } else {
+        // With zero children, the absolute PIDL identifies the item to select in its parent.
+        // The checked path is one shell value; commas never become Explorer switches.
+        let opened = unsafe { SHOpenFolderAndSelectItems(item, 0, std::ptr::null(), 0) };
+        if opened < 0 {
+            Err(format!(
+                "Could not reveal '{}': {opened:#x}",
+                target.display()
+            ))
+        } else {
+            Ok(())
+        }
+    };
+    unsafe {
+        CoTaskMemFree(item.cast());
+        if initialized >= 0 {
+            CoUninitialize();
+        }
+    }
+    result
+}
+
 // Return the exact path handed to the OS so native tests can observe the real dispatch boundary.
 fn dispatch_open_target(target: &Path) -> Result<PathBuf, String> {
     #[cfg(windows)]
     {
         let target = shell_dispatch_path(target)?;
-        if target.is_dir() {
-            Command::new("explorer.exe")
-                .arg(&target)
-                .status()
-                .map_err(|e| format!("Failed to open folder '{}': {e}", target.display()))?;
-        } else {
-            windows_shell_open(target.as_os_str())?;
-        }
+        windows_shell_open(target.as_os_str())?;
         Ok(target)
     }
     #[cfg(not(windows))]
@@ -1525,17 +1577,11 @@ fn dispatch_reveal_target(_item: &Path, directory: &Path) -> Result<PathBuf, Str
     {
         let target = if _item.is_file() { _item } else { directory };
         let target = shell_dispatch_path(target)?;
-        let argument = if _item.is_file() {
-            let mut argument = std::ffi::OsString::from("/select,");
-            argument.push(target.as_os_str());
-            argument
+        if _item.is_file() {
+            windows_shell_reveal(&target)?;
         } else {
-            target.as_os_str().to_os_string()
-        };
-        Command::new("explorer.exe")
-            .arg(argument)
-            .status()
-            .map_err(|e| format!("Failed to reveal '{}': {e}", target.display()))?;
+            windows_shell_open(target.as_os_str())?;
+        }
         Ok(target)
     }
     #[cfg(not(windows))]
@@ -3105,6 +3151,11 @@ mod open_guard_tests {
     }
 
     #[cfg(windows)]
+    mod windows_probe {
+        include!("open_guard_windows.rs");
+    }
+
+    #[cfg(windows)]
     fn assert_plain_dispatched_path(result: Result<PathBuf, String>, expected: &Path) {
         assert_eq!(
             result.as_ref().map(|_| ()),
@@ -3127,6 +3178,7 @@ mod open_guard_tests {
     fn windows_real_open_uses_plain_dispatch_path() {
         let dir = tempdir().unwrap();
         let path = fixture(dir.path(), "real-document.txt");
+        let _gui = windows_probe::WindowsProbe::new(dir.path(), &[Path::new(&path)]);
         let target = local_open_target(&path).unwrap();
         assert_plain_dispatched_path(dispatch_open_target(&target), Path::new(&path));
     }
@@ -3136,6 +3188,7 @@ mod open_guard_tests {
     fn windows_real_reveal_uses_plain_dispatch_path_for_file_and_folder() {
         let dir = tempdir().unwrap();
         let path = fixture(dir.path(), "real-document.txt");
+        let _gui = windows_probe::WindowsProbe::new(dir.path(), &[Path::new(&path)]);
         let (item, parent) = reveal_target(&path).unwrap();
         assert_plain_dispatched_path(dispatch_reveal_target(&item, &parent), Path::new(&path));
         let folder = dir.path().to_str().unwrap();
@@ -3150,6 +3203,7 @@ mod open_guard_tests {
         let folder = dir.path().join("folder [draft] ？");
         fs::create_dir(&folder).unwrap();
         let path = fixture(&folder, "notes[1]？.txt");
+        let _gui = windows_probe::WindowsProbe::new(dir.path(), &[Path::new(&path)]);
         let target = local_open_target(&path).unwrap();
         assert_plain_dispatched_path(dispatch_open_target(&target), Path::new(&path));
         let (item, directory) = reveal_target(&path).unwrap();
@@ -3164,6 +3218,7 @@ mod open_guard_tests {
         let folder = fs::canonicalize(dir.path()).unwrap().join("verbatim-only.");
         fs::create_dir(&folder).unwrap();
         let path = fixture(&folder, "document.txt");
+        let _gui = windows_probe::WindowsProbe::new(dir.path(), &[Path::new(&path)]);
         let target = fs::canonicalize(path).unwrap();
         let parent = target.parent().unwrap();
         let results = [
@@ -3188,6 +3243,7 @@ mod open_guard_tests {
         )
         .unwrap();
         let checked = local_open_target(target.to_str().unwrap()).unwrap();
+        let _gui = windows_probe::WindowsProbe::new(dir.path(), &[target.as_path()]);
         let result = dispatch_open_target(&checked);
         assert_eq!(
             result.as_ref().map(|_| ()),
@@ -3253,6 +3309,10 @@ mod open_guard_tests {
         // Always remove only this test's successful mapping, including on assertion failure.
         let result = std::panic::catch_unwind(|| {
             let document = format!(r"{drive}\Windows\win.ini");
+            let _gui = windows_probe::WindowsProbe::new(
+                Path::new(&format!(r"{drive}\Windows")),
+                &[Path::new(&document)],
+            );
             let target = local_open_target(&document).unwrap();
             assert!(
                 matches!(target.components().next(), Some(std::path::Component::Prefix(prefix))
@@ -3286,5 +3346,44 @@ mod open_guard_tests {
             Some(0),
             "could not remove test mapping {drive}"
         );
+    }
+    #[cfg(windows)]
+    fn windows_observe_folder(name: &str) {
+        let dir = tempdir().unwrap();
+        let folder = dir.path().join(name);
+        fs::create_dir(&folder).unwrap();
+        let gui = windows_probe::WindowsProbe::new(dir.path(), &[]);
+        let target = local_open_target(folder.to_str().unwrap()).unwrap();
+        assert_plain_dispatched_path(dispatch_open_target(&target), &folder);
+        gui.assert_folder(&folder, None);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_folder_window_control() {
+        windows_observe_folder("plain-folder");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_comma_folder_window_notes() {
+        windows_observe_folder("Q4,notes");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_comma_folder_window_root() {
+        windows_observe_folder("Q6,root");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_comma_reveal_window_and_selection() {
+        let dir = tempdir().unwrap();
+        let file = PathBuf::from(fixture(dir.path(), "a,b2.txt"));
+        let gui = windows_probe::WindowsProbe::new(dir.path(), &[&file]);
+        let (item, parent) = reveal_target(file.to_str().unwrap()).unwrap();
+        assert_plain_dispatched_path(dispatch_reveal_target(&item, &parent), &file);
+        gui.assert_folder(dir.path(), Some(&file));
     }
 }
