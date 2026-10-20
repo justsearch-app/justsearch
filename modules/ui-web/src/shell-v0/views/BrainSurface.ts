@@ -2454,7 +2454,7 @@ export class BrainSurface extends JfElement {
     // The compat callout above owns the BLOCKED_* states (it carries the reindex remedy); a second
     // card about the same condition would be two voices on one fact.
     if (emb?.compatState?.startsWith('BLOCKED')) return nothing;
-    const live = !this._unifiedAiState || this._unifiedAiState.snapshotLive;
+    const live = !this._unifiedAiState || this._unifiedAiState.indexingStatusLive;
     const progress = selectIndexingProgress(
       this.systemStatus,
       live,
@@ -2483,7 +2483,7 @@ export class BrainSurface extends JfElement {
                 Semantic search build — last known
               </div>
               <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 0.25rem">
-                ${reasonFor('binding.unreachable').wording} — these figures are the last observed
+                ${this._unifiedAiState?.snapshotLive ? progress.activity.summary : reasonFor('binding.unreachable').wording} — these figures are the last observed
                 values, not live progress.
               </div>
             </div>

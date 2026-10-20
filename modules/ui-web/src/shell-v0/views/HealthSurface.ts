@@ -886,7 +886,7 @@ export class HealthSurface extends JfElement {
    */
   private queueSubLabel(queue: number, known: boolean): string {
     const progress = selectIndexingProgress(
-      this.status, this.aiState?.snapshotLive ?? false,
+      this.status, this.aiState?.indexingStatusLive ?? false,
       this.aiState?.episodeMaxPendingJobs ?? 0, this.aiState?.enrichSettleSamples ?? [],
     );
     if (!progress.activity.confirmed || progress.activity.detail) {
@@ -927,7 +927,7 @@ export class HealthSurface extends JfElement {
     // authority `queueSubLabel` reads, so the card's value and its sub-text cannot disagree.
     const queue = selectIndexingProgress(
       this.status,
-      this.aiState?.snapshotLive ?? false,
+      this.aiState?.indexingStatusLive ?? false,
       this.aiState?.episodeMaxPendingJobs ?? 0,
       this.aiState?.enrichSettleSamples ?? [],
     ).jobsPending;

@@ -206,7 +206,7 @@ export class SystemSelfView extends JfElement {
     // can no longer contradict each other the way §1a's "0 running · 1218 queued" vs "queue 0" did.
     const progress = selectIndexingProgress(
       this.aiState?.status,
-      this.aiState?.snapshotLive ?? false,
+      this.aiState?.indexingStatusLive ?? false,
       this.aiState?.episodeMaxPendingJobs ?? 0,
       this.aiState?.enrichSettleSamples ?? [],
     );

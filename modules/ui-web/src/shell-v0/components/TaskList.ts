@@ -191,7 +191,7 @@ export class TaskList extends JfElement {
       this.applyProgress(
         selectIndexingProgress(
           s.status,
-          s.snapshotLive,
+          s.indexingStatusLive,
           s.episodeMaxPendingJobs,
           s.enrichSettleSamples,
         ),

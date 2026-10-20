@@ -85,6 +85,7 @@ function harness(live: boolean): Harness {
   el._unifiedAiState = {
     verdict: live ? LIVE_VERDICT : DEAD_VERDICT,
     snapshotLive: live,
+    indexingStatusLive: live,
     aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
     episodeMaxPendingJobs: 0,
     enrichSettleSamples: [],
@@ -105,6 +106,19 @@ function domOf(tpl: TemplateResult | symbol): HTMLElement {
 }
 
 describe('BrainSurface — enrichment progress card (807)', () => {
+  it('S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers', () => {
+    const el = harness(true);
+    const state = el._unifiedAiState as AiState;
+    state.indexingStatusLive = false;
+    const stale = domOf(el.renderEnrichmentProgress());
+    expect(stale.textContent).toContain('Indexing status unconfirmed');
+    expect(stale.textContent).not.toContain(DISCONNECTED);
+    expect(stale.textContent).not.toContain('Building semantic search');
+    expect(stale.querySelector('.spin, [class*="spin"]')).toBeNull();
+    state.indexingStatusLive = true;
+    expect(textOf(el.renderEnrichmentProgress())).toContain('Building semantic search');
+  });
+
   it('stops presenting as live progress when the snapshot is not live', () => {
     const text = textOf(harness(false).renderEnrichmentProgress());
     expect(text).not.toContain('Building semantic search');

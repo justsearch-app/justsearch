@@ -376,7 +376,7 @@ export class IndexingOverlayHost extends JfElement {
     // silently withdraw a live overlay).
     const progress = selectIndexingProgress(
       ai.status,
-      ai.snapshotLive,
+      ai.indexingStatusLive,
       ai.episodeMaxPendingJobs,
       ai.enrichSettleSamples,
     );

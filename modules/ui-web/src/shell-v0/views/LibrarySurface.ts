@@ -583,7 +583,7 @@ export class LibrarySurface extends JfElement {
       // ONE index-wide progress derivation rather than re-reading the enrichment wire flags here.
       const progress = selectIndexingProgress(
         s.status,
-        s.snapshotLive,
+        s.indexingStatusLive,
         s.episodeMaxPendingJobs,
         s.enrichSettleSamples,
       );

@@ -31,6 +31,7 @@ function makeAiState(overrides: Partial<AiState> = {}): AiState {
     stability: { kind: 'settled' },
     verdict: { kind: 'operational', severity: 'ok', reasons: [] },
     snapshotLive: true,
+    indexingStatusLive: true,
     status: null,
     inference: null,
     lastSettledIndex: null,
@@ -45,7 +46,8 @@ function makeAiState(overrides: Partial<AiState> = {}): AiState {
   // Tempdoc 807 — keep the fixture COHERENT: a test that overrides `connection` to an unreachable
   // origin must not silently keep `snapshotLive: true` (production derives one from the other in
   // `buildSnapshot`). An explicit override still wins, so a test can pin the pair deliberately.
-  return { ...built, snapshotLive: overrides.snapshotLive ?? isSnapshotLive(built.connection) };
+  const live = overrides.snapshotLive ?? isSnapshotLive(built.connection);
+  return { ...built, snapshotLive: live, indexingStatusLive: overrides.indexingStatusLive ?? live };
 }
 
 function make(): StatusDeck {

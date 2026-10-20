@@ -6,7 +6,7 @@ import './TaskList.js';
 import './IndexingOverlay.js';
 import '../views/HealthSurface.js';
 import '../views/LibrarySurface.js';
-import { __feedForTest, __resetAiStateForTest, __tickClockForTest, type StatusSnapshot } from '../state/aiStateStore.js';
+import { __feedForTest, __resetAiStateForTest, __tickClockForTest, getAiState, type StatusSnapshot } from '../state/aiStateStore.js';
 import { __resetTasksForTest } from '../substrates/tasks/index.js';
 import type { LibrarySurface } from '../views/LibrarySurface.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
@@ -72,6 +72,7 @@ afterEach(async () => {
   __resetTasksForTest();
   await Promise.resolve();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe('WP3.3 shared status surfaces', () => {
@@ -112,6 +113,36 @@ describe('WP3.3 shared status surfaces', () => {
     for (const [i, text] of texts().entries()) {
       expect(text, surfaces[i]!.localName).toContain('Indexing status unconfirmed');
       expect(text, surfaces[i]!.localName).not.toContain('Text indexing continues');
+    }
+  });
+
+  it.each([4, 0])('S33.4 aged observations with %i queued files expire on every surface while inference stays live and recover on fresh status', async (jobs) => {
+    vi.useFakeTimers();
+    const observedAt = Date.now();
+    const fresh = status(jobs);
+    fresh.meta = { workerRpcAtMs: observedAt - 7_000, workerRpcStale: false };
+    fresh.operating!.freshness.staleAfterMs = 30_000;
+    feed(fresh);
+    await mountAll();
+    for (const text of texts()) expect(text).toContain('save energy');
+
+    vi.setSystemTime(observedAt + 23_001);
+    __feedForTest({ inference: { mode: 'indexing', starting: false } });
+    await flush();
+    expect(getAiState().snapshotLive, 'inference still confirms Engine reachability').toBe(true);
+    for (const [i, text] of texts().entries()) {
+      expect(text, surfaces[i]!.localName).toContain('Indexing status unconfirmed');
+      expect(text, surfaces[i]!.localName).not.toMatch(/Text indexing continues|Ready — fully searchable|save energy/);
+    }
+
+    const recovered = status(jobs, []);
+    recovered.meta = { workerRpcAtMs: Date.now(), workerRpcStale: false };
+    recovered.operating!.freshness.staleAfterMs = 30_000;
+    feed(recovered);
+    await flush();
+    for (const [i, text] of texts().entries()) {
+      expect(text, surfaces[i]!.localName).not.toContain('Indexing status unconfirmed');
+      expect(text, surfaces[i]!.localName).not.toContain('save energy');
     }
   });
 

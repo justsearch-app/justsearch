@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-20T16:18:39.928Z",
-  "revision": "8237e63d99b9b348e5e2078d2d2664abd0aa9f9c",
-  "tree": "c633a80fe4d54ba311ad84fc41546e965a13285d",
+  "createdAt": "2026-10-20T16:57:19.572Z",
+  "revision": "4c59d07c0df208961e71f2620df056695fc6b190",
+  "tree": "ed950052242d89c15f8ae39677570a55116a4339",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/state/indexingStatus.test.ts\" \"src/shell-v0/components/indexingStatusSurfaces.test.ts\" \"src/shell-v0/state/folderStatus.test.ts\" \"src/shell-v0/state/indexingProgress.test.ts\" \"src/shell-v0/views/SystemSelfView.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" \"src/shell-v0/views/HealthSurface.render.test.ts\" \"src/shell-v0/components/IndexingOverlay.test.ts\" \"src/shell-v0/components/TaskList.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/repair/test-intent-vitest-1047166-1792513110521.json\"",
+      "command": "npx vitest run \"src/shell-v0/state/indexingStatus.test.ts\" \"src/shell-v0/components/indexingStatusSurfaces.test.ts\" \"src/shell-v0/state/folderStatus.test.ts\" \"src/shell-v0/state/indexingProgress.test.ts\" \"src/shell-v0/views/SystemSelfView.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" \"src/shell-v0/views/HealthSurface.render.test.ts\" \"src/shell-v0/components/IndexingOverlay.test.ts\" \"src/shell-v0/components/TaskList.test.ts\" \"src/shell-v0/state/indexingFreshness.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-vitest-1624205-1792515424028.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4123
+      "durationMs": 9235
     }
   ],
   "checks": [
@@ -80,7 +80,7 @@
       "id": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
       "file": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2e243df1d7526a137b80b7c6cd89c1616db3677bc4bc8c7cf69d17dc8e0028ea",
+      "contentDigest": "sha256:a4907c83f15504d137016db9b275a69167ae34a64bdc4d80ee5f2fe51ece0e57",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,6 +95,14 @@
         },
         {
           "name": "WP3.3 shared status surfaces S33.4 retained stale observations are unconfirmed on every surface",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.4 aged observations with 4 queued files expire on every surface while inference stays live and recover on fresh status",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.4 aged observations with 0 queued files expire on every surface while inference stays live and recover on fresh status",
           "status": "passed"
         },
         {
@@ -172,7 +180,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts#S33.1 energy saver names continued text indexing and deferred enrichment",
       "file": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f7e05c0f25e9cad64339d11a3284be49e002d7a90e205b538254ef6766878954",
+      "contentDigest": "sha256:838c4af94505ed684c2b3949eef84aece46acbb2de62581d2aecbce2adf6226a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -227,6 +235,40 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ebfd592dec064239968862d3de84e151be4a88b7e25ab9c4ca675a91b366f404",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S33.4 the store timer expires the worker observation while SSE alone keeps the Engine reachable and fresh status restores it",
+          "status": "passed"
+        },
+        {
+          "name": "S33.4 a status without a worker timestamp expires by receipt age using its reported freshness window",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2f8a0089f1d16f171189abfe322e63c73b1c1340a8cc6108a927a3c08ded3c9b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "BrainSurface — enrichment progress card (807) S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": {
@@ -236,11 +278,11 @@
     "patches": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/shell-v0/state/indexingStatus.test.ts\" \"src/shell-v0/components/indexingStatusSurfaces.test.ts\" \"src/shell-v0/state/folderStatus.test.ts\" \"src/shell-v0/state/indexingProgress.test.ts\" \"src/shell-v0/views/SystemSelfView.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" \"src/shell-v0/views/HealthSurface.render.test.ts\" \"src/shell-v0/components/IndexingOverlay.test.ts\" \"src/shell-v0/components/TaskList.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/repair/test-intent-vitest-1047166-1792513116325.json\"",
+        "command": "npx vitest run \"src/shell-v0/state/indexingStatus.test.ts\" \"src/shell-v0/components/indexingStatusSurfaces.test.ts\" \"src/shell-v0/state/folderStatus.test.ts\" \"src/shell-v0/state/indexingProgress.test.ts\" \"src/shell-v0/views/SystemSelfView.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" \"src/shell-v0/views/HealthSurface.render.test.ts\" \"src/shell-v0/components/IndexingOverlay.test.ts\" \"src/shell-v0/components/TaskList.test.ts\" \"src/shell-v0/state/indexingFreshness.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-vitest-1624205-1792515435189.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 3342,
-        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/repair/test-intent-vitest-1047166-1792513116325.json\n\n"
+        "durationMs": 4130,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-vitest-1624205-1792515435189.json\n\n"
       }
     ],
     "checks": [
@@ -252,44 +294,54 @@
       {
         "id": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
         "classification": "assertion",
-        "detail": "WP3.3 shared status surfaces S33.1 S33.6 every surface says text indexing continues and enrichment waits for energy:  AssertionError: jf-status-deck: expected '\\n      All systems operational\\n    …' to contain 'Text indexing continues'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/repair/test-intent-before-1Dx2zO/modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.t | WP3.3 shared status surfaces S33.2 S33.4 all surfaces replace and clear the rea"
+        "detail": "WP3.3 shared status surfaces S33.1 S33.6 every surface says text indexing continues and enrichment waits for energy:  AssertionError: jf-status-deck: expected '\\n      All systems operational\\n    …' to contain 'Text indexing continues'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-before-lRtjlI/modules/ui-web/src/shell-v0/components/indexingStatu | WP3.3 shared status surfaces S33.2 S33.4 all surfaces replace and clear the rea"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/folderStatus.test.ts#S33.5 zero settled stays enriching without a fabricated starting percentage",
         "classification": "assertion",
-        "detail": "folderStatus — per-root enrichment tier (813 §4) S33.5 zero settled stays enriching without a fabricated starting percentage:  AssertionError: expected 'default · 312 files · keyword search …' not to match /\\d+%/\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/repair/test-intent-before-1Dx2zO/modules/ui-web/src/shell-v0/state/folderStatus.test.ts:259:31\n    at file:///home/elias/dev/justsearc"
+        "detail": "folderStatus — per-root enrichment tier (813 §4) S33.5 zero settled stays enriching without a fabricated starting percentage:  AssertionError: expected 'default · 312 files · keyword search …' not to match /\\d+%/\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-before-lRtjlI/modules/ui-web/src/shell-v0/state/folderStatus.test.ts:259:31\n    at file:///home/eli"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/indexingProgress.test.ts#S33.5 an undrained stage with pending above its total has no percentage",
         "classification": "assertion",
-        "detail": "selectIndexingProgress — denominator honesty S33.5 an undrained stage with pending above its total has no percentage:  AssertionError: expected +0 to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/repair/test-intent-before-1Dx2zO/modules/ui-web/src/shell-v0/state/indexingProgress.test.ts:355:32\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/mod"
+        "detail": "selectIndexingProgress — denominator honesty S33.5 an undrained stage with pending above its total has no percentage:  AssertionError: expected +0 to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-before-lRtjlI/modules/ui-web/src/shell-v0/state/indexingProgress.test.ts:355:32\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-ag"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/SystemSelfView.test.ts#S33.4 strip variant keeps the body and marks a missing observation unconfirmed",
         "classification": "assertion",
-        "detail": "jf-system-self-view — strip variant (578 Workstream A) S33.4 strip variant keeps the body and marks a missing observation unconfirmed:  AssertionError: expected '\\n      \\n      \\n        \\n        \\…' to contain 'Indexing status unconfirmed'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/repair/test-intent-before-1Dx2zO/modules/ui-web/src/shell-v0/views/SystemSelfView.test.ts:80:40\n    at file:///ho"
+        "detail": "jf-system-self-view — strip variant (578 Workstream A) S33.4 strip variant keeps the body and marks a missing observation unconfirmed:  AssertionError: expected '\\n      \\n      \\n        \\n        \\…' to contain 'Indexing status unconfirmed'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-before-lRtjlI/modules/ui-web/src/shell-v0/views/SystemSelfView.test.ts:80:40"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts#S33.1 energy saver names continued text indexing and deferred enrichment",
         "classification": "assertion",
-        "detail": "StatusDeck (slice 461) S33.1 energy saver names continued text indexing and deferred enrichment:  AssertionError: expected '\\n            \\n    \\n  \\n           …' to contain 'Text indexing continues'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/repair/test-intent-before-1Dx2zO/modules/ui-web/src/shell-v0/components/StatusDeck.test.ts:238:27\n    at file:///home"
+        "detail": "StatusDeck (slice 461) S33.1 energy saver names continued text indexing and deferred enrichment:  AssertionError: expected '\\n            \\n    \\n  \\n           …' to contain 'Text indexing continues'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-before-lRtjlI/modules/ui-web/src/shell-v0/components/StatusDeck.test.ts:240:27"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts#S33.1 energy saver explains enrichment deferral while text indexing continues",
         "classification": "assertion",
-        "detail": "HealthSurface — Queue card status vocabulary (630 D1) S33.1 energy saver explains enrichment deferral while text indexing continues:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/repair/test-intent-before-1Dx2zO/modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts:769:71\n    at file:///home/elias/dev/justsearch/.claude/work"
+        "detail": "HealthSurface — Queue card status vocabulary (630 D1) S33.1 energy saver explains enrichment deferral while text indexing continues:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-before-lRtjlI/modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts:769:71\n    at file:///home/elias/dev/justsea"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts#S33.4 without an observation renders an unconfirmed header and explanation",
         "classification": "assertion",
-        "detail": "IndexingOverlay (slice 460) S33.4 without an observation renders an unconfirmed header and explanation:  AssertionError: expected 'Batch Processing Active' to be 'Indexing status unconfirmed' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/repair/test-intent-before-1Dx2zO/modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts:28:61\n    at pr"
+        "detail": "IndexingOverlay (slice 460) S33.4 without an observation renders an unconfirmed header and explanation:  AssertionError: expected 'Batch Processing Active' to be 'Indexing status unconfirmed' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-before-lRtjlI/modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/TaskList.test.ts#S33.4 unknown indexing is unconfirmed without a phase, bar or counts",
         "classification": "assertion",
-        "detail": "<jf-task-list> — aggregate card (813 §5) S33.4 unknown indexing is unconfirmed without a phase, bar or counts:  AssertionError: expected 'Tasks' to be 'Indexing status unconfirmed' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/repair/test-intent-before-1Dx2zO/modules/ui-web/src/shell-v0/components/TaskList.test.ts:322:48\n    at file:///home/elias/dev/jus"
+        "detail": "<jf-task-list> — aggregate card (813 §5) S33.4 unknown indexing is unconfirmed without a phase, bar or counts:  AssertionError: expected 'Tasks' to be 'Indexing status unconfirmed' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-before-lRtjlI/modules/ui-web/src/shell-v0/components/TaskList.test.ts:322:48\n    at file:///ho"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+        "classification": "assertion",
+        "detail": "S33.4 the store timer expires the worker observation while SSE alone keeps the Engine reachable and fresh status restores it:  AssertionError: expected undefined to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-before-lRtjlI/modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts:50:46\n    at file:///home/elias/dev/justsea | S33.4 a status without a worker timestamp expires by receipt age using"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers",
+        "classification": "assertion",
+        "detail": "BrainSurface — enrichment progress card (807) S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers:  AssertionError: expected '\\n      \\n        \\n          \\n    \\…' to contain 'Indexing status unconfirmed'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-before-lRtjlI/modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness."
       }
     ]
   },
-  "digest": "sha256:0328e80ecac6935ef2ee5b99cdbc74c12325ae20e0bd771d03eea4a05659491a"
+  "digest": "sha256:b40794ba37710a5533b080b4d1bbbacb96dd848131f1b4b848cd73dd9726a672"
 }

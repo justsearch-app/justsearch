@@ -520,7 +520,7 @@ export class StatusDeck extends JfElement {
     // showing one would claim progress that cannot happen.
     const progress = selectIndexingProgress(
       this.status,
-      this.aiState?.snapshotLive ?? false,
+      this.aiState?.indexingStatusLive ?? false,
       this.aiState?.episodeMaxPendingJobs ?? 0,
       this.aiState?.enrichSettleSamples ?? [],
     );
@@ -701,7 +701,7 @@ export class StatusDeck extends JfElement {
     // the user has navigated away from the AI Brain page.
     const aiEngineAnnounce = this.aiState ? presentAiEngineVerdict(this.aiState.aiEngine).announce : null;
     const progress = selectIndexingProgress(
-      this.status, this.aiState?.snapshotLive ?? false,
+      this.status, this.aiState?.indexingStatusLive ?? false,
       this.aiState?.episodeMaxPendingJobs ?? 0, this.aiState?.enrichSettleSamples ?? [],
     );
     const indexingAnnounce = [progress.activity.summary, progress.activity.detail].filter(Boolean).join(' — ');

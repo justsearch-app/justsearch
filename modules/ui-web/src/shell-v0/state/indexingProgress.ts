@@ -188,7 +188,7 @@ export interface IndexingProgress {
   pendingBytes: number | null;
   /**
    * Is this snapshot still a LIVE observation? Threaded in from the ONE liveness authority
-   * (`AiState.snapshotLive`, 807 A.3) — this module does NOT invent a staleness signal, and in
+   * (`AiState.indexingStatusLive`) — this module does NOT invent a staleness signal, and in
    * particular never reads `chunkCoverage.observedAtMs`, which is a Head serialization stamp.
    */
   live: boolean;
@@ -539,7 +539,8 @@ function derivePendingBytes(
  * Derive the index-wide progress projection from one `/api/status` snapshot.
  *
  * @param status the retained poll snapshot (`AiState.status`); `null` before the first poll.
- * @param snapshotLive the ONE liveness answer (`AiState.snapshotLive`).
+ * @param indexingStatusLive the store's indexing-observation freshness answer (`AiState.indexingStatusLive`),
+ *   bounded by worker sample/receipt age even while inference or SSE still confirms reachability.
  * @param episodeMaxPendingJobs the CROSS-POLL memory this pure function cannot have: the largest
  *   backlog observed during the current drain episode (`AiState.episodeMaxPendingJobs`, owned and
  *   stamped by the store). REQUIRED, not optional-with-a-default: a defaulted parameter would let
@@ -552,13 +553,13 @@ function derivePendingBytes(
  */
 export function selectIndexingProgress(
   status: StatusResponse | null | undefined,
-  snapshotLive: boolean,
+  indexingStatusLive: boolean,
   episodeMaxPendingJobs: number,
   enrichSettleSamples: readonly EnrichSettleSample[],
 ): IndexingProgress {
   const core = status?.worker?.core;
   if (!isWorkerReportedIndex(status) || !core || core.indexState === 'FAILED') {
-    return { ...EMPTY, live: snapshotLive };
+    return { ...EMPTY, live: indexingStatusLive };
   }
 
   const migration = status.worker?.migration;
@@ -595,7 +596,7 @@ export function selectIndexingProgress(
     : null;
 
   const phase = derivePhase(jobsPending, work);
-  const activity = indexingActivity(status, snapshotLive, phase, work.rawPending);
+  const activity = indexingActivity(status, indexingStatusLive, phase, work.rawPending);
 
   // 813 §19 (W2) — the high-water denominator. `episodeMax > jobsPending` is the whole admission
   // test: it is simultaneously "a drain was observed" and "the denominator is positive", so the
@@ -629,7 +630,7 @@ export function selectIndexingProgress(
     embeddingPending: count(status.worker?.enrichment?.embeddingPendingCount),
     vduPending: count(core.pendingVduCount),
     etaSeconds:
-      phase === 'indexing' && snapshotLive
+      phase === 'indexing' && indexingStatusLive
         ? deriveEtaSeconds(core.recentDocsPerSec, core.recentJobQueueDepth, jobsPending)
         : null,
     indexingPercent,
@@ -638,7 +639,7 @@ export function selectIndexingProgress(
       count(core.pendingUnknownSizeJobs),
       jobsPending,
     ),
-    live: snapshotLive,
+    live: indexingStatusLive,
     stages: applicable,
   };
 }

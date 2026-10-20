@@ -2,12 +2,12 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: builder-uiux-status-20261020
+author-session: builder-uiux-status-freshness-20261020
 ---
 
 # Test-intent entries
 
-Durable WP3.3 checks, updated for verifier repair. The incompatible placement field and its isolated worker/mapper tests are retired together: all their production members are removed, and the complete scheduler/mapper source files return to f6a14b5a6. The regenerated fixture also returns byte-for-byte to f6a14b5a6. No branch-base test or compatibility baseline is removed. Existing acceptance records are retained below for history; independent verification must accept the final digest. The builder does not write acceptance.
+Durable WP3.3 checks, updated for the second verifier's S33.4 observation-age repair. Additional exact-candidate fail-before evidence is in `gates/test-intent/evidence/uiux-status-freshness-4c59d07c0.json`; the original-base evidence below is regenerated for all changed check files. The incompatible placement field and its isolated worker/mapper tests are retired together: all their production members are removed, and the complete scheduler/mapper source files return to f6a14b5a6. The regenerated fixture also returns byte-for-byte to f6a14b5a6. No branch-base test or compatibility baseline is removed. Existing acceptance records are retained below for history; independent verification must accept the final digest. The builder does not write acceptance.
 
 The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.1–S33.6. Each source retains its original ID in agreedScenario and its verbatim agreed quote.
 
@@ -89,7 +89,7 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
         "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts"
       ],
       "class": "New",
-      "behaviour": "All shared surfaces use qualified idle/interleaved hold wording, clear reasons, mark stale status unconfirmed, and announce semantic changes once. Library root with zero settled documents has no starting 0%. Deferred enrichment retains the measured task aggregate and counts without an active progress bar; this preservation assertion passes on f6a14b5a6 and fails on 8237e63d9.",
+      "behaviour": "All shared surfaces use qualified idle/interleaved hold wording, clear reasons, mark stale status unconfirmed, and announce semantic changes once. Library root with zero settled documents has no starting 0%. Deferred enrichment retains the measured task aggregate and counts without an active progress bar; this preservation assertion passes on f6a14b5a6 and fails on 8237e63d9. S33.4 worker observations expire by age even while inference remains live; all six mounted surfaces drop current-work and hold explanations, and recover on a fresh observation with the cleared reason absent.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -211,7 +211,7 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
         "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts"
       ],
       "class": "New",
-      "behaviour": "Replace the old whole-queue paused expectation under energy saver with continued text indexing and enrichment deferral; the positive queued-work/power fixture remains the same.",
+      "behaviour": "Replace the old whole-queue paused expectation under energy saver with continued text indexing and enrichment deferral; the positive queued-work/power fixture remains the same. The handcrafted AiState fixture gains indexingStatusLive, following its existing live override unless explicitly supplied; all existing oracles are retained.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -340,6 +340,82 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
       "evidence": "gates/test-intent/evidence/uiux-status-compatibility.json",
       "newChecks": [
         "modules/app-api/src/test/java/io/justsearch/app/api/status/StatusBackfillCompatibilityTest.java#enrichmentDoesNotPublishAnIncompatiblePlacementKey"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "S33.4 the real store interval expires a retained worker sample after the reported window even while SSE keeps Engine contact live, notifies subscribers without a new poll, and restores confirmation on the next fresh observation. Without worker timestamp metadata, receipt age and the reported freshness window bound confirmation. Quiet mocked subscriptions isolate the timer; they are not live transport evidence. The original before-state lacks the shared activity projection; additional 4c59d07c0 evidence pins the specific confirmed-Ready and receipt-age failures.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S334",
+          "quote": "S33.4 When a reason clears, its explanation disappears after the next fresh status observation; when status is stale or unavailable, surfaces mark the observation as unconfirmed instead of asserting current activity or quiescence.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.4"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S336",
+          "quote": "S33.6 The same state is described consistently on status deck, task list, Health, Library rows and the overlay; changes are announced once to screen readers, not on every poll.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.6"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.3 automatic-hold wording and read-only status observability; automatic hold actuation remains unchanged.",
+          "choice": "Decision 4: keep operating.indexing as is; the UI words reasons by the work they hold, and the contract docs state that PAUSED with automatic reasons means GPU bulk/enrichment held (no wire state change). Preserve old strict clients by retaining the original public status shape. Explain idle enrichment and interleaved sparse scheduling separately: energy saver defers idle work, GPU holds also defer sparse work between files on CPU. Placement is unreported; CPU-only idle work may continue under GPU holds. Fixed wording is authored once in the shared activity projection; the status deck owns its semantic live announcement.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-status-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "S33.4 Brain enrichment reports an expired observation as unconfirmed without claiming the reachable Engine is disconnected or animating current activity; fresh status restores the live presentation. The existing harness gains the indexingStatusLive field paired with its existing liveness input; the previous preservation oracles are retained.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S334",
+          "quote": "S33.4 When a reason clears, its explanation disappears after the next fresh status observation; when status is stale or unavailable, surfaces mark the observation as unconfirmed instead of asserting current activity or quiescence.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.4"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S336",
+          "quote": "S33.6 The same state is described consistently on status deck, task list, Health, Library rows and the overlay; changes are announced once to screen readers, not on every poll.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.6"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.3 automatic-hold wording and read-only status observability; automatic hold actuation remains unchanged.",
+          "choice": "Decision 4: keep operating.indexing as is; the UI words reasons by the work they hold, and the contract docs state that PAUSED with automatic reasons means GPU bulk/enrichment held (no wire state change). Preserve old strict clients by retaining the original public status shape. Explain idle enrichment and interleaved sparse scheduling separately: energy saver defers idle work, GPU holds also defer sparse work between files on CPU. Placement is unreported; CPU-only idle work may continue under GPU holds. Fixed wording is authored once in the shared activity projection; the status deck owns its semantic live announcement.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-status-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers"
       ],
       "repaired": true
     }
