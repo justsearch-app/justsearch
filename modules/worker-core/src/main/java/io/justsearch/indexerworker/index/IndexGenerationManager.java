@@ -2614,7 +2614,10 @@ public final class IndexGenerationManager {
     // fallback. Never move it aside: a process kill between two moves leaves strict boot with
     // no current pointer. Do not replace a valid fallback with a torn current during recovery.
     if (Files.exists(statePath)) {
-      byte[] prior = io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(statePath);
+      // The generation owner snapshots immutable pointer bytes before atomic replacement.
+      // Taking a reader lock here would prevent publication while a strict reader waits on
+      // the old file. Strict readers still acquire their lock and reopen the named pointer.
+      byte[] prior = Files.readAllBytes(statePath);
       try {
         if (JSON.readValue(prior, State.class) != null) {
           io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(statePrevPath, prior);

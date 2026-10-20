@@ -415,6 +415,38 @@ The scenarios are delegated orchestrator choices, not owner words. Linux and Win
         "modules/ui-web/src/shell-v0/views/UnifiedChatView.test.ts#M26 keeps the journal refusal visible across renders and repeated status updates until resolved"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRebuildPreparationTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "Create and close the real intact SQLite job journal before seeding the unfinished migration. The fixture represents healthy migration/brake recovery, while missing journals are separate R9 refusal cases. The Engine boot, read-only brake, frozen target/plan, byte preservation, queue depth, migration state and no-ingestion assertions and 180-second timeout are unchanged. CI #39411554019 previously refused this incomplete fixture with index.migration_journal_unavailable.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Fix anything that is yours.",
+          "location": "task t-20261019-91c3ab request (Builder A, round 9)"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexGenerationVduEligibilityTest.java"
+      ],
+      "class": "Structural rule kept",
+      "rule": "A warm generation owner may atomically publish while a strict reader waits on the old pointer; the reader must reopen and observe MIGRATING rather than cached IDLE. Cold owners still refuse unavailable input.",
+      "whySurvives": "Only wrap the existing updateMigrationState call in assertDoesNotThrow to make its already-required successful publication explicit. The held real file lock, 100ms blocked-reader precondition, owner API call, successor read, refusal assertion, timeouts and cleanup remain unchanged. CI #39411554019 fails from writeState acquiring a reader lock for its backup snapshot. The writer now snapshots immutable old pointer bytes under its generation control and still validates JSON before replacing the backup; strict readers retain ContendedFileReads. Focused before/after and known-good results are retained under tmp/ci-822/round9/.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Fix anything that is yours.",
+          "location": "task t-20261019-91c3ab request (Builder A, round 9)"
+        }
+      ]
     }
   ]
 }

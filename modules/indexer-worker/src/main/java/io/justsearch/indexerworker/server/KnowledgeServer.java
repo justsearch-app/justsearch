@@ -1301,7 +1301,7 @@ public final class KnowledgeServer implements Closeable {
       // Inject after ownership reconciliation so both the baseline and candidate reach the actual
       // fallback writer. Its next process must then recover the interrupted repair on its own.
       if ("1".equals(SystemAccess.envVar("JUSTSEARCH_SUPERVISOR_HARNESS"))
-          && java.util.Objects.toString(SystemAccess.envVar("JUSTSEARCH_REAL_RECOVERY_SCENARIO"), "")
+          && Objects.toString(SystemAccess.envVar("JUSTSEARCH_REAL_RECOVERY_SCENARIO"), "")
               .startsWith("pointer-recovery-")
           && !Files.exists(effectiveIndexBasePath.resolve("pointer-publication-cut"))) {
         Files.writeString(effectiveIndexBasePath.resolve("state.json"), "{torn native pointer");
