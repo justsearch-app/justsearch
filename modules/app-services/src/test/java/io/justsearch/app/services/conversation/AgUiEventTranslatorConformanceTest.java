@@ -45,7 +45,7 @@ class AgUiEventTranslatorConformanceTest {
           new AgentEvent.ToolBatchProposed(List.of()),
           new AgentEvent.ToolCallPendingApproval("id", "tool", "args", RiskTier.LOW),
           new AgentEvent.ToolCallApproved("id"),
-          new AgentEvent.DirectiveAcknowledged("focus"),
+          new AgentEvent.DirectiveAcknowledged("focus", "d1", AgentEvent.DirectiveAcknowledged.QUEUED, null),
           new AgentEvent.ToolExecutionStarted("id", "tool"),
           new AgentEvent.ToolExecutionCompleted("id", OperationResult.success("ok")),
           new AgentEvent.ToolCallRejected("id", "no"),

@@ -54,7 +54,8 @@ final class AgentRunDurabilityClosureTest {
           "done",
           "error",
           "progress",
-          "handoff_executed");
+          "handoff_executed",
+          "directive_acknowledged");
 
   /**
    * Kinds {@code fromRunEvent} declares non-projecting, written there as explicit cases. See that
@@ -70,7 +71,6 @@ final class AgentRunDurabilityClosureTest {
           "tool_batch_proposed",
           "tool_call_approved",
           "tool_call_virtual",
-          "directive_acknowledged",
           "handoff_proposed",
           "budget_update",
           "budget_gate",

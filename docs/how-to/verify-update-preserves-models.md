@@ -9,7 +9,7 @@ description: "Run the Update Preserves Models CI lane, which installs a publishe
 
 [ADR-0024](../decisions/0024-app-packaging-nsis-per-user-download.md) ships the
 app without model weights and downloads them after install. Tempdoc 617 D2 then chose
-**monolithic full-installer updates** on one condition: the models already on disk — up to ~9 GB —
+**monolithic full-installer updates** on one condition: the models already on disk
 are reused in place and are never re-downloaded or deleted by an update.
 
 A monolithic update runs uninstall-then-install over an existing install, so the two ways to break
@@ -42,11 +42,14 @@ Inputs:
 | `candidate_release_tag` | `v0.2.0` | Release whose published installer plays **N+1**. |
 | `candidate_run_id` | *(empty)* | `build-installer.yml` run id supplying N+1 when `candidate_source: run-artifact`. Artifacts expire after 7 days. |
 
-To gate a candidate **before** publishing it, dispatch `build-installer.yml`, then feed its run id:
+The defaults test the historical v0.1.0 → v0.2.0 pair. Set explicit inputs to test the intended upgrade.
+
+To gate a candidate **before** publishing it, dispatch `build-installer.yml` against an unpublished
+**branch** ref (release-loop step 1), then feed its run id. A tag build publishes before this lane can run:
 
 ```bash
 gh workflow run update-preserves-models.yml \
-  -f base_release_tag=v0.2.0 -f candidate_source=run-artifact -f candidate_run_id=<id>
+  -f base_release_tag=<previous vX.Y.Z> -f candidate_source=run-artifact -f candidate_run_id=<branch-run-id>
 ```
 
 The run uploads `update-preserves-models-evidence` containing
@@ -63,8 +66,8 @@ the before/after deletion diffs, and a `verdict`). The job summary carries a one
 3. Seeds model files and records each one's sha256, size and mtime:
    - **Gating** — `%APPDATA%\io.justsearch.shell\models\…`. The packaged shell passes
      `-Djustsearch.data.dir=<app_data_dir>` and `JUSTSEARCH_HOME=<app_data_dir>` to the backend
-     (`modules/shell/src-tauri/src/lib.rs:770-791`) and creates `<app_data_dir>\models` itself
-     (`lib.rs:430`, `lib.rs:575`), so this is where a real user's weights live.
+     (`spawn_headless_backend` in `modules/shell/src-tauri/src/lib.rs`) and creates
+     `<app_data_dir>\models` itself, so this is where a real user's weights live.
    - **Observational** — `%LOCALAPPDATA%\JustSearch\models\…`. This is the contract default data
      dir (`platform_paths.rs`, `ResolvedPathResolver.java:66`) **and** the NSIS `currentUser`
      `$INSTDIR`. The two collide, so anything seeded there sits inside the directory the
@@ -96,7 +99,7 @@ Every step fails closed, and the evidence JSON is written even on an unexpected 
   plus an interruption/reconciliation case) still needs a GUI Sandbox host. This lane supersedes
   only item 3 ("the exact published installer-over-release lane") and the model-survival half of
   item 5.
-- **Not scale.** The ~9 GB figure is mimicked by a sparse blob, not reproduced.
+- **Not scale.** The multi-gigabyte model set is mimicked by a sparse blob, not reproduced.
 - **Not the install-tree collision.** `%LOCALAPPDATA%\JustSearch\models` is recorded, not gated.
 
 ## Why it downloads two published installers instead of building one

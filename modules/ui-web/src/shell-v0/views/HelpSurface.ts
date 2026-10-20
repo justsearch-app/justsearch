@@ -51,7 +51,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: 'How does AI summarization work?',
-    a: 'Select text in a document and choose "Summarize" from the menu that appears, or type a request such as "summarize the budget notes" in the search bar. Summaries need the local chat model, which is installed only on a machine with an NVIDIA GPU with at least 7.5 GB of video memory. It runs on your machine; no data is sent externally.',
+    a: 'Select text in a document and choose "Summarize" from the menu that appears, or type a request such as "summarize the budget notes" in the search bar. Summaries need the local chat model, which is installed only on a machine with an NVIDIA GPU with at least 7.5 GB of video memory. The model runs on your machine. See Network for downloads, update checks, optional trace export, and connected tools.',
   },
   {
     q: 'Why is indexing slow?',
@@ -99,9 +99,11 @@ const TROUBLESHOOTING: string[] = [
 ];
 
 const NETWORK: string[] = [
-  'Local app traffic uses loopback (not a network service).',
-  'AI model downloads occur only when you explicitly install models.',
-  'Future "Online" features will be clearly labeled and opt-in.',
+  'The UI connects to the local backend over loopback. Indexing, retrieval, and built-in inference run locally.',
+  'Desktop builds with an embedded release URL check GitHub for updates on launch, including CI-built branch candidates and pre-releases. GitHub sees your IP address and request time; the check sends no document content or queries. There is no off switch yet.',
+  'Install AI downloads models and runtimes from github.com and huggingface.co with consent. Repair and upgrades can download them again. On Windows, supported NVIDIA hardware also gets an automatically selected CUDA build of llama-server unless you chose your own executable.',
+  'Trace export is off by default. Enabling API or index tracing and setting an OTLP endpoint sends traces there; they can include file paths and document excerpts. An endpoint alone does not enable tracing.',
+  'Connected MCP clients receive retrieved passages and file paths; cloud-hosted clients can forward them to their model provider. Optional MCP host tools and links opened in your browser may also use the network.',
 ];
 
 export class HelpSurface extends JfElement {
@@ -499,8 +501,8 @@ export class HelpSurface extends JfElement {
                 ${icon({ name: 'shield', size: 16 })} Local-first
               </div>
               <p style="margin: 0; font-size: var(--font-size-xs); line-height: 1.6; color: var(--text-secondary)">
-                Your files stay on this machine. Search and indexing run locally,
-                and the UI only talks to the local backend over loopback.
+                Search, indexing, and built-in inference run on this machine.
+                The UI talks to the local backend over loopback; network activity is listed below.
               </p>
             </div>
           </section>
