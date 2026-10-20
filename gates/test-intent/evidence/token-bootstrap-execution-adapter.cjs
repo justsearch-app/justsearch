@@ -5,19 +5,41 @@ const fs = require('node:fs');
 const { syncBuiltinESMExports } = require('node:module');
 const original = cp.spawnSync;
 const clones = new Set();
+// Generated only in the caller's temporary directory; never loaded by a product build.
+const javaPolicy = String.raw`// Test-only execution policy: isolate temporary files and Engine homes without JAVA_TOOL_OPTIONS.
+def requestedRoot = System.getenv('TOKEN_TEST_TEMP_ROOT')
+if (!requestedRoot) throw new GradleException('TOKEN_TEST_TEMP_ROOT must name the evidence sandbox')
+allprojects { p ->
+  def sandbox = new File(requestedRoot,
+      Integer.toHexString(p.rootDir.absolutePath.hashCode()) + '/' + p.path.replace(':', '_'))
+  tasks.withType(Test).configureEach {
+    def taskRoot = new File(sandbox, name)
+    systemProperty('java.io.tmpdir', new File(taskRoot, 'temp').absolutePath)
+    environment('JUSTSEARCH_HOME', new File(taskRoot, 'home').absolutePath)
+    environment('JUSTSEARCH_DATA_DIR', new File(taskRoot, 'data').absolutePath)
+    doFirst {
+      ['temp', 'home', 'data'].each { new File(taskRoot, it).mkdirs() }
+    }
+  }
+}
+`;
+
 cp.spawnSync = function (command, args, options) {
   if (typeof command === 'string' && command.startsWith('./gradlew ')) {
-    const actual = `js-gradle-slot ${command}`;
-    process.stderr.write(`[execution-policy] ${actual}\n`);
-    const env = { ...args.env };
-    env.JAVA_TOOL_OPTIONS = `${env.JAVA_TOOL_OPTIONS ?? ''} -Djava.io.tmpdir=${env.TMPDIR}`.trim();
-    process.stderr.write(`[execution-policy] JAVA_TOOL_OPTIONS=${env.JAVA_TOOL_OPTIONS}\n`);
-    const result = original(actual, { ...args, env });
-    if (result.status === 75) {
-      process.stderr.write(`${result.stdout ?? ''}${result.stderr ?? ''}\nGradle slot exited 75; stopping without retry.\n`);
-      process.exit(75);
+    // The complete producer (candidate, report extraction and before run) holds one slot.
+    const heldLock = fs.readlinkSync(`/proc/${process.ppid}/fd/9`);
+    if (!heldLock.startsWith('/tmp/js-linux-port/gradle.lock')) {
+      throw new Error('Run the complete evidence producer under js-gradle-slot');
     }
-    return result;
+    const init = require('node:path').join(process.env.TMPDIR, 'token-bootstrap-java-policy.init.gradle');
+    fs.writeFileSync(init, javaPolicy);
+    const quotedInit = "'" + init.replaceAll("'", "'\\''") + "'";
+    const actual = `${command} --init-script ${quotedInit} --max-workers=6`;
+    const env = { ...args.env };
+    delete env.JAVA_TOOL_OPTIONS;
+    env.JAVA_OPTS = `${env.JAVA_OPTS ?? ''} -Djava.io.tmpdir=${env.TMPDIR}`.trim();
+    process.stderr.write(`[execution-policy] existing whole-producer slot: ${actual}\n`);
+    return original(actual, { ...args, env });
   }
   if (typeof command === 'string' && command.startsWith('npx vitest run ')) {
     // Copying node_modules dereferences .bin symlinks; invoke the same installed CLI
