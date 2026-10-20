@@ -11,7 +11,8 @@ Author classification of all 25 flagged items against merge-base
 `c00a0cb24b4c6000e090d5d09054c1e7e1d24e2f` with `origin/main`.
 The user adopted T1–T19 on 2026-10-20: “i agree, proceed accordingly”.
 Each cited scenario below quotes its agreed text, independently of implementation output.
-This is an author record, with no acceptance or audit record.
+These are author entries. Existing independent acceptance and audit records are retained
+unchanged below; they refer to an older digest. No new review record is authored here.
 
 Execution procedure and assertion inventory: [evidence notes](../evidence/token-bootstrap-notes.md).
 The security before-runs use the relevant fix's parent: `8f49bdc3a` before
@@ -185,9 +186,9 @@ like acceptance, must come from another session. No author approval is supplied.
           "quote": "The headless Engine no longer prints the token to stdout or stderr.",
           "label": "agent-drafted, owner-adopted"
         },
-        "reproduction": "On 8f49bdc3a invoke the existing HeadlessApp port-signal method, capture stdout and check that JUSTSEARCH_PORT remains while neither the credential nor JUSTSEARCH_SESSION_TOKEN is printed. The test supports the previous method signature by reflection without changing the production method. Baseline fails the secret-absence assertion; candidate passes."
+        "reproduction": "On 8f49bdc3a invoke the existing HeadlessApp port-signal method, capturing both System.out and System.err and restoring both in finally. The stdout case keeps the JUSTSEARCH_API_PORT=54321 assertion and rejects the credential value and JUSTSEARCH_SESSION_TOKEN marker. It fails before on stdout and passes after. The same helper supports the old signature by reflection. The separately recorded stderr case is preservation, not a claim of a stderr defect: it passes before and after."
       },
-      "reproduction": "On 8f49bdc3a invoke the existing HeadlessApp port-signal method, capture stdout and check that JUSTSEARCH_PORT remains while neither the credential nor JUSTSEARCH_SESSION_TOKEN is printed. The test supports the previous method signature by reflection without changing the production method. Baseline fails the secret-absence assertion; candidate passes.",
+      "reproduction": "On 8f49bdc3a invoke the existing HeadlessApp port-signal method, capturing both System.out and System.err and restoring both in finally. The stdout case keeps the JUSTSEARCH_API_PORT=54321 assertion and rejects the credential value and JUSTSEARCH_SESSION_TOKEN marker. It fails before on stdout and passes after. The same helper supports the old signature by reflection. The separately recorded stderr case is preservation, not a claim of a stderr defect: it passes before and after.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -199,7 +200,7 @@ like acceptance, must come from another session. No author approval is supplied.
       ],
       "evidence": "gates/test-intent/evidence/token-bootstrap-engine.json",
       "newChecks": [
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessTokenOutputTest.java"
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessTokenOutputTest.java#stdoutDoesNotEmitSessionCredential"
       ]
     },
     {
@@ -235,9 +236,12 @@ like acceptance, must come from another session. No author approval is supplied.
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261019-5ec1a1 request",
-          "quote": "Base: this checkout's HEAD (104f263de, the headless launchers already start in production mode; leave that change alone)."
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261019-5ec1a1 request",
+          "delegationScope": "implementation choices inside the agreed security scenarios",
+          "choice": "Base: this checkout's HEAD (104f263de, the headless launchers already start in production mode; leave that change alone).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/token-bootstrap-launchers.json",
@@ -259,9 +263,9 @@ like acceptance, must come from another session. No author approval is supplied.
           "quote": "`GET /api/mcp/token` hands the token to no caller: without a token it is refused like any other protected route (401), with a valid token it answers 404; no other route hands out the token.",
           "label": "agent-drafted, owner-adopted"
         },
-        "reproduction": "On 8f49bdc3a, install the production security filter over the minimal test router. New private GET/HEAD/PATCH/TRACE requests without credentials must return 401 and removed-bootstrap access in production must return 401 without a credential in the body; these assertions fail before. Existing mutation missing/wrong/valid-token, public-status, OPTIONS and missing-token startup assertions keep their outcomes. The dev private GET=200 is an added preservation control alongside existing dev POST=200. Fixture-only changes remove the fabricated token handler, add a private read, and propagate HttpResponseException status as production does. Dev bootstrap 404 is covered by the obsolete-behaviour warrant below; it is not claimed to fail on the transplanted old fixture."
+        "reproduction": "On 8f49bdc3a, install the production security filter over the minimal test router. New private GET/HEAD/PATCH/TRACE requests without credentials must return 401 and removed-bootstrap access in production must return 401 without a credential in the body; these assertions fail before. Existing mutation missing/wrong/valid-token, public-status and OPTIONS assertions keep their outcomes. The dev private GET=200 is an added preservation control alongside existing dev POST=200. Fixture-only changes remove the fabricated token handler, add a private read, and propagate HttpResponseException status as production does. Dev bootstrap 404 is covered by the obsolete-behaviour warrant below; it is not claimed to fail on the transplanted old fixture."
       },
-      "reproduction": "On 8f49bdc3a, install the production security filter over the minimal test router. New private GET/HEAD/PATCH/TRACE requests without credentials must return 401 and removed-bootstrap access in production must return 401 without a credential in the body; these assertions fail before. Existing mutation missing/wrong/valid-token, public-status, OPTIONS and missing-token startup assertions keep their outcomes. The dev private GET=200 is an added preservation control alongside existing dev POST=200. Fixture-only changes remove the fabricated token handler, add a private read, and propagate HttpResponseException status as production does. Dev bootstrap 404 is covered by the obsolete-behaviour warrant below; it is not claimed to fail on the transplanted old fixture.",
+      "reproduction": "On 8f49bdc3a, install the production security filter over the minimal test router. New private GET/HEAD/PATCH/TRACE requests without credentials must return 401 and removed-bootstrap access in production must return 401 without a credential in the body; these assertions fail before. Existing mutation missing/wrong/valid-token, public-status and OPTIONS assertions keep their outcomes. The dev private GET=200 is an added preservation control alongside existing dev POST=200. Fixture-only changes remove the fabricated token handler, add a private read, and propagate HttpResponseException status as production does. Dev bootstrap 404 is covered by the obsolete-behaviour warrant below; it is not claimed to fail on the transplanted old fixture.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -315,19 +319,17 @@ like acceptance, must come from another session. No author approval is supplied.
       "conflictSearch": "decision records searched for a conflict: ADR-0046 at the merge-base explicitly says GET /api/mcp/token is token-exempt and correct and guards its Origin. The later owner-adopted T1 explicitly replaces that decision by removing the route; T17 preserves Origin obligations on surviving /mcp. The branch amends ADR-0046 accordingly; that amendment is not used as an independent source. Searched docs/decisions at both merge-base and candidate for token bootstrap, /api/mcp/token, session token and MCP Origin: no other conflicting record found. The recorded conflict is resolved by the owner-adopted scenario, not an author decision.",
       "retiredExpectations": [
         "LocalApiUiTokenPolicyTest production bootstrap: old 200 and body contains TEST_TOKEN; new 401 and body excludes TEST_TOKEN (Defect pin above). Dev bootstrap: old 200 and token empty-string body; new 404, because the route is removed in both modes. Public status stays 200; dev ordinary GET/POST stay 200.",
-        "McpOriginValidationTest bootstrap foreign Origin: old 403, MCP_ORIGIN_FORBIDDEN, no JSON-RPC/body token; native/loopback/Tauri: old 200 (native body contains test-token). These route-specific guards are retired with the route. The replacement fixture-absence sanity case authenticates each absent/loopback/Tauri/foreign Origin and expects 404 plus no secret. It passes when transplanted to the old minimal fixture because its fabricated handler is also removed, so this is explicitly not fail-before proof of production route removal. ProductionRouteTokenBoundaryTest and ProductionRouteTokenWalkTest supply that independent fail-before."
+        "McpOriginValidationTest bootstrap foreign Origin: old 403, MCP_ORIGIN_FORBIDDEN, no JSON-RPC/body token; native/loopback/Tauri: old 200 (native body contains test-token). Those route-specific expectations are retired with the route. The replacement fixture-absence case keeps dev requests credential-free and authenticates production requests, expecting 404 plus no secret for each absent/loopback/Tauri/foreign Origin. On 8f49bdc3a it fails for the foreign Origin in both modes (old guard returns 403), proving the obsolete token-path guard was retired. Because the fabricated handler is removed by the test overlay, that alone does not prove production route removal: ProductionRouteTokenBoundaryTest and ProductionRouteTokenWalkTest supply the real-server fail-before."
       ],
       "supportingEvidence": [
         "gates/test-intent/evidence/token-bootstrap-engine.json",
-        "gates/test-intent/evidence/token-bootstrap-installed-engine.json",
-        "gates/test-intent/evidence/token-bootstrap-java-preservation.json"
+        "gates/test-intent/evidence/token-bootstrap-installed-engine.json"
       ]
     },
     {
       "items": [
         "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredSurvivalHttpAdmissionTest.java",
-        "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatControllerTest.java",
-        "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java"
+        "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatControllerTest.java"
       ],
       "class": "Adaptation",
       "moved": [
@@ -350,10 +352,10 @@ like acceptance, must come from another session. No author approval is supplied.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "whatMoved": "Authenticated fixture requests now carry their existing owner credential before reaching the oracle. DeclaredSurvivalHttpAdmissionTest changes only GET helper header (46/46 assertions identical), retaining request foreground ownership, operation stream and admission assertions. OpenAiCompatControllerTest adds the token to both existing /v1/models Origin cases; expected status 200, exact JSON body and CORS headers are identical; only diagnostic text changes from \"token-exempt production GET\" to \"authenticated production GET\". McpOriginValidationTest runs the installed production filters in production mode with a known token and adds it to GET/POST/DELETE; the 64 assertions of surviving Origin/method/lifecycle tests, origin input sets, denied error shapes, hook ordering and public status read are unchanged. Only the retired bootstrap expectations belong to the separate Obsolete entry. The static audit retains full diffs so authentication preconditions and fault injection can be reviewed, not just assertion strings.",
+      "whatMoved": "Authenticated fixture requests now carry their existing owner credential before reaching the oracle. DeclaredSurvivalHttpAdmissionTest changes only GET helper header (46/46 assertions identical), retaining request foreground ownership, operation stream and admission assertions. OpenAiCompatControllerTest adds the token to both existing /v1/models Origin cases; expected status 200, exact JSON body and CORS headers are identical; only diagnostic text changes from \"token-exempt production GET\" to \"authenticated production GET\". The static audit retains full diffs so authentication preconditions and fault injection can be reviewed, not just assertion strings.",
       "adaptationEvidence": [
         "gates/test-intent/evidence/token-bootstrap-adaptation-audit.json",
-        "gates/test-intent/evidence/token-bootstrap-java-preservation.json",
+        "gates/test-intent/evidence/token-bootstrap-engine.json",
         "gates/test-intent/evidence/token-bootstrap-original-preservation.json"
       ],
       "evidence": "gates/test-intent/evidence/token-bootstrap-adaptation-audit.json"
@@ -395,7 +397,7 @@ like acceptance, must come from another session. No author approval is supplied.
       "whatMoved": "The base GET helper delegates with empty headers by default and gains an overload that copies supplied headers; URL, GET, timeout, response body and JSON parsing stay the same. The production settings test passes its existing tokenHeader() for settings and AI-status GETs so the same write/reload persistence and activation-failure oracles can execute under T2. All 19 old assertion calls are identical; an extra HTTP=200 assertion in the readiness loop makes explicit the successful-response precondition formerly assumed before parsing activation. No activation state, missing-token POST expectation, failure deadline or persistence expected value changes.",
       "adaptationEvidence": [
         "gates/test-intent/evidence/token-bootstrap-adaptation-audit.json",
-        "gates/test-intent/evidence/token-bootstrap-java-preservation.json",
+        "gates/test-intent/evidence/token-bootstrap-engine.json",
         "gates/test-intent/evidence/token-bootstrap-original-preservation.json"
       ],
       "evidence": "gates/test-intent/evidence/token-bootstrap-adaptation-audit.json"
@@ -440,9 +442,12 @@ like acceptance, must come from another session. No author approval is supplied.
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261019-5ec1a1 request",
-          "quote": "Fix: these tests must exercise the stream path the product now uses. Adapt their stubs to the fetch-based stream (one shared test helper if several need it), keeping every behavioral assertion; change an assertion only where the transport change forces it, and list each such change with the old and new assertion. Do not skip or delete tests."
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261019-5ec1a1 request",
+          "delegationScope": "implementation choices inside the agreed security scenarios",
+          "choice": "Fix: these tests must exercise the stream path the product now uses. Adapt their stubs to the fetch-based stream (one shared test helper if several need it), keeping every behavioral assertion; change an assertion only where the transport change forces it, and list each such change with the old and new assertion. Do not skip or delete tests.",
+          "label": "agent choice"
         }
       ],
       "whatMoved": "EventSource stubs and immediate fetch-count timing are adapted to actual authenticated fetch SSE. Shared src/test/fetchSse.ts supplies HTTP Response/ReadableStream bytes, lifecycle/abort observations and asynchronous flushes; it does not replace FetchEventSource, the parser, EnvelopeStream, reducers or rendering. All 229 old web assertion calls survive: 212 are text-identical and 17 map fake transport observations to real fetch observations with unchanged expected results (full pairs in the audit). ResourceView listener sets still equal frame/open/error then empty; stream URLs remain identical. Advisory counts, URL, identity and close expectations keep their values, observing HTTP cancellation instead of EventSource.CLOSED. Idle/presence, rows and history reconciliation, advisory ack/order/connectivity, health snapshots/deltas/reset/badges, AI poll 3/6/9 counts and cancellation, and same-run prompt/lookup/abort oracles remain. AgentSession adds a fetch-start readiness assertion while the authorization lookup remains unresolved. Indexing bridge withholds fetch instead of EventSource to exercise the same no-transport fallback and adds zero pooled connections beside zero tasks. Full diff inventories retain all setup, tags, conditions and input frames for review; test-only helper ownership is governed by the named register.",
@@ -518,6 +523,86 @@ like acceptance, must come from another session. No author approval is supplied.
         "modules/ui-web/src/shell-v0/streaming/AuthenticatedStream.test.ts"
       ],
       "preservedControls": "http browser/dev no-token GET stays header-free (T4); existing request serialization, abort, admission retry and endpoint discovery assertions remain. authorizedFetch non-GET/wrong-token/unsafe-retry behavior remains. External schema URLs never gain Engine credentials (T12 trust boundary)."
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-5ec1a1",
+          "scenario": "T17",
+          "quote": "Host allowlist, the Origin check on the surviving MCP endpoint (`/mcp`) and CORS keep their behavior on real HTTP responses, including OPTIONS preflight from desktop origins and denial of foreign, null and lookalike origins.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "whatMoved": "All 19 existing candidate cases run in dev mode with ApiSecurityFilters(false, null) and no session-token headers, preserving their inputs, assertions, hook ordering and fixture preconditions. This includes the 18 surviving merge-base cases plus the absence sanity case already warranted by T1; retired bootstrap expectations remain in the Obsolete entry. JUnit class parameterization also runs the identical bodies in production, classified separately as New. The dev run is retained rather than replaced. The 64 surviving merge-base assertion calls remain identical; the full setup diff and before/after execution receipts are in the adaptation audit.",
+      "evidence": "gates/test-intent/evidence/token-bootstrap-adaptation-audit.json",
+      "adaptationEvidence": [
+        "gates/test-intent/evidence/token-bootstrap-engine.json",
+        "gates/test-intent/evidence/token-bootstrap-original-preservation.json"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Run all 19 existing MCP Origin cases alongside the preserved dev run in production mode: install ApiSecurityFilters(true, \"test-token\") and authenticate GET/POST/DELETE helper requests. The same Origin inputs, rejection codes/bodies, method ordering, after-handler balance, public-route CORS and bootstrap-absence assertions apply. No prior expectation is replaced; pure predicate cases also run in both class invocations. T17 supplies the independent Origin obligation; T2 explains the authenticated production fixture and T1 the already-removed token endpoint.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-5ec1a1",
+          "scenario": "T17",
+          "quote": "Host allowlist, the Origin check on the surviving MCP endpoint (`/mcp`) and CORS keep their behavior on real HTTP responses, including OPTIONS preflight from desktop origins and denial of foreign, null and lookalike origins.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-5ec1a1",
+          "scenario": "T2",
+          "quote": "In production every request except OPTIONS and GET/HEAD on the six public Runtime Contract reads (`/api/health`, `/api/runtime/live`, `/api/runtime/ready`, `/api/status`, `/api/runtime/manifest`, `/.well-known/justsearch/manifest.json`) needs the token, including streams; a test walks every registered route of the real production server so future routes are covered.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-5ec1a1",
+          "scenario": "T1",
+          "quote": "`GET /api/mcp/token` hands the token to no caller: without a token it is refused like any other protected route (401), with a valid token it answers 404; no other route hands out the token.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/token-bootstrap-engine.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessTokenOutputTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preservation control: capture stderr as well as stdout while invoking emitPortSignals, and assert stderr contains neither secret-output-token nor JUSTSEARCH_SESSION_TOKEN=. The base prints its credential only to stdout, so the stderr expectation passes on both 8f49bdc3a and the candidate. This is not labeled a repaired stderr defect.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-5ec1a1",
+          "scenario": "T18",
+          "quote": "The headless Engine no longer prints the token to stdout or stderr.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/token-bootstrap-engine.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessTokenOutputTest.java#stderrDoesNotEmitSessionCredential"
+      ],
+      "repaired": false
     }
   ]
 }
@@ -533,5 +618,38 @@ like acceptance, must come from another session. No author approval is supplied.
   "verdict": "accept",
   "digest": "sha256:6ee3080b467b5dbd824f79bc9b9b053ce32f86dca22cf86eb85373bab1f3ec80",
   "note": "All 11 entries match their class and owner-adopted T1-T19 sources; reran the Java security pins and web token/stream pins (both fail on base by assertion for the reason under test and pass on fcdac3d8f), and the 0073e38aa and http.test.ts edits add only the token or capture the outcome without weakening any assertion."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "efb762b0-25cb-4e32-9a2c-62d35ea349d0",
+  "verdict": "reject",
+  "digest": "sha256:6ee3080b467b5dbd824f79bc9b9b053ce32f86dca22cf86eb85373bab1f3ec80",
+  "note": "The McpOriginValidationTest Adaptation changes a precondition, not just instrumentation: it moves the live /mcp Origin cases from dev to production mode, which the change did not force (my rerun with the dev-mode fixture passes 19/19 on the candidate), and leaves no live test of the guard in dev mode, where ADR-0046 says it applies regardless of mode and where it is the only barrier because no token is required; keep the dev-mode cases (add the production run alongside) or cite a source for dropping them."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "870966bc-b6a6-40df-b8e1-01d50f08b2f8",
+  "verdict": "accept",
+  "digest": "sha256:3c4cfc3d6dbe8201f250db2adc33417919cf5974038d56c647ecff475a528573",
+  "note": "All 15 entries hold against T1-T19 with owner-adopted sources; reran Java and web fail-before on the merge-base (assertion failures for the reason under test) and candidate passes, McpOriginValidationTest keeps all dev-mode cases; minor: E5/E10 delegated-choice text reads as brief wording and the launcher mode assertion has no cited source."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "6b4a638d-8764-4777-b299-fbdb6811912c",
+  "verdict": "accept",
+  "digest": "sha256:3c4cfc3d6dbe8201f250db2adc33417919cf5974038d56c647ecff475a528573",
+  "note": "All 15 entries match their class and T1-T19 sources, and both delegated choices stay inside 'resume with remaining work autonomously' with no stronger conflict (ADR-0046 at base is replaced by the later T1/T2); my reruns show the Java and web new checks fail on c00a0cb24 by assertion for the reason under test and pass on e1a09d099, and the unmodified base McpOriginValidationTest and LocalApiUiTokenPolicyTest pass on the candidate except the T1-retired token-route cases, so the dev-mode Origin cases are kept; notes: the launcher delegated-choice text is a brief line rather than a stated choice, and the launcher and installed-route-walk receipts were made with JAVA_TOOL_OPTIONS (not rerun by me)."
 }
 ```

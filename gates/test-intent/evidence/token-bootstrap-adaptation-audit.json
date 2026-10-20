@@ -1,9 +1,9 @@
 {
   "schema": "token-bootstrap-adaptation-audit.v1",
   "baseline": "c00a0cb24b4c6000e090d5d09054c1e7e1d24e2f",
-  "candidate": "0073e38aab1b158e5e4a9f4b02c14f887095bd9b",
-  "producerSourceSha256": "23082ac8581f1266f9f1780a0d265f02ffa29a992a3e8b7fa1aa1144e637ee37",
-  "executionAdapter": "// Execution-policy adapter for run-evidence.mjs; no test results or assertions are changed.\n// Use with node --require <this file> scripts/governance/gates/test-intent/run-evidence.mjs.\nconst cp = require('node:child_process');\nconst fs = require('node:fs');\nconst { syncBuiltinESMExports } = require('node:module');\nconst original = cp.spawnSync;\nconst clones = new Set();\ncp.spawnSync = function (command, args, options) {\n  if (typeof command === 'string' && command.startsWith('./gradlew ')) {\n    const actual = `js-gradle-slot ${command}`;\n    process.stderr.write(`[execution-policy] ${actual}\\n`);\n    const env = { ...args.env };\n    env.JAVA_TOOL_OPTIONS = `${env.JAVA_TOOL_OPTIONS ?? ''} -Djava.io.tmpdir=${env.TMPDIR}`.trim();\n    process.stderr.write(`[execution-policy] JAVA_TOOL_OPTIONS=${env.JAVA_TOOL_OPTIONS}\\n`);\n    const result = original(actual, { ...args, env });\n    if (result.status === 75) {\n      process.stderr.write(`${result.stdout ?? ''}${result.stderr ?? ''}\\nGradle slot exited 75; stopping without retry.\\n`);\n      process.exit(75);\n    }\n    return result;\n  }\n  if (typeof command === 'string' && command.startsWith('npx vitest run ')) {\n    // Copying node_modules dereferences .bin symlinks; invoke the same installed CLI\n    // at its package location so its relative imports remain valid in isolated clones.\n    const actual = `${command.replace(/^npx vitest run /, \"node node_modules/vitest/vitest.mjs run \")} --maxWorkers=4`;\n    process.stderr.write(`[execution-policy] ${actual}\\n`);\n    const result = original(actual, args);\n    const report = /--outputFile=(\"[^\"\\n]+\")/.exec(command);\n    if (process.env.TOKEN_EVIDENCE_RAW && report) {\n      const file = JSON.parse(report[1]);\n      if (fs.existsSync(file)) fs.copyFileSync(file, `${process.env.TOKEN_EVIDENCE_RAW}-${clones.has(args.cwd.replace(/\\/modules\\/ui-web$/, \"\")) ? \"before\" : \"candidate\"}.json`);\n    }\n    return result;\n  }\n  if (command === 'git' && Array.isArray(args) && args[2] === 'worktree') {\n    if (args[3] === 'add') {\n      const [, , , , , destination, revision] = args;\n      process.stderr.write(`[execution-policy] shared clone ${destination}; detached checkout ${revision}\\n`);\n      const clone = original('git', ['clone', '--quiet', '--shared', '--no-checkout', options.cwd, destination], options);\n      if (clone.status !== 0) return clone;\n      clones.add(destination);\n      return original('git', ['-C', destination, 'checkout', '--quiet', '--detach', revision], options);\n    }\n    if (args[3] === 'remove') {\n      const destination = args[5];\n      if (!clones.delete(destination)) throw new Error(`refusing to remove an unowned clone: ${destination}`);\n      fs.rmSync(destination, { recursive: true });\n      return { status: 0, signal: null, stdout: '', stderr: '' };\n    }\n  }\n  return original(command, args, options);\n};\nsyncBuiltinESMExports();\n",
+  "candidate": "b7970713685eca09ce9e3bef361ae74709887a78",
+  "producerSourceSha256": "25c764f8bb95ccc5fd69a22d3e334ad0c58627f2cf6b21e6c4ad96cf2ff0618a",
+  "executionAdapter": "// Execution-policy adapter for run-evidence.mjs; no test results or assertions are changed.\n// Use with node --require <this file> scripts/governance/gates/test-intent/run-evidence.mjs.\nconst cp = require('node:child_process');\nconst fs = require('node:fs');\nconst { syncBuiltinESMExports } = require('node:module');\nconst original = cp.spawnSync;\nconst clones = new Set();\n// Generated only in the caller's temporary directory; never loaded by a product build.\nconst javaPolicy = String.raw`// Test-only execution policy: isolate temporary files and Engine homes without JAVA_TOOL_OPTIONS.\ndef requestedRoot = System.getenv('TOKEN_TEST_TEMP_ROOT')\nif (!requestedRoot) throw new GradleException('TOKEN_TEST_TEMP_ROOT must name the evidence sandbox')\nallprojects { p ->\n  def sandbox = new File(requestedRoot,\n      Integer.toHexString(p.rootDir.absolutePath.hashCode()) + '/' + p.path.replace(':', '_'))\n  tasks.withType(Test).configureEach {\n    def taskRoot = new File(sandbox, name)\n    systemProperty('java.io.tmpdir', new File(taskRoot, 'temp').absolutePath)\n    environment('JUSTSEARCH_HOME', new File(taskRoot, 'home').absolutePath)\n    environment('JUSTSEARCH_DATA_DIR', new File(taskRoot, 'data').absolutePath)\n    doFirst {\n      ['temp', 'home', 'data'].each { new File(taskRoot, it).mkdirs() }\n    }\n  }\n}\n`;\n\ncp.spawnSync = function (command, args, options) {\n  if (typeof command === 'string' && command.startsWith('./gradlew ')) {\n    // The complete producer (candidate, report extraction and before run) holds one slot.\n    const heldLock = fs.readlinkSync(`/proc/${process.ppid}/fd/9`);\n    if (!heldLock.startsWith('/tmp/js-linux-port/gradle.lock')) {\n      throw new Error('Run the complete evidence producer under js-gradle-slot');\n    }\n    const init = require('node:path').join(process.env.TMPDIR, 'token-bootstrap-java-policy.init.gradle');\n    fs.writeFileSync(init, javaPolicy);\n    const quotedInit = \"'\" + init.replaceAll(\"'\", \"'\\\\''\") + \"'\";\n    const actual = `${command} --init-script ${quotedInit} --max-workers=6`;\n    const env = { ...args.env };\n    delete env.JAVA_TOOL_OPTIONS;\n    env.JAVA_OPTS = `${env.JAVA_OPTS ?? ''} -Djava.io.tmpdir=${env.TMPDIR}`.trim();\n    process.stderr.write(`[execution-policy] existing whole-producer slot: ${actual}\\n`);\n    return original(actual, { ...args, env });\n  }\n  if (typeof command === 'string' && command.startsWith('npx vitest run ')) {\n    // Copying node_modules dereferences .bin symlinks; invoke the same installed CLI\n    // at its package location so its relative imports remain valid in isolated clones.\n    const actual = `${command.replace(/^npx vitest run /, \"node node_modules/vitest/vitest.mjs run \")} --maxWorkers=4`;\n    process.stderr.write(`[execution-policy] ${actual}\\n`);\n    const result = original(actual, args);\n    const report = /--outputFile=(\"[^\"\\n]+\")/.exec(command);\n    if (process.env.TOKEN_EVIDENCE_RAW && report) {\n      const file = JSON.parse(report[1]);\n      if (fs.existsSync(file)) fs.copyFileSync(file, `${process.env.TOKEN_EVIDENCE_RAW}-${clones.has(args.cwd.replace(/\\/modules\\/ui-web$/, \"\")) ? \"before\" : \"candidate\"}.json`);\n    }\n    return result;\n  }\n  if (command === 'git' && Array.isArray(args) && args[2] === 'worktree') {\n    if (args[3] === 'add') {\n      const [, , , , , destination, revision] = args;\n      process.stderr.write(`[execution-policy] shared clone ${destination}; detached checkout ${revision}\\n`);\n      const clone = original('git', ['clone', '--quiet', '--shared', '--no-checkout', options.cwd, destination], options);\n      if (clone.status !== 0) return clone;\n      clones.add(destination);\n      return original('git', ['-C', destination, 'checkout', '--quiet', '--detach', revision], options);\n    }\n    if (args[3] === 'remove') {\n      const destination = args[5];\n      if (!clones.delete(destination)) throw new Error(`refusing to remove an unowned clone: ${destination}`);\n      fs.rmSync(destination, { recursive: true });\n      return { status: 0, signal: null, stdout: '', stderr: '' };\n    }\n  }\n  return original(command, args, options);\n};\nsyncBuiltinESMExports();\n",
   "executionEvidence": [
     {
       "file": "gates/test-intent/evidence/token-bootstrap-web-preservation.json",
@@ -528,16 +528,16 @@
       }
     },
     {
-      "file": "gates/test-intent/evidence/token-bootstrap-java-preservation.json",
+      "file": "gates/test-intent/evidence/token-bootstrap-engine.json",
       "evidence": {
         "schema": "test-intent-evidence.v1",
         "producer": {
           "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
           "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
         },
-        "createdAt": "2026-10-20T07:35:43.513Z",
-        "revision": "0073e38aab1b158e5e4a9f4b02c14f887095bd9b",
-        "tree": "9147f2308fff03cf9c3f621d97cc6cf91d0ccf5a",
+        "createdAt": "2026-10-20T09:19:48.775Z",
+        "revision": "b7970713685eca09ce9e3bef361ae74709887a78",
+        "tree": "221693f854c92fc080cf96fb27f60c174fce04d9",
         "environment": {
           "platform": "linux",
           "arch": "x64",
@@ -549,19 +549,305 @@
         },
         "runs": [
           {
-            "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.DeclaredSurvivalHttpAdmissionTest\" --tests \"io.justsearch.ui.api.OpenAiCompatControllerTest\" --tests \"io.justsearch.ui.api.McpOriginValidationTest\" --rerun -PskipWebBuild=true --console=plain",
+            "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.ProductionRouteTokenBoundaryTest\" --tests \"io.justsearch.ui.runtime.RuntimeManifestCredentialBoundaryTest\" --tests \"io.justsearch.ui.HeadlessTokenOutputTest.stdoutDoesNotEmitSessionCredential\" --tests \"io.justsearch.ui.HeadlessTokenOutputTest.stderrDoesNotEmitSessionCredential\" --tests \"io.justsearch.ui.api.LocalApiUiTokenPolicyTest\" --tests \"io.justsearch.ui.api.McpOriginValidationTest\" --tests \"io.justsearch.ui.api.DeclaredSurvivalHttpAdmissionTest\" --tests \"io.justsearch.ui.api.OpenAiCompatControllerTest\" --rerun -PskipWebBuild=true --console=plain",
             "cwd": ".",
             "exitCode": 0,
-            "durationMs": 841311
+            "durationMs": 8808
           },
           {
             "command": "./gradlew :modules:ui:integrationTest --tests \"io.justsearch.ui.api.ProdModeSettingsPersistenceIntegrationTest\" --rerun -PskipWebBuild=true --console=plain",
             "cwd": ".",
             "exitCode": 0,
-            "durationMs": 8820
+            "durationMs": 8889
           }
         ],
         "checks": [
+          {
+            "id": "modules/ui/src/test/java/io/justsearch/ui/api/ProductionRouteTokenBoundaryTest.java",
+            "file": "modules/ui/src/test/java/io/justsearch/ui/api/ProductionRouteTokenBoundaryTest.java",
+            "runner": "gradle",
+            "contentDigest": "sha256:fcee9979a398586e04c77fa721b12c15821ff62f803162c5ad9ff11660ab1440",
+            "executed": true,
+            "skipped": false,
+            "outcome": "passed",
+            "cases": [
+              {
+                "name": "everyRegisteredProductionRouteRequiresTokenExceptPublicReadsAndOptions()",
+                "status": "passed"
+              },
+              {
+                "name": "removedBootstrapReturns401WithoutTokenAnd404WithToken()",
+                "status": "passed"
+              }
+            ]
+          },
+          {
+            "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestCredentialBoundaryTest.java",
+            "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestCredentialBoundaryTest.java",
+            "runner": "gradle",
+            "contentDigest": "sha256:0967b80a44ded3bae45e5c860fbca3c21705d48e0589b2892f6f5d71b46a2ff1",
+            "executed": true,
+            "skipped": false,
+            "outcome": "passed",
+            "cases": [
+              {
+                "name": "newInstanceHistoryContainsNoCredentialAcrossPublishes()",
+                "status": "passed"
+              },
+              {
+                "name": "everyPublishReplacesReadableManifestAndLeftoverTempWithOwnerOnlyFile()",
+                "status": "passed"
+              }
+            ]
+          },
+          {
+            "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessTokenOutputTest.java#stdoutDoesNotEmitSessionCredential",
+            "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessTokenOutputTest.java",
+            "runner": "gradle",
+            "contentDigest": "sha256:06086717ef74909bbbcbbd579e1d095c823ee6f6c9fa4cc072866f2dfab10def",
+            "executed": true,
+            "skipped": false,
+            "outcome": "passed",
+            "cases": [
+              {
+                "name": "stdoutDoesNotEmitSessionCredential()",
+                "status": "passed"
+              }
+            ]
+          },
+          {
+            "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessTokenOutputTest.java#stderrDoesNotEmitSessionCredential",
+            "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessTokenOutputTest.java",
+            "runner": "gradle",
+            "contentDigest": "sha256:06086717ef74909bbbcbbd579e1d095c823ee6f6c9fa4cc072866f2dfab10def",
+            "executed": true,
+            "skipped": false,
+            "outcome": "passed",
+            "cases": [
+              {
+                "name": "stderrDoesNotEmitSessionCredential()",
+                "status": "passed"
+              }
+            ]
+          },
+          {
+            "id": "modules/ui/src/test/java/io/justsearch/ui/api/LocalApiUiTokenPolicyTest.java",
+            "file": "modules/ui/src/test/java/io/justsearch/ui/api/LocalApiUiTokenPolicyTest.java",
+            "runner": "gradle",
+            "contentDigest": "sha256:5edd37afac26f07245d74cb5efa087c81a213d4d23b97cf2c35c3f6f604dbdc2",
+            "executed": true,
+            "skipped": false,
+            "outcome": "passed",
+            "cases": [
+              {
+                "name": "Token generation produces valid base64url tokens",
+                "status": "passed"
+              },
+              {
+                "name": "POST without token returns 401 in prod mode",
+                "status": "passed"
+              },
+              {
+                "name": "OPTIONS preflight succeeds without token",
+                "status": "passed"
+              },
+              {
+                "name": "nonPublicReadsAndOtherMethodsNeedToken()",
+                "status": "passed"
+              },
+              {
+                "name": "Removed bootstrap requires authentication in prod mode",
+                "status": "passed"
+              },
+              {
+                "name": "DELETE without token returns 401 in prod mode",
+                "status": "passed"
+              },
+              {
+                "name": "POST with correct token succeeds",
+                "status": "passed"
+              },
+              {
+                "name": "POST with wrong token returns 401",
+                "status": "passed"
+              },
+              {
+                "name": "Dev mode (no token configured) allows all requests",
+                "status": "passed"
+              },
+              {
+                "name": "Removed bootstrap is absent in dev mode",
+                "status": "passed"
+              },
+              {
+                "name": "Public status read succeeds without token",
+                "status": "passed"
+              }
+            ]
+          },
+          {
+            "id": "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java",
+            "file": "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java",
+            "runner": "gradle",
+            "contentDigest": "sha256:0b77abc8fdcd1ced21344cc69cc1efeeff52727d906e92149f2b42a9e82c3f6c",
+            "executed": true,
+            "skipped": false,
+            "outcome": "passed",
+            "cases": [
+              {
+                "name": "Live: POST /mcp from a foreign Origin is 403 with a JSON-RPC error body",
+                "status": "passed"
+              },
+              {
+                "name": "Removed token endpoint is absent for every Origin",
+                "status": "passed"
+              },
+              {
+                "name": "Live: DELETE /mcp is validated too — the check covers all methods on the endpoint",
+                "status": "passed"
+              },
+              {
+                "name": "The opaque `null` origin is rejected — it carries no host that can be verified",
+                "status": "passed"
+              },
+              {
+                "name": "Live: a denied request still runs after-handlers (no scope/inflight leak) and keeps its body",
+                "status": "passed"
+              },
+              {
+                "name": "Live: GET /mcp with no Origin is 405 + Allow — the spec's answer for a server with no SSE stream",
+                "status": "passed"
+              },
+              {
+                "name": "Unparseable values and non-web schemes are rejected",
+                "status": "passed"
+              },
+              {
+                "name": "Live: GET /mcp from a loopback Origin is 405 + Allow — the guard admits it, the method rejects it",
+                "status": "passed"
+              },
+              {
+                "name": "Absent Origin is allowed — native MCP hosts are not browsers and send none",
+                "status": "passed"
+              },
+              {
+                "name": "Loopback origins are allowed: 127.0.0.1 / localhost / ::1, any port, http or https",
+                "status": "passed"
+              },
+              {
+                "name": "Live: POST /mcp from a loopback-lookalike Origin is 403",
+                "status": "passed"
+              },
+              {
+                "name": "Live: POST /mcp with no Origin is served (native MCP host)",
+                "status": "passed"
+              },
+              {
+                "name": "Live: POST /mcp from a loopback Origin is served",
+                "status": "passed"
+              },
+              {
+                "name": "Live: the MCP guard is endpoint-scoped — other routes keep browser-enforced CORS",
+                "status": "passed"
+              },
+              {
+                "name": "Live: GET /mcp from a foreign Origin is 403 — the guard wins over the 405",
+                "status": "passed"
+              },
+              {
+                "name": "Foreign web origins are rejected",
+                "status": "passed"
+              },
+              {
+                "name": "Loopback LOOKALIKE origins are rejected (host equality, never substring matching)",
+                "status": "passed"
+              },
+              {
+                "name": "An over-long Origin is truncated before it reaches logs and the event buffer",
+                "status": "passed"
+              },
+              {
+                "name": "Desktop-shell origins are allowed (tauri://localhost, https://tauri.localhost)",
+                "status": "passed"
+              },
+              {
+                "name": "Live: POST /mcp from a foreign Origin is 403 with a JSON-RPC error body",
+                "status": "passed"
+              },
+              {
+                "name": "Removed token endpoint is absent for every Origin",
+                "status": "passed"
+              },
+              {
+                "name": "Live: DELETE /mcp is validated too — the check covers all methods on the endpoint",
+                "status": "passed"
+              },
+              {
+                "name": "The opaque `null` origin is rejected — it carries no host that can be verified",
+                "status": "passed"
+              },
+              {
+                "name": "Live: a denied request still runs after-handlers (no scope/inflight leak) and keeps its body",
+                "status": "passed"
+              },
+              {
+                "name": "Live: GET /mcp with no Origin is 405 + Allow — the spec's answer for a server with no SSE stream",
+                "status": "passed"
+              },
+              {
+                "name": "Unparseable values and non-web schemes are rejected",
+                "status": "passed"
+              },
+              {
+                "name": "Live: GET /mcp from a loopback Origin is 405 + Allow — the guard admits it, the method rejects it",
+                "status": "passed"
+              },
+              {
+                "name": "Absent Origin is allowed — native MCP hosts are not browsers and send none",
+                "status": "passed"
+              },
+              {
+                "name": "Loopback origins are allowed: 127.0.0.1 / localhost / ::1, any port, http or https",
+                "status": "passed"
+              },
+              {
+                "name": "Live: POST /mcp from a loopback-lookalike Origin is 403",
+                "status": "passed"
+              },
+              {
+                "name": "Live: POST /mcp with no Origin is served (native MCP host)",
+                "status": "passed"
+              },
+              {
+                "name": "Live: POST /mcp from a loopback Origin is served",
+                "status": "passed"
+              },
+              {
+                "name": "Live: the MCP guard is endpoint-scoped — other routes keep browser-enforced CORS",
+                "status": "passed"
+              },
+              {
+                "name": "Live: GET /mcp from a foreign Origin is 403 — the guard wins over the 405",
+                "status": "passed"
+              },
+              {
+                "name": "Foreign web origins are rejected",
+                "status": "passed"
+              },
+              {
+                "name": "Loopback LOOKALIKE origins are rejected (host equality, never substring matching)",
+                "status": "passed"
+              },
+              {
+                "name": "An over-long Origin is truncated before it reaches logs and the event buffer",
+                "status": "passed"
+              },
+              {
+                "name": "Desktop-shell origins are allowed (tauri://localhost, https://tauri.localhost)",
+                "status": "passed"
+              }
+            ]
+          },
           {
             "id": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredSurvivalHttpAdmissionTest.java",
             "file": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredSurvivalHttpAdmissionTest.java",
@@ -657,93 +943,6 @@
             ]
           },
           {
-            "id": "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java",
-            "file": "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java",
-            "runner": "gradle",
-            "contentDigest": "sha256:cdd816b9b9d0c833165d25062977490984a6c0e27e85cceb1fae5375862faa04",
-            "executed": true,
-            "skipped": false,
-            "outcome": "passed",
-            "cases": [
-              {
-                "name": "Live: POST /mcp from a foreign Origin is 403 with a JSON-RPC error body",
-                "status": "passed"
-              },
-              {
-                "name": "Removed token endpoint is absent for every Origin",
-                "status": "passed"
-              },
-              {
-                "name": "Live: DELETE /mcp is validated too — the check covers all methods on the endpoint",
-                "status": "passed"
-              },
-              {
-                "name": "The opaque `null` origin is rejected — it carries no host that can be verified",
-                "status": "passed"
-              },
-              {
-                "name": "Live: a denied request still runs after-handlers (no scope/inflight leak) and keeps its body",
-                "status": "passed"
-              },
-              {
-                "name": "Live: GET /mcp with no Origin is 405 + Allow — the spec's answer for a server with no SSE stream",
-                "status": "passed"
-              },
-              {
-                "name": "Unparseable values and non-web schemes are rejected",
-                "status": "passed"
-              },
-              {
-                "name": "Live: GET /mcp from a loopback Origin is 405 + Allow — the guard admits it, the method rejects it",
-                "status": "passed"
-              },
-              {
-                "name": "Absent Origin is allowed — native MCP hosts are not browsers and send none",
-                "status": "passed"
-              },
-              {
-                "name": "Loopback origins are allowed: 127.0.0.1 / localhost / ::1, any port, http or https",
-                "status": "passed"
-              },
-              {
-                "name": "Live: POST /mcp from a loopback-lookalike Origin is 403",
-                "status": "passed"
-              },
-              {
-                "name": "Live: POST /mcp with no Origin is served (native MCP host)",
-                "status": "passed"
-              },
-              {
-                "name": "Live: POST /mcp from a loopback Origin is served",
-                "status": "passed"
-              },
-              {
-                "name": "Live: the MCP guard is endpoint-scoped — other routes keep browser-enforced CORS",
-                "status": "passed"
-              },
-              {
-                "name": "Live: GET /mcp from a foreign Origin is 403 — the guard wins over the 405",
-                "status": "passed"
-              },
-              {
-                "name": "Foreign web origins are rejected",
-                "status": "passed"
-              },
-              {
-                "name": "Loopback LOOKALIKE origins are rejected (host equality, never substring matching)",
-                "status": "passed"
-              },
-              {
-                "name": "An over-long Origin is truncated before it reaches logs and the event buffer",
-                "status": "passed"
-              },
-              {
-                "name": "Desktop-shell origins are allowed (tauri://localhost, https://tauri.localhost)",
-                "status": "passed"
-              }
-            ]
-          },
-          {
             "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/ProdModeSettingsPersistenceIntegrationTest.java",
             "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/ProdModeSettingsPersistenceIntegrationTest.java",
             "runner": "gradle",
@@ -771,8 +970,77 @@
             ]
           }
         ],
-        "failBefore": null,
-        "digest": "sha256:ec1077359f1d15f80f75ca74610d05831de990bbd978abd3feccfe48ade556be"
+        "failBefore": {
+          "ref": "8f49bdc3a",
+          "revision": "8f49bdc3a6d3b820a676d97cfcb41d991474ff33",
+          "overlays": [
+            "modules/ui/src/integrationTest/java/io/justsearch/ui/api/LocalApiIntegrationTestBase.java"
+          ],
+          "patches": [],
+          "runs": [
+            {
+              "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.ProductionRouteTokenBoundaryTest\" --tests \"io.justsearch.ui.runtime.RuntimeManifestCredentialBoundaryTest\" --tests \"io.justsearch.ui.HeadlessTokenOutputTest.stdoutDoesNotEmitSessionCredential\" --tests \"io.justsearch.ui.HeadlessTokenOutputTest.stderrDoesNotEmitSessionCredential\" --tests \"io.justsearch.ui.api.LocalApiUiTokenPolicyTest\" --tests \"io.justsearch.ui.api.McpOriginValidationTest\" --tests \"io.justsearch.ui.api.DeclaredSurvivalHttpAdmissionTest\" --tests \"io.justsearch.ui.api.OpenAiCompatControllerTest\" --rerun -PskipWebBuild=true --console=plain",
+              "cwd": "<before-worktree>",
+              "exitCode": 1,
+              "durationMs": 12489,
+              "output": "Calculating task graph as no cached configuration is available for tasks: :modules:ui:test --tests io.justsearch.ui.api.ProductionRouteTokenBoundaryTest --tests io.justsearch.ui.runtime.RuntimeManifestCredentialBoundaryTest --tests io.justsearch.ui.HeadlessTokenOutputTest.stdoutDoesNotEmitSessionCredential --tests io.justsearch.ui.HeadlessTokenOutputTest.stderrDoesNotEmitSessionCredential --tests io.justsearch.ui.api.LocalApiUiTokenPolicyTest --tests io.justsearch.ui.api.McpOriginValidationTest --tests io.justsearch.ui.api.DeclaredSurvivalHttpAdmissionTest --tests io.justsearch.ui.api.OpenAiCompatControllerTest --rerun\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :build-logic:compileKotlin FROM-CACHE\n> Task :build-logic:compileJava NO-SOURCE\n> Task :build-logic:pluginDescriptors\n> Task :build-logic:processResources\n> Task :build-logic:classes\n> Task :build-logic:jar\n\n> Configure project :\nThe com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.\nThe 'val name by creating { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = create(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:180)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:adapters-lucene\nThe Configuration.setVisible(boolean) method has been deprecated. This is scheduled to be removed in Gradle 11. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#deprecate-visible-property\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:48)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:88)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ai-backend\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:27)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:40)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:22)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:39)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:141)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api-tck\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:34)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-config\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:15)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-engine\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:86)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-inference\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:31)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-launcher\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$12$1.execute(build.gradle.kts:189)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-observability\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:59)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:103)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-util\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:17)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:dead-code-audit\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:58)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:gpu-bridge\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:16)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexer-worker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:137)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexing\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:52)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:infra-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:24)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ort-common\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:prompt-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:18)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:reranker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ssot-tools\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:system-tests\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:119)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:123)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:131)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:telemetry\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:42)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:test-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$8$1.execute(build.gradle.kts:377)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ui\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:94)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:201)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:222)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:230)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:245)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:270)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:319)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:350)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:371)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:476)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:493)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:548)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:630)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:695)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:746)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:844)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:885)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:958)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:977)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1041)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1087)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1153)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1208)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1274)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1361)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1422)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1546)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1571)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:191)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nSkipping ui-web build/copy (skipWebBuild=true).\n\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:extension-substrate:compileJava FROM-CACHE\n> Task :modules:infra-core:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:extractProto\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:configuration:processResources\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:api-contract-projection-java:processProtoResources\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:ipc-common:extractProto\n> Task :modules:core-contracts:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:processResources\n> Task :modules:core:compileJava FROM-CACHE\n> Task :modules:prompt-support:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:extractIncludeProto\n> Task :modules:ui:syncSsotSchemas\n> Task :modules:indexing:compileJava FROM-CACHE\n> Task :modules:telemetry:compileJava FROM-CACHE\n> Task :modules:ui:processResources\n> Task :modules:adapters-lucene:syncSsotCatalogs\n> Task :modules:configuration:compileJava FROM-CACHE\n> Task :modules:adapters-lucene:processResources\n> Task :modules:ai-backend:processResources\n> Task :modules:api-contract-projection-java:generateProto FROM-CACHE\n> Task :modules:app-agent-api:compileJava FROM-CACHE\n> Task :modules:app-config:compileJava FROM-CACHE\n> Task :modules:app-agent:processResources NO-SOURCE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:app-util:compileJava FROM-CACHE\n> Task :modules:app-config:processResources NO-SOURCE\n> Task :modules:app-config:classes UP-TO-DATE\n> Task :modules:app-config:jar\n> Task :modules:app-engine:processResources\n> Task :modules:app-inference:processResources NO-SOURCE\n> Task :modules:app-api:buildLinuxBoundExec\n> Task :modules:app-observability:processResources\n> Task :modules:app-services:processResources\n> Task :modules:app-util:processResources NO-SOURCE\n> Task :modules:app-api:processResources\n> Task :modules:app-util:classes UP-TO-DATE\n> Task :modules:app-util:jar\n> Task :modules:configuration:classes\n> Task :modules:adapters-lucene:compileJava FROM-CACHE\n> Task :modules:adapters-lucene:classes\n> Task :modules:ort-common:compileJava FROM-CACHE\n> Task :modules:app-agent-api:jar\n> Task :modules:configuration:compileTestFixturesJava FROM-CACHE\n> Task :modules:configuration:processTestFixturesResources NO-SOURCE\n> Task :modules:configuration:testFixturesClasses UP-TO-DATE\n> Task :modules:configuration:testFixturesJar\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:configuration:jar\n> Task :modules:core:jar\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:core:compileTestFixturesJava FROM-CACHE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:adapters-lucene:jar\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:extension-substrate:jar\n> Task :modules:core-contracts:jar\n> Task :modules:core:testFixturesJar\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:gpu-bridge:processResources NO-SOURCE\n> Task :modules:indexer-worker:processResources NO-SOURCE\n> Task :modules:infra-core:processResources NO-SOURCE\n> Task :modules:infra-core:classes UP-TO-DATE\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:reranker:compileJava FROM-CACHE\n> Task :modules:ipc-common:processProtoResources\n> Task :modules:infra-core:jar\n> Task :modules:ort-common:processResources NO-SOURCE\n> Task :modules:ort-common:classes UP-TO-DATE\n> Task :modules:prompt-support:processResources NO-SOURCE\n> Task :modules:indexing:jar\n> Task :modules:prompt-support:classes UP-TO-DATE\n> Task :modules:reranker:processResources NO-SOURCE\n> Task :modules:reranker:classes UP-TO-DATE\n> Task :modules:ipc-common:processResources\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:prompt-support:jar\n> Task :modules:reranker:jar\n> Task :modules:worker-core:processResources NO-SOURCE\n> Task :modules:worker-services:processResources NO-SOURCE\n> Task :modules:ui:processTestResources\n> Task :modules:telemetry:jar\n> Task :modules:ort-common:jar\n> Task :modules:ipc-common:extractIncludeProto\n> Task :modules:ipc-common:generateProto FROM-CACHE\n> Task :modules:api-contract-projection-java:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:classes\n> Task :modules:api-contract-projection-java:jar\n> Task :modules:app-api:compileJava FROM-CACHE\n> Task :modules:app-api:classes\n> Task :modules:ai-backend:compileJava FROM-CACHE\n> Task :modules:ai-backend:classes\n> Task :modules:gpu-bridge:compileJava FROM-CACHE\n> Task :modules:app-api:jar\n> Task :modules:ai-backend:jar\n> Task :modules:gpu-bridge:classes UP-TO-DATE\n> Task :modules:app-agent:compileJava FROM-CACHE\n> Task :modules:app-agent:classes UP-TO-DATE\n> Task :modules:gpu-bridge:jar\n> Task :modules:app-agent:jar\n> Task :modules:app-inference:compileJava FROM-CACHE\n> Task :modules:app-inference:classes UP-TO-DATE\n> Task :modules:app-inference:jar\n> Task :modules:worker-core:compileJava FROM-CACHE\n> Task :modules:worker-core:classes UP-TO-DATE\n> Task :modules:worker-core:jar\n> Task :modules:ipc-common:compileJava FROM-CACHE\n> Task :modules:ipc-common:classes\n> Task :modules:ipc-common:jar\n> Task :modules:app-observability:compileJava FROM-CACHE\n> Task :modules:app-observability:classes\n> Task :modules:app-observability:jar\n> Task :modules:worker-services:compileJava FROM-CACHE\n> Task :modules:worker-services:classes UP-TO-DATE\n> Task :modules:worker-services:jar\n> Task :modules:indexer-worker:compileJava FROM-CACHE\n> Task :modules:indexer-worker:classes UP-TO-DATE\n> Task :modules:indexer-worker:jar\n> Task :modules:app-services:compileJava FROM-CACHE\n> Task :modules:app-services:classes\n> Task :modules:app-engine:compileJava FROM-CACHE\n> Task :modules:app-engine:classes\n> Task :modules:app-services:jar\n> Task :modules:app-engine:jar\n> Task :modules:ui:compileJava FROM-CACHE\n> Task :modules:ui:classes\n> Task :modules:ui:jar\n\n> Task :modules:ui:compileTestJava\n\n> Task :modules:ui:testClasses\n\n> Task :modules:ui:test\n\nHeadlessTokenOutputTest > stdoutDoesNotEmitSessionCredential() FAILED\n    org.opentest4j.AssertionFailedError at HeadlessTokenOutputTest.java:15\n\nUI Session Token enforcement (prod mode) > nonPublicReadsAndOtherMethodsNeedToken() FAILED\n    org.opentest4j.AssertionFailedError at LocalApiUiTokenPolicyTest.java:241\n\nUI Session Token enforcement (prod mode) > Removed bootstrap requires authentication in prod mode FAILED\n    org.opentest4j.AssertionFailedError at LocalApiUiTokenPolicyTest.java:215\n\nMCP endpoint Origin validation (Streamable HTTP transport security) > production=false > Removed token endpoint is absent for every Origin FAILED\n    org.opentest4j.AssertionFailedError at McpOriginValidationTest.java:298\n\nMCP endpoint Origin validation (Streamable HTTP transport security) > production=true > Removed token endpoint is absent for every Origin FAILED\n    org.opentest4j.AssertionFailedError at McpOriginValidationTest.java:298\n\n\n> Task :modules:ui:test\n\nProductionRouteTokenBoundaryTest > everyRegisteredProductionRouteRequiresTokenExceptPublicReadsAndOptions() FAILED\n    org.gradle.internal.exceptions.DefaultMultiCauseException at ProductionRouteTokenBoundaryTest.java:61\n        Caused by: org.opentest4j.AssertionFailedError at ProductionRouteTokenBoundaryTest.java:56\n\nProductionRouteTokenBoundaryTest > removedBootstrapReturns401WithoutTokenAnd404WithToken() FAILED\n    org.opentest4j.AssertionFailedError at ProductionRouteTokenBoundaryTest.java:77\n\nRuntimeManifestCredentialBoundaryTest > newInstanceHistoryContainsNoCredentialAcrossPublishes() FAILED\n    org.opentest4j.AssertionFailedError at RuntimeManifestCredentialBoundaryTest.java:41\n\nRuntimeManifestCredentialBoundaryTest > everyPublishReplacesReadableManifestAndLeftoverTempWithOwnerOnlyFile() FAILED\n    org.opentest4j.AssertionFailedError at RuntimeManifestCredentialBoundaryTest.java:27\n\n> Task :modules:ui:test FAILED\n> Task :modules:ui:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/test-intent-repair/test-intent-before-3tLw2a/build/reports/problems/problems-report.html\n89 actionable tasks: 56 executed, 33 from cache\nConfiguration cache entry stored.\n\n/home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/test-intent-repair/test-intent-before-3tLw2a/modules/ui/src/test/java/io/justsearch/ui/HeadlessAppFailedDrainBackendTest.java:114: warning: [removal] stopsGenerativeBackend() in Reason has been deprecated and marked for removal\n          assertEquals(external || !reason.stopsGenerativeBackend(), !exit.isDone());\n                                          ^\n/home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/test-intent-repair/test-intent-before-3tLw2a/modules/ui/src/test/java/io/justsearch/ui/HeadlessAppFailedDrainBackendTest.java:117: warning: [removal] stopsGenerativeBackend() in Reason has been deprecated and marked for removal\n        if (reason.stopsGenerativeBackend()) {\n                  ^\n/home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/test-intent-repair/test-intent-before-3tLw2a/modules/ui/src/test/java/io/justsearch/ui/HeadlessAppFailedDrainBackendTest.java:122: warning: [removal] stopsGenerativeBackend() in Reason has been deprecated and marked for removal\n        if (external || !reason.stopsGenerativeBackend()) {\n                               ^\n/home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/test-intent-repair/test-intent-before-3tLw2a/modules/ui/src/test/java/io/justsearch/ui/HeadlessAppFailedDrainBackendTest.java:129: warning: [removal] setStopServerOnClose(boolean) in InferenceLifecycleManager has been deprecated and marked for removal\n        manager.setStopServerOnClose(false);\n               ^\nNote: Some input files use or override a deprecated API.\nNote: Recompile with -Xlint:deprecation for details.\nNote: Some input files use unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n4 warnings\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\n\n73 tests completed, 9 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:ui:test'.\n> There were failing tests. See the report at: file:///home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/test-intent-repair/test-intent-before-3tLw2a/modules/ui/build/reports/tests/test/index.html\n\nBUILD FAILED in 12s\n"
+            },
+            {
+              "command": "./gradlew :modules:ui:integrationTest --tests \"io.justsearch.ui.api.ProdModeSettingsPersistenceIntegrationTest\" --rerun -PskipWebBuild=true --console=plain",
+              "cwd": "<before-worktree>",
+              "exitCode": 0,
+              "durationMs": 9717
+            }
+          ],
+          "checks": [
+            {
+              "id": "modules/ui/src/test/java/io/justsearch/ui/api/ProductionRouteTokenBoundaryTest.java",
+              "classification": "assertion",
+              "detail": "everyRegisteredProductionRouteRequiresTokenExceptPublicReadsAndOptions(): org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (65 failures)&#10;&#9;org.opentest4j.AssertionFailedError: GET /api/chat/agent/history ==> expected: <401> but was: <200>&#10;&#9;org.opentest4j.AssertionFailedError: GET /api/chat/agent/history/{batchId} ==> expected: <401> but was: <404>&#10; | removedBootstrapReturns401WithoutTokenAnd404WithToken(): org.opentest4j.AssertionFaile"
+            },
+            {
+              "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestCredentialBoundaryTest.java",
+              "classification": "assertion",
+              "detail": "newInstanceHistoryContainsNoCredentialAcrossPublishes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: manifest.json ==> expected: <false> but was: <true> | everyPublishReplacesReadableManifestAndLeftoverTempWithOwnerOnlyFile(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[OWNER_READ, OWNER_WRITE]> but was: <[OWNER_READ, OWNER_WRITE, GROUP_READ, GROUP_WRITE, OTHERS_READ]>"
+            },
+            {
+              "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessTokenOutputTest.java#stdoutDoesNotEmitSessionCredential",
+              "classification": "assertion",
+              "detail": "stdoutDoesNotEmitSessionCredential(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true>"
+            },
+            {
+              "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessTokenOutputTest.java#stderrDoesNotEmitSessionCredential",
+              "classification": "passed",
+              "detail": "the check passes on the before-state, so it does not show a repair"
+            },
+            {
+              "id": "modules/ui/src/test/java/io/justsearch/ui/api/LocalApiUiTokenPolicyTest.java",
+              "classification": "assertion",
+              "detail": "nonPublicReadsAndOtherMethodsNeedToken(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: GET ==> expected: <401> but was: <200> | Removed bootstrap requires authentication in prod mode: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <401> but was: <404>"
+            },
+            {
+              "id": "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java",
+              "classification": "assertion",
+              "detail": "Removed token endpoint is absent for every Origin: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <404> but was: <403> | Removed token endpoint is absent for every Origin: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <404> but was: <403>"
+            },
+            {
+              "id": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredSurvivalHttpAdmissionTest.java",
+              "classification": "passed",
+              "detail": "the check passes on the before-state, so it does not show a repair"
+            },
+            {
+              "id": "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatControllerTest.java",
+              "classification": "passed",
+              "detail": "the check passes on the before-state, so it does not show a repair"
+            },
+            {
+              "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/ProdModeSettingsPersistenceIntegrationTest.java",
+              "classification": "passed",
+              "detail": "the check passes on the before-state, so it does not show a repair"
+            }
+          ]
+        },
+        "digest": "sha256:20aef4dc79546962ab178de882a758835cf423b39e3152c9324244d669e8ab1d"
       }
     },
     {
@@ -5071,9 +5339,9 @@
     },
     {
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java",
-      "assertionScope": "Surviving MCP/Origin tests only; bootstrap expectations are Obsolete in the changeset",
+      "assertionScope": "Surviving MCP/Origin assertions, retained in dev mode; identical production invocations are New; bootstrap expectations are Obsolete",
       "beforeSha256": "1276500ad7e68c276dab0c98a520afb3557685cb2dad63fc71919010f2864fdf",
-      "afterSha256": "cdd816b9b9d0c833165d25062977490984a6c0e27e85cceb1fae5375862faa04",
+      "afterSha256": "0b77abc8fdcd1ced21344cc69cc1efeeff52727d906e92149f2b42a9e82c3f6c",
       "beforeCount": 64,
       "afterCount": 64,
       "preserved": [
@@ -5083,7 +5351,7 @@
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(null))"
           },
           "after": {
-            "line": 62,
+            "line": 70,
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(null))"
           }
         },
@@ -5093,7 +5361,7 @@
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"\"))"
           },
           "after": {
-            "line": 63,
+            "line": 71,
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"\"))"
           }
         },
@@ -5103,7 +5371,7 @@
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\" \"))"
           },
           "after": {
-            "line": 64,
+            "line": 72,
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\" \"))"
           }
         },
@@ -5113,7 +5381,7 @@
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"http://127.0.0.1\"))"
           },
           "after": {
-            "line": 70,
+            "line": 78,
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"http://127.0.0.1\"))"
           }
         },
@@ -5123,7 +5391,7 @@
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"http://127.0.0.1:8080\"))"
           },
           "after": {
-            "line": 71,
+            "line": 79,
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"http://127.0.0.1:8080\"))"
           }
         },
@@ -5133,7 +5401,7 @@
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"http://localhost\"))"
           },
           "after": {
-            "line": 72,
+            "line": 80,
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"http://localhost\"))"
           }
         },
@@ -5143,7 +5411,7 @@
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"http://localhost:5173\"))"
           },
           "after": {
-            "line": 73,
+            "line": 81,
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"http://localhost:5173\"))"
           }
         },
@@ -5153,7 +5421,7 @@
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"https://localhost:5173\"))"
           },
           "after": {
-            "line": 74,
+            "line": 82,
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"https://localhost:5173\"))"
           }
         },
@@ -5163,7 +5431,7 @@
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"HTTP://LOCALHOST:5173\"))"
           },
           "after": {
-            "line": 75,
+            "line": 83,
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"HTTP://LOCALHOST:5173\"))"
           }
         },
@@ -5173,7 +5441,7 @@
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"http://[::1]:8080\"))"
           },
           "after": {
-            "line": 76,
+            "line": 84,
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"http://[::1]:8080\"))"
           }
         },
@@ -5183,7 +5451,7 @@
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\" http://127.0.0.1:8080 \"))"
           },
           "after": {
-            "line": 77,
+            "line": 85,
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\" http://127.0.0.1:8080 \"))"
           }
         },
@@ -5193,7 +5461,7 @@
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"tauri://localhost\"))"
           },
           "after": {
-            "line": 83,
+            "line": 91,
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"tauri://localhost\"))"
           }
         },
@@ -5203,7 +5471,7 @@
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"https://tauri.localhost\"))"
           },
           "after": {
-            "line": 84,
+            "line": 92,
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"https://tauri.localhost\"))"
           }
         },
@@ -5213,7 +5481,7 @@
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"http://tauri.localhost\"))"
           },
           "after": {
-            "line": 85,
+            "line": 93,
             "text": "assertTrue(ApiSecurityFilters.isAllowedMcpOrigin(\"http://tauri.localhost\"))"
           }
         },
@@ -5223,7 +5491,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://evil.example.com\"))"
           },
           "after": {
-            "line": 91,
+            "line": 99,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://evil.example.com\"))"
           }
         },
@@ -5233,7 +5501,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"https://evil.example.com:8080\"))"
           },
           "after": {
-            "line": 92,
+            "line": 100,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"https://evil.example.com:8080\"))"
           }
         },
@@ -5243,7 +5511,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://169.254.169.254\"))"
           },
           "after": {
-            "line": 93,
+            "line": 101,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://169.254.169.254\"))"
           }
         },
@@ -5253,7 +5521,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"null\"))"
           },
           "after": {
-            "line": 99,
+            "line": 107,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"null\"))"
           }
         },
@@ -5263,7 +5531,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"NULL\"))"
           },
           "after": {
-            "line": 100,
+            "line": 108,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"NULL\"))"
           }
         },
@@ -5273,7 +5541,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://127.0.0.1.evil.com\"))"
           },
           "after": {
-            "line": 111,
+            "line": 119,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://127.0.0.1.evil.com\"))"
           }
         },
@@ -5283,7 +5551,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://localhost.evil.com\"))"
           },
           "after": {
-            "line": 112,
+            "line": 120,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://localhost.evil.com\"))"
           }
         },
@@ -5293,7 +5561,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://evil-localhost.com\"))"
           },
           "after": {
-            "line": 113,
+            "line": 121,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://evil-localhost.com\"))"
           }
         },
@@ -5303,7 +5571,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://tauri.localhost.evil.com\"))"
           },
           "after": {
-            "line": 114,
+            "line": 122,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://tauri.localhost.evil.com\"))"
           }
         },
@@ -5313,7 +5581,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://127.0.0.1@evil.com\"))"
           },
           "after": {
-            "line": 116,
+            "line": 124,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://127.0.0.1@evil.com\"))"
           }
         },
@@ -5323,7 +5591,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://evil.com/127.0.0.1\"))"
           },
           "after": {
-            "line": 118,
+            "line": 126,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://evil.com/127.0.0.1\"))"
           }
         },
@@ -5333,7 +5601,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://evil.com#http://localhost\"))"
           },
           "after": {
-            "line": 119,
+            "line": 127,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"http://evil.com#http://localhost\"))"
           }
         },
@@ -5343,7 +5611,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"localhost\"))"
           },
           "after": {
-            "line": 125,
+            "line": 133,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"localhost\"))"
           }
         },
@@ -5353,7 +5621,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"not a uri\"))"
           },
           "after": {
-            "line": 126,
+            "line": 134,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"not a uri\"))"
           }
         },
@@ -5363,7 +5631,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"file:///C:/tmp\"))"
           },
           "after": {
-            "line": 127,
+            "line": 135,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"file:///C:/tmp\"))"
           }
         },
@@ -5373,7 +5641,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"javascript:alert(1)\"))"
           },
           "after": {
-            "line": 128,
+            "line": 136,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"javascript:alert(1)\"))"
           }
         },
@@ -5383,7 +5651,7 @@
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"tauri://evil.com\"))"
           },
           "after": {
-            "line": 129,
+            "line": 137,
             "text": "assertFalse(ApiSecurityFilters.isAllowedMcpOrigin(\"tauri://evil.com\"))"
           }
         },
@@ -5393,7 +5661,7 @@
             "text": "assertEquals(200, resp.statusCode())"
           },
           "after": {
-            "line": 139,
+            "line": 147,
             "text": "assertEquals(200, resp.statusCode())"
           }
         },
@@ -5403,7 +5671,7 @@
             "text": "assertEquals(200, post(\"http://127.0.0.1:5173\").statusCode())"
           },
           "after": {
-            "line": 146,
+            "line": 154,
             "text": "assertEquals(200, post(\"http://127.0.0.1:5173\").statusCode())"
           }
         },
@@ -5413,7 +5681,7 @@
             "text": "assertEquals(200, post(\"http://localhost\").statusCode())"
           },
           "after": {
-            "line": 147,
+            "line": 155,
             "text": "assertEquals(200, post(\"http://localhost\").statusCode())"
           }
         },
@@ -5423,7 +5691,7 @@
             "text": "assertEquals(403, resp.statusCode())"
           },
           "after": {
-            "line": 155,
+            "line": 163,
             "text": "assertEquals(403, resp.statusCode())"
           }
         },
@@ -5433,7 +5701,7 @@
             "text": "assertTrue(resp.body().contains(\"\\\"jsonrpc\\\":\\\"2.0\\\"\"), \"Body should be JSON-RPC shaped: \" + resp.body())"
           },
           "after": {
-            "line": 156,
+            "line": 164,
             "text": "assertTrue(resp.body().contains(\"\\\"jsonrpc\\\":\\\"2.0\\\"\"), \"Body should be JSON-RPC shaped: \" + resp.body())"
           }
         },
@@ -5443,7 +5711,7 @@
             "text": "assertTrue(resp.body().contains(\"\\\"id\\\":null\"), \"JSON-RPC error must carry no request id: \" + resp.body())"
           },
           "after": {
-            "line": 157,
+            "line": 165,
             "text": "assertTrue(resp.body().contains(\"\\\"id\\\":null\"), \"JSON-RPC error must carry no request id: \" + resp.body())"
           }
         },
@@ -5453,7 +5721,7 @@
             "text": "assertTrue(resp.body().contains(\"MCP_ORIGIN_FORBIDDEN\"), \"Body should name the error code: \" + resp.body())"
           },
           "after": {
-            "line": 158,
+            "line": 166,
             "text": "assertTrue(resp.body().contains(\"MCP_ORIGIN_FORBIDDEN\"), \"Body should name the error code: \" + resp.body())"
           }
         },
@@ -5463,7 +5731,7 @@
             "text": "assertFalse(resp.body().contains(\"\\\"handled\\\"\"), \"The handler must not have run\")"
           },
           "after": {
-            "line": 159,
+            "line": 167,
             "text": "assertFalse(resp.body().contains(\"\\\"handled\\\"\"), \"The handler must not have run\")"
           }
         },
@@ -5473,7 +5741,7 @@
             "text": "assertEquals(403, resp.statusCode())"
           },
           "after": {
-            "line": 178,
+            "line": 186,
             "text": "assertEquals(403, resp.statusCode())"
           }
         },
@@ -5483,7 +5751,7 @@
             "text": "assertEquals(1, afterHandlerRuns.get(), \"after-handlers must run on the deny path\")"
           },
           "after": {
-            "line": 179,
+            "line": 187,
             "text": "assertEquals(1, afterHandlerRuns.get(), \"after-handlers must run on the deny path\")"
           }
         },
@@ -5493,7 +5761,7 @@
             "text": "assertEquals(0, inflight.get(), \"before/after must stay balanced — a leaked inflight never returns to 0\")"
           },
           "after": {
-            "line": 180,
+            "line": 188,
             "text": "assertEquals(0, inflight.get(), \"before/after must stay balanced — a leaked inflight never returns to 0\")"
           }
         },
@@ -5503,7 +5771,7 @@
             "text": "assertTrue(resp.body().contains(\"\\\"jsonrpc\\\":\\\"2.0\\\"\"), \"The JSON-RPC body must survive the exception mapper: \" + resp.body())"
           },
           "after": {
-            "line": 181,
+            "line": 189,
             "text": "assertTrue(resp.body().contains(\"\\\"jsonrpc\\\":\\\"2.0\\\"\"), \"The JSON-RPC body must survive the exception mapper: \" + resp.body())"
           }
         },
@@ -5513,7 +5781,7 @@
             "text": "assertTrue(resp.body().contains(\"MCP_ORIGIN_FORBIDDEN\"), \"Body should name the error code: \" + resp.body())"
           },
           "after": {
-            "line": 182,
+            "line": 190,
             "text": "assertTrue(resp.body().contains(\"MCP_ORIGIN_FORBIDDEN\"), \"Body should name the error code: \" + resp.body())"
           }
         },
@@ -5523,7 +5791,7 @@
             "text": "assertEquals(\"http://127.0.0.1\", ApiSecurityFilters.truncateForLog(\"http://127.0.0.1\"))"
           },
           "after": {
-            "line": 188,
+            "line": 196,
             "text": "assertEquals(\"http://127.0.0.1\", ApiSecurityFilters.truncateForLog(\"http://127.0.0.1\"))"
           }
         },
@@ -5533,7 +5801,7 @@
             "text": "assertTrue(truncated.length() < overlong.length(), \"An over-long origin must be capped\")"
           },
           "after": {
-            "line": 191,
+            "line": 199,
             "text": "assertTrue(truncated.length() < overlong.length(), \"An over-long origin must be capped\")"
           }
         },
@@ -5543,7 +5811,7 @@
             "text": "assertTrue(truncated.endsWith(\"...[truncated]\"), \"Truncation must be visible: \" + truncated)"
           },
           "after": {
-            "line": 192,
+            "line": 200,
             "text": "assertTrue(truncated.endsWith(\"...[truncated]\"), \"Truncation must be visible: \" + truncated)"
           }
         },
@@ -5553,7 +5821,7 @@
             "text": "assertEquals(403, post(\"http://127.0.0.1.evil.com\").statusCode())"
           },
           "after": {
-            "line": 199,
+            "line": 207,
             "text": "assertEquals(403, post(\"http://127.0.0.1.evil.com\").statusCode())"
           }
         },
@@ -5563,7 +5831,7 @@
             "text": "assertEquals(403, delete(\"http://evil.example.com\").statusCode())"
           },
           "after": {
-            "line": 206,
+            "line": 214,
             "text": "assertEquals(403, delete(\"http://evil.example.com\").statusCode())"
           }
         },
@@ -5573,7 +5841,7 @@
             "text": "assertEquals(204, delete(null).statusCode())"
           },
           "after": {
-            "line": 207,
+            "line": 215,
             "text": "assertEquals(204, delete(null).statusCode())"
           }
         },
@@ -5583,7 +5851,7 @@
             "text": "assertEquals(204, delete(\"http://127.0.0.1:5173\").statusCode())"
           },
           "after": {
-            "line": 208,
+            "line": 216,
             "text": "assertEquals(204, delete(\"http://127.0.0.1:5173\").statusCode())"
           }
         },
@@ -5593,7 +5861,7 @@
             "text": "assertEquals(200, resp.statusCode(), \"Only /mcp carries the MCP transport-security check\")"
           },
           "after": {
-            "line": 223,
+            "line": 231,
             "text": "assertEquals(200, resp.statusCode(), \"Only /mcp carries the MCP transport-security check\")"
           }
         },
@@ -5603,7 +5871,7 @@
             "text": "assertTrue( resp.headers().firstValue(\"Access-Control-Allow-Origin\").isEmpty(), \"A foreign origin still gets no CORS grant\")"
           },
           "after": {
-            "line": 224,
+            "line": 232,
             "text": "assertTrue( resp.headers().firstValue(\"Access-Control-Allow-Origin\").isEmpty(), \"A foreign origin still gets no CORS grant\")"
           }
         },
@@ -5613,7 +5881,7 @@
             "text": "assertEquals(405, resp.statusCode(), \"Not 404: the endpoint exists and must say so\")"
           },
           "after": {
-            "line": 244,
+            "line": 252,
             "text": "assertEquals(405, resp.statusCode(), \"Not 404: the endpoint exists and must say so\")"
           }
         },
@@ -5623,7 +5891,7 @@
             "text": "assertEquals( \"POST, DELETE, OPTIONS\", resp.headers().firstValue(\"Allow\").orElse(null), \"405 MUST carry Allow naming the methods this endpoint does serve\")"
           },
           "after": {
-            "line": 245,
+            "line": 253,
             "text": "assertEquals( \"POST, DELETE, OPTIONS\", resp.headers().firstValue(\"Allow\").orElse(null), \"405 MUST carry Allow naming the methods this endpoint does serve\")"
           }
         },
@@ -5633,7 +5901,7 @@
             "text": "assertTrue(resp.body().contains(\"\\\"jsonrpc\\\":\\\"2.0\\\"\"), \"Body should be JSON-RPC shaped: \" + resp.body())"
           },
           "after": {
-            "line": 249,
+            "line": 257,
             "text": "assertTrue(resp.body().contains(\"\\\"jsonrpc\\\":\\\"2.0\\\"\"), \"Body should be JSON-RPC shaped: \" + resp.body())"
           }
         },
@@ -5643,7 +5911,7 @@
             "text": "assertTrue(resp.body().contains(\"\\\"id\\\":null\"), \"JSON-RPC error must carry no request id: \" + resp.body())"
           },
           "after": {
-            "line": 250,
+            "line": 258,
             "text": "assertTrue(resp.body().contains(\"\\\"id\\\":null\"), \"JSON-RPC error must carry no request id: \" + resp.body())"
           }
         },
@@ -5653,7 +5921,7 @@
             "text": "assertTrue(resp.body().contains(\"MCP_METHOD_NOT_ALLOWED\"), \"Body should name the error code: \" + resp.body())"
           },
           "after": {
-            "line": 251,
+            "line": 259,
             "text": "assertTrue(resp.body().contains(\"MCP_METHOD_NOT_ALLOWED\"), \"Body should name the error code: \" + resp.body())"
           }
         },
@@ -5663,7 +5931,7 @@
             "text": "assertEquals(405, resp.statusCode())"
           },
           "after": {
-            "line": 260,
+            "line": 268,
             "text": "assertEquals(405, resp.statusCode())"
           }
         },
@@ -5673,7 +5941,7 @@
             "text": "assertEquals(\"POST, DELETE, OPTIONS\", resp.headers().firstValue(\"Allow\").orElse(null))"
           },
           "after": {
-            "line": 261,
+            "line": 269,
             "text": "assertEquals(\"POST, DELETE, OPTIONS\", resp.headers().firstValue(\"Allow\").orElse(null))"
           }
         },
@@ -5683,7 +5951,7 @@
             "text": "assertEquals(403, resp.statusCode(), \"The Origin guard must pre-empt the 405\")"
           },
           "after": {
-            "line": 276,
+            "line": 284,
             "text": "assertEquals(403, resp.statusCode(), \"The Origin guard must pre-empt the 405\")"
           }
         },
@@ -5693,7 +5961,7 @@
             "text": "assertTrue( resp.headers().firstValue(\"Allow\").isEmpty(), \"A rejected origin must not learn the endpoint's method surface\")"
           },
           "after": {
-            "line": 277,
+            "line": 285,
             "text": "assertTrue( resp.headers().firstValue(\"Allow\").isEmpty(), \"A rejected origin must not learn the endpoint's method surface\")"
           }
         },
@@ -5703,7 +5971,7 @@
             "text": "assertTrue(resp.body().contains(\"MCP_ORIGIN_FORBIDDEN\"), \"Body should name the guard's error code: \" + resp.body())"
           },
           "after": {
-            "line": 280,
+            "line": 288,
             "text": "assertTrue(resp.body().contains(\"MCP_ORIGIN_FORBIDDEN\"), \"Body should name the guard's error code: \" + resp.body())"
           }
         },
@@ -5713,7 +5981,7 @@
             "text": "assertFalse(resp.body().contains(\"MCP_METHOD_NOT_ALLOWED\"), \"The 405 handler must not have run\")"
           },
           "after": {
-            "line": 281,
+            "line": 289,
             "text": "assertFalse(resp.body().contains(\"MCP_METHOD_NOT_ALLOWED\"), \"The 405 handler must not have run\")"
           }
         }
@@ -5721,7 +5989,7 @@
       "remapped": [],
       "removed": [],
       "added": [],
-      "diff": "diff --git a/modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java b/modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java\nindex a0934dff2..77b4412ff 100644\n--- a/modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java\n+++ b/modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java\n@@ -281,47 +281,22 @@ class McpOriginValidationTest {\n     assertFalse(resp.body().contains(\"MCP_METHOD_NOT_ALLOWED\"), \"The 405 handler must not have run\");\n   }\n \n-  // ---- GET /api/mcp/token: the session-token bootstrap, guarded on the same terms ----\n-\n-  /**\n-   * The token route hands out — unauthenticated by construction — the credential that gates every\n-   * mutating call, so it belongs to the MCP transport's attack surface. Every legitimate caller is\n-   * a native process sending no Origin (the MCPB bridge, {@code justsearch-mcp/discovery.mjs}, the\n-   * sandbox probes); the desktop shell reads the token from the runtime manifest instead, and no\n-   * {@code ui-web} code calls it — so these two assertions together pin both that the guard bites\n-   * and that it costs no real caller anything.\n-   */\n   @Test\n-  @DisplayName(\"Live: GET /api/mcp/token from a foreign Origin is 403 — the token never leaves\")\n-  void liveTokenFromForeignOriginIsForbidden() throws Exception {\n+  @DisplayName(\"Removed token endpoint is absent for every Origin\")\n+  void removedTokenEndpointIsAbsentForEveryOrigin() throws Exception {\n     startServerWithProductionFilters();\n-    HttpResponse<String> resp = get(LocalApiServer.MCP_TOKEN_PATH, \"http://evil.example.com\");\n-\n-    assertEquals(403, resp.statusCode());\n-    assertFalse(resp.body().contains(\"test-token\"), \"The token must not appear in a denied response: \" + resp.body());\n-    assertTrue(resp.body().contains(\"MCP_ORIGIN_FORBIDDEN\"), \"Body should name the error code: \" + resp.body());\n-    assertFalse(\n-        resp.body().contains(\"\\\"jsonrpc\\\"\"),\n-        \"The token route is not JSON-RPC — its deny body uses the repo's {error, errorCode} shape: \" + resp.body());\n-  }\n-\n-  @Test\n-  @DisplayName(\"Live: GET /api/mcp/token with absent or loopback Origin is served — no legitimate caller regresses\")\n-  void liveTokenFromLegitimateCallersIsServed() throws Exception {\n-    startServerWithProductionFilters();\n-\n-    HttpResponse<String> nativeCaller = get(LocalApiServer.MCP_TOKEN_PATH, null);\n-    assertEquals(200, nativeCaller.statusCode(), \"Native MCP bridges send no Origin\");\n-    assertTrue(nativeCaller.body().contains(\"test-token\"));\n-\n-    assertEquals(200, get(LocalApiServer.MCP_TOKEN_PATH, \"http://127.0.0.1:5173\").statusCode());\n-    assertEquals(200, get(LocalApiServer.MCP_TOKEN_PATH, \"tauri://localhost\").statusCode());\n+    for (String origin : new String[] {null, \"http://127.0.0.1:5173\", \"tauri://localhost\", \"http://evil.example.com\"}) {\n+      var response = get(\"/api/mcp/token\", origin);\n+      assertEquals(404, response.statusCode());\n+      assertFalse(response.body().contains(\"test-token\"));\n+    }\n   }\n \n   private HttpResponse<String> get(String path, String origin) throws Exception {\n     var builder =\n         HttpRequest.newBuilder(URI.create(\"http://127.0.0.1:\" + port + path))\n             .timeout(Duration.ofSeconds(3))\n+            .header(LocalApiServer.SESSION_TOKEN_HEADER, \"test-token\")\n             .GET();\n     if (origin != null) {\n       builder.header(\"Origin\", origin);\n@@ -334,6 +309,7 @@ class McpOriginValidationTest {\n         HttpRequest.newBuilder(URI.create(\"http://127.0.0.1:\" + port + \"/mcp\"))\n             .timeout(Duration.ofSeconds(3))\n             .header(\"Content-Type\", \"application/json\")\n+            .header(LocalApiServer.SESSION_TOKEN_HEADER, \"test-token\")\n             .POST(HttpRequest.BodyPublishers.ofString(\"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1,\\\"method\\\":\\\"tools/list\\\"}\"));\n     if (origin != null) {\n       builder.header(\"Origin\", origin);\n@@ -345,6 +321,7 @@ class McpOriginValidationTest {\n     var builder =\n         HttpRequest.newBuilder(URI.create(\"http://127.0.0.1:\" + port + \"/mcp\"))\n             .timeout(Duration.ofSeconds(3))\n+            .header(LocalApiServer.SESSION_TOKEN_HEADER, \"test-token\")\n             .DELETE();\n     if (origin != null) {\n       builder.header(\"Origin\", origin);\n@@ -357,7 +334,7 @@ class McpOriginValidationTest {\n    * {@code HttpResponseException} mapper that preserves a handler-set body while propagating the\n    * status (`LocalApiServer.java:397-399`), then the paired before/after lifecycle hooks (inflight\n    * counter + OTel scope, registered at `:489-550` BEFORE `securityFilters.install`), then the\n-   * production {@link ApiSecurityFilters#install} (dev mode: no session token, no lease service, no\n+   * production {@link ApiSecurityFilters#install} (production token, no lease service, no\n    * capability gates), then stand-ins for the two methods registered at {@code /mcp}.\n    *\n    * <p>The mapper and the hook ordering are load-bearing, not decoration: without the mapper the\n@@ -382,7 +359,7 @@ class McpOriginValidationTest {\n         });\n \n     executor = Executors.newSingleThreadExecutor();\n-    new ApiSecurityFilters(false, null, new EventBuffer(), executor, null).install(app);\n+    new ApiSecurityFilters(true, \"test-token\", new EventBuffer(), executor, null).install(app);\n \n     app.post(LocalApiServer.MCP_ENDPOINT_PATH, ctx -> ctx.json(Map.of(\"handled\", true)));\n     app.delete(LocalApiServer.MCP_ENDPOINT_PATH, ctx -> ctx.status(204));\n@@ -391,7 +368,6 @@ class McpOriginValidationTest {\n     app.get(\n         LocalApiServer.MCP_ENDPOINT_PATH,\n         io.justsearch.ui.api.mcp.McpProtocolHandler::handleGet);\n-    app.get(LocalApiServer.MCP_TOKEN_PATH, ctx -> ctx.json(Map.of(\"token\", \"test-token\")));\n     app.get(\"/api/status\", ctx -> ctx.json(Map.of(\"status\", \"ok\")));\n \n     app.start(\"127.0.0.1\", 0);\n"
+      "diff": "diff --git a/modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java b/modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java\nindex a0934dff2..fbefd4eee 100644\n--- a/modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java\n+++ b/modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java\n@@ -16,6 +16,9 @@ import org.junit.jupiter.api.AfterEach;\n import org.junit.jupiter.api.BeforeEach;\n import org.junit.jupiter.api.DisplayName;\n import org.junit.jupiter.api.Test;\n+import org.junit.jupiter.params.Parameter;\n+import org.junit.jupiter.params.ParameterizedClass;\n+import org.junit.jupiter.params.provider.ValueSource;\n \n /**\n  * MCP Streamable-HTTP Origin validation — the spec's transport-security MUST: \"Servers MUST validate\n@@ -27,8 +30,13 @@ import org.junit.jupiter.api.Test;\n  * mirror — so a guard registered on the wrong path, or dropped from {@code install()}, fails here.\n  */\n @DisplayName(\"MCP endpoint Origin validation (Streamable HTTP transport security)\")\n+@ParameterizedClass(name = \"production={0}\")\n+@ValueSource(booleans = {false, true})\n class McpOriginValidationTest {\n \n+  @Parameter\n+  boolean productionMode;\n+\n   private HttpClient client;\n   private Javalin app;\n   private ExecutorService executor;\n@@ -281,41 +289,15 @@ class McpOriginValidationTest {\n     assertFalse(resp.body().contains(\"MCP_METHOD_NOT_ALLOWED\"), \"The 405 handler must not have run\");\n   }\n \n-  // ---- GET /api/mcp/token: the session-token bootstrap, guarded on the same terms ----\n-\n-  /**\n-   * The token route hands out — unauthenticated by construction — the credential that gates every\n-   * mutating call, so it belongs to the MCP transport's attack surface. Every legitimate caller is\n-   * a native process sending no Origin (the MCPB bridge, {@code justsearch-mcp/discovery.mjs}, the\n-   * sandbox probes); the desktop shell reads the token from the runtime manifest instead, and no\n-   * {@code ui-web} code calls it — so these two assertions together pin both that the guard bites\n-   * and that it costs no real caller anything.\n-   */\n   @Test\n-  @DisplayName(\"Live: GET /api/mcp/token from a foreign Origin is 403 — the token never leaves\")\n-  void liveTokenFromForeignOriginIsForbidden() throws Exception {\n+  @DisplayName(\"Removed token endpoint is absent for every Origin\")\n+  void removedTokenEndpointIsAbsentForEveryOrigin() throws Exception {\n     startServerWithProductionFilters();\n-    HttpResponse<String> resp = get(LocalApiServer.MCP_TOKEN_PATH, \"http://evil.example.com\");\n-\n-    assertEquals(403, resp.statusCode());\n-    assertFalse(resp.body().contains(\"test-token\"), \"The token must not appear in a denied response: \" + resp.body());\n-    assertTrue(resp.body().contains(\"MCP_ORIGIN_FORBIDDEN\"), \"Body should name the error code: \" + resp.body());\n-    assertFalse(\n-        resp.body().contains(\"\\\"jsonrpc\\\"\"),\n-        \"The token route is not JSON-RPC — its deny body uses the repo's {error, errorCode} shape: \" + resp.body());\n-  }\n-\n-  @Test\n-  @DisplayName(\"Live: GET /api/mcp/token with absent or loopback Origin is served — no legitimate caller regresses\")\n-  void liveTokenFromLegitimateCallersIsServed() throws Exception {\n-    startServerWithProductionFilters();\n-\n-    HttpResponse<String> nativeCaller = get(LocalApiServer.MCP_TOKEN_PATH, null);\n-    assertEquals(200, nativeCaller.statusCode(), \"Native MCP bridges send no Origin\");\n-    assertTrue(nativeCaller.body().contains(\"test-token\"));\n-\n-    assertEquals(200, get(LocalApiServer.MCP_TOKEN_PATH, \"http://127.0.0.1:5173\").statusCode());\n-    assertEquals(200, get(LocalApiServer.MCP_TOKEN_PATH, \"tauri://localhost\").statusCode());\n+    for (String origin : new String[] {null, \"http://127.0.0.1:5173\", \"tauri://localhost\", \"http://evil.example.com\"}) {\n+      var response = get(\"/api/mcp/token\", origin);\n+      assertEquals(404, response.statusCode());\n+      assertFalse(response.body().contains(\"test-token\"));\n+    }\n   }\n \n   private HttpResponse<String> get(String path, String origin) throws Exception {\n@@ -323,6 +305,9 @@ class McpOriginValidationTest {\n         HttpRequest.newBuilder(URI.create(\"http://127.0.0.1:\" + port + path))\n             .timeout(Duration.ofSeconds(3))\n             .GET();\n+    if (productionMode) {\n+      builder.header(LocalApiServer.SESSION_TOKEN_HEADER, \"test-token\");\n+    }\n     if (origin != null) {\n       builder.header(\"Origin\", origin);\n     }\n@@ -335,6 +320,9 @@ class McpOriginValidationTest {\n             .timeout(Duration.ofSeconds(3))\n             .header(\"Content-Type\", \"application/json\")\n             .POST(HttpRequest.BodyPublishers.ofString(\"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1,\\\"method\\\":\\\"tools/list\\\"}\"));\n+    if (productionMode) {\n+      builder.header(LocalApiServer.SESSION_TOKEN_HEADER, \"test-token\");\n+    }\n     if (origin != null) {\n       builder.header(\"Origin\", origin);\n     }\n@@ -346,6 +334,9 @@ class McpOriginValidationTest {\n         HttpRequest.newBuilder(URI.create(\"http://127.0.0.1:\" + port + \"/mcp\"))\n             .timeout(Duration.ofSeconds(3))\n             .DELETE();\n+    if (productionMode) {\n+      builder.header(LocalApiServer.SESSION_TOKEN_HEADER, \"test-token\");\n+    }\n     if (origin != null) {\n       builder.header(\"Origin\", origin);\n     }\n@@ -357,7 +348,7 @@ class McpOriginValidationTest {\n    * {@code HttpResponseException} mapper that preserves a handler-set body while propagating the\n    * status (`LocalApiServer.java:397-399`), then the paired before/after lifecycle hooks (inflight\n    * counter + OTel scope, registered at `:489-550` BEFORE `securityFilters.install`), then the\n-   * production {@link ApiSecurityFilters#install} (dev mode: no session token, no lease service, no\n+   * production {@link ApiSecurityFilters#install} (dev mode without a token, or production with a token, no lease service, no\n    * capability gates), then stand-ins for the two methods registered at {@code /mcp}.\n    *\n    * <p>The mapper and the hook ordering are load-bearing, not decoration: without the mapper the\n@@ -382,7 +373,8 @@ class McpOriginValidationTest {\n         });\n \n     executor = Executors.newSingleThreadExecutor();\n-    new ApiSecurityFilters(false, null, new EventBuffer(), executor, null).install(app);\n+    new ApiSecurityFilters(productionMode, productionMode ? \"test-token\" : null,\n+        new EventBuffer(), executor, null).install(app);\n \n     app.post(LocalApiServer.MCP_ENDPOINT_PATH, ctx -> ctx.json(Map.of(\"handled\", true)));\n     app.delete(LocalApiServer.MCP_ENDPOINT_PATH, ctx -> ctx.status(204));\n@@ -391,7 +383,6 @@ class McpOriginValidationTest {\n     app.get(\n         LocalApiServer.MCP_ENDPOINT_PATH,\n         io.justsearch.ui.api.mcp.McpProtocolHandler::handleGet);\n-    app.get(LocalApiServer.MCP_TOKEN_PATH, ctx -> ctx.json(Map.of(\"token\", \"test-token\")));\n     app.get(\"/api/status\", ctx -> ctx.json(Map.of(\"status\", \"ok\")));\n \n     app.start(\"127.0.0.1\", 0);\n"
     }
   ],
   "conclusion": "Exact source inventories and transport substitutions; the verifier must also inspect full setup/input/tag diffs."

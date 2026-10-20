@@ -16,6 +16,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * MCP Streamable-HTTP Origin validation — the spec's transport-security MUST: "Servers MUST validate
@@ -27,7 +30,12 @@ import org.junit.jupiter.api.Test;
  * mirror — so a guard registered on the wrong path, or dropped from {@code install()}, fails here.
  */
 @DisplayName("MCP endpoint Origin validation (Streamable HTTP transport security)")
+@ParameterizedClass(name = "production={0}")
+@ValueSource(booleans = {false, true})
 class McpOriginValidationTest {
+
+  @Parameter
+  boolean productionMode;
 
   private HttpClient client;
   private Javalin app;
@@ -296,8 +304,10 @@ class McpOriginValidationTest {
     var builder =
         HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
             .timeout(Duration.ofSeconds(3))
-            .header(LocalApiServer.SESSION_TOKEN_HEADER, "test-token")
             .GET();
+    if (productionMode) {
+      builder.header(LocalApiServer.SESSION_TOKEN_HEADER, "test-token");
+    }
     if (origin != null) {
       builder.header("Origin", origin);
     }
@@ -309,8 +319,10 @@ class McpOriginValidationTest {
         HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/mcp"))
             .timeout(Duration.ofSeconds(3))
             .header("Content-Type", "application/json")
-            .header(LocalApiServer.SESSION_TOKEN_HEADER, "test-token")
             .POST(HttpRequest.BodyPublishers.ofString("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"));
+    if (productionMode) {
+      builder.header(LocalApiServer.SESSION_TOKEN_HEADER, "test-token");
+    }
     if (origin != null) {
       builder.header("Origin", origin);
     }
@@ -321,8 +333,10 @@ class McpOriginValidationTest {
     var builder =
         HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/mcp"))
             .timeout(Duration.ofSeconds(3))
-            .header(LocalApiServer.SESSION_TOKEN_HEADER, "test-token")
             .DELETE();
+    if (productionMode) {
+      builder.header(LocalApiServer.SESSION_TOKEN_HEADER, "test-token");
+    }
     if (origin != null) {
       builder.header("Origin", origin);
     }
@@ -334,7 +348,7 @@ class McpOriginValidationTest {
    * {@code HttpResponseException} mapper that preserves a handler-set body while propagating the
    * status (`LocalApiServer.java:397-399`), then the paired before/after lifecycle hooks (inflight
    * counter + OTel scope, registered at `:489-550` BEFORE `securityFilters.install`), then the
-   * production {@link ApiSecurityFilters#install} (production token, no lease service, no
+   * production {@link ApiSecurityFilters#install} (dev mode without a token, or production with a token, no lease service, no
    * capability gates), then stand-ins for the two methods registered at {@code /mcp}.
    *
    * <p>The mapper and the hook ordering are load-bearing, not decoration: without the mapper the
@@ -359,7 +373,8 @@ class McpOriginValidationTest {
         });
 
     executor = Executors.newSingleThreadExecutor();
-    new ApiSecurityFilters(true, "test-token", new EventBuffer(), executor, null).install(app);
+    new ApiSecurityFilters(productionMode, productionMode ? "test-token" : null,
+        new EventBuffer(), executor, null).install(app);
 
     app.post(LocalApiServer.MCP_ENDPOINT_PATH, ctx -> ctx.json(Map.of("handled", true)));
     app.delete(LocalApiServer.MCP_ENDPOINT_PATH, ctx -> ctx.status(204));

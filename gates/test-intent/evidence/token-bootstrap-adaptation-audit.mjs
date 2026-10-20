@@ -83,7 +83,7 @@ const files = [...web, ...java].map(file => {
       (assertion.text === next.text ? preserved : remapped).push({ before: assertion, after: next });
     }
   }
-  return { file, assertionScope: originScope ? "Surviving MCP/Origin tests only; bootstrap expectations are Obsolete in the changeset" : "whole file", beforeSha256: digest(before), afterSha256: digest(after), beforeCount: oldAssertions.length,
+  return { file, assertionScope: originScope ? "Surviving MCP/Origin assertions, retained in dev mode; identical production invocations are New; bootstrap expectations are Obsolete" : "whole file", beforeSha256: digest(before), afterSha256: digest(after), beforeCount: oldAssertions.length,
     afterCount: preserved.length + remapped.length + remaining.length, preserved, remapped,
     removed, added: remaining,
     diff: cp.execFileSync('git', ['diff', baseline, '--', file], { encoding: 'utf8' }) };
@@ -93,7 +93,7 @@ const report = { schema: 'token-bootstrap-adaptation-audit.v1', baseline,
   candidate: cp.execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
   producerSourceSha256: digest(fs.readFileSync(new URL(import.meta.url), 'utf8')),
   executionAdapter: fs.readFileSync('gates/test-intent/evidence/token-bootstrap-execution-adapter.cjs', 'utf8'),
-  executionEvidence: ['web-preservation', 'java-preservation', 'original-preservation'].map(name => {
+  executionEvidence: ['web-preservation', 'engine', 'original-preservation'].map(name => {
     const file = `gates/test-intent/evidence/token-bootstrap-${name}.json`;
     return { file, evidence: JSON.parse(fs.readFileSync(file, 'utf8')) };
   }),
