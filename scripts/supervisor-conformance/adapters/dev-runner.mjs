@@ -20,6 +20,7 @@ import { awaitFixtureExit, fixturesExited, removeFixtureDirectory } from '../fix
  */
 
 import fs from 'node:fs';
+import assert from 'node:assert/strict';
 import net from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -116,6 +117,7 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
   const uiPort = await freePort();
   const statePath = path.join(dataDir, 'runtime', 'supervisor.v1.json');
   const faultGatePath = path.join(workDir, 'first-incarnation-running.json');
+  const firstBootBudgetPath = path.join(workDir, 'first-boot-budget.json');
   const seen = new Map();
 
   const child = spawn(
@@ -146,6 +148,7 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
         JUSTSEARCH_FAKE_ENGINE_FAULT_GATE: faultGatePath,
         JUSTSEARCH_SUPERVISOR_HARNESS_REQUEST_REASON: testCase.request?.reason ?? '',
         JUSTSEARCH_CONFORMANCE_FIRST_BOOT_TIMEOUT_MS: String(testCase.startTimeoutMs ?? ''),
+        JUSTSEARCH_CONFORMANCE_FIRST_BOOT_BUDGET_PATH: firstBootBudgetPath,
         // Keep the first incarnation's start bounded: the default is 15 s locally and 300 s in CI,
         // and a case that hangs for either is a case nobody will run.
         JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: '10000',
@@ -224,7 +227,7 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
     removeFixtureDirectory(workDir);
   };
 
-  return { workDir, dataDir, stateRoot, statePath, faultGatePath, child, output, exited, seen, cleanup, uiPort, identities };
+  return { workDir, dataDir, stateRoot, statePath, faultGatePath, firstBootBudgetPath, child, output, exited, seen, cleanup, uiPort, identities };
 }
 
 const RESTART_CASES = new Set([
@@ -654,6 +657,12 @@ async function runLifecycleCase({ testCase, policy, io }) {
         `never reached ${reach.state}/${reach.incarnation}. seen: ${[...run.seen.keys()].join(' -> ')}\n`
         + `        stdout: ${run.output.stdout.slice(-600)}\n        stderr: ${run.output.stderr.slice(-1500)}`);
       return { problems };
+    }
+    if (testCase.startTimeoutMs !== undefined) {
+      assert.deepEqual(io.readJsonIfPresent(run.firstBootBudgetPath), {
+        initialPortMs: testCase.startTimeoutMs,
+        initialReadyMs: testCase.startTimeoutMs,
+      }, 'first incarnation captured the short startup budget before the spawn hook');
     }
     if (reach.restartCount !== undefined && reached.restartCount !== reach.restartCount) {
       problems.push(`restartCount ${reached.restartCount}, expected ${reach.restartCount}`);
