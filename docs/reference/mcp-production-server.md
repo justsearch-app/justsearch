@@ -76,7 +76,10 @@ MCP server on?" is exactly "which port is the API on?":
   negotiated with the earlier Engine (session, `MCP-Protocol-Version`, server stream) is carried
   over, and the version is negotiated again from the new Engine's answer. The bridge keeps all of
   that per Engine epoch: a new Engine, or a client `initialize`, starts a new one, ends requests
-  still in flight in the old one, and an answer or event of an ended epoch changes nothing. Idle pooled connections are closed after 25 s,
+  still in flight in the old one, and an answer or event of an ended epoch changes nothing. Nothing
+  but an epoch's own `initialize` is sent in it until that has been answered (bounded at 10 s) and
+  the Engine that answered is known: other calls wait for it, or for the epoch that replaces it;
+  a later connection reaching another Engine starts a new epoch, initialized first. Idle pooled connections are closed after 25 s,
   before the Engine's 30 s idle expiry can cross a request. Closing stdin stops either client,
   also during discovery. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
   the Roaming folder (so a redirected folder is still found), waiting up to 30 s for the answer;

@@ -62,7 +62,9 @@ stdio→Streamable-HTTP bridge** (`server/index.js`):
    `MCP-Protocol-Version` and the server stream; also when it assigned no session id), and re-initializes the session with
    the cached `initialize` params, sent exactly as a first `initialize` is; the
    version is negotiated again from the new Engine's answer (an answer or event that still
-   arrives from the old session changes nothing). The failed call is sent again once only if it surely did not reach the
+   arrives from the old session changes nothing). Until a session's own `initialize` has been
+   answered (bounded at 10 s), no other message is sent in it: calls wait for it, or for the
+   session that replaces it, and a call before any `initialize` is refused unsent. The failed call is sent again once only if it surely did not reach the
    app (it never had a connection, or the app answered 400/404 for its session);
    otherwise it fails with an error saying its outcome is unknown, so a mutating
    call never runs twice. Idle connections are closed after 25 s, before the

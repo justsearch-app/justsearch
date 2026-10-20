@@ -1591,12 +1591,14 @@ test('P5/P7: bridge pinned to a port no manifest names — the Engine restarts t
 // ---------------------------------------------------------------------------
 
 const INIT_LINE = `${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } } })}\n`;
+const callLine = (id) => `${JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/call', params: { name: 'justsearch_ingest', arguments: { paths: ['/x'] } } })}\n`;
+const INITIALIZED_LINE = `${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`;
 
 /**
  * Start a client pinned to port (production MCP: --port; bundle: JUSTSEARCH_API_PORT) and write
- * initialize, leaving stdin open. exited resolves to the exit code; messages and stderr fill in.
+ * firstLine (initialize), leaving stdin open. exited resolves to the exit code; messages and stderr fill in.
  */
-function startPinnedClient(client, m, root, port, envExtra = {}) {
+function startPinnedClient(client, m, root, port, envExtra = {}, firstLine = INIT_LINE) {
   const [entry, args, env] = client === 'production MCP'
     ? [PROD_MCP_ENTRY, ['--port', String(port)], {}]
     : [bundle(root), [], { JUSTSEARCH_API_PORT: String(port) }];
@@ -1615,7 +1617,7 @@ function startPinnedClient(client, m, root, port, envExtra = {}) {
   child.stderr.on('data', (d) => (out.stderr += d));
   child.stdin.on('error', () => {});
   out.exited = new Promise((resolve) => child.once('exit', resolve));
-  child.stdin.write(INIT_LINE);
+  child.stdin.write(firstLine);
   return out;
 }
 
@@ -1794,6 +1796,36 @@ test('P5 (bundle): the client initializes again — that initialize carries no s
   assert.deepEqual(initShape(again), initShape(initial), 'sent as the first initialize was');
 });
 
+test('P5 (bundle): the client initializes again while a call is in flight and the event stream is open — the old session ends wholesale: the call fails as outcome unknown (its late answer is dropped), and the old stream is closed', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const engine = await startService(t, { mcpSessions: true, stream: true });
+  const run = startPinnedClient('bundle', m, root, engine.port);
+  await untilMessage(run, (x) => x.id === 1, 'initialize');
+  run.child.stdin.write(INITIALIZED_LINE);
+  await handshakeDone(engine, { stream: true });
+  const held = engine.hold('/mcp', { rpc: 'tools/call' });
+  run.child.stdin.write(callLine(4));
+  await within(held.arrived, 10000, 'the call at the Engine');
+  run.child.stdin.write(INIT_LINE.replace('"id":1', '"id":5'));
+  await untilMessage(run, (x) => x.id === 5, 'the second initialize');
+  await untilMessage(run, (x) => x.id === 4, 'the call in flight ends');
+  held.release((body) => ({ jsonrpc: '2.0', id: JSON.parse(body).id, result: { content: [{ type: 'text', text: 'late' }] } }));
+  const gets = () => engine.requests.filter((r) => r.url === '/mcp' && r.method === 'GET');
+  await within((async () => { while (gets().length < 2) await pause(10); })(), 5000, 'the new session\'s event stream');
+  await pause(100);
+  engine.notify({ jsonrpc: '2.0', method: 'notifications/message', params: { level: 'info', data: 'after' } });
+  await untilMessage(run, (x) => x.params?.data === 'after', 'a notification in the new session');
+  await pause(200);
+  assert.equal(run.messages.filter((x) => x.params?.data === 'after').length, 1, 'only the new session\'s stream delivers');
+  assert.equal(gets()[0].closed, true, 'the old stream is closed');
+  const four = run.messages.filter((x) => x.id === 4);
+  assert.equal(four.length, 1, 'one answer for the call');
+  assert.match(four[0].error?.message ?? '', /outcome is unknown/, JSON.stringify(four));
+  run.child.stdin.end();
+  await within(run.exited, 7000, 'the bridge exits once stdin closes');
+});
+
 test('P5 (bundle): a client initialize the Engine turns away (404) is sent again as itself after recovery — not after a bridge re-initialize, and carrying nothing from that one', async (t) => {
   const root = tempRoot(t);
   const m = machine(root);
@@ -1812,6 +1844,9 @@ test('P5 (bundle): a client initialize the Engine turns away (404) is sent again
   engine.rejectNext(404);
   run.child.stdin.write(INIT_LINE.replace('"id":1', '"id":5'));
   await replied(5);
+  run.child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'justsearch_status', arguments: {} } })}\n`);
+  await replied(6); // the session that initialize set up is ready for calls
+  assert.equal(run.messages.find((x) => x.id === 6).result?.content?.[0]?.text, `tools/call by ${engine.instanceId}`, run.stderr);
   run.child.stdin.end();
   await within(run.exited, 7000, 'the bridge exits once stdin closes');
   assert.ok(run.messages.find((x) => x.id === 5)?.result, `the client's initialize is answered\n${run.stderr}`);
@@ -1920,6 +1955,90 @@ test('P5 (bundle): an initialize answer from the old Engine that arrives after t
   await untilMessage(run, (x) => x.id === 7, 'a call after it');
   assert.equal(run.messages.find((x) => x.id === 7).result?.content?.[0]?.text, `tools/call by ${b.instanceId}`, run.stderr);
   assert.ok(b.requests.every((r) => r.headers['mcp-protocol-version'] !== '2025-03-26'), 'the old version never reaches the replacement');
+  run.child.stdin.end();
+  await within(run.exited, 7000, 'the bridge exits once stdin closes');
+});
+
+
+/**
+ * The bundle's Engine on a pin restarts as B; call 2 sets off a recovery whose initialize B holds.
+ * B then stops listening with that request in flight, C binds the pin, and call 3 is sent.
+ */
+async function recoveryHeldWhileReplaced(t) {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const a = await startService(t, { mcpSessions: true });
+  const run = startPinnedClient('bundle', m, root, a.port);
+  await untilMessage(run, (x) => x.id === 1, 'initialize');
+  run.child.stdin.write(INITIALIZED_LINE);
+  await handshakeDone(a);
+  await a.close();
+  const b = await startService(t, { port: a.port, mcpSessions: true });
+  const held = b.hold('/mcp', { rpc: 'initialize' });
+  run.child.stdin.write(callLine(2)); // refused on B's connection before writing: the bridge recovers
+  await within(held.arrived, 10000, 'the recovery initialize at B');
+  await b.dropAllBut(held.socket);
+  const c = await startService(t, { port: a.port, mcpSessions: true });
+  run.child.stdin.write(callLine(3));
+  const posts = (service) => service.requests.filter((r) => r.url === '/mcp' && r.method === 'POST').map((r) => JSON.parse(r.body).method);
+  const assertC = () => {
+    const answer = run.messages.find((x) => x.id === 3);
+    assert.equal(answer?.result?.content?.[0]?.text, `tools/call by ${c.instanceId}`, `${JSON.stringify(answer)}\n${run.stderr}`);
+    assert.deepEqual(posts(c), ['initialize', 'notifications/initialized', 'tools/call'], 'C is initialized before anything else reaches it');
+    assert.equal(mcpPosts(c, 'tools/call')[0].headers['mcp-session-id'], `session-${c.instanceId}`);
+    assert.ok(run.messages.some((x) => x.id === 2), 'call 2 is answered');
+    const sent2 = [a, b, c].flatMap((s) => mcpPosts(s, 'tools/call')).filter((r) => JSON.parse(r.body).id === 2);
+    assert.ok(sent2.length <= 1, 'call 2 is sent at most once');
+  };
+  return { run, b, c, held, posts, assertC };
+}
+
+test('P5 (bundle): a recovery initialize is held by the restarted Engine, which then gives way to another — a concurrent call waits for an initialized session and is sent only after the new Engine is initialized', async (t) => {
+  const { run, c, held, posts, assertC } = await recoveryHeldWhileReplaced(t);
+  await pause(500);
+  assert.deepEqual(posts(c), [], `nothing reaches C while the initialize is unanswered\n${run.stderr}`);
+  // B answers last, on its way out; the identity that answered is not the one the next connection reaches.
+  held.release((body) => ({ jsonrpc: '2.0', id: JSON.parse(body).id, result: { protocolVersion: '2025-06-18', capabilities: {}, serverInfo: { name: 'B', version: '0' } } }));
+  await untilMessage(run, (x) => x.id === 3, 'call 3');
+  assertC();
+  run.child.stdin.end();
+  await within(run.exited, 7000, 'the bridge exits once stdin closes');
+});
+
+test('P5 (bundle): a recovery initialize is never answered — the session setup is bounded at 10 s, and a call waiting for it then goes to the Engine now on the pin, after initializing it', async (t) => {
+  const { run, assertC } = await recoveryHeldWhileReplaced(t);
+  await within((async () => { while (!run.messages.some((x) => x.id === 3)) await pause(20); })(), 20000, `call 3\n${run.stderr}`);
+  assertC();
+  run.child.stdin.end();
+  await within(run.exited, 7000, 'the bridge exits once stdin closes');
+});
+
+test('P5 (bundle): an initialize answered with an error leaves no session — the next call is preceded by a new initialize', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const a = await startService(t, { mcpSessions: true, holdUrl: '/mcp' });
+  const run = startPinnedClient('bundle', m, root, a.port);
+  await within(a.arrived, 10000, 'the client initialize');
+  a.release({ jsonrpc: '2.0', id: 1, error: { code: -32603, message: 'not now' } });
+  await untilMessage(run, (x) => x.id === 1, 'the initialize answer');
+  assert.equal(run.messages.find((x) => x.id === 1).error?.message, 'not now');
+  run.child.stdin.write(callLine(2));
+  await untilMessage(run, (x) => x.id === 2, 'call 2');
+  assert.equal(run.messages.find((x) => x.id === 2).result?.content?.[0]?.text, `tools/call by ${a.instanceId}`, run.stderr);
+  const methods = a.requests.filter((r) => r.url === '/mcp' && r.method === 'POST').map((r) => JSON.parse(r.body).method);
+  assert.deepEqual(methods, ['initialize', 'initialize', 'notifications/initialized', 'tools/call']);
+  run.child.stdin.end();
+  await within(run.exited, 7000, 'the bridge exits once stdin closes');
+});
+
+test('P5 (bundle): a call before any initialize is refused and not sent', async (t) => {
+  const root = tempRoot(t);
+  const m = machine(root);
+  const a = await startService(t, { mcpSessions: true });
+  const run = startPinnedClient('bundle', m, root, a.port, {}, callLine(1));
+  await untilMessage(run, (x) => x.id === 1, 'the call answer');
+  assert.match(run.messages.find((x) => x.id === 1).error?.message ?? '', /has not sent initialize/, run.stderr);
+  assert.deepEqual(a.requests.filter((r) => r.url === '/mcp'), [], 'nothing reaches /mcp');
   run.child.stdin.end();
   await within(run.exited, 7000, 'the bridge exits once stdin closes');
 });
