@@ -87,7 +87,6 @@ public final class IndexGenerationManager {
   private static final int RECORDED_PROJECTION_MANIFEST_FORMAT_VERSION = 3;
 
   private static final String STATE_FILE = "state.json";
-  private static final String STATE_TMP_FILE = "state.json.tmp";
   private static final String STATE_PREV_FILE = "state.json.prev";
 
   private static final String INDICES_DIR = "indices";
@@ -228,7 +227,6 @@ public final class IndexGenerationManager {
   private final Path basePath;
   private final Path indicesDir;
   private final Path statePath;
-  private final Path stateTmpPath;
   private final Path statePrevPath;
   private final StateMoveProbe stateMoveProbe;
 
@@ -294,7 +292,6 @@ public final class IndexGenerationManager {
     }
     this.indicesDir = this.basePath.resolve(INDICES_DIR);
     this.statePath = this.basePath.resolve(STATE_FILE);
-    this.stateTmpPath = this.basePath.resolve(STATE_TMP_FILE);
     this.statePrevPath = this.basePath.resolve(STATE_PREV_FILE);
   }
 
@@ -377,8 +374,14 @@ public final class IndexGenerationManager {
     record Fenced() implements BootOwnership {}
     record Recorded(String operationKey, String sourceGeneration, String source,
         String targetFingerprint, boolean captureComplete, boolean continuationAuthorized,
-        List<String> projectionSourceIds)
+        List<String> projectionSourceIds, boolean previousSourcePointerProven)
         implements BootOwnership {
+      public Recorded(String operationKey, String sourceGeneration, String source,
+          String targetFingerprint, boolean captureComplete, boolean continuationAuthorized,
+          List<String> projectionSourceIds) {
+        this(operationKey, sourceGeneration, source, targetFingerprint, captureComplete,
+            continuationAuthorized, projectionSourceIds, false);
+      }
       public Recorded(String operationKey, String sourceGeneration, String source,
           String targetFingerprint, boolean captureComplete) {
         this(operationKey, sourceGeneration, source, targetFingerprint, captureComplete, true, null);
@@ -415,7 +418,10 @@ public final class IndexGenerationManager {
         State observed = null;
         try { observed = readRecordedState(); }
         catch (IOException unreadable) {
-          if (hasRecordedFallbackEvidence()) throw unreadable;
+          if (hasRecordedFallbackEvidence()) {
+            throw new IOException("index.generation_previous_unproven: current pointer is unavailable"
+                + " and recorded generation evidence forbids native fallback", unreadable);
+          }
         }
         if (observed != null && isRecordedIdentity(observed.active_generation())) {
           boolean noBuilding = observed.building_generation() == null || observed.building_generation().isBlank();
@@ -431,6 +437,15 @@ public final class IndexGenerationManager {
           return new BootLayout(initializeOrLoad(), BootDisposition.NATIVE);
         }
         return new BootLayout(strictBootLayout(observed), BootDisposition.FENCED);
+      }
+      if (ownership instanceof BootOwnership.Recorded recorded
+          && recorded.previousSourcePointerProven()
+          && Files.notExists(statePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        restoreProvenPreviousSource(recorded, effectiveFingerprint);
+      }
+      if (Files.notExists(statePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+          && Files.exists(statePrevPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        throw new IOException("index.generation_previous_unproven: recorded receipts do not prove the previous pointer");
       }
       IndexLayout layout = strictBootLayout(readRecordedState());
       if (ownership instanceof BootOwnership.Fenced) {
@@ -467,6 +482,41 @@ public final class IndexGenerationManager {
         return new BootLayout(layout, BootDisposition.BUILDING);
       }
       return new BootLayout(layout, BootDisposition.FENCED);
+    }
+  }
+
+  /** The owner proved that settlement has not authorized pointer promotion. Validate its bytes too. */
+  private void restoreProvenPreviousSource(BootOwnership.Recorded owner, String fingerprint)
+      throws IOException {
+    try {
+      State previous = RECORDED_JSON.readValue(
+          io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(statePrevPath), State.class);
+      IndexLayout layout = strictBootLayout(previous);
+      String target = recordedGenerationId(owner.operationKey());
+      if (!owner.captureComplete() || !owner.continuationAuthorized()
+          || !owner.targetFingerprint().matches("[0-9a-f]{64}")
+          || !owner.targetFingerprint().equals(fingerprint)
+          || !owner.sourceGeneration().equals(layout.activeGenerationId())
+          || !target.equals(previous.building_generation())
+          || !owner.sourceGeneration().equals(previous.previous_generation())
+          || !Set.of("MIGRATING", "SWITCHING", "AWAITING_ACCEPTANCE")
+              .contains(previous.migration_state())) {
+        throw new IOException("previous pointer disagrees with recorded capture receipts");
+      }
+      requireOwnedRetirementDirectory(layout.activeGenerationPath(), owner.sourceGeneration(), false, false);
+      requireRecordedGeneration(resolveGenerationPathReadOnly(target), target, owner.source(),
+          owner.targetFingerprint(), false, true, owner.projectionSourceIds());
+      try (var entries = Files.list(indicesDir)) {
+        for (Path entry : entries.toList()) {
+          String identity = entry.getFileName().toString();
+          if (!identity.equals(target) && !identity.equals(owner.sourceGeneration())) {
+            throw new IOException("unrelated generation evidence: " + identity);
+          }
+        }
+      }
+      writeState(previous);
+    } catch (IOException | RuntimeException invalid) {
+      throw new IOException("index.generation_previous_unproven: " + invalid.getMessage(), invalid);
     }
   }
 
@@ -520,6 +570,34 @@ public final class IndexGenerationManager {
         throw new IOException("Authoritative generation state is not a regular file: " + statePath);
       }
       return java.util.Optional.of(strictBootLayout(readRecordedState()));
+    }
+  }
+
+  /** Read-only queue admission guard, before SQLite may migrate or quarantine any live bytes. */
+  public boolean requiresMigrationJournalForBoot() throws IOException {
+    try (var ignored = stateControl()) {
+      State state = tryReadState(statePath);
+      boolean fallback = state == null;
+      if (fallback) state = tryReadState(statePrevPath);
+      if (state == null) {
+        return hasRecordedFallbackEvidence() || retainedGenerationCount() > 1;
+      }
+      if (state.format_version() != 1 && state.format_version() != STATE_FORMAT_VERSION) return true;
+      final String active;
+      try { active = requireSafeGenerationId(state.active_generation(), "queue admission generation"); }
+      catch (IOException invalid) { return true; }
+      if (!Files.isDirectory(resolveGenerationPathReadOnly(active), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        return true;
+      }
+      String phase = state.migration_state();
+      if (phase == null && state.format_version() == 1) phase = MigrationState.IDLE.name();
+      // IDLE is published before final journal replay and predecessor retirement finish.
+      if (!MigrationState.IDLE.name().equals(phase)
+          || state.building_generation() != null && !state.building_generation().isBlank()
+          || state.previous_generation() != null && !state.previous_generation().isBlank()
+              && !active.equals(state.previous_generation())) return true;
+      return fallback ? hasRecordedFallbackEvidence() || retainedGenerationCount() > 1
+          : hasPristineRecordedOrphan(state);
     }
   }
 
@@ -641,7 +719,16 @@ public final class IndexGenerationManager {
       if (Files.notExists(statePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
         return false;
       }
-      State state = readRecordedState();
+      State state;
+      try { state = readRecordedState(); }
+      catch (IOException invalid) {
+        // Boot ownership decides whether ordinary .prev recovery is allowed. A malformed native
+        // pointer has no adapter-recovery authority yet; do not preempt that later decision.
+        if ((invalid.getCause() instanceof tools.jackson.core.JacksonException
+                || "Authoritative generation state is empty".equals(invalid.getMessage()))
+            && !hasRecordedFallbackEvidence()) return false;
+        throw invalid;
+      }
       if (state.format_version() == 1) {
         // Ownership-aware boot decides whether v1 is a native layout that may be normalized or a
         // recorded/fenced layout that must remain read-only and fail strict validation.
@@ -2017,7 +2104,6 @@ public final class IndexGenerationManager {
   }
 
   /** Installed supervisor proof: stop only after this owner actually removes predecessor payload. */
-  @SuppressWarnings("PMD.DoNotTerminateVM")
   private void haltAfterObservedRetirementDeletion(
       String generationId, Path directory, Path removed) throws IOException {
     if (!"1".equals(SystemAccess.envVar("JUSTSEARCH_SUPERVISOR_HARNESS"))
@@ -2031,7 +2117,7 @@ public final class IndexGenerationManager {
     try (FileChannel channel = FileChannel.open(reached, StandardOpenOption.WRITE)) {
       channel.force(true);
     }
-    Runtime.getRuntime().halt(73);
+    haltHarnessWriter();
   }
 
   /** Count physical representations, including an abandoned but not yet deleted candidate. */
@@ -2251,8 +2337,8 @@ public final class IndexGenerationManager {
       String stamp = contentStampBestEffort();
       CachedState cached = cache; // single volatile read — the whole entry is atomic
       // A hit needs the stamp to be UNCHANGED, or unreadable. Unreadable is a hit on purpose:
-      // writeState replaces state.json by renaming (state.json -> state.json.prev, then tmp ->
-      // state.json), and on Windows a file being renamed over is briefly unopenable. Treating that
+      // writeState atomically replaces state.json, and on Windows a file being renamed over is
+      // briefly unopenable. Treating that
       // window as "re-read" rather than "unchanged" would trade the stale read this stamp exists to
       // fix for a transient NULL — which is worse, because every caller projects null as an empty
       // migration state. A permanently missing state.json serves the last parse, which is exactly
@@ -2505,34 +2591,46 @@ public final class IndexGenerationManager {
   private void writeState(State state) throws IOException {
     Objects.requireNonNull(state, "state");
     Files.createDirectories(basePath);
+    haltAtPointerPublication("before-backup", state);
 
-    // 1) Write tmp
-    JSON.writerWithDefaultPrettyPrinter().writeValue(stateTmpPath.toFile(), state);
-
-    // 2) Rotate current -> prev (best-effort)
+    // Preserve the current authority throughout publication, including while publishing its
+    // fallback. Never move it aside: a process kill between two moves leaves strict boot with
+    // no current pointer. Do not replace a valid fallback with a torn current during recovery.
     if (Files.exists(statePath)) {
+      byte[] prior = io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(statePath);
       try {
-        Files.move(statePath, statePrevPath, StandardCopyOption.REPLACE_EXISTING);
-      } catch (Exception e) {
-        // best-effort; proceed with writing the new state
-        log.debug("Failed to rotate state.json -> state.json.prev (continuing): {}", e.getMessage());
+        if (JSON.readValue(prior, State.class) != null) {
+          io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(statePrevPath, prior);
+        }
+      } catch (tools.jackson.core.JacksonException malformed) {
+        log.debug("Preserving previous generation pointer while repairing invalid current state");
       }
     }
+    haltAtPointerPublication("after-backup", state);
+    io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
+        statePath, JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(state));
+    haltAtPointerPublication("after-publication", state);
 
-    // 3) Move tmp -> state.json (prefer atomic)
-    try {
-      Files.move(
-          stateTmpPath,
-          statePath,
-          StandardCopyOption.ATOMIC_MOVE,
-          StandardCopyOption.REPLACE_EXISTING);
-    } catch (AtomicMoveNotSupportedException e) {
-      Files.move(stateTmpPath, statePath, StandardCopyOption.REPLACE_EXISTING);
-    }
-
-    // 4) Invalidate the read cache so the next readStateBestEffort() re-reads from disk.
+    // Invalidate the read cache so the next readStateBestEffort() re-reads from disk.
     cache = null;
     stateMoveProbe.afterMove(state);
+  }
+
+  /** Deterministic process-kill cut for the installed worker recovery harness. */
+  private void haltAtPointerPublication(String point, State state) throws IOException {
+    if (!"1".equals(SystemAccess.envVar("JUSTSEARCH_SUPERVISOR_HARNESS"))
+        || !point.equals(SystemAccess.envVar("JUSTSEARCH_POINTER_PUBLICATION_CUT"))
+        || !Objects.equals(state.migration_state(), SystemAccess.envVar("JUSTSEARCH_POINTER_CUT_PHASE"))
+        || Files.exists(basePath.resolve("pointer-publication-cut"))) return;
+    io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
+        basePath.resolve("pointer-publication-cut"), JSON.writeValueAsBytes(
+            Map.of("point", point, "pid", ProcessHandle.current().pid(), "state", state)));
+    haltHarnessWriter();
+  }
+
+  @SuppressWarnings("PMD.DoNotTerminateVM")
+  private static void haltHarnessWriter() {
+    Runtime.getRuntime().halt(73);
   }
 
   private Path resolveGenerationPath(String genId) throws IOException {

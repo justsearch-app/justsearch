@@ -991,7 +991,7 @@ final class JobQueueMigrationTest {
         assertTrue(rs.next());
         assertEquals(SqliteSchema.TARGET_VERSION, rs.getInt(1));
       }
-      assertEquals(22, SqliteSchema.TARGET_VERSION);
+      assertEquals(23, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {
@@ -1368,6 +1368,8 @@ final class JobQueueMigrationTest {
           + "VALUES ('prefix:/root', 'DELETE_PREFIX', '/root', 42, 'v1')");
       query.execute("INSERT INTO switch_buffer(key, op, payload, last_updated, revision) "
           + "VALUES ('path:/root/file', 'UPSERT', '/root/file', 42, 'v2')");
+      query.execute("DROP TRIGGER IF EXISTS count_switch_buffer_admission");
+      query.execute("DROP TABLE IF EXISTS switch_buffer_admissions");
       query.execute("PRAGMA user_version = 19");
     }
     try (var queue = new SqliteJobQueue(path)) {
@@ -1422,6 +1424,8 @@ final class JobQueueMigrationTest {
       query.execute("ALTER TABLE ingestion_walk_progress DROP COLUMN manifest_sha256");
       query.execute("ALTER TABLE ingestion_walk_progress DROP COLUMN planned_units");
       query.execute("INSERT INTO jobs(path, state, last_updated) VALUES ('/v18/retained.txt', 'PENDING', 123)");
+      query.execute("DROP TRIGGER IF EXISTS count_switch_buffer_admission");
+      query.execute("DROP TABLE IF EXISTS switch_buffer_admissions");
       query.execute("PRAGMA user_version = 18");
     }
   }
@@ -1485,6 +1489,8 @@ final class JobQueueMigrationTest {
       if (hasColumn(statement, "content_hash")) {
         statement.execute("ALTER TABLE jobs DROP COLUMN content_hash");
       }
+      statement.execute("DROP TRIGGER IF EXISTS count_switch_buffer_admission");
+      statement.execute("DROP TABLE IF EXISTS switch_buffer_admissions");
       statement.execute("PRAGMA user_version = 14");
       statement.execute("INSERT INTO jobs(path, state, attempts, last_updated)"
           + " VALUES ('/c2/preserved.txt', 'DONE', 0, 123)");

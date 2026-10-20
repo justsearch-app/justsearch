@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -1383,6 +1384,34 @@ final class KnowledgeServerRecordedIngestionTest {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"quarantined", "restore-torn"})
+  void interruptedQueueQuarantineRestoresItsRecordedBackupBeforeOpeningFreshTables(String phase, @TempDir Path tempDir)
+      throws Exception {
+    var layout = preparedLayout(tempDir);
+    seedProcessingRecordedClaim(layout.dataDir(), tempDir.resolve("watched/interrupted.txt"));
+    Path database = layout.dataDir().resolve("jobs.db");
+    Files.copy(database, layout.dataDir().resolve("jobs.db.bak"));
+    Files.move(database, layout.dataDir().resolve("jobs.db.corrupt"));
+    if ("restore-torn".equals(phase)) Files.write(database, new byte[0]);
+    byte[] quarantine = Files.readAllBytes(layout.dataDir().resolve("jobs.db.corrupt"));
+    Files.writeString(layout.dataDir().resolve("jobs.db.triage"),
+        "{\"quarantine\":\"jobs.db.corrupt\",\"backup\":true,\"unfinished\":false,\"complete\":false}");
+    var lifecycle = new BootLifecycle();
+    var server = withoutDeferredModels(new KnowledgeServer(new TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(layout.dataDir()), null,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle));
+    lifecycle.server.set(server);
+    try {
+      assertDoesNotThrow(server::start);
+      assertEquals(1L, server.jobQueueForTests().jobStateCounts().processingCount(),
+          "a kill after quarantine must restore the old journal instead of opening empty tables");
+      assertArrayEquals(quarantine, Files.readAllBytes(layout.dataDir().resolve("jobs.db.corrupt")));
+      assertTrue(Files.readString(layout.dataDir().resolve("jobs.db.triage"))
+          .contains("\"complete\":true"));
+    } finally { server.close(); }
+  }
+
   @Test
   void corruptionRestoreKeepsConstructorBoundAuthority(@TempDir Path tempDir) throws Exception {
     var layout = preparedLayout(tempDir);
@@ -1419,6 +1448,7 @@ final class KnowledgeServerRecordedIngestionTest {
   @Test
   void recordedOwnershipPrecedesNativePrevRepairInRealBoot(@TempDir Path tempDir) throws Exception {
     var layout = preparedLayout(tempDir);
+    try (var queue = new SqliteJobQueue(layout.dataDir().resolve("jobs.db"))) { queue.open(); }
     String key = "01994180-0000-7000-8000-000000000199";
     layout.genManager().startRecordedMigration(key, "recorded-boot-test", "a".repeat(64));
     byte[] previous = Files.readAllBytes(layout.indexBase().resolve("state.json.prev"));
@@ -1447,6 +1477,7 @@ final class KnowledgeServerRecordedIngestionTest {
       throws Exception {
     var layout = preparedLayout(tempDir);
     WorkerBootFixture.seed(layout.activePath(), null, 1);
+    try (var queue = new SqliteJobQueue(layout.dataDir().resolve("jobs.db"))) { queue.open(); }
     layout.genManager().startRecordedMigration(
         "01994180-0000-7000-8000-000000000199", "recorded-boot-test", "a".repeat(64));
     byte[] state = Files.readAllBytes(layout.indexBase().resolve("state.json"));

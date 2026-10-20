@@ -1189,6 +1189,32 @@ public final class KnowledgeServer implements Closeable {
       long signalBusMs = (tPhase - tPrev) / 1_000_000;
       tPrev = tPhase;
 
+      // 3. Resolve generation-scoped index path BEFORE opening Lucene.
+      // Production root captured this once; legacy fixture constructors capture at first start.
+      ResolvedConfig rc = startupConfiguration;
+      if (rc == null) {
+        throw new IllegalStateException("ConfigStore not initialized — cannot start KnowledgeServer");
+      }
+
+      this.migrationCutoverMaxFailedJobs = rc.index().migrationCutoverMaxFailedJobs();
+
+      Path effectiveIndexBasePath = rc.paths().indexBasePath();
+
+      recordIndexStartupWait("index root lock at " + effectiveIndexBasePath);
+      awaitIndexStartHarnessBarrier(rc.paths().dataDir(), effectiveIndexBasePath);
+
+      // Acquire a lock for the effective index root to prevent two Workers from mutating the same
+      // indexBasePath (important when justsearch.index.base_path is overridden).
+      this.indexRootLock = new IndexRootLock(effectiveIndexBasePath);
+      this.indexRootLock.acquire();
+
+      var journalWitness = new io.justsearch.indexerworker.queue.MigrationJournalWitness(
+          effectiveIndexBasePath, dataDir.resolve("jobs.db"));
+      IndexGenerationManager genManager = new IndexGenerationManager(effectiveIndexBasePath);
+      boolean unfinishedMigration = recordedIngestionLifecycle.generationPendingAtBoot()
+          || genManager.requiresMigrationJournalForBoot();
+      if (unfinishedMigration) journalWitness.validateUnfinished(dataDir.resolve("jobs.db"));
+
       // 2. Initialize job queue (with corruption triage). Tempdoc 417 Phase 3c: write-failure
       // callback late-binds to WorkerOpsMetricCatalog (constructed later in
       // registerTelemetryGauges); the lambda silently no-ops until the catalog is wired.
@@ -1215,44 +1241,35 @@ public final class KnowledgeServer implements Closeable {
             }
           });
       jobQueue = sqliteQueue;
+      var triageReceipt = journalWitness.triageReceipt();
+      boolean interruptedTriage = triageReceipt != null && !triageReceipt.complete();
       try {
-        jobQueue.open();
+        if (interruptedTriage) handleCorruptDatabase(dbPath, journalWitness);
+        else jobQueue.open();
       } catch (SQLException e) {
+        if (interruptedTriage) throw e;
         // Check for database corruption (SQLite error code 11 = SQLITE_CORRUPT)
         if (e.getErrorCode() == 11) {
+          if (unfinishedMigration) {
+            throw new IOException(
+                io.justsearch.indexerworker.queue.MigrationJournalWitness.REFUSAL
+                    + ": corruption during unfinished migration", e);
+          }
           log.error("Database corruption detected in jobs.db. Initiating triage...", e);
           try {
             jobQueue.close();
           } catch (IOException closeEx) {
             log.warn("Failed to close corrupt database handle", closeEx);
           }
-          handleCorruptDatabase(dbPath);
+          handleCorruptDatabase(dbPath, journalWitness);
         } else {
           throw e;
         }
       }
+      sqliteQueue.attachMigrationJournalWitness(journalWitness);
       tPhase = System.nanoTime();
       long jobQueueMs = (tPhase - tPrev) / 1_000_000;
       tPrev = tPhase;
-
-      // 3. Resolve generation-scoped index path BEFORE opening Lucene.
-      // Production root captured this once; legacy fixture constructors capture at first start.
-      ResolvedConfig rc = startupConfiguration;
-      if (rc == null) {
-        throw new IllegalStateException("ConfigStore not initialized — cannot start KnowledgeServer");
-      }
-
-      this.migrationCutoverMaxFailedJobs = rc.index().migrationCutoverMaxFailedJobs();
-
-      Path effectiveIndexBasePath = rc.paths().indexBasePath();
-
-      recordIndexStartupWait("index root lock at " + effectiveIndexBasePath);
-      awaitIndexStartHarnessBarrier(rc.paths().dataDir(), effectiveIndexBasePath);
-
-      // Acquire a lock for the effective index root to prevent two Workers from mutating the same
-      // indexBasePath (important when justsearch.index.base_path is overridden).
-      this.indexRootLock = new IndexRootLock(effectiveIndexBasePath);
-      this.indexRootLock.acquire();
 
       var bootOwnership = recoveryStartContext != null
               && recoveryStartContext.generationState() != null
@@ -1276,12 +1293,19 @@ public final class KnowledgeServer implements Closeable {
       }
       this.recordedCandidate = candidate.orElse(null);
 
-      IndexGenerationManager genManager = new IndexGenerationManager(effectiveIndexBasePath);
       genManager.reconcileActiveRecoveryOwnership(activeGenerationPath -> {
         if (!IndexRecoveryMarker.exists(activeGenerationPath)) {
           IndexRecoveryMarker.write(activeGenerationPath, "interrupted_backup_first");
         }
       });
+      // Inject after ownership reconciliation so both the baseline and candidate reach the actual
+      // fallback writer. Its next process must then recover the interrupted repair on its own.
+      if ("1".equals(SystemAccess.envVar("JUSTSEARCH_SUPERVISOR_HARNESS"))
+          && java.util.Objects.toString(SystemAccess.envVar("JUSTSEARCH_REAL_RECOVERY_SCENARIO"), "")
+              .startsWith("pointer-recovery-")
+          && !Files.exists(effectiveIndexBasePath.resolve("pointer-publication-cut"))) {
+        Files.writeString(effectiveIndexBasePath.resolve("state.json"), "{torn native pointer");
+      }
       IndexGenerationManager.BootLayout boot;
       if (recoveryStartContext != null && recoveryStartContext.generationState() != null) {
         var inspected = genManager.inspectCurrentLayoutForBoot().orElseThrow(
@@ -1929,7 +1953,11 @@ public final class KnowledgeServer implements Closeable {
       // with the actual cause visible nowhere but the (then separate) worker.log. It is a
       // deliberate refusal, not a
       // crash, and it has its own remedy. Other fatal causes stay generic.
-      if (isCorruptIndexCause(e)) {
+      if (e.getMessage() != null && e.getMessage().startsWith(
+          io.justsearch.indexerworker.queue.MigrationJournalWitness.REFUSAL)) {
+        io.justsearch.ipc.WorkerFatalReasonMarker.write(dataDir,
+            io.justsearch.ipc.WorkerFatalReasonMarker.MIGRATION_JOURNAL_UNAVAILABLE);
+      } else if (isCorruptIndexCause(e)) {
         io.justsearch.ipc.WorkerFatalReasonMarker.write(
             dataDir, io.justsearch.ipc.WorkerFatalReasonMarker.INDEX_CORRUPT);
       } else if (isSchemaMismatch(e)) {
@@ -9579,43 +9607,43 @@ public final class KnowledgeServer implements Closeable {
    * @throws IOException if quarantine or restore operations fail
    * @throws SQLException if re-opening the queue fails
    */
-  private void handleCorruptDatabase(Path dbPath) throws IOException, SQLException {
-    Path corruptPath = dbPath.resolveSibling(dbPath.getFileName() + ".corrupt");
-    Path backupPath = dbPath.resolveSibling(dbPath.getFileName() + ".bak");
-
-    // 1. Quarantine the corrupted file for forensics
-    if (Files.exists(dbPath)) {
-      Files.move(dbPath, corruptPath, StandardCopyOption.REPLACE_EXISTING);
+  private void handleCorruptDatabase(Path dbPath,
+      io.justsearch.indexerworker.queue.MigrationJournalWitness witness) throws IOException, SQLException {
+    var receipt = witness.beginTriage(dbPath);
+    if (receipt.unfinished()) {
+      throw new IOException(io.justsearch.indexerworker.queue.MigrationJournalWitness.REFUSAL
+          + ": recorded triage during unfinished migration");
+    }
+    Path corruptPath = dbPath.resolveSibling(receipt.quarantine());
+    Path backupPath = dbPath.resolveSibling("jobs.db.bak");
+    if (receipt.backup() && !Files.isRegularFile(backupPath)) {
+      throw new IOException("Interrupted jobs.db triage has lost its recorded backup");
+    }
+    // Each receipt owns one quarantine. A resumed restore must never replace its original evidence.
+    if (!Files.exists(corruptPath) && Files.exists(dbPath)) {
+      Files.move(dbPath, corruptPath);
       log.error("Quarantined corrupt database to: {}", corruptPath);
     }
-
-    // WAL sidecar files must be handled together with main DB
-    Path walPath = dbPath.resolveSibling(dbPath.getFileName() + "-wal");
-    Path shmPath = dbPath.resolveSibling(dbPath.getFileName() + "-shm");
-
+    Path walPath = dbPath.resolveSibling("jobs.db-wal");
+    Path corruptWalPath = dbPath.resolveSibling(
+        receipt.quarantine().replace("jobs.db.corrupt", "jobs.db-wal.corrupt"));
     if (Files.exists(walPath)) {
-      Path corruptWalPath = corruptPath.resolveSibling(dbPath.getFileName() + "-wal.corrupt");
-      Files.move(walPath, corruptWalPath, StandardCopyOption.REPLACE_EXISTING);
-      log.warn("Quarantined WAL file to: {}", corruptWalPath);
+      if (!Files.exists(corruptWalPath)) Files.move(walPath, corruptWalPath);
+      else Files.delete(walPath); // Only an unacknowledged, interrupted restore can have made this WAL.
     }
-
-    if (Files.exists(shmPath)) {
-      // SHM is a shared-memory file, safe to delete (will be recreated)
-      Files.deleteIfExists(shmPath);
-      log.debug("Deleted SHM sidecar file");
+    Files.deleteIfExists(dbPath.resolveSibling("jobs.db-shm"));
+    if (receipt.backup()) {
+      // Keep both backup and quarantine through a failed or unsupported atomic replacement.
+      Path temporary = Files.createTempFile(dbPath.getParent(), "jobs.db.restore-", ".tmp");
+      try {
+        Files.copy(backupPath, temporary, StandardCopyOption.REPLACE_EXISTING);
+        try (var channel = java.nio.channels.FileChannel.open(temporary,
+            java.nio.file.StandardOpenOption.WRITE)) { channel.force(true); }
+        Files.move(temporary, dbPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+      } finally { Files.deleteIfExists(temporary); }
     }
-
-    // 2. Attempt recovery from backup
-    if (Files.exists(backupPath)) {
-      Files.copy(backupPath, dbPath, StandardCopyOption.REPLACE_EXISTING);
-      log.warn("Restored database from backup: {}", backupPath);
-    } else {
-      log.warn("No backup found at {}. A fresh database will be created.", backupPath);
-    }
-
-    // 3. Re-open the queue with forced integrity check to validate the restored backup.
-    // SqliteJobQueue.open() is designed to be re-callable after close().
     jobQueue.openWithIntegrityCheck();
+    witness.completeTriage(receipt);
     log.info("Job queue re-opened after triage (integrity validated)");
   }
 

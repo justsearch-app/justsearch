@@ -442,7 +442,7 @@ final class LifecycleSnapshotTapTest {
   void fatalIndexFactsAssertAndClearBothDimensions() {
     for (String code : List.of(
         "component.start_deadline", "component.recovery_exhausted",
-        "index.failed", "index.corrupt", "index.schema_open_refused")) {
+        "index.failed", "index.corrupt", "index.schema_open_refused", "index.migration_journal_unavailable")) {
       tap.accept(envelope(Map.of(
           ReadinessDimension.INDEX_CONTROL_PLANE, component("NOT_READY", code),
           ReadinessDimension.INDEX_SERVING, component("NOT_READY", code))));

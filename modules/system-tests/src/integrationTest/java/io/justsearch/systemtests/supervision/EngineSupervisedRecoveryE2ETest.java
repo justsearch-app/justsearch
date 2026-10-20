@@ -1053,8 +1053,8 @@ final class EngineSupervisedRecoveryE2ETest {
       assumeTrue(hasRetainedInstallerModels(repo),
           "installed standard-model activation requires retained model bytes; run on a model-equipped host");
     }
-    Path work =
-        repo.resolve("tmp/lane-f-takeover/writer-junit-" + UUID.randomUUID()).normalize();
+    Path work = repo.resolve((scenario.startsWith("journal-loss-") || scenario.startsWith("pointer-")
+        ? "tmp/restart/installed-" : "tmp/lane-f-takeover/writer-junit-") + UUID.randomUUID()).normalize();
     Path outputFile = work.resolve("fixture-output.txt");
     Files.createDirectories(work);
     ProcessBuilder builder =
@@ -1289,6 +1289,23 @@ final class EngineSupervisedRecoveryE2ETest {
       assertEquals(promoted.path("supervisor").path("incarnation").asInt(),
           migration.path("afterRefusal").path("incarnation").asInt(),
           "migration settlement and refused rollback must preserve the Engine incarnation");
+    } else if (scenario.startsWith("pointer-")) {
+      assertTrue(output.contains("POINTER_PUBLICATION_PASS "), output);
+      var proof = markerPayload(output, "POINTER_PUBLICATION_PASS");
+      assertNotEquals(proof.path("cut").path("pid").asLong(),
+          proof.path("recovered").path("manifest").path("pid").asLong(), output);
+      assertEquals(2, proof.path("recovered").path("generation").path("format_version").asInt(), output);
+      assertTrue(Files.isRegularFile(work.resolve("pointer-publication-proof.json")), output);
+    } else if (scenario.startsWith("journal-loss-")) {
+      assertTrue(output.contains("MIGRATION_JOURNAL_LOSS_PASS "), output);
+      var proof = markerPayload(output, "MIGRATION_JOURNAL_LOSS_PASS");
+      assertEquals("index.migration_journal_unavailable", proof.path("refusal").path("reasonCode").asText(), output);
+      assertEquals(4, proof.path("beforeReady").size(), output);
+      assertEquals(4, proof.path("afterRestart").size(), output);
+      for (String phase : List.of("beforeReady", "afterRestart")) {
+        for (var query : proof.path(phase)) assertEquals(503, query.path("status").asInt(), output);
+      }
+      assertTrue(Files.isRegularFile(work.resolve("migration-journal-loss-proof.json")), output);
     } else if (nativeProjectionScenario) {
       assertTrue(output.contains("PASS native-mixed-after-pointer"), output);
       var recovery = markerPayload(output, "COMPONENT_DEATH_RECOVERY_PASS");
