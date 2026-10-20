@@ -23,12 +23,14 @@
     "root": "modules/ui-web/src",
     "excludeSuffixes": [".test.ts", ".test.tsx"],
     "excludeFiles": [
+      "modules/ui-web/src/shell-v0/streaming/FetchEventSource.ts",
       "modules/ui-web/src/shell-v0/streaming/EnvelopeStream.ts",
       "modules/ui-web/src/shell-v0/streaming/EnvelopeStreamPool.ts",
       "modules/ui-web/src/shell-v0/streaming/MultiplexedStream.ts"
     ],
-    "excludeFilesNote": "The 3 substrate files IMPLEMENT the openers (new EnvelopeStream / subscribePooled appear inside MultiplexedStream.ts and EnvelopeStreamPool.ts as their own transport, not as a registrable 'channel') — excluded the same way execution-surfaces.v1.json exempts the canonical record type's own defining file. A channel is declared at its CALL SITE, not inside the mechanism.",
+    "excludeFilesNote": "The 4 substrate files IMPLEMENT the transport/openers; they do not own independent channels. FetchEventSource replaces the native EventSource transport used by EnvelopeStream and CapabilitiesHandshake. Connections remain classified at their existing CALL SITES (always-on Shell, lazy surfaces, fallback clients, dormant handshake), with the same owners and budget. Exclude the mechanism itself, as for EnvelopeStream, EnvelopeStreamPool and MultiplexedStream; scan new FetchEventSource call sites with fetch-event-source.",
     "openers": [
+      { "id": "fetch-event-source", "pattern": "new FetchEventSource\\b", "transport": "fetch-stream" },
       { "id": "envelope-stream-direct", "pattern": "new EnvelopeStream\\b", "transport": "sse" },
       { "id": "envelope-stream-pool", "pattern": "\\bsubscribePooled\\b", "transport": "sse" },
       { "id": "multiplexed-stream", "pattern": "new MultiplexedStream\\b", "transport": "sse-multiplexed" },
@@ -64,6 +66,12 @@
       "openerId": "envelope-stream-pool",
       "class": "fallback",
       "note": "startIndexingJobsBridge's subscribePooled fallback branch — used only when `opts.multiplex` is omitted. Dormant on the production boot path (Shell always passes it)."
+    },
+    {
+      "file": "modules/ui-web/src/shell-v0/handshake/CapabilitiesHandshake.ts",
+      "openerId": "fetch-event-source",
+      "class": "dormant",
+      "note": "The default transport factory for this same dormant handshake channel (the envelope-stream-direct row below). Replaces native EventSource; ownership and lifetime remain with CapabilitiesHandshake, not the transport substrate."
     },
     {
       "file": "modules/ui-web/src/shell-v0/handshake/CapabilitiesHandshake.ts",
