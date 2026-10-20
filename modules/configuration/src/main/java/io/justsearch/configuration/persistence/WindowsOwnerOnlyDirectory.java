@@ -15,7 +15,7 @@ import java.lang.invoke.VarHandle;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
 
-/** Windows directory security, including protection against later parent ACL changes. */
+/** Windows entry security, including protection against later parent ACL changes. */
 final class WindowsOwnerOnlyDirectory {
   // Protected DACL; owner and SYSTEM have full control, inherited by files and subdirectories.
   static final String SDDL = "D:P(A;OICI;FA;;;OW)(A;OICI;FA;;;SY)";
@@ -45,7 +45,8 @@ final class WindowsOwnerOnlyDirectory {
           attributes.set(ValueLayout.ADDRESS, 8, descriptor);
           result = (int) Win32.CREATE.invokeExact(captured, name, attributes);
         } else {
-          result = (int) Win32.REPAIR.invokeExact(captured, name, REPAIR_SECURITY_INFORMATION, descriptor);
+          repair(arena, path, captured, name, descriptor);
+          result = 1;
         }
         if (result == 0) {
           int error = (int) Win32.ERROR.get(captured, 0L);
@@ -64,13 +65,44 @@ final class WindowsOwnerOnlyDirectory {
     }
   }
 
+  private static void repair(Arena arena, Path path, MemorySegment captured,
+      MemorySegment name, MemorySegment descriptor) throws Throwable {
+    // MAXIMUM_ALLOWED suppresses SetSecurityInfo's automatic propagation to children.
+    // Only our no-follow walker may select descendants for repair.
+    // https://learn.microsoft.com/en-us/windows/win32/api/aclapi/nf-aclapi-setsecurityinfo
+    MemorySegment handle = (MemorySegment) Win32.OPEN.invokeExact(captured, name,
+        0x02000000, 3, MemorySegment.NULL, 3, 0x02200000, MemorySegment.NULL);
+    if (handle.address() == -1L || handle.address() == 0L) throw failure(path, captured);
+    try {
+      // FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS opens the entry itself.
+      MemorySegment information = arena.allocate(52, 4); // BY_HANDLE_FILE_INFORMATION
+      if ((int) Win32.INFORMATION.invokeExact(captured, handle, information) == 0) throw failure(path, captured);
+      if ((information.get(ValueLayout.JAVA_INT, 0) & 0x400) != 0) {
+        throw new IOException("Skipping security repair on a reparse point: " + path);
+      }
+      MemorySegment present = arena.allocate(ValueLayout.JAVA_INT);
+      MemorySegment dacl = arena.allocate(ValueLayout.ADDRESS);
+      MemorySegment defaulted = arena.allocate(ValueLayout.JAVA_INT);
+      if ((int) Win32.DACL.invokeExact(captured, descriptor, present, dacl, defaulted) == 0) throw failure(path, captured);
+      MemorySegment acl = dacl.get(ValueLayout.ADDRESS, 0);
+      if (present.get(ValueLayout.JAVA_INT, 0) == 0 || acl.address() == 0L) {
+        throw new IOException("Owner-only security descriptor has no DACL");
+      }
+      int error = (int) Win32.REPAIR.invokeExact(handle, 1, REPAIR_SECURITY_INFORMATION,
+          MemorySegment.NULL, MemorySegment.NULL, acl, MemorySegment.NULL);
+      if (error != 0) throw new IOException("Cannot set protected entry DACL for " + path + " (Windows error " + error + ")");
+    } finally {
+      int closed = (int) Win32.CLOSE.invokeExact(handle);
+    }
+  }
+
   private static MemorySegment wide(Arena arena, String value) {
     return arena.allocateFrom(ValueLayout.JAVA_CHAR, (value + '\0').toCharArray());
   }
 
   private static IOException failure(Path path, MemorySegment captured) {
     int error = (int) Win32.ERROR.get(captured, 0L);
-    return new IOException("Cannot set protected directory DACL for " + path + " (Windows error " + error + ")");
+    return new IOException("Cannot set protected entry DACL for " + path + " (Windows error " + error + ")");
   }
 
   private static final class Win32 {
@@ -85,9 +117,21 @@ final class WindowsOwnerOnlyDirectory {
             ValueLayout.ADDRESS, ValueLayout.ADDRESS), CAPTURE);
     private static final MethodHandle CREATE = bind(KERNEL, "CreateDirectoryW",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS), CAPTURE);
-    private static final MethodHandle REPAIR = bind(ADVAPI, "SetFileSecurityW",
-        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+    private static final MethodHandle OPEN = bind(KERNEL, "CreateFileW",
+        FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
             ValueLayout.ADDRESS), CAPTURE);
+    private static final MethodHandle INFORMATION = bind(KERNEL, "GetFileInformationByHandle",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS), CAPTURE);
+    private static final MethodHandle DACL = bind(ADVAPI, "GetSecurityDescriptorDacl",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS, ValueLayout.ADDRESS), CAPTURE);
+    private static final MethodHandle REPAIR = bind(ADVAPI, "SetSecurityInfo",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS));
+    private static final MethodHandle CLOSE = bind(KERNEL, "CloseHandle",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     private static final MethodHandle FREE = bind(KERNEL, "LocalFree",
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 

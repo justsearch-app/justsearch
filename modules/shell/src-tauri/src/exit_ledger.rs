@@ -497,41 +497,21 @@ fn retain_and_rename(
 }
 
 /// Create with private permissions, then repair existing directories without following links.
-/// Permission failures are reported once per path; unsafe paths and creation failures are refused.
+/// Links warn once and remain writable without permission repair; non-directories are refused.
 pub(crate) fn ensure_owner_only_directory(path: &Path) -> io::Result<()> {
     match fs::symlink_metadata(path) {
         Ok(metadata) => {
-            #[cfg(windows)]
-            {
-                use std::os::windows::fs::MetadataExt;
-                if metadata.file_attributes() & 0x400 != 0 {
-                    warn_owner_only_directory(path, "refusing directory reparse point");
-                    return Err(io::Error::other("refusing directory reparse point"));
-                }
+            if is_directory_link(&metadata) {
+                warn_owner_only_directory(path, "skipping repair on a link or reparse point");
+                return Ok(());
             }
-            if metadata.file_type().is_symlink() || !metadata.is_dir() {
-                warn_owner_only_directory(path, "refusing linked or non-directory runtime path");
-                return Err(io::Error::other(
-                    "refusing linked or non-directory runtime path",
-                ));
+            if !metadata.is_dir() {
+                warn_owner_only_directory(path, "refusing non-directory runtime path");
+                return Err(io::Error::other("refusing non-directory runtime path"));
             }
         }
         Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            #[cfg(unix)]
-            let creation = {
-                use std::os::unix::fs::DirBuilderExt;
-                fs::DirBuilder::new().mode(0o700).create(path)
-            };
-            #[cfg(windows)]
-            let creation = private_windows_directory(path, true);
-            match creation {
-                Ok(()) => {}
-                Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
-                Err(e) => {
-                    fs::create_dir(path)?;
-                    warn_owner_only_directory(path, &e.to_string());
-                }
-            }
+            create_directory_without_repair(path)?;
             return ensure_owner_only_directory(path);
         }
         Err(e) => return Err(e),
@@ -562,6 +542,49 @@ pub(crate) fn ensure_owner_only_directory(path: &Path) -> io::Result<()> {
         warn_owner_only_directory(path, &error.to_string());
     }
     Ok(())
+}
+
+fn is_directory_link(metadata: &fs::Metadata) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        if metadata.file_attributes() & 0x400 != 0 {
+            return true;
+        }
+    }
+    metadata.file_type().is_symlink()
+}
+
+// Used below a linked runtime too: existing entries must keep their permissions.
+fn create_directory_without_repair(path: &Path) -> io::Result<()> {
+    match fs::metadata(path) {
+        Ok(metadata) if metadata.is_dir() => return Ok(()),
+        Ok(_) => return Err(io::Error::other("runtime path is not a directory")),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
+    }
+    #[cfg(unix)]
+    let creation = {
+        use std::os::unix::fs::DirBuilderExt;
+        fs::DirBuilder::new().mode(0o700).create(path)
+    };
+    #[cfg(windows)]
+    let creation = private_windows_directory(path, true);
+    match creation {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+            if fs::metadata(path)?.is_dir() {
+                Ok(())
+            } else {
+                Err(io::Error::other("runtime path is not a directory"))
+            }
+        }
+        Err(e) => {
+            fs::create_dir(path)?;
+            warn_owner_only_directory(path, &e.to_string());
+            Ok(())
+        }
+    }
 }
 
 fn warn_owner_only_directory(path: &Path, error: &str) {
@@ -647,7 +670,12 @@ fn ensure_ledger_directory(dir: &Path) -> io::Result<()> {
             if let Some(data) = parent.parent() {
                 fs::create_dir_all(data)?;
             }
+            let linked =
+                fs::symlink_metadata(parent).is_ok_and(|metadata| is_directory_link(&metadata));
             ensure_owner_only_directory(parent)?;
+            if linked {
+                return create_directory_without_repair(dir);
+            }
         } else {
             fs::create_dir_all(parent)?;
         }
@@ -910,14 +938,36 @@ mod tests {
     use super::*;
     #[test]
     fn windows_directory_descriptor_is_protected_and_only_owner_and_system_inherit_full_control() {
-        let parts: Vec<_> = OWNER_ONLY_DIRECTORY_SDDL.split('(').collect();
+        // Compatible harness: inspect the production declarations, keeping the exact literal
+        // policy oracle, without requiring new production symbols in the before-state crate.
+        let source = include_str!("exit_ledger.rs");
+        let production = source.split("\n#[cfg(test)]\nmod tests").next().unwrap();
+        let sddl = production
+            .split("const OWNER_ONLY_DIRECTORY_SDDL: &str = \"")
+            .nth(1)
+            .unwrap()
+            .split('"')
+            .next()
+            .unwrap();
+        let parts: Vec<_> = sddl.split('(').collect();
         assert_eq!(
             parts[0], "D:P",
             "disable parent DACL inheritance at creation"
         );
         assert_eq!(parts.len(), 3, "exactly two explicit access entries");
         assert_eq!(&parts[1..], &["A;OICI;FA;;;OW)", "A;OICI;FA;;;SY)"]);
-        assert_eq!(OWNER_ONLY_DIRECTORY_SECURITY_INFORMATION, 0x80000004);
+        let flags = production
+            .split("const OWNER_ONLY_DIRECTORY_SECURITY_INFORMATION: u32 = ")
+            .nth(1)
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap();
+        let flags = flags
+            .split('|')
+            .map(|part| u32::from_str_radix(part.trim().trim_start_matches("0x"), 16).unwrap())
+            .fold(0, |left, right| left | right);
+        assert_eq!(flags, 0x80000004);
     }
     fn fixtures() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../governance/fixtures/exit-ledger")
@@ -988,20 +1038,91 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[test]
-    fn shell_refuses_linked_runtime_without_touching_target() {
+    fn linked_runtime_fixture() -> (tempfile::TempDir, tempfile::TempDir) {
         use std::os::unix::fs::{symlink, PermissionsExt};
         let data = tempfile::tempdir().unwrap();
         let outside = tempfile::tempdir().unwrap();
-        fs::set_permissions(outside.path(), fs::Permissions::from_mode(0o775)).unwrap();
+        for path in [data.path(), outside.path()] {
+            fs::set_permissions(path, fs::Permissions::from_mode(0o775)).unwrap();
+        }
+        let ledger = outside.path().join("exit-ledger");
+        fs::create_dir(&ledger).unwrap();
+        fs::set_permissions(&ledger, fs::Permissions::from_mode(0o775)).unwrap();
         symlink(outside.path(), data.path().join("runtime")).unwrap();
-        let ledger = writer(&ledger_directory(data.path()), true);
-        assert!(ledger.write_line(b"{}\n").is_err());
-        assert_eq!(
-            fs::metadata(outside.path()).unwrap().permissions().mode() & 0o777,
-            0o775
+        (data, outside)
+    }
+
+    #[cfg(unix)]
+    fn exercise_linked_writers(data: &Path) {
+        let runtime = data.join("runtime");
+        let ledger = writer(&ledger_directory(data), true);
+        assert!(ledger.write_line(b"{}\n").is_ok());
+        let record: crate::supervisor::StateRecord = serde_json::from_value(json!({
+            "schemaVersion": 1, "kind": "engine-supervisor-state.v1", "supervisor": "tauri",
+            "state": "RUNNING", "incarnation": 1, "restartCount": 0, "maxRestartAttempts": 1,
+            "policyProfile": "product", "updatedAt": "2026-10-20T00:00:00Z"
+        }))
+        .unwrap();
+        crate::engine_host::EngineHost::default().publish_state(
+            Some(&runtime.join("supervisor.v1.json")),
+            &record,
+            |_| {},
         );
-        assert_eq!(fs::read_dir(outside.path()).unwrap().count(), 0);
+        assert!(runtime.join("supervisor.v1.json").is_file());
+        assert!(
+            crate::shell_actuator::write_atomic(&runtime.join("shutdown-request.json"), "{}")
+                .is_ok()
+        );
+        assert!(runtime.join("shutdown-request.json").is_file());
+    }
+
+    #[cfg(unix)]
+    fn assert_link_permissions(data: &Path, outside: &Path) {
+        use std::os::unix::fs::PermissionsExt;
+        for path in [data, outside, &outside.join("exit-ledger")] {
+            assert_eq!(
+                fs::metadata(path).unwrap().permissions().mode() & 0o777,
+                0o775
+            );
+        }
+        assert!(fs::symlink_metadata(data.join("runtime"))
+            .unwrap()
+            .file_type()
+            .is_symlink());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn shell_linked_runtime_keeps_all_writers_working() {
+        let (data, outside) = linked_runtime_fixture();
+        exercise_linked_writers(data.path());
+        assert_link_permissions(data.path(), outside.path());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn shell_linked_runtime_warns_once_without_repairing_through_link() {
+        const CHILD_ROOT: &str = "JUSTSEARCH_PRIVATE_FOLDERS_WARNING_CHILD";
+        if let Some(data) = std::env::var_os(CHILD_ROOT) {
+            exercise_linked_writers(Path::new(&data));
+            return;
+        }
+        let (data, outside) = linked_runtime_fixture();
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "exit_ledger::tests::shell_linked_runtime_warns_once_without_repairing_through_link", "--nocapture"])
+            .env(CHILD_ROOT, data.path()).output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&output.stderr)
+                .matches("skipping repair on a link or reparse point")
+                .count(),
+            1
+        );
+        assert_link_permissions(data.path(), outside.path());
     }
 
     #[test]

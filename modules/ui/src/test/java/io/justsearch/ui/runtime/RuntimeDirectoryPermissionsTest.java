@@ -45,6 +45,7 @@ class RuntimeDirectoryPermissionsTest {
     Files.setPosixFilePermissions(old, PosixFilePermissions.fromString("rw-rw-r--"));
     try (var publisher = new RuntimeManifestPublisher(data)) {
       assertPrivate(runtime);
+      assertEquals(PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(old));
       publisher.publishHead(54321, "test-token");
       assertEquals("recognizable-old-token", Files.readString(old));
     }
@@ -102,7 +103,8 @@ class RuntimeDirectoryPermissionsTest {
       }
       assertEquals(PosixFilePermissions.fromString("rwxrwxr-x"), Files.getPosixFilePermissions(runtime));
       assertEquals(parentMode, Files.getPosixFilePermissions(data));
-      Mockito.verify(warning, Mockito.times(1)).warn(Mockito.startsWith("Skipping owner-only directory repair"));
+      assertDoesNotThrow(() -> Mockito.verify(warning, Mockito.times(1))
+          .warn(Mockito.startsWith("Skipping owner-only directory repair")));
     }
   }
 
@@ -130,6 +132,100 @@ class RuntimeDirectoryPermissionsTest {
       assertDoesNotThrow(() -> Mockito.verify(warning, Mockito.times(1))
           .warn(Mockito.startsWith("Could not protect owner-only directory")));
     }
+  }
+
+  @Test void repairsExistingDescendantsWhenRootIsAlreadyPrivate() throws Exception {
+    assumeTrue(Files.getFileStore(data).supportsFileAttributeView("posix"));
+    var runtime = Files.createDirectory(data.resolve("runtime"));
+    Files.setPosixFilePermissions(runtime, PosixFilePermissions.fromString("rwx------"));
+    var nested = Files.createDirectory(runtime.resolve("instances"));
+    var history = Files.writeString(nested.resolve("old-history"), "old-token");
+    var pending = Files.writeString(runtime.resolve("ledger.pending"), "pending");
+    Files.setPosixFilePermissions(nested, PosixFilePermissions.fromString("rwxrwxr-x"));
+    for (var file : java.util.List.of(history, pending)) {
+      Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rw-rw-r--"));
+    }
+    Files.setPosixFilePermissions(elsewhere, PosixFilePermissions.fromString("rwxrwxr-x"));
+    var outside = Files.writeString(elsewhere.resolve("outside"), "keep");
+    Files.setPosixFilePermissions(outside, PosixFilePermissions.fromString("rw-rw-r--"));
+    Files.createSymbolicLink(runtime.resolve("linked"), elsewhere);
+    var parentMode = Files.getPosixFilePermissions(data);
+    try (var publisher = new RuntimeManifestPublisher(data)) {
+      assertAll(
+          () -> assertEquals(PosixFilePermissions.fromString("rwx------"), Files.getPosixFilePermissions(nested)),
+          () -> assertEquals(PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(history)),
+          () -> assertEquals(PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(pending)));
+      publisher.publishHead(54321, "test-token");
+    }
+    assertEquals("old-token", Files.readString(history));
+    assertEquals("pending", Files.readString(pending));
+    assertEquals(parentMode, Files.getPosixFilePermissions(data));
+    assertEquals(PosixFilePermissions.fromString("rwxrwxr-x"), Files.getPosixFilePermissions(elsewhere));
+    assertEquals(PosixFilePermissions.fromString("rw-rw-r--"), Files.getPosixFilePermissions(outside));
+  }
+
+  @Test void windowsRepairIncludesExistingFilesAndSkipsEveryReparsePoint() throws Exception {
+    assumeTrue(Files.getFileStore(data).supportsFileAttributeView("posix"));
+    var runtime = Files.createDirectory(data.resolve("runtime")).toAbsolutePath().normalize();
+    var nested = Files.createDirectories(runtime.resolve("instances/old"));
+    var history = Files.writeString(nested.resolve("manifest.log.ndjson"), "old-token");
+    var pending = Files.writeString(runtime.resolve("ledger.pending"), "pending");
+    var keystore = Files.writeString(runtime.resolve("keystore.json"), "old-keystore");
+    var junction = Files.createDirectory(runtime.resolve("junction"));
+    var skipped = Files.writeString(junction.resolve("must-not-repair"), "keep");
+    var outside = Files.writeString(elsewhere.resolve("outside-history"), "outside");
+    var outsideMode = Files.getPosixFilePermissions(outside);
+    var link = Files.createSymbolicLink(runtime.resolve("symlink"), elsewhere);
+    var parentMode = Files.getPosixFilePermissions(data);
+    var targetMode = Files.getPosixFilePermissions(elsewhere);
+    var reparse = Mockito.mock(BasicFileAttributes.class);
+    Mockito.when(reparse.isDirectory()).thenReturn(true);
+    Mockito.when(reparse.isOther()).thenReturn(true);
+    var acl = Mockito.mock(java.nio.file.attribute.AclFileAttributeView.class);
+    var repaired = new java.util.HashSet<Path>();
+    var warning = Mockito.mock(Logger.class);
+    // Compatible harness: the before-state has no native backend class. It still executes
+    // the real RuntimeManifestPublisher; an empty repair log then fails the same file assertions.
+    Class<?> backend;
+    try { backend = Class.forName("io.justsearch.configuration.persistence.WindowsOwnerOnlyDirectory"); }
+    catch (ClassNotFoundException beforeState) { backend = null; }
+    try (var nativeSecurity = backend == null ? null : Mockito.mockStatic(backend, invocation -> {
+           if (invocation.getMethod().getName().equals("apply")) {
+             repaired.add(invocation.getArgument(0));
+             assertFalse((Boolean) invocation.getArgument(1), "existing entries must be repaired");
+             return null;
+           }
+           return Mockito.CALLS_REAL_METHODS.answer(invocation);
+         });
+         var files = Mockito.mockStatic(Files.class, Mockito.CALLS_REAL_METHODS);
+         var logging = Mockito.mockStatic(LoggerFactory.class, Mockito.CALLS_REAL_METHODS)) {
+      files.when(() -> Files.getFileAttributeView(Mockito.any(Path.class),
+          Mockito.eq(PosixFileAttributeView.class), Mockito.eq(LinkOption.NOFOLLOW_LINKS))).thenReturn(null);
+      files.when(() -> Files.getFileAttributeView(Mockito.any(Path.class),
+          Mockito.eq(java.nio.file.attribute.AclFileAttributeView.class),
+          Mockito.eq(LinkOption.NOFOLLOW_LINKS))).thenReturn(acl);
+      files.when(() -> Files.readAttributes(junction, BasicFileAttributes.class,
+          LinkOption.NOFOLLOW_LINKS)).thenReturn(reparse);
+      logging.when(() -> LoggerFactory.getLogger(Mockito.<Class<?>>argThat(type -> type != null
+          && type.getName().equals("io.justsearch.configuration.persistence.OwnerOnlyDirectory"))))
+          .thenReturn(warning);
+      try (var publisher = new RuntimeManifestPublisher(data)) {
+        publisher.publishHead(54321, "test-token");
+      }
+      assertTrue(repaired.containsAll(java.util.Set.of(runtime, runtime.resolve("instances"), nested, history, pending, keystore)),
+          "every existing directory, history file and pending file needs the protected DACL");
+      assertFalse(repaired.stream().anyMatch(path -> path.startsWith(link)));
+      assertTrue(repaired.stream().allMatch(path -> path.startsWith(runtime)), "repair must stay inside the protected root");
+      assertFalse(repaired.stream().anyMatch(path -> path.startsWith(junction)));
+      assertFalse(repaired.contains(elsewhere));
+      Mockito.verify(warning, Mockito.times(2)).warn(Mockito.startsWith("Skipping owner-only directory repair"));
+    }
+    assertEquals("old-token", Files.readString(history));
+    assertEquals("keep", Files.readString(skipped));
+    assertEquals("outside", Files.readString(outside));
+    assertEquals(outsideMode, Files.getPosixFilePermissions(outside));
+    assertEquals(parentMode, Files.getPosixFilePermissions(data));
+    assertEquals(targetMode, Files.getPosixFilePermissions(elsewhere));
   }
 
   private static void assertPrivate(Path runtime) throws Exception {

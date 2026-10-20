@@ -46,6 +46,7 @@ class EncryptionKeystorePermissionsTest {
     Files.setPosixFilePermissions(data.resolve("encryption/keystore.json"), PosixFilePermissions.fromString("rw-rw-r--"));
     var next = restart();
     assertEquals(PosixFilePermissions.fromString("rwx------"), Files.getPosixFilePermissions(data.resolve("encryption")));
+    assertEquals(PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(data.resolve("encryption/keystore.json")));
     next.unlock("passphrase".toCharArray());
     assertArrayEquals(dek, next.dek());
   }

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-20T09:19:02.989Z",
-  "revision": "2fa7248d7609f6e8a627aec681d9f359c699b97b",
-  "tree": "9744e65c681f756fc2b84d5c8a2725df3667b8ef",
+  "createdAt": "2026-10-20T11:03:42.589Z",
+  "revision": "6bd1e5902b48811895e39c985aa50d82c35dcae1",
+  "tree": "8ea1f275c1ccb889d711af647b078c0bef966f5f",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,16 +21,51 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::windows_directory_descriptor_is_protected_and_only_owner_and_system_inherit_full_control\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2264
+      "durationMs": 1799
     },
     {
-      "command": "./gradlew :modules:configuration:test --tests \"io.justsearch.configuration.persistence.WindowsOwnerOnlyDirectoryTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "./gradlew :modules:configuration:test --tests \"io.justsearch.configuration.persistence.OwnerOnlyDirectoryTest\" --tests \"io.justsearch.configuration.persistence.WindowsOwnerOnlyDirectoryTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2019
+      "durationMs": 2519
     }
   ],
   "checks": [
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/OwnerOnlyDirectoryTest.java",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/OwnerOnlyDirectoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8f42377c5e91be9acfe132c3493912bfb44bc8fce3149186166453eadf1a8857",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linkWarnsOnceAndContinuesWithoutCallingPermissionSetterOrChangingTarget()",
+          "status": "passed"
+        },
+        {
+          "name": "permissionFailureWarnsOnceAndPreservesContents()",
+          "status": "passed"
+        },
+        {
+          "name": "freshAndRestoredDirectoryArePrivateWithoutChangingParentOrOldContents()",
+          "status": "passed"
+        },
+        {
+          "name": "repairsNestedFilesAndDirectoriesButNeverLinkTargets()",
+          "status": "passed"
+        },
+        {
+          "name": "unsupportedPermissionsWarnAndContinue()",
+          "status": "passed"
+        },
+        {
+          "name": "deniedChildRepairsWarnOnceForTheFolderAndPreserveEveryFile()",
+          "status": "passed"
+        }
+      ]
+    },
     {
       "id": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/WindowsOwnerOnlyDirectoryTest.java",
       "file": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/WindowsOwnerOnlyDirectoryTest.java",
@@ -58,7 +93,7 @@
       "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::windows_directory_descriptor_is_protected_and_only_owner_and_system_inherit_full_control",
       "file": "modules/shell/src-tauri/src/exit_ledger.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:5a0dd39edd33b069c728f7dbc3a5c2db6f093ca0e22c0e2583db10157316e18f",
+      "contentDigest": "sha256:a37ab48723e7fd7e98e09fe61bcf50512d8f58860db466cea94e49229a0b68a5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -71,5 +106,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:e6948bae596d3a87f9d368ed58a0f5ad93c544cbe1f4dcd0bf699f6a738f4139"
+  "digest": "sha256:914de9a23144da46432334b84766b640b6c6a0dcb23312762142644663763bda"
 }

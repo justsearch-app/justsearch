@@ -13,7 +13,7 @@ class OwnerOnlyDirectoryTest {
   @TempDir Path data;
   @TempDir Path elsewhere;
 
-  @Test void freshAndRestoredDirectoryArePrivateWithoutChangingParentOrOldFiles() throws Exception {
+  @Test void freshAndRestoredDirectoryArePrivateWithoutChangingParentOrOldContents() throws Exception {
     assumeTrue(Files.getFileStore(data).supportsFileAttributeView("posix"));
     Files.setPosixFilePermissions(data, PosixFilePermissions.fromString("rwxrwxr-x"));
     var parentMode = Files.getPosixFilePermissions(data);
@@ -26,8 +26,38 @@ class OwnerOnlyDirectoryTest {
     OwnerOnlyDirectory.ensureOwnerOnlyDirectory(runtime);
     assertEquals(PosixFilePermissions.fromString("rwx------"), Files.getPosixFilePermissions(runtime));
     assertEquals("recognizable-old-token", Files.readString(history));
-    assertEquals(PosixFilePermissions.fromString("rw-rw-r--"), Files.getPosixFilePermissions(history));
+    assertEquals(PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(history));
     assertEquals(parentMode, Files.getPosixFilePermissions(data));
+  }
+
+  @Test void repairsNestedFilesAndDirectoriesButNeverLinkTargets() throws Exception {
+    assumeTrue(Files.getFileStore(data).supportsFileAttributeView("posix"));
+    var runtime = Files.createDirectory(data.resolve("runtime"));
+    var nested = Files.createDirectory(runtime.resolve("instances"));
+    var history = Files.writeString(nested.resolve("history"), "old-token");
+    var pending = Files.writeString(runtime.resolve("ledger.pending"), "pending");
+    for (var directory : java.util.List.of(runtime, nested, elsewhere)) {
+      Files.setPosixFilePermissions(directory, PosixFilePermissions.fromString("rwxrwxr-x"));
+    }
+    for (var file : java.util.List.of(history, pending)) {
+      Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rw-rw-r--"));
+    }
+    var outside = Files.writeString(elsewhere.resolve("outside"), "keep");
+    Files.setPosixFilePermissions(outside, PosixFilePermissions.fromString("rw-rw-r--"));
+    Files.createSymbolicLink(runtime.resolve("linked"), elsewhere);
+    var parentMode = Files.getPosixFilePermissions(data);
+    OwnerOnlyDirectory.ensureOwnerOnlyDirectory(runtime);
+    for (var directory : java.util.List.of(runtime, nested)) {
+      assertEquals(PosixFilePermissions.fromString("rwx------"), Files.getPosixFilePermissions(directory));
+    }
+    for (var file : java.util.List.of(history, pending)) {
+      assertEquals(PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(file));
+    }
+    assertEquals("old-token", Files.readString(history));
+    assertEquals("pending", Files.readString(pending));
+    assertEquals(parentMode, Files.getPosixFilePermissions(data));
+    assertEquals(PosixFilePermissions.fromString("rwxrwxr-x"), Files.getPosixFilePermissions(elsewhere));
+    assertEquals(PosixFilePermissions.fromString("rw-rw-r--"), Files.getPosixFilePermissions(outside));
   }
 
   @Test void permissionFailureWarnsOnceAndPreservesContents() throws Exception {
@@ -39,6 +69,21 @@ class OwnerOnlyDirectoryTest {
     OwnerOnlyDirectory.ensure(runtime, denied, warnings::add);
     assertEquals(1, warnings.size());
     assertEquals("old", Files.readString(old));
+  }
+
+  @Test void deniedChildRepairsWarnOnceForTheFolderAndPreserveEveryFile() throws Exception {
+    var runtime = Files.createDirectory(data.resolve("runtime"));
+    var first = Files.writeString(runtime.resolve("first"), "first");
+    var second = Files.writeString(runtime.resolve("second"), "second");
+    var warnings = new ArrayList<String>();
+    OwnerOnlyDirectory.Permissions deniedChildren = path -> {
+      if (!path.equals(runtime.toAbsolutePath().normalize())) throw new AccessDeniedException(path.toString());
+    };
+    OwnerOnlyDirectory.ensure(runtime, deniedChildren, warnings::add);
+    OwnerOnlyDirectory.ensure(runtime, deniedChildren, warnings::add);
+    assertEquals(1, warnings.size());
+    assertEquals("first", Files.readString(first));
+    assertEquals("second", Files.readString(second));
   }
 
   @Test void unsupportedPermissionsWarnAndContinue() throws Exception {
