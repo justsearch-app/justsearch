@@ -359,3 +359,14 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
   "note": "Test expectations have scenario or delegated-choice sources. Named UI and Java checks passed independently and fail by assertion on f6a14b5a6; run-evidence rerun to retained scratch evidence. Fixture adds only an unknown optional observation. This accepts test intent only; the product verdict is fail for scheduler-path wording, old-client compatibility, Library zero-percent coverage, and the measured Library axe gate."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp33-verifier-momfoz0",
+  "verdict": "accept",
+  "digest": "sha256:8fabf08ea13c4647b3e2bf3b5ce520c9fd396e259a5a964a94cc572fee7bbe8d",
+  "note": "Intent follows S33.1-S33.6, N33.3 and the explicit compatibility repair brief. Independently reran named checks; 25 UI assertions fail on f6a14b5a6 and pass on dbcd1c111. Compatibility passes f6a14b5a6 and dbcd1c111 and fails by assertion on 8237e63d9. Scratch run-evidence retained. Qualified CPU/GPU and idle/interleaved scopes match scheduler probes. Acceptance is of test intent only; hardware and full-suite verification limits are reported separately."
+}
+```
