@@ -426,3 +426,14 @@ complete. The rejection record below is retained unchanged.
   "note": "AgentRunStoreTest.java is classed New/repaired, but the change removes an existing expectation (appendSearchEvent returns null for a blank or null conversationId) and replaces it with a throw. That removal needs an Obsolete entry with a conflict search and a source that changes this behaviour. PS1 does not: the old null return already refused a blank id before any filesystem access, so PS1 neither makes the old behaviour a defect nor requires an exception. Either keep the old expectation, or cite a source (owner words) that a blank id must raise. The other entries hold: their expectations follow from PS1-PS3/PN1-PN2, and the fail-before evidence is an assertion failure on 117e89be9 for each repaired check."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-3e60obt8",
+  "verdict": "reject",
+  "digest": "sha256:15e550765692d88cb934dc4996298d75c7c0c3c536011e7f6405f6abb68605d9",
+  "note": "Re-ran run-evidence with every repaired check against the real base 117e89be9 (scratch: evidence/run-evidence/repaired-vs-117e89be9.json). 16 of 19 fail there by assertion and pass on d0de611d2; those entries hold (expectations follow PS1-PS3, PS1b, PS1w, PN1-PN3). Omissions: (1) RunStoresSafeIdsTest#appendSearchEventWithoutConversationCreatesNoFiles is entered as repaired:true, but it passes on 117e89be9 (base already returns null for a blank id without touching disk); its only fail-before is against b359747af, an intermediate commit of this same change, so it is a preservation check and needs an entry without repaired and evidence without --before. Its source PA4 quotes the orchestrator's brief to the builder, labelled owner-adopted-scenario; a brief is never a citation, so only PS1 can support it. (2) StoreIdAmendmentsHttpTest#blankConversationIdRetainsLegacyHttpResponse is also repaired:true but passes on 117e89be9; same fix (preservation, PN3). Notes, not omissions: StoreIdsUnicodeExtensionsTest cannot compile on the base (StoreIds is new); its fail-before against b359747af is acceptable but the entry should say so. Uncited stale evidence files uiux-safe-ids-repair.json and uiux-safe-ids-preserve.json remain; repair.json names the removed check AgentRunStoreTest#appendSearchEventRefusesBlankConversationId. PN3's 'exactly as before' does not hold literally: on 117e89be9 a blank sessionId on /api/chat/dispatch was used as a store key (wrote messages.jsonl/meta.json into the conversations root, created folders ' ' and tab); the N9.3 check's fail-before is that difference."
+}
+```
