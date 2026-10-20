@@ -3,7 +3,14 @@
 // Tempdoc 565 §3.A — the sources pane + its open-store: the answer's grounding sources render as
 // clickable local-passage cards that dispatch citation-select (the deep-link).
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// These projections do not exercise their incidental backend reads.
+const originalFetch = globalThis.fetch;
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Test backend unavailable')));
+});
+afterEach(() => { globalThis.fetch = originalFetch; });
 import './SourcesPane.js';
 import type { SourcesPane } from './SourcesPane.js';
 import {
