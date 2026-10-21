@@ -97,7 +97,7 @@ This design ensures CPU always works out of the box, while GPU activation is exp
 **For developers:** To test with the GPU variant without the UI activation flow, set the system property directly:
 
 ```text
--Djustsearch.server.exe=modules/ui/native-bin/llama-server/variants/cuda12/llama-server.exe
+-Djustsearch.server.exe=modules/ui/build/llama-server/stage/variants/cuda12/llama-server.exe
 ```
 
 See also: `docs/how-to/test-gpu-locally.md`.

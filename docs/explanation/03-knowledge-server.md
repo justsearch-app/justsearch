@@ -21,7 +21,7 @@ The `IndexingLoop.java` class is an infinite loop that processes files one by on
 3.  **Validate:** Checks `Files.exists()` and `Files.isReadable()`.
 4.  **Check Modified:** Compares `Files.getLastModifiedTime()` against the Lucene index. If unchanged, mark `DONE` and skip.
 5.  **Extract:** Passes file to `TimeboxedContentExtractor` (wraps `ContentExtractor` / Tika) to prevent pathological files from hanging the loop; timeouts fail the job with `EXTRACTION_TIMEOUT`.
-6.  **Embed (Deferred):** During primary indexing, embedding is deferred - documents get `EMBEDDING_STATUS=PENDING`. After the queue drains, `EmbeddingBackfillOps` batch-embeds via ORT (EmbeddingGemma-300M by default). If the in-process `WorkerSignalBus.isMainGpuActive()` flag is true, the index half skips or unloads GPU embedding work to avoid VRAM contention with Online mode.
+6.  **Embed (Deferred):** During primary indexing, embedding is deferred - documents get `EMBEDDING_STATUS=PENDING`. After the queue drains, `EmbeddingBackfillOps` batch-embeds via ORT (gte-multilingual-base by default). Current `InferenceWiring` leaves `mainGpuActive=false`, so going Online does not claim the GPU from the encoders.
 7.  **Index:** Writes `IndexDocument` via the write-path ops (`WritePathOps`/`CommitOps`), including canonical metadata fields used by the UI:
     - `mime_base`: normalized MIME without parameters (e.g., strip `; charset=` from Tika `mime`)
     - `file_kind`: UX-friendly type bucket (e.g., `pdf|markdown|image|code|text|office|archive|binary|unknown`)
@@ -434,8 +434,8 @@ One filesystem-identity gap remains here: Windows junction points can expose the
 > **Session construction.** The `OnnxEmbeddingEncoder` session is built by the Engine's index-half composition root alongside the other five ORT encoders (SPLADE, NER, BGE-M3, reranker, citation). See [24-engine-inference-composition.md](24-engine-inference-composition.md) for the pipeline (resolvers -> composition root -> assembler -> `SessionHandle`) and register entry D-007.
 
 *   **Class:** `io.justsearch.indexerworker.embed.EmbeddingService`
-*   **Backend:** ONNX Runtime via `OnnxEmbeddingEncoder` (default model: EmbeddingGemma-300M INT8, 298 MB).
-*   **Discovery:** `EmbeddingOnnxModelDiscovery` tries `embeddinggemma-300m/` first, falls back to `embedding/` (nomic). Explicit override via `JUSTSEARCH_EMBED_ONNX_MODEL_PATH`.
+*   **Backend:** ONNX Runtime via `OnnxEmbeddingEncoder` (default model: gte-multilingual-base).
+*   **Discovery:** `EmbeddingOnnxModelDiscovery` delegates to shared `OnnxModelDiscovery` for `gte-multilingual-base`. Explicit override via `JUSTSEARCH_EMBED_ONNX_MODEL_PATH`.
 *   **Default Mode:** CPU-only by default; GPU offload is opt-in via `JUSTSEARCH_EMBED_GPU_ENABLED`.
 *   **Batch size:** `MAX_ORT_BATCH_SIZE=8` (optimal for 300M-param models; batch=16+ causes GPU OOM on 2048 MB arena).
 *   **Key Env Vars:**
@@ -444,10 +444,10 @@ One filesystem-identity gap remains here: Windows junction points can expose the
     *   `JUSTSEARCH_EMBED_GPU_MEM_MB`: GPU arena size in MB (default `2048`).
     *   `JUSTSEARCH_EMBED_BACKEND=onnx`: backend selector (default `auto`, which resolves to ONNX when model found).
     *   `JUSTSEARCH_LLM_BACKEND=stub`: disables embeddings entirely (useful for hermetic tests).
-*   **Constraint:** When `llama-server` is running in Online mode on low-VRAM cards, we must not keep a GPU embedding backend loaded.
-*   **Logic (`IndexingLoop.handleGpuStateTransition`):**
-    *   If `signalBus.isMainGpuActive()` is **TRUE**: the index half **unloads** `EmbeddingService` (best-effort VRAM release) and skips embedding work.
-    *   If `signalBus.isMainGpuActive()` is **FALSE**: the index half **reloads** `EmbeddingService` (auto-discovery) and performs a backfill pass for pending embeddings.
+*   **GPU coordination:** Current `InferenceWiring` keeps `mainGpuActive=false`, preserving
+    chat/encoder co-residence. `EmbeddingProviderLifecycle` retains a handoff implementation that
+    releases only the GPU session and keeps CPU query embedding alive if that signal is raised;
+    it does not unload the provider to a no-op on an Online transition.
 
 ### Deferred embedding lifecycle
 
@@ -468,7 +468,7 @@ Chunk vectors (Phase 6) are also supported:
 The embedding service is configured for optimal throughput:
 - **Batching enabled**: Multiple documents are embedded in a single inference call, providing +200-300% throughput vs sequential processing.
 - **Backfill batch size**: 100 documents per backfill cycle (up from 50; provides +40% backfill throughput).
-- **GPU arbitration**: When `isMainGpuActive()` is true, embedding is paused to avoid VRAM contention with Online mode chat.
+- **GPU arbitration**: Bulk embedding backfill has a `mainGpuActive` pacing guard; current Online wiring leaves that signal false.
 
 ## RAG Chunking
 *   **Class:** `ChunkSplitter.java`

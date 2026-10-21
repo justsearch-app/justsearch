@@ -2,6 +2,7 @@
 package io.justsearch.agent.tools;
 
 import io.justsearch.configuration.persistence.AtomicFileWrites;
+import io.justsearch.configuration.persistence.StoreIds;
 import io.justsearch.configuration.persistence.CorruptDurableStoreException;
 import io.justsearch.configuration.persistence.UnsupportedStoreVersionException;
 import io.justsearch.telemetry.DiagnosticFileRetention;
@@ -51,10 +52,12 @@ public final class FileOperationLog {
       LOG.warn("Failed to create transaction log directory: {}", logDir, e);
     }
     DiagnosticFileRetention.pruneBefore(
-        logDir, "", Instant.now().minus(java.time.Duration.ofDays(30)));
+        logDir, "", Instant.now().minus(java.time.Duration.ofDays(30)),
+        FileOperationLog::hasValidBatchName);
   }
 
   void startBatch(String batchId, String explanation, List<FileOperation> operations) {
+    StoreIds.requireValid(batchId);
     Map<String, Object> log = new HashMap<>();
     log.put("batchId", batchId);
     log.put("schemaVersion", CURRENT_SCHEMA_VERSION);
@@ -158,7 +161,7 @@ public final class FileOperationLog {
   /** Read a batch log from disk. Returns null if the batch does not exist. */
   @SuppressWarnings("unchecked")
   public Map<String, Object> readBatch(String batchId) {
-    Path logFile = logDir.resolve(batchId + ".json");
+    Path logFile = batchPath(batchId);
     if (!Files.exists(logFile)) {
       return null;
     }
@@ -183,6 +186,7 @@ public final class FileOperationLog {
       try (var stream = Files.list(logDir)) {
         return stream
             .filter(p -> p.toString().endsWith(".json"))
+            .filter(FileOperationLog::hasValidBatchName)
             .sorted(
                 Comparator.<Path, FileTime>comparing(
                         p -> {
@@ -219,8 +223,8 @@ public final class FileOperationLog {
   }
 
   private void writeBatchLog(String batchId, Map<String, Object> log) {
+    Path logFile = batchPath(batchId);
     try {
-      Path logFile = logDir.resolve(batchId + ".json");
       atomicWrite(logFile, log);
     } catch (UnsupportedStoreVersionException e) {
       throw e;
@@ -231,8 +235,8 @@ public final class FileOperationLog {
 
   @SuppressWarnings("unchecked")
   private void updateBatchLog(String batchId, Consumer<Map<String, Object>> updater) {
+    Path logFile = batchPath(batchId);
     try {
-      Path logFile = logDir.resolve(batchId + ".json");
       if (!Files.exists(logFile)) {
         LOG.warn("Batch log not found: {}", batchId);
         return;
@@ -247,6 +251,17 @@ public final class FileOperationLog {
       throw new CorruptDurableStoreException(
           "file-operation-journal", "cannot update batch " + batchId, e);
     }
+  }
+
+  private static boolean hasValidBatchName(Path path) {
+    String name = path.getFileName().toString();
+    String id = name.endsWith(".json") ? name.substring(0, name.length() - 5) : name;
+    return StoreIds.isValid(id);
+  }
+
+  private Path batchPath(String batchId) {
+    StoreIds.requireValid(batchId);
+    return StoreIds.resolve(logDir, batchId + ".json");
   }
 
   /** Write JSON to a temp file, then atomic-rename to the target. */

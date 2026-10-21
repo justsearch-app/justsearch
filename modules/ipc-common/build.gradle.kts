@@ -12,10 +12,8 @@ tasks.withType<Pmd>().configureEach {
 
 dependencies {
   api(project(":modules:app-api"))
-  api(libs.guava)
   api(libs.protobuf.java)
   implementation(libs.slf4j.api)
-  implementation(libs.opentelemetry.api)
   testImplementation(platform(libs.junit.bom))
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)

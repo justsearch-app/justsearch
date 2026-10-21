@@ -13,7 +13,7 @@ JustSearch wraps **Apache Lucene 10** as its core storage engine. We do not use 
 
 ### Index root (`indexBasePath`)
 
-The effective on-disk index root is `RuntimeConfig.indexBasePath()`:
+The effective on-disk index root is `ResolvedConfig.paths().indexBasePath()`:
 
 - **Default**: `<dataDir>/index/<collection>` (collection defaults to `default`)
 - **Override**: `JUSTSEARCH_INDEX_BASE_PATH` or `-Djustsearch.index.base_path=<path>`
@@ -276,7 +276,7 @@ For large result sets, TEXT mode supports:
 The cursor token is intentionally opaque and short-lived: index mutations (especially reindex) can invalidate it.
 
 ### Validation Strategies
-1.  **Startup Check:** `LuceneIndexRuntime.validateIndexableFields(...)` ensures the loaded catalog matches the constant `SchemaFields.INDEXABLE_FIELDS`. This prevents "silent failures" where code writes to a field that doesn't exist in the schema.
+1.  **Startup Check:** `IndexSchema.validateIndexableFields(...)` ensures the loaded catalog matches the constant `SchemaFields.INDEXABLE_FIELDS`. This prevents "silent failures" where code writes to a field that doesn't exist in the schema.
 2.  **Runtime Check:** `FieldMapper` logs a warning (once per field) if an unknown field is encountered.
 
 ## Reliability Strategies
@@ -309,7 +309,7 @@ field boosts) is the other tracked key but never triggers a rebuild. Full input 
 the enforcement mechanics live in `docs/explanation/11-index-schema-migration.md`.
 
 ### 3. Commit Strategy
-Writing to disk is expensive. `IndexingLoop` controls commits, but `LuceneIndexRuntime` enforces the physical write.
+Writing to disk is expensive. `IndexingLoop` controls commits, but `CommitOps` performs the physical commit.
 *   **Trigger:** We commit to disk (fsync) when:
     1.  **Time:** > 10 seconds since last commit.
     2.  **Size:** > 1000 documents in buffer.
@@ -328,7 +328,7 @@ The `queueDepth` counter guards against overloading the writer.
 *   If `queueDepth > maxQueueDepth` (default 10,000), `indexBatch` throws `BACKPRESSURE` exception to slow down the ingest loop.
 
 ### 5. Vector Search (HNSW)
-We use `Lucene99HnswVectorsFormat` (Float32) in the current default codec (`JustSearchCodec`, which extends `Lucene104Codec`).
+We use `Lucene99HnswVectorsFormat` (Float32) in the current default codec (`JustSearchCodec`, which extends `FilterCodec` and wraps `Lucene104Codec`).
 *   **Quantization:** Available behind a flag (default off): `index.vector.quantization.enabled`, `JUSTSEARCH_INDEX_VECTOR_QUANTIZATION_ENABLED`, or `-Djustsearch.index.vector.quantization.enabled=true`. Uses `Lucene104HnswScalarQuantizedVectorsFormat`. Tested with Lucene 10.3.1 (5K/20K/50K docs, all modes pass). Provides ~75% vector storage reduction. Float32 remains default for backwards compatibility with existing indexes.
 *   **Dimension:** Validated against the SSOT catalog (768).
 *   **Validation:** `FieldMapper` strictly checks that `vector` field arrays match the expected dimension, throwing errors if they drift.
@@ -339,7 +339,7 @@ JustSearch uses tuned Lucene defaults optimized for desktop workloads:
 
 | Setting | Default | Purpose |
 |---------|---------|---------|
-| Directory type | MMapDirectory | Memory-mapped files for fast reads (explicitly set at `ComponentsFactory.java:83`) |
+| Directory type | MMapDirectory | Memory-mapped files for fast reads (explicitly set at `ComponentsFactory.java:101`) |
 | RAM buffer | 64 MB | Larger buffer reduces flush frequency (+20-30% indexing throughput vs Lucene's ~16MB default) |
 | Commit interval | 10s / 1000 docs | Balance between durability and performance |
 
@@ -371,7 +371,7 @@ replayed or reported as success. SQL error codes and causes remain in internal l
 The schema starts
 at version 1 and migrates to version 2 with SQL payload bounds (262144 UTF-8 bytes
 for identity, 4096 for checkpoint cursor), preserving rows, ordering sequence and
-history fence; `jobs.db` independently uses version 19. Versions 15–17 retain nullable
+history fence; `jobs.db` independently uses version 22. Versions 15–17 retain nullable
 `jobs.content_hash` for legacy rows and add opaque revisions to switch-buffer replacements
 and queue admissions. Version 18 adds the finite-walk projection schema and epoch primitives. Explicit recorded
 enumeration preserves same-walk retry state; maintenance preserves active membership while

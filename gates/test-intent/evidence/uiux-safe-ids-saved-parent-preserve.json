@@ -1,0 +1,50 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T06:31:10.033Z",
+  "revision": "08da0572dbd87b2075b7a5a3cd2b85a61891afc5",
+  "tree": "605313d454122287b595e35d8fdafd002c7dc317",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.SavedStoreIdsHttpTest.branchWithInvalidSavedParentOpensLikeMissingParentOverHttp\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3693
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/SavedStoreIdsHttpTest.java#branchWithInvalidSavedParentOpensLikeMissingParentOverHttp",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/SavedStoreIdsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5605cd37f2ca6545748f035e35be976788679ed0be5bc6432575cc0a0fc0112",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "branchWithInvalidSavedParentOpensLikeMissingParentOverHttp(history)",
+          "status": "passed"
+        },
+        {
+          "name": "branchWithInvalidSavedParentOpensLikeMissingParentOverHttp(thread)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:24b283612fbbbaf76e6cb50b7b955327c5708ec3261115e471603b3bb67d3717"
+}

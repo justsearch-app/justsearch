@@ -253,12 +253,14 @@ function normalizeJob(job, policyEntry, artifacts, splitRun) {
     return conclusion === 'failure' || conclusion === 'cancelled' || status === 'failure';
   });
   const name = job.name || 'unknown job';
+  const skipped = job.conclusion === 'skipped' || (steps.length > 0 && steps.every((step) =>
+    step.conclusion === 'skipped' || /^(Set up job|Complete job)$/.test(step.name)));
   const expected = new Set(policyEntry?.requiredStatusChecks || []);
-  const baseArtifact = name === 'Unit tests (app-ui)' && (splitRun || steps.some((s) => /Require every app-ui part/.test(s.name)))
+  const baseArtifact = skipped || (name === 'Unit tests (app-ui)' && (splitRun || steps.some((s) => /Require every app-ui part/.test(s.name))))
     ? null : UNIT_ARTIFACTS.get(name) || null;
   const localCommand = SHARD_POLICY.lanes.find((lane) => lane.jobName === name)?.localCommand;
   const part = /^(?:Unit tests \(app-ui-(?:ui|services)\)|Windows-native tests \((?:node|contracts)\))$/.test(name);
-  const partBase = baseArtifact || WINDOWS_ARTIFACTS.get(name);
+  const partBase = skipped ? null : baseArtifact || WINDOWS_ARTIFACTS.get(name);
   const selected = partBase ? selectJobArtifact(artifacts, partBase, job) : null;
   const partArtifact = part && partBase ? selected?.name || `${partBase}-attempt-${job.run_attempt || 1}` : null;
   const artifactName = baseArtifact && part ? partArtifact : baseArtifact;

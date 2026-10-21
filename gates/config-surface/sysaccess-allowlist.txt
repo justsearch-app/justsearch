@@ -68,7 +68,6 @@ io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#resolveOccurrenceBu
 io.justsearch.app.services.bootstrap.phases.ExamplePlugin#enabled
 io.justsearch.app.services.bootstrap.phases.InferenceWiring#seedAutostartSpec
 io.justsearch.app.services.bootstrap.phases.InfraPhase#runWithOutcome
-io.justsearch.app.services.indexing.ExcludeGlobs#isWindows
 io.justsearch.app.services.lease.OperationLeaseServiceImpl#<init>
 io.justsearch.app.services.lease.OperationLeaseServiceImpl#currentHolder
 io.justsearch.app.services.policy.EnterprisePolicyServiceImpl#isWindows

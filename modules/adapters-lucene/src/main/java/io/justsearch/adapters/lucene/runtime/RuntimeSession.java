@@ -97,6 +97,9 @@ final class RuntimeSession implements AutoCloseable {
   volatile TelemetryEvents telemetryEvents;
   volatile SoftDeletesMetrics softDeletesMetrics;
 
+  /** Worker-owned file policy, bound before admission; document reads remain available. */
+  volatile java.util.function.Predicate<String> sourceProcessingPolicy;
+
   // ==========================================================================
   // Config-derived knobs (set after Components open; volatile for cross-thread visibility).
   // No field-init defaults — both constructors assign each field explicitly so the audit

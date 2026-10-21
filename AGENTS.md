@@ -1,4 +1,4 @@
-<!-- Agent System entry for project justsearch. Method: ~/.local/share/agent-method. Private folder: ~/dev/agent-private. Method commit: 0f37ac7ee888. Checksum: badd4b87c541. -->
+<!-- Agent System entry for project justsearch. Method: ~/.local/share/agent-method. Private folder: ~/dev/agent-private. Method commit: 47c18bf1c6cc. Checksum: af62d7608e9f. -->
 # Working agreement
 
 This is how agents work in this project. The project's maintainer owns these rules; project knowledge
@@ -50,7 +50,10 @@ CPU, memory and disk, CI runners and the merge queue; then complexity and upkeep
    configured check is not a pass.
 5. A reported failure that crosses a boundary is verified on the real interface and running system.
 6. Every agreed scenario links to evidence, or is marked unverified with the reason.
-7. Every delivery asks for the user's verdict on behavior. Silence is not acceptance.
+7. The user's request, or their merge where the project leaves merging to them, is their sign-off
+   on verified work.
+   Ask for their verdict only when a change breaks something they use, changes what they see, or
+   touches their data: one plain question, never a list; until they answer, that change waits.
 
 ## Depth: you decide, before editing or delegating
 

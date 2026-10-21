@@ -1,0 +1,109 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T03:41:22.909Z",
+  "revision": "8cf7897584558633c36d27bbe092c2cef0cb7973",
+  "tree": "106895f535827fcb689a82ac386c811e75af3dd0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-exclusions/tmp/wp31-ax/test-intent-vitest-1262256-1792467677909.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1593
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#AX1 editor preserves the saved list and names every literal fallback warning",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fadf6b4fdc5ef9d0ed1aec5f6d168cda7efeeb4e386dd52bf2a7afc8a38d286",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions AX1 editor preserves the saved list and names every literal fallback warning",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#AX1 unchanged legacy list can be previewed and applied without replacing the saved policy",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fadf6b4fdc5ef9d0ed1aec5f6d168cda7efeeb4e386dd52bf2a7afc8a38d286",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions AX1 unchanged legacy list can be previewed and applied without replacing the saved policy",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#AX2 pattern help explains character classes and alternatives for previously saved lists",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fadf6b4fdc5ef9d0ed1aec5f6d168cda7efeeb4e386dd52bf2a7afc8a38d286",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions AX2 pattern help explains character classes and alternatives for previously saved lists",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "8cf789758",
+    "revision": "8cf7897584558633c36d27bbe092c2cef0cb7973",
+    "overlays": [
+      "modules/ui-web/src/api/generated/schema-types/settings-v2.ts"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-exclusions/tmp/wp31-ax/test-intent-vitest-1262256-1792467681444.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1303,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-exclusions/tmp/wp31-ax/test-intent-vitest-1262256-1792467681444.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#AX1 editor preserves the saved list and names every literal fallback warning",
+        "classification": "assertion",
+        "detail": "Library retained-base exclusions AX1 editor preserves the saved list and names every literal fallback warning:  AssertionError: expected [] to deeply equal [ …(2) ]\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-exclusions/tmp/wp31-ax/test-intent-before-23TZKi/modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts:50:68\n    at processTicksAndRejections (node:internal/process/task_"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#AX1 unchanged legacy list can be previewed and applied without replacing the saved policy",
+        "classification": "assertion",
+        "detail": "Library retained-base exclusions AX1 unchanged legacy list can be previewed and applied without replacing the saved policy:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 3 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-exclusions/tmp/wp31-ax/test-intent-before-23TZKi/modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts:66:18\n    at processTicksAndRejections (node:in"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts#AX2 pattern help explains character classes and alternatives for previously saved lists",
+        "classification": "assertion",
+        "detail": "Library retained-base exclusions AX2 pattern help explains character classes and alternatives for previously saved lists:  AssertionError: expected ' Library Manage your indexed folders …' to contain '[ab] matches one listed character'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-exclusions/tmp/wp31-ax/test-intent-before-23TZKi/modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts:80:18"
+      }
+    ]
+  },
+  "digest": "sha256:e22cbc52a0d21dea70907534cae8ab5daf7a2818f3c21497ce8b9f0fd11c535c"
+}

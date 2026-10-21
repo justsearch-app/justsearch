@@ -190,6 +190,48 @@ final class MemoryExtractionConsumerTest {
     }
   }
 
+  @Test
+  void failedLoadSkipsExtractionOncePerEpisodeAndToolRefuses(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+    var locked = new java.util.concurrent.atomic.AtomicBoolean(true);
+    var cipher = new io.justsearch.agent.api.encryption.StoreCipher(new io.justsearch.agent.api.encryption.DataKeyState() {
+      public boolean enabled() { return true; }
+      public boolean locked() { return locked.get(); }
+      public byte[] dek() { return new byte[32]; }
+    });
+    var file = dir.resolve("memory.json");
+    String broken = "[{\"id\":\"old\",\"content\":\"kept\"},{\"content\":\"bad\"}]";
+    java.nio.file.Files.writeString(file, broken);
+    var store = new io.justsearch.agent.FileMemoryStore(dir, cipher);
+    locked.set(false);
+    org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, store::onKeyUnlocked);
+    var consumer = new MemoryExtractionConsumer(store);
+    var appender = attach();
+    try {
+      try (var pool = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+        var turns = new ArrayList<java.util.concurrent.Future<?>>();
+        for (int i = 0; i < 10; i++) {
+          turns.add(pool.submit(() -> assertDoesNotThrow(() -> consumer.onDone("ok", ctx("remember that this must not overwrite")))));
+        }
+        for (var turn : turns) turn.get(5, java.util.concurrent.TimeUnit.SECONDS);
+      }
+      assertEquals(1, warnMessages(appender).size());
+      assertTrue(warnMessages(appender).getFirst().contains("unavailable"));
+      var result = new io.justsearch.app.services.registry.operations.handlers.RememberFactHandler(store)
+          .execute("{\"content\":\"new\"}", io.justsearch.app.services.TestEngineContexts.internal());
+      assertTrue(!result.success(), "core_remember must fail");
+      assertEquals(broken, java.nio.file.Files.readString(file));
+      java.nio.file.Files.writeString(file, "[]");
+      assertTrue(store.whatItKnows().isEmpty()); // recovery through another caller
+      locked.set(true);
+      store.onKeyLocked();
+      java.nio.file.Files.writeString(file, broken);
+      locked.set(false);
+      org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, store::onKeyUnlocked);
+      consumer.onDone("ok", ctx("remember that another episode must warn"));
+      assertEquals(2, warnMessages(appender).size());
+    } finally { detach(appender); }
+  }
+
   private static ListAppender<ILoggingEvent> attach() {
     var appender = new ListAppender<ILoggingEvent>();
     appender.start();
