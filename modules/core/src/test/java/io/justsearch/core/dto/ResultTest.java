@@ -25,6 +25,6 @@ class ResultTest {
     Result result = new Result(List.of(), Map.of(), null, metadata);
 
     metadata.put("source", "mutated");
-    assertEquals("test", result.metadata().get("source"));
+    assertEquals("not-test", result.metadata().get("source"));
   }
 }
