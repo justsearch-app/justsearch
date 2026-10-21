@@ -7,13 +7,15 @@ date: 2026-04-06
 probes:
   - adr-0017-decomposed-modules-present
   - adr-0017-retired-modules-absent
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0017: ai-bridge Module Decomposition
 
 ## Status
 Accepted
+
+Current implementation corrections are recorded in the 2026-10-20 amendment below.
 
 ## Context
 
@@ -67,3 +69,17 @@ Combine GPU detection with LLM server management (both "infrastructure") and sep
 
 ### Keep app-ai as a thin translator
 Retain the `IndexingAiService` interface and `app-ai` module as a clean contract seam between the application layer and AI backends. Rejected because the interface was hollow — it had a single real implementation (`GrpcAiTranslatorService`), a local fallback that duplicated the real implementation's logic, and a no-op stub. The indirection added complexity (three classes, one module, one proto definition) without enabling any actual pluggability or testability benefit.
+
+## Amendment 2026-10-20: current module responsibilities
+
+The accepted decomposition table records the original split. Today
+`modules/gpu-bridge` owns GPU/VRAM detection and device probes, while ONNX
+session assembly and CUDA session support live in `modules/ort-common`
+(`OrtSessionAssembler`, `OrtCudaHelper`, `NativeSessionHandle`).
+`modules/prompt-support` contains template loading/rendering types, including
+`PromptTemplateLoader`; it does not contain the retired reasoning pipeline or
+its schema guards. The active chat-server lifecycle now spans
+`modules/app-inference` and `modules/app-services`'s `ChatServerControllerImpl`.
+The Brain wording above is historical: see
+[ADR-0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) for the Engine
+and surviving native `llama-server` boundary.

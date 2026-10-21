@@ -1,0 +1,38 @@
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/policy/EnterprisePolicyServiceImpl.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/policy/EnterprisePolicyServiceImpl.java
+@@ -55,9 +55,10 @@
+ 
+   @Override
+   public EffectivePolicy snapshot() {
+-    Path aiHome = resolveAiHome();
+-    Path machinePath = resolveMachinePolicyPath();
+-    Path userPath = aiHome.resolve("policy.v1.json");
++    return snapshot(resolveMachinePolicyPath(), resolveAiHome().resolve("policy.v1.json"));
++  }
++
++  EffectivePolicy snapshot(Path machinePath, Path userPath) {
+ 
+     PolicyLoad machine = loadPolicy(machinePath);
+     PolicyLoad user = loadPolicy(userPath);
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/EffectivePolicy.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/EffectivePolicy.java
+@@ -26,6 +26,19 @@
+     PolicySource user,
+     boolean aiDisabledOverride) {
+ 
++  // Compatibility only: candidate tests pass the new field, which the before-state
++  // deliberately ignores. Existing record fields, serialization and policy behavior stay intact.
++  public EffectivePolicy(
++      boolean ignoredAppUpdatesEnabled, boolean downloadsEnabled, boolean onlineAiEnabled,
++      boolean gpuAccelerationEnabled, boolean disallowExternalInferenceServers,
++      List<String> allowlistedModelSha256, List<String> allowlistedPackManifestSha256,
++      String packAllowlistSource, boolean packAllowlistConfigured, PolicySource machine,
++      PolicySource user, boolean aiDisabledOverride) {
++    this(downloadsEnabled, onlineAiEnabled, gpuAccelerationEnabled,
++        disallowExternalInferenceServers, allowlistedModelSha256, allowlistedPackManifestSha256,
++        packAllowlistSource, packAllowlistConfigured, machine, user, aiDisabledOverride);
++  }
++
+   public record PolicySource(
+       Path path,
+       boolean present,

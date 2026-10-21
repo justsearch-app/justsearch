@@ -51,6 +51,10 @@ import org.slf4j.LoggerFactory;
 @ExtendWith(MockitoExtension.class)
 class CombinedEnrichmentBackfillOpsTest {
 
+  @BeforeEach void snapshots() throws Exception {
+    BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, false, Set.of(SchemaFields.IS_CHUNK, SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_RETRY_COUNT, SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_RETRY_COUNT, SchemaFields.NER_STATUS, SchemaFields.NER_RETRY_COUNT));
+  }
+
   @Mock DocumentFieldOps documentFieldOps;
   @Mock IndexingCoordinator indexingCoordinator;
   @Mock CommitOps commitOps;

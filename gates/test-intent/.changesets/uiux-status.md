@@ -823,3 +823,14 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
   "note": "Expectations follow S33.1-S33.6 and decision 4. Independent run-evidence reruns pass; 66 original-baseline UI assertions fail and 300 adapted preservation cases pass. All three followup assertions fail on f0e351814; live Library expiry/loss and Ask announcements pass on fa8d37021. Compatibility passes before/after and assertion-fails on 8237e63d9. Test intent only; hardware, chat generation and spoken screen-reader output remain unverified."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp33-test-intent-8fooh0zz",
+  "verdict": "accept",
+  "digest": "sha256:dd84be42e2c3987da947d0a1b4e7f15bc026f2f160a3bcb2d0e7be3ffa4b27da",
+  "note": "Revalidated against accepted 2d3faef2d: agreed sources still warrant all entries. Merged main only adds M09/M26 to UnifiedChatView; package oracles are unchanged. Independent scratch run-evidence passes 383 accepted and 385 candidate named UI cases with maxWorkers=4, preserving every recorded UI case. Historical adaptation evidence has an older file hash from those two additions; scratch evidence matches current tests. Unchanged Java and original assertion fail-before evidence retained. Test-intent acceptance only."
+}
+```

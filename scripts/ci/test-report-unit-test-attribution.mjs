@@ -240,11 +240,23 @@ withTempRoot((root) => {
   }
   const report = buildReport({ root, top: 1, requiredClasses });
   assert.equal(report.slowestSuites.length, 1);
-  assert.equal(report.requiredClassCoverage.length, 13);
+  assert.equal(report.requiredClassCoverage.length, 15);
   assert.ok(report.requiredClassCoverage.every((entry) => entry.executed === 1 && !entry.issues.length));
   const run = () => spawnSync(process.execPath, [scriptPath, '--results-root', root,
     '--require-windows-classes', '--json'], { encoding: 'utf8' });
   assert.equal(run().status, 0);
+  for (const name of [
+    'io.justsearch.app.services.ai.install.AiInstallServiceCudaPolicyTest',
+    'io.justsearch.ui.HeadlessAppCudaPolicyTest',
+  ]) {
+    assert.ok(requiredClasses.some((entry) => entry.name === name), `${name} must be required`);
+    fs.rmSync(resultPath(name));
+    const missingCuda = run();
+    assert.equal(missingCuda.status, 1);
+    assert.ok(missingCuda.stderr.includes(`${name}: no tests executed`));
+    write(resultPath(name), suiteXml({ name, tests: 1, skipped: 0 }));
+    assert.equal(run().status, 0);
+  }
   const atomic = requiredClasses[0];
   const atomicCases = Array.from({ length: 12 }, (_, i) =>
     `<testcase classname="${atomic.name}" name="case${i}">`

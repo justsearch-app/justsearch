@@ -100,6 +100,26 @@ describe('appUpdateState', () => {
     expect(status?.bytesTotal).not.toBe(0);
   });
 
+  it('keeps a suppressed scheduled check idle, with manual checks still explicit', async () => {
+    vi.useFakeTimers();
+    invoke.mockResolvedValue({ state: 'idle', currentVersion: '1.0.0' });
+    const states: Array<string | undefined> = [];
+    const unsubscribe = subscribeAppUpdate((status) => states.push(status?.state));
+    const stop = startAppUpdateMonitor();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(invoke).toHaveBeenCalledWith('check_for_app_update', { automatic: true });
+    expect(states).not.toContain('checking');
+    expect(states).not.toContain('up_to_date');
+    expect(getAppUpdateStatus()?.state).toBe('idle');
+    invoke.mockClear().mockResolvedValue({ state: 'up_to_date', currentVersion: '1.0.0' });
+    await checkForAppUpdate();
+    expect(invoke).toHaveBeenCalledWith('check_for_app_update');
+    expect(states).toContain('checking');
+    expect(getAppUpdateStatus()?.state).toBe('up_to_date');
+    stop();
+    unsubscribe();
+  });
+
   it('defers the passive check until after startup', async () => {
     vi.useFakeTimers();
     invoke.mockResolvedValue({
@@ -113,7 +133,7 @@ describe('appUpdateState', () => {
     expect(invoke).not.toHaveBeenCalledWith('check_for_app_update');
 
     await vi.advanceTimersByTimeAsync(1_000);
-    expect(invoke).toHaveBeenCalledWith('check_for_app_update');
+    expect(invoke).toHaveBeenCalledWith('check_for_app_update', { automatic: true });
     stop();
   });
 });

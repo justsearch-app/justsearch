@@ -5,14 +5,14 @@ status: stable
 description: "Remove pipeline DAG definitions, budget profiles, and pipeline-schema module."
 date: 2026-03-16
 probes: none - a removal decision; its premise is carried by the consumer-drift gate, whose slot-retraction classification cites ADR-0014 (scripts/governance/gates/consumer-drift/classifications.mjs).
-last_reviewed: 2026-09-03
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0014: Pipeline Definition and Schema Removal
 
 ## Status
 
-Accepted
+Accepted. See the 2026-10-20 amendment for surviving schema residue and retired prompt machinery.
 
 ## Context
 
@@ -66,3 +66,18 @@ above, but present in commit metadata at the time), `index_schema_fp`, and `anal
 single rebuild-requiring `index_fingerprint` key — see `docs/explanation/11-index-schema-migration.md`.
 This is a downstream refinement of the commit-metadata surface described here, not a reversal of this
 decision.
+
+## Amendment 2026-10-20: removal is not complete in the metadata schema
+
+The runtime pipeline-definition removal stands, but the original Decision's
+claim to remove `dag_hash` and `pipeline_budget_profile` from the schema is not
+fully implemented: both remain optional properties in
+`SSOT/schemas/indexing/commit-metadata.schema.json`. Their presence in that
+schema does not mean a DAG is executed. Removing the residual declarations is
+a separate code/schema cleanup, not part of this documentation amendment.
+
+The "Not removed" paragraph is also historical: `PromptPipelineLoader` is
+absent from the current modules. The retained prompt-support module contains
+`PromptTemplateLoader` and template types under
+`modules/prompt-support/src/main/java/io/justsearch/prompts/`; it does not
+restore the retired pipeline-definition system.
