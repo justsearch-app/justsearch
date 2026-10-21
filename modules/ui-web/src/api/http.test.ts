@@ -53,7 +53,25 @@ describe('http module', () => {
   });
 
   describe('request function', () => {
-    it('does not include token header on GET requests', async () => {
+    it('authenticates GET and retries once with the newly resolved token after a restart', async () => {
+      mocks.isTauriRuntime.mockReturnValue(true);
+      mocks.invoke.mockResolvedValueOnce('old-token').mockResolvedValueOnce('new-token');
+      const send = vi.fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify({ errorCode: 'UI_TOKEN_REQUIRED' }), { status: 401 }))
+        .mockResolvedValueOnce(Response.json({ recovered: true }));
+      globalThis.fetch = send;
+      const { request } = await import('./http');
+      // Capture rejection so the fail-before is an explicit assertion, not an uncaught error.
+      const outcome = await request('http://127.0.0.1:33221', '/api/preview').then(
+        (value) => ({ value }), (error: unknown) => ({ error }),
+      );
+      expect(outcome).toEqual({ value: { recovered: true } });
+      expect(new Headers(send.mock.calls[0]?.[1]?.headers).get('X-JustSearch-Session')).toBe('old-token');
+      expect(new Headers(send.mock.calls[1]?.[1]?.headers).get('X-JustSearch-Session')).toBe('new-token');
+      expect(send).toHaveBeenCalledTimes(2);
+    });
+
+    it('omits the token on browser/dev GETs when none is available', async () => {
       let capturedInit: RequestInit | undefined;
       globalThis.fetch = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
         capturedInit = init;
@@ -67,7 +85,7 @@ describe('http module', () => {
       await request('http://localhost:3000', '/api/test', { method: 'GET' });
 
       expect(capturedInit).toBeDefined();
-      // GET request should not have the token header (even if cached)
+      // Browser/dev has no desktop token to attach.
       const headers = capturedInit?.headers as Record<string, string> | undefined;
       expect(headers?.['X-JustSearch-Session']).toBeUndefined();
     });

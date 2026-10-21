@@ -543,7 +543,8 @@ export class AdvisoryStore {
       this.notify();
     });
     this.entries.set(resource.id, entry);
-    if (typeof EventSource !== 'undefined') {
+    // eslint-disable-next-line no-restricted-globals -- Availability probe; requests use authorizedFetch.
+    if (typeof fetch !== 'undefined') {
       stream.start();
     }
   }
@@ -608,7 +609,8 @@ export function createAdvisoryStore(
   multiplex?: MultiplexedStream,
 ): AdvisoryStore {
   const store = new AdvisoryStore({ apiBase, multiplex });
-  if (typeof EventSource !== 'undefined') {
+  // eslint-disable-next-line no-restricted-globals -- Availability probe; requests use authorizedFetch.
+  if (typeof fetch !== 'undefined') {
     store.start();
   }
   return store;

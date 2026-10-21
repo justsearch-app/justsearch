@@ -954,7 +954,8 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
     String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(manifest);
     // Canonical last-writer-wins path.
     Path tmp = manifestPath.resolveSibling(MANIFEST_FILENAME + ".tmp");
-    Files.writeString(tmp, json + "\n", StandardCharsets.UTF_8);
+    OwnerOnlyFile.createFresh(tmp);
+    Files.writeString(tmp, json + "\n", StandardCharsets.UTF_8, StandardOpenOption.WRITE);
     try {
       Files.move(tmp, manifestPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
     } catch (IOException atomicFailed) {
@@ -975,11 +976,15 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
     try {
       Files.createDirectories(historyDir);
       Path histPath = historyDir.resolve(MANIFEST_FILENAME);
-      Files.writeString(histPath, json + "\n", StandardCharsets.UTF_8);
+      // History retains ownership/shutdown evidence, but never the boot credential.
+      RuntimeManifest history = manifest.head() == null ? manifest
+          : RuntimeManifestBuilder.builder(manifest).head(manifest.head().publicProjection()).build();
+      String historyJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(history);
+      Files.writeString(histPath, historyJson + "\n", StandardCharsets.UTF_8);
       Path logPath = historyDir.resolve(INSTANCE_LOG_FILENAME);
       // ndjson: pretty-printed JSON would break the one-object-per-line
       // invariant; use the compact writer here.
-      String compact = mapper.writeValueAsString(manifest);
+      String compact = mapper.writeValueAsString(history);
       Files.writeString(
           logPath,
           compact + "\n",

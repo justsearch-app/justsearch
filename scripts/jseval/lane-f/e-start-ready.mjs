@@ -65,11 +65,10 @@ export async function activateChat(command, context, runtime = {}) {
 }
 async function api(context, endpoint) {
   const url = `http://127.0.0.1:33221${endpoint}`;
-  const response = await fetch(url, { headers: { Host: '127.0.0.1:33221' }, signal: AbortSignal.timeout(10000) });
+  const response = await fetch(url, { headers: { Host: '127.0.0.1:33221', ...(context.token ? { 'X-JustSearch-Session': context.token } : {}) }, signal: AbortSignal.timeout(10000) });
   if (!response.ok) throw new Error(`${endpoint}: HTTP ${response.status}`);
   const body = await response.json();
-  const rawFile = endpoint === '/api/mcp/token' ? undefined
-    : path.join(context.raw, `${context.sequence++}-${endpoint.replaceAll('/', '_')}.json`);
+  const rawFile = path.join(context.raw, `${context.sequence++}-${endpoint.replaceAll('/', '_')}.json`);
   context.record.commands.push({ label: endpoint, method: 'GET', url, headers: { Host: '127.0.0.1:33221' },
     status: response.status, observedAt: new Date().toISOString(), rawFile, tokenResponseRetained: false });
   if (rawFile) write(rawFile, body);
@@ -96,7 +95,7 @@ export async function startOwned(command, context, bindings, execute, sharedMode
   write(path.join(context.raw, `${command.label}-receipt.json`), receipt);
   // A dev-mode stack (main's split arm) does not enforce the per-boot token and hands out none;
   // proceed without it there. Any mutation the server does guard still fails loudly on the wire.
-  context.token = (await api(context, '/api/mcp/token')).token ?? null;
+  context.token = JSON.parse(fs.readFileSync(path.join(context.dataDir, 'runtime/manifest.json'), 'utf8')).head?.sessionToken ?? null;
   context.record.tokenEnforced = Boolean(context.token);
   // /api/health answers 503 until the index is ready; wait for readiness, bounded.
   const readyBy = Date.now() + 300000;

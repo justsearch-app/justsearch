@@ -979,7 +979,7 @@
       "id": "runtime-manifest-history",
       "pathVerification": "LITERAL",
       "encryption": "NOT_APPLICABLE",
-      "encryptionNote": "Who is running right now and where: instance id, process ids, loopback ports, the app's own data directory, and reachability/shutdown classification per instance (RuntimeManifestPublisher.java:40). Process bookkeeping only; no user content.",
+      "encryptionNote": "Who is running right now and where: instance id, process ids, loopback ports, the app's own data directory, and reachability/shutdown classification per instance (RuntimeManifestPublisher.java:40). No user content. The per-boot session credential is held only in the owner-only current manifest (POSIX 0600 or Windows owner plus SYSTEM); new instance history strips it. OwnerOnlyFile creates the protected temporary file before RuntimeManifestPublisher writes and replaces the current manifest.",
       "owner": "HEAD",
       "root": "DATA_DIR",
       "ownedPaths": [
@@ -1001,10 +1001,12 @@
       "reconciliation": "PUBLISH_CURRENT_INSTANCE_AND_RETAIN_BOUNDED_HISTORY",
       "status": "READY",
       "implementationSources": [
+        "modules/ui/src/main/java/io/justsearch/ui/runtime/OwnerOnlyFile.java",
         "modules/ui/src/main/java/io/justsearch/ui/runtime/RuntimeManifestPublisher.java",
         "modules/shell/src-tauri/src/shell_actuator.rs"
       ],
       "tests": [
+        "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestCredentialBoundaryTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestPublisherTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestPublisherShutdownClassifyTest.java"
       ],

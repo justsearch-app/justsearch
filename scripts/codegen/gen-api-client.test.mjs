@@ -171,11 +171,19 @@ run('live health validation accepts only HTTP 200 READY or DEGRADED', () => {
 });
 
 async function captureWritesTheValidatedPair() {
+  const previousToken = process.env.JUSTSEARCH_SESSION_TOKEN;
+  process.env.JUSTSEARCH_SESSION_TOKEN = 'capture-owner-token';
   const temporary = mkdtempSync(join(tmpdir(), 'justsearch-api-capture-'));
   const routePath = join(temporary, 'routes.json');
   const openApiPath = join(temporary, 'openapi.json');
   const server = createServer((request, response) => {
     response.setHeader('content-type', 'application/json');
+    if (request.url.startsWith('/api/meta/') && request.headers['x-justsearch-session'] !== 'capture-owner-token') {
+      response.writeHead(401); response.end('{}'); return;
+    }
+    if (request.url === '/api/health' && request.headers['x-justsearch-session']) {
+      response.writeHead(400); response.end('{}'); return;
+    }
     if (request.url === '/api/meta/routes') {
       response.end(JSON.stringify(FIXTURE));
     } else if (request.url === '/api/meta/openapi.json') {
@@ -208,6 +216,8 @@ async function captureWritesTheValidatedPair() {
   } catch (error) {
     failures.push(`capture writes both validated live snapshots: ${error.message}`);
   } finally {
+    if (previousToken === undefined) delete process.env.JUSTSEARCH_SESSION_TOKEN;
+    else process.env.JUSTSEARCH_SESSION_TOKEN = previousToken;
     await new Promise((resolve) => server.close(resolve));
     rmSync(temporary, { recursive: true, force: true });
   }

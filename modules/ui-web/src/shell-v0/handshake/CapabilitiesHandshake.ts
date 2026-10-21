@@ -17,6 +17,7 @@
  *  - The React `useServerCapabilities` hook (sibling file).
  *  - Lit reactive controllers in slice 3a.2+ surface ports.
  */
+import { FetchEventSource, type StreamSource } from '../streaming/FetchEventSource.js';
 
 import { EnvelopeStream } from '../streaming/EnvelopeStream.js';
 import type { SseEnvelope } from '../streaming/envelope-types.js';
@@ -36,7 +37,7 @@ export interface CapabilitiesHandshakeConfig {
   /** Optional fetch override for tests. */
   fetchImpl?: typeof fetch;
   /** Optional EventSource factory for tests. */
-  eventSourceFactory?: (url: string) => EventSource;
+  eventSourceFactory?: (url: string) => StreamSource;
 }
 
 const EMPTY_SNAPSHOT: CapabilitiesSnapshot = {
@@ -49,7 +50,7 @@ const EMPTY_SNAPSHOT: CapabilitiesSnapshot = {
 export class CapabilitiesHandshake {
   private readonly apiBase: string;
   private readonly fetchImpl: typeof fetch;
-  private readonly eventSourceFactory: (url: string) => EventSource;
+  private readonly eventSourceFactory: (url: string) => StreamSource;
 
   private snapshot: CapabilitiesSnapshot = EMPTY_SNAPSHOT;
   private stream: EnvelopeStream<{ resetCount: number }> | null = null;
@@ -63,7 +64,7 @@ export class CapabilitiesHandshake {
     this.apiBase = config.apiBase.replace(/\/$/, '');
     this.fetchImpl = config.fetchImpl ?? authorizedFetch;
     this.eventSourceFactory =
-      config.eventSourceFactory ?? ((url) => new EventSource(url));
+      config.eventSourceFactory ?? ((url) => new FetchEventSource(url));
   }
 
   /**
