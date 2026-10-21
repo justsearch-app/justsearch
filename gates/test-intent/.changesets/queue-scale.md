@@ -2123,3 +2123,14 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
   "note": "All 40 entries preserve or explicitly supersede Q1–Q27 intent with valid receipts, independent repair reruns and successful Linux V13, main-V23 and unshipped-V23 migration, refusal and crash-reopen probes; the startup-readiness finding is reported separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15e54-79e3-7582-af77-985c4dcb513a",
+  "verdict": "accept",
+  "digest": "sha256:c631920a6e524c4907a2438e50efcd8592b2900563511397ae54c2aea8c9de5c",
+  "note": "All 40 entries preserve or explicitly supersede Q1–Q27 intent; refreshed Resource/cache and rail repairs independently fail before and pass after, and merged indexing-status checks remain intact."
+}
+```
