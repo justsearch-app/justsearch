@@ -17,6 +17,10 @@ The new check extends the real Engine reload fixture (RuntimeReloadProducersHttp
 which can now run the production restore path: root membership persisted in the data folder and the
 bootstrap's automatic root producers. Fail-before ran against the previous candidate, 583d7e6e3.
 
+The check was intermittent in the suite: the restore's watch could reach the read-only view after
+the upgrade's reconcile had run. That order is fixed and checked under
+b81d05-lane-b-deferred-watch-receipts; this check then passed in 10 of 10 executed suite runs.
+
 ```json
 {
   "entries": [{
