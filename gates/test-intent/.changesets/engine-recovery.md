@@ -579,3 +579,14 @@ acceptance/rejection record are preserved; a new independent acceptance is requi
   "note": "All twelve entry classifications and delegated choices are supported; independent JVM parent/candidate checks, real SIGBUS summary, Linux Engine artifacts, browser recovery and both supervisor conformance suites confirm the cited behavior within this PR's scope."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15d55-b897-75b2-84c9-64f376624c97",
+  "verdict": "accept",
+  "digest": "sha256:161cbfb992aa4a10286deba1544f2c7b66491befc71f8232e72a0c88b9839e90",
+  "note": "All twelve entries follow scoped owner intent and preserve existing oracles; JVM before failures are assertions, candidate and HEAD~1 pass 13 cases, real SIGBUS summary passes, retention fails before and passes after, both supervisor suites pass, and register semantics match the code."
+}
+```
