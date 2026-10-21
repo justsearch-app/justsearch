@@ -310,9 +310,12 @@ public final class InstallPlanner {
       // Supporting files are always downloaded (profile-independent)
       for (SupportingFile sf : pkg.supportingFiles()) {
         Path targetFile = installBaseDir.resolve(sf.filename());
-        if (isAlreadyInstalled(targetFile, sf.sizeBytes(), sf.sha256(), candidateOwned)) {
+        boolean archivePresent = isAlreadyInstalled(
+            targetFile, sf.sizeBytes(), sf.sha256(), !sf.extract() && candidateOwned);
+        if (archivePresent && (!sf.extract() || ArchiveExtractionState.isApplied(targetFile, sf.sha256()))) {
           continue;
         }
+        boolean extractionOnly = sf.extract() && archivePresent;
         String targetPath = useAbsoluteTargetPath
             ? targetFile.toAbsolutePath().toString()
             : joinTargetPath(effectiveTargetDir, sf.filename());
@@ -327,9 +330,12 @@ public final class InstallPlanner {
                 false,
                 sf.extract(),
                 sf.required(),
-                staged));
-        totalBytes += sf.sizeBytes();
-        resumableBytes += staged;
+                staged,
+                extractionOnly));
+        if (!extractionOnly) {
+          totalBytes += sf.sizeBytes();
+          resumableBytes += staged;
+        }
         packageFullyInstalled = false;
       }
 

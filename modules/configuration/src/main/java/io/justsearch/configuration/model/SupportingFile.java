@@ -13,10 +13,9 @@ package io.justsearch.configuration.model;
  * @param downloadUrl HTTPS URL to download the file
  * @param extract when true, the file is treated as a zip archive and its entries are extracted
  *     into the package's {@code targetDir} after download + SHA verification. The archive itself
- *     is kept on disk so the install planner's {@code isAlreadyInstalled} check (which looks at
- *     the archive's filename) skips re-download on subsequent installs. Used by the alpha.15
- *     CUDA-runtime package (tempdoc 374) — bundled DLLs are too large for the NSIS installer
- *     payload, so they ship via Install AI as a downloaded + extracted archive instead.
+ *     is kept for extraction-only repairs. Installation requires the archive plus a matching
+ *     extraction receipt and complete output sizes (legacy installs without receipts use ZIP
+ *     entry sizes). Install runs hash a kept archive before repairing its outputs; status does not.
  * @param required whether the capability this package delivers needs this file to work (tempdoc
  *     824 §3.3a). Defaults to TRUE and every absent-in-JSON entry is required — the axis exists to
  *     stop an 872-byte metadata file producing the same terminal red as a missing 500 MB model

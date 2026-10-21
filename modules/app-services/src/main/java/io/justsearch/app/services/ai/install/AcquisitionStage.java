@@ -2,6 +2,7 @@
 package io.justsearch.app.services.ai.install;
 
 import io.justsearch.configuration.model.InstallPlan;
+import io.justsearch.configuration.model.ArchiveExtractionState;
 import io.justsearch.configuration.model.InstallPlanner;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -80,7 +81,7 @@ final class AcquisitionStage {
     for (InstallPlan.PlannedDownload dl : downloads) {
       byTargetPath.putIfAbsent(dl.targetPath(), dl);
       items.add(
-          new AcquisitionScheduler.Item(dl.targetPath(), dl.packageId(), dl.sizeBytes()));
+          new AcquisitionScheduler.Item(dl.targetPath(), dl.packageId(), dl.extractionOnly() ? 0L : dl.sizeBytes()));
     }
     return new AcquisitionScheduler(
         items,
@@ -110,10 +111,30 @@ final class AcquisitionStage {
     Path targetFile = modelsDir.resolve(dl.targetPath());
     Path partialFile = InstallPlanner.partialPathFor(targetFile);
     try {
+      if (dl.extract()) {
+        ArchiveExtractionState.requireSafePath(targetFile);
+        ArchiveExtractionState.requireSafePath(partialFile);
+      }
       Files.createDirectories(targetFile.getParent());
+      if (dl.extract()) {
+        ArchiveExtractionState.requireSafePath(targetFile);
+        ArchiveExtractionState.requireSafePath(partialFile);
+      }
     } catch (IOException e) {
       return new ResumableFetch.Outcome(
           false, false, "Failed to prepare download directory: " + e.getMessage(), null, 0, null);
+    }
+
+    if (dl.extractionOnly()) {
+      listener.onItemVerifying(item);
+      try {
+        DownloadExecutor.verify(targetFile, dl.sizeBytes(), dl.sha256());
+        return new ResumableFetch.Outcome(true, false, null, null, 0, null);
+      } catch (Exception mismatch) {
+        // Status is deliberately cheap; only an install run hashes a kept archive. A corrupt
+        // ZIP goes through normal verified acquisition instead of reaching the extractor.
+        log.info("Kept archive requires re-download: {}", targetFile);
+      }
     }
 
     // Tempdoc 824 §3.4: pass n meets tier n. Decided from this FILE's history across runs, which

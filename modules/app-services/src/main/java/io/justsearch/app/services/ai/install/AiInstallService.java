@@ -1806,8 +1806,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
   /**
    * Re-derives completeness from DISK, or null when the probe cannot answer (no registry on the
-   * classpath, IO failure). Cheap by construction — the planner's already-installed test is
-   * existence + size, never a hash ({@code InstallPlanner.isAlreadyInstalled}).
+   * classpath, IO failure). The planner checks archive receipts and output sizes without hashing
+   * ZIPs, and verifies retained ONNX candidate identities.
    */
   private InstallCompleteness recomputeCompletenessFromDiskBestEffort() {
     try {
@@ -2740,7 +2740,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       ps.state = "pending";
       ps.bytesTotal = plan.downloads().stream()
           .filter(d -> d.packageId().equals(dl.packageId()))
-          .mapToLong(InstallPlan.PlannedDownload::sizeBytes)
+          .mapToLong(d -> d.extractionOnly() ? 0L : d.sizeBytes())
           .sum();
       status.packages.add(ps);
     }
@@ -3019,13 +3019,10 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   }
 
   /**
-   * Tempdoc 374 alpha.15 fix B: extract a zip archive into {@code targetDir},
-   * skipping entries that already exist (idempotent re-runs). Used by the
-   * cuda-runtime package to expand the supplemental CUDA DLLs (cuFFT et al.)
-   * into the cuda12 variant dir post-download.
-   *
-   * <p>Defensive against zip-slip: rejects entries whose normalized path
-   * escapes {@code targetDir} (e.g., {@code ../../etc/passwd}).
+   * Apply archive entries by size and CRC, replacing changed files through complete siblings.
+   * A pending apply survives failure; the extraction receipt is published only after all outputs.
+   * Identical entries retain their modification times. Version markers are removed before changed
+   * payloads and published last. Traversal and redirected destination paths are rejected.
    *
    * @param zipFile the archive to extract
    * @param targetDir the directory entries are extracted into (entries are
@@ -3033,68 +3030,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    *     under it)
    */
   static void extractZipInPlace(Path zipFile, Path targetDir) throws IOException {
-    if (zipFile == null || !Files.isRegularFile(zipFile)) {
-      throw new IOException("Archive not found: " + zipFile);
-    }
-    Path normalizedTarget = targetDir.toAbsolutePath().normalize();
-    Files.createDirectories(normalizedTarget);
-    int extracted = 0;
-    try (var zip = new java.util.zip.ZipFile(zipFile.toFile())) {
-      var entries = zip.entries();
-      while (entries.hasMoreElements()) {
-        var entry = entries.nextElement();
-        if (entry.isDirectory()) continue;
-        Path resolved = normalizedTarget.resolve(entry.getName()).normalize();
-        if (!resolved.startsWith(normalizedTarget)) {
-          throw new IOException(
-              "Refusing zip entry that escapes target directory: " + entry.getName());
-        }
-        if (!PlatformPaths.isWindows() && Files.isSymbolicLink(resolved)) {
-          throw new IOException("Refusing symbolic-link archive target: " + entry.getName());
-        }
-        if (Files.exists(resolved)) {
-          if (!PlatformPaths.isWindows() && !resolved.toRealPath().startsWith(normalizedTarget.toRealPath())) {
-            throw new IOException("Refusing archive target outside directory: " + entry.getName());
-          }
-          applyExecutablePermission(resolved);
-          continue;
-        }
-        Files.createDirectories(resolved.getParent());
-        if (!PlatformPaths.isWindows() && !resolved.getParent().toRealPath().startsWith(normalizedTarget.toRealPath())) {
-          throw new IOException("Refusing archive parent outside directory: " + entry.getName());
-        }
-        // Extract to a sibling .partial then atomically rename, so a crash mid-copy never leaves a
-        // half-written file at the final path (which the existence-skip above would then trust
-        // forever). Mirrors the download path's partial-then-moveAtomicBestEffort discipline.
-        Path partial = resolved.resolveSibling(resolved.getFileName() + ".partial");
-        Files.deleteIfExists(partial);
-        try (var in = zip.getInputStream(entry)) {
-          Files.copy(in, partial);
-        }
-        applyExecutablePermission(partial, resolved.getFileName().toString());
-        DownloadExecutor.moveAtomicBestEffort(partial, resolved);
-        extracted++;
-      }
-    }
-    log.info(
-        "Extracted {} new entries from {} to {}",
-        extracted,
-        zipFile.getFileName(),
-        normalizedTarget);
-  }
-
-  private static void applyExecutablePermission(Path file) throws IOException {
-    applyExecutablePermission(file, file.getFileName().toString());
-  }
-
-  private static void applyExecutablePermission(Path file, String declaredName) throws IOException {
-    if (PlatformPaths.isWindows()) return;
-    // Archives do not carry trustworthy executable modes. Only a declared executable gets +x.
-    if (declaredName.equals(NativeTargets.current().executableName("llama-server"))) {
-      var permissions = Files.getPosixFilePermissions(file);
-      permissions.add(java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE);
-      Files.setPosixFilePermissions(file, permissions);
-    }
+    ArchiveExtractor.apply(zipFile, targetDir);
   }
 
   private long countPackagesByState(String state) {

@@ -65,8 +65,7 @@ public record InstallPlan(
    * @param extract when true, after download + SHA verification the file is unzipped into its
    *     parent directory. Used for the alpha.15 CUDA runtime package — bundled DLLs are too
    *     large for the NSIS installer, so they ship as a downloaded + extracted archive instead.
-   *     The archive is kept on disk so the planner's {@code isAlreadyInstalled} check skips
-   *     re-download on subsequent installs.
+   *     The archive is kept on disk for extraction-only repair without downloading again.
    * @param required whether the package's capability needs this file (tempdoc 824 §3.3a). Carried
    *     through from {@code SupportingFile.required}; a model variant is always required. This is
    *     the axis {@code InstallCompleteness} reads to keep an optional metadata gap out of the
@@ -77,6 +76,7 @@ public record InstallPlan(
    *     file still cost?" — the disk precondition, a per-component cost row, a per-tier estimate —
    *     needs the answer at its own granularity, and each one deriving it separately is how the
    *     headline total came to disagree with the rows beneath it. Zero everywhere nothing is staged.
+   * @param extractionOnly true when a kept archive needs applying; contributes no transfer bytes
    */
   public record PlannedDownload(
       String packageId,
@@ -87,10 +87,18 @@ public record InstallPlan(
       boolean isModelVariant,
       boolean extract,
       boolean required,
-      long stagedBytes) {
+      long stagedBytes,
+      boolean extractionOnly) {
 
     public PlannedDownload {
       if (stagedBytes < 0) stagedBytes = 0;
+    }
+
+    /** Compatibility constructor for ordinary acquisition. */
+    public PlannedDownload(String packageId, String url, String targetPath, String sha256,
+        long sizeBytes, boolean isModelVariant, boolean extract, boolean required, long stagedBytes) {
+      this(packageId, url, targetPath, sha256, sizeBytes, isModelVariant, extract, required,
+          stagedBytes, false);
     }
 
     /** Backwards-compat constructor — non-extracted, required file (existing behavior). */
@@ -135,7 +143,7 @@ public record InstallPlan(
      * the file-size total a progress bar counts up to.
      */
     public long remainingBytes() {
-      return Math.max(0L, sizeBytes - stagedBytes);
+      return extractionOnly ? 0L : Math.max(0L, sizeBytes - stagedBytes);
     }
   }
 
