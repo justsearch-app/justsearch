@@ -398,3 +398,14 @@ The existing rejection and acceptance records below are preserved byte-for-byte.
   "note": "Hard-link and iterator entries follow P6/P7 and the delegated hard-link choice; both new checks fail by assertion at 46816f593 (outside file chmod to 0600, escaping DirectoryIteratorException) and pass on f4fafcb26, and the live Linux Engine confirms hard-linked outside files keep mode 0664 with a warning while P1/P2 still hold."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "146de75c-e9bc-4471-8262-0d63604c31e6",
+  "verdict": "accept",
+  "digest": "sha256:aab87b23d0f89721090da8b839eb062b1b9b899579f96c14b54977c4881ca643",
+  "note": "Entries match P1-P9 and the delegated choices; on main eae9993ac the 11 JVM repair and 2 hard-link/iterator checks fail by assertion (the 2 Rust repair checks only per receipt) while the preservation checks and the adapted keystore fixture (assertions unchanged) pass, all pass on da6d23a8b, and live Linux runs confirm owner-only keystore files at every #857 crash point; the preamble's 'PR/gate base 4f5954535' is stale but the flagged before-content is unchanged."
+}
+```
