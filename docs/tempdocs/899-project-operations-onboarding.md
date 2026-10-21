@@ -209,9 +209,7 @@ runtime themselves or use the devcontainer; do not pretend a Node script solved 
 bootstrap problem.
 `CONTRIBUTING.md` presents Windows and devcontainer paths side by side and uses platform-neutral
 Gradle command notation where possible. The container pins Node 24 and JDK 25 for reproducibility,
-while native bootstrap validation preserves the currently documented Node 20+ and JDK 24+ floors;
-raising those minimums requires a deliberate contributor-contract update rather than an incidental
-container choice.
+while native bootstrap validation requires the contributor Node 24+ and JDK 24+ floors.
 
 Verification: build the container, assert all four tool versions, run `bootstrap.mjs --check`, run
 the doctor, and execute `scripts/dev/test-onramp-first-success.mjs` inside the container. Record the
@@ -788,8 +786,8 @@ Confidence-building checks:
 
 Main risks and controls:
 
-1. Preserve the native contributor floor (Node >=20, JDK >=24) while pinning Node 24 and JDK 25 in
-   the reproducible container; do not accidentally raise native Node to 24.
+1. Enforce the native contributor floor (Node >=24, JDK >=24) while pinning Node 24 and JDK 25 in
+   the reproducible container.
 2. Require Python 3.13 for the all-repository bootstrap, while treating Rust stable as advisory for
    the core Java/web contribution path.
 3. Make `--check` structurally non-mutating: no dependency installation, chmod, download, profile
@@ -817,7 +815,7 @@ replace `prepare-worktree.cjs`, `doctor.mjs`, or `test-onramp-first-success.mjs`
   `waitFor` cover that command. Add no GPU, model, Docker-in-Docker, host mount, or Linux product-
   support claim.
 - [x] **Build the post-Node coordinator behind pure seams.** Add `scripts/setup/bootstrap.mjs` with
-  a main guard and exported parsers/planners. Validate Node >=20, resolve and validate JDK >=24 via
+  a main guard and exported parsers/planners. Validate Node >=24, resolve and validate JDK >=24 via
   `resolve-jdk.cjs`, require Python 3.13, report Rust without making it a core failure, verify the
   Gradle wrapper, and run explicit lockfile-preserving installs for the five reviewed npm roots.
   `--check` must execute no install, chmod, download, profile edit, or package-manager selection.

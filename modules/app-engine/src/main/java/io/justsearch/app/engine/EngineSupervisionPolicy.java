@@ -42,6 +42,9 @@ public final class EngineSupervisionPolicy {
    */
   public static final int MAX_RESTART_ATTEMPTS = 3;
 
+  /** Delay before a transient exhaustion starts a fresh restart budget. */
+  public static final long EXHAUSTED_RETRY_DELAY_MS = 1_800_000L;
+
   /**
    * The linear step added per attempt over the cooldown floor.
    *

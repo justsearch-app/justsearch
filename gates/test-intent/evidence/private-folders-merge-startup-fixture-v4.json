@@ -1,0 +1,94 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T13:07:59.382Z",
+  "revision": "75853ca8448ecb5a2cbf08ca56fd32e60f52b192",
+  "tree": "94fbfed93c5c42f8d4139c9c7b945ff5d33f4b68",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.KeystoreStartupAvailabilityHttpTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15436
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/KeystoreStartupAvailabilityHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/KeystoreStartupAvailabilityHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2d837a6e2571c49c6b2bdb698e5d110aa5f3e11e474b2c1e3e85d8c11cbddb3e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "validPrimaryLoadsAndWarnsThenRetries(read-only, restart)",
+          "status": "passed"
+        },
+        {
+          "name": "validPrimaryLoadsAndWarnsThenRetries(blocked, restart)",
+          "status": "passed"
+        },
+        {
+          "name": "validPrimaryLoadsAndWarnsThenRetries(read-error, restart)",
+          "status": "passed"
+        },
+        {
+          "name": "validPrimaryLoadsAndWarnsThenRetries(read-only, save)",
+          "status": "passed"
+        },
+        {
+          "name": "validPrimaryLoadsAndWarnsThenRetries(blocked, save)",
+          "status": "passed"
+        },
+        {
+          "name": "validPrimaryLoadsAndWarnsThenRetries(read-error, save)",
+          "status": "passed"
+        },
+        {
+          "name": "validPrimaryLoadsAndWarnsThenRetries(read-only-filesystem, restart)",
+          "status": "passed"
+        },
+        {
+          "name": "validPrimaryLoadsAndWarnsThenRetries(read-only-filesystem, save)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4f595453517bbf430bf907117f2c60303b7357ba",
+    "revision": "4f595453517bbf430bf907117f2c60303b7357ba",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.KeystoreStartupAvailabilityHttpTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 15645
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/KeystoreStartupAvailabilityHttpTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:b86f782cbe46f3746f91829e56f80e49e5fbbb9f6b38e95dd32cd5807012e2a2"
+}

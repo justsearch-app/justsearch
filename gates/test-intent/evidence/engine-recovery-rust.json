@@ -1,0 +1,151 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T02:36:44.917Z",
+  "revision": "a2ab1d99cf71e1be63abec9b6884c53f42b13517",
+  "tree": "75b906b8f08b0487777c9052a52990a50c577e6d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::fresh_crash_folder_with_spaces_keeps_artifacts_across_boots\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2873
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::unavailable_crash_folder_reports_the_real_obstacle\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1038
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::fatal_summary_is_bounded_and_redacts_windows_paths_with_spaces\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1055
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"recovery::tests::the_daily_count_survives_budget_reset_and_shell_relaunch\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1081
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::manual_restart_after_finished_exhaustion_reaches_ready_with_a_new_generation\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2393
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::manual_restart_refuses_quit_and_update_holds_without_admitting_a_child\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1447
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/recovery.rs#recovery::tests::fresh_crash_folder_with_spaces_keeps_artifacts_across_boots",
+      "file": "modules/shell/src-tauri/src/recovery.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:53b7a63c3fed62e6832c44b7f67f0fd6802407440ac445eb2fdfcbf9b28c0d56",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recovery::tests::fresh_crash_folder_with_spaces_keeps_artifacts_across_boots",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/recovery.rs#recovery::tests::unavailable_crash_folder_reports_the_real_obstacle",
+      "file": "modules/shell/src-tauri/src/recovery.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:53b7a63c3fed62e6832c44b7f67f0fd6802407440ac445eb2fdfcbf9b28c0d56",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recovery::tests::unavailable_crash_folder_reports_the_real_obstacle",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/recovery.rs#recovery::tests::fatal_summary_is_bounded_and_redacts_windows_paths_with_spaces",
+      "file": "modules/shell/src-tauri/src/recovery.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:53b7a63c3fed62e6832c44b7f67f0fd6802407440ac445eb2fdfcbf9b28c0d56",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recovery::tests::fatal_summary_is_bounded_and_redacts_windows_paths_with_spaces",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/recovery.rs#recovery::tests::the_daily_count_survives_budget_reset_and_shell_relaunch",
+      "file": "modules/shell/src-tauri/src/recovery.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:53b7a63c3fed62e6832c44b7f67f0fd6802407440ac445eb2fdfcbf9b28c0d56",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recovery::tests::the_daily_count_survives_budget_reset_and_shell_relaunch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::manual_restart_after_finished_exhaustion_reaches_ready_with_a_new_generation",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:218d48d691a63eca2fac4f6042d2c9a937d228f40ccbbea442d4d0598a74fa5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::manual_restart_after_finished_exhaustion_reaches_ready_with_a_new_generation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::manual_restart_refuses_quit_and_update_holds_without_admitting_a_child",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:218d48d691a63eca2fac4f6042d2c9a937d228f40ccbbea442d4d0598a74fa5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::manual_restart_refuses_quit_and_update_holds_without_admitting_a_child",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:f66777d00dba7cce917ca2ad6f5a2df12a94068285e9289aecc1f08736cd5467"
+}

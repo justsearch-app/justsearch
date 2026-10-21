@@ -1,0 +1,34 @@
+[
+  {
+    "name": "before-slow",
+    "childDelayMs": 4000,
+    "exitCode": 1,
+    "elapsedSeconds": 30.42026426899247,
+    "expectedMessage": "timed out after 30 seconds",
+    "matched": true
+  },
+  {
+    "name": "after-slow",
+    "childDelayMs": 4000,
+    "exitCode": 0,
+    "elapsedSeconds": 46.3019670349895,
+    "expectedMessage": null,
+    "matched": true
+  },
+  {
+    "name": "after-hung-child",
+    "childDelayMs": 60000,
+    "exitCode": 1,
+    "elapsedSeconds": 31.17932028399082,
+    "expectedMessage": "password publication step 1 did not pause within 30 s",
+    "matched": true
+  },
+  {
+    "name": "after-whole-timeout",
+    "childDelayMs": 15000,
+    "exitCode": 1,
+    "elapsedSeconds": 120.35549209499732,
+    "expectedMessage": "timed out after 120 seconds",
+    "matched": true
+  }
+]
