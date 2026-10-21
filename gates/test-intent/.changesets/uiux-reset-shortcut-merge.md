@@ -63,3 +63,14 @@ evidence remains valid. No acceptance record is authored by the builder.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-g9v0_p0p",
+  "verdict": "accept",
+  "digest": "sha256:582ba9ef144c17315d895a5140550730192c3efdf86af257f658cca291f71760",
+  "note": "New combination checks follow the agreed recovery-only rule RS4 and preference contract SC8; both executed and passed in this independent session. Production startup and activation guards were reviewed against both branch states and exercised on the real private-Xvfb shell. Existing test changes are formatting-only adaptations; no oracle is weakened."
+}
+```
