@@ -412,3 +412,14 @@ New round-3 checks use 94c9bb8ec as their before-state. No verifier evidence was
   "note": "Round 4 on 31b6bc98d: own cases incl. legacy-ro/T3b/T4 unchanged pass, startup checks fail on c697a4684 and pass here, real Engine starts with read-only encryption folder, full suite green except known out-of-scope long-path test"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-verifier-f3-4b2e3ac61",
+  "verdict": "accept",
+  "digest": "sha256:ed22f6bbff70de4adc82c0a0ced5342dfdfeefd27ea1bd2ff045887adf8a56b3",
+  "note": "Merge 4b2e3ac61: keystore files identical to 906fae5b7, shell identical to main; factory_reset tests plus own encryption-folder check pass (mutant fails); 6 modules fresh green; lint green"
+}
+```
