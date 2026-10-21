@@ -175,6 +175,24 @@ public final class FileConversationStore implements ConversationStore {
         history.add(msg);
         index++;
       }
+      if (!history.isEmpty()
+          && "core.extract".equals(history.get(history.size() - 1).get("shapeId"))
+          && isTurnOpen(sessionId)) {
+        int question = history.size() - 1;
+        while (question >= 0 && !"user".equals(history.get(question).get("role"))) question--;
+        if (question >= 0 && "core.extract".equals(history.get(question).get("shapeId"))) {
+          // Read-time recovery only: never resume work or write a success after a process death.
+          Map<String, Object> last = history.get(history.size() - 1);
+          var incomplete = new LinkedHashMap<String, Object>(last);
+          incomplete.put("role", "assistant");
+          incomplete.put("content", "Extraction has not completed. Retry or edit to run it again.");
+          incomplete.put("terminalError", true);
+          incomplete.put("errorCode", "INCOMPLETE_TURN");
+          if (question == history.size() - 1) incomplete.put("id", last.get("id") + "-incomplete");
+          history = new ArrayList<>(history.subList(0, question + 1));
+          history.add(incomplete);
+        }
+      }
       return history;
     } catch (Exception e) {
       throw new CorruptDurableStoreException(
@@ -610,7 +628,9 @@ public final class FileConversationStore implements ConversationStore {
     // trimmed to start at the context floor (floor message inclusive), with the
     // compaction summary (if any) prepended as a synthetic system message. No
     // floor (or a stale floor id) → fail safe to the full history.
-    List<Map<String, Object>> full = loadHistory(sessionId);
+    List<Map<String, Object>> full = loadHistory(sessionId).stream()
+        .filter(m -> !("core.extract".equals(m.get("shapeId")) && Boolean.TRUE.equals(m.get("terminalError"))))
+        .toList();
     Map<String, Object> meta = readMeta(sessionId);
     if (meta == null) return full;
     // Tempdoc 610 §E.3 — the floor is located in the FULL history, before exclusion: excluding the

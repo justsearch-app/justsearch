@@ -542,6 +542,7 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       assistantRecordId: turn.assistantId,
       recordOpenedByUser: turn.openedByUser,
       kind: agent ? 'agent' : 'ask',
+      shapeId: turn.declaredShapeId ?? undefined,
       question: turn.question,
       answer: turn.answers.join('\n\n'),
       // The same messages, kept apart: what a follow-up's context is built from (S2.0).

@@ -290,6 +290,44 @@ final class SelectionContextInjectorTest {
 
   // ---- fixtures ----
 
+  @Test
+  void extractRefusesUnreadableOrExcessMembersAndDeduplicatesDocuments() {
+    var docs = new StubDocs(Map.of("a", new DocumentRecord("a", "Paris", Map.of())));
+    var injector = new SelectionContextInjector(docs);
+    for (List<String> paths : List.of(List.of("a", "missing"), List.of("a", "b", "c", "d", "e", "f"))) {
+      var result = injector.inject(ctx(ExtractShape.ID.value(), Map.of("selection", Map.of(
+          "kind", "result-set", "items", paths.stream().map(id -> Map.of("id", id, "kind", "search-hit")).toList()))));
+      assertTrue(result.terminalError().isPresent(), paths.toString());
+    }
+    var result = injector.inject(ctx(ExtractShape.ID.value(), Map.of("selection", Map.of(
+        "kind", "result-set", "items", List.of(Map.of("id", "a", "kind", "search-hit"), Map.of("id", "a", "kind", "search-hit"))))));
+    String text = String.valueOf(result.messages().get(0).get("content"));
+    assertEquals(1, text.split("Paris", -1).length - 1, "one document, even with multiple hits");
+  }
+
+  @Test
+  void extractRefusesEverySelectionTruncationThreshold() {
+    // A result-set member can fit the overall budget and still exceed the per-document allocation.
+    for (String kind : List.of("item", "result-set")) {
+      String content = "x".repeat(kind.equals("item") ? 100_000 : 4_000);
+      var docs = new StubDocs(Map.of("a", new DocumentRecord("a", content, Map.of())));
+      Map<String, Object> selection = kind.equals("item")
+          ? Map.of("kind", "item", "itemKind", "search-hit", "itemId", "a")
+          : Map.of("kind", "result-set", "items", List.of(Map.of("id", "a", "kind", "search-hit")));
+      var result = new SelectionContextInjector(docs).inject(
+          ctx(ExtractShape.ID.value(), Map.of("selection", selection)));
+      assertTrue(result.terminalError().isPresent(), kind + " must refuse, never truncate");
+    }
+  }
+
+  @Test
+  void extractRefusesOmittedConversationContext() {
+    var result = new ExternalContextInjector(null).inject(ctx(ExtractShape.ID.value(), Map.of(
+        "context", List.of(Map.of("role", "user", "content", "earlier".repeat(2_000)),
+            Map.of("role", "assistant", "content", "latest")))));
+    assertTrue(result.terminalError().isPresent(), "dropped context must be visible");
+  }
+
   private static ConversationContext ctx(String shapeId, Map<String, Object> body) {
     return new ConversationContext() {
       @Override
