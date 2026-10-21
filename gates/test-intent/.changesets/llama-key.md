@@ -380,3 +380,14 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
   "note": "Accept: all five entries' classes, sources and evidence hold; both delegated choices (401 probe before ready; 32-byte base64url key per launch) lie within the stated K1-K9 implementation scope with no conflicting owner source; I reproduced assertion fail-befores for the reason under test on 673b54a1b (ignored-key, 4 cases) and f003a5c64 (lost-bind, context step-down, both CPU environment checks), all 21 flagged and 3 exempt classes pass unskipped on the candidate, and a proxy-omits-key mutant fails the adapted ProxyStreamAcrossReconfigureTest; non-blocking: the assertion-audit evidence attributes the evidence-runner permission to the owner while the changeset attributes it to the orchestrator, and the 43-character format pin rejects other correct key encodings."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "0c2a06c5-28a7-4de6-94e2-5a9322972b65",
+  "verdict": "reject",
+  "digest": "sha256:1707dabb37564c6955dd5c4175d43dc3a7183117db11d1206b1fd07a05bbd939",
+  "note": "Entries 1, 2, 4 and 5 and both reproduced fail-befores hold, but entry 3 cites ManagedLlamaAuthenticationTest#aWrapperPassesTheKeyToTheServingProcessAndStopsWithIt, which failed on the candidate (stopping the owned wrapper also ends its serving descendant: false) because on Linux the Engine SIGKILLs the wrapper and never ends descendants, so the assertion races the fixture's 100 ms self-exit poll; that expectation is not an Engine guarantee under K6."
+}
+```
