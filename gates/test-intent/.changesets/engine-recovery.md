@@ -511,3 +511,14 @@ acceptance on the changed digest.
   "note": "The entries match agreed intent and scoped delegation, with valid evidence and independently reproduced retry failures before and passes after."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15c58-a359-71e1-98cd-6f2186363ddd",
+  "verdict": "reject",
+  "digest": "sha256:1325779400c554492817ac2ecbd357bea6b39303a77ba7c41ee6f2ded86576a9",
+  "note": "E2 remains incomplete: a real JVM Internal Error fatal report is omitted by the public diagnostic summary on the exact candidate, and the new diagnostics tests do not cover it."
+}
+```
