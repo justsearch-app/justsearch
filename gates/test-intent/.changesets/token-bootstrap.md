@@ -7,13 +7,12 @@ author-session: 01a15693-314a-7240-ad93-9b6f8c3969e5
 
 # Test-intent entries
 
-Author classification of all 25 changed test/support items against the updated base.
-Local merge-base with `origin/main`: `f003a5c6476776ed2e56d9e0882f8bbaf55fc731`;
-PR base `origin/worktree-headless-prod`: `fe3753d37e585f35c61ae5f1488a909739d4b47c`.
-The local diff has 19 flagged items and six isolated new test exemptions. The PR-base
-diff has the same 19 flagged items and five exemptions: HeadlessLauncherProductionModeTest
-already exists unchanged in that base. Its historical entry remains, as do the entries
-for exempt files with their original source/evidence duties.
+Author entries retain 25 test/support items. The current merge-base with
+`origin/main` is `f6d92d768f86d778ea805012b176c3349705018c`, merged in
+`734f9f25b` on 2026-10-21. This diff has 24 changed items: 19 flagged items and
+five isolated new test exemptions. HeadlessLauncherProductionModeTest already exists
+unchanged in main; its historical entry remains, as do the entries for exempt files
+with their original source/evidence duties.
 The user adopted T1–T19 on 2026-10-20: “i agree, proceed accordingly”.
 Each cited scenario below quotes its agreed text, independently of implementation output.
 These are author entries. Existing independent acceptance and audit records are retained
@@ -23,9 +22,9 @@ Execution procedure and assertion inventory: [evidence notes](../evidence/token-
 The security before-runs use the relevant fix's parent: `8f49bdc3a` before
 `9a893ca7a`; launcher expectations use `c00a0cb24` before `104f263de`.
 Using the current parent would test already-repaired code. Preservation runs use
-unaltered original tests at the new PR base, plus adapted candidate tests and an
+unaltered original tests at the current main merge-base, plus adapted candidate tests and an
 explicit assertion/diff audit regenerated against that same base. Historical receipts
-retain their recorded revisions. The merge is `63bcd183c`; subsequent evidence and
+retain their recorded revisions. The latest merge is `734f9f25b`; subsequent evidence and
 changeset edits are intentionally uncommitted. This does not claim Windows or desktop end-to-end execution.
 PR #825 is also audit-selected under the documented every-fifth-PR rule; that review,
 like acceptance, must come from another session. No author approval is supplied.
@@ -457,11 +456,11 @@ like acceptance, must come from another session. No author approval is supplied.
           "label": "agent choice"
         }
       ],
-      "whatMoved": "EventSource stubs and immediate fetch-count timing are adapted to actual authenticated fetch SSE. Shared src/test/fetchSse.ts supplies HTTP Response/ReadableStream bytes, lifecycle/abort observations and asynchronous flushes; it does not replace FetchEventSource, the parser, EnvelopeStream, reducers or rendering. All 229 old web assertion calls survive: 212 are text-identical and 17 map fake transport observations to real fetch observations with unchanged expected results (full pairs in the audit). ResourceView listener sets still equal frame/open/error then empty; stream URLs remain identical. Advisory counts, URL, identity and close expectations keep their values, observing HTTP cancellation instead of EventSource.CLOSED. Idle/presence, rows and history reconciliation, advisory ack/order/connectivity, health snapshots/deltas/reset/badges, AI poll 3/6/9 counts and cancellation, and same-run prompt/lookup/abort oracles remain. AgentSession adds a fetch-start readiness assertion while the authorization lookup remains unresolved. Indexing bridge withholds fetch instead of EventSource to exercise the same no-transport fallback and adds zero pooled connections beside zero tasks. Full diff inventories retain all setup, tags, conditions and input frames for review; test-only helper ownership is governed by the named register. Base merge 63bcd183c keeps main's incidental-request isolation in ResourceView.render and HealthLitView: non-stream fetches reject with TypeError('Test backend unavailable'), while fetchSseHarness handles actual SSE requests. Main added no cases in those two files; all eight ResourceView and ten HealthLitView cases and all 35 assertion calls survive. No behavioral assertion was changed by this merge. The complete 39-file union of ui-web tests touched by either side executed: 909 passed, zero failed/skipped. A fresh unmodified shared clone at PR base fe3753d37 ran all eight original stream-fixture files (100 cases); candidate adaptations also ran 100 cases. The new-base inventory records every old assertion and its transport-only mapping.",
+      "whatMoved": "EventSource stubs and immediate fetch-count timing are adapted to actual authenticated fetch SSE. Shared src/test/fetchSse.ts supplies HTTP Response/ReadableStream bytes, lifecycle/abort observations and asynchronous flushes; it does not replace FetchEventSource, the parser, EnvelopeStream, reducers or rendering. All 229 old web assertion calls survive: 212 are text-identical and 17 map fake transport observations to real fetch observations with unchanged expected results (full pairs in the audit). ResourceView listener sets still equal frame/open/error then empty; stream URLs remain identical. Advisory counts, URL, identity and close expectations keep their values, observing HTTP cancellation instead of EventSource.CLOSED. Idle/presence, rows and history reconciliation, advisory ack/order/connectivity, health snapshots/deltas/reset/badges, AI poll 3/6/9 counts and cancellation, and same-run prompt/lookup/abort oracles remain. AgentSession adds a fetch-start readiness assertion while the authorization lookup remains unresolved. Indexing bridge withholds fetch instead of EventSource to exercise the same no-transport fallback and adds zero pooled connections beside zero tasks. Full diff inventories retain all setup, tags, conditions and input frames for review; test-only helper ownership is governed by the named register. Base merge 63bcd183c keeps main's incidental-request isolation in ResourceView.render and HealthLitView: non-stream fetches reject with TypeError('Test backend unavailable'), while fetchSseHarness handles actual SSE requests. Main added no cases in those two files; all eight ResourceView and ten HealthLitView cases and all 35 assertion calls survive. No behavioral assertion was changed by this merge. The complete 39-file union of ui-web tests touched by either side executed: 909 passed, zero failed/skipped. A fresh unmodified shared clone at PR base fe3753d37 ran all eight original stream-fixture files (100 cases); candidate adaptations also ran 100 cases. The new-base inventory records every old assertion and its transport-only mapping. The 2026-10-21 main merge (734f9f25b, base f6d92d768) changes no test or assertion in these fixtures. Fresh D4 runs execute all eight original files unmodified in a detached shared clone of the new main base (100 passed), and the eight adapted files in the merged candidate (100 passed). The regenerated new-base inventory retains all 229 original web assertions, including the 17 transport observation mappings; none is unmatched. Earlier merge executions described above remain historical evidence, rather than claims about the current base.",
       "adaptationEvidence": [
         "gates/test-intent/evidence/token-bootstrap-adaptation-audit.json",
-        "gates/test-intent/evidence/token-bootstrap-merged-web.json",
-        "gates/test-intent/evidence/token-bootstrap-merged-base-preservation.json"
+        "gates/test-intent/evidence/token-bootstrap-main-20261021-web.json",
+        "gates/test-intent/evidence/token-bootstrap-main-20261021-base-preservation.json"
       ],
       "evidence": "gates/test-intent/evidence/token-bootstrap-adaptation-audit.json"
     },
