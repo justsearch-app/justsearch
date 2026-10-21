@@ -293,3 +293,14 @@ F1/F2 follow the adopted b81d05 scenarios. I5 uses five alternating pairs on mat
   "note": "Real-Engine F1 (stale VDU rejected, live+restart; baseline publishes V0 text) and F2 (windowing restarts; baseline resumes C0) checked; adapted-test assertion removals are signature/preflight-refresh adaptations."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-lint-846-20261021",
+  "verdict": "accept",
+  "digest": "sha256:d04bb5011ba6a2d9180b6a8b75f548ca8a1f44a3f0539e0f43af09b2a7e9dafd",
+  "note": "Reviewed lint-only delta a12b918ff..96cb76b63: assertions, inputs and behavioral paths preserved; removed snapshot/helpers are obsolete remnants. Candidate uncached pmdTest passed; full indexer-worker tests passed (1227 passed, 28 skipped; all 44 tests in changed files passed). Race evidence validates. Baseline reproduced seven PMD violations and two pre-existing test failures; stale RP7 comment and gate reconsider-rate warning noted."
+}
+```
