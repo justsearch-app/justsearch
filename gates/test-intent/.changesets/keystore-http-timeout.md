@@ -120,3 +120,14 @@ Its SHA-256, in PR order:
   PRs, 11.1%) is nonblocking. The final gate output is in `test-intent.log`.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-verifier-ks-http-2426ca209",
+  "verdict": "accept",
+  "digest": "sha256:3bbbb2d2eb03978b9c0858068bd71df148a2b5a17fc93b34a134b3c0e63a27fe",
+  "note": "Incidental fits: oracle unchanged, 90s on rotation/retry only (3.3x slowest Windows pass 27.4s), print-only diagnostics; candidate passed hosted Windows 24.8s, Linux 2.9s"
+}
+```
