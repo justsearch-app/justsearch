@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
@@ -196,6 +197,28 @@ final class WorkerWatcherEventOwnershipTest {
       event.get(5, TimeUnit.SECONDS);
       assertTrue(writer.get(5, TimeUnit.SECONDS));
     }
+  }
+
+  @Test
+  void watchOnAServiceThatCannotApplyReceiptsQueuesThemForTheCurrentWriter() throws Exception {
+    // A restored watch can reach the deferred view after its writer upgrade already ran the
+    // receipt reconcile, before this subscription existed: the view has no writable lifecycle, so
+    // the receipts are queued for whichever writer is current, not dropped until the next trigger.
+    Path root = Files.createDirectory(tempDir.resolve("deferred-watch"));
+    WorkerMethvinWatcher watcher = mock(WorkerMethvinWatcher.class);
+    when(watcher.registerRoot(any(RootWatcherRegistry.Subscription.class))).thenReturn(true);
+    when(watcher.activateRoot(any(RootWatcherRegistry.Subscription.class))).thenReturn(true);
+    var deferredView = new WorkerIngestService(
+        mock(JobQueue.class), null, null, IndexingPacing.unthrottled(), null, null,
+        null, null, null, 0L);
+    deferredView.setRootWatcherRegistry(new RootWatcherRegistry(watcher));
+
+    assertTrue(deferredView.watchRoot(
+        io.justsearch.ipc.WatchRootRequest.newBuilder()
+            .setRootPath(root.toString()).setCollection("docs").build(),
+        CallContext.none()).getWatching());
+
+    verify(watcher).applyPendingReceiptsLater();
   }
 
   private Fixture fixture(Path root) {

@@ -758,6 +758,11 @@ public final class WorkerIngestService {
     }
   }
 
+  private boolean canApplyWatcherReceipts() {
+    return ingestLifecycle != null && ingestLifecycle.isAcceptingWrites()
+        && !switchBufferOps.isSwitching();
+  }
+
   public void reconcilePendingWatcherRoots() {
     try (var ignoredMutation = mutationLease()) {
       reconcilePendingWatcherRootsUnderLease();
@@ -765,9 +770,9 @@ public final class WorkerIngestService {
   }
 
   private void reconcilePendingWatcherRootsUnderLease() {
-    if (!(jobQueue instanceof SwitchBufferCapableQueue journal)
-        || ingestLifecycle == null || !ingestLifecycle.isAcceptingWrites()
-        || switchBufferOps.isSwitching()) return;
+    if (!(jobQueue instanceof SwitchBufferCapableQueue journal) || !canApplyWatcherReceipts()) {
+      return;
+    }
     for (var receipt : journal.listSwitchBufferOpsStrict()) {
       if (!WATCHER_RECONCILE.equals(receipt.op())) continue;
       var debt = WatcherRootReconciliation.decode(receipt.payload());
@@ -3590,7 +3595,13 @@ public final class WorkerIngestService {
             held != null
                 ? rootWatcherRegistry.watchWhenVolumeReturns(held, request.getCollection())
                 : rootWatcherRegistry.watch(rootPath, request.getCollection());
-        if (result.watching()) reconcilePendingWatcherRoots();
+        if (result.watching()) {
+          // A watch that reaches a service which cannot apply receipts (a deferred view whose
+          // writer upgrade already ran its reconcile before this subscription existed) queues
+          // them for whichever writer is current when the watcher's reconcile thread runs them.
+          if (canApplyWatcherReceipts()) reconcilePendingWatcherRoots();
+          else rootWatcherRegistry.applyPendingReceiptsLater();
+        }
         return io.justsearch.ipc.WatchRootResponse.newBuilder()
             .setWatching(result.watching())
             .setErrorMessage(result.errorMessage() == null ? "" : result.errorMessage())

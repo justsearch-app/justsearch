@@ -195,6 +195,15 @@ public final class RootWatcherRegistry {
     return result.watching();
   }
 
+  /** Queues the current writer's pending watcher receipts on the watcher's reconcile thread. */
+  synchronized void applyPendingReceiptsLater() {
+    if (successor != null) {
+      successor.applyPendingReceiptsLater();
+    } else if (watcher != null) {
+      watcher.applyPendingReceiptsLater();
+    }
+  }
+
   synchronized boolean unwatch(String rootPath) {
     if (successor != null) return successor.unwatch(rootPath);
     Path normalized;
