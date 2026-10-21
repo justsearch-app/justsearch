@@ -191,3 +191,25 @@ The delegated builder brief supplied scenarios v2, R1–R8. This adds checks wit
   "note": "behaviour line 21 calls deadline and running-cancellation checks preservation, but both fail on f6a14b5a6 before reaching the opener and are absent from newChecks/evidence; provide genuine before/after preservation evidence or reframe and evidence them as repaired checks. Independent results: tmp/audit-850/ownership-before.json and preservation-and-producers.json."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-dfab48022",
+  "verdict": "accept",
+  "digest": "sha256:0f57069fb93927ae8ca285d8cb2b3f4c957507bc4b258ddfa20cf50614ea84de",
+  "note": "Classes reviewed; preservation 3/3 before/after; mutation fails exactly at 353/400. tmp/verify-http/dfab48022/report.md"
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "codex-auditor-850-20261021",
+  "verdict": "accept",
+  "digest": "sha256:0f57069fb93927ae8ca285d8cb2b3f4c957507bc4b258ddfa20cf50614ea84de",
+  "note": "Prior finding resolved: new ownership checks are distinct from genuine preservation checks. Independently reran both mutation checks: candidate passes; reload-only premature release fails ownership assertions at lines 353 and 400. Evidence: tmp/audit-850b/ownership-mutation-disk-retry.json; initial tmp-space failure retained."
+}
+```
