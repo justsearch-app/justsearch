@@ -252,10 +252,31 @@ tracing, or unset both endpoint variables to keep enabled traces on disk only.
 These `OTEL_*` values are read directly from the environment by `TracingBootstrap`; the general
 system-property precedence rule above does not apply to them.
 
+## Desktop app-update traffic and policy
+
+Desktop builds with a configured release URL check by default, including CI-built branch candidates
+and pre-releases. Discovery fetches `release.v1.json`, `release.v1.json.sig` and `latest.json` from
+GitHub, following download/CDN redirects. Installation rechecks `latest.json` and downloads installer
+bytes only on request. The contacted hosts see request IP and time; these updater requests send no
+document content or queries. A build without a configured URL makes no updater requests; debug
+builds may use a runtime URL. These controls do not disable AI downloads, trace export or integrations.
+
+Set `JUSTSEARCH_AUTO_UPDATE_CHECK=false` before starting a fresh desktop process to suppress only
+launch checks. To forbid all new updater requests (manual and automatic), set
+`{"schemaVersion": 1, "appUpdatesEnabled": false}` in `policy.v1.json`. Rust enforces policy even when the Engine is down.
+Windows machine policy is `%PROGRAMDATA%\JustSearch\policy.v1.json`; user policy is in the shell's
+app-data directory, passed to the Engine as `JUSTSEARCH_HOME`. User policy may only further restrict
+machine policy. Policy is read at each discovery and installation, and again before artifact
+download. An in-flight discovery may finish its metadata requests; no request is cancelled. Local
+upgrade/rollback state is retained. The key is optional in schemaVersion 1 and independent of AI flags;
+older releases ignore it. The first enforcing release will be named in its release notes.
+
 ## Additional Runtime Keys (Selected)
 
 | Env Variable | System Property | Type | Description |
 | :--- | :--- | :--- | :--- |
+| **Desktop app updates (Rust shell)** | | | |
+| `JUSTSEARCH_AUTO_UPDATE_CHECK` | *(n/a — env only)* | String | Exact value `false` suppresses the automatic check scheduled about 30 seconds after chrome mount. Default on; set before starting a fresh desktop process. Settings and recovery manual checks still work when policy allows them. No settings key or UI control. `{"schemaVersion": 1, "appUpdatesEnabled": false}` in policy forbids all new updater checks and downloads independently of this preference and the AI flags. |
 | **JVM & index half** | | | |
 | `JUSTSEARCH_WORKER_DEADLINE_MS` | | | Retained compatibility key for the index-half call deadline. The current index half is composed in the Engine, so this no longer denotes the historical Head-to-Worker process RPC. |
 | `JUSTSEARCH_REQUIRE_CONTAINMENT` | *(n/a — env only)* | Bool | When `1`, an Engine that could not join its Windows kill-on-close job (so its helper processes could outlive it) exits with `FATAL_OR_UNCAUGHT` before taking the instance lock instead of booting with the `engine.containment_unavailable` warning. `JUSTSEARCH_SUPERVISOR_HARNESS=1` implies it. Default unset. The runtime manifest's `containment {status, reason}` reports the boot outcome. |

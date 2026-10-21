@@ -134,8 +134,12 @@ detect and the ordinal-450 tier had nothing left to cross.
 Search, indexing and built-in inference run on the device; loopback listeners do not imply
 zero outbound connections. Current network paths are:
 
-- **Desktop updates:** the Tauri UI schedules an update check 30 seconds after launch, without
-  an off switch. The Rust shell fetches the release descriptor, detached signature and updater
+- **Desktop updates:** the Tauri UI schedules an update check by default about 30 seconds after
+  chrome mount. Set `JUSTSEARCH_AUTO_UPDATE_CHECK=false` before starting a fresh desktop process
+  to suppress automatic checks; manual checks still work when policy allows them. Set
+  `"appUpdatesEnabled": false` in `policy.v1.json` to forbid all new updater checks and downloads,
+  enforced by Rust even with the Engine down. See the [update controls](../reference/configuration/environment-variables.md#desktop-app-update-traffic-and-policy).
+  The Rust shell fetches the release descriptor, detached signature and updater
   metadata from the configured HTTPS release feed (GitHub in release builds). It verifies the
   signature and rejects older release sequences. Download/install requires user consent.
 - **AI installation:** user-initiated Install AI, repair and resume can download registry-pinned
