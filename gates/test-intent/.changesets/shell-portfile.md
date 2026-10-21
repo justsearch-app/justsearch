@@ -80,3 +80,14 @@ The test-intent gate's historical, nonblocking reconsider-rate warning reports 1
 (11.1%). Independent acceptance is intentionally left to the verifier.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16075-df1b-7d43-b81f-60d211e4d5b2",
+  "verdict": "accept",
+  "digest": "sha256:1b5ae3901494c8df5eb1b9e16c0d56bf4bae4cf11cf6572ed1f6e6cca5a50e82",
+  "note": "The delegated instrumentation adaptation preserves the complete test oracle and deadlines, with independent before/after race evidence; native X11 execution remains unverified under the no-/tmp constraint."
+}
+```
