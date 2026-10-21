@@ -51,8 +51,8 @@ contain no policy parsing, environment suppression or fail-closed repair.
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "fail closed on mismatches (hash/policy/pack allowlist).",
-          "location": "docs/explanation/15-enterprise-policy.md:24"
+          "location": "task t-20261019-9d870e request",
+          "quote": "nothing on the machine or network is exposed by accident"
         },
         {
           "kind": "delegated-choice",
