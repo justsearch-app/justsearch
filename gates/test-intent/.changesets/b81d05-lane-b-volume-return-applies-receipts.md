@@ -52,3 +52,16 @@ sync's timer stay unverified.
   }]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-848-5ead93951",
+  "verdict": "accept",
+  "digest": "sha256:046cf65438d37032b3811bbb96eed669736dce46631a44890bca6a0617baed88",
+  "note": "Round7: 60/60 producer cases, 10 outcome failures on recorded before-states, and reload/restart gap probes verified; lint passes; JVM run has only the predeclared long-path socket exception. Round6 product passes carried forward; scoped exclusions retained."
+}
+```

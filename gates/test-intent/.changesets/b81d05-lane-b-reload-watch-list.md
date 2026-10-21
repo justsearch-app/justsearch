@@ -69,3 +69,16 @@ before the change and its evidence has no fail-before (`repaired: false`).
   }]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-848-5ead93951",
+  "verdict": "accept",
+  "digest": "sha256:64a43ff8d6c0c6fe7385aaa20fe3ec61a313a88b4a62cc6210890c83061cf4b1",
+  "note": "Round7: 60/60 producer cases, 10 outcome failures on recorded before-states, and reload/restart gap probes verified; lint passes; JVM run has only the predeclared long-path socket exception. Round6 product passes carried forward; scoped exclusions retained."
+}
+```

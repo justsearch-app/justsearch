@@ -48,3 +48,14 @@ author-session: builder-index-deletes-round3-20261020
   "note": "Accepted under narrowed scope. The missing-root-sync replay-uncertainty latch and follow-on rebuild HTTP 500 move to migration recovery; the shared help-document drop moves to follow-up. Verification limits remain in tmp/verify-r5/scenario-matrix.json."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-848-5ead93951",
+  "verdict": "accept",
+  "digest": "sha256:77d57eba5b3c394f8275729bf58f4198d20ff02fc9f48072b2e729c961703b9c",
+  "note": "Round7: 60/60 producer cases, 10 outcome failures on recorded before-states, and reload/restart gap probes verified; lint passes; JVM run has only the predeclared long-path socket exception. Round6 product passes carried forward; scoped exclusions retained."
+}
+```

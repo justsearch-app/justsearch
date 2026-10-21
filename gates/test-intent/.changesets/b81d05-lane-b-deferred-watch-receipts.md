@@ -43,3 +43,16 @@ registered root, and the watcher's queue observed. Fail-before ran against the p
   }]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-848-5ead93951",
+  "verdict": "accept",
+  "digest": "sha256:0c0a8b9f2e85675ffd55c8edd81116ce948db2efafdd7c0a93d994b5b2a58ad8",
+  "note": "Round7: 60/60 producer cases, 10 outcome failures on recorded before-states, and reload/restart gap probes verified; lint passes; JVM run has only the predeclared long-path socket exception. Round6 product passes carried forward; scoped exclusions retained."
+}
+```

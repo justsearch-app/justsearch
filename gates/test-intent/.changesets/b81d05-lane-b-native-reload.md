@@ -52,3 +52,16 @@ crash checks in b81d05-lane-b-waiting-delete-durable.
   }]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-848-5ead93951",
+  "verdict": "accept",
+  "digest": "sha256:f0dfa5c1cd8b76a2f39f4c51c52901f97be89c95b171d07403f2fbbd27045cc2",
+  "note": "Round7: 60/60 producer cases, 10 outcome failures on recorded before-states, and reload/restart gap probes verified; lint passes; JVM run has only the predeclared long-path socket exception. Round6 product passes carried forward; scoped exclusions retained."
+}
+```

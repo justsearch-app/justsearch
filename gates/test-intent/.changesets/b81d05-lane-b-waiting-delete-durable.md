@@ -51,3 +51,16 @@ loop activation, both still inside the fence. Fail-before ran against the previo
   }]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-848-5ead93951",
+  "verdict": "accept",
+  "digest": "sha256:b619f0073ba6cbfefd6c9c23af0f2634ac8ce88fd2cfadf10c5687d52de35a20",
+  "note": "Round7: 60/60 producer cases, 10 outcome failures on recorded before-states, and reload/restart gap probes verified; lint passes; JVM run has only the predeclared long-path socket exception. Round6 product passes carried forward; scoped exclusions retained."
+}
+```
