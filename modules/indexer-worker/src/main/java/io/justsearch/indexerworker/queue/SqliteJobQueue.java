@@ -3823,7 +3823,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
         return enqueueEntriesInTransaction(List.of(entry), collection, null,
-            System.currentTimeMillis(), false) == 1;
+            System.currentTimeMillis(), false, null) == 1;
       });
     } catch (SQLException failure) {
       log.warn("Cannot admit recreated file {}", entry.path(), failure);

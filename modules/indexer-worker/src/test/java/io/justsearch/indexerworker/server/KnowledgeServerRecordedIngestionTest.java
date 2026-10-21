@@ -842,6 +842,9 @@ final class KnowledgeServerRecordedIngestionTest {
         "a".repeat(64), active, List.of()).building_generation();
     org.mockito.Mockito.when(lifecycle.recordedPrecommitRefused(operation)).thenReturn(true);
     var source = org.mockito.Mockito.mock(RunningRuntime.class);
+    // Refused recovery commits A before acknowledging the journal, even with nothing to apply.
+    org.mockito.Mockito.when(source.commitOps()).thenReturn(
+        org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.CommitOps.class));
     var green = org.mockito.Mockito.mock(RunningRuntime.class);
     var owner = new Object();
     var producer = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
