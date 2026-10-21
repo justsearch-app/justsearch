@@ -1,0 +1,15 @@
+diff --git a/modules/app-engine/src/main/java/io/justsearch/app/engine/EngineKnowledgeClient.java b/modules/app-engine/src/main/java/io/justsearch/app/engine/EngineKnowledgeClient.java
+--- a/modules/app-engine/src/main/java/io/justsearch/app/engine/EngineKnowledgeClient.java
++++ b/modules/app-engine/src/main/java/io/justsearch/app/engine/EngineKnowledgeClient.java
+@@ -829,7 +829,10 @@
+     };
+     Budget budget;
+     try {
+-      budget = new Budget(budgetMs, work, pending::completeExceptionally);
++      budget = new Budget(budgetMs, work, failure -> {
++        if ("reloadRuntime".equals(operation)) work.close();
++        pending.completeExceptionally(failure);
++      });
+     } catch (RuntimeException | Error failure) {
+       view.release();
+       work.close();

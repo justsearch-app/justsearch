@@ -1111,6 +1111,19 @@ public final class EngineRoot implements WorkerHost {
     return servingLease(current.captureStartupHealthView());
   }
 
+  @Override
+  public java.util.Optional<WorkerHost.ServingLease> tryCaptureHealthView() {
+    KnowledgeServer current = server;
+    if (current == null) throw new IllegalStateException("Index serving owner is unavailable");
+    return current.tryCaptureHealthView().map(EngineRoot::servingLease);
+  }
+
+  @Override
+  public boolean runtimeReloadInProgress() {
+    KnowledgeServer current = server;
+    return current != null && current.runtimeReloadInProgress();
+  }
+
   private static WorkerHost.ServingLease servingLease(KnowledgeServer.ServingLease lease) {
     return new WorkerHost.ServingLease() {
       @Override
