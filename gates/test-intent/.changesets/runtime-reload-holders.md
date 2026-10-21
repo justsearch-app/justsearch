@@ -18,7 +18,7 @@ The delegated builder brief supplied scenarios v2, R1–R8. This adds checks wit
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "A runtime reload retains Engine work ownership through actual worker exit without capturing a serving view. Real client/server lease dispatch permits idle and repeated reloads, bounds holder refusal and permits retry, refuses migration before destruction including changes while queued, drains older shared-runtime holders, serializes concurrent swaps and does not reopen serving across shutdown. Native IO is mocked in this deterministic boundary fixture. Cancellation, deadlines, executor refusal, queued cancellation and ordinary lifecycle serving leases are preservation checks. Real HTTP search, ingestion and restart checks remain unverified in this builder pass; see tmp/712d3e/real-engine-steps.md.",
+      "behaviour": "Runtime-reload dispatch stops capturing a serving view. Real client/server lease dispatch permits idle and repeated reloads, bounds holder refusal and permits retry, refuses migration before destruction including changes while queued, drains older shared-runtime holders, serializes concurrent swaps and does not reopen serving across shutdown. Native IO is mocked in this deterministic boundary fixture.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -98,6 +98,59 @@ The delegated builder brief supplied scenarios v2, R1–R8. This adds checks wit
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRuntimeReloadTest.java#reloadQueuedBehindCutoverRechecksTheNewOwner",
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRuntimeReloadTest.java#interruptedReloadWithoutHoldersLeavesServingAdmissionOpen",
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRuntimeReloadTest.java#reloadRefusesUnavailableMigrationStateBeforeDestructiveWork"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRuntimeReloadTest.java"
+      ],
+      "class": "New",
+      "repaired": false,
+      "behaviour": "New pass-after checks of running-reload ownership through actual worker exit after deadline expiry or running cancellation. These are not repairs of deadline or cancellation ownership. On f6a14b5a66e7b879c711ef9ca54280723de2c242, deadlineReleasesCallerButOwnsRunningReloadUntilWorkerExit fails at line 350 and cancellationKeepsRunningReloadOwnedUntilItsWorkerExits at line 397: both entered.await(3, TimeUnit.SECONDS) assertions fail before the opener barrier is reached. The baseline reload dispatch captures its own serving lease, then waits for that same lease in retireServingView; the deadline can interrupt this drain, but cannot make the opener reachable. The cancellation check never reaches cancelInteractive. Therefore these baseline failures do not demonstrate premature ownership release after the named events. The New row of docs/reference/testing/test-intent.md requires assertion fail-before only for repaired behaviour; repaired is false here. The candidate reaches the blocked opener, releases the caller on deadline or cancellation, asserts activeWorkCount remains 1 until the worker is released, then observes 0.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-712d3e",
+          "scenario": "R5",
+          "quote": "The reload dispatch itself keeps Engine work owned until the worker actually exits, including deadline expiry, cancellation, executor rejection, and cancellation before execution. A timed-out caller never lets shutdown close resources beneath a running swap.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/runtime-reload-ownership-mutation.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRuntimeReloadTest.java#deadlineReleasesCallerButOwnsRunningReloadUntilWorkerExit",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRuntimeReloadTest.java#cancellationKeepsRunningReloadOwnedUntilItsWorkerExits"
+      ],
+      "mutationProof": "The before run is candidate 85ee1ac9d25658721452f40b7f8165d24d5946ae plus gates/test-intent/evidence/runtime-reload-release-on-caller-exit.patch: only the reloadRuntime failure callback closes its Engine work handle before delivering a deadline or cancellation failure, removing retention until worker exit while leaving dispatch, serving leases, opener entry and tests unchanged. Both unmodified checks pass on the candidate; under this mutation deadlineReleasesCallerButOwnsRunningReloadUntilWorkerExit fails at EngineRuntimeReloadTest.java:353 and cancellationKeepsRunningReloadOwnedUntilItsWorkerExits at EngineRuntimeReloadTest.java:400, each at its activeWorkCount ownership assertion (expected 1, observed 0), after the opener latch has succeeded. This proves check sensitivity, not a named ownership defect in f6a14b5a6; that baseline reachability evidence remains in gates/test-intent/evidence/runtime-reload-ownership-classification.json."
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRuntimeReloadTest.java"
+      ],
+      "class": "New",
+      "repaired": false,
+      "behaviour": "New checks of preserved behavior, not repaired checks: executor refusal releases reload ownership without entering the worker; queued cancellation removes the queued task, releases ownership and never enters the opener; ordinary resetIndex lifecycle calls retain a serving-view lease until completion. Each named check must pass unchanged on f6a14b5a66e7b879c711ef9ca54280723de2c242 and on the candidate. Both runs are recorded in the cited evidence. These use the New row with repaired false because the checks are new but their named behavior is preserved. The evidence utility exits 1 when --before finds these preservation checks passing, since its repair-oriented success condition requires assertion fail-before; this is not a failed preservation run.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-712d3e",
+          "scenario": "R5",
+          "quote": "The reload dispatch itself keeps Engine work owned until the worker actually exits, including deadline expiry, cancellation, executor rejection, and cancellation before execution. A timed-out caller never lets shutdown close resources beneath a running swap.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-712d3e",
+          "scenario": "R5",
+          "quote": "Only the runtime-reload dispatch stops taking a serving view; other lifecycle RPCs stay leased.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/runtime-reload-ownership-classification.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRuntimeReloadTest.java#executorRejectionReleasesReloadOwnershipWithoutEnteringWorker",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRuntimeReloadTest.java#cancellingQueuedReloadReleasesItsOwnerWithoutEnteringWorker",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRuntimeReloadTest.java#otherLifecycleCallsStillRetainServingView"
       ]
     }
   ]
