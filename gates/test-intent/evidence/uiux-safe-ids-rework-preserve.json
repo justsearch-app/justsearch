@@ -1,0 +1,88 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T22:32:01.226Z",
+  "revision": "b359747afa2075bf346aac0362ea6b91632b0474",
+  "tree": "fc485e2253d0bcdea6d311c4379440c9de33301d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.conversation.FileConversationStoreSafeIdsTest.preservesCreatedAndLegacyIdsWithoutRewritingSavedData\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4642
+    },
+    {
+      "command": "./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.RunStoresSafeIdsTest.preservesRunIdFormatsAndConversationJoins\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3668
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.ConversationSafeIdsHttpTest.validDeleteAndReadKeepTheirResponses\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6071
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java#preservesCreatedAndLegacyIdsWithoutRewritingSavedData",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd368903c045f4f6ac5e849b49349db63e6aaca652d801be3bd159616b2ef64d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesCreatedAndLegacyIdsWithoutRewritingSavedData()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/RunStoresSafeIdsTest.java#preservesRunIdFormatsAndConversationJoins",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/RunStoresSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6b03bf6212a9c9fe23f6df18b80ff767a58ff67c00b935c23a4a3c3a0f38062d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesRunIdFormatsAndConversationJoins()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ConversationSafeIdsHttpTest.java#validDeleteAndReadKeepTheirResponses",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ConversationSafeIdsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e15a1f4079a134d1f88fb1ebbb68002c14b178ea67dd7a56f42ef16b7c607306",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "validDeleteAndReadKeepTheirResponses()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:0ea82c558593ec4ba3c64d901a94638586fa21f06314ce0954a2739e6db02b37"
+}

@@ -183,6 +183,8 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   inputs.file(rootProject.file("scripts/supervisor-conformance/native-projection-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/component-recovery-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/migration-restart-scenario.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/migration-journal-loss-scenario.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/pointer-publication-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/hostile-lock-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/processing-replay-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/operation-resume-scenario.mjs"))

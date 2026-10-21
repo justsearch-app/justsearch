@@ -1,6 +1,5 @@
 ﻿plugins {
   `java-library`
-  `java-test-fixtures`
   id("jvm-test-suite")
   id("conventions.jvm-base")
   // Scoped to the seams registered for this module in governance/logic-seams.v1.json (tempdoc 627:

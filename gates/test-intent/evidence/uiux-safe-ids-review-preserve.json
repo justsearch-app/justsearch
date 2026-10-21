@@ -1,0 +1,409 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T02:11:34.134Z",
+  "revision": "bcbbb6e5ca2e479ed98bd80a302255bf963293e3",
+  "tree": "882edb7c392975075268b08ec9e204ff77d0e157",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.conversation.FileConversationStoreSafeIdsTest.refusesUnsafeIdsBeforeAnyOperationAndPreservesSentinels\" --tests \"io.justsearch.app.services.conversation.FileConversationStoreSafeIdsTest.recursiveDeleteCannotRemoveSentinelsBesideAndAboveRoot\" --tests \"io.justsearch.app.services.conversation.FileConversationStoreSafeIdsTest.validatesBranchDestinationBeforeReadingParent\" --tests \"io.justsearch.app.services.agenthistory.AgentHistorySafeIdsTest.refusesUnsafeRunIdsBeforeSchedulingOrReadingTranscripts\" --tests \"io.justsearch.app.services.conversation.FileConversationStoreSafeIdsTest.preservesCreatedAndLegacyIdsWithoutRewritingSavedData\" --tests \"io.justsearch.app.services.conversation.FileConversationStoreSafeIdsTest.refusesWindowsAliasesBeforeConversationAccess\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2411
+    },
+    {
+      "command": "./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.RunStoresSafeIdsTest.refusesUnsafeIdsAcrossRunAndEventOperationsBeforeFilesystemAccess\" --tests \"io.justsearch.agent.RunStoresSafeIdsTest.preservesRunIdFormatsAndConversationJoins\" --tests \"io.justsearch.agent.tools.FileOperationLogSafeIdsTest.refusesTraversalBeforeReadingOrUpdatingExternalJournal\" --tests \"io.justsearch.agent.tools.FileOperationLogSafeIdsTest.refusesWindowsAliasesBeforeJournalAccess\" --tests \"io.justsearch.agent.RunStoresSafeIdsTest.refusesWindowsAliasesBeforeRunOrEventAccess\" --tests \"io.justsearch.agent.RunStoresSafeIdsTest.appendSearchEventWithoutConversationCreatesNoFiles\" --tests \"io.justsearch.agent.tools.FileOperationLogSafeIdsTest.legacyAndCreatedBatchIdsKeepTheirJournalBytes\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2370
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.ConversationSafeIdsHttpTest.refusesUnsafeBodyAndQueryIdsBeforeStartingWork\" --tests \"io.justsearch.ui.api.ConversationSafeIdsHttpTest.realStoreSentinelsSurviveEncodedReadWriteBranchAndDelete\" --tests \"io.justsearch.ui.api.ConversationSafeIdsHttpTest.validDeleteAndReadKeepTheirResponses\" --tests \"io.justsearch.ui.api.StoreIdAmendmentsHttpTest.historyRefusesExternalBatchIdsBeforeQuerying\" --tests \"io.justsearch.ui.api.StoreIdAmendmentsHttpTest.undoRefusesUnsafeExecutionIdsBeforeQuerying\" --tests \"io.justsearch.ui.api.StoreIdAmendmentsHttpTest.runtimeInstanceIdsRefuseWindowsDevicesBeforeResolvingTheRoot\" --tests \"io.justsearch.ui.api.ConversationSafeIdsHttpTest.rejectsEncodedIdsOnEveryAddressedRouteWithoutTouchingStores\" --tests \"io.justsearch.ui.api.StoreIdAmendmentsHttpTest.optionalBlankBodyIdsDispatchAsAbsent\" --tests \"io.justsearch.ui.api.StoreIdAmendmentsHttpTest.blankConversationIdRetainsLegacyHttpResponse\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4702
+    },
+    {
+      "command": "./gradlew :modules:configuration:test --tests \"io.justsearch.configuration.persistence.StoreIdsUnicodeExtensionsTest.refusesDeviceNamesWithUnicodeLineSeparatorExtensions\" --tests \"io.justsearch.configuration.persistence.StoreIdsWindowsAliasesTest.preservesOrdinaryNamesNearWindowsDevices\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1452
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java#refusesUnsafeIdsBeforeAnyOperationAndPreservesSentinels",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd368903c045f4f6ac5e849b49349db63e6aaca652d801be3bd159616b2ef64d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusesUnsafeIdsBeforeAnyOperationAndPreservesSentinels()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java#recursiveDeleteCannotRemoveSentinelsBesideAndAboveRoot",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd368903c045f4f6ac5e849b49349db63e6aaca652d801be3bd159616b2ef64d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recursiveDeleteCannotRemoveSentinelsBesideAndAboveRoot()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java#validatesBranchDestinationBeforeReadingParent",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd368903c045f4f6ac5e849b49349db63e6aaca652d801be3bd159616b2ef64d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "validatesBranchDestinationBeforeReadingParent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/agenthistory/AgentHistorySafeIdsTest.java#refusesUnsafeRunIdsBeforeSchedulingOrReadingTranscripts",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/agenthistory/AgentHistorySafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f57ed4dd327135472a07a2cd6b9feacdf63a189d7ae22186e8db3a67eefa8928",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusesUnsafeRunIdsBeforeSchedulingOrReadingTranscripts()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/RunStoresSafeIdsTest.java#refusesUnsafeIdsAcrossRunAndEventOperationsBeforeFilesystemAccess",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/RunStoresSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6b03bf6212a9c9fe23f6df18b80ff767a58ff67c00b935c23a4a3c3a0f38062d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusesUnsafeIdsAcrossRunAndEventOperationsBeforeFilesystemAccess()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ConversationSafeIdsHttpTest.java#refusesUnsafeBodyAndQueryIdsBeforeStartingWork",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ConversationSafeIdsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e15a1f4079a134d1f88fb1ebbb68002c14b178ea67dd7a56f42ef16b7c607306",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusesUnsafeBodyAndQueryIdsBeforeStartingWork()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ConversationSafeIdsHttpTest.java#realStoreSentinelsSurviveEncodedReadWriteBranchAndDelete",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ConversationSafeIdsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e15a1f4079a134d1f88fb1ebbb68002c14b178ea67dd7a56f42ef16b7c607306",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realStoreSentinelsSurviveEncodedReadWriteBranchAndDelete(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java#preservesCreatedAndLegacyIdsWithoutRewritingSavedData",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd368903c045f4f6ac5e849b49349db63e6aaca652d801be3bd159616b2ef64d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesCreatedAndLegacyIdsWithoutRewritingSavedData()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/RunStoresSafeIdsTest.java#preservesRunIdFormatsAndConversationJoins",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/RunStoresSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6b03bf6212a9c9fe23f6df18b80ff767a58ff67c00b935c23a4a3c3a0f38062d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesRunIdFormatsAndConversationJoins()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ConversationSafeIdsHttpTest.java#validDeleteAndReadKeepTheirResponses",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ConversationSafeIdsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e15a1f4079a134d1f88fb1ebbb68002c14b178ea67dd7a56f42ef16b7c607306",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "validDeleteAndReadKeepTheirResponses()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationLogSafeIdsTest.java#refusesTraversalBeforeReadingOrUpdatingExternalJournal",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationLogSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c9cb9861e28fbeb715a9d9856723400bb681c7f7c1ee14b2c7765ab45940d228",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusesTraversalBeforeReadingOrUpdatingExternalJournal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationLogSafeIdsTest.java#refusesWindowsAliasesBeforeJournalAccess",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationLogSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c9cb9861e28fbeb715a9d9856723400bb681c7f7c1ee14b2c7765ab45940d228",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusesWindowsAliasesBeforeJournalAccess()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/RunStoresSafeIdsTest.java#refusesWindowsAliasesBeforeRunOrEventAccess",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/RunStoresSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6b03bf6212a9c9fe23f6df18b80ff767a58ff67c00b935c23a4a3c3a0f38062d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusesWindowsAliasesBeforeRunOrEventAccess()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java#refusesWindowsAliasesBeforeConversationAccess",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd368903c045f4f6ac5e849b49349db63e6aaca652d801be3bd159616b2ef64d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusesWindowsAliasesBeforeConversationAccess()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java#historyRefusesExternalBatchIdsBeforeQuerying",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5d8a2caf0fb15620ea29603bbcd969caa89aec36882978902b4672ac24f5b7e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "historyRefusesExternalBatchIdsBeforeQuerying()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java#undoRefusesUnsafeExecutionIdsBeforeQuerying",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5d8a2caf0fb15620ea29603bbcd969caa89aec36882978902b4672ac24f5b7e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "undoRefusesUnsafeExecutionIdsBeforeQuerying()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java#runtimeInstanceIdsRefuseWindowsDevicesBeforeResolvingTheRoot",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5d8a2caf0fb15620ea29603bbcd969caa89aec36882978902b4672ac24f5b7e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "runtimeInstanceIdsRefuseWindowsDevicesBeforeResolvingTheRoot()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ConversationSafeIdsHttpTest.java#rejectsEncodedIdsOnEveryAddressedRouteWithoutTouchingStores",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ConversationSafeIdsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e15a1f4079a134d1f88fb1ebbb68002c14b178ea67dd7a56f42ef16b7c607306",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rejectsEncodedIdsOnEveryAddressedRouteWithoutTouchingStores()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java#optionalBlankBodyIdsDispatchAsAbsent",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5d8a2caf0fb15620ea29603bbcd969caa89aec36882978902b4672ac24f5b7e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "optionalBlankBodyIdsDispatchAsAbsent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/RunStoresSafeIdsTest.java#appendSearchEventWithoutConversationCreatesNoFiles",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/RunStoresSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6b03bf6212a9c9fe23f6df18b80ff767a58ff67c00b935c23a4a3c3a0f38062d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "appendSearchEventWithoutConversationCreatesNoFiles()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationLogSafeIdsTest.java#legacyAndCreatedBatchIdsKeepTheirJournalBytes",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationLogSafeIdsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c9cb9861e28fbeb715a9d9856723400bb681c7f7c1ee14b2c7765ab45940d228",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacyAndCreatedBatchIdsKeepTheirJournalBytes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/StoreIdsUnicodeExtensionsTest.java#refusesDeviceNamesWithUnicodeLineSeparatorExtensions",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/StoreIdsUnicodeExtensionsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c0c34a7b2379bfd0a04acdb173ef88c438ba29d5a906765e84bbb1b410ba7f7e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusesDeviceNamesWithUnicodeLineSeparatorExtensions()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java#blankConversationIdRetainsLegacyHttpResponse",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StoreIdAmendmentsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5d8a2caf0fb15620ea29603bbcd969caa89aec36882978902b4672ac24f5b7e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blankConversationIdRetainsLegacyHttpResponse()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/StoreIdsWindowsAliasesTest.java#preservesOrdinaryNamesNearWindowsDevices",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/StoreIdsWindowsAliasesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6789997a9541e24f2ac3e1b1a22f48210f1216b1773f4fbd72fdfa17835ca54a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preservesOrdinaryNamesNearWindowsDevices()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:a330dd39d0df0a0e92385c9280b3f1edb2c5c5d30ff66ac41b01b2688749d5dd"
+}

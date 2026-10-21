@@ -30,7 +30,8 @@ export async function exerciseProcessingReplay(c) {
   requireThat(originalTable.ok, 'initial process identity must be available');
   const originalProcess = originalTable.table.find(row => Number(row.ProcessId) === first.pid);
   requireThat(originalProcess?.CommandLine?.includes(data), 'Engine command must name this fixture data');
-  const record = { pid: first.pid, creationFileTimeUtc: originalProcess.CreationFileTimeUtc,
+  const record = { pid: first.pid, processIdentity: originalProcess.processIdentity,
+    creationFileTimeUtc: originalProcess.CreationFileTimeUtc,
     cmdlineFingerprint: originalProcess.CommandLine };
   const file = path.join(work, 'corpus', 'chaos-hang-processing.txt');
   const marker = 'processingreplayedmarker';

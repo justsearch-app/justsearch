@@ -42,12 +42,12 @@ failures inside the omnibus job took about 17-18 minutes to become actionable.
 The public repository's standard GitHub-hosted CI lane runs automatically on `pull_request`
 and `push` to `main`, and it may also be dispatched manually with `workflow_dispatch`.
 
-Every workflow that produces a required status check also declares `merge_group`, so the
-check still reports if a GitHub merge queue is ever enabled. A required check that never
-reports on a merge-group ref stalls the queue until it times out, so the trigger is declared
-ahead of the queue rather than after the first stall. It changes nothing until the repository
-is organization-owned and a queue is configured, because no `merge_group` event can be
-delivered before then.
+Every workflow that produces a required status check also declares `merge_group`.
+PRs and pushes to `main` run the full required set. Merge-queue runs check governance,
+build and secrets on the combined tree. Other required jobs report successful skips;
+matrix jobs keep their expanded check names by skipping every step. Runtime, unit and
+Windows tests do not rerun on the combined tree. Measured axe, Integration tests and
+CI wall-clock attribution run only on manual dispatch.
 
 The CI workflow is organized as stable **fact lanes**:
 
@@ -60,7 +60,7 @@ The CI workflow is organized as stable **fact lanes**:
 Each lane name describes the fact it proves. Main branch protection requires the current stable
 check names declared in `scripts/ci/workflow-signal-policy.v1.json`. The same policy file declares
 whether GitHub must require each pull-request branch to be up to date before merging. That setting
-is `false` while the native merge queue is active: the queue creates and tests a merge group
+is `false` while the native merge queue is active: the queue checks a merge group
 against current `main`, so forcing every PR branch through a separate update-and-retest cycle
 would duplicate the queue's integration check and restore the serial re-CI tax.
 

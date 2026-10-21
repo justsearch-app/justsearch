@@ -1,0 +1,101 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T09:20:31.701Z",
+  "revision": "f9bd104d228c80173d58068cfe0f24c6d9ced149",
+  "tree": "64aca0fd96af6f72c65a727f7dd100f71257952a",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "Picked up JAVA_TOOL_OPTIONS:  -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/restart-a/tmp/restart/run8-tmp",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:system-tests:integrationTest --tests \"io.justsearch.systemtests.supervision.GenerationPointerPublicationPreservationE2ETest\" --tests \"io.justsearch.systemtests.supervision.EngineSupervisedRecoveryE2ETest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 217138
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/GenerationPointerPublicationPreservationE2ETest.java",
+      "file": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/GenerationPointerPublicationPreservationE2ETest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5ee70dbb695faaa407ddebea2e9072f4c4c4782e1bef62d27c15992ab807ab0b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] first, before-backup",
+          "status": "passed"
+        },
+        {
+          "name": "[2] first, after-backup",
+          "status": "passed"
+        },
+        {
+          "name": "[3] first, after-publication",
+          "status": "passed"
+        },
+        {
+          "name": "[4] replacement, before-backup",
+          "status": "passed"
+        },
+        {
+          "name": "[5] replacement, after-publication",
+          "status": "passed"
+        },
+        {
+          "name": "[6] recovery, after-backup",
+          "status": "passed"
+        },
+        {
+          "name": "[7] recovery, after-publication",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/EngineSupervisedRecoveryE2ETest.java",
+      "file": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/EngineSupervisedRecoveryE2ETest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1183575e2cade4a20df2161aef605e34c5180a16be95d7124b387f3cb6bfdc7b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] writer",
+          "status": "passed"
+        },
+        {
+          "name": "[2] migration",
+          "status": "passed"
+        },
+        {
+          "name": "[3] lock-ingest",
+          "status": "passed"
+        },
+        {
+          "name": "[4] processing",
+          "status": "passed"
+        },
+        {
+          "name": "deterministicLockHandleCanCloseAfterIntruderCleanup(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2872c548e9df43777e49836fd1d7037057e797555add35abcea5be58a28d2910"
+}

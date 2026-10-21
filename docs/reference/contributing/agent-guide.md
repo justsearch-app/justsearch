@@ -346,7 +346,10 @@ The public repository has two CI postures:
 
 - The standard hosted `CI` workflow runs automatically on pull requests and
   pushes to `main`, and can also be dispatched manually. ADR-0044 owns this
-  public hosted lane.
+  public hosted lane. PRs and pushes to `main` run the full required set.
+  Merge-queue runs check governance, build and secrets on the combined tree;
+  runtime, unit and Windows tests do not rerun there.
+  Measured axe, Integration tests and CI wall-clock attribution run only on manual dispatch.
 - Self-hosted, release, and benchmark/specialty workflows stay manually dispatched unless a
   later ADR changes their trigger policy. ADR-0026 remains the historical basis for that posture.
   CodeQL runs weekly on Mondays at 04:17 UTC and can also be dispatched manually (ADR-0052).
@@ -387,9 +390,8 @@ introduced, update that policy with the owner, evidence tier, replacement
 signal, and cadence. Stress tags remain governed by
 `scripts/ci/stress-suite-policy.v1.json`.
 
-Local verification is still required before pushing substantive work. Use the
-automatic PR checks as remote confirmation, not as a replacement for running the
-subject-specific local commands.
+Hosted CI checks finished candidates. Run the local subset before each push;
+Windows-only behaviour is the exception when it requires the hosted Windows runner.
 
 **Dispatch `ci.yml` manually** when you need a fresh hosted run outside the
 normal pull-request or push trigger, for example after updating a branch whose
@@ -625,8 +627,8 @@ longer applies once a PR is enqueued). Practical sequence:
   review record, then issues the ordinary strategy-free queue request. Direct
   `gh pr merge` and the generic `run-gh.mjs pr merge` passthrough bypass that proof. Under the queue the accepted request
   does not merge directly; it adds the PR to the queue. The queue runs its own
-  `merge-group` CI pass against the PR merged with the latest `main` and merges
-  (squash) autonomously on success.
+  `merge-group` governance, build and secrets pass against the PR merged with the
+  latest `main` and merges (squash) autonomously on success.
 - **A queue rejection is a real signal, not a flake to blind-retry.** If the entry
   drops out of the queue and the PR stays open/unmerged, the merge-group run
   failed — pull that run (merge_group event, or the PR's checks tab) and

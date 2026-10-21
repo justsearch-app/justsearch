@@ -49,3 +49,43 @@ it('document fallback still explains why chunk retrieval was unavailable', () =>
   const host = document.createElement('div'); render(view.renderPreamble(), host);
   expect(host.textContent).toContain('(document too small for chunking)');
 });
+
+it('reloaded Unified Chat shows a turn the reader stopped as stopped, with its note, not as an answer', () => {
+  // The rows the Engine saves for the reader's Stop in Search v3 (S2.3, N2.3): the answer holds what
+  // had streamed (nothing, for an early Stop), with the CANCELLED disposition and the rewrite note.
+  const at = (ms: number): string => new Date(ms).toISOString();
+  const view = document.createElement('jf-unified-chat-view') as unknown as {
+    affordance: string; unifiedEvents: unknown[]; render(): TemplateResult;
+  };
+  view.affordance = 'none';
+  view.unifiedEvents = [
+    { id: 'q1', occurredAt: at(1000), kind: 'USER_MESSAGE', originator: 'user',
+      content: 'and who owns it?', attributes: { shapeId: 'core.rag-ask' } },
+    { id: 'a1', occurredAt: at(2000), kind: 'ASSISTANT_MESSAGE', originator: 'agent', content: '',
+      attributes: { shapeId: 'core.rag-ask', disposition: 'CANCELLED',
+        standaloneQuestion: 'Who owns Project Cobalt?' } },
+    { id: 'q2', occurredAt: at(3000), kind: 'USER_MESSAGE', originator: 'user',
+      content: 'and when does it ship?', attributes: { shapeId: 'core.rag-ask' } },
+    { id: 'a2', occurredAt: at(4000), kind: 'ASSISTANT_MESSAGE', originator: 'agent',
+      content: 'It ships on', attributes: { shapeId: 'core.rag-ask', disposition: 'CANCELLED' } },
+    { id: 'q3', occurredAt: at(5000), kind: 'USER_MESSAGE', originator: 'user',
+      content: 'and who built it?', attributes: { shapeId: 'core.rag-ask' } },
+    { id: 'a3', occurredAt: at(6000), kind: 'ASSISTANT_MESSAGE', originator: 'agent',
+      content: 'Ada built it.', attributes: { shapeId: 'core.rag-ask' } },
+  ];
+  const host = document.createElement('div'); render(view.render(), host);
+  const answers = [...host.querySelectorAll<HTMLElement>('.message.assistant')];
+  expect(answers.map((a) => a.dataset.itemId)).toEqual(['a1', 'a2', 'a3']);
+  const stopped = (a: HTMLElement | undefined): string | null | undefined =>
+    a?.querySelector('[data-testid="chat-turn-stopped"]')?.textContent?.trim();
+  // An early Stop: the note it showed live and the Stop, and no empty answer standing in for one.
+  expect(answers[0]?.querySelector('.rewrite-note')?.textContent).toContain('Who owns Project Cobalt?');
+  expect(stopped(answers[0])).toBe('Stopped by you.');
+  expect(answers[0]?.querySelector('jf-markdown-block')).toBeNull();
+  // A late Stop keeps what had streamed, said to be stopped.
+  expect(stopped(answers[1])).toBe('Stopped by you.');
+  expect((answers[1]?.querySelector('jf-markdown-block') as { text?: string } | null)?.text).toBe('It ships on');
+  // A finished answer says nothing of the kind.
+  expect(stopped(answers[2])).toBeUndefined();
+  expect((answers[2]?.querySelector('jf-markdown-block') as { text?: string } | null)?.text).toBe('Ada built it.');
+});

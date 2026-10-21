@@ -49,6 +49,7 @@ public enum LifecycleReasonCode {
   INDEX_BLOCKED_LEGACY("index.blocked_legacy"),
   INDEX_SCHEMA_MISMATCH("index.schema_mismatch"),
   INDEX_SCHEMA_OPEN_REFUSED("index.schema_open_refused"),
+  INDEX_MIGRATION_JOURNAL_UNAVAILABLE("index.migration_journal_unavailable"),
   MIGRATION_AWAITING_GAP_ACCEPTANCE("migration.awaiting_gap_acceptance"),
   // Tempdoc 915 §C: the Worker gave up on automatic rebuilds for this index shape after
   // MAX_AUTO_REBUILD_ATTEMPTS. Search still serves the existing index read-only; ingestion does
@@ -254,7 +255,7 @@ public enum LifecycleReasonCode {
   public RetentionClass retentionClass() {
     return switch (this) {
       // Fatal marker evidence is consumed once; exhausted recovery is terminal until READY.
-      case INDEX_CORRUPT, INDEX_SCHEMA_OPEN_REFUSED,
+      case INDEX_CORRUPT, INDEX_SCHEMA_OPEN_REFUSED, INDEX_MIGRATION_JOURNAL_UNAVAILABLE,
           COMPONENT_RECOVERY_EXHAUSTED -> RetentionClass.STICKY;
 
       // Tempdoc 882 item 24: observed exactly once, at load, and never re-derived. The file that
