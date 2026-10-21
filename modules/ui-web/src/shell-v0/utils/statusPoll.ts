@@ -1,3 +1,4 @@
+// ci probe
 // SPDX-License-Identifier: Apache-2.0
 /**
  * statusPoll — shared /api/status pub-sub poller (slice 461).
