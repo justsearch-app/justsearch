@@ -1,0 +1,167 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T08:13:56.683Z",
+  "revision": "0073e38aab1b158e5e4a9f4b02c14f887095bd9b",
+  "tree": "d2c13ee311a926e5d9ad1bb2619196f31c4903a8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/api/http.test.ts\" \"src/shell-v0/api/authorizedFetch.test.ts\" \"src/api/registry/AuthenticatedCatalogs.test.ts\" \"src/shell-v0/streaming/AuthenticatedStream.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/justsearch-token-builder/test-intent-01a15693/test-intent-vitest-1686227-1792484025537.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3852
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/api/http.test.ts#authenticates GET and retries once with the newly resolved token after a restart",
+      "file": "modules/ui-web/src/api/http.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3be7d10eda59293cf3f336471fd6b32e4a6a45eea54ecb8124f0e8679bbd92cb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "http module request function authenticates GET and retries once with the newly resolved token after a restart",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/api/authorizedFetch.test.ts#attaches the resolved session token to GET requests",
+      "file": "modules/ui-web/src/shell-v0/api/authorizedFetch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f19611a84e40864b81b0a016fb4c99c2f4efdbb14e77f85e419dd85cc2c1d69",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "authorizedFetch attaches the resolved session token to GET requests",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/registry/AuthenticatedCatalogs.test.ts",
+      "file": "modules/ui-web/src/api/registry/AuthenticatedCatalogs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6c8d8a3014db0ff2ac5e6211aa71616e429f0c698253f44ad562600970b1b5e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "authenticates the default operation boot fetch",
+          "status": "passed"
+        },
+        {
+          "name": "authenticates the default operation refresh fetch",
+          "status": "passed"
+        },
+        {
+          "name": "authenticates the default resource boot fetch",
+          "status": "passed"
+        },
+        {
+          "name": "authenticates the default resource refresh fetch",
+          "status": "passed"
+        },
+        {
+          "name": "authenticates the default surface boot fetch",
+          "status": "passed"
+        },
+        {
+          "name": "authenticates the default shape boot fetch",
+          "status": "passed"
+        },
+        {
+          "name": "authenticates the default diagnostic boot fetch",
+          "status": "passed"
+        },
+        {
+          "name": "authenticates canonical Engine schema reads",
+          "status": "passed"
+        },
+        {
+          "name": "keeps external schema documents credential-free",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/streaming/AuthenticatedStream.test.ts",
+      "file": "modules/ui-web/src/shell-v0/streaming/AuthenticatedStream.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e8aace2cd386809ba2765e5e2098559d700482eaa06ac6d06dc22b9b3c0293e7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "default EnvelopeStream authenticated transport sends a header, refreshes a rejected token, and parses chunked SSE frames",
+          "status": "passed"
+        },
+        {
+          "name": "reconnects after EOF with the resume checkpoint and a newly resolved boot token",
+          "status": "passed"
+        },
+        {
+          "name": "retries a cold-start null token on the next connection instead of caching failure",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "8f49bdc3a",
+    "revision": "8f49bdc3a6d3b820a676d97cfcb41d991474ff33",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/api/http.test.ts\" \"src/shell-v0/api/authorizedFetch.test.ts\" \"src/api/registry/AuthenticatedCatalogs.test.ts\" \"src/shell-v0/streaming/AuthenticatedStream.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/justsearch-token-builder/test-intent-01a15693/test-intent-vitest-1686227-1792484032506.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3884,
+        "output": "JSON report written to /home/elias/.cache/justsearch-token-builder/test-intent-01a15693/test-intent-vitest-1686227-1792484032506.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/api/http.test.ts#authenticates GET and retries once with the newly resolved token after a restart",
+        "classification": "assertion",
+        "detail": "http module request function authenticates GET and retries once with the newly resolved token after a restart:  AssertionError: expected { …(1) } to deeply equal { value: { recovered: true } }\n    at /home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/test-intent/test-intent-before-JPbKM5/modules/ui-web/src/api/http.test.ts:68:23\n    at processTicksAndRejections (node:internal/process/tas"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/api/authorizedFetch.test.ts#attaches the resolved session token to GET requests",
+        "classification": "assertion",
+        "detail": "authorizedFetch attaches the resolved session token to GET requests:  AssertionError: expected undefined to be 'tok-abc' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/test-intent/test-intent-before-JPbKM5/modules/ui-web/src/shell-v0/api/authorizedFetch.test.ts:80:46\n    at processTicksAndRejections (node:internal"
+      },
+      {
+        "id": "modules/ui-web/src/api/registry/AuthenticatedCatalogs.test.ts",
+        "classification": "assertion",
+        "detail": "authenticates the default operation boot fetch:  AssertionError: expected null to be 'owner-boot-token' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/test-intent/test-intent-before-JPbKM5/modules/ui-web/src/api/registry/AuthenticatedCatalogs.test.ts:30:85\n    at processTicksAndRejections (nod | authenticates the default operation refresh fetch:  AssertionError: expected null to be 'owner-boot-token' // Object.is equality\n    at /home/elias/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/streaming/AuthenticatedStream.test.ts",
+        "classification": "assertion",
+        "detail": "default EnvelopeStream authenticated transport sends a header, refreshes a rejected token, and parses chunked SSE frames:  AssertionError: expected \"vi.fn()\" to be called 2 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/test-intent/test-intent-before-JPbKM5/modules/ui-web/src/shell-v0/streaming/AuthenticatedStream.test.ts:24:43\n    at Timeout.checkCallback (file:// | reconnects after EOF with the resume checkpoint and a newly resolved boot "
+      }
+    ]
+  },
+  "digest": "sha256:36c0e4e6d237a34d7fb9403b84391ad29bae40759257025409678da8a7d34594"
+}

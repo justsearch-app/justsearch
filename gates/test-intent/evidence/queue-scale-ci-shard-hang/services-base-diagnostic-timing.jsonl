@@ -1,0 +1,4 @@
+{"event": "task-start", "task": ":modules:app-services:test", "time": 1792556143855}
+{"event": "start", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.HeadAssemblyTest", "name": "recoveredWorkerPreparationDefersIndexingJobsUntilActivation()", "time": 1792556276704}
+{"event": "end", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.HeadAssemblyTest", "name": "recoveredWorkerPreparationDefersIndexingJobsUntilActivation()", "time": 1792556276725, "durationMs": 21, "result": "SUCCESS"}
+{"event": "task-end", "task": ":modules:app-services:test", "time": 1792556831782, "durationMs": 687921, "tests": 3990, "failed": 3, "skipped": 11}

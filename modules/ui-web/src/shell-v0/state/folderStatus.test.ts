@@ -249,6 +249,17 @@ describe('folderStatus — per-root enrichment tier (813 §4)', () => {
       ...over,
     });
 
+  it('S33.5 zero settled stays enriching without a fabricated starting percentage', () => {
+    for (const pending of [false, true]) {
+      const fs = folderStatus(covered({ parentDocsSettledEmbedding: 0,
+        parentDocsSettledSplade: 0, parentDocsSettledNer: 0, chunkDocsSettled: 0 }),
+        ctx({ enrichmentStages: ALL_STAGES, enrichmentPending: pending }));
+      expect(fs.state).toBe('enriching');
+      expect(fs.metaText).toContain(CAVEAT);
+      expect(fs.metaText).not.toMatch(/\d+%/);
+    }
+  });
+
   it('arm a — drained but coverage incomplete → the shared caveat + a per-root percent', () => {
     // Four applicable stages of 100 docs each, 40 settled in every one: 160/400 = 40%.
     const fs = folderStatus(

@@ -462,7 +462,7 @@ pub(crate) async fn run_install_now(
     let finish_coordinator = coordinator.clone();
     authorize_app_update(&app, false)?;
     set_state(&coordinator, "downloading", None);
-    let bytes = update
+    let downloaded = update
         .download(
             move |chunk_len, content_length| {
                 let mut state = chunk_progress
@@ -488,20 +488,15 @@ pub(crate) async fn run_install_now(
             },
         )
         .await
-        .map_err(|error| format!("Update download or signature verification failed: {error}"))?;
+        .map_err(|error| format!("Update download or signature verification failed: {error}"));
+    let bytes = checked_installer_bytes(&coordinator, &descriptor, downloaded)?;
     let digest = sha256_bytes(&bytes);
-    if digest != descriptor.artifact.sha256.to_ascii_lowercase()
-        || bytes.len() as u64 != descriptor.artifact.size
-    {
-        return Err("Downloaded installer bytes do not match release descriptor".into());
-    }
-    if bytes.get(0..2) != Some(b"MZ") {
-        return Err("Authenticated updater artifact is not a Windows NSIS executable".into());
-    }
 
     let attempt_id = uuid::Uuid::new_v4().to_string();
-    let staged = stage_installer(&app, &attempt_id, &bytes, &digest)?;
-    validate_staged_artifact(&staged, &staging_root(&app))?;
+    let staged = stage_installer(&app, &attempt_id, &bytes, &digest)
+        .inspect_err(|error| set_state(&coordinator, "error", Some(error.clone())))?;
+    validate_staged_artifact(&staged, &staging_root(&app))
+        .inspect_err(|error| set_state(&coordinator, "error", Some(error.clone())))?;
 
     finish_staged_update(
         &upgrade_root(&app),
@@ -813,7 +808,9 @@ trait UpgradeHandoff: Sync {
     fn wait_for_exit(&self, timeout: Duration) -> bool;
     fn observe_precommit_exit(&self, timeout: Duration) -> Result<(), String> {
         if !self.wait_for_exit(timeout) || self.child_pid().is_some() {
-            return Err("Unsent upgrade commit did not obtain an actor exit before the deadline".into());
+            return Err(
+                "Unsent upgrade commit did not obtain an actor exit before the deadline".into(),
+            );
         }
         self.stop_unrecoverable()?;
         Ok(())
@@ -920,28 +917,39 @@ fn resolve_commit_delivery<T>(
     observe_held_exit: impl FnOnce() -> Result<(), String>,
 ) -> Result<T, String> {
     match receipt {
-        Err(error) if error == crate::shell_actuator::UPGRADE_COMMIT_NOT_SENT
-            || error == "Engine exited before upgrade commit request" => {
-                observe_held_exit()?;
-                Err("Engine exited before upgrade commit request".into())
-            }
+        Err(error)
+            if error == crate::shell_actuator::UPGRADE_COMMIT_NOT_SENT
+                || error == "Engine exited before upgrade commit request" =>
+        {
+            observe_held_exit()?;
+            Err("Engine exited before upgrade commit request".into())
+        }
         other => other,
     }
 }
 
-fn finish_held_actor_exit(host: &crate::engine_host::EngineHost, timeout: Duration) -> Result<(), String> {
+fn finish_held_actor_exit(
+    host: &crate::engine_host::EngineHost,
+    timeout: Duration,
+) -> Result<(), String> {
     let deadline = std::time::Instant::now() + timeout;
     if host.quit_started() || !host.replacement_held() {
         return Err("Quit or released hold refuses the pre-commit exit handoff".into());
     }
     if !host.wait_for_exit(timeout) || host.child_pid().is_some() {
-        return Err("Unsent upgrade commit did not obtain an actor exit before the deadline".into());
+        return Err(
+            "Unsent upgrade commit did not obtain an actor exit before the deadline".into(),
+        );
     }
     // child_pid can clear during reaping, just before record_exit. Awaiting the
     // actor's terminal publication proves its ledger write has completed too.
     let remaining = deadline.saturating_duration_since(std::time::Instant::now());
     host.post_stop("upgrade", None, remaining)?;
-    if host.supervisor_running() && host.wait_terminal(host.now_ms() + remaining.as_millis() as u64).is_none() {
+    if host.supervisor_running()
+        && host
+            .wait_terminal(host.now_ms() + remaining.as_millis() as u64)
+            .is_none()
+    {
         return Err("Pre-commit actor exit observation timed out".into());
     }
     if host.latest_record().is_some() && host.terminal_outcome().is_none() {
@@ -1861,38 +1869,19 @@ async fn post_head<T: for<'de> Deserialize<'de>>(
     path: &str,
     body: Option<serde_json::Value>,
 ) -> Result<T, String> {
-    let port = backend
-        .get_port()
-        .ok_or_else(|| "Backend is unavailable".to_string())?;
-    let token = backend
-        .get_session_token()
-        .ok_or_else(|| "Backend session token is unavailable".to_string())?;
-    let client = reqwest::Client::builder()
-        .timeout(HEAD_TIMEOUT)
-        .build()
-        .map_err(|error| format!("Failed to create backend client: {error}"))?;
-    let mut request = client
-        .post(format!("http://127.0.0.1:{port}{path}"))
-        .header("X-JustSearch-Session", token);
-    if let Some(body) = body {
-        request = request.json(&body);
-    }
-    let response = request
-        .send()
-        .await
-        .map_err(|error| format!("Backend upgrade handshake failed: {error}"))?;
-    let status = response.status();
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|error| format!("Backend upgrade response failed: {error}"))?;
-    if !status.is_success() {
-        return Err(format!(
-            "Backend rejected upgrade handshake with {status}: {}",
-            String::from_utf8_lossy(&bytes)
-        ));
-    }
-    serde_json::from_slice(&bytes)
+    let host = backend.host.clone();
+    let path = path.to_owned();
+    let response = tokio::task::spawn_blocking(move || {
+        crate::shell_actuator::post(
+            &host,
+            &path,
+            &body.unwrap_or_else(|| serde_json::json!({})),
+            HEAD_TIMEOUT.as_millis() as u64,
+        )
+    })
+    .await
+    .map_err(|error| format!("Backend upgrade task failed: {error}"))??;
+    serde_json::from_value(response)
         .map_err(|error| format!("Backend upgrade response was invalid: {error}"))
 }
 
@@ -2390,7 +2379,7 @@ fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, String> {
         .map_err(|error| format!("Failed to parse {}: {error}", path.display()))
 }
 
-fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let parent = path
         .parent()
         .ok_or_else(|| format!("Path has no parent: {}", path.display()))?;
@@ -2442,6 +2431,28 @@ fn replace_file(source: &Path, target: &Path) -> std::io::Result<()> {
     } else {
         Ok(())
     }
+}
+
+fn checked_installer_bytes(
+    coordinator: &UpdateCoordinator,
+    descriptor: &ReleaseDescriptor,
+    downloaded: Result<Vec<u8>, String>,
+) -> Result<Vec<u8>, String> {
+    let result = downloaded.and_then(|bytes| {
+        if sha256_bytes(&bytes) != descriptor.artifact.sha256.to_ascii_lowercase()
+            || bytes.len() as u64 != descriptor.artifact.size
+        {
+            return Err("Downloaded installer bytes do not match release descriptor".into());
+        }
+        if bytes.get(0..2) != Some(b"MZ") {
+            return Err("Authenticated updater artifact is not a Windows NSIS executable".into());
+        }
+        Ok(bytes)
+    });
+    if let Err(error) = &result {
+        set_state(coordinator, "error", Some(error.clone()));
+    }
+    result
 }
 
 fn sha256_bytes(bytes: &[u8]) -> String {
@@ -2575,6 +2586,81 @@ fn now_epoch_ms() -> u128 {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    // The harness bypasses both startup entry points. A subprocess also prevents any other test
+    // (or the updater plugin) from hiding a missing default provider or changing the trust key.
+    fn in_fresh_process(test: &str) -> bool {
+        let module = module_path!().split_once("::").unwrap().1;
+        let name = format!("{module}::{test}");
+        if std::env::var("JUSTSEARCH_TLS_TEST_CHILD").as_deref() == Ok(name.as_str()) {
+            return true;
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", &name, "--nocapture"])
+            .env("JUSTSEARCH_TLS_TEST_CHILD", &name)
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let ran_exactly_this_test = stdout.lines().any(|line| line == "running 1 test")
+            && stdout
+                .lines()
+                .any(|line| line.starts_with("test result: ok. 1 passed; 0 failed;"));
+        assert_eq!(
+            (output.status.success(), ran_exactly_this_test),
+            (true, true),
+            "fresh-process check failed:\n{}\n{}",
+            stdout,
+            String::from_utf8_lossy(&output.stderr),
+        );
+        false
+    }
+
+    #[test]
+    fn startup_provider_builds_release_and_backend_clients() {
+        if !in_fresh_process("startup_provider_builds_release_and_backend_clients") {
+            return;
+        }
+        assert!(rustls::crypto::CryptoProvider::get_default().is_none());
+        crate::tls::initialize();
+        let first = rustls::crypto::CryptoProvider::get_default().cloned();
+        crate::tls::initialize();
+        // These are the configurations used by check_release and post_head. Keep the clients
+        // local to this child: a global provider installed by another test must not satisfy this.
+        for timeout in [Duration::from_secs(20), HEAD_TIMEOUT] {
+            let client = std::panic::catch_unwind(|| {
+                reqwest::Client::builder().timeout(timeout).build()
+            });
+            assert!(
+                matches!(client, Ok(Ok(_))),
+                "client construction must not panic or fail",
+            );
+        }
+        let first = first.expect("startup must install a provider");
+        assert!(Arc::ptr_eq(
+            &first,
+            rustls::crypto::CryptoProvider::get_default().unwrap(),
+        ));
+    }
+
+    #[test]
+    fn metadata_signature_rejects_wrong_signature() {
+        if !in_fresh_process("metadata_signature_rejects_wrong_signature") {
+            return;
+        }
+        use ring::signature::{Ed25519KeyPair, KeyPair};
+        let key = Ed25519KeyPair::from_seed_unchecked(&[7; 32]).unwrap();
+        std::env::set_var(
+            "JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY",
+            base64::engine::general_purpose::STANDARD.encode(key.public_key().as_ref()),
+        );
+        let bytes = b"signed release metadata";
+        let signature = base64::engine::general_purpose::STANDARD.encode(key.sign(bytes).as_ref());
+        assert!(verify_metadata_signature(bytes, &signature).is_ok());
+        assert_eq!(
+            verify_metadata_signature(b"tampered release metadata", &signature).unwrap_err(),
+            "Release metadata signature verification failed",
+        );
+    }
 
     // The Java loader consumes this identical file. In particular, malformed known AI
     // fields must deny machine-policy updates even though Rust only enforces updates.
@@ -3136,9 +3222,11 @@ mod tests {
             .find(|store| store.id == "ui-settings")
             .unwrap()
             .current_version = 1;
-        assert!(validate_store_compatibility_against(old_local, &wrong_strategy)
-            .unwrap_err()
-            .contains("ownership or recovery strategy"));
+        assert!(
+            validate_store_compatibility_against(old_local, &wrong_strategy)
+                .unwrap_err()
+                .contains("ownership or recovery strategy")
+        );
     }
 
     #[test]
@@ -3243,38 +3331,62 @@ mod tests {
     #[test]
     fn target_reconciliation_expands_baseline_to_all_installed_owners() {
         let mut intent = test_intent(UpgradePhase::Reconciling);
-        let all: Vec<OwnerExpectation> = current_store_compatibility().into_iter()
-            .map(|store| OwnerExpectation { owner_id: store.owner_id, format_version: store.format_version })
+        let all: Vec<OwnerExpectation> = current_store_compatibility()
+            .into_iter()
+            .map(|store| OwnerExpectation {
+                owner_id: store.owner_id,
+                format_version: store.format_version,
+            })
             .collect();
-        intent.owner_expectations = all.iter().filter(|row| row.owner_id != "operations-db").cloned().collect();
+        intent.owner_expectations = all
+            .iter()
+            .filter(|row| row.owner_id != "operations-db")
+            .cloned()
+            .collect();
         let mut expected = all;
         expected.sort_by(|a, b| a.owner_id.cmp(&b.owner_id));
-        assert_eq!(target_reconciliation_owners(&intent, "1.1.0").unwrap(), expected);
+        assert_eq!(
+            target_reconciliation_owners(&intent, "1.1.0").unwrap(),
+            expected
+        );
     }
 
     #[test]
     fn target_reconciliation_consumes_only_exact_retired_inherited_version() {
         let mut intent = test_intent(UpgradePhase::Reconciling);
-        intent.owner_expectations = current_store_compatibility().into_iter()
+        intent.owner_expectations = current_store_compatibility()
+            .into_iter()
             .map(|store| OwnerExpectation {
-                owner_id: store.owner_id, format_version: store.format_version,
-            }).collect();
+                owner_id: store.owner_id,
+                format_version: store.format_version,
+            })
+            .collect();
         intent.owner_expectations.push(OwnerExpectation {
-            owner_id: "worker-config-snapshot".into(), format_version: 0,
+            owner_id: "worker-config-snapshot".into(),
+            format_version: 0,
         });
         let active = target_reconciliation_owners(&intent, "1.1.0").unwrap();
         let local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
         assert_eq!(active.len(), local.durable_stores.len());
-        assert!(active.iter().all(|row| row.owner_id != "worker-config-snapshot"));
+        assert!(active
+            .iter()
+            .all(|row| row.owner_id != "worker-config-snapshot"));
         for store in local.durable_stores {
-            assert!(active.iter().any(|row| row.owner_id == store.id
-                && row.format_version == store.current_version));
+            assert!(
+                active
+                    .iter()
+                    .any(|row| row.owner_id == store.id
+                        && row.format_version == store.current_version)
+            );
         }
         intent.owner_expectations.last_mut().unwrap().format_version = 1;
-        assert!(target_reconciliation_owners(&intent, "1.1.0").unwrap_err()
+        assert!(target_reconciliation_owners(&intent, "1.1.0")
+            .unwrap_err()
             .contains("worker-config-snapshot"));
         intent.owner_expectations.last_mut().unwrap().format_version = 0;
-        intent.owner_expectations.push(intent.owner_expectations.last().unwrap().clone());
+        intent
+            .owner_expectations
+            .push(intent.owner_expectations.last().unwrap().clone());
         assert!(target_reconciliation_owners(&intent, "1.1.0").is_err());
     }
 
@@ -3283,29 +3395,40 @@ mod tests {
         let intent = test_intent(UpgradePhase::Reconciling);
         let mut local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
         local.retired_durable_stores[0].store.id = local.durable_stores[0].id.clone();
-        assert!(target_reconciliation_owners_against(&intent, local).unwrap_err()
+        assert!(target_reconciliation_owners_against(&intent, local)
+            .unwrap_err()
             .contains("retired store identity/disposition"));
         let mut local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
         local.retired_durable_stores[0].byte_disposition = "DELETE".into();
-        assert!(target_reconciliation_owners_against(&intent, local).unwrap_err()
+        assert!(target_reconciliation_owners_against(&intent, local)
+            .unwrap_err()
             .contains("retired store identity/disposition"));
         let mut raw: serde_json::Value = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
         let retired = raw["retiredDurableStores"][0].clone();
-        raw["retiredDurableStores"].as_array_mut().unwrap().push(retired);
+        raw["retiredDurableStores"]
+            .as_array_mut()
+            .unwrap()
+            .push(retired);
         let local: LocalStoreRegister = serde_json::from_value(raw).unwrap();
         assert!(target_reconciliation_owners_against(&intent, local).is_err());
     }
 
     #[test]
     fn frozen_retired_descriptor_preserves_legacy_installed_owner_identity() {
-        let old: LocalStoreRegister = serde_json::from_str(r#"{"durableStores":[{
+        let old: LocalStoreRegister = serde_json::from_str(
+            r#"{"durableStores":[{
             "id":"worker-config-snapshot", "owner":"HEAD", "recoverability":"DERIVED",
             "currentVersion":0, "reconciliation":"UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START"
-        }]}"#).unwrap();
+        }]}"#,
+        )
+        .unwrap();
         assert!(old.retired_durable_stores.is_empty());
         let frozen = ReleaseStoreCompatibility {
-            owner_id: "worker-config-snapshot".into(), owner: "HEAD".into(), role: "DERIVED".into(),
-            format_version: 0, readable_source_versions: vec![0],
+            owner_id: "worker-config-snapshot".into(),
+            owner: "HEAD".into(),
+            role: "DERIVED".into(),
+            format_version: 0,
+            readable_source_versions: vec![0],
             reconciliation_strategy: "UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START".into(),
         };
         validate_store_compatibility_against(old, &test_descriptor(vec![frozen])).unwrap();
@@ -3316,11 +3439,16 @@ mod tests {
         let mut intent = test_intent(UpgradePhase::Reconciling);
         let first = current_store_compatibility().remove(0);
         intent.owner_expectations = vec![OwnerExpectation {
-            owner_id: first.owner_id.clone(), format_version: first.format_version + 1,
+            owner_id: first.owner_id.clone(),
+            format_version: first.format_version + 1,
         }];
-        assert!(target_reconciliation_owners(&intent, "1.1.0").unwrap_err().contains(&first.owner_id));
+        assert!(target_reconciliation_owners(&intent, "1.1.0")
+            .unwrap_err()
+            .contains(&first.owner_id));
         intent.owner_expectations[0].owner_id = "removed-store".into();
-        assert!(target_reconciliation_owners(&intent, "1.1.0").unwrap_err().contains("removed-store"));
+        assert!(target_reconciliation_owners(&intent, "1.1.0")
+            .unwrap_err()
+            .contains("removed-store"));
     }
 
     #[test]
@@ -3330,7 +3458,10 @@ mod tests {
         intent.owner_expectations.clear();
         assert!(target_reconciliation_owners(&intent, "1.1.0").is_err());
         let first = current_store_compatibility().remove(0);
-        let owner = OwnerExpectation { owner_id: first.owner_id, format_version: first.format_version };
+        let owner = OwnerExpectation {
+            owner_id: first.owner_id,
+            format_version: first.format_version,
+        };
         intent.owner_expectations = vec![owner.clone(), owner];
         assert!(target_reconciliation_owners(&intent, "1.1.0").is_err());
     }
@@ -3425,6 +3556,46 @@ mod tests {
         }
     }
 
+    #[test]
+    fn download_failures_and_rejections_return_to_actionable_error() {
+        for kind in ["transport", "signature", "digest", "size", "executable"] {
+            let coordinator = UpdateCoordinator::default();
+            let mut descriptor = test_descriptor(vec![]);
+            descriptor.artifact.sha256 = sha256_bytes(b"MZfixture");
+            descriptor.artifact.size = 9;
+            *coordinator.pending.lock().unwrap() = Some(descriptor.clone());
+            set_state(&coordinator, "downloading", None);
+            set_download_progress(&coordinator, 7, Some(9));
+            let guard = InstallGuard::begin(&coordinator.installing).unwrap();
+            let downloaded = match kind {
+                "transport" => Err("Connection reset during update download".into()),
+                "signature" => Err("Update signature verification failed".into()),
+                "digest" => Ok(b"MZtampered".to_vec()),
+                "size" => {
+                    descriptor.artifact.size = 99;
+                    Ok(b"MZfixture".to_vec())
+                }
+                _ => {
+                    descriptor.artifact.sha256 = sha256_bytes(b"not an exe");
+                    descriptor.artifact.size = 10;
+                    Ok(b"not an exe".to_vec())
+                }
+            };
+            let error = checked_installer_bytes(&coordinator, &descriptor, downloaded).unwrap_err();
+            drop(guard);
+            let status = coordinator.snapshot();
+            assert_eq!(
+                status.state, "error",
+                "{kind} left recovery actions disabled"
+            );
+            assert_eq!(status.error.as_deref(), Some(error.as_str()));
+            assert_eq!(status.bytes_downloaded, None);
+            assert!(coordinator.pending.lock().unwrap().is_some());
+            assert!(ensure_no_unresolved_intent(&coordinator).is_ok());
+            assert!(InstallGuard::begin(&coordinator.installing).is_ok());
+        }
+    }
+
     fn test_descriptor(compatibility: Vec<ReleaseStoreCompatibility>) -> ReleaseDescriptor {
         ReleaseDescriptor {
             schema_version: 1,
@@ -3457,3 +3628,7 @@ mod commit_delivery_tests;
 #[cfg(test)]
 #[path = "updater_actor_hold_witness_tests.rs"]
 mod actor_hold_witness_tests;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "updater_connection_tests.rs"]
+mod connection_tests;

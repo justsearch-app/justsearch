@@ -19,7 +19,7 @@ import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.telemetry.JvmRuntimeGauges;
 import io.justsearch.telemetry.Telemetry;
 import java.time.Instant;
-import java.util.function.IntSupplier;
+import io.justsearch.app.inference.LlamaServerEndpoint;
 import java.util.function.Supplier;
 
 /**
@@ -84,7 +84,7 @@ final class CoreApiAssembly {
       HeadAssembly headAssemblyRef,
       SettingsController settingsController,
       Supplier<Integer> portSupplier,
-      IntSupplier llamaServerPortSupplier,
+      Supplier<LlamaServerEndpoint> llamaServerEndpointSupplier,
       Supplier<GpuCapabilities> gpuSnapshotSupplier,
       Supplier<Double> inflightSupplier) {
     // §31 + 526 F2: DocumentService late-binds via HeadAssembly.connectKnowledgeServer;
@@ -373,7 +373,7 @@ final class CoreApiAssembly {
             io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.generationLifetime(
                 b.executors));
     OpenAiCompatController openAiCompatController =
-        new OpenAiCompatController(b.executors, llamaServerPortSupplier, telemetry, proxyAdmission);
+        new OpenAiCompatController(b.executors, llamaServerEndpointSupplier, telemetry, proxyAdmission);
     // Spec A step 9: the chat controller's residency surface, shared by every chat entry's gate,
     // the load-anyway route and the dev pressure trigger. Read live: the controller is installed
     // into the manager at composition.

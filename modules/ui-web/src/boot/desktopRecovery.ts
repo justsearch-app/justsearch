@@ -4,6 +4,7 @@ import { installSupervisorStateBridge, isTerminal } from '../api/supervisorState
 import type { EngineRecovery } from '../shell-v0/components/EngineRecovery.js';
 import { installBackendRestartBridge } from '../api/backendRestart.js';
 import { resolveBootApiBase } from './apiBase.js';
+import { gateFactoryReset } from './factoryReset.js';
 
 const recoverySurfaces = new WeakMap<HTMLElement, {
   recovery: EngineRecovery;
@@ -14,7 +15,7 @@ const recoverySurfaces = new WeakMap<HTMLElement, {
 export function mountBootApplication(root: HTMLElement, application: HTMLElement): void {
   const owner = recoverySurfaces.get(root);
   let presentation = application;
-  if (owner && isTerminal(owner.recovery.supervisor)) {
+  if (owner && (isTerminal(owner.recovery.supervisor) || !!owner.recovery.supervisor?.notReady)) {
     owner.teardown();
     presentation = owner.recovery;
   }
@@ -38,6 +39,8 @@ export async function resolveBootWithRecovery(
     return base;
   }
 
+  if (!await gateFactoryReset(root)) return null;
+
   const { EngineRecovery } = await import('../shell-v0/components/EngineRecovery.js');
   const recovery = new EngineRecovery();
   recoverySurfaces.set(root, { recovery, teardown });
@@ -45,7 +48,7 @@ export async function resolveBootWithRecovery(
   let waitingForApi = false;
   await installSupervisorStateBridge((state) => {
     recovery.supervisor = state;
-    if (isTerminal(state)) {
+    if (isTerminal(state) || state.notReady) {
       // Store-owned subscriptions outlive shell listeners, so release them explicitly.
       teardown();
       if (recovery.parentElement !== root) root.replaceChildren(recovery);
@@ -53,11 +56,11 @@ export async function resolveBootWithRecovery(
     }
     // Initial boot has no backend-restart event. If it finishes after API discovery gave up,
     // retry discovery through the normal entry point when the host announces it is running.
-    if (waitingForApi && state.state === 'running') window.location.reload();
+    if (waitingForApi && state.state === 'running' && !state.notReady) window.location.reload();
   });
   await installBackendRestartBridge(() => window.location.reload());
   const base = await resolveBootApiBase();
-  if (base && !isTerminal(recovery.supervisor)) recovery.remove();
+  if (base && !isTerminal(recovery.supervisor) && !recovery.supervisor?.notReady) recovery.remove();
   else waitingForApi = true;
   return base;
 }

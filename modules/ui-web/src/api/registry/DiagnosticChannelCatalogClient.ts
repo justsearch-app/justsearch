@@ -19,6 +19,7 @@
  *    updates the in-memory catalog.
  */
 
+import { authorizedFetch } from '../../shell-v0/api/authorizedFetch.js';
 import type {
   DiagnosticChannel,
   DiagnosticChannelCatalog,
@@ -102,7 +103,7 @@ function rebuildIndex(catalog: DiagnosticChannelCatalog): void {
  */
 export async function bootDiagnosticChannelRegistry(
   baseUrl: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = authorizedFetch,
 ): Promise<void> {
   if (bootSucceeded) return;
   if (inFlightBoot) return inFlightBoot;

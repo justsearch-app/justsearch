@@ -36,6 +36,7 @@
 import type { Resource, Category, SubscriptionMode } from '../../api/types/registry.js';
 import type { EnvelopeReducer } from '../streaming/EnvelopeStream.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
+import { JOB_STATE_RETRY_EXHAUSTED } from '../state/indexingJobStates.js';
 
 /** Common envelope: every strategy's state carries the seq cursor + a typed payload. */
 export interface StrategyState<T> {
@@ -295,7 +296,7 @@ function tabularOneShotStrategy<T extends Record<string, unknown>>(
   };
 }
 
-export function tabularStrategy<T extends Record<string, unknown>>(
+function tabularStrategy<T extends Record<string, unknown>>(
   primaryKey: string,
 ): SubscriptionStrategy<TabularData<T>> {
   if (!primaryKey) {
@@ -372,6 +373,52 @@ export function tabularStrategy<T extends Record<string, unknown>>(
   };
 }
 
+/** The indexing-jobs view holds all PROCESSING rows and 200 recent failures. */
+export function indexingJobsStrategy<T extends Record<string, unknown>>(
+  primaryKey: string,
+): SubscriptionStrategy<TabularData<T>> {
+  const base = tabularStrategy<T>(primaryKey);
+  const isFailure = (row: T): boolean => row['state'] === 'FAILED' || row['state'] === JOB_STATE_RETRY_EXHAUSTED;
+  return {
+    initialState: base.initialState,
+    reducer: (state, env) => {
+      const next = base.reducer(state, env);
+      if (next.data === state.data) return next;
+      const payload = env.payload as Record<string, unknown>;
+      const kind = typeof payload['kind'] === 'string' ? payload['kind'] : '';
+      const snapshot = Array.isArray(payload['items']) && (
+        (env.frameKind === 'LIFECYCLE' && kind === 'snapshot') ||
+        (env.frameKind === 'UPDATE' && (kind === 'snapshot-replaced' || kind === ''))
+      );
+      // Keep failure keys oldest first, as the head's eviction map does. Head snapshot
+      // insertion order can mix old and live rows, so restore age before applying deltas.
+      const ordered = [...next.data.items];
+      if (snapshot) ordered.reverse().sort(([, left], [, right]) =>
+        Number(left['lastUpdatedMs'] ?? 0) - Number(right['lastUpdatedMs'] ?? 0));
+      const items = new Map(ordered);
+      const row = payload['row'] as T | undefined;
+      if (env.frameKind === 'UPDATE' && row && (kind === 'insert' || kind === 'update' || kind === '') && isFailure(row)) {
+        const key = String(row[primaryKey]);
+        items.delete(key);
+        items.set(key, row);
+      }
+      let failures = 0;
+      for (const [key, value] of items) {
+        if (isFailure(value)) failures += 1;
+        else if (value['state'] !== 'PROCESSING') items.delete(key);
+      }
+      for (const [key, value] of items) {
+        if (failures <= 200) break;
+        if (isFailure(value)) {
+          items.delete(key);
+          failures -= 1;
+        }
+      }
+      return { ...next, data: { items, primaryKey } };
+    },
+  };
+}
+
 // LOG_TAIL × SSE_STREAM strategy deleted in slice 448 phase 6 — Category.LOG_TAIL
 // retired per CONFLICT-LEDGER C-012 path-b. Operator-trace surfaces are modeled
 // by the sibling DiagnosticChannel primitive; the equivalent strategy lives at
@@ -402,7 +449,9 @@ export function strategyFor(
     case 'HISTORY_SSE_STREAM':
       return historyStrategy(DEFAULT_CAP, resource.primaryKey) as SubscriptionStrategy<unknown>;
     case 'TABULAR_SSE_STREAM':
-      return tabularStrategy(resource.primaryKey) as SubscriptionStrategy<unknown>;
+      return (resource.id === 'core.indexing-jobs'
+        ? indexingJobsStrategy(resource.primaryKey)
+        : tabularStrategy(resource.primaryKey)) as SubscriptionStrategy<unknown>;
     case 'TABULAR_ONE_SHOT':
       return tabularOneShotStrategy(
         resource.primaryKey,

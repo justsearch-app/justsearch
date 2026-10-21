@@ -1,0 +1,12 @@
+{"event": "task-start", "task": ":modules:app-services:test", "time": 1792556143855}
+{"event": "start", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.HeadAssemblyTest", "name": "recoveredWorkerPreparationDefersIndexingJobsUntilActivation()", "time": 1792556276704}
+{"event": "end", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.HeadAssemblyTest", "name": "recoveredWorkerPreparationDefersIndexingJobsUntilActivation()", "time": 1792556276725, "durationMs": 21, "result": "SUCCESS"}
+{"event": "start", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.gpl.LambdaMartRerankerTest", "name": "rerank_threadSafe_noConcurrentExceptions()", "time": 1792556469740}
+{"event": "end", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.gpl.LambdaMartRerankerTest", "name": "rerank_threadSafe_noConcurrentExceptions()", "time": 1792556469752, "durationMs": 12, "result": "SUCCESS"}
+{"event": "start", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.gpu.StoredChatBudgetTest", "name": "aMissingRelativeManagedPathNamesTheUnavailableFile()", "time": 1792556470301}
+{"event": "end", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.gpu.StoredChatBudgetTest", "name": "aMissingRelativeManagedPathNamesTheUnavailableFile()", "time": 1792556470362, "durationMs": 30, "result": "FAILURE"}
+{"event": "start", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.gpu.StoredChatBudgetTest", "name": "aMissingRelativeManagedPathNamesTheUnavailableFile()", "time": 1792556826976}
+{"event": "end", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.gpu.StoredChatBudgetTest", "name": "aMissingRelativeManagedPathNamesTheUnavailableFile()", "time": 1792556827247, "durationMs": 265, "result": "FAILURE"}
+{"event": "start", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.gpu.StoredChatBudgetTest", "name": "aMissingRelativeManagedPathNamesTheUnavailableFile()", "time": 1792556831475}
+{"event": "end", "task": ":modules:app-services:test", "cls": "io.justsearch.app.services.gpu.StoredChatBudgetTest", "name": "aMissingRelativeManagedPathNamesTheUnavailableFile()", "time": 1792556831746, "durationMs": 264, "result": "FAILURE"}
+{"event": "task-end", "task": ":modules:app-services:test", "time": 1792556831782, "durationMs": 687921, "tests": 3990, "failed": 3, "skipped": 11}

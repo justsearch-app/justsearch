@@ -41,8 +41,10 @@ final class ApiSecurityFilters {
   // Newer Tauri/WebView2 versions use an http(s) origin for the bundled app assets.
   // This is not a general DNS-backed host; treat it as a special-case desktop origin.
   private static final String TAURI_WEBVIEW_HOST = "tauri.localhost";
-  /** Methods that require the session token in prod mode. */
-  private static final Set<String> TOKEN_REQUIRED_METHODS = Set.of("POST", "PUT", "DELETE");
+  /** The complete unauthenticated Runtime Contract read surface. */
+  private static final Set<String> PUBLIC_READ_PATHS = Set.of(
+      "/api/health", "/api/runtime/live", "/api/runtime/ready", "/api/status",
+      "/api/runtime/manifest", "/.well-known/justsearch/manifest.json");
 
   /** Contract-facing projection of the filters that actually enforce this route. */
   record ContractSecurity(
@@ -52,7 +54,7 @@ final class ApiSecurityFilters {
     return new ContractSecurity(
         true,
         requiresSessionToken(method, path),
-        MCP_ENDPOINT_PATH.equals(path) || MCP_TOKEN_PATH.equals(path));
+        MCP_ENDPOINT_PATH.equals(path));
   }
   /**
    * The MCP Streamable-HTTP endpoint path, shared with the route registration in {@link
@@ -62,12 +64,6 @@ final class ApiSecurityFilters {
    * in {@link #setupCors}.
    */
   private static final String MCP_ENDPOINT_PATH = LocalApiServer.MCP_ENDPOINT_PATH;
-  /**
-   * The MCP session-token bootstrap path, guarded by the same Origin check as {@link
-   * #MCP_ENDPOINT_PATH} — see {@link #setupMcpOriginValidation} for why this second path is in
-   * scope.
-   */
-  private static final String MCP_TOKEN_PATH = LocalApiServer.MCP_TOKEN_PATH;
   /** Cap on the attacker-controlled Origin string reproduced in logs and the event buffer. */
   private static final int MAX_LOGGED_ORIGIN_CHARS = 128;
   private static final long SLOW_REQUEST_THRESHOLD_MS = 3000;
@@ -146,7 +142,7 @@ final class ApiSecurityFilters {
       String reasonCode = LifecycleReasonCode.LOCAL_API_SESSION_TOKEN_MISSING.code();
       String message =
           "Refusing to start the local API: prod mode is enabled but no session token was provided."
-              + " The session token is the only control gating mutating loopback requests, so"
+              + " The session token is the control gating non-public loopback requests, so"
               + " starting without it would ship the API open to any local process. Reason code: "
               + reasonCode
               + ". Pass a token (HeadlessApp mints one per boot when justsearch.prod=true) or start"
@@ -316,40 +312,20 @@ final class ApiSecurityFilters {
    * clients, not browsers, so they send none. A browser-driven caller always supplies one — exactly
    * the caller class the clause addresses.
    *
-   * <p><b>{@code /api/mcp/token} is guarded on the same terms.</b> That route is the bootstrap for
-   * the whole session-token scheme — it hands out, unauthenticated by construction, the credential
-   * that gates every mutating call — so it belongs to the MCP transport's attack surface even
-   * though it is not the JSON-RPC endpoint. Its callers are all non-browser (the MCPB bridge at
-   * {@code packaging/mcpb/server/index.js}, {@code scripts/prod/justsearch-mcp/discovery.mjs}, the
-   * sandbox/installer probes) and therefore send no Origin; the desktop shell does not call it at
-   * all (it reads {@code head.sessionToken} from the runtime manifest), and no {@code ui-web} code
-   * references it. So no legitimate caller supplies an Origin this check could reject — it is
-   * defense in depth over the Host allowlist and CORS, not a load-bearing gate, and its cost is a
-   * rejection where CORS would otherwise merely withhold the read grant.
    */
   private void setupMcpOriginValidation(Javalin app) {
-    app.before(MCP_ENDPOINT_PATH, ctx -> enforceLoopbackOrigin(ctx, true));
-    app.before(MCP_TOKEN_PATH, ctx -> enforceLoopbackOrigin(ctx, false));
+    app.before(MCP_ENDPOINT_PATH, this::enforceLoopbackOrigin);
   }
 
-  /**
-   * The shared deny path. {@code jsonRpcBody} selects the envelope: the JSON-RPC error the MCP spec
-   * allows for {@code /mcp}, or the repo's plain {@code {error, errorCode}} shape for the token
-   * route, which is an ordinary JSON endpoint and would be misdescribed by a JSON-RPC envelope.
-   */
-  private void enforceLoopbackOrigin(Context ctx, boolean jsonRpcBody) {
+  /** Rejects foreign Origins on the surviving MCP transport endpoint. */
+  private void enforceLoopbackOrigin(Context ctx) {
     String originHeader = ctx.header("Origin");
     if (isAllowedMcpOrigin(originHeader)) {
       return;
     }
     maybeRecordMcpOriginDeny(ctx, originHeader);
     ctx.status(403);
-    ctx.json(
-        jsonRpcBody
-            ? mcpForbiddenOriginBody()
-            : Map.of(
-                "error", "Request Origin is not an allowed loopback origin",
-                "errorCode", "MCP_ORIGIN_FORBIDDEN"));
+    ctx.json(mcpForbiddenOriginBody());
     throw new io.javalin.http.HttpResponseException(403, "Forbidden");
   }
 
@@ -489,37 +465,10 @@ final class ApiSecurityFilters {
     }, ActivityRole.OBSERVATION);
   }
 
-  /**
-   * Whether a request must carry the session token — the ONE authority for that question, so the
-   * enforcing filter and any test double read the same rule.
-   *
-   * <p>Two axes, in this order:
-   *
-   * <ol>
-   *   <li><strong>Method.</strong> {@code OPTIONS} is always exempt (a CORS preflight cannot carry
-   *       the header, so requiring it there would break every browser call it precedes). Otherwise
-   *       {@link #TOKEN_REQUIRED_METHODS} — the mutating verbs — require it, and {@code GET} does
-   *       not, because a read-only local API behind a loopback bind was the original bargain.
-   *   <li><strong>Path (tempdoc 834 §1.6/§15.2).</strong> The run family breaks that bargain and so
-   *       requires the token for GET too. Loopback-only (Hard Invariant #2) is not a trust boundary
-   *       here — the session token exists precisely because other local processes are not trusted —
-   *       and the run journal carries prompts, answers, retrieved passage text and tool arguments,
-   *       while {@code GET /api/chat/runs/live} dispenses the very runIds needed to fetch them. A
-   *       GET-exempt enumeration would therefore ship that unauthenticated to any local process.
-   * </ol>
-   *
-   * <p>The path check is deliberately a PREFIX over {@link RunRoutes#PATH_PREFIX} rather than an
-   * exact match on the one known route: a future read route under the family inherits the
-   * requirement instead of silently shipping open.
-   */
+  /** OPTIONS and GET/HEAD on the six public reads are the only production exemptions. */
   static boolean requiresSessionToken(String method, String path) {
-    if ("OPTIONS".equals(method)) {
-      return false;
-    }
-    if (path != null && path.startsWith(RunRoutes.PATH_PREFIX)) {
-      return true;
-    }
-    return TOKEN_REQUIRED_METHODS.contains(method);
+    if ("OPTIONS".equals(method)) return false;
+    return !(("GET".equals(method) || "HEAD".equals(method)) && PUBLIC_READ_PATHS.contains(path));
   }
 
   /**
@@ -536,7 +485,7 @@ final class ApiSecurityFilters {
       return;
     }
 
-    log.info("Session token enforcement enabled for non-GET requests");
+    log.info("Session token enforcement enabled for non-public requests");
     eventBuffer.info("LocalApiServer", "Session token enforcement enabled");
 
     app.before(ctx -> {

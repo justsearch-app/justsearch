@@ -64,7 +64,7 @@ final class OnlineModeOps {
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
   private final Supplier<Mode> currentMode;
-  private final Supplier<Integer> serverPort;
+  private final Supplier<LlamaServerEndpoint> serverEndpoint;
   private final Supplier<String> lastKnownModelId;
   private final Supplier<String> configModelFileName;
   // Tempdoc 412 follow-up: request-event sink. Defaults to noop when no telemetry is wired.
@@ -106,7 +106,7 @@ final class OnlineModeOps {
       HttpClient httpClient,
       ObjectMapper objectMapper,
       Supplier<Mode> currentMode,
-      Supplier<Integer> serverPort,
+      Supplier<LlamaServerEndpoint> serverEndpoint,
       Supplier<String> lastKnownModelId,
       Supplier<String> configModelFileName) {
     this(
@@ -114,7 +114,7 @@ final class OnlineModeOps {
         httpClient,
         objectMapper,
         currentMode,
-        serverPort,
+        serverEndpoint,
         lastKnownModelId,
         configModelFileName,
         InferenceTelemetryEvents.noop());
@@ -129,11 +129,11 @@ final class OnlineModeOps {
       HttpClient httpClient,
       ObjectMapper objectMapper,
       Supplier<Mode> currentMode,
-      Supplier<Integer> serverPort,
+      Supplier<LlamaServerEndpoint> serverEndpoint,
       Supplier<String> lastKnownModelId,
       Supplier<String> configModelFileName,
       InferenceTelemetryEvents events) {
-    this(executors, httpClient, objectMapper, currentMode, serverPort, lastKnownModelId,
+    this(executors, httpClient, objectMapper, currentMode, serverEndpoint, lastKnownModelId,
         configModelFileName, events, new GenerationTracker(ignored -> () -> {}, Runnable::run));
   }
 
@@ -142,7 +142,7 @@ final class OnlineModeOps {
       HttpClient httpClient,
       ObjectMapper objectMapper,
       Supplier<Mode> currentMode,
-      Supplier<Integer> serverPort,
+      Supplier<LlamaServerEndpoint> serverEndpoint,
       Supplier<String> lastKnownModelId,
       Supplier<String> configModelFileName,
       InferenceTelemetryEvents events,
@@ -150,7 +150,7 @@ final class OnlineModeOps {
     this.httpClient = httpClient;
     this.objectMapper = objectMapper;
     this.currentMode = currentMode;
-    this.serverPort = serverPort;
+    this.serverEndpoint = serverEndpoint;
     this.lastKnownModelId = lastKnownModelId;
     this.configModelFileName = configModelFileName;
     this.events = events == null ? InferenceTelemetryEvents.noop() : events;
@@ -715,7 +715,7 @@ final class OnlineModeOps {
 
                 HttpRequest request =
                     buildJsonPostRequest(
-                        lease, serverPort.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
+                        lease, serverEndpoint.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
 
                 HttpResponse<java.io.InputStream> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
@@ -1119,7 +1119,7 @@ final class OnlineModeOps {
 
                 HttpRequest request =
                     buildJsonPostRequest(
-                        lease, serverPort.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
+                        lease, serverEndpoint.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
 
                 HttpResponse<java.io.InputStream> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
@@ -1425,7 +1425,7 @@ final class OnlineModeOps {
           json.length());
 
       HttpRequest request =
-          buildJsonPostRequest(lease, serverPort.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
+          buildJsonPostRequest(lease, serverEndpoint.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
 
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -1668,7 +1668,7 @@ final class OnlineModeOps {
   boolean probeOneToken(Duration timeout) {
     Objects.requireNonNull(timeout, "timeout");
     try (GenerationLease lease = generation.admit(GenerationTracker.Kind.AUX, null)) {
-      HttpRequest request = buildJsonPostRequest(lease, serverPort.get(), PATH_COMPLETION,
+      HttpRequest request = buildJsonPostRequest(lease, serverEndpoint.get(), PATH_COMPLETION,
           "{\"prompt\":\"ok\",\"n_predict\":1}", timeout);
       int status = httpClient.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
       if (status != 200) LOG.warn("Resume probe: one-token completion answered HTTP {}", status);

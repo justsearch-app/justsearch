@@ -18,6 +18,8 @@ export const RULES = [
   [/^modules\/ui-web\/(?:scripts\/|[^/]*(?:config|package)[^/]*$)/, ['devrunner']],
   [/^modules\/ui-web\/src\/api\/backendRestart\.ts$/, ['rust']],
   [/^modules\/app-services\/src\/test\/resources\/policy\/app-update-policy-cases\.json$/, ['rust']],
+  // Rust recovery tests and both conformance adapters consume the shared crash fixtures.
+  [/^modules\/app-services\/src\/test\/resources\/io\/justsearch\/app\/services\/diagnostics\/hotspot-fatal-headers\//, ['rust']],
   [/^(?:modules\/shell\/|native\/)/, ['build', 'rust', 'services', 'platform', 'windows', 'devrunner', 'jseval', 'lifecycle', 'integration']],
   [/^(?:build-logic\/|gradle\/|gradlew|settings\.gradle|build\.gradle|gradle\.properties)/, LANES],
   [/^(?:schemas?\/|contracts?\/|catalog\/|ssot\/|scripts\/(?:codegen|wire-contract)\/)/, contracts],

@@ -578,14 +578,15 @@ test('ordinary workload records wire refusals and terminates on its owned stop m
   const observed = [];
   globalThis.fetch = async (url, options) => {
     observed.push({ url, options });
-    if (url.endsWith('/api/mcp/token')) return Response.json({ token: 'wire-fixture-token' });
     if (url.endsWith('/api/knowledge/search')) return Response.json({ errorCode: 'ADMISSION_ENGINE_LIMIT', retrySafe: true },
       { status: 429, headers: { 'Retry-After': '1' } });
     fs.writeFileSync(stop, 'stop');
     return new Response('event: run_started\ndata: {"runId":"wire-chat"}\n\nevent: done\ndata: {}\n\n', { status: 200 });
   };
   try {
-    await captureWorkload(directory, 'http://127.0.0.1:33221', stop);
+    const manifest = path.join(directory, 'manifest.json');
+    fs.writeFileSync(manifest, JSON.stringify({ head: { sessionToken: 'wire-fixture-token' } }));
+    await captureWorkload(directory, 'http://127.0.0.1:33221', stop, undefined, manifest);
     const text = fs.readFileSync(path.join(directory, 'workload.json'), 'utf8');
     const capture = JSON.parse(text);
     assert.equal(capture.offered, 2);
@@ -594,7 +595,7 @@ test('ordinary workload records wire refusals and terminates on its owned stop m
     assert.equal(capture.requests[0].retrySafe, true);
     assert.equal(capture.requests[1].terminal.doneCount, 1);
     assert.ok(capture.requests.every(r => Number.isFinite(r.durationMs)));
-    assert.ok(observed.slice(1).every(r => r.options.headers['X-JustSearch-Session'] === 'wire-fixture-token'));
+    assert.ok(observed.every(r => r.options.headers['X-JustSearch-Session'] === 'wire-fixture-token'));
     assert.ok(!text.includes('wire-fixture-token'));
   } finally { globalThis.fetch = originalFetch; }
 });
@@ -615,4 +616,15 @@ test('E4 workload clause: a window-cut cycle covering the window counts; a short
     collect({ record: r, raw, values });
     assert.equal(r.clauses['index-agent-reconfigure-workload'], expected, JSON.stringify(cycle));
   }
+});
+
+test('T15: evaluation GETs carry the owner-file credential just like POSTs', async () => {
+  const originalFetch = globalThis.fetch;
+  let headers;
+  globalThis.fetch = async (_url, init) => { headers = init.headers; return Response.json({ ok: true }); };
+  try {
+    const { requestLive } = await import('./e456-live.mjs');
+    await requestLive({ token: 'owner-file-test-token' }, '/api/debug/state');
+    assert.equal(headers['X-JustSearch-Session'], 'owner-file-test-token');
+  } finally { globalThis.fetch = originalFetch; }
 });

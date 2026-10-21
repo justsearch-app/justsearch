@@ -41,8 +41,16 @@ final class InferenceHttpHelpers {
     return null;
   }
 
-  static URI serverUri(int port, String path) {
-    return URI.create("http://localhost:" + port + path);
+  static URI serverUri(LlamaServerEndpoint endpoint, String path) {
+    return URI.create("http://127.0.0.1:" + endpoint.port() + path);
+  }
+
+  private static HttpRequest.Builder requestBuilder(LlamaServerEndpoint endpoint, String path) {
+    HttpRequest.Builder builder = HttpRequest.newBuilder().uri(serverUri(endpoint, path));
+    if (endpoint.apiKey() != null) {
+      builder.header("Authorization", "Bearer " + endpoint.apiKey());
+    }
+    return builder;
   }
 
   /**
@@ -50,10 +58,9 @@ final class InferenceHttpHelpers {
    * exchange's lease so that no exchange can be built outside one (Spec A §5.2, U14).
    */
   static HttpRequest buildJsonPostRequest(
-      GenerationLease lease, int port, String path, String json, Duration timeout) {
+      GenerationLease lease, LlamaServerEndpoint endpoint, String path, String json, Duration timeout) {
     Objects.requireNonNull(lease, "a llama-server exchange needs a generation lease");
-    return HttpRequest.newBuilder()
-        .uri(serverUri(port, path))
+    return requestBuilder(endpoint, path)
         .header("Content-Type", "application/json")
         .timeout(timeout)
         .POST(HttpRequest.BodyPublishers.ofString(json))
@@ -61,7 +68,7 @@ final class InferenceHttpHelpers {
   }
 
   /** Lifecycle probes only ({@code /health}, {@code /props}); never a generation exchange. */
-  static HttpRequest buildGetRequest(int port, String path, Duration timeout) {
-    return HttpRequest.newBuilder().uri(serverUri(port, path)).timeout(timeout).GET().build();
+  static HttpRequest buildGetRequest(LlamaServerEndpoint endpoint, String path, Duration timeout) {
+    return requestBuilder(endpoint, path).timeout(timeout).GET().build();
   }
 }

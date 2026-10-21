@@ -47,11 +47,13 @@ import { subscribeFeedStalled } from '../substrates/tasks/indexingJobsBridge.js'
 import { subscribeAiState } from '../state/aiStateStore.js';
 import {
   selectIndexingProgress,
+  indexingTaskStatus,
   type EnrichingStageRow,
   type IndexingProgress,
 } from '../state/indexingProgress.js';
 import { humanizeSeconds } from '../state/startupEstimate.js';
 import { ENRICHMENT_BLOCKED_BODY, ENRICHMENT_BODY } from '../state/enrichmentCoverage.js';
+import { indexingQueueCounts } from '../state/indexingQueueCounts.js';
 import { formatBytes, formatCount } from '../display/format.js';
 
 /**
@@ -143,31 +145,14 @@ const STAGE_LABELS: Record<EnrichingStageRow['id'], string> = {
 };
 
 /** The empty projection this component starts from, before the first `/api/status` poll lands. */
-const NO_PROGRESS: IndexingProgress = {
-  phase: 'unknown',
-  jobsPending: 0,
-  jobsRunning: 0,
-  jobsQueued: 0,
-  enrichingPercent: null,
-  enrichingPending: 0,
-  blockedPending: 0,
-  enrichingStages: [],
-  enrichingEtaSeconds: null,
-  embeddingPending: 0,
-  vduPending: 0,
-  etaSeconds: null,
-  indexingPercent: null,
-  pendingBytes: null,
-  live: false,
-  // Applicability is UNKNOWN before the first poll — never all-false, which reads as a claim.
-  stages: null,
-};
+const NO_PROGRESS = selectIndexingProgress(null, false, 0, []);
 
 export class TaskList extends JfElement {
   static properties = {
     tasks: { state: true },
     feedStalled: { state: true },
     progress: { state: true },
+    queueCounts: { state: true },
     filesOpen: { state: true },
     showingReady: { state: true },
   };
@@ -189,6 +174,7 @@ export class TaskList extends JfElement {
 
   constructor() {
     super();
+    this.queueCounts = null;
     this.tasks = listTasks();
     this.feedStalled = false;
     this.progress = NO_PROGRESS;
@@ -206,10 +192,11 @@ export class TaskList extends JfElement {
       this.feedStalled = stalled;
     });
     this.aiUnsub = subscribeAiState((s) => {
+      this.queueCounts = indexingQueueCounts(s.status);
       this.applyProgress(
         selectIndexingProgress(
           s.status,
-          s.snapshotLive,
+          s.indexingStatusLive,
           s.episodeMaxPendingJobs,
           s.enrichSettleSamples,
         ),
@@ -479,16 +466,19 @@ export class TaskList extends JfElement {
    */
   private isEmpty(): boolean {
     return (
-      this.tasks.length === 0 && !isActivePhase(this.progress.phase) && !this.showingReady
+      this.tasks.length === 0 && !(this.queueCounts &&
+        (this.queueCounts.queued + this.queueCounts.processing + this.queueCounts.failed > 0)) && !isActivePhase(this.progress.phase) && !this.showingReady
     );
   }
 
   private renderTask(t: Task): TemplateResult {
+    const status = indexingTaskStatus(t, this.progress.activity);
+    const confirmed = status === t.status;
     return html`
       <div class="task" data-testid="task-${t.id}">
         <div class="task-row">
-          <span class="status ${t.status}" data-testid="task-status-${t.id}"
-            >${t.status}</span
+          <span class="status ${confirmed ? t.status : 'stale'}" data-testid="task-status-${t.id}"
+            >${status}</span
           >
           ${/* Tempdoc 609 §R (T1.3) — when the task knows its origin surface, the label is a button that
                 returns there ("return to running job"); otherwise a plain span. */ ''}
@@ -514,7 +504,7 @@ export class TaskList extends JfElement {
               </jf-button>`
             : nothing}
         </div>
-        ${t.status === 'running' && t.progress !== undefined
+        ${confirmed && t.status === 'running' && t.progress !== undefined
           ? html`<div class="bar">
               <span style=${`width:${Math.round(t.progress * 100)}%`}></span>
             </div>`
@@ -522,6 +512,8 @@ export class TaskList extends JfElement {
       </div>
     `;
   }
+
+  private declare queueCounts: ReturnType<typeof indexingQueueCounts>;
 
   private counts(): Map<TaskStatus, number> {
     // Projection-layer primitive (tempdoc 550 thesis III(b)); shared with the Activity timeline.
@@ -535,6 +527,7 @@ export class TaskList extends JfElement {
    */
   private renderAggregate(): TemplateResult | typeof nothing {
     const p = this.progress;
+    if (!p.activity.confirmed) return nothing;
     if (this.showingReady) {
       // Round-15 F1 — the terminal card has TWO bodies, and which one is true is decided by the
       // projection's own evidence, never by the absence of queued work: an index whose semantic
@@ -590,6 +583,15 @@ export class TaskList extends JfElement {
           >
             ${indexingCountsLine(p)}
           </div>
+        </div>
+      `;
+    }
+    if (p.phase === 'enriching' && p.activity.enrichmentDeferred) {
+      return html`
+        <div class="aggregate" data-testid="task-aggregate" data-phase="enriching">
+          <div class="counts" data-testid="task-aggregate-counts">${
+            p.enrichingPercent === null ? '' : `${p.enrichingPercent}% · `
+          }${formatCount(p.enrichingPending)} enrichment steps waiting</div>
         </div>
       `;
     }
@@ -655,7 +657,18 @@ export class TaskList extends JfElement {
               </jf-button>`
             : nothing}
         </div>
+        ${this.progress.activity.detail ? html`<div class="counts">${this.progress.activity.detail}</div>` : nothing}
         ${this.renderAggregate()}
+        ${this.queueCounts ? html`
+          <div class="counts" data-testid="task-queue-totals">
+            ${this.progress.live ? '' : 'Last reported: '}${formatCount(this.queueCounts.processing)} processing · ${formatCount(this.queueCounts.failed)} failed
+          </div>
+          ${this.queueCounts.queued > 0 ? html`
+            <div class="task-row" data-testid="task-queued-aggregate">
+              <span class="status queued">queued</span>
+              <span>${this.progress.live ? '' : 'Last reported: '}${formatCount(this.queueCounts.queued)} files queued</span>
+            </div>` : nothing}
+        ` : nothing}
         <!-- 595 §4.4: when the live feed stalls, say so — don't show stale counts
              as if they were live (the §1.3 freeze). -->
         ${stalled
@@ -681,6 +694,7 @@ export class TaskList extends JfElement {
           : nothing}
         ${this.filesOpen && hasDetail
           ? html`<div class="files" data-testid="tasks-files">
+              ${!this.progress.activity.confirmed ? html`<div class="counts">Last observed indexing and enrichment details</div>` : nothing}
               <!-- 813 §20 — machine stages, in the disclosure: the very rows the surface percent
                    sums (enrichingStages), so this is a narrower SCOPE of the same number, never a
                    second derivation. -->
@@ -694,6 +708,9 @@ export class TaskList extends JfElement {
                 : nothing}
               ${this.tasks.length > 0
                 ? html`
+                    <div class="counts" data-testid="task-window-notice">
+                      File details are a live window, showing up to 8 tasks; queue totals include files outside it.
+                    </div>
                     <!-- Bounded summary: one count chip per non-empty status (550 Thesis III).
                          Absorbed into the disclosure by 813 §5 — inside, they label the row SETS
                          (which rows are listed, which are collapsed), not the panel. -->
@@ -726,6 +743,7 @@ export class TaskList extends JfElement {
    * panel is up for agent operations alone.
    */
   private headline(): string {
+    if (!this.progress.activity.confirmed || this.progress.activity.detail) return this.progress.activity.summary;
     // Round-15 F1 — "fully searchable" is a claim about COVERAGE, so it may only be made when the
     // projection says coverage supports it. With the semantic stage unable to run, the honest
     // headline keeps the capability lead (§19 W1) and names the limit instead of hiding it.

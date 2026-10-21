@@ -149,6 +149,17 @@ impl ShellActuator {
     }
 }
 impl Actuator for ShellActuator {
+    fn take_manual_restart(&mut self) -> bool {
+        self.host.take_manual_restart()
+    }
+    fn not_ready_reason(&mut self) -> String {
+        self.host
+            .observe_current_value(|port| {
+                engine_probe::not_ready_reason(port, Duration::from_millis(100))
+            })
+            .map(|(_, reason)| reason)
+            .unwrap_or("The Engine answers, but index status is unavailable".into())
+    }
     fn discovery(&mut self) -> Option<Ready> {
         self.refresh_binding();
         let binding = self.host.binding_snapshot();
@@ -170,15 +181,22 @@ impl Actuator for ShellActuator {
         self.intents.clear();
         self.forced = false;
         #[cfg(target_os = "linux")]
-        { self.forced_with_intent = false; }
+        {
+            self.forced_with_intent = false;
+        }
         self.detail = None;
         self.terminated_at = None;
         self.started_at = epoch();
         self.suspended_at_start = self.host.clock.lock().unwrap().suspended_ms_since(0);
         self.process = process_record(pid);
         let mut start = self.process.clone();
-        start.as_object_mut().unwrap().extend(json!({"incarnation":self.incarnation(),
-            "cause":if self.n == 1 {"INITIAL"} else {"RESTART"}, "supervisorKind":"tauri"}).as_object().unwrap().clone());
+        start.as_object_mut().unwrap().extend(
+            json!({"incarnation":self.incarnation(),
+            "cause":if self.n == 1 {"INITIAL"} else {"RESTART"}, "supervisorKind":"tauri"})
+            .as_object()
+            .unwrap()
+            .clone(),
+        );
         self.append("engine-start", start);
         Ok(pid)
     }
@@ -259,18 +277,13 @@ impl Actuator for ShellActuator {
             "incarnation":self.wire_incarnation(),"requestNonce":uuid::Uuid::new_v4().to_string(),"issuedBy":"tauri-shell"});
         if reason == "upgrade" {
             if let Some((preparation, nonce)) = self.host.take_upgrade() {
-                let binding = self.host.binding_snapshot();
-                let receipt = match (binding.port, binding.token) {
-                    (Some(port), Some(token)) => post_before_send(
-                        port,
-                        &token,
-                        "/api/upgrade/commit-shutdown",
-                        &json!({"schemaVersion":1,"preparationId":preparation,"shutdownNonce":nonce}),
-                        1000,
-                        || self.host.child_pid().is_some() && !self.host.quit_started(),
-                    ),
-                    _ => (Err("Upgrade binding unavailable".into()), false),
-                };
+                let receipt = post_before_send(
+                    &self.host,
+                    "/api/upgrade/commit-shutdown",
+                    &json!({"schemaVersion":1,"preparationId":preparation,"shutdownNonce":nonce}),
+                    1000,
+                    || !self.host.quit_started(),
+                );
                 let (mut receipt, sent) = receipt;
                 if !sent {
                     receipt = Err(UPGRADE_COMMIT_NOT_SENT.into());
@@ -284,11 +297,8 @@ impl Actuator for ShellActuator {
             }
         }
         if reason == "quit" {
-            let binding = self.host.binding_snapshot();
-            if let (Some(port), Some(token)) = (binding.port, binding.token) {
-                if post(port, &token, "/api/lifecycle/shutdown", &body, 200).is_ok() {
-                    return Ok(());
-                }
+            if post(&self.host, "/api/lifecycle/shutdown", &body, 200).is_ok() {
+                return Ok(());
             }
         }
         write_atomic(&self.request_path(), &format!("{body}\n"))
@@ -297,10 +307,14 @@ impl Actuator for ShellActuator {
         self.forced = true;
         self.terminated_at = Some(epoch());
         #[cfg(target_os = "linux")]
-        { self.forced_with_intent = !self.intents.is_empty(); }
+        {
+            self.forced_with_intent = !self.intents.is_empty();
+        }
         let sent = self.host.force_stop();
         #[cfg(target_os = "linux")]
-        { self.forced_with_intent &= sent.is_ok(); }
+        {
+            self.forced_with_intent &= sent.is_ok();
+        }
         #[cfg(not(target_os = "linux"))]
         let _ = sent;
     }
@@ -332,9 +346,15 @@ impl Actuator for ShellActuator {
         let requested = if self.host.exit_signal().is_some() {
             // Only our successful forced SIGKILL following an owner intent is requested.
             self.host.exit_signal() == Some(9) && self.forced_with_intent
-        } else { requested };
+        } else {
+            requested
+        };
         let intent = matched.or(latest);
-        let contained = cfg!(windows) && self.host.latest_record().is_some_and(|r| r.containment.as_deref() != Some("shell_unavailable"));
+        let contained = cfg!(windows)
+            && self
+                .host
+                .latest_record()
+                .is_some_and(|r| r.containment.as_deref() != Some("shell_unavailable"));
         #[allow(unused_mut)]
         let mut exit = json!({"incarnation":self.incarnation(), "exitClass":if requested {"REQUESTED"} else {"UNEXPECTED"},
             "reason":intent.map(|i|i["reason"].clone()),"detail":intent.map(|i|i["detail"].clone()), "code":code,
@@ -349,7 +369,8 @@ impl Actuator for ShellActuator {
             exit["signal"] = json!(signal);
             exit["signalName"] = json!(linux_signal_name(signal));
             exit["codeName"] = json!(linux_signal_name(signal));
-            exit["ownerIntentBeforeSignal"] = if self.forced_with_intent || self.intents.is_empty() {
+            exit["ownerIntentBeforeSignal"] = if self.forced_with_intent || self.intents.is_empty()
+            {
                 json!(self.forced_with_intent)
             } else {
                 // An unrelated signal's OS delivery time is unknown; observation order alone
@@ -392,9 +413,12 @@ impl Actuator for ShellActuator {
         self.host.now_ms()
     }
     fn publish_state(&mut self, record: &StateRecord) {
+        let mut record = record.clone();
+        record.recent_exits = crate::recovery::recent_exits(&self.data_dir, epoch());
+        record.crash_file = crate::recovery::latest_crash(&self.data_dir);
         self.host.publish_state(
             Some(&self.data_dir.join("runtime").join("supervisor.v1.json")),
-            record,
+            &record,
             |r| (self.event)(r),
         );
     }
@@ -510,10 +534,20 @@ fn legacy_identity_check(pid: u32, birth: Option<&str>) -> &'static str {
 #[cfg(target_os = "linux")]
 fn linux_signal_name(signal: i32) -> String {
     match signal {
-        1 => "SIGHUP", 2 => "SIGINT", 3 => "SIGQUIT", 4 => "SIGILL", 6 => "SIGABRT",
-        8 => "SIGFPE", 9 => "SIGKILL", 11 => "SIGSEGV", 13 => "SIGPIPE", 14 => "SIGALRM",
-        15 => "SIGTERM", _ => return format!("signal {signal}"),
-    }.to_string()
+        1 => "SIGHUP",
+        2 => "SIGINT",
+        3 => "SIGQUIT",
+        4 => "SIGILL",
+        6 => "SIGABRT",
+        8 => "SIGFPE",
+        9 => "SIGKILL",
+        11 => "SIGSEGV",
+        13 => "SIGPIPE",
+        14 => "SIGALRM",
+        15 => "SIGTERM",
+        _ => return format!("signal {signal}"),
+    }
+    .to_string()
 }
 
 fn process_record(pid: u32) -> Value {
@@ -522,7 +556,9 @@ fn process_record(pid: u32) -> Value {
         return match crate::linux_process::capture(pid) {
             Ok((identity, executable)) => json!({"pid":pid, "processIdentity":identity,
                 "processStartedAt":null, "executable":executable.to_string_lossy()}),
-            Err(_) => json!({"pid":pid, "processIdentity":null, "processStartedAt":null, "executable":null}),
+            Err(_) => {
+                json!({"pid":pid, "processIdentity":null, "processStartedAt":null, "executable":null})
+            }
         };
     }
     #[cfg(not(target_os = "linux"))]
@@ -536,25 +572,39 @@ fn process_record(pid: u32) -> Value {
 
 fn same_engine_identity(engine: &Value, owned: &Value) -> bool {
     #[cfg(target_os = "linux")]
-    return !owned["processIdentity"].is_null() && engine["processIdentity"] == owned["processIdentity"];
+    return !owned["processIdentity"].is_null()
+        && engine["processIdentity"] == owned["processIdentity"];
     #[cfg(not(target_os = "linux"))]
-    return engine["creationFileTime"].is_null() || engine["creationFileTime"] == owned["creationFileTime"];
+    return engine["creationFileTime"].is_null()
+        || engine["creationFileTime"] == owned["creationFileTime"];
 }
 
 fn identity_check(record: &Value) -> &'static str {
-    let pid = record["pid"].as_u64().and_then(|p| u32::try_from(p).ok()).unwrap_or(0);
+    let pid = record["pid"]
+        .as_u64()
+        .and_then(|p| u32::try_from(p).ok())
+        .unwrap_or(0);
     #[cfg(target_os = "linux")]
     {
-        let identity: Option<crate::linux_process::Identity> = serde_json::from_value(record["processIdentity"].clone()).ok();
+        let identity: Option<crate::linux_process::Identity> =
+            serde_json::from_value(record["processIdentity"].clone()).ok();
         let state = crate::linux_process::check(pid, identity.as_ref());
-        if state != "ALIVE_MATCH" { return state; }
-        let Some(executable) = record["executable"].as_str().filter(|exe| Path::new(exe).is_absolute())
-            else { return "IDENTITY_UNKNOWN"; };
+        if state != "ALIVE_MATCH" {
+            return state;
+        }
+        let Some(executable) = record["executable"]
+            .as_str()
+            .filter(|exe| Path::new(exe).is_absolute())
+        else {
+            return "IDENTITY_UNKNOWN";
+        };
         match crate::linux_process::capture(pid) {
             Ok((seen, exe)) if Some(&seen) == identity.as_ref() => {
-                if exe != Path::new(executable) { eprintln!("Managed child {pid} executable changed: {executable:?} -> {exe:?}; birth identity still matches"); }
+                if exe != Path::new(executable) {
+                    eprintln!("Managed child {pid} executable changed: {executable:?} -> {exe:?}; birth identity still matches");
+                }
                 "ALIVE_MATCH"
-            },
+            }
             Ok(_) => "GONE",
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => "GONE",
             Err(_) => "IDENTITY_UNKNOWN",
@@ -565,67 +615,38 @@ fn identity_check(record: &Value) -> &'static str {
 }
 
 /// Bounded loopback HTTP from the actor, including during runtime teardown.
-fn post(
-    port: u16,
-    token: &str,
+pub(crate) fn post(
+    host: &EngineHost,
     path: &str,
     body: &Value,
     timeout_ms: u64,
 ) -> Result<Value, String> {
-    post_before_send(port, token, path, body, timeout_ms, || true).0
+    post_before_send(host, path, body, timeout_ms, || true).0
 }
 
 /// The boolean means a write was attempted, including a partial/failed write.
 /// A connect failure cannot deliver a commit; every error after this boundary can.
 fn post_before_send(
-    port: u16,
-    token: &str,
+    host: &EngineHost,
     path: &str,
     body: &Value,
     timeout_ms: u64,
     before_send: impl FnOnce() -> bool,
 ) -> (Result<Value, String>, bool) {
-    use std::io::{Read, Write};
-    let mut sent = false;
-    let result = (|| {
-        if token.contains(['\r', '\n']) {
-            return Err("Invalid session token".into());
-        }
-        let timeout = Duration::from_millis(timeout_ms);
-        let mut stream = std::net::TcpStream::connect_timeout(
-            &std::net::SocketAddr::from(([127, 0, 0, 1], port)),
-            timeout,
-        )
-        .map_err(|e| e.to_string())?;
-        stream
-            .set_read_timeout(Some(timeout))
-            .map_err(|e| e.to_string())?;
-        stream
-            .set_write_timeout(Some(timeout))
-            .map_err(|e| e.to_string())?;
-        let body = body.to_string();
-        if !before_send() {
-            return Err("Engine exited or quit before upgrade commit request".into());
-        }
-        sent = true;
-        write!(stream,"POST {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-JustSearch-Session: {token}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).map_err(|e|e.to_string())?;
-        let mut response = String::new();
-        stream
-            .read_to_string(&mut response)
-            .map_err(|e| e.to_string())?;
-        let (headers, body) = response
-            .split_once("\r\n\r\n")
-            .ok_or("Malformed HTTP response")?;
-        if !headers
-            .lines()
-            .next()
-            .is_some_and(|line| line.contains(" 2"))
-        {
-            return Err("Shutdown rejected".into());
-        }
-        serde_json::from_str(body).or_else(|_| Ok(json!({"accepted":true})))
-    })();
-    (result, sent)
+    let timeout = Duration::from_millis(timeout_ms);
+    let (stream, binding) = match host.connect_engine(timeout) {
+        Ok(endpoint) => endpoint,
+        Err(error) => return (Err(error), false),
+    };
+    crate::engine_conn::post_connected(
+        stream,
+        binding.port.unwrap(),
+        binding.token.as_deref().unwrap(),
+        path,
+        body,
+        timeout,
+        before_send,
+    )
 }
 
 #[cfg(test)]
@@ -639,28 +660,55 @@ mod linux_identity_tests {
         let dir = tempfile::tempdir().unwrap();
         let host = Arc::new(EngineHost::default());
         let spawn_host = host.clone();
-        let mut actuator = ShellActuator::new(host.clone(), dir.path().into(), move || {
-            let mut command = crate::containment::engine_command("sleep").unwrap();
-            command.arg("30");
-            spawn_host.admit(crate::engine_host::PreparedCommand { command }).map(|c| c.pid)
-        }, |_| {});
+        let mut actuator = ShellActuator::new(
+            host.clone(),
+            dir.path().into(),
+            move || {
+                let mut command = crate::containment::engine_command("sleep").unwrap();
+                command.arg("30");
+                spawn_host
+                    .admit(crate::engine_host::PreparedCommand { command })
+                    .map(|c| c.pid)
+            },
+            |_| {},
+        );
         actuator.spawn_engine().unwrap();
         if with_intent {
             actuator.record_intent("quit", None, "TERMINATE", epoch() + 1000);
         }
-        if with_intent { actuator.force_kill(); }
-        else { host.force_stop().unwrap(); }
+        if with_intent {
+            actuator.force_kill();
+        } else {
+            host.force_stop().unwrap();
+        }
         let deadline = std::time::Instant::now() + Duration::from_secs(2);
         let code = loop {
-            if let Some(code) = actuator.poll_exit() { break code; }
-            assert!(std::time::Instant::now() < deadline, "owned fixture did not exit");
+            if let Some(code) = actuator.poll_exit() {
+                break code;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "owned fixture did not exit"
+            );
             std::thread::sleep(Duration::from_millis(5));
         };
-        let decision = Decision { action: supervisor::Action::Stop, reason: None,
-            exit_class: None, cooldown_ms: None, counted: false };
+        let decision = Decision {
+            action: supervisor::Action::Stop,
+            reason: None,
+            exit_class: None,
+            cooldown_ms: None,
+            counted: false,
+        };
         actuator.record_exit(code, "running", &decision);
-        exit_ledger::read_ledger(&exit_ledger::ledger_directory(dir.path()), exit_ledger::Family::Engine)
-            .unwrap().records.into_iter().find(|r| r["type"] == "engine-exit").unwrap()
+        exit_ledger::read_ledger(
+            &exit_ledger::ledger_directory(dir.path()),
+            exit_ledger::Family::Engine,
+        )
+        .unwrap()
+        .records
+        .into_iter()
+        .find(|r| r["type"] == "engine-exit")
+        .unwrap()
     }
 
     #[test]
@@ -672,7 +720,14 @@ mod linux_identity_tests {
             assert_eq!(exit["signalName"], "SIGKILL");
             assert_eq!(exit["forced"], with_intent);
             assert_eq!(exit["ownerIntentBeforeSignal"], with_intent);
-            assert_eq!(exit["exitClass"], if with_intent { "REQUESTED" } else { "UNEXPECTED" });
+            assert_eq!(
+                exit["exitClass"],
+                if with_intent {
+                    "REQUESTED"
+                } else {
+                    "UNEXPECTED"
+                }
+            );
             assert!(exit["exitedAt"].is_null());
             assert_eq!(exit["containment"], "LINUX_PARENT_DEATH");
         }
@@ -708,14 +763,18 @@ mod linux_identity_tests {
             .args(["-c", "printf ready; read -r hold"])
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
-            .spawn().unwrap();
+            .spawn()
+            .unwrap();
         let mut ready = [0; 5];
         let readiness = std::io::Read::read_exact(child.stdout.as_mut().unwrap(), &mut ready);
         if readiness.is_err() {
             let _ = child.kill();
             let _ = child.wait();
         }
-        assert!(readiness.is_ok(), "owned shell did not acknowledge startup: {readiness:?}");
+        assert!(
+            readiness.is_ok(),
+            "owned shell did not acknowledge startup: {readiness:?}"
+        );
         let record = process_record(child.id());
         let identity = serde_json::from_value(record["processIdentity"].clone()).unwrap();
         std::fs::remove_file(&executable).unwrap();
@@ -726,15 +785,30 @@ mod linux_identity_tests {
         let termination = crate::linux_process::terminate(&identity, &executable);
         let deadline = std::time::Instant::now() + Duration::from_secs(2);
         let ended = loop {
-            if child.try_wait().unwrap().is_some() { break true; }
-            if std::time::Instant::now() >= deadline { break false; }
+            if child.try_wait().unwrap().is_some() {
+                break true;
+            }
+            if std::time::Instant::now() >= deadline {
+                break false;
+            }
             std::thread::sleep(Duration::from_millis(10));
         };
-        if !ended { child.kill().unwrap(); }
+        if !ended {
+            child.kill().unwrap();
+        }
         child.wait().unwrap();
-        assert_eq!(verdict, "ALIVE_MATCH", "a deleted image does not end its birth identity");
+        assert_eq!(
+            verdict, "ALIVE_MATCH",
+            "a deleted image does not end its birth identity"
+        );
         termination.unwrap();
-        assert!(ended, "identity-matched deleted image must be signalled, not skipped");
+        assert!(
+            ended,
+            "identity-matched deleted image must be signalled, not skipped"
+        );
     }
-
 }
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "shell_connection_tests.rs"]
+mod connection_tests;

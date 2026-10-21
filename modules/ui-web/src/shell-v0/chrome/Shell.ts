@@ -304,6 +304,7 @@ import {
   shouldIgnoreKeyEvent,
 } from '../utils/keyboardHandler.js';
 import { modalOwnsFocus } from '../primitives/modality.js';
+import { installSearchSummonBridge } from '../router/tauriBridge.js';
 import { SURFACE_ICONS, railAccessibleName } from '../utils/surfaceIcons.js';
 import {
   isViewSaved,
@@ -618,7 +619,7 @@ export class Shell extends JfElement {
       /* Tempdoc 813 §5c — the rail track reads its width from the ONE --rail-width token
          (tokens.css) instead of an inline literal, so a viewport-docked overlay can reserve the
          same band the rail actually occupies rather than re-deriving it. */
-      grid-template-columns: var(--rail-width) 1fr;
+      grid-template-columns: var(--rail-width) minmax(0, 1fr);
       grid-template-rows: 2.5rem auto 1fr 1.75rem;
       grid-template-areas:
         'topbar topbar'
@@ -817,7 +818,8 @@ export class Shell extends JfElement {
       this.shellEventsMultiplex = new MultiplexedStream({
         url: `${this.apiBase.replace(/\/$/, '')}${SHELL_EVENTS_STREAM_PATH}`,
       });
-      if (typeof EventSource !== 'undefined') {
+      // eslint-disable-next-line no-restricted-globals -- Availability probe; requests use authorizedFetch.
+      if (typeof fetch !== 'undefined') {
         this.shellEventsMultiplex.start();
       }
       setSharedShellEventsMultiplex(this.shellEventsMultiplex);
@@ -1680,8 +1682,11 @@ export class Shell extends JfElement {
     // `bindRouterDispatch` helper; removed in the slice-492 follow-up
     // since the indirection had no behavioral benefit).
     const router = this.intentRouter;
+    let nativeRequestHandled = false;
+    let startingSources = false;
     const dispatch = (intent: Parameters<typeof router.dispatch>[0],
                       options?: Parameters<typeof router.dispatch>[1]): void => {
+      if (nativeRequestHandled && startingSources && intent.transport === 'URL_BAR') return;
       void router.dispatch(intent, options);
     };
     // Sources are constructed eagerly; their `start(...)` returns a
@@ -1698,10 +1703,21 @@ export class Shell extends JfElement {
       // earlier in this method, instead of opening its own EventSource.
       createBackendStreamSource({ multiplex: this.shellEventsMultiplex! }),
     ];
+    this.sourceTeardowns.push(installSearchSummonBridge(async (request) => {
+      if (this.disconnected) return;
+      nativeRequestHandled = true;
+      if (request.kind === 'deepLink') {
+        const address = parseUrl(request.url);
+        if (address) await router.dispatch({ address, transport: 'URL_DEEPLINK' });
+      } else {
+        await this.summonSearch();
+      }
+    }));
     void fetchAndRegisterSurfaceSchemas(this.apiBase).then(() => {
       // Surface schemas arrived asynchronously. If we disconnected
       // before that resolved, skip source bootstrap entirely.
       if (this.disconnected) return;
+      startingSources = true;
       for (const source of sources) {
         try {
           const teardown = source.start(dispatch);
@@ -1724,6 +1740,7 @@ export class Shell extends JfElement {
           console.warn(`[Shell] source ${source.ref} failed to start:`, err);
         }
       }
+      startingSources = false;
       // Slice 489 T1/G2 (+G3) boot completion — if neither URLSource nor the
       // Tauri cold-launch path dispatched a navigate intent (i.e., the
       // chrome was opened without a `#justsearch://` hash and without a
@@ -1739,7 +1756,7 @@ export class Shell extends JfElement {
       const hash = window.location.hash;
       const urlDispatched =
         typeof hash === 'string' && hash.startsWith('#justsearch://');
-      if (!urlDispatched) {
+      if (!urlDispatched && !nativeRequestHandled) {
         // Tempdoc 609 §R (T2.2) — resume where you left off: on a cold boot with no deep-link, restore the
         // LAST surface (with its saved state) from the persisted NavigationJournal; fall back to the rail
         // default when the journal is empty (a first-ever launch, or after clearing history). The journal
@@ -1770,6 +1787,22 @@ export class Shell extends JfElement {
         }
       }
     });
+  }
+
+  private async summonSearch(): Promise<void> {
+    if (this.disconnected || modalOwnsFocus()) return;
+    const stage = this.shadowRoot?.querySelector('jf-stage') as Stage | null;
+    const target = getSurface(INTERACTION_SURFACE_ID);
+    if (!stage || !target) return;
+    // A visible secondary search pane owns its existing state just as the primary does.
+    const visible = stage.surface?.id === target.id || (stage.splitAxis && stage.secondarySurface?.id === target.id);
+    if (visible && isTypingTarget(deepActiveElement())) return;
+    if (!visible) {
+      if (!this.intentRouter) return;
+      await this.intentRouter.dispatch({ address: { kind: 'navigate', target: target.id, state: {} }, transport: 'BUTTON' });
+      await this.updateComplete;
+    }
+    if (!this.disconnected && !modalOwnsFocus()) await stage.focusSearch(target.id);
   }
 
   override disconnectedCallback(): void {
@@ -2929,6 +2962,7 @@ export class Stage extends JfElement {
     userConfig: { attribute: false },
     hostApi_: { attribute: false },
     aiAvailable: { type: Boolean, attribute: false },
+    summonCoreSurface: { state: true },
   };
 
   declare surface: SurfaceCatalogEntry | null;
@@ -2938,6 +2972,38 @@ export class Stage extends JfElement {
   declare userConfig: RendererUserConfig | undefined;
   declare hostApi_: PluginHostApi | null;
   declare aiAvailable: boolean;
+  private declare summonCoreSurface: { id: string; overrideId: string | undefined } | null;
+
+  /** Target a single retained element; never broadcast to both search implementations. */
+  async focusSearch(id: string): Promise<void> {
+    await this.updateComplete;
+    const original = this.surface?.id === id ? this.surface : this.splitAxis && this.secondarySurface?.id === id ? this.secondarySurface : null;
+    let surface = this.resolveSurface(original);
+    if (!surface) return;
+    await ensureSurfaceLoaded(surface.mountTag);
+    await this.updateComplete;
+    const element = this._surfaceElCache.get(surface.id) as (HTMLElement & {
+      updateComplete?: Promise<unknown>;
+      focusComposer?: () => Promise<void> | void;
+      onFocusComposer?: () => void;
+      renamingId?: string | null;
+    }) | undefined;
+    if (element?.updateComplete) await element.updateComplete;
+    if (modalOwnsFocus() || element?.renamingId != null || isTypingTarget(deepActiveElement())) return;
+    if (typeof element?.focusComposer === 'function') { await element.focusComposer(); return; }
+    // The retiring window's existing handler is kept intact, behind the shared protection above.
+    if (typeof element?.onFocusComposer === 'function') { element.onFocusComposer(); return; }
+    const field = element?.shadowRoot?.querySelector<HTMLInputElement | HTMLTextAreaElement>('[role="searchbox"], input[type="search"], jf-composer textarea');
+    if (field) { field.focus(); return; }
+    if (surface.id !== id) {
+      // A configured override without a composer is not rewritten to implement this one summon.
+      this.summonCoreSurface = { id, overrideId: this.userConfig?.surfaceOverride?.[id] };
+      this.requestUpdate();
+      await this.updateComplete;
+      surface = getSurface(id) ?? null;
+      if (surface) await this.focusSearch(id);
+    }
+  }
 
   /**
    * Tempdoc 609 (instance-retention) — mounted-surface element cache keyed by resolved surface id.
@@ -2977,6 +3043,7 @@ export class Stage extends JfElement {
     this.userConfig = undefined;
     this.hostApi_ = null;
     this.aiAvailable = true;
+    this.summonCoreSurface = null;
   }
 
   static styles = css`
@@ -3042,9 +3109,9 @@ export class Stage extends JfElement {
    *      degradation per `archive/source-tempdocs/421-extensibility.md`
    *      §"Failure modes".
    */
-  private resolveSurface(): SurfaceCatalogEntry | null {
-    const original = this.surface;
+  private resolveSurface(original: SurfaceCatalogEntry | null = this.surface): SurfaceCatalogEntry | null {
     if (!original) return null;
+    if (this.summonCoreSurface?.id === original.id) return original;
     const overrideId = this.userConfig?.surfaceOverride?.[original.id];
     if (!overrideId) return original;
     const overrideTarget = getSurface(overrideId);
@@ -3052,7 +3119,13 @@ export class Stage extends JfElement {
   }
 
   override render(): TemplateResult {
+    const fallback = this.summonCoreSurface;
+    if (fallback && ((this.surface?.id !== fallback.id && this.secondarySurface?.id !== fallback.id)
+      || this.userConfig?.surfaceOverride?.[fallback.id] !== fallback.overrideId)) {
+      this.summonCoreSurface = null;
+    }
     const primary = this.resolveSurface();
+    const secondary = this.resolveSurface(this.secondarySurface);
     // Tempdoc 609 (instance-retention) — the cache is APPEND-ONLY across navigation: a surface's element
     // instance is retained when you navigate away (it leaves the DOM, so `disconnectedCallback` fires and
     // its streams/subscriptions tear down — 578 hygiene intact — but its component `@state` is preserved)
@@ -3064,7 +3137,7 @@ export class Stage extends JfElement {
     // CSS grid. Falls back to single-surface render whenever either
     // is absent (so layouts that don't set stage.exclusive=false
     // behave identically to before).
-    if (primary && this.secondarySurface && this.splitAxis) {
+    if (primary && secondary && this.splitAxis) {
       // Tempdoc 521 §16.7 deeper (Phase B) — right-pane picker. The
       // candidate list is every independent catalog surface that ISN'T the primary. Legacy
       // Ask/Chat/Extract mode addresses normalize to the one Search window and therefore never
@@ -3086,11 +3159,11 @@ export class Stage extends JfElement {
           <div class="pane right-pane">
             <jf-pane-picker
               .candidates=${candidates}
-              selected-id=${this.secondarySurface.id}
+              selected-id=${this.secondarySurface?.id ?? secondary.id}
               .onPick=${onPick}
             ></jf-pane-picker>
             <div class="right-pane-body">
-              ${this.renderOneSurface(this.secondarySurface)}
+              ${this.renderOneSurface(secondary)}
             </div>
           </div>
         </div>

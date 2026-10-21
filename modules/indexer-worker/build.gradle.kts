@@ -178,3 +178,43 @@ tasks.withType<Test>().matching { it.name == "test" || it.name.startsWith("ciUni
     .withPropertyName("devMcpServerSource")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 }
+
+// Opt-in million-row gate. The default suite still excludes its evidence tag.
+val queueScaleTestSourceSet = the<SourceSetContainer>()["test"]
+val queueScaleHeapAgent by tasks.registering(Jar::class) {
+  dependsOn(tasks.named("testClasses"))
+  archiveClassifier.set("queue-scale-heap-agent")
+  from(queueScaleTestSourceSet.output) {
+    include("io/justsearch/indexerworker/queue/QueueScaleHeapAgent.class")
+  }
+  manifest.attributes("Premain-Class" to "io.justsearch.indexerworker.queue.QueueScaleHeapAgent")
+}
+tasks.register<Test>("queueScaleEvidence") {
+  group = "verification"
+  description = "Opt-in Q1–Q6/Q12 million-row queue measurements at a 1 GiB heap."
+  testClassesDirs = queueScaleTestSourceSet.output.classesDirs
+  classpath = queueScaleTestSourceSet.runtimeClasspath
+  dependsOn(queueScaleHeapAgent)
+  useJUnitPlatform {
+    excludeTags.remove("evidence")
+    includeTags("evidence")
+  }
+  filter {
+    includeTestsMatching("*QueueScaleEvidenceTest")
+    includeTestsMatching("*QueueScaleV24MigrationEvidenceTest")
+    includeTestsMatching("*JobCountsTest")
+  }
+  maxHeapSize = "1g"
+  maxParallelForks = 1
+  jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED",
+      "--add-opens=java.base/java.util=ALL-UNNAMED",
+      "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED")
+  jvmArgs("-javaagent:${queueScaleHeapAgent.get().archiveFile.get().asFile.absolutePath}")
+  systemProperty("queue.scale.output", layout.buildDirectory.dir("queue-scale").get().asFile.absolutePath)
+  systemProperty("queue.scale.classpath", classpath.asPath)
+  outputs.upToDateWhen { false } // Timings and heap evidence must be measured, never replayed.
+  testLogging {
+    showStandardStreams = true
+    exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+  }
+}

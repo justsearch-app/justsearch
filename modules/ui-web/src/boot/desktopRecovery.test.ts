@@ -9,7 +9,8 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('../utils/tauriRuntime.js', () => ({ isTauriRuntime: mocks.native }));
 vi.mock('../api/http', () => ({ resolveApiEndpoint: mocks.endpoint }));
-vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: (command: string, ...args: unknown[]) => command === 'factory_reset_status'
+  ? Promise.resolve({ phase: 'idle', remaining: [] }) : mocks.invoke(command, ...args) }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: mocks.listen }));
 
 import { mountBootApplication, resolveBootWithRecovery } from './desktopRecovery.js';
@@ -90,7 +91,7 @@ describe('desktop boot recovery', () => {
     expect(shell.isConnected).toBe(false);
     await recovery.updateComplete;
     expect(recovery.shadowRoot?.textContent).toContain('JustSearch could not restart');
-    expect(recovery.shadowRoot?.textContent).toContain('Try connecting again');
+    expect(recovery.shadowRoot?.textContent).toContain('Restart JustSearch');
     expect(recovery.shadowRoot?.textContent).toContain('Check for updates');
   });
 
@@ -146,6 +147,66 @@ describe('desktop boot recovery', () => {
     await recovery.updateComplete;
     expect(recovery.shadowRoot?.querySelector('[role="alert"]')?.textContent).toContain(refusal);
     expect(mocks.endpoint).toHaveBeenCalledOnce();
+  });
+
+  it('restarts through the host and shows a refused restart reason without losing controls', async () => {
+    const root = document.getElementById('root')!;
+    await resolveBootWithRecovery(root);
+    const recovery = root.querySelector('jf-engine-recovery') as EngineRecovery;
+    await recovery.updateComplete;
+    const restart = [...recovery.shadowRoot!.querySelectorAll('jf-button')]
+      .find(button => button.textContent?.trim() === 'Restart JustSearch') as HTMLElement & { onActivate: () => Promise<void> };
+    expect(restart).toBeDefined();
+    mocks.invoke.mockRejectedValueOnce(new Error('An update holds Engine replacement; restart refused'));
+    await restart.onActivate();
+    await recovery.updateComplete;
+    expect(mocks.invoke).toHaveBeenCalledWith('restart_engine');
+    expect(recovery.shadowRoot?.querySelector('[role="alert"]')?.textContent).toContain('update holds');
+  });
+
+  it('shows the spawn obstacle, retained crash evidence, and the count across budget resets', async () => {
+    mocks.invoke.mockImplementation(async command => command === 'supervisor_state' ? {
+      ...terminal, reason: 'spawn_failed: Java executable missing',
+      recentExits: { count: 12, codes: { '3': 12 } },
+      crashFile: { name: 'hs_err_pid42.log', at: '2026-10-20T01:02:03Z', problematicFrame: 'C [onnxruntime.dll+0x123]' },
+    } : { state: 'up_to_date' });
+    const root = document.getElementById('root')!;
+    await resolveBootWithRecovery(root);
+    const recovery = root.querySelector('jf-engine-recovery') as EngineRecovery;
+    await recovery.updateComplete;
+    expect(recovery.shadowRoot?.textContent).toContain('Java executable missing');
+    expect(recovery.shadowRoot?.textContent).toContain('12 times');
+    expect(recovery.shadowRoot?.textContent).toContain('onnxruntime.dll');
+    const open = [...recovery.shadowRoot!.querySelectorAll('jf-button')]
+      .find(button => button.textContent?.trim() === 'Open crash folder') as HTMLElement & { onActivate: () => Promise<void> };
+    mocks.invoke.mockResolvedValueOnce({ home: 'C:/Users/Name With Spaces/data' }).mockResolvedValueOnce(undefined);
+    await open.onActivate();
+    expect(mocks.invoke).toHaveBeenCalledWith('reveal_in_explorer', { path: 'C:/Users/Name With Spaces/data/crashes' });
+  });
+
+  it('keeps the running-but-not-ready explanation visible when the API answers', async () => {
+    mocks.invoke.mockImplementation(async command => command === 'supervisor_state'
+      ? { ...terminal, state: 'running', notReady: 'Index: UNAVAILABLE (index.failed)' } : { state: 'up_to_date' });
+    mocks.endpoint.mockResolvedValue({ baseUrl: 'http://127.0.0.1:40404' });
+    const root = document.getElementById('root')!;
+    await resolveBootWithRecovery(root);
+    const recovery = root.querySelector('jf-engine-recovery') as EngineRecovery;
+    expect(recovery).not.toBeNull();
+    await recovery.updateComplete;
+    expect(recovery.shadowRoot?.textContent).toContain('running but not ready');
+    expect(recovery.shadowRoot?.textContent).toContain('index.failed');
+  });
+
+  it('explains a locked data folder without suggesting an automatic retry', async () => {
+    mocks.invoke.mockImplementation(async command => command === 'supervisor_state'
+      ? { ...terminal, reason: 'ENGINE_RESTART_EXHAUSTED:data_dir_locked', lastExit: { code: 2, reason: 'data_dir_locked', class: 'NON_TRANSIENT' } }
+      : { state: 'up_to_date' });
+    const root = document.getElementById('root')!;
+    await resolveBootWithRecovery(root);
+    const recovery = root.querySelector('jf-engine-recovery') as EngineRecovery;
+    await recovery.updateComplete;
+    expect(recovery.shadowRoot?.textContent).toContain('data folder is in use by another process');
+    expect(recovery.shadowRoot?.textContent).not.toContain('Automatic retry');
   });
 
   it('keeps browser unresolved behavior and never invokes native recovery commands', async () => {

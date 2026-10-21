@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T10:24:12.903Z",
+  "revision": "906fae5b736cabecf0a206ff6e289204542b8918",
+  "tree": "e1822e155e8295f2850540a6f253d4f5e072fba5",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4678
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5730
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:2a22987c092e5ed12992ef8bd9f854379b741167d845be2aeddae8ba4f7ac6b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:2a22987c092e5ed12992ef8bd9f854379b741167d845be2aeddae8ba4f7ac6b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2ffa46f2c2d4655719652b19e9e7aabc0972fed0d23cde6a876d591ff3d3f1bc"
+}

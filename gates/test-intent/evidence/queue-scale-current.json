@@ -1,0 +1,1274 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T10:00:09.508Z",
+  "revision": "436bd744ac8b65a657d3d4217615a9e6a38cea3e",
+  "tree": "74c86c0502b366746f5fa99bd379c4f42c21ac53",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "Picked up JAVA_TOOL_OPTIONS: -Djava.io.tmpdir=/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/test-intent",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.IndexingJobsCoalescingTest\" --tests \"io.justsearch.app.engine.IndexingJobsSseIsolationTest\" --tests \"io.justsearch.app.engine.IndexingJobsWindowFlowTest\" --tests \"io.justsearch.app.engine.RemoteIndexingJobsBridgeCapacityTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11717
+    },
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.IndexingJobsBridgeWiringTest\" --tests \"io.justsearch.app.services.worker.IndexingJobsBridgeResubscribeTest\" --tests \"io.justsearch.app.services.worker.IndexingJobsRecoveryTest\" --tests \"io.justsearch.app.services.worker.RemoteIndexingJobsBridgeTest\" --tests \"io.justsearch.app.services.worker.StatusStateProducersTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5355
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.ClaimCursorInvalidationTest\" --tests \"io.justsearch.indexerworker.queue.IndexingJobsChangeStreamLocaleTest\" --tests \"io.justsearch.indexerworker.queue.IndexingJobsChangeStreamTest\" --tests \"io.justsearch.indexerworker.queue.IndexingJobsStatePresenceTest\" --tests \"io.justsearch.indexerworker.queue.JobCountsMigrationTest\" --tests \"io.justsearch.indexerworker.queue.JobCountsReplaceTest\" --tests \"io.justsearch.indexerworker.queue.JobCountsTest\" --tests \"io.justsearch.indexerworker.queue.JobQueryPlansTest\" --tests \"io.justsearch.indexerworker.queue.JobQueueMigrationTest\" --tests \"io.justsearch.indexerworker.queue.JobReadinessAndClaimTest\" --tests \"io.justsearch.indexerworker.queue.QueueProjectionCommitTest\" --tests \"io.justsearch.indexerworker.queue.SqliteJobQueueConformanceTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12708
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.IndexingJobsSubstrateIntegrationTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3645
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.IndexingLoopClaimBudgetTest\" --tests \"io.justsearch.indexerworker.services.IndexingJobsSnapshotOrderTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4897
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/components/ResourceView.render.test.ts\" \"src/shell-v0/hooks/resolvePathLazy.test.ts\" \"src/shell-v0/state/indexingQueueCounts.test.ts\" \"src/shell-v0/strategies/indexingJobsWindow.test.ts\" \"src/shell-v0/strategies/subscriptionStrategy.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/test-intent/test-intent-vitest-3590872-1792490408064.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1441
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsCoalescingTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsCoalescingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:db54f0e2d4b03862d6ec7df637da8bb24fddbb2393925cc4e505a5c0d9200d39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "drainAndCloseCountsCoalescedItemsRatherThanReplacedFrames()",
+          "status": "passed"
+        },
+        {
+          "name": "uniquePendingFramesFailFastAtTheBound()",
+          "status": "passed"
+        },
+        {
+          "name": "deliveryRefusalFailsAndClosesTheFlowOnce()",
+          "status": "passed"
+        },
+        {
+          "name": "busyDeliveryYieldsToQueuedSubscriptionStartup()",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotsAreOrderingBarriersAndDoNotMergeDeltasAcrossThem()",
+          "status": "passed"
+        },
+        {
+          "name": "statePresenceFramesAreBarriersAndSurviveLaterHeartbeats()",
+          "status": "passed"
+        },
+        {
+          "name": "mixedPathsKeepLatestReplacementOrderAndDeleteReinsertState()",
+          "status": "passed"
+        },
+        {
+          "name": "largeSinglePathBurstCoalescesIntoLatestInsert()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsSseIsolationTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsSseIsolationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b9c398ee1f43efc72879aecfa0833e384fbd6667c3ccd7a3eb78fc682b4036e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "stalledSseObserverCannotOverflowTheHeadHandoffDuringTwoThousandRowBurst()",
+          "status": "passed"
+        },
+        {
+          "name": "failFastOverflowHasATypedCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsWindowFlowTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsWindowFlowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3dfff509ccba802e8c561f6b4c9bc45cab5e43eb6c88ba411dd9752fc052666e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realWorkerCarriesPresenceOnSnapshotsAndEveryStateChangingCommit()",
+          "status": "passed"
+        },
+        {
+          "name": "stalledDeliveryFailsAtBoundWithoutBlockingClaimsAndReconnectRecovers()",
+          "status": "passed"
+        },
+        {
+          "name": "writesDuringSnapshotOverflowReconnectAndReloadConverge()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RemoteIndexingJobsBridgeCapacityTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RemoteIndexingJobsBridgeCapacityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5eb743659d7730d572ef33dc11737ff0f4d6e4e0e0aa996ef2e5cefc93a25706",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "timerSaturationRetainsReconnectUntilProductionCapacityReturns()",
+          "status": "passed"
+        },
+        {
+          "name": "stoppingDuringSaturationCancelsTheRetainedReconnect()",
+          "status": "passed"
+        },
+        {
+          "name": "localQueueSaturationRetainsReconnectUntilProductionCapacityReturns()",
+          "status": "passed"
+        },
+        {
+          "name": "closedSchedulerStopsRetrying()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/IndexingJobsBridgeWiringTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/IndexingJobsBridgeWiringTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:aa5bf0120c8518a46111f84b7c9c3cb1b2d9db9d3389c27dc0c5b258ce9fc0b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "liveTerminalOutcomesOutsideWindowKeepScanAttributionWithoutSnapshotReplay()",
+          "status": "passed"
+        },
+        {
+          "name": "PENDING and PROCESSING (in-flight) emit NO ledger event",
+          "status": "passed"
+        },
+        {
+          "name": "FAILED emits one index event carrying the failure detail",
+          "status": "passed"
+        },
+        {
+          "name": "state is matched case-insensitively; null/unknown rows are safely ignored",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 812 D2 — the scan key rides the terminal event; absent stays empty",
+          "status": "passed"
+        },
+        {
+          "name": "DONE emits one index event (originator=system) with the terminal state",
+          "status": "passed"
+        },
+        {
+          "name": "terminalLedgerObserversCannotBlockJobDeliveryAndSnapshotsNeverReplayThem()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/IndexingJobsBridgeResubscribeTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/IndexingJobsBridgeResubscribeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5b348e602b662256c4d9812f3f916c0348492bfe768008a4ceac85e5ef2928d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "synchronousAdmissionAndExecutorRefusalUseTheExistingRetryPath()",
+          "status": "passed"
+        },
+        {
+          "name": "subscriptionRefusalsSurviveTheRollingBudgetAndRecoverWithoutAnotherStart()",
+          "status": "passed"
+        },
+        {
+          "name": "a permanently failing flow cools down at the rolling cap instead of spinning",
+          "status": "passed"
+        },
+        {
+          "name": "stop() ends the retry loop rather than leaving a scheduler re-subscribing",
+          "status": "passed"
+        },
+        {
+          "name": "a failed flow is re-subscribed and the listener gets a fresh snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "replacementSnapshotsResetFailureCapAndKeepAutomaticRecoveryAlive()",
+          "status": "passed"
+        },
+        {
+          "name": "asynchronousFailuresKeepOneCooldownAndStopCancelsIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/IndexingJobsRecoveryTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/IndexingJobsRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73a7cac843e2b13e807d16a942a3d3c8937cc0055915fe628965516741782a27",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "typedOverflowRecoversImmediatelyButSnapshotLoopsStayRateLimited()",
+          "status": "passed"
+        },
+        {
+          "name": "successfulSnapshotsResetTheDelayAndAttemptCount()",
+          "status": "passed"
+        },
+        {
+          "name": "firstOverflowIsImmediateEvenWithANegativeMonotonicClock()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteIndexingJobsBridgeTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteIndexingJobsBridgeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:073550ba88439b4895144bc4455967eb45c4ab29b833d962efc4424e6eb9204a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "translates delta frames into typed Insert / Update / Delete",
+          "status": "passed"
+        },
+        {
+          "name": "sustainedChurnAndReconnectConvergeToBoundedWindowWithoutPhantoms()",
+          "status": "passed"
+        },
+        {
+          "name": "post-stop frames are dropped — no listener fan-out, no state mutation",
+          "status": "passed"
+        },
+        {
+          "name": "statusCounterTracksJobsAndNotReadOnlyReattachment()",
+          "status": "passed"
+        },
+        {
+          "name": "§B.2: a deleted job is removed from latestSnapshot",
+          "status": "passed"
+        },
+        {
+          "name": "§B.2 fix-pass: latestSnapshotPair() returns a coherent (seq, items) pair",
+          "status": "passed"
+        },
+        {
+          "name": "subscribers added after start receive only subsequent deltas",
+          "status": "passed"
+        },
+        {
+          "name": "statePresenceOutsideWindowInvalidatesButHeartbeatCountsAndReconnectDoNot()",
+          "status": "passed"
+        },
+        {
+          "name": "translates snapshot frame to SnapshotReplaced delta",
+          "status": "passed"
+        },
+        {
+          "name": "completed rows leave the window and still reach live listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/StatusStateProducersTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/StatusStateProducersTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4c9be3336d9bdeafa3b2b411e109010a3b402c0864609aa7512fab6ebf0febae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexingJobCountsWithinTheSameStatesDoNotAdvanceTheCounter()",
+          "status": "passed"
+        },
+        {
+          "name": "watchedRootTimestampsDoNotAdvanceTheCounter()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/ClaimCursorInvalidationTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/ClaimCursorInvalidationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4d44b353c2ed4021fc68c59302b29a8dd39f9868f646f6ef04bc1dfdd2020f54",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "newlyReadyRowBeforeCursorIsNotSkipped()",
+          "status": "passed"
+        },
+        {
+          "name": "tiedTimestampPathChangeBeforeCursorClaimsOldestFirst()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] completion",
+          "status": "passed"
+        },
+        {
+          "name": "[2] batch",
+          "status": "passed"
+        },
+        {
+          "name": "[3] return",
+          "status": "passed"
+        },
+        {
+          "name": "reenqueueLoweringTimestampClaimsOldestFirst()",
+          "status": "passed"
+        },
+        {
+          "name": "directPendingTimestampChangeInvalidatesCursor()",
+          "status": "passed"
+        },
+        {
+          "name": "enqueueBeforeFutureCursorClaimsOldestFirst()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IndexingJobsChangeStreamLocaleTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IndexingJobsChangeStreamLocaleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:01b511d4a3a10fc3084524a45dfa46c24974c8405d36bc2220ae0cd17b935e19",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "windowSqlExecutesWhenDefaultLocaleUsesNonAsciiDigits()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IndexingJobsChangeStreamTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IndexingJobsChangeStreamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f914f858e2fbc2d89d2ab2170743c6bdca925411dc6599df28195c0c1936c0b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedRollbackAndCloseRefuseFurtherQueueUseUntilCleanup()",
+          "status": "passed"
+        },
+        {
+          "name": "projectionFailureAfterCommitDoesNotRollbackPersistedJob()",
+          "status": "passed"
+        },
+        {
+          "name": "failedRestoreAfterCommitStillProjectsTheConfirmedRow()",
+          "status": "passed"
+        },
+        {
+          "name": "errorAfterSqlWriteRollsBackWithoutAnImplicitCommit()",
+          "status": "passed"
+        },
+        {
+          "name": "rapidMutationsArriveInCausalOrderWithoutLoss()",
+          "status": "passed"
+        },
+        {
+          "name": "failedNormalCloseRefusesReopenUntilTheRetainedConnectionCloses()",
+          "status": "passed"
+        },
+        {
+          "name": "failedRollbackClosesConnectionWithoutRestoringAutoCommit()",
+          "status": "passed"
+        },
+        {
+          "name": "failedRestoreKeepsPrimaryCauseWhenASubscriberThrowsError()",
+          "status": "passed"
+        },
+        {
+          "name": "enqueueEmitsInsertDelta()",
+          "status": "passed"
+        },
+        {
+          "name": "reentrantSubscribeAndWritesConvergeWithoutReplayingEarlierCommit()",
+          "status": "passed"
+        },
+        {
+          "name": "changeStreamIsAttachedAfterOpen()",
+          "status": "passed"
+        },
+        {
+          "name": "scanIdRoundTripsFromEnqueueToDelta()",
+          "status": "passed"
+        },
+        {
+          "name": "markDoneEmitsUpdateDelta()",
+          "status": "passed"
+        },
+        {
+          "name": "replacementEnqueuesRetainOnlyLiveRowIdsAndCleanupReleasesThem()",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotCapturesPriorState()",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotKeepsAllProcessingAndOnlyNewestTwoHundredFailures()",
+          "status": "passed"
+        },
+        {
+          "name": "distinctFailureChurnDoesNotRegrowTheIdentityCache()",
+          "status": "passed"
+        },
+        {
+          "name": "unknownDeletesCoalesceAndRollbackDoesNotResync()",
+          "status": "passed"
+        },
+        {
+          "name": "cancellationNeverWaitsForTheQueueWriterLock()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IndexingJobsStatePresenceTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IndexingJobsStatePresenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e8d271ab7cdcebdf6a50010a97c0cdba75c462ba71034ebaa4314179a1dc76ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "presenceOutsideWindowTracksTransitionsReplacementRollbackAndReconnect()",
+          "status": "passed"
+        },
+        {
+          "name": "presenceReadIsAnIndexedSearchForEveryState()",
+          "status": "passed"
+        },
+        {
+          "name": "commitReadsOnlyDepartedStatesAndKeepsTrackingConnectionLocal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7a2bb2c0be22cc5e2a4a819b5c94f71a68c2c49d9caf35134185f059a87b81e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedV23MigrationRollsBackTableTriggersIndexesCountsAndVersion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsReplaceTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsReplaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a191d4023fca0ebf3abc2990c72b385ded4610db543e8bc5b5d2f17133ed8304",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reopenRepairsUnmanagedWriterDriftOnceWithoutChangingRows()",
+          "status": "passed"
+        },
+        {
+          "name": "plainSqlReplaceKeepsCountsAndBytesExactWithoutReopen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:28d39591a1a90745a9f1448e9fffbd9ca70dbafee7da4a888a8c93deda22fe36",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "randomOperationsPreserveExactCountsBytesAndSavedRows()",
+          "status": "passed"
+        },
+        {
+          "name": "reAdmissionResetsOnlyTheFieldsFormerReplaceReset()",
+          "status": "passed"
+        },
+        {
+          "name": "reopenRepairsCountDriftWithoutChangingJobs()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueryPlansTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueryPlansTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:59e21f5734814dcdb2e8149cba054be9604925db20afe178a7836d567c439ca9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyStatusReadAndBothClaimSourcesSearchIndexesWithoutScanningJobs()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:972dfa681f619f2472e7c0821a6b0abbd8be28d5492086ec9e56fb0d5d1f4471",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "v10ToV11FailureRollsBackTheIdentityTableAndVersion()",
+          "status": "passed"
+        },
+        {
+          "name": "v14ToCurrentPreservesRowsAndMatchesFreshSchema()",
+          "status": "passed"
+        },
+        {
+          "name": "freshDatabaseCreatedAtTargetVersion()",
+          "status": "passed"
+        },
+        {
+          "name": "unversionedDbWithCollectionMigratesToV5WithoutDuplicateColumnFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "migratesV1ToV2Successfully()",
+          "status": "passed"
+        },
+        {
+          "name": "migratesV10ToV11WithPathFreeIdentitySchemaAndPreservesJobs()",
+          "status": "passed"
+        },
+        {
+          "name": "versionWriteFailureCannotCommitDdlWithoutItsVersion()",
+          "status": "passed"
+        },
+        {
+          "name": "failedOpenClosesItsConnectionAndCanRetryWithoutExplicitClose()",
+          "status": "passed"
+        },
+        {
+          "name": "migratesV4ToV5AddsIngestionOutcomeColumns()",
+          "status": "passed"
+        },
+        {
+          "name": "v19FailureRollsBackCaptureColumnsSelectionAndVersion()",
+          "status": "passed"
+        },
+        {
+          "name": "v18CaptureUpgradePreservesStreamingReceiptAndLegacyRows()",
+          "status": "passed"
+        },
+        {
+          "name": "futureSchemaIsRefusedBeforeDdlAndDatabaseBytesRemainUnchanged()",
+          "status": "passed"
+        },
+        {
+          "name": "uncheckedMigrationFailureAlsoRollsBackDdlAndVersion()",
+          "status": "passed"
+        },
+        {
+          "name": "currentVersionPrivacyRepairClosesRatherThanCommittingAfterRollbackFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "migratesV5ToV6AddsIngestionLedger()",
+          "status": "passed"
+        },
+        {
+          "name": "futureVersionInWalIsRefusedBeforeWritableOpen()",
+          "status": "passed"
+        },
+        {
+          "name": "upgradesLegacyDatabaseWithoutVersioning()",
+          "status": "passed"
+        },
+        {
+          "name": "failedBackupPreservesLiveDatabaseAndCompletedBackup()",
+          "status": "passed"
+        },
+        {
+          "name": "migratesV12ToV13AddingDeletedAtWithoutDisturbingExistingIdentityRows()",
+          "status": "passed"
+        },
+        {
+          "name": "migrationFailureRollsBack()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "migratesV7ThroughV10AddingSizeBytesScanIdAndFirstFailedAtAndPreservingRows()",
+          "status": "passed"
+        },
+        {
+          "name": "v19SwitchBufferRowsAcquireDurableOrderBeforeFurtherAdmissions()",
+          "status": "passed"
+        },
+        {
+          "name": "migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion()",
+          "status": "passed"
+        },
+        {
+          "name": "v14ToV15DdlFailureRollsBackColumnAndVersion()",
+          "status": "passed"
+        },
+        {
+          "name": "v11ToV12FailureRollsBackTheImportTableAndVersion()",
+          "status": "passed"
+        },
+        {
+          "name": "v12ToV13FailureRollsBackTheColumnAndVersion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobReadinessAndClaimTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobReadinessAndClaimTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:36733c07340ad388e94e4d098c92b20b706e615304f77ed8cb2cc670a540c78c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "skipBudgetAdvancesWithoutClaimingDeniedRowsAndStopsAtWrap()",
+          "status": "passed"
+        },
+        {
+          "name": "refillingDeniedSourcePrecedesTheOtherSourcesLookahead()",
+          "status": "passed"
+        },
+        {
+          "name": "elapsedRetryDeadlineChangesCountsProbeAndClaimsWithoutAWrite()",
+          "status": "passed"
+        },
+        {
+          "name": "walkProgressChangeRestartsCursorAndAuthorityStillDecides()",
+          "status": "passed"
+        },
+        {
+          "name": "walkPreconditionReuseNeverCachesAuthorityDecisions()",
+          "status": "passed"
+        },
+        {
+          "name": "readyAndDueSourcesMergeByTimeThenBinaryPath()",
+          "status": "passed"
+        },
+        {
+          "name": "reentrantProgressChangeInvalidatesWalkPreconditionWithinThePoll()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueProjectionCommitTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueProjectionCommitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3b5adc71875fed7d3949200d1a85b65f5f5a1276cf47b851f6861c0cd344b32b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrentSnapshotWaitsForConnectionOwner()",
+          "status": "passed"
+        },
+        {
+          "name": "rollbackDropsProvisionalDeltasButPreservesEarlierCommittedChunks()",
+          "status": "passed"
+        },
+        {
+          "name": "reentrantMutationDeliversOriginalBatchToEverySubscriberFirst()",
+          "status": "passed"
+        },
+        {
+          "name": "subscriberClaimSurvivesEnqueueAndCompletionBookkeeping()",
+          "status": "passed"
+        },
+        {
+          "name": "reentrantSnapshotExcludesAlreadyCommittedQueuedDeltas()",
+          "status": "passed"
+        },
+        {
+          "name": "independentConnectionSeesCommittedStateBeforeSubscriberRuns()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SqliteJobQueueConformanceTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SqliteJobQueueConformanceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:45e03707a5515df502e621069db8744fa2d499b74070c01af477fc96b7b65df9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "countAndStreamAgreeAcrossTransitions()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8ac073c1e45304bed8c973431be49bc444935b190b3592c356c274293e0b38f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders shows a placeholder when resource-id is unknown",
+          "status": "passed"
+        },
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders shows a placeholder when resource-id is empty",
+          "status": "passed"
+        },
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders renders header with localized label key when resource is found",
+          "status": "passed"
+        },
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders exposes connectionState as reactive property",
+          "status": "passed"
+        },
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders prefixes SSE resource endpoints with api-base",
+          "status": "passed"
+        },
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders waits for catalog arrival when mounted before boot completes (slice 3a.2 §B.B.E.1)",
+          "status": "passed"
+        },
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders errors immediately when catalog is populated but id is missing",
+          "status": "passed"
+        },
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders 727 F-4 — opens the api-base-prefixed EventSource for an operation-history-shaped resource",
+          "status": "passed"
+        },
+        {
+          "name": "Q14 — indexing Resource window and queue totals names the bounded window and reads totals outside it from status",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts",
+      "file": "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:baa028c9a41f0767f1213135bea693971bf89cac19f51695d0943f27835ec64c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "resolvePathLazy returns null for unknown resource",
+          "status": "passed"
+        },
+        {
+          "name": "resolvePathLazy returns null for resource with NO_PATHS privacy",
+          "status": "passed"
+        },
+        {
+          "name": "resolvePathLazy returns null for resource missing resolver",
+          "status": "passed"
+        },
+        {
+          "name": "resolvePathLazy memoizes seeded resolutions without HTTP",
+          "status": "passed"
+        },
+        {
+          "name": "resolvePathLazy hydrates a core label through the observation read with the scoped pathHash",
+          "status": "passed"
+        },
+        {
+          "name": "resolvePathLazy returns null on resolver \"found: false\"",
+          "status": "passed"
+        },
+        {
+          "name": "resolvePathLazy memoizes after first successful resolution",
+          "status": "passed"
+        },
+        {
+          "name": "resolvePathLazy does NOT memoize a failed invocation — a later call retries and can succeed",
+          "status": "passed"
+        },
+        {
+          "name": "resolvePathLazy memoizes a definitive \"found: false\"",
+          "status": "passed"
+        },
+        {
+          "name": "bounds the label cache over a long run, retaining recent Windows and UNC identities",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingQueueCounts.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/indexingQueueCounts.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3a403ea9d58ab6bcd74388075a4c26a1623448426d87102ce08ef0c241d04c81",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "does not certify the hard-zero fallback as an empty queue (UNAVAILABLE)",
+          "status": "passed"
+        },
+        {
+          "name": "does not certify the hard-zero fallback as an empty queue (NOT_STARTED)",
+          "status": "passed"
+        },
+        {
+          "name": "does not certify the hard-zero fallback as an empty queue (DEGRADED)",
+          "status": "passed"
+        },
+        {
+          "name": "does not certify the hard-zero fallback as an empty queue (undefined)",
+          "status": "passed"
+        },
+        {
+          "name": "whole queue counts from a reported worker keeps real counts independent of the window",
+          "status": "passed"
+        },
+        {
+          "name": "whole queue counts from a reported worker does not turn missing aggregates into zeros",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/strategies/indexingJobsWindow.test.ts",
+      "file": "modules/ui-web/src/shell-v0/strategies/indexingJobsWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:87d78e29d0370156ff1b1c9deff0c0eecc580dcc4cdf90e47f8cad103558131c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexing-jobs bounded browser window live deltas and a reload of the same final queue converge, including retry and eviction",
+          "status": "passed"
+        },
+        {
+          "name": "indexing-jobs bounded browser window keeps every processing row, evicts the oldest snapshot failure, and replaces on resync",
+          "status": "passed"
+        },
+        {
+          "name": "indexing-jobs bounded browser window restores failure age from a head snapshot whose row insertion order is mixed",
+          "status": "passed"
+        },
+        {
+          "name": "indexing-jobs bounded browser window leaves other tabular resources unfiltered and uncapped",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/strategies/subscriptionStrategy.test.ts",
+      "file": "modules/ui-web/src/shell-v0/strategies/subscriptionStrategy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:963bf5e8e9ac66c11b28140c1805a82fa2d6997cbb87a23483c60c9222d252a8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "subscription strategy registry lookup returns a strategy for each (Category × SSE_STREAM) covered",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry lookup returns null for unsupported combos",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry lookup TABULAR strategy throws when primaryKey is blank",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry STATE × SSE_STREAM snapshot sets value",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry STATE × SSE_STREAM UPDATE replaces value",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry STATE × SSE_STREAM reset clears value",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry EVENT_STREAM × SSE_STREAM snapshot sets entries; UPDATE appends",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry EVENT_STREAM × SSE_STREAM declared primaryKey deduplicates snapshot/live rows and keeps distinct invocations",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry EVENT_STREAM × SSE_STREAM declared primaryKey still appends rows without usable identities independently",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry EVENT_STREAM × SSE_STREAM keeps scalar identities distinct and does not coerce non-scalars into one key",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry EVENT_STREAM × SSE_STREAM declared primaryKey keeps its bounded 200-entry tail",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry EVENT_STREAM × SSE_STREAM cap-bounded ring evicts oldest",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry HISTORY × SSE_STREAM snapshot+UPDATE matches the slice 444b OperationHistory shape",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry HISTORY × SSE_STREAM uses the declared primaryKey for snapshot/update convergence",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry TABULAR × SSE_STREAM snapshot loads items keyed by primaryKey",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry TABULAR × SSE_STREAM Insert/Update upserts by primaryKey (slice 445 wire shape)",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry TABULAR × SSE_STREAM Delete removes by primaryKey value in payload",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry TABULAR × SSE_STREAM SnapshotReplaced clears and reloads",
+          "status": "passed"
+        },
+        {
+          "name": "subscription strategy registry catalog version tracking every reducer call advances catalogVersion",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts",
+      "file": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:599936d0f5e7639100008aa93b4eff161209a465071a16bebd05459414e95825",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) PENDING belongs to the aggregate queued entry, with no per-file task",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a PROCESSING job with a FRESH heartbeat → running (575 §14 live owner)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a PROCESSING job with a STALE heartbeat → queued, NOT running (575 §14)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a DONE job → vanishes from the live rail (success is history, not work)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a FAILED job → failed Task",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a RETRY_EXHAUSTED job → failed Task (not the unknown-state fallback), labelled as giving up",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a plain FAILED job keeps the \"Indexing ·\" label — the verb only changes for the exhausted case",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a job that leaves the live set → REMOVED (not marked succeeded)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a present FAILED job stays a single failed task across frames; departs → removed",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a running job that transitions to FAILED → failed (no duplicate task)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) 1A: reset (empty) then re-appear → running again, NOT stuck terminal",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) 1B: reconciles against pre-existing substrate job-tasks (remount-safe)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) an in-place FAILED → PENDING retry leaves the per-file window for the queued aggregate",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) does not touch non-job tasks (idxjob: prefix scoping)",
+          "status": "passed"
+        },
+        {
+          "name": "602 R5 — resolved file/folder labels (Tasks tray) resolves a job pathHash to a friendly \"parent/file\" label, relabelling in place",
+          "status": "passed"
+        },
+        {
+          "name": "602 R5 — resolved file/folder labels (Tasks tray) keeps the short-hash fallback when the hash cannot be resolved (found:false)",
+          "status": "passed"
+        },
+        {
+          "name": "602 R5 — resolved file/folder labels (Tasks tray) a bare filename (no parent folder) resolves to just the file name",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — startIndexingJobsBridge (stream → reducer → tasks) projects a snapshot, removes on delete, and survives a reset cycle",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — startIndexingJobsBridge (stream → reducer → tasks) residue #3 — bridge + a second consumer of the same URL share ONE pooled EventSource",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — startIndexingJobsBridge (stream → reducer → tasks) 575 §14: the re-eval tick demotes a job whose heartbeat goes stale (no new frame)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — startIndexingJobsBridge (stream → reducer → tasks) is a headless no-op when EventSource is unavailable and no factory given",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — startIndexingJobsBridge (stream → reducer → tasks) tempdoc 662 — multiplexed path subscribes on the shared multiplexer instead of opening its own EventSource",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — startIndexingJobsBridge (stream → reducer → tasks) tempdoc 662 — multiplexed path ignores a frame for a different streamId on the same multiplexed connection",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts",
+      "file": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:01ee8919603f5e037221ff4ce555e09642b04664c2c5d9fc6f58a11e1865c7f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "standalone million-row rail shows one real queued count, retry until claim, liveness, both failures, DONE, cancel and resync",
+          "status": "passed"
+        },
+        {
+          "name": "multiplexed million-row rail shows one real queued count, retry until claim, liveness, both failures, DONE, cancel and resync",
+          "status": "passed"
+        },
+        {
+          "name": "bounds outstanding label requests and ignores late results for departed window rows",
+          "status": "passed"
+        },
+        {
+          "name": "does not retain resolved labels for every file visited over a long run",
+          "status": "passed"
+        },
+        {
+          "name": "renders only eight file tasks at 700k queued, with at most window plus concurrency label requests",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingJobsSubstrateIntegrationTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingJobsSubstrateIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ebabecd814560925fbb7f4dca316d316333fde6585badea4b0ea69a005f4cc51",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "operations dispatch: cancel/retry/resolve through CoreOperationCatalog handlers",
+          "status": "passed"
+        },
+        {
+          "name": "delete delta: SSE forwards the path-hash-only Delete envelope",
+          "status": "passed"
+        },
+        {
+          "name": "end-to-end: stub frames → bridge → registry → SSE controller → SseClient",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopClaimBudgetTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopClaimBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9ff11d9141f57a1e14c50353e3aa18982598ab0cfb494e9312f8e79e32259db1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "budgetStoppedEmptyBatchPollsAgainBeforeAnyIdleWork()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/IndexingJobsSnapshotOrderTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/IndexingJobsSnapshotOrderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:733dbd859594c8d19a128979e2c01088ce1583f0b6899e9e90058e18492b8636",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "presenceMetadataUsesExistingFramesAndDistinguishesEmptyFromUnchanged()",
+          "status": "passed"
+        },
+        {
+          "name": "fullInitialHandoffIsDeliveredWithoutOverflow()",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotPrecedesDeltasAlreadyDeliveredDuringRegistration()",
+          "status": "passed"
+        },
+        {
+          "name": "callbackThreadCanFinishBeforeSubscribeReturnsWithoutLockInversion()",
+          "status": "passed"
+        },
+        {
+          "name": "bufferedDeltaSinkFailureClosesAndDiscardsTheRemainingBuffer()",
+          "status": "passed"
+        },
+        {
+          "name": "resyncIsASnapshotAndRetainsCausalOrderWithoutReplayingTerminalDeltas()",
+          "status": "passed"
+        },
+        {
+          "name": "initialHandoffOverflowClosesAndFailsInsteadOfDropping()",
+          "status": "passed"
+        },
+        {
+          "name": "reentrantSnapshotSinkCannotOvertakeBufferedDeltas()",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotSinkFailureClosesWithoutFlushingBufferedDeltas()",
+          "status": "passed"
+        },
+        {
+          "name": "cancellationFromSnapshotSinkPreventsBufferedDelivery()",
+          "status": "passed"
+        },
+        {
+          "name": "cancellationBeforeSubscriptionReturnClosesTheLateHandle()",
+          "status": "passed"
+        },
+        {
+          "name": "overflowDuringSnapshotEmissionFailsThePartiallyOpenedStream()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5867b404d52643e534cbc9618da45d40bc4d68c691307446a5bc92189b1f7412"
+}

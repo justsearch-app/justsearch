@@ -66,10 +66,8 @@ export async function invokeOperatorConfirmed(context, operationId, body, timeou
 export async function requestLive(context, endpoint, body, timeoutMs = 3000) {
   const url = `http://127.0.0.1:33221${endpoint}`;
   const headers = { Host: '127.0.0.1:33221' };
-  if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    if (context.token) headers['X-JustSearch-Session'] = context.token;
-  }
+  if (context.token) headers['X-JustSearch-Session'] = context.token;
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
   const row = { requestId: context.collectorRequestSequence = (context.collectorRequestSequence ?? 0) + 1,
     endpoint, atMs: Date.now(), requestTimeoutMs: timeoutMs };
   const append = event => {
@@ -566,7 +564,7 @@ export async function crashExperiment(context) {
     const manifest = await requestLive(context, '/api/runtime/manifest');
     if (!manifest?.instanceId) throw new Error('Runtime manifest unavailable (E5 successor API): instance required');
     if (r.arm === 'branch' && manifest.instanceId === cut.instanceId) return null;
-    context.token = (await requestLive(context, '/api/mcp/token')).token ?? null;
+    context.token = json(path.join(context.dataDir, 'runtime/manifest.json'))?.head?.sessionToken ?? null;
     return manifest;
   });
   timeline.apiMs = Date.now();
@@ -687,7 +685,7 @@ export async function childPathExperiment(context, reason) {
       await collector.sample();
       requireCollectorSample(collector, 'E5 child restart');
       if (r.arm === 'main' && !collector.current.some(p => p.role === 'worker' && keyOf(p) !== keyOf(initialWorker))) return null;
-      context.token = (await requestLive(context, '/api/mcp/token')).token ?? null;
+      context.token = json(path.join(context.dataDir, 'runtime/manifest.json'))?.head?.sessionToken ?? null;
       await requestLive(context, '/api/health'); return true;
     });
     const engineReadyMs = Date.now();
@@ -870,7 +868,7 @@ export async function hangExperiment(context, command) {
       const manifest = await requestLive(context, '/api/runtime/manifest');
       if (!manifest?.instanceId) throw new Error('Runtime manifest unavailable (E6 successor API): instance required');
       if (r.arm === 'branch' && manifest.instanceId === initialInstance) return null;
-      context.token = (await requestLive(context, '/api/mcp/token')).token ?? null;
+      context.token = json(path.join(context.dataDir, 'runtime/manifest.json'))?.head?.sessionToken ?? null;
       await requestLive(context, '/api/health');
       evidence.apiRestoredAtMs ??= Date.now();
       await requestLive(context, '/api/knowledge/search', { query: 'capybara', limit: 1, mode: 'text', pipeline: { sparseEnabled: true } }); return manifest;

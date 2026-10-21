@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { classifyDiff, classifyPaths, LANES } from './classify-changes.mjs';
 const selected = (paths) => Object.entries(classifyPaths(paths)).filter(([, value]) => value).map(([lane]) => lane);
 const all = (value) => assert.deepEqual(value, Object.fromEntries(LANES.map((lane) => [lane, true])));
@@ -20,6 +21,7 @@ for (const [path, lanes] of [
   ['gradle.properties', ['license']],
   ['scripts/codegen/license-overrides.json', ['license']],
   ['modules/app-services/src/test/resources/policy/app-update-policy-cases.json', ['rust', 'services', 'ui', 'platform', 'windows', 'search', 'lifecycle']],
+  ['modules/app-services/src/test/resources/io/justsearch/app/services/diagnostics/hotspot-fatal-headers/native-oom.txt', ['rust', 'devrunner', 'services']],
   ['gates/config-surface/sysaccess-allowlist.txt', ['platform']],
   ['modules/core/src/testFixtures/java/Shared.java', ['ui', 'services', 'search', 'platform', 'windows', 'lifecycle']],
   ['modules/configuration/src/main/java/Config.java', ['ui', 'services', 'search', 'platform', 'windows', 'lifecycle']],
@@ -67,7 +69,7 @@ for (const path of [
 // Read-only drift check: a literal path/folder in a lane's tests is a conservative
 // consumer edge. Expand folders over tracked files so adding a new reader or file
 // cannot quietly weaken the classifier. Runtime opens are audited separately.
-test('tracked repository paths named by Java and Node tests select their readers', () => {
+test('tracked repository paths named by Java, Node and Rust tests select their readers', () => {
   const tracked = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }).split('\0').filter(Boolean);
   const present = new Set(tracked);
   const folders = new Map();
@@ -93,6 +95,7 @@ test('tracked repository paths named by Java and Node tests select their readers
     }
   }
   for (const source of tracked) {
+    if (/^modules\/shell\/src-tauri\/.*\.rs$/.test(source)) add(source, 'rust');
     if (/^scripts\/dev\/test-dev-runner-.*\.mjs$/.test(source)) add(source, 'devrunner');
     if (/^scripts\/lib\/.*\.test\.mjs$/.test(source)) { add(source, 'devrunner'); add(source, 'windows'); }
     if (/^scripts\/supervisor-conformance\/.*\.mjs$/.test(source)) { add(source, 'devrunner'); add(source, 'rust'); }
@@ -109,9 +112,19 @@ test('tracked repository paths named by Java and Node tests select their readers
       // construction, file reads, and named path constants; bare root markers
       // locate the checkout rather than consuming every file below that marker.
       const prefix = text.slice(Math.max(0, match.index - 180), match.index);
-      const pathUse = /(?:\b(?:resolve|join|readFileSync|readFile|readAllLines|readString|URL|Path.of|Paths.get)\([^;{}\n]*|\b[A-Z][A-Z_0-9]*\s*=\s*)$/.test(prefix);
+      const pathUse = /(?:\b(?:resolve|join|readFileSync|readFile|readAllLines|readString|read_to_string|copyFileSync|URL|Path.of|Paths.get|include_str!|include_bytes!)\([^;{}\n]*|\b[A-Z][A-Z_0-9]*\s*=\s*)$/.test(prefix)
+        // Across lines, stop at a closed call so an earlier assertion argument
+        // cannot make a fixture string in a following argument look like a read.
+        || /\b(?:resolve|join|readFileSync|readFile|readAllLines|readString|read_to_string|copyFileSync|URL|Path.of|Paths.get|include_str!|include_bytes!)\([^;{})]*$/.test(prefix);
       if (!pathUse) continue;
-      const literal = (match[1] ?? match[2] ?? match[3]).replaceAll('\\', '/').replace(/\/$/, '');
+      let literal = (match[1] ?? match[2] ?? match[3]).replaceAll('\\', '/').replace(/\/$/, '');
+      if (/^\.\.?\//.test(literal)) {
+        if (/\b(?:URL|include_str!|include_bytes!)\($/.test(prefix)) {
+          literal = path.posix.normalize(path.posix.join(path.posix.dirname(source), literal));
+        } else if (source.endsWith('.rs') && prefix.includes('CARGO_MANIFEST_DIR')) {
+          literal = path.posix.normalize(path.posix.join('modules/shell/src-tauri', literal));
+        }
+      }
       if (!literal.includes('/') && folders.has(literal)) continue;
       if (!literal.includes('/') && /assert(?:True|False|Equals)/.test(prefix)) continue;
       const files = present.has(literal) ? [literal] : folders.get(literal);

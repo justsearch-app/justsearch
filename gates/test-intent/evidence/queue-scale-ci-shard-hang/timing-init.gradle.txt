@@ -1,0 +1,36 @@
+allprojects {
+  tasks.withType(org.gradle.api.tasks.testing.Test).configureEach { t ->
+    def ciEnv = new HashMap(t.environment)
+    ciEnv.remove('JUSTSEARCH_SERVER_EXE')
+    ciEnv.remove('JUSTSEARCH_GPU_ENABLED')
+    t.setEnvironment(ciEnv)
+    def fixtureTmp = '/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/qh'
+    systemProperty 'java.io.tmpdir', fixtureTmp
+    environment 'TMPDIR', fixtureTmp
+    if (project.name == 'app-services') {
+      systemProperty 'user.home', new File(fixtureTmp, 'user-home').absolutePath
+      def isolatedEnv = new HashMap(t.environment)
+      isolatedEnv.remove('JUSTSEARCH_HOME')
+      isolatedEnv.remove('JUSTSEARCH_DATA_DIR')
+      t.setEnvironment(isolatedEnv)
+    }
+    if (project.name == 'app-launcher') {
+      def isolatedEnv = new HashMap(t.environment)
+      isolatedEnv.remove('JUSTSEARCH_HOME')
+      isolatedEnv.remove('JUSTSEARCH_DATA_DIR')
+      t.setEnvironment(isolatedEnv)
+    }
+    def eventLog = new File(System.getenv('QUEUE_HANG_EVENTS'), project.name + '.jsonl')
+    def taskLabel = t.path
+    t.doFirst { eventLog.parentFile.mkdirs(); eventLog.append(groovy.json.JsonOutput.toJson([event:'task-start', task:taskLabel, time:System.currentTimeMillis()]) + '\n') }
+    t.addTestListener(new org.gradle.api.tasks.testing.TestListener() {
+      synchronized void record(Map event) { eventLog.append(groovy.json.JsonOutput.toJson(event) + '\n') }
+      void beforeSuite(org.gradle.api.tasks.testing.TestDescriptor d) { }
+      void afterSuite(org.gradle.api.tasks.testing.TestDescriptor d, org.gradle.api.tasks.testing.TestResult r) {
+        if (d.parent == null) record([event:'task-end', task:taskLabel, time:System.currentTimeMillis(), durationMs:r.endTime-r.startTime, tests:r.testCount, failed:r.failedTestCount, skipped:r.skippedTestCount])
+      }
+      void beforeTest(org.gradle.api.tasks.testing.TestDescriptor d) { record([event:'start', task:taskLabel, cls:d.className, name:d.name, time:System.currentTimeMillis()]) }
+      void afterTest(org.gradle.api.tasks.testing.TestDescriptor d, org.gradle.api.tasks.testing.TestResult r) { record([event:'end', task:taskLabel, cls:d.className, name:d.name, time:System.currentTimeMillis(), durationMs:r.endTime-r.startTime, result:r.resultType.toString()]) }
+    })
+  }
+}

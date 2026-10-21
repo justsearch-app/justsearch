@@ -1,0 +1,15 @@
+--- a/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerChangeRegistry.java
++++ b/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerChangeRegistry.java
+@@ -44,7 +44,11 @@
+   }
+ 
+   public ActionLedgerChangeRegistry(ActionEventJournal journal) {
+-    this.channel = new SseStreamChannel(STREAM_ID);
++    this(journal, new SseStreamChannel(STREAM_ID));
++  }
++  // Evidence-only constructor injection; baseline synchronous broadcasting is unchanged.
++  public ActionLedgerChangeRegistry(ActionEventJournal journal, SseStreamChannel channel) {
++    this.channel = Objects.requireNonNull(channel, "channel");
+     this.journal = Objects.requireNonNull(journal, "journal");
+   }
+ 

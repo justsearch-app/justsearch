@@ -1,0 +1,139 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T04:02:15.592Z",
+  "revision": "b3e8d63d4869cc506cf965d302649c106f0344d8",
+  "tree": "f48c1e18f8db028ce07c2517666711bc1880e978",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.themeContrast.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-library-actions/tmp/wp3.4-repair/test-intent-vitest-2871457-1792555330967.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1628
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d7d96cbe3c5ea1ab3c307bb9eaa93d72198cf404ba9b257feab143d7367ff9ef",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps a refused Add draft reachable and allows correction and retry",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (inside) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (containing) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "submits Add once while waiting and announces its outcome",
+          "status": "passed"
+        },
+        {
+          "name": "a cancelled native picker leaves a closed form and an existing draft unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "exposes row removal progress, suppresses repeats and keeps the other row usable",
+          "status": "passed"
+        },
+        {
+          "name": "a refused removal retains the row, explains retry without a live-watch claim, and retries",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (NETWORK_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (SERIALIZATION_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (HANDLER_FAILURE)",
+          "status": "passed"
+        },
+        {
+          "name": "ignores an old removal response after returning and reads the current roots",
+          "status": "passed"
+        },
+        {
+          "name": "names legacy inner folders and ancestor coverage in Remove confirmations",
+          "status": "passed"
+        },
+        {
+          "name": "distinguishes accepted reindex from the recorded completion and failure",
+          "status": "passed"
+        },
+        {
+          "name": "explains an empty reindex scope and offline folders without claiming a full reindex",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.themeContrast.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.themeContrast.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1d71c5a7b7befb44a42ca818136b21883f67ee32f6b4123fce7bd8cf3a827e38",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps Library primary-button ink legible when Follow OS changes light and dark",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2d3faef2d",
+    "revision": "2d3faef2d3b51873a0f405989d5ff3f2e201e56b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.themeContrast.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-library-actions/tmp/wp3.4-repair/test-intent-vitest-2871457-1792555333894.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1404,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-library-actions/tmp/wp3.4-repair/test-intent-vitest-2871457-1792555333894.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+        "classification": "assertion",
+        "detail": "keeps a refused Add draft reachable and allows correction and retry:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-library-actions/tmp/wp3.4-repair/test-intent-before-6MallS/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:62:30\n    at processTicksAndRejections (node:inte | explains a preview overlap (inside) and blocks click and Enter before Add:  AssertionError: expected '\\n    \\n   Folder found ·"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.themeContrast.test.ts",
+        "classification": "assertion",
+        "detail": "keeps Library primary-button ink legible when Follow OS changes light and dark:  AssertionError: Library primary ink after OS switched to dark: expected 1.6062363727724576 to be greater than or equal to 4.5\n    at assertContrast (/home/elias/dev/justsearch/.claude/worktrees/uiux-library-actions/tmp/wp3.4-repair/test-intent-before-6MallS/modules/ui-web/src/shell-v0/views/LibraryS"
+      }
+    ]
+  },
+  "digest": "sha256:35ac5b02e18b9adfb4a89f01fbb2c039fbdd3571468ac9c98ec60231121ee0c1"
+}

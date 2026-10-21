@@ -104,6 +104,9 @@ public final class AddWatchedRootHandler implements OperationHandler {
       indexing.addWatchedRoot(collection, p, engineContext);
       return OperationResult.success(
           "Added watched root " + p, Map.of("path", p.toString(), "collection", collection));
+    } catch (IllegalArgumentException e) {
+      return OperationResult.failure(e.getMessage(),
+          io.justsearch.app.api.ApiErrorCode.INVALID_REQUEST.name(), Map.of(), false);
     } catch (Exception e) {
       io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("AddWatchedRootHandler: addWatchedRoot threw", e);

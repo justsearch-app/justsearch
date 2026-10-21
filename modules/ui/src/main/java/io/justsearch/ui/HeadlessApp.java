@@ -536,7 +536,7 @@ public class HeadlessApp {
       constructedApi = apiServer;
       int port = apiServer.getPort();
 
-      emitPortSignals(port, sessionToken, prodMode);
+      emitPortSignals(port);
 
       return new ApiPhaseResult(bootstrap, apiServer, port, sessionToken);
     } catch (Exception | Error failure) {
@@ -573,8 +573,7 @@ public class HeadlessApp {
   }
 
   @SuppressWarnings("PMD.SystemPrintln")
-  private static void emitPortSignals(
-      int port, String sessionToken, boolean prodMode) {
+  private static void emitPortSignals(int port) {
     // Tempdoc 501 Phase 18: the api-port.txt mirror is gone. The full runtime
     // manifest at <dataDir>/runtime/manifest.json (written by RuntimeManifestPublisher)
     // is now the canonical filesystem transport. Every known consumer
@@ -584,17 +583,6 @@ public class HeadlessApp {
     // The stdout JUSTSEARCH_API_PORT=<port> line below remains as human-readable
     // log output; no tool parses it for discovery (Phase 8 removed the parse-to-
     // state paths from the Tauri shell and dev-runner).
-    log.info(
-        "Preparing stdout signals: prodMode={}, tokenGenerated={}", prodMode, sessionToken != null);
-    if (sessionToken != null) {
-      System.out.println("JUSTSEARCH_SESSION_TOKEN=" + sessionToken);
-      System.out.flush();
-      log.debug("Session token printed to stdout (length={})", sessionToken.length());
-    } else {
-      // Dev mode only: prod mode with no token is refused at ApiSecurityFilters construction
-      // (tempdoc 884 item 23), so the Head never reaches this line with prodMode=true.
-      log.debug("No session token (dev mode); token enforcement is not installed.");
-    }
     System.out.println("JUSTSEARCH_API_PORT=" + port);
     System.out.flush();
   }
@@ -891,9 +879,10 @@ public class HeadlessApp {
     // Policy discovery mirrors its effective flags into the resolver's process sources.
     // A later settings candidate must not mistake that boot publication for an encoder change.
     try {
-      new EnterprisePolicyServiceImpl().snapshot();
-    } catch (Exception ignored) {
-      // best-effort; policy loading itself fails closed where required.
+      java.util.Objects.requireNonNull(new EnterprisePolicyServiceImpl().snapshot());
+    } catch (Exception failure) {
+      log.warn("Boot policy load failed; GPU acceleration disabled", failure);
+      SystemAccess.setSysProp("policy.gpu_acceleration_enabled", "false");
     }
   }
 
@@ -1010,6 +999,7 @@ public class HeadlessApp {
 
   private static void maybeMirrorOrtNativePath(ConfigStore configStore) {
     try {
+      if (configStore != null && !configStore.get().ai().gpuAccelerationAllowed()) return;
       Path home = PlatformPaths.resolveDataDir();
       if (home == null) {
         log.debug("ORT native_path mirror: data dir unresolved; skipping");
@@ -2811,6 +2801,7 @@ public class HeadlessApp {
       int gpuLayers = settings.getGpuLayers();
       ConfigStore cs = activeConfigStore != null ? activeConfigStore : ConfigStore.globalOrNull();
       if (cs != null) {
+        if (!cs.get().ai().gpuAccelerationAllowed()) return null;
         gpuLayers = cs.get().ai().gpuLayers();
       }
       if (gpuLayers <= 0) {
