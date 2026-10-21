@@ -207,6 +207,8 @@ public final class HealthyFakeLlamaServer {
   }
 
   public static void main(String[] args) throws Exception {
+    // Capture the wrapper before publishing readiness; after its exit parent() can be PID 1.
+    ProcessHandle launcher = ProcessHandle.current().parent().orElse(null);
     String home = System.getProperty(HOME_PROPERTY);
     if (home != null) {
       var self = ProcessHandle.current();
@@ -361,10 +363,10 @@ public final class HealthyFakeLlamaServer {
           StandardCharsets.US_ASCII, java.nio.file.StandardOpenOption.CREATE,
           java.nio.file.StandardOpenOption.APPEND);
     }
-    ProcessHandle launcher = ProcessHandle.current().parent().orElse(null);
     long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2);
     Path oomSignal = home == null ? null : Path.of(home, OOM_SIGNAL);
-    while (launcher != null && launcher.isAlive() && System.nanoTime() < deadline) {
+    while (launcher != null && (behaviour.contains("--ignore-parent") || launcher.isAlive())
+        && System.nanoTime() < deadline) {
       if (behaviour.contains("--oom-on-signal") && Files.deleteIfExists(oomSignal)) {
         // A KV or compute allocation that fails while serving, as b8571 reports it.
         System.out.println("CUDA error: out of memory");

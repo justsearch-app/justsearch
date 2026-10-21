@@ -271,18 +271,75 @@ final class ManagedLlamaAuthenticationTest {
   }
 
   @Test
-  void aWrapperPassesTheKeyToTheServingProcessAndStopsWithIt() throws Exception {
+  void aCooperativeWrapperDescendantExitsAndRestartAuthenticates() throws Exception {
     Assumptions.assumeFalse(System.getProperty("os.name").startsWith("Windows"),
         "explicit shell-wrapper fixture is POSIX; Windows launchers already wrap child JVMs");
     create("--require-api-key", "--wrapper");
     manager.switchToOnlineMode();
     assertWorking();
-    long serving = Long.parseLong(Files.readAllLines(tmp.resolve("fake/pids.txt")).getLast().trim());
-    assertTrue(control.list().stream().noneMatch(child -> child.pid() == serving),
-        "the fixture must serve from a descendant, not the tracked wrapper PID");
+    String first = key(0);
+    ProcessHandle serving = servingDescendant();
     manager.switchToIndexingMode();
-    assertTrue(ProcessHandle.of(serving).map(p -> !p.isAlive()).orElse(true),
-        "stopping the owned wrapper also ends its serving descendant");
+    awaitDescendantExit(serving);
+    manager.switchToOnlineMode();
+    assertWorking();
+    assertTrue(servingDescendant().isAlive());
+    String next = key(1);
+    assertFalse(first.equals(next), "the restarted wrapper gets a fresh key");
+    assertEquals(200, status(manager.servingPort(), "/props", next));
+    assertEquals(401, status(manager.servingPort(), "/props", first));
+    assertEquals(401, status(manager.servingPort(), "/props", null));
+  }
+
+  @Test
+  void aServingWrapperDescendantBlocksRestartUntilItEnds() throws Exception {
+    Assumptions.assumeFalse(System.getProperty("os.name").startsWith("Windows"),
+        "Windows ends the wrapper's job; this checks the POSIX waiting barrier");
+    create("--require-api-key", "--wrapper", "--ignore-parent");
+    manager.switchToOnlineMode();
+    assertWorking();
+    String first = key(0);
+    int firstPort = manager.servingPort();
+    ProcessHandle serving = servingDescendant();
+    manager.switchToIndexingMode();
+    assertTrue(serving.isAlive(), "this fixture deliberately outlives its wrapper");
+    assertEquals(200, status(firstPort, "/props", first));
+    assertEquals(401, status(firstPort, "/props", null));
+    var refused = assertThrows(ModeTransitionException.class, manager::switchToOnlineMode);
+    assertTrue(refused.getMessage().contains("descendant is still running"), refused::getMessage);
+    assertTrue(refused.getMessage().contains("no LLAMA_SERVER starts beside it"), refused::getMessage);
+    assertFalse(manager.isOnline());
+    assertEquals(1, HealthyFakeLlamaServer.launches(tmp.resolve("fake")).size(),
+        "refusal must not spawn a second serving process");
+    assertEquals(200, status(firstPort, "/props", first));
+
+    HealthyFakeLlamaServer.crashLatest(tmp.resolve("fake"));
+    awaitDescendantExit(serving);
+    HealthyFakeLlamaServer.install(tmp.resolve("fake"), "--require-api-key", "--wrapper");
+    int nextLaunch = launches.size();
+    manager.switchToOnlineMode();
+    assertWorking();
+    String next = key(nextLaunch);
+    assertFalse(first.equals(next), "the admitted restart gets a fresh key");
+    assertTrue(servingDescendant().isAlive());
+    assertEquals(2, HealthyFakeLlamaServer.launches(tmp.resolve("fake")).size());
+    assertEquals(200, status(manager.servingPort(), "/props", next));
+    assertEquals(401, status(manager.servingPort(), "/props", first));
+  }
+
+  private ProcessHandle servingDescendant() throws IOException {
+    long pid = Long.parseLong(Files.readAllLines(tmp.resolve("fake/pids.txt")).getLast().trim());
+    assertTrue(control.list().stream().noneMatch(child -> child.pid() == pid),
+        "the fixture must serve from a descendant, not the tracked wrapper PID");
+    return ProcessHandle.of(pid).orElseThrow();
+  }
+
+  private static void awaitDescendantExit(ProcessHandle serving) throws InterruptedException {
+    // The cooperative fixture polls its parent. Allow STOP_WAIT (12 s) plus a 3 s load margin;
+    // Linux does not kill descendants, so this is a fixture bound, not a termination guarantee.
+    long deadline = System.nanoTime() + Duration.ofSeconds(15).toNanos();
+    while (serving.isAlive() && System.nanoTime() < deadline) Thread.sleep(10);
+    assertFalse(serving.isAlive(), "the serving fixture must exit within the bounded wait");
   }
 
   @Test
