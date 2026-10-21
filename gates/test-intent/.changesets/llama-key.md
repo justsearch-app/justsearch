@@ -603,3 +603,14 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
   "note": "Entries 1-7 classed correctly and in scope; live Linux runs of the shipped Engine confirm K1-K4, K6 and K8 (TERM-ignoring and ignored-key descendants ended within the bound, zombie never blocks, decoy and incidental server untouched), and the six descendant-cleanup checks fail on 0109762bc by assertion and pass on the candidate."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "e2cec082-1ce6-4aee-9ea1-3bc384eb2792",
+  "verdict": "accept",
+  "digest": "sha256:7cb60c037b28e530e2af53dba14c431a4c0efb13f203d4cc031c7123709efdcc",
+  "note": "Accept: entries 1-7 are correctly classed with in-scope sources and no conflicting stronger source; on 4ee0dea2e the four changed modules' suites pass except one esbuild-environment UI failure, all new checks fail by assertion for the reason under test on 4f4e20514 and the nine cleanup checks on 0109762bc, and live Linux runs of the installed Engine confirm K1, K3, K4, K6, K8 and the zombie barrier, with the K8 message reaching the Engine log while the settings route returns only the generic preparation refusal."
+}
+```
