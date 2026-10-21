@@ -368,13 +368,15 @@ async function main() {
           console.error(
             `failed to launch producer for gate '${gate.id}' after ${elapsedMs} ms (${input.producer}): ${res.error.message}`,
           );
-          process.exit(2);
+          process.exitCode = 2;
+          return;
         }
         if (res.status !== 0) {
           console.error(
             `producer exited ${res.status ?? `signal ${res.signal}`} after ${elapsedMs} ms for gate '${gate.id}': ${input.producer}`,
           );
-          process.exit(2);
+          process.exitCode = 2;
+          return;
         }
         console.log(`produced input for gate '${gate.id}' in ${elapsedMs} ms: ${input.producer}`);
       }
@@ -421,7 +423,8 @@ async function main() {
           `shallow clone detected; gate '${gate.id}' requires full git history. ` +
             `Re-run with 'fetch-depth: 0'.`,
         );
-        process.exit(2);
+        process.exitCode = 2;
+        return;
       }
       try {
         const resolveSpec =
@@ -488,8 +491,8 @@ async function main() {
     }
   }
 
-  if (args.mode === 'gate' && anyFail) process.exit(1);
-  process.exit(0);
+  // Let piped stdout drain, including the test-intent report printed by its enforcer.
+  process.exitCode = args.mode === 'gate' && anyFail ? 1 : 0;
 }
 
 main().catch(err => {
@@ -497,5 +500,5 @@ main().catch(err => {
   if (process.env.GOVERNANCE_DEBUG === '1') {
     console.error(err.stack);
   }
-  process.exit(2);
+  process.exitCode = 2;
 });

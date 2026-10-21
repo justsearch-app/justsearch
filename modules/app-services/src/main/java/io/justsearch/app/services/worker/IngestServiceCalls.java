@@ -99,6 +99,8 @@ public interface IngestServiceCalls {
    */
   boolean releaseVduProcessing(String docId);
 
+  boolean releaseVduProcessing(String docId, String attemptId);
+
   /** {@code IngestService/RecoverVduProcessing}. */
   io.justsearch.ipc.RecoverVduProcessingResponse recoverVduProcessing(io.justsearch.ipc.RecoverVduProcessingRequest request);
 

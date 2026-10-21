@@ -1159,6 +1159,7 @@ message UpdateVduResultRequest {
   string vdu_enrichment = 4;                // JSON: {summary, doc_type, entities}
   int32 page_count = 5;                     // Number of pages processed
   VduUpdateOutcome outcome = 6;             // Explicit outcome (preferred over vdu_status)
+  string attempt_id = 7;                   // Exact claim; empty legacy results cannot publish
 }
 
 message UpdateVduResultResponse {
@@ -1184,6 +1185,7 @@ message QueryPendingVduResponse {
 message MarkVduProcessingRequest {
   string doc_id = 1;       // Document ID to mark
   int32 max_retries = 2;   // Max retry attempts (e.g., 3)
+  string attempt_id = 3;   // Unique for each claim, even under the same procedure owner
 }
 
 message MarkVduProcessingResponse {
@@ -1198,6 +1200,7 @@ message MarkVduProcessingResponse {
 message RecoverVduProcessingRequest {
   // Empty retains general recovery. Otherwise reset only this admitted procedure's claims.
   string procedure_owner = 1;
+  repeated string attempt_ids = 2; // Exact attempts selected for scoped cancellation
 }
 
 message RecoverVduProcessingResponse {

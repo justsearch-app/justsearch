@@ -30,6 +30,9 @@
                 }
               }
             },
+            "appUpdatesEnabled" : {
+              "type" : [ "boolean", "null" ]
+            },
             "disallowExternalInferenceServers" : {
               "type" : [ "boolean", "null" ]
             },
@@ -75,6 +78,9 @@
       "items" : {
         "type" : "string"
       }
+    },
+    "appUpdatesEnabled" : {
+      "type" : "boolean"
     },
     "disallowExternalInferenceServers" : {
       "type" : "boolean"

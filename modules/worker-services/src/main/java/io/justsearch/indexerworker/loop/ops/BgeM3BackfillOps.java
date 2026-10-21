@@ -99,10 +99,10 @@ public final class BgeM3BackfillOps {
 
       // Phase 1: Collect content for all pending docs
       long t1 = System.nanoTime();
-      Map<String, String> contentByDocId =
-          context.documentFieldOps().getDocumentContentBatch(pendingIds);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds);
+      Map<String, String> contentByDocId = batch.contents();
       Map<String, Map<String, String>> typeByDocId =
-          context.documentFieldOps().getDocumentFieldsBatch(pendingIds, java.util.Set.of(SchemaFields.IS_CHUNK));
+          batch.fields();
       List<String> batchDocIds = new ArrayList<>(pendingIds.size());
       List<String> batchContents = new ArrayList<>(pendingIds.size());
       // Tempdoc 710 D.3: aligned with batchDocIds/batchContents — tracks whether each pending doc
@@ -123,26 +123,11 @@ public final class BgeM3BackfillOps {
             // (tempdoc 711/717) bounces straight back to PENDING, forever. Escalate each stage
             // through its own retry-count seam instead: retry next cycle, FAILED at max.
             context.log().warn("BGE-M3 backfill: content missing or blank for {}", docId);
-            SpladeBackfillOps.handleSpladeFailure(
-                context.documentFieldOps(),
-                context.indexingCoordinator(),
-                docId,
-                "Content missing or blank",
-                context.log());
+            batch.failure(docId, SchemaFields.SPLADE_RETRY_COUNT, SpladeBackfillOps::computeSpladeFailureUpdate);
             if (isChunk) {
-              EmbeddingBackfillOps.handleChunkEmbeddingFailure(
-                  context.documentFieldOps(),
-                  context.indexingCoordinator(),
-                  docId,
-                  "Content missing or blank",
-                  context.log());
+              batch.failure(docId, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeChunkEmbeddingFailureUpdate);
             } else {
-              EmbeddingBackfillOps.handleEmbeddingFailure(
-                  context.documentFieldOps(),
-                  context.indexingCoordinator(),
-                  docId,
-                  "Content missing or blank",
-                  context.log());
+              batch.failure(docId, SchemaFields.EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeEmbeddingFailureUpdate);
             }
             failed++;
             continue;
@@ -194,8 +179,7 @@ public final class BgeM3BackfillOps {
           try {
             BgeM3Output output = encoder.encode(
                 batchContents.get(i), io.justsearch.core.execution.InferenceRequest.background());
-            writeOutput(context, docId, isChunk, output);
-            processed++;
+            if (writeOutput(batch, docId, isChunk, output)) processed++;
           } catch (Exception e2) {
             context
                 .log()
@@ -204,19 +188,9 @@ public final class BgeM3BackfillOps {
             // deterministically-failing doc reaches EMBEDDING_MAX_RETRIES instead of retrying
             // this pending batch forever with no persisted state.
             if (isChunk) {
-              EmbeddingBackfillOps.handleChunkEmbeddingFailure(
-                  context.documentFieldOps(),
-                  context.indexingCoordinator(),
-                  docId,
-                  e2.getMessage(),
-                  context.log());
+              batch.failure(docId, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeChunkEmbeddingFailureUpdate);
             } else {
-              EmbeddingBackfillOps.handleEmbeddingFailure(
-                  context.documentFieldOps(),
-                  context.indexingCoordinator(),
-                  docId,
-                  e2.getMessage(),
-                  context.log());
+              batch.failure(docId, SchemaFields.EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeEmbeddingFailureUpdate);
             }
             perDocFailed++;
             failed++;
@@ -261,7 +235,7 @@ public final class BgeM3BackfillOps {
         }
         batchUpdates.add(Map.entry(batchDocIds.get(i), updates));
       }
-      var batchResult = context.indexingCoordinator().updateDocumentsBatch(batchUpdates);
+      var batchResult = batch.updateBatch(batchUpdates);
       processed += batchResult.updatedCount();
       long writeMs = (System.nanoTime() - t3) / 1_000_000;
 
@@ -292,8 +266,8 @@ public final class BgeM3BackfillOps {
     }
   }
 
-  private static void writeOutput(
-      BackfillContext context, String docId, boolean isChunk, BgeM3Output output) {
+  private static boolean writeOutput(
+      EnrichmentBatch batch, String docId, boolean isChunk, BgeM3Output output) {
     Map<String, Object> updates = new HashMap<>();
     putSparse(updates, output.sparseWeights());
     if (output.denseVector() != null && output.denseVector().length > 0) {
@@ -307,7 +281,7 @@ public final class BgeM3BackfillOps {
           isChunk ? SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT : SchemaFields.EMBEDDING_RETRY_COUNT,
           "0");
     }
-    context.indexingCoordinator().updateDocument(docId, updates);
+    return batch.update(docId, updates);
   }
 
   /**

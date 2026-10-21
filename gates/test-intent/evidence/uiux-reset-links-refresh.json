@@ -1,0 +1,133 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T01:28:43.767Z",
+  "revision": "769eb6ec661ce1e60e686d1ac1b9b83356899514",
+  "tree": "42367add76cd87839ab3e1b88447d652979f9c8e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7464
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5105
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3114
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:06309e4cd20a5e359f571bd1deb8d57ac1edb78137417898c18cbab806418789",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:06309e4cd20a5e359f571bd1deb8d57ac1edb78137417898c18cbab806418789",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:06309e4cd20a5e359f571bd1deb8d57ac1edb78137417898c18cbab806418789",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "97dc55c62",
+    "revision": "97dc55c628d7bf72f82093da2b5965c5a200b51b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5763,
+        "output": "\nrunning 1 test\ntest factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target ... FAILED\n\nfailures:\n\n---- factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target stdout ----\n\nthread 'factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target' (3150764) panicked at src/factory_reset.rs:725:9:\nassertion `left == right` failed: a link on the path to a kept runtime must remain as it is\n  left: None\n right: Some(\"/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51-retry/.tmpTjpCmb\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 163 filtered out; finished in 0.03s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51-retry/test-intent-before-z0UlKF/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:898:15\n    |\n898 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.69s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1097,
+        "output": "\nrunning 1 test\ntest factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets ... FAILED\n\nfailures:\n\n---- factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets stdout ----\n\nthread 'factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets' (3151240) panicked at src/factory_reset.rs:666:17:\nassertion `left == right` failed: kept link must remain as it is: models\n  left: None\n right: Some(\"/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51-retry/.tmpdmvyly\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 163 filtered out; finished in 0.03s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51-retry/test-intent-before-z0UlKF/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:898:15\n    |\n898 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.02s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1168,
+        "output": "\nrunning 1 test\ntest factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart ... FAILED\n\nfailures:\n\n---- factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart stdout ----\n\nthread 'factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart' (3151946) panicked at src/factory_reset.rs:759:9:\nassertion `left == right` failed: a linked parent of a kept asset must remain as it is\n  left: None\n right: Some(\"/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51-retry/.tmpmoX46c\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 163 filtered out; finished in 0.03s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51-retry/test-intent-before-z0UlKF/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:898:15\n    |\n898 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.10s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target",
+        "classification": "assertion",
+        "detail": "factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target:  ---- factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target stdout ----\n\nthread 'factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target' (3150764) panicked at src/factory_reset.rs:725:9:\nassertion `left == right` failed: a link on the path to a kept runtime must remain as it is\n  left: None\n right: Some(\"/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets",
+        "classification": "assertion",
+        "detail": "factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets:  ---- factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets stdout ----\n\nthread 'factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets' (3151240) panicked at src/factory_reset.rs:666:17:\nassertion `left == right` failed: kept link must remain as it is: models\n  left: None\n right: Some(\"/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51-retry/.tmpdmvyly\")\nnote:"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart",
+        "classification": "assertion",
+        "detail": "factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart:  ---- factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart stdout ----\n\nthread 'factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart' (3151946) panicked at src/factory_reset.rs:759:9:\nassertion `left == right` failed: a linked parent of a kept asset must remain as it is\n  left: None\n right: Some(\"/home/elias/dev/justsearc"
+      }
+    ]
+  },
+  "digest": "sha256:51f14ffa9523d7c4ff53272f547a9ac628ab52f91ae09992d28ef697fc3ba033"
+}

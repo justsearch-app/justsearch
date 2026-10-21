@@ -63,6 +63,8 @@ public final class NerBackfillOps {
       // (single NRT refresh instead of 100 × 85ms per-doc refreshes)
       List<Map.Entry<String, Map<String, Object>>> batchUpdates = new ArrayList<>();
 
+      if (!context.runningSupplier().getAsBoolean()) return StageOutcome.elapsedSince(methodStart);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds);
       for (String docId : pendingIds) {
         // NER is CPU-only: interrupt on shutdown, no GPU check. Tempdoc 885 item 3: foreground
         // load paces the per-document loop instead of breaking out of it.
@@ -73,7 +75,7 @@ public final class NerBackfillOps {
         }
 
         try {
-          String content = context.documentFieldOps().getDocumentContent(docId);
+          String content = batch.content(docId);
           if (content == null || content.isBlank()) {
             // NER never ran, so this is not a legitimately-empty extraction — marking COMPLETED
             // would claim an enrichment that does not exist (the F-032 "status lies" class,
@@ -81,12 +83,7 @@ public final class NerBackfillOps {
             // EmbeddingBackfillOps handles missing content: retry next cycle, FAILED at max.
             context.log().warn("NER backfill: content missing or blank for {}", docId);
             markedFailed +=
-                handleNerFailure(
-                    context.documentFieldOps(),
-                    context.indexingCoordinator(),
-                    docId,
-                    "Content missing or blank",
-                    context.log());
+                batch.failure(docId, SchemaFields.NER_RETRY_COUNT, NerBackfillOps::computeNerFailureUpdate);
             failed++;
             continue;
           }
@@ -117,14 +114,14 @@ public final class NerBackfillOps {
         } catch (Exception e) {
           context.log().error("NER backfill failed for doc {}: {}", docId, e.getMessage());
           markedFailed +=
-              handleNerFailure(context.documentFieldOps(), context.indexingCoordinator(), docId, e.getMessage(), context.log());
+              batch.failure(docId, SchemaFields.NER_RETRY_COUNT, NerBackfillOps::computeNerFailureUpdate);
           failed++;
         }
       }
 
       // Batch-write all collected updates (single NRT refresh for the entire batch)
       if (!batchUpdates.isEmpty()) {
-        context.indexingCoordinator().updateDocumentsBatch(batchUpdates);
+        processed = batch.updateBatch(batchUpdates).updatedCount();
       }
 
       if (processed > 0 || failed > 0) {
@@ -147,38 +144,10 @@ public final class NerBackfillOps {
     }
   }
 
-  static int handleNerFailure(
-      DocumentFieldOps documentFieldOps, IndexingCoordinator indexingCoordinator, String docId, String reason, Logger log) {
-    try {
-      String retryCountStr = documentFieldOps.getDocumentField(docId, SchemaFields.NER_RETRY_COUNT);
-      int currentRetryCount = parseRetryCountOrZero(retryCountStr);
-      Map<String, Object> updates = computeNerFailureUpdate(currentRetryCount);
-      int retryCount = currentRetryCount + 1;
 
-      if (updates.containsKey(SchemaFields.NER_STATUS)) {
-        log.warn("NER permanently FAILED for {} after {} retries: {}", docId, retryCount, reason);
-        indexingCoordinator.updateDocument(docId, updates);
-        return 1;
-      } else {
-        log.debug(
-            "NER retry {}/{} for {}: {}",
-            retryCount,
-            SchemaFields.NER_MAX_RETRIES,
-            docId,
-            reason);
-        indexingCoordinator.updateDocument(docId, updates);
-        return 0;
-      }
-
-    } catch (Exception e) {
-      log.error("Failed to update NER retry count for {}", docId, e);
-      return 0;
-    }
-  }
 
   /**
-   * Pure computation of the retry-count/status update for a NER failure — no I/O. Shared by {@link
-   * #handleNerFailure} (immediate single-doc write) and the combined enrichment path (merges the
+   * Pure computation of the retry-count/status update for a NER failure — no I/O. Shared by the snapshot-bound individual and combined enrichment paths (merges the
    * result into its own single batched write), so the two stay in escalation-parity by
    * construction (tempdoc 700).
    *
@@ -219,14 +188,5 @@ public final class NerBackfillOps {
     }
   }
 
-  private static int parseRetryCountOrZero(String retryCountStr) {
-    if (retryCountStr == null || retryCountStr.isBlank()) {
-      return 0;
-    }
-    try {
-      return Integer.parseInt(retryCountStr);
-    } catch (NumberFormatException ignored) {
-      return 0;
-    }
-  }
+
 }
