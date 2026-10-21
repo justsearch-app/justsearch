@@ -123,6 +123,7 @@ pub(crate) fn latest_crash(data_dir: &Path) -> Option<Value> {
             if line.starts_with("#  SIG")
                 || line.starts_with("#  EXCEPTION_")
                 || line.starts_with("#  Internal Error")
+                || line.starts_with("#  Out of Memory Error")
             {
                 exception = Some(safe_crash_line(line));
             }
@@ -143,8 +144,10 @@ pub(crate) fn latest_crash(data_dir: &Path) -> Option<Value> {
 
 fn safe_crash_line(line: &str) -> String {
     let mut text = line.trim_start_matches('#').trim().to_string();
-    if text.starts_with("Internal Error") {
-        return "Internal Error [path]".into();
+    for kind in ["Internal Error", "Out of Memory Error"] {
+        if text.starts_with(kind) {
+            return format!("{kind} [path]");
+        }
     }
     // Native frame libraries can be absolute paths (including spaces on Windows).
     if let (Some(start), Some(end)) = (text.find('['), text.rfind(']')) {
@@ -263,6 +266,92 @@ mod tests {
             "# filler\n".repeat(64) + "#  SIGSEGV (0xb)\n",
         )
         .unwrap();
+        assert!(latest_crash(root.path()).is_none());
+    }
+
+    fn hotspot_report(name: &str) -> String {
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "../../app-services/src/test/resources/io/justsearch/app/services/diagnostics/hotspot-fatal-headers",
+        );
+        std::fs::read_to_string(fixtures.join(name)).unwrap()
+    }
+
+    #[test]
+    fn fatal_summary_recognizes_shared_real_hotspot_headers() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("crashes");
+        std::fs::create_dir(&dir).unwrap();
+        for (fixture, kind) in [
+            ("internal.txt", "Internal Error"),
+            ("native-oom.txt", "Out of Memory Error"),
+            ("sigsegv.txt", "SIGSEGV"),
+            ("realtime-signal.txt", "SIGRTMIN+1"),
+        ] {
+            std::fs::write(dir.join("hs_err_pid-real.log"), hotspot_report(fixture)).unwrap();
+            let crash = latest_crash(root.path()).unwrap_or(Value::Null);
+            assert_eq!(crash["name"], "hs_err_pid-real.log", "{fixture}");
+            assert!(crash["exception"].as_str().unwrap().starts_with(kind));
+            assert!(crash["exception"].as_str().unwrap().len() <= 256);
+        }
+    }
+
+    #[test]
+    fn newest_fatal_summary_prefers_native_oom_over_older_signal() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("crashes");
+        std::fs::create_dir(&dir).unwrap();
+        for (name, text, at) in [
+            (
+                "hs_err_pid-older.log",
+                "#  SIGILL (0x4) at pc=0x123\n".to_string(),
+                1000,
+            ),
+            (
+                "hs_err_pid-newest.log",
+                hotspot_report("native-oom.txt"),
+                2000,
+            ),
+            (
+                "hs_err_pid-outside-bound.log",
+                "# filler\n".repeat(64) + "#  SIGSEGV (0xb)\n",
+                3000,
+            ),
+            ("heap.hprof", "#  SIGSEGV (0xb)\n".to_string(), 4000),
+        ] {
+            let path = dir.join(name);
+            std::fs::write(&path, text).unwrap();
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(path)
+                .unwrap()
+                .set_times(
+                    std::fs::FileTimes::new()
+                        .set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(at)),
+                )
+                .unwrap();
+        }
+        let crash = latest_crash(root.path()).unwrap_or(Value::Null);
+        assert_eq!(crash["name"], "hs_err_pid-newest.log");
+        assert_eq!(crash["exception"], "Out of Memory Error [path]");
+        assert_eq!(crash["at"], "1970-01-01T00:33:20.000Z");
+        assert!(crash["problematicFrame"].is_null());
+    }
+
+    #[test]
+    fn native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("crashes");
+        std::fs::create_dir(&dir).unwrap();
+        let report = dir.join("hs_err_pid-real.log");
+        let header = hotspot_report("native-oom.txt").replace(
+            "virtualSpaceNode.cpp",
+            "C:\\Users\\Private Middle Name\\virtualSpaceNode.cpp",
+        );
+        std::fs::write(&report, &header).unwrap();
+        let crash = latest_crash(root.path()).unwrap_or(Value::Null);
+        assert_eq!(crash["exception"], "Out of Memory Error [path]");
+        assert!(!crash.to_string().contains("Private"));
+        std::fs::write(report, "x".repeat(64 * 1024) + "\n" + &header).unwrap();
         assert!(latest_crash(root.path()).is_none());
     }
 

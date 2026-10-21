@@ -32,7 +32,8 @@ function recoveryData(dataDir, now = Date.now()) {
   return { recentExits, crashFile: latestCrash(dataDir) };
 }
 function safeLine(line) {
-  if (line.replace(/^#\s*/, '').startsWith('Internal Error')) return 'Internal Error [path]';
+  const errorKind = line.replace(/^#\s*/, '').match(/^(Internal Error|Out of Memory Error)/)?.[1];
+  if (errorKind) return `${errorKind} [path]`;
   return line.replace(/^#\s*/, '').replace(/\[([^\]]+)\]/g, (_, value) => `[${value.split(/[\\/]/).at(-1)}]`)
     .split(/\s+/).map(word => /[\\/]/.test(word) ? '[path]' : word).join(' ').replace(/[\x00-\x1f\x7f]/g, '').slice(0, 256);
 }
@@ -50,7 +51,7 @@ function latestCrash(dataDir) {
       fd = fs.openSync(path.join(directory, file.name), 'r');
       const buffer = Buffer.alloc(64 * 1024);
       const lines = buffer.subarray(0, fs.readSync(fd, buffer, 0, buffer.length, 0)).toString('utf8').split(/\r?\n/).slice(0, 64);
-      const exception = lines.find(line => /^#  (SIG|EXCEPTION_|Internal Error)/.test(line));
+      const exception = lines.find(line => /^#  (SIG|EXCEPTION_|Internal Error|Out of Memory Error)/.test(line));
       const frameIndex = lines.findIndex(line => line.trim() === '# Problematic frame:');
       const frame = frameIndex >= 0 ? lines[frameIndex + 1] : null;
       if (exception || frame) return { name: file.name, at: new Date(file.at).toISOString(),

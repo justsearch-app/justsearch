@@ -5,6 +5,59 @@ import fs from 'node:fs';
 import os from 'node:os';
 const require = createRequire(import.meta.url);
 const { createSupervisionLoop, loadPolicy } = require('./lib/engine-supervisor.cjs');
+const { recoveryData } = require('./lib/engine-recovery.cjs');
+const hotspotFixtures = new URL('../../modules/app-services/src/test/resources/io/justsearch/app/services/diagnostics/hotspot-fatal-headers/', import.meta.url);
+
+for (const [fixture, kind] of [
+  ['internal.txt', 'Internal Error'], ['native-oom.txt', 'Out of Memory Error'],
+  ['sigsegv.txt', 'SIGSEGV'], ['realtime-signal.txt', 'SIGRTMIN+1'],
+]) {
+  test(`E1/E3: shared real HotSpot header ${fixture} appears in recovery data`, t => {
+    const profile = fs.mkdtempSync(`${os.tmpdir()}/fatal-summary-`);
+    t.after(() => fs.rmSync(profile, { recursive: true, force: true }));
+    fs.mkdirSync(`${profile}/crashes`);
+    fs.copyFileSync(new URL(fixture, hotspotFixtures), `${profile}/crashes/hs_err_pid-real.log`);
+    const crash = recoveryData(profile).crashFile;
+    assert.equal(crash?.name, 'hs_err_pid-real.log');
+    assert.ok(crash.exception.startsWith(kind));
+    assert(crash.exception.length <= 256);
+  });
+}
+
+test('E1/E3: newest native OOM wins over older SIGILL, bounded-out text and heaps', t => {
+  const profile = fs.mkdtempSync(`${os.tmpdir()}/fatal-summary-mixed-`);
+  t.after(() => fs.rmSync(profile, { recursive: true, force: true }));
+  const directory = `${profile}/crashes`;
+  fs.mkdirSync(directory);
+  for (const [name, text, at] of [
+    ['hs_err_pid-older.log', '#  SIGILL (0x4) at pc=0x123\n', 1000],
+    ['hs_err_pid-newest.log', fs.readFileSync(new URL('native-oom.txt', hotspotFixtures), 'utf8'), 2000],
+    ['hs_err_pid-outside-bound.log', '# filler\n'.repeat(64) + '#  SIGSEGV (0xb)\n', 3000],
+    ['heap.hprof', '#  SIGSEGV (0xb)\n', 4000],
+  ]) {
+    fs.writeFileSync(`${directory}/${name}`, text);
+    fs.utimesSync(`${directory}/${name}`, at, at);
+  }
+  const crash = recoveryData(profile).crashFile;
+  assert.equal(crash?.name, 'hs_err_pid-newest.log');
+  assert.equal(crash.exception, 'Out of Memory Error [path]');
+  assert.equal(crash.at, '1970-01-01T00:33:20.000Z');
+  assert.equal(crash.problematicFrame, null);
+});
+
+test('E1/E3: native OOM redacts source paths and keeps the byte bound', t => {
+  const profile = fs.mkdtempSync(`${os.tmpdir()}/fatal-summary-private-`);
+  t.after(() => fs.rmSync(profile, { recursive: true, force: true }));
+  fs.mkdirSync(`${profile}/crashes`);
+  const report = `${profile}/crashes/hs_err_pid-real.log`;
+  const header = fs.readFileSync(new URL('native-oom.txt', hotspotFixtures), 'utf8')
+    .replace('virtualSpaceNode.cpp', 'C:\\Users\\Private Middle Name\\virtualSpaceNode.cpp');
+  fs.writeFileSync(report, header);
+  assert.equal(recoveryData(profile).crashFile?.exception, 'Out of Memory Error [path]');
+  assert.doesNotMatch(JSON.stringify(recoveryData(profile)), /Private/);
+  fs.writeFileSync(report, 'x'.repeat(64 * 1024) + '\n' + header);
+  assert.equal(recoveryData(profile).crashFile, null);
+});
 
 function fixture({ failFirst = false, crashFirstFour = false, failAt = 0, neverReady = false, stopOnInitialExhaustion = false } = {}) {
   let now = 0, n = 0, exited = false, pendingExit = null, spawnedAt = 0;

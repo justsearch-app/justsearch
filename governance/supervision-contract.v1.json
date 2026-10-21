@@ -531,6 +531,14 @@
           "faultMode": "partial-boot"
         },
         {
+          "id": "recovery-newest-fatal-report",
+          "drives": ["actuator"],
+          "enginePlan": [{"mode": "honour"}],
+          "expect": {"action": "show-crash"},
+          "why": "E1/E3/E17: published recovery evidence selects a newer native-OOM HotSpot report over an older signal report in both hosts.",
+          "faultMode": "clean-exit"
+        },
+        {
           "id": "recovery-long-loop-remains-visible",
           "drives": [
             "actuator"

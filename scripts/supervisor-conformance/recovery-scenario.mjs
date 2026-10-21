@@ -15,6 +15,17 @@ export async function runRecoveryCase({ name, testCase, io }) {
   const workDir = io.makeWorkDir(`${name}-${testCase.id}`);
   const dataDir = path.join(workDir, 'data');
   fs.mkdirSync(dataDir, { recursive: true });
+  if (testCase.id === 'recovery-newest-fatal-report') {
+    const crashes = path.join(dataDir, 'crashes');
+    fs.mkdirSync(crashes);
+    const older = path.join(crashes, 'hs_err_pid-older.log');
+    const newest = path.join(crashes, 'hs_err_pid-newest.log');
+    fs.writeFileSync(older, '#  SIGILL (0x4) at pc=0x123\n');
+    fs.copyFileSync(path.join(io.repoRoot,
+      'modules/app-services/src/test/resources/io/justsearch/app/services/diagnostics/hotspot-fatal-headers/native-oom.txt'), newest);
+    fs.utimesSync(older, 1000, 1000);
+    fs.utimesSync(newest, 2000, 2000);
+  }
   const localIo = { ...io, harnessOverrides: env };
   let run;
   if (name === 'dev-runner') run = await driveCase({ testCase, io: localIo, workDir });
@@ -52,6 +63,13 @@ export async function runRecoveryCase({ name, testCase, io }) {
       return { problems: [] };
     }
     const first = await waitState(state => state.state === 'running');
+    if (testCase.id === 'recovery-newest-fatal-report') {
+      assert.equal(first.crashFile?.name, 'hs_err_pid-newest.log', 'published recovery data must choose the newest fatal report, including native OOM');
+      assert.equal(first.crashFile.exception, 'Out of Memory Error [path]');
+      assert.equal(first.crashFile.at, '1970-01-01T00:33:20.000Z');
+      assert.equal(first.crashFile.problematicFrame, null);
+      return { problems: [] };
+    }
     const firstManifest = io.readJsonIfPresent(path.join(run.dataDir, 'runtime/manifest.json'));
     if (run.faultGatePath) fs.writeFileSync(run.faultGatePath, JSON.stringify({ pid: first.pid, instanceId: first.instanceId, incarnation: first.incarnation }));
     if (testCase.failSpawnAt === 2) {

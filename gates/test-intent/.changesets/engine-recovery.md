@@ -293,7 +293,7 @@ acceptance on the changed digest.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/engine-recovery-jvm-folder.json",
+      "evidence": "gates/test-intent/evidence/engine-recovery-jvm-folder-headers.json",
       "newChecks": [
         "modules/shell/src-tauri/src/recovery.rs#recovery::tests::fresh_crash_folder_with_spaces_keeps_artifacts_across_boots"
       ],
@@ -304,8 +304,15 @@ acceptance on the changed digest.
         "modules/shell/src-tauri/src/recovery.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "The three new recovery-data checks cover the new spawn-obstacle reporting interface (E6), a bounded fatal-log header and Windows-path redaction in the new shell-side summary (E1/E3), and a ledger-based 24-hour count surviving stability-budget reset and shell relaunch including an exhausting hang (E19). These are new shell recovery-data capabilities, not replacements for old assertions.",
+      "behaviour": "The three original recovery-data checks preserve spawn-obstacle reporting (E6), the bounded header/Windows-path redaction summary (E1/E3), and the ledger-based 24-hour count across budget reset/relaunch (E19). Their assertions are unchanged. Native-OOM recognition and newest-report selection are now repaired in both readers and covered by the separate repaired-header entry, shared Java real-report fixtures and a common published-state conformance case (E2/E3/E17).",
       "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-51b072",
+          "scenario": "E2",
+          "quote": "The diagnostics export and the latest-crash summary find those JVM fatal logs (not only crash-*.json), without exporting heap dumps automatically.",
+          "label": "agent-drafted, owner-adopted"
+        },
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261020-51b072",
@@ -343,7 +350,7 @@ acceptance on the changed digest.
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/engine-recovery-rust.json",
+      "evidence": "gates/test-intent/evidence/engine-recovery-summary-preserved.json",
       "newChecks": [
         "modules/shell/src-tauri/src/recovery.rs#recovery::tests::unavailable_crash_folder_reports_the_real_obstacle",
         "modules/shell/src-tauri/src/recovery.rs#recovery::tests::fatal_summary_is_bounded_and_redacts_windows_paths_with_spaces",
@@ -374,7 +381,7 @@ acceptance on the changed digest.
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/engine-recovery-heap-retention.json",
+      "evidence": "gates/test-intent/evidence/engine-recovery-heap-retention-headers.json",
       "newChecks": [
         "modules/shell/src-tauri/src/recovery.rs#recovery::tests::spawn_preparation_keeps_only_the_first_and_latest_heap_dumps"
       ],
@@ -504,6 +511,51 @@ acceptance on the changed digest.
           "label": "agent-drafted, owner-adopted"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/recovery.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "Three repaired-header checks: all four real HotSpot report fixtures already shared with Java participate in recovery data (Internal Error, native Out of Memory Error, SIGSEGV and SIGRTMIN+1); a newer native-OOM report without a problematic frame displaces an older SIGILL while newer bounded-out text and heap dumps are ignored; native-OOM source paths with spaces are redacted and the 64KiB bound remains. The 64-line/256-character controls are kept. All three fail by assertion on ad2b22ae5 and pass after. JS exercises the same shared fixtures with equivalent direct tests, and recovery-newest-fatal-report drives the real published supervisor state in both hosts: both show the older SIGILL before and the newer OOM after. Script checks are outside the product gate by design and have actual before/after transcripts rather than fabricated D4 records.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-51b072",
+          "scenario": "E2",
+          "quote": "The diagnostics export and the latest-crash summary find those JVM fatal logs (not only crash-*.json), without exporting heap dumps automatically.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-51b072",
+          "scenario": "E3",
+          "quote": "Desktop, restart budget spent: the recovery screen shows the cause (exit reason, count, problematic frame when known) and a restart action; pressing it brings the Engine back to READY without quitting the app, and the UI reconnects to the new instance's port and token, ignoring stale manifests and late probe results.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-51b072",
+          "scenario": "E17",
+          "quote": "The Rust shell supervisor and the JS supervisor (dev runner, conformance) behave the same for exhaustion, delayed retry, manual restart, hang detection, stability-budget reset and shutdown (conformance cases in both).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-51b072 request",
+          "delegationScope": "implementation choices inside the agreed recovery scenarios E1-E21",
+          "choice": "Read only the first 64 lines and redact paths.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/engine-recovery-fatal-headers-rust.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/recovery.rs#recovery::tests::fatal_summary_recognizes_shared_real_hotspot_headers",
+        "modules/shell/src-tauri/src/recovery.rs#recovery::tests::newest_fatal_summary_prefers_native_oom_over_older_signal",
+        "modules/shell/src-tauri/src/recovery.rs#recovery::tests::native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound"
+      ],
+      "repaired": true
     }
   ]
 }
@@ -615,6 +667,38 @@ main); the corrected fixture uses the documented runtime location. It is scaffol
 shared clone, with source/result recorded in the supplemental transcript; no product test is added.
 No Java code changes or Gradle calls are needed; only the shell and related UI tests are run.
 
+## Rust/JS native-OOM summary repair after the R2l rejection (2026-10-21)
+
+The appended, uncommitted rejection of entry 8 is retained verbatim with every earlier record.
+Rust/JS already recognized signals, Windows EXCEPTION_ headers and Internal Error; both omitted
+Out of Memory Error. A native-OOM report commonly has no problematic frame, so it was skipped and
+an older signal could be selected. Both readers now include that fourth HotSpot header family.
+Native-OOM source locations are redacted exactly like Internal Error, including Windows paths
+with spaces. Existing 64KiB/64-line reads and 256-character displays are unchanged; heaps are still
+excluded. Existing mtime ordering is unchanged; accepting the valid newest report fixes selection.
+
+Both unit suites read the existing Java real-report fixtures directly; no fixture is copied into
+a second source tree. Three new Rust checks fail by assertion on ad2b22ae5 and pass after. The JS
+suite fails three native-OOM assertions before and passes 19/19 after. The new common conformance
+case recovery-newest-fatal-report seeds older SIGILL/newer real native-OOM evidence before starting
+a real fixture Engine and checks crashFile in the published supervisor state. It fails on both
+baseline hosts for choosing the older file and passes in both corrected hosts. Full conformance
+passes self-test 35/35, dev-runner 51/51 and Tauri 61/61; related Vitest passes 127/127 in 16 files.
+
+The full candidate Rust suite passes 224 library tests and then reproduces the same seven known
+updater_probe::handoff_tests failures as current main 947be754d. Filtering only those seven leaves
+the complete remaining suite green. Main is a shared detached clone with the unchanged installed
+bound-exec prerequisite copied into its ignored distribution path. No main production code is
+patched for that comparison. The exact failure comparison and Node/boundary outputs are in
+engine-recovery-fatal-headers.txt. Only Rust, Node and related UI checks run; no Gradle is needed.
+
+The unmodified evidence runner writes the new repaired-header artifact against ad2b22ae5. Since
+its source digest covers the whole recovery.rs file, it also refreshes entry 8's three unchanged
+checks and the existing folder/heap repair proofs against their original before states. Those
+pre-existing test bodies/assertions and every older artifact are retained. Entry 14 records the
+new repaired-header assertions; entry 8 keeps its original API checks and adds E2 as a source.
+No acceptance record is written by the builder, and no commit is made.
+
 ## Acceptance records
 
 ```json
@@ -691,5 +775,16 @@ No Java code changes or Gradle calls are needed; only the shell and related UI t
   "verdict": "accept",
   "digest": "sha256:413750e658b6796888da17581208078eff59cc21d7e99f1121849bf7b3d2e0e0",
   "note": "All twelve test-intent entries follow the agreed scenarios and scoped delegation; independent before/after checks, real JVM evidence, merge preservation and register review found no defect."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15e12-6c62-7e33-b41b-66220c7a78e8",
+  "verdict": "reject",
+  "digest": "sha256:494ea3d72213106743679e87dc4fe8b950bb0a3cfbc3f26ef14ebedada025b49",
+  "note": "Entry 8 leaves fatal-crash recovery evidence incomplete: the running Rust shell and JS recovery summaries omit a real native-OOM fatal report and can present an older crash instead."
 }
 ```
