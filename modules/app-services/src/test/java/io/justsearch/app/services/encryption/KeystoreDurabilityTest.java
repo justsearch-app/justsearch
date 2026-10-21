@@ -178,14 +178,14 @@ class KeystoreDurabilityTest {
   }
 
   @Test
-  void existingInstallationLoadsUnchangedAndNextSaveCreatesReplica() throws Exception {
+  void existingInstallationLoadsPrimaryUnchangedAndRepairsReplica() throws Exception {
     var setup = EncryptionEnvelope.setup(pass("old"));
     Files.createDirectories(primary().getParent());
     byte[] original = JsonMapper.builder().build().writeValueAsBytes(setup.record());
     Files.write(primary(), original);
     var keys = manager();
     assertArrayEquals(original, Files.readAllBytes(primary()));
-    assertFalse(Files.exists(replica()));
+    assertTrue(Files.isRegularFile(replica()), "startup must repair the replica from the valid primary");
     keys.changePassphrase(pass("old"), pass("new"));
     assertTrue(Files.isRegularFile(replica()), "legacy installation must gain replica on save");
     assertArrayEquals(Files.readAllBytes(primary()), Files.readAllBytes(replica()));

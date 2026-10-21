@@ -29,13 +29,13 @@ F3 evidence retains its original before-state, 50eafae23, and is rerun on the re
 The V5/V6 source was read from the verifier's own/VerifierOwnCasesTest.java and its recorded
 candidate failures; the new port preserves restart-without-retry and known-credential observations.
 
-Save results distinguish SAVED, FAILED_ROLLED_BACK and SAVED_WITHOUT_REPLICA. The existing
-String/void manager entry points preserve compatibility; the control endpoints consume the typed
-results directly. Stale replica invalidation precedes publication, so a failed rollback cannot
-revive revoked wraps even if subsequent storage operations also fail. Abandoned temp removal
-also precedes publication, so cleanup refusal leaves the prior credentials in force. Existing
-SystemNotice rendering on Security & Privacy displays restoration and degraded-save warnings;
-no new notice transport or startup channel is introduced. Windows remains hosted-CI-only.
+Save results distinguish SAVED, FAILED_ROLLED_BACK and SAVED_WITHOUT_REPLICA. Round 3
+retains the old replica until the primary and then replica are published. Clean rollback preserves
+both old copies; only failed rollback invalidates stale wraps. Startup treats a valid primary as
+authoritative and durably repairs missing, invalid or different replicas. Temporary writes already
+use unique names; refused abandoned-file cleanup warns and retries on subsequent saves.
+Existing SystemNotice rendering displays restoration and degraded-save warnings.
+New round-3 checks use 94c9bb8ec as their before-state. No verifier evidence was read this round.
 
 ```json
 {
@@ -45,7 +45,7 @@ no new notice transport or startup channel is introduced. Windows remains hosted
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreDurabilityTest.java"
       ],
       "class": "New",
-      "behaviour": "S1: strict forced-writer selection and replica creation are separate checks; replica wraps must match the live key, successful rotations revoke prior credentials through both copies, and real child processes are killed before/after each primary/replica rename. A refused replica publication leaves ciphertext and export keys usable, and a retry repairs both copies. S2: restoration starts from an explicitly seeded valid replica and reports recovery; bad records produce a named error, unavailable storage never becomes first-time setup, and a future replica is refused without writes. S3b: legacy records load byte-for-byte unchanged, gain a replica on their next save. All tests carry cross-platform selection for hosted Windows CI.",
+      "behaviour": "S1: strict forced-writer selection and replica creation are separate checks; replica wraps must match the live key, successful rotations revoke prior credentials through both copies, and real child processes are killed before/after each primary/replica rename. A refused replica publication leaves ciphertext and export keys usable, and a retry repairs both copies. S2: restoration starts from an explicitly seeded valid replica and reports recovery; bad records produce a named error, unavailable storage never becomes first-time setup, and a future replica is refused without writes. S3b: legacy primary records load byte-for-byte unchanged and gain a replica at startup. All tests carry cross-platform selection for hosted Windows CI.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -88,6 +88,11 @@ no new notice transport or startup channel is introduced. Windows remains hosted
           "scenario": "S11",
           "quote": "Linux and Windows both where the path exists. Windows is only available through hosted CI here: write the Windows-relevant checks so CI runs them, and mark anything you could not run.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "At start, a valid primary is authoritative. If the replica is missing, invalid, or holds wraps other than the primary's, rewrite it from the primary durably, and log it.",
+          "location": "task t-20261021-f3 user turn 5"
         }
       ],
       "evidence": "gates/test-intent/evidence/f3-keystore-repaired.json",
@@ -99,7 +104,7 @@ no new notice transport or startup channel is introduced. Windows remains hosted
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreDurabilityTest.java#badCopiesGiveNamedErrorAndRemainUntouched",
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreDurabilityTest.java#unavailableReplicaNeverTurnsMissingPrimaryIntoFirstTimeSetup",
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreDurabilityTest.java#failureBetweenCopiesCanBeRetriedWithoutLosingCiphertextOrExportKey",
-        "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreDurabilityTest.java#existingInstallationLoadsUnchangedAndNextSaveCreatesReplica",
+        "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreDurabilityTest.java#existingInstallationLoadsPrimaryUnchangedAndRepairsReplica",
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreDurabilityTest.java#unavailableStorageRefusesSilentSetupOrReplicaReplacement",
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreDurabilityTest.java#futureReplicaCannotReplaceMissingPrimary",
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreDurabilityTest.java#processKillAtEachPublicationStepRetainsUnlockableData"
@@ -126,6 +131,11 @@ no new notice transport or startup channel is introduced. Windows remains hosted
           "scenario": "S3",
           "quote": "First-time setup; unlock and recovery; password change; existing PBKDF2 records; export and import of wrapped keys through conversation backup; the existing future-version refusal (DataKeyManager lifecycle, PBKDF2 and backup tests).",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "At start, a valid primary is authoritative. If the replica is missing, invalid, or holds wraps other than the primary's, rewrite it from the primary durably, and log it.",
+          "location": "task t-20261021-f3 user turn 5"
         }
       ],
       "evidence": "gates/test-intent/evidence/f3-keystore-preserved.json",
@@ -277,6 +287,11 @@ no new notice transport or startup channel is introduced. Windows remains hosted
           "kind": "owner-words",
           "quote": "Restoring from the replica at start is currently only a warning in the Engine log. If the app has an existing user-visible notice or startup-warning channel, use it. If there is none, keep the log line and say so; don't build a new channel.",
           "location": "task t-20261021-f3 user turn 4"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "At start, a valid primary is authoritative. If the replica is missing, invalid, or holds wraps other than the primary's, rewrite it from the primary durably, and log it.",
+          "location": "task t-20261021-f3 user turn 5"
         }
       ],
       "evidence": "gates/test-intent/evidence/f3-save-outcomes-repaired.json",
@@ -311,9 +326,42 @@ no new notice transport or startup channel is introduced. Windows remains hosted
         "modules/ui-web/src/shell-v0/views/SecuritySurface.keystore-warning.test.ts"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreReplicaRepairTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Clean rollback retains a restorable old replica; startup repairs five damaged replica states from the authoritative primary; four real process kills between publication steps converge to current wraps and reject revoked credentials through both copies. Injected deletion failure for a leftover temp warns without blocking saves, unique temporary paths are observed, and later cleanup retries.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "At start, a valid primary is authoritative. If the replica is missing, invalid, or holds wraps other than the primary's, rewrite it from the primary durably, and log it.",
+          "location": "task t-20261021-f3 user turn 5"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Don't delete or invalidate the replica up front. Order: write the new primary durably, then the new replica.",
+          "location": "task t-20261021-f3 user turn 5"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Use a unique temporary name per save, and treat a failed cleanup as a logged warning that is retried on the next save, not as a save failure.",
+          "location": "task t-20261021-f3 user turn 5"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f3-replica-repair-repaired.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreReplicaRepairTest.java#cleanRollbackRetainsReplicaThatRestoresOldCredentials",
+        "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreReplicaRepairTest.java#startupRepairsReplicaFromAuthoritativePrimary",
+        "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreReplicaRepairTest.java#lockedAbandonedTempWarnsAndRetriesWithoutBlockingSaves",
+        "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreReplicaRepairTest.java#killBetweenPublicationsRepairsCurrentWrapsOnRestart"
+      ],
+      "repaired": true
     }
   ]
 }
+
 ```
 
 ## Acceptance records

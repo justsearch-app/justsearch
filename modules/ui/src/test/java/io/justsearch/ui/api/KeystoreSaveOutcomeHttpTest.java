@@ -62,8 +62,13 @@ class KeystoreSaveOutcomeHttpTest {
       }
       assertArrayEquals(keys.dek(), restarted.dek());
       if (sealed != null) assertEquals("saved conversation", new StoreCipher(restarted).open(sealed));
+      assertArrayEquals(Files.readAllBytes(primary()), Files.readAllBytes(replica()),
+          "startup must repair the replica using the committed primary");
       Files.delete(primary());
-      assertEquals(DataKeyManager.State.NOT_CONFIGURED, manager().state(), "old replica was invalidated");
+      var restored = manager();
+      if (action.equals("change-passphrase")) restored.unlock("new-password".toCharArray());
+      else restored.recover(result.path("recoveryKey").asString());
+      assertArrayEquals(keys.dek(), restored.dek());
     } finally {
       app.stop();
     }

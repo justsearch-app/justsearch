@@ -6,6 +6,7 @@ import io.justsearch.configuration.persistence.CorruptDurableStoreException;
 import io.justsearch.configuration.persistence.StoreFormatVersions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.DirectoryIteratorException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -64,7 +65,23 @@ public final class EncryptionKeystore {
     try {
       byte[] primary = readIfPresent(file);
       if (primary != null && primary.length != 0) {
-        return Optional.of(decode(primary));
+        KeystoreRecord authoritative = decode(primary);
+        byte[] backup = readIfPresent(replica);
+        boolean matches = false;
+        if (backup != null) {
+          try {
+            matches = authoritative.equals(decode(backup));
+          } catch (IllegalStateException invalidReplica) {
+            // A valid primary owns the current credentials, including when the replica is
+            // corrupt or uses a different schema. Never replace the primary with that copy.
+          }
+        }
+        if (!matches) {
+          AtomicFileWrites.replaceStrict(replica, primary);
+          LoggerFactory.getLogger(EncryptionKeystore.class)
+              .warn("Repaired encryption keystore recovery replica from authoritative primary: {}", replica);
+        }
+        return Optional.of(authoritative);
       }
       byte[] backup = readIfPresent(replica);
       if (backup == null && primary == null) {
@@ -143,9 +160,6 @@ public final class EncryptionKeystore {
       byte[] bytes = MAPPER.writeValueAsBytes(record);
       byte[] previous = readIfPresent(file);
       removeAbandonedTemps();
-      // Refuse before changing credentials if the old replica cannot be invalidated. This
-      // guarantees that even failed rollback cannot later resurrect revoked credentials.
-      Files.deleteIfExists(replica);
       AtomicFileWrites.replaceStrict(file, bytes);
       try {
         AtomicFileWrites.replaceStrict(replica, bytes);
@@ -155,6 +169,13 @@ public final class EncryptionKeystore {
           else AtomicFileWrites.replaceStrict(file, previous);
         } catch (IOException rollbackFailure) {
           replicaFailure.addSuppressed(rollbackFailure);
+          try {
+            Files.deleteIfExists(replica);
+          } catch (IOException invalidationFailure) {
+            replicaFailure.addSuppressed(invalidationFailure);
+            LoggerFactory.getLogger(EncryptionKeystore.class)
+                .error("Could not invalidate stale encryption keystore replica", invalidationFailure);
+          }
           LoggerFactory.getLogger(EncryptionKeystore.class)
               .warn("Encryption change saved without recovery replica; rollback also failed", replicaFailure);
           return new SaveResult(SaveOutcome.SAVED_WITHOUT_REPLICA, replicaFailure);
@@ -168,14 +189,24 @@ public final class EncryptionKeystore {
     }
   }
 
-  private void removeAbandonedTemps() throws IOException {
+  private void removeAbandonedTemps() {
     if (!Files.exists(file.getParent())) return;
     try (var entries = Files.newDirectoryStream(file.getParent(), path -> {
       String name = path.getFileName().toString();
       return (name.startsWith("keystore.json.") || name.startsWith("keystore.replica.json."))
           && name.endsWith(".tmp");
     })) {
-      for (Path path : entries) Files.delete(path);
+      for (Path path : entries) {
+        try {
+          Files.delete(path);
+        } catch (IOException cleanupFailure) {
+          LoggerFactory.getLogger(EncryptionKeystore.class)
+              .warn("Could not remove abandoned encryption keystore temp; retrying on next save: {}", path, cleanupFailure);
+        }
+      }
+    } catch (IOException | DirectoryIteratorException cleanupFailure) {
+      LoggerFactory.getLogger(EncryptionKeystore.class)
+          .warn("Could not inspect abandoned encryption keystore temps; retrying on next save", cleanupFailure);
     }
   }
 }
