@@ -45,7 +45,7 @@ everywhere) — and they are **not directly apples-to-apples**. Read them honest
 
 <!-- generated:start — do not edit between markers; run: node scripts/docs/gen-public-benchmark.mjs -->
 
-*Default mode `hybrid`, commit `32d6a0a0e`, NVIDIA GeForce RTX 4070, 13 GB VRAM, ORT 1.24.3. nDCG@10. External baselines are cited published numbers (not re-run by us) — see the comparison-class note above.*
+*Default mode `hybrid`, commit `32d6a0a0e`, NVIDIA GeForce RTX 4070, 12 GiB VRAM, ORT 1.24.3. nDCG@10. External baselines are cited published numbers (not re-run by us) — see the comparison-class note above.*
 
 | Corpus | Ours (mode) | nDCG@10 | Ablation | Published baselines (cited) |
 |---|---|---|---|---|

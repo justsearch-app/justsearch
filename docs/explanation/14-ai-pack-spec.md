@@ -30,7 +30,7 @@ This spec covers v2 + v3. The current implementation status is:
   - Runtime activation is a separate step (`POST /api/ai/runtime/activate`) and is gated by policy + self-test.
 - **Not implemented yet (future)**:
   - `kind: "vision"` and `kind: "combo"` packs and their non-runtime asset roles.
-  - Auto-recommendation/auto-activation of a GPU plan (the UI can surface capabilities and installed variants, but activation remains explicit).
+  - Automatic activation as part of offline pack import. Separately, runtime discovery can prefer CUDA and Windows startup can select an installed `cuda12` variant when GPU layers are requested; see [AI Setup + Verification](13-ai-setup-and-verification.md).
 
 ## 1. Goals
 
@@ -50,7 +50,7 @@ This spec covers v2 + v3. The current implementation status is:
 
 - Signed remote manifest / TUF (deferred).
 - Accepting arbitrary packs from arbitrary sources without allowlisting.
-- Auto-downloading executables from the internet.
+- Arbitrary remote runtime sources. Outside offline import, Install AI can download registry-pinned, SHA-256-verified Windows runtime binaries and CUDA dependencies.
 
 ## 3. Terminology
 
@@ -61,7 +61,7 @@ This spec covers v2 + v3. The current implementation status is:
 
 Scope note:
 
-- v2/v3 initial implementation is **Windows desktop first**. This spec is written to be portable, but concrete paths (AI Home, `%PROGRAMDATA%`) and some threat-model assumptions are Windows-centric today.
+- Model packs use the platform AI Home. Offline **runtime packs are Windows-only** (`NativeTargets.supportsRuntimePacks()`); Linux uses an operator-supplied runtime and has no machine-policy file. Concrete executable/DLL examples below describe Windows packs.
 
 ## 4. Trust model (allowlist-only)
 
@@ -171,7 +171,7 @@ Runtime variant rules (v3):
 
 - If `kind` is `runtime`, top-level `variantId` is REQUIRED (e.g., `cuda-12.4`).
 - Runtime packs must include exactly one `runtime.llamaServer` asset that references `payload/llama-server.exe`.
-- Runtime packs MAY also include `runtime.onnxruntime` / `runtime.onnxruntimeFile` assets to ship an ONNX Runtime native payload under the same `variantId` (used by the Worker for reranker GPU acceleration).
+- Runtime packs MAY also include `runtime.onnxruntime` / `runtime.onnxruntimeFile` assets to ship an ONNX Runtime native payload under the same `variantId` (used by the Engine index half for reranker GPU acceleration).
 - Hardware compatibility gating (driver/VRAM) is based on the app’s known mapping for `variantId` (not pack-provided claims).
 
 ### 6.4 Example manifest (models-only AI Pack)
