@@ -70,7 +70,6 @@ public final class ObservationJustifications {
       Map.entry("GET /api/inference/transitions", "CONSUMER: ui-web/src/shell-v0/views/BrainSurface.ts automatic transition timeline poll"),
       Map.entry("GET /api/intent/stream", "STATUS: current backend navigation intent stream; the web shell now uses the multiplexed shell-events stream"),
       Map.entry("GET /api/knowledge/status", "STATUS: current knowledge/index state"),
-      Map.entry("GET /api/mcp/token", "CONSUMER: scripts/jseval/lane-f/e-start-ready.mjs via scripts/jseval/lane-f/e-acquire.mjs via scripts/jseval/lane-f/e-run.mjs automatic MCP protocol bootstrap of an evaluation run"),
       Map.entry("GET /api/memory", "CONSUMER: ui-web/src/shell-v0/views/MemorySurface.ts automatic memory hydration on mount"),
       Map.entry("GET /api/messages/errors/{locale}", "CONSUMER: ui-web/src/i18n/errorCatalog.ts via ui-web/src/i18n.ts automatic bootstrap catalog hydration"),
       Map.entry("GET /api/messages/health-events/{locale}", "CONSUMER: ui-web/src/i18n/resourceCatalog.ts via ui-web/src/i18n.ts automatic bootstrap catalog hydration"),

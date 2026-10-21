@@ -689,7 +689,7 @@ try {
   # payload whose entire non-GET surface answers 401 still scored green. The
   # installed payload boots with -Djustsearch.prod=true, so HeadlessApp
   # generates a session token and ApiSecurityFilters.setupSessionTokenEnforcement
-  # arms 401-on-missing/invalid for POST/PUT/DELETE. Assert all three legs --
+  # arms 401-on-missing/invalid for every non-public route. Assert all three legs --
   # the deny, the allow, AND the wrong-token deny. Without the third leg a 200
   # in (b) could equally mean enforcement was never armed at all.
   $searchUri = "http://127.0.0.1:$port/api/knowledge/search"
@@ -700,21 +700,20 @@ try {
   Add-Content -LiteralPath $evidenceFile -Value ("INFO: POST /api/knowledge/search without session header -> " + $searchNoToken.StatusCode)
   Assert ($searchNoToken.StatusCode -eq 401) ("Expected POST /api/knowledge/search WITHOUT a session token to be rejected with 401 in prod mode, got $($searchNoToken.StatusCode). Body=$($searchNoToken.Body)")
 
-  # (b) GET /api/mcp/token, then POST with that token -> 200 (server half of the chain works).
-  $tokenResp = Get-HttpBody -Client $client -Uri ("http://127.0.0.1:$port/api/mcp/token")
-  Assert ($tokenResp.StatusCode -eq 200) "Expected GET /api/mcp/token to return 200, got $($tokenResp.StatusCode). Body=$($tokenResp.Body)"
-  $sessionToken = $null
-  try {
-    $sessionToken = [string]($tokenResp.Body | ConvertFrom-Json).token
-  } catch {
-    throw "GET /api/mcp/token returned unparsable JSON: $($tokenResp.Body)"
-  }
-  Assert (-not [string]::IsNullOrWhiteSpace($sessionToken)) ("Expected GET /api/mcp/token to carry a non-empty token in prod mode (empty means token enforcement is DISABLED). Body=" + $tokenResp.Body)
-  Add-Content -LiteralPath $evidenceFile -Value ("INFO: GET /api/mcp/token returned a token of length " + $sessionToken.Length)
+  # (b) The owner-only canonical file is the supported credential source.
+  $manifestPath = Join-Path -Path $dataDir -ChildPath "runtime\manifest.json"
+  $sessionToken = [string](Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json).head.sessionToken
+  Assert (-not [string]::IsNullOrWhiteSpace($sessionToken)) "Expected a non-empty token in the owner-only runtime manifest."
+  $tokenNoAuth = Get-HttpBody -Client $client -Uri ("http://127.0.0.1:$port/api/mcp/token")
+  Assert ($tokenNoAuth.StatusCode -eq 401) "Expected removed token route without credentials to return 401."
+  $tokenAuthed = Get-HttpBody -Client $client -Uri ("http://127.0.0.1:$port/api/mcp/token") -SessionToken $sessionToken
+  Assert ($tokenAuthed.StatusCode -eq 404) "Expected removed token route with credentials to return 404."
+  $sensitiveRead = Get-HttpBody -Client $client -Uri ("http://127.0.0.1:$port/api/settings/v2")
+  Assert ($sensitiveRead.StatusCode -eq 401) "Expected sensitive GET without credentials to return 401."
 
   $searchWithToken = Send-JsonPost -Client $client -Uri $searchUri -Json $searchBody -SessionToken $sessionToken
   Add-Content -LiteralPath $evidenceFile -Value ("INFO: POST /api/knowledge/search with the real session token -> " + $searchWithToken.StatusCode)
-  Assert ($searchWithToken.StatusCode -eq 200) ("Expected POST /api/knowledge/search WITH the session token from /api/mcp/token to return 200, got $($searchWithToken.StatusCode). Body=$($searchWithToken.Body)")
+  Assert ($searchWithToken.StatusCode -eq 200) ("Expected POST /api/knowledge/search WITH the session token from the runtime manifest to return 200, got $($searchWithToken.StatusCode). Body=$($searchWithToken.Body)")
 
   # (c) Deliberately wrong token -> 401 (proves (b)'s 200 came from the RIGHT token, not from enforcement being off).
   $wrongToken = "not-the-session-token-0000000000000000000000"
@@ -764,15 +763,8 @@ try {
     Assert ($newInstanceId -ne $oldInstanceId) "Restart leg FAILED: manifest instanceId did NOT change across restart (old=$oldInstanceId new=$newInstanceId). This is R11-F2's exact precondition -- stale instance identity surviving a restart. Manifest=$manifestPath"
     Add-Content -LiteralPath $evidenceFile -Value ("INFO: Restart leg -- post-restart instanceId=" + $newInstanceId + " (changed from " + $oldInstanceId + ")")
 
-    $tokenResp2 = Get-HttpBody -Client $client -Uri ("http://127.0.0.1:$port/api/mcp/token")
-    Assert ($tokenResp2.StatusCode -eq 200) "Restart leg FAILED: GET /api/mcp/token returned $($tokenResp2.StatusCode) after restart, expected 200. Body=$($tokenResp2.Body)"
-    $newSessionToken = $null
-    try {
-      $newSessionToken = [string]($tokenResp2.Body | ConvertFrom-Json).token
-    } catch {
-      throw "Restart leg FAILED: GET /api/mcp/token returned unparsable JSON after restart: $($tokenResp2.Body)"
-    }
-    Assert (-not [string]::IsNullOrWhiteSpace($newSessionToken)) "Restart leg FAILED: GET /api/mcp/token returned an empty token after restart (empty means enforcement is DISABLED). Body=$($tokenResp2.Body)"
+    $newSessionToken = [string]$newManifestJson.head.sessionToken
+    Assert (-not [string]::IsNullOrWhiteSpace($newSessionToken)) "Restart manifest must contain a new session token."
 
     $searchWithNewToken = Send-JsonPost -Client $client -Uri $searchUri -Json $searchBody -SessionToken $newSessionToken
     Assert ($searchWithNewToken.StatusCode -eq 200) "Restart leg FAILED: POST /api/knowledge/search with the FRESH post-restart token returned $($searchWithNewToken.StatusCode), expected 200. Body=$($searchWithNewToken.Body)"
@@ -834,15 +826,9 @@ try {
 
       $null = Wait-ForBackendReady -Det $det -Client $client -Port $upgradePort -TimeoutSec $ReadyTimeoutSec -EvidenceFile $evidenceFile
 
-      $upgradeTokenResp = Get-HttpBody -Client $client -Uri ("http://127.0.0.1:$upgradePort/api/mcp/token")
-      Assert ($upgradeTokenResp.StatusCode -eq 200) "Upgrade-arrival leg FAILED: GET /api/mcp/token returned $($upgradeTokenResp.StatusCode), expected 200. Body=$($upgradeTokenResp.Body)"
-      $upgradeToken = $null
-      try {
-        $upgradeToken = [string]($upgradeTokenResp.Body | ConvertFrom-Json).token
-      } catch {
-        throw "Upgrade-arrival leg FAILED: GET /api/mcp/token returned unparsable JSON: $($upgradeTokenResp.Body)"
-      }
-      Assert (-not [string]::IsNullOrWhiteSpace($upgradeToken)) "Upgrade-arrival leg FAILED: GET /api/mcp/token returned an empty token. Body=$($upgradeTokenResp.Body)"
+      $upgradeManifestPath = Join-Path -Path $upgradeDataDir -ChildPath "runtime\manifest.json"
+      $upgradeToken = [string](Get-Content -LiteralPath $upgradeManifestPath -Raw | ConvertFrom-Json).head.sessionToken
+      Assert (-not [string]::IsNullOrWhiteSpace($upgradeToken)) "Upgrade-arrival manifest must contain a session token."
 
       # (1) Settings persist -- tempdoc 804 sec B4.2's exact round-10 regression: prod=true must not
       # silently switch UiSettingsStore to in-memory just because no settings file exists yet.
@@ -860,7 +846,7 @@ try {
       # (W-TRUTH) adds. TODO(tempdoc 805 W-TRUTH): once repairNeeded's semantics land, tighten
       # this from a shape-only check to asserting the VALUE this fixture should produce
       # (repair-needed, since the contract's own cuda-runtime entry is recorded skipped -- U3).
-      $installStatusResp = Get-HttpBody -Client $client -Uri ("http://127.0.0.1:$upgradePort/api/ai/install/status")
+      $installStatusResp = Get-HttpBody -Client $client -Uri ("http://127.0.0.1:$upgradePort/api/ai/install/status") -SessionToken $upgradeToken
       Assert ($installStatusResp.StatusCode -eq 200) "Upgrade-arrival leg FAILED: GET /api/ai/install/status returned $($installStatusResp.StatusCode), expected 200. Body=$($installStatusResp.Body)"
       $installStatusJson = $installStatusResp.Body | ConvertFrom-Json
       Assert ($null -ne $installStatusJson.PSObject.Properties['installedFully']) "Upgrade-arrival leg FAILED: /api/ai/install/status is missing 'installedFully'. Body=$($installStatusResp.Body)"
@@ -879,7 +865,7 @@ try {
       $activationState = $null
       $activationErrorCode = $null
       while ([DateTime]::UtcNow -lt $activationDeadline) {
-        $runtimeStatusResp = Get-HttpBody -Client $client -Uri ("http://127.0.0.1:$upgradePort/api/ai/runtime/status")
+        $runtimeStatusResp = Get-HttpBody -Client $client -Uri ("http://127.0.0.1:$upgradePort/api/ai/runtime/status") -SessionToken $upgradeToken
         if ($runtimeStatusResp.StatusCode -eq 200) {
           $runtimeStatusJson = $runtimeStatusResp.Body | ConvertFrom-Json
           if ($runtimeStatusJson.activation) {

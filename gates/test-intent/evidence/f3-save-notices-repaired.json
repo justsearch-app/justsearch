@@ -1,0 +1,79 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T09:40:33.862Z",
+  "revision": "c697a46842d9c273fe15765c9dbf18aef9b1752f",
+  "tree": "9defd09c1cad7bdc00c25be59fe35d752ae5711e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/SecuritySurface.keystore-warning.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/saved-state/tmp/agent-tmp/test-intent-vitest-3323283-1792575630855.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 879
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SecuritySurface.keystore-warning.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SecuritySurface.keystore-warning.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ed351cffe5cedd4537d335022ede7f64ccc6704b9f8a2dec9711c330437349f4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shows saved-without-replica warning and retains the returned recovery key (setup)",
+          "status": "passed"
+        },
+        {
+          "name": "shows saved-without-replica warning and retains the returned recovery key (recovery)",
+          "status": "passed"
+        },
+        {
+          "name": "shows saved-without-replica warning and retains the returned recovery key (password)",
+          "status": "passed"
+        },
+        {
+          "name": "shows the restored-key startup warning through the existing system notice",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "36d97a92f",
+    "revision": "36d97a92f2472310f75c05daf5e1bc7cacc7fd80",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/SecuritySurface.keystore-warning.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/saved-state/tmp/agent-tmp/test-intent-vitest-3323283-1792575632706.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 966,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/saved-state/tmp/agent-tmp/test-intent-vitest-3323283-1792575632706.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SecuritySurface.keystore-warning.test.ts",
+        "classification": "assertion",
+        "detail": "shows saved-without-replica warning and retains the returned recovery key (setup):  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/saved-state/modules/ui-web/ | shows saved-without-replica warning and retains the returned recovery key (recovery):  AssertionError: the given "
+      }
+    ]
+  },
+  "digest": "sha256:3051289f2cb9655e7f20ad9aa4f1c705718dfb8a54597d627bd3c57979a4951a"
+}

@@ -234,6 +234,7 @@ describe('aiInstallPoll lifecycle cancellation', () => {
     setAiInstallApiBase('http://old');
     const oldListener = vi.fn();
     const unsubscribe = subscribeAiInstall(oldListener);
+    await vi.advanceTimersByTimeAsync(0);
     expect(fetchMock).toHaveBeenCalledTimes(3);
     const oldSignals = fetchMock.mock.calls.map(([, init]) => init?.signal);
     const listener = lifecycle === 'resubscribe' ? vi.fn() : oldListener;
@@ -245,6 +246,7 @@ describe('aiInstallPoll lifecycle cancellation', () => {
       setAiInstallApiBase('http://replacement');
     }
     expect(oldSignals.every((signal) => signal?.aborted)).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
     expect(fetchMock).toHaveBeenCalledTimes(6);
     finish.slice(0, 3).forEach((resolve) => resolve(jsonResponse({ state: 'running' })));
     await vi.advanceTimersByTimeAsync(30_000);
