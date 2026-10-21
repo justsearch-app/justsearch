@@ -888,3 +888,14 @@ the existing merge commit remain uncommitted; product code and tests are unchang
   "note": "Entries 2 and 10 cite evidence whose source digests no longer match the merged candidate, although the independently rerun behavioral checks pass."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15edb-5bbc-7073-a73c-a51722cbd6c0",
+  "verdict": "accept",
+  "digest": "sha256:d0812a717dc8d721f3091b95232157a83fa7579a31c90322742f53524cf1b47f",
+  "note": "All fifteen entries are warranted; fresh host/updater checks pass and updater fails by the intended baseline assertion; merge and register review found no conflict."
+}
+```
