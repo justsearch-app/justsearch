@@ -67,3 +67,14 @@ author-session: reload-holders-producer-repair
   "note": "Verified c93a81d9c: 216 candidate checks, 167 predecessor preservation checks, native HTTP reload/ingestion/backfill/restart/migration checks; tmp/verify-http/c93a81d9c/report.md"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-784a8dafc",
+  "verdict": "accept",
+  "digest": "sha256:48fe813421614c39ede40088dbf40cdd616f8beb4cb21bfb78069be65536f576",
+  "note": "31 checks/build; CI lint; tmp/verify-http/784a8dafc/report.md"
+}
+```

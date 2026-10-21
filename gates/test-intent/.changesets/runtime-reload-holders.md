@@ -116,3 +116,14 @@ The delegated builder brief supplied scenarios v2, R1–R8. This adds checks wit
   "note": "Verified c93a81d9c: 216 candidate checks, 167 predecessor preservation checks, native HTTP reload/ingestion/backfill/restart/migration checks; tmp/verify-http/c93a81d9c/report.md"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-784a8dafc",
+  "verdict": "accept",
+  "digest": "sha256:c34f5634793061154fb682afc915e9c91788ad9ba1d96fc73cf728c25ffd5fa8",
+  "note": "31 checks/build; CI lint; tmp/verify-http/784a8dafc/report.md"
+}
+```
