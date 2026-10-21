@@ -478,8 +478,8 @@ final class SwitchBufferStrictReplayTest {
     assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
         scopedContext("green")));
     verify(queue, never()).enqueueEntries(anyList(), isNull());
-    var order = inOrder(queue);
-    order.verify(queue).matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash, hash);
+    var order = inOrder(fields, queue);
+    order.verify(fields).getDocumentFieldOrThrow(file.toString(), SchemaFields.SOURCE_SHA256);
     order.verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
     verify(queue, never()).removeReplayedSwitchBufferOps(List.of(foreign));
   }
@@ -487,8 +487,10 @@ final class SwitchBufferStrictReplayTest {
   @Test
   void capturedReplayRefreshesBeforeCertifyingPlannedH1AndIndexedH2() throws Exception {
     String h1 = "a".repeat(64);
-    String h2 = "b".repeat(64);
-    String path = tempDir.resolve("captured-replay.txt").toAbsolutePath().toString();
+    // A refusal settles only on the file's current bytes: the captured H2 is what it holds.
+    Path captured = Files.writeString(tempDir.resolve("captured-replay.txt"), "captured H2");
+    String h2 = SourceContentHash.sha256(captured);
+    String path = captured.toAbsolutePath().toString();
     var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
         "green", "path:" + path, "UPSERT",
         new SwitchBufferUpsert(path, null, null, "captured-unit", h1).encode(), 1, "v1");
@@ -510,8 +512,8 @@ final class SwitchBufferStrictReplayTest {
     var order = inOrder(commits, fields, queue);
     order.verify(commits).maybeRefreshBlocking();
     order.verify(fields).getDocumentFieldOrThrow(path, SchemaFields.SOURCE_SHA256);
-    order.verify(queue).matchesAcceptedFileProjection(path, "captured-unit", h1, h2);
     order.verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
+    verify(queue, never()).enqueueEntries(anyList(), any());
   }
 
   @Test

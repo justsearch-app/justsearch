@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T11:51:10.537Z",
-  "revision": "2397a837648dfd5f8479e8ae2724c8394c12baa8",
-  "tree": "56e269bc73412b7c98277020663a0bb39abe30f8",
+  "createdAt": "2026-10-21T13:19:33.435Z",
+  "revision": "18a242439e636df73dd3effdba8bed170a7c4936",
+  "tree": "c013a9be2bacbee930d9509974ff046156cbba64",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAProjectionObligationKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.anUnlatchedMigratingCandidateKeepsBuilding\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aLaterAdmissionCommittedOnAHandsTheUpdateToA\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7058
+      "durationMs": 8852
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aCandidateWithAProjectionObligationKeepsWaiting",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:61bbb850268c414ddcc29274ab4be0d57f4639cca7f5a20d027093c8fb6c27f2",
+      "contentDigest": "sha256:a433af2e33346011e4c0b8410db5dd9faa558ce711d6a9d555fa5fbfc1f98bbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#anUnlatchedMigratingCandidateKeepsBuilding",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:61bbb850268c414ddcc29274ab4be0d57f4639cca7f5a20d027093c8fb6c27f2",
+      "contentDigest": "sha256:a433af2e33346011e4c0b8410db5dd9faa558ce711d6a9d555fa5fbfc1f98bbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterAdmissionCommittedOnAHandsTheUpdateToA",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:61bbb850268c414ddcc29274ab4be0d57f4639cca7f5a20d027093c8fb6c27f2",
+      "contentDigest": "sha256:a433af2e33346011e4c0b8410db5dd9faa558ce711d6a9d555fa5fbfc1f98bbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -81,7 +81,7 @@
         "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAProjectionObligationKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.anUnlatchedMigratingCandidateKeepsBuilding\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aLaterAdmissionCommittedOnAHandsTheUpdateToA\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 8945
+        "durationMs": 12301
       }
     ],
     "checks": [
@@ -102,5 +102,5 @@
       }
     ]
   },
-  "digest": "sha256:d93630214f4a5fec437128abea789ef0ee6ba83928eb8134b9ddaf73f8a5332a"
+  "digest": "sha256:1c3824362b79b2180f0d6992a4a64e752f32c29d6132dd895904d24677e36412"
 }

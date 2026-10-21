@@ -351,26 +351,6 @@ builder.
     },
     {
       "items": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java"
-      ],
-      "class": "New",
-      "behaviour": "Round 4 preservation, passing on the round-3 state and after. A file made unreadable before refusal cleanup keeps the safe state: cleanup reports the source unproved, the journal UPSERT is kept and no job is queued.",
-      "sources": [
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261020-a5fbcb",
-          "scenario": "M1",
-          "quote": "A file unreadable at queue time keeps the operation in its safe state (old index active, journal kept), never acknowledged.",
-          "label": "agent-drafted, owner-adopted"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/migration-recovery-r4-preserve.json",
-      "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredUpdateOfAnUnreadableFileStaysUnproved"
-      ]
-    },
-    {
-      "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java"
       ],
@@ -427,7 +407,7 @@ builder.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java"
       ],
       "class": "New",
-      "behaviour": "Round 5 preservation, passing on a26eaf3e3 and after. A retired re-admission of an unchanged file whose bytes A already holds is handed to A at once. M8: an accepted update whose bytes A holds, and which are the file's current bytes, is handed to A at once also after a later admission of the file moved the row's revision on and A's writer found the file unchanged (DONE, UNCHANGED, nothing written); an intermediate round-5 state that required the row's exact revision re-queued such a file forever on the real Engine. A retired update of a file made unreadable stays unproved with its journal kept and nothing queued. A FENCED recovery boot whose refused walk is still open (unsealed) does not start the producer's writer and keeps Green. Refusal cleanup hands the journal UPSERT to A and completes (IDLE, journal empty, restart requested) when a later admission's writer committed exactly the bytes A holds, also when that later captured revision's bytes changed after its plan.",
+      "behaviour": "Round 5 preservation, passing on a26eaf3e3 and after. A retired re-admission of an unchanged file whose bytes A already holds is handed to A at once. M8: an accepted update whose bytes A holds, and which are the file's current bytes, is handed to A at once also after a later admission of the file moved the row's revision on and A's writer found the file unchanged (DONE, UNCHANGED, nothing written); an intermediate round-5 state that required the row's exact revision re-queued such a file forever on the real Engine. A FENCED recovery boot whose refused walk is still open (unsealed) does not start the producer's writer and keeps Green. Refusal cleanup hands the journal UPSERT to A and completes (IDLE, journal empty, restart requested) when a later admission's writer committed exactly the bytes A holds, also when that later captured revision's bytes changed after its plan.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -447,7 +427,6 @@ builder.
       "evidence": "gates/test-intent/evidence/migration-recovery-r5-preserve.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredReadmissionOfAnUnchangedFileIsHandedToA",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredUpdateOfAnUnreadableFileStaysUnproved",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#anAcceptedUpdateAHoldsSettlesAfterALaterAdmissionFoundItUnchanged",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterAdmissionCommittedOnAHandsTheUpdateToA",
@@ -510,6 +489,93 @@ builder.
       "evidence": "gates/test-intent/evidence/migration-recovery-r6-preserve.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#anIoFailedFileStillWaits"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 7, failing on 18a242439 and passing after. Refusal cleanup settles an ordinary file only when A's index holds the file's current bytes: a DONE row for earlier bytes never settles changed bytes that cannot be read (the file gets its one admission, which fails, and cleanup stays fail-closed); likewise a retired update of a file made unreadable gets that one admission and keeps its journal, replacing the round-4 expectation that nothing is queued for it). A path that is no longer a regular file settles on A's policy-terminal outcome for that state only once A no longer serves the replaced text; an outcome that leaves A serving it does not settle. While a migration projects writes to A, a source the loop retires as missing or non-regular (folder, link) is deleted from A as well as from Green, as the normal product deletes it.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "Only a comparison of A's index with the current bytes can settle an ordinary file. If the current bytes can't be read, nothing settles it. A DONE row for earlier bytes never does. The file gets its one admission for the current state, and that fails I/O, so it stays fail-closed until the file is readable.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "The file's state includes its kind. For a path that is no longer a regular file, A's policy-terminal outcome for that current state settles it, with no bytes needed. A must not keep serving the replaced file's old content, unless the normal product (outside migration) also keeps it for a path that became a directory.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "A delete settles once A no longer holds the file. The deleted state is a file state too, so give it its one admission (A's delete); it settles once A's index no longer holds the path.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/migration-recovery-r7-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#anEarlierCommitNeverSettlesChangedBytesThatCannotBeRead",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredUpdateOfAnUnreadableFileStaysUnproved",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aFolderReplacementSettlesOnceAsPolicyRetiresTheOldText",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aPolicyOutcomeThatLeavesAServingTheReplacedTextDoesNotSettle",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java#missingSourceRetiresTheActiveGenerationsTextToo",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java#nonRegularSourceRetiresTheActiveGenerationsTextToo"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecordedIngestionTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "Only a comparison of A's index with the current bytes can settle an ordinary file. If the current bytes can't be read, nothing settles it. A DONE row for earlier bytes never does.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "conflictSearch": "Task t-20261020-a5fbcb decisions searched: round 6 decision 1 (A's effect is judged from A's index) and the round-7 restatement agree; none keeps the queue-row witness. The removed expectation is that refusal cleanup consults the queue's accepted-file projection (matchesAcceptedFileProjection) and settles on that captured witness in refusalTransfersAcceptedMutationBeforeAbandoningCandidate, refusalRetiresOnlySettledAcceptedUpsertAfterSourceProjectionIsProved and capturedReplayRefreshesBeforeCertifyingPlannedH1AndIndexedH2. Their other expectations (fence and producer order, refresh before certification, removal only after the proof, the planned H1 never rewritten) are kept."
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecordedIngestionTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 7. Refusal cleanup retires an accepted upsert only after reading A's committed SOURCE_SHA256 for the path and finding it equal to the file's current bytes; a captured replay whose file holds the indexed H2 bytes is retired after the refresh and that read, and queues no A job. The KnowledgeServerRecordedIngestionTest check names the whole class because its changed test (refusalTransfersAcceptedMutationBeforeAbandoningCandidate) carries a @DisplayName, which the JUnit report uses in place of the method name.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "Only a comparison of A's index with the current bytes can settle an ordinary file. If the current bytes can't be read, nothing settles it. A DONE row for earlier bytes never does.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "A's committed effect is judged from A's index, not from the queue row. The obligation is settled when A's index holds content for the path that matches the file's current bytes on disk, from the accepted revision or any later one.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/migration-recovery-r7-changed.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecordedIngestionTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java#refusalRetiresOnlySettledAcceptedUpsertAfterSourceProjectionIsProved",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java#capturedReplayRefreshesBeforeCertifyingPlannedH1AndIndexedH2"
       ]
     }
   ]

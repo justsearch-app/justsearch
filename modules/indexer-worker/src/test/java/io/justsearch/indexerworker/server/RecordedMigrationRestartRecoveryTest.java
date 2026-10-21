@@ -75,7 +75,7 @@ class RecordedMigrationRestartRecoveryTest {
             .anyMatch(call -> "startIndexingLoop".equals(call.getMethod().getName())),
         "this boot's writer, which writes A, runs the pending rows");
     rollback.assertGreenRetained();
-    rollback.sourceWork.set("COMMITTED");
+    rollback.aWritesTheCurrentBytes();
     rollback.reconcile();
     rollback.assertRolledBackToA();
     verify(rollback.queue, never()).deleteByExactPath(anyString());
@@ -544,6 +544,13 @@ class RecordedMigrationRestartRecoveryTest {
       Files.writeString(file, "changed after the accepted admission");
     }
 
+    /** A's writer ran the file's job and committed its current bytes, which A now holds. */
+    void aWritesTheCurrentBytes() throws Exception {
+      sourceWork.set("COMMITTED");
+      when(fields.getDocumentFieldOrThrow(file.toString(), SchemaFields.SOURCE_SHA256))
+          .thenReturn(SourceContentHash.sha256(file));
+    }
+
     /** A FENCED recovery boot: its one producer writes A. */
     void recoveryBoot() throws Exception {
       setField(server, "generationBootDisposition", IndexGenerationManager.BootDisposition.FENCED);
@@ -610,8 +617,19 @@ class RecordedMigrationRestartRecoveryTest {
     final java.util.concurrent.atomic.AtomicReference<String> onA =
         new java.util.concurrent.atomic.AtomicReference<>();
 
-    static final String LATER = "c".repeat(64);
+    /** The later bytes: the file holds them once the later admission is accepted. */
+    static final String LATER_BYTES = "later";
+    static final String LATER = sha256(LATER_BYTES);
     static final String STALE = "d".repeat(64);
+
+    private static String sha256(String text) {
+      try {
+        return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+            .digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+      } catch (java.security.NoSuchAlgorithmException impossible) {
+        throw new IllegalStateException(impossible);
+      }
+    }
 
     RealQueueHandover(Path tempDir, String laterState, String sourceHolds) throws Exception {
       this(tempDir, laterState, LATER, "DONE".equals(laterState) ? LATER : null,
@@ -642,6 +660,8 @@ class RecordedMigrationRestartRecoveryTest {
           building, JobQueue.EnqueueEntry.stat(file), null, null));
       key = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
       database = tempDir.resolve("handover.db").toAbsolutePath();
+      Files.writeString(file, LATER_BYTES); // A later watcher update, after the accepted one
+      assertEquals(LATER, SourceContentHash.sha256(file));
       try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database);
           var update = connection.prepareStatement("UPDATE jobs SET state = ?, unit_revision = ?, "
               + "planned_source_sha256 = ?, content_hash = ? WHERE path = ?")) {

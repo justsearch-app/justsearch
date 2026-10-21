@@ -1654,13 +1654,8 @@ public final class KnowledgeServerMigrationOps {
         String indexed = context.ingestLifecycle().documentFieldOps()
             .getDocumentFieldOrThrow(upsert.path(), SchemaFields.SOURCE_SHA256);
         if (refusedSourceRecovery) {
-          // The writer of this very admission committed the other bytes A holds (a captured
-          // witness); A holding the accepted bytes proves nothing about the file's current ones.
           // Judge every admission, so each one A lacks gets its A job in this attempt.
-          boolean proved = queue.matchesAcceptedFileProjection(upsert.path(),
-              upsert.unitRevision(), upsert.sourceSha256(), indexed)
-              && !upsert.sourceSha256().equals(indexed);
-          if (!proved && !sourceHoldsAdmission(context, queue, upsert, indexed)) {
+          if (!sourceHoldsAdmission(context, queue, upsert, indexed)) {
             if (awaited++ == 0) firstAwaited = upsert.path();
           }
           continue;
@@ -1699,35 +1694,54 @@ public final class KnowledgeServerMigrationOps {
   }
 
   /**
-   * Refusal cleanup only: whether A's committed effect settles an accepted admission. A
-   * candidate hands its admission to A only by that effect, judged from A's index: A holds the
-   * file's current bytes (from this admission or any later one), the bytes a later admission's
-   * writer committed, the removal of a file that is gone, or A's normal policy ended the file's
-   * current state (not a regular file, excluded, too large). A pending or failed A job only
-   * waits, and an unreadable file stays unproved.
+   * Refusal cleanup only: whether A's committed effect settles an accepted admission, judged
+   * from A's index against the path as it is now, never from a queue row about earlier bytes.
+   * A regular file settles when A holds its current bytes, or when the cleanup's own admission of
+   * this file state ended by A's normal policy (excluded, too large). Unreadable bytes settle
+   * nothing. A path that is no longer a regular file (gone, a folder, a link) settles once A no
+   * longer holds it: A's normal policy retires such a source's text, and its retirement reaches
+   * A while a candidate exists. A pending or failed A job only waits.
    *
    * <p>Otherwise the Engine may have retired the admission's row unwritten, so nothing would ever
-   * bring A to the file: queue one ordinary A job for the path, once per file state. A file that
+   * bring A to the path: queue one ordinary A job for it, once per file state. A path that
    * changes, or a restart, may admit it again; the same state is never admitted twice.
    */
   private static boolean sourceHoldsAdmission(DrainSwitchBufferContext context,
       SwitchBufferCapableQueue queue, SwitchBufferUpsert upsert, String indexed) throws IOException {
-    var work = queue.sourceFileWork(upsert.path(), indexed);
-    if (work == SwitchBufferCapableQueue.SourceFileWork.COMMITTED) return true;
-    String onDisk = currentSource(upsert.path());
-    if (onDisk == null) return false; // Unreadable: A's effect for it is unknown.
-    if (indexed != null && indexed.equals(onDisk)) return true;
     Path file = Path.of(upsert.path());
-    if (SOURCE_GONE.equals(onDisk) && indexed == null
-        && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(upsert.path()) == 0) {
-      return true; // A shows the removal.
+    BasicFileAttributes attributes;
+    try {
+      attributes = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+    } catch (NoSuchFileException absent) {
+      attributes = null;
+    } catch (IOException | RuntimeException unknown) {
+      return false; // What the path is now is unknown, so is A's effect for it.
     }
-    String state = fileState(file, onDisk);
+    String state;
+    boolean readableFile = false;
+    if (attributes == null || !attributes.isRegularFile()) {
+      if (indexed == null
+          && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(upsert.path()) == 0) {
+        return true; // A shows the retirement.
+      }
+      state = attributes == null ? SOURCE_GONE
+          : (attributes.isSymbolicLink() ? "link/" : attributes.isDirectory() ? "directory/" : "other/")
+              + attributes.lastModifiedTime().toMillis() + '/' + attributes.fileKey();
+    } else {
+      String onDisk = currentSource(upsert.path());
+      if (onDisk != null && onDisk.equals(indexed)) return true;
+      readableFile = onDisk != null;
+      state = "file/" + attributes.size() + '/' + attributes.lastModifiedTime().toMillis() + '/'
+          + attributes.fileKey() + '/' + (readableFile ? onDisk : "unreadable");
+    }
+    var work = queue.sourceFileWork(upsert.path(), indexed);
     boolean admittedNow = state.equals(
         queue.refusalCleanupAdmission(context.replayGeneration(), upsert.path()));
     // The policy outcome must be the writer's answer to this file state, which only an
     // admission of that state that it finished proves.
-    if (work == SwitchBufferCapableQueue.SourceFileWork.POLICY && admittedNow) return true;
+    if (readableFile && work == SwitchBufferCapableQueue.SourceFileWork.POLICY && admittedNow) {
+      return true;
+    }
     if (work == SwitchBufferCapableQueue.SourceFileWork.OUTSTANDING || admittedNow) return false;
     var entry = new JobQueue.EnqueueEntry(file, JobQueue.EnqueueEntry.stat(file).sizeBytes(),
         upsert.provenance(), null, upsert.ingestionRoot());
@@ -1737,20 +1751,6 @@ public final class KnowledgeServerMigrationOps {
           upsert.path());
     }
     return false;
-  }
-
-  /** The file's kind, size, modification time, identity and bytes, links not followed. */
-  private static String fileState(Path file, String bytes) {
-    try {
-      var attributes = Files.readAttributes(file, BasicFileAttributes.class,
-          LinkOption.NOFOLLOW_LINKS);
-      String kind = attributes.isRegularFile() ? "file" : attributes.isSymbolicLink() ? "link"
-          : attributes.isDirectory() ? "directory" : "other";
-      return kind + '/' + attributes.size() + '/' + attributes.lastModifiedTime().toMillis() + '/'
-          + attributes.fileKey() + '/' + bytes;
-    } catch (IOException | RuntimeException absent) {
-      return SOURCE_GONE + '/' + bytes;
-    }
   }
 
   /** A broad receipt used to supersede a file witness must prove its complete final scope. */

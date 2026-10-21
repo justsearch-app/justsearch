@@ -218,7 +218,10 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
         assumeFalse(Files.isReadable(fixture.file), "this user can read any file");
         assertFalse(fixture.drain(), "an unreadable file is not proved");
         assertEquals(1, fixture.journalSize(), "the journal is kept");
-        assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(), "nothing is queued");
+        assertEquals(1, fixture.queue.jobStateCountsStrict().pendingCount(),
+            "the file's one admission for this state");
+        assertFalse(fixture.drain(), "still unproved");
+        assertEquals(1, fixture.queue.jobStateCountsStrict().pendingCount(), "and only one");
       } finally {
         fixture.makeReadable();
       }
@@ -353,6 +356,80 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
       }
       assertEquals(1, fixture.journalSize(), "the journal is kept");
       assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(), "nothing is re-queued");
+    }
+  }
+
+  // round 7, F1: A committed H2 from a successful row; while the Engine was down the file
+  // changed to H3 and became unreadable. Only A's index against the current bytes settles a
+  // file, so nothing does: the file gets its one admission and cleanup keeps Green.
+  @Test
+  void anEarlierCommitNeverSettlesChangedBytesThatCannotBeRead() throws Exception {
+    try (var fixture = new Fixture(temp, "original A source")) {
+      fixture.capture();
+      fixture.edit("accepted watcher update H2");
+      fixture.admitOnGreen();
+      fixture.retire();
+      assertFalse(fixture.drain());
+      fixture.assertQueuedOnA();
+      fixture.aWriterCommitsTheFile();
+      fixture.edit("H3, written while the Engine was down");
+      Files.setPosixFilePermissions(fixture.file, java.util.Set.of());
+      try {
+        assumeFalse(Files.isReadable(fixture.file), "this user can read any file");
+        fixture.restart();
+        for (int attempt = 0; attempt < 3; attempt++) {
+          assertFalse(fixture.drain(), "A holds H2; the current bytes cannot be compared");
+        }
+        assertEquals(1, fixture.journalSize(), "the journal is kept");
+        assertEquals(1, fixture.queue.jobStateCountsStrict().pendingCount(),
+            "one admission for the unreadable file state");
+      } finally {
+        fixture.makeReadable();
+      }
+    }
+  }
+
+  // round 7, F2: a folder replaced the accepted file. A's policy retires a source that is not a
+  // regular file; once A no longer holds the path, cleanup settles without any file bytes.
+  @Test
+  void aFolderReplacementSettlesOnceAsPolicyRetiresTheOldText() throws Exception {
+    try (var fixture = new Fixture(temp, "original A source")) {
+      fixture.capture();
+      fixture.edit("accepted watcher update");
+      fixture.admitOnGreen();
+      fixture.retire();
+      Files.delete(fixture.file);
+      Files.createDirectory(fixture.file);
+      assertFalse(fixture.drain(), "A still serves the replaced file's text");
+      fixture.assertQueuedOnA();
+      fixture.aWriterEndsTheFile(IngestionOutcomeClass.SKIPPED_POLICY,
+          IngestionReasonCodes.NON_REGULAR_SOURCE, true);
+      assertTrue(fixture.drain(), "A's policy retired the folder's old text");
+      assertEquals(0, fixture.journalSize());
+      assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(), "admitted once");
+    }
+  }
+
+  // round 7, F2: outside a migration A retires the text of a source that became a link, so a
+  // policy outcome that left A serving it is no settlement
+  @Test
+  void aPolicyOutcomeThatLeavesAServingTheReplacedTextDoesNotSettle() throws Exception {
+    try (var fixture = new Fixture(temp, "original A source")) {
+      fixture.capture();
+      fixture.edit("accepted watcher update");
+      fixture.admitOnGreen();
+      fixture.retire();
+      Path target = Files.writeString(temp.resolve("target.txt"), "link target");
+      Files.delete(fixture.file);
+      Files.createSymbolicLink(fixture.file, target);
+      assertFalse(fixture.drain());
+      fixture.assertQueuedOnA();
+      fixture.aWriterEndsTheFile(IngestionOutcomeClass.SKIPPED_POLICY,
+          IngestionReasonCodes.NON_REGULAR_SOURCE, false);
+      for (int attempt = 0; attempt < 3; attempt++) {
+        assertFalse(fixture.drain(), "A still serves the replaced file's text");
+      }
+      assertEquals(1, fixture.journalSize(), "the journal is kept");
     }
   }
 

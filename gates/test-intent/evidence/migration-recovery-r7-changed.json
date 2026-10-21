@@ -1,0 +1,238 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T13:27:34.740Z",
+  "revision": "18a242439e636df73dd3effdba8bed170a7c4936",
+  "tree": "c942144eef082b04780b0cf09b8b8720b5c6a7ae",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerRecordedIngestionTest\" --tests \"io.justsearch.indexerworker.server.ops.SwitchBufferStrictReplayTest.refusalRetiresOnlySettledAcceptedUpsertAfterSourceProjectionIsProved\" --tests \"io.justsearch.indexerworker.server.ops.SwitchBufferStrictReplayTest.capturedReplayRefreshesBeforeCertifyingPlannedH1AndIndexedH2\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 32462
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecordedIngestionTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecordedIngestionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1b0ee94fced7b7f9b61adc5b98049b7fc6e95daa989f425034babce01b82dd9b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fencedRecordedBootOpensSourceWriterBeforeRefusalIsCheckpointed(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "[1] quarantined",
+          "status": "passed"
+        },
+        {
+          "name": "[2] restore-torn",
+          "status": "passed"
+        },
+        {
+          "name": "malformedStateBeforeAttachmentAbortsRealBootWithoutRepair(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "candidate gap approval drains accepted Green work before freezing its witness",
+          "status": "passed"
+        },
+        {
+          "name": "recorded generation waits for the replacement writer and resumes after publication",
+          "status": "passed"
+        },
+        {
+          "name": "refused recorded candidate retains Green when accepted A projection is missing",
+          "status": "passed"
+        },
+        {
+          "name": "a failed attachment close retains queue and owner until retry",
+          "status": "passed"
+        },
+        {
+          "name": "corruptionRestoreKeepsConstructorBoundAuthority(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "generation observation follows authoritative state, not captured Blue",
+          "status": "passed"
+        },
+        {
+          "name": "recordedOwnershipPrecedesNativePrevRepairInRealBoot(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "a refused producer park cannot durably advertise the unbounded gap wait",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedBackupCopyCannotPartiallyReplaceLiveTarget(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "refused recorded candidate transfers an accepted file to A before abandonment",
+          "status": "passed"
+        },
+        {
+          "name": "completedSourceFromPriorCandidateCannotCertifyIncompleteSuccessor(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "refusalRecoveryRetriesExactCandidateAfterPointerWasAlreadyCleared(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "restartedCandidateNamesMissingAndIncompleteSourceMarkers(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "refusal cannot recompose A while its prior native owner remains open",
+          "status": "passed"
+        },
+        {
+          "name": "fencedRealBootServesCurrentBlueWithoutPollingOrReplacingRecordedGreen(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "invalid or missing generation state throws, while readiness never queries jobs",
+          "status": "passed"
+        },
+        {
+          "name": "legacy constructor denies recorded recovery during a real boot",
+          "status": "passed"
+        },
+        {
+          "name": "deferredInitCompletionReconcilesRefusedCandidateBeforeReaperTick(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "attachment failure cleans up a real boot and preserves fatal Error identity",
+          "status": "passed"
+        },
+        {
+          "name": "failed runtime drain cannot restore recorded authority after unlock",
+          "status": "passed"
+        },
+        {
+          "name": "secondTriageKeepsFirstQuarantineBytes(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "an in-place gap wait parks B and republishes text-only A before its durable state",
+          "status": "passed"
+        },
+        {
+          "name": "recorded Green build admits writes through a separate writable A projection",
+          "status": "passed"
+        },
+        {
+          "name": "final journal witness distinguishes failed Green projection from exact success",
+          "status": "passed"
+        },
+        {
+          "name": "failed A recomposition retains both refusal reasons after recording recovery",
+          "status": "passed"
+        },
+        {
+          "name": "laterStartupFailureRetainsFailedAttachmentCleanupForRetry(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "nativePromotionRequiresDurableSourceMarker(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "migration, deferred runtime, and rebuild brake all fence recorded serving",
+          "status": "passed"
+        },
+        {
+          "name": "real boot attaches before recorded recovery and closes attachment after services",
+          "status": "passed"
+        },
+        {
+          "name": "running runtime swap fences generation until unlock and replacement publication",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java#refusalRetiresOnlySettledAcceptedUpsertAfterSourceProjectionIsProved",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1692372b0f1bc9c215da48e8f4345bc7e7600ff9dc6d9b0356c733e59ba7103e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusalRetiresOnlySettledAcceptedUpsertAfterSourceProjectionIsProved()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java#capturedReplayRefreshesBeforeCertifyingPlannedH1AndIndexedH2",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1692372b0f1bc9c215da48e8f4345bc7e7600ff9dc6d9b0356c733e59ba7103e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "capturedReplayRefreshesBeforeCertifyingPlannedH1AndIndexedH2()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "18a242439",
+    "revision": "18a242439e636df73dd3effdba8bed170a7c4936",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerRecordedIngestionTest\" --tests \"io.justsearch.indexerworker.server.ops.SwitchBufferStrictReplayTest.refusalRetiresOnlySettledAcceptedUpsertAfterSourceProjectionIsProved\" --tests \"io.justsearch.indexerworker.server.ops.SwitchBufferStrictReplayTest.capturedReplayRefreshesBeforeCertifyingPlannedH1AndIndexedH2\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 59790
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecordedIngestionTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java#refusalRetiresOnlySettledAcceptedUpsertAfterSourceProjectionIsProved",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java#capturedReplayRefreshesBeforeCertifyingPlannedH1AndIndexedH2",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:8da5760bbe762312675b69168fd0ac6a76e8030d4bbf965ebe1335a7a80da918"
+}

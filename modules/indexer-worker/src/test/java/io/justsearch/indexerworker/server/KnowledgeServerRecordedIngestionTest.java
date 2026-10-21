@@ -805,10 +805,10 @@ final class KnowledgeServerRecordedIngestionTest {
     reconcile.setAccessible(true);
     reconcile.invoke(server);
 
-    var order = org.mockito.Mockito.inOrder(producer, queue, green, manager);
+    var order = org.mockito.Mockito.inOrder(producer, fields, queue, green, manager);
     order.verify(producer).commitActiveLexicalProjectionForCutover();
-    order.verify(queue).matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash,
-        hash);
+    order.verify(fields).getDocumentFieldOrThrow(file.toString(),
+        io.justsearch.indexing.SchemaFields.SOURCE_SHA256);
     order.verify(queue).removeReplayedSwitchBufferOps(List.of(version));
     order.verify(producer).close();
     order.verify(green).close();
