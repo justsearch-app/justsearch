@@ -1376,19 +1376,19 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     try {
       ensureOpen();
       try (PreparedStatement query = connection.prepareStatement(
-          "SELECT state, unit_revision, planned_source_sha256, content_hash FROM jobs WHERE path = ?")) {
+          "SELECT state, content_hash FROM jobs WHERE path = ?")) {
         query.setString(1, path);
         try (ResultSet row = query.executeQuery()) {
           if (!row.next()) return false;
           if (STATE_PENDING.equals(row.getString("state"))) return true;
-          String revision = row.getString("unit_revision");
-          String planned = row.getString("planned_source_sha256");
+          // Only a write records content_hash, and every admission clears it, so a hash here
+          // was written by this admission or a later one; a retired, refused or skipped row has
+          // none. A later admission's bytes supersede the accepted ones even when they differ
+          // from its captured plan, because the file legitimately changed again.
           String committed = row.getString("content_hash");
           return STATE_DONE.equals(row.getString("state"))
-              && revision != null && !unitRevision.equals(revision)
-              && JobQueue.IngestionLedgerTransition.isSha256(indexedSourceSha256)
-              && indexedSourceSha256.equals(planned)
-              && (committed == null || indexedSourceSha256.equals(committed));
+              && JobQueue.IngestionLedgerTransition.isSha256(committed)
+              && committed.equals(indexedSourceSha256);
         }
       }
     } catch (SQLException unavailable) {

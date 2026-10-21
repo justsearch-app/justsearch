@@ -1648,14 +1648,27 @@ public final class KnowledgeServerMigrationOps {
         }
         String indexed = context.ingestLifecycle().documentFieldOps()
             .getDocumentFieldOrThrow(upsert.path(), SchemaFields.SOURCE_SHA256);
+        // A refused candidate hands its admission to A only by A's committed effect: a pending
+        // row that A's writer runs after the restart, or A holding the bytes this admission or
+        // a later one wrote.
         if (refusedSourceRecovery
             && queue.sourceOwnsFileAdmission(upsert.path(), upsert.unitRevision(), indexed)) {
-          // Judged by A's committed effect: A already holds a later admission's exact bytes, or
-          // a pending row will produce the file on A when its writer runs after the restart.
           continue;
         }
         boolean settled = queue.matchesAcceptedFileProjection(
             upsert.path(), upsert.unitRevision(), upsert.sourceSha256(), indexed);
+        String onDisk = null;
+        if (settled && refusedSourceRecovery && upsert.sourceSha256().equals(indexed)) {
+          // The exact projection also accepts a row that wrote nothing (retired or refused)
+          // while A holds the witness. A captured witness names the plan's bytes, not the bytes
+          // a later watcher update admitted, so A must hold the file's current bytes as well.
+          onDisk = currentSource(upsert.path());
+          settled = indexed.equals(onDisk);
+        }
+        if (!settled && refusedSourceRecovery) {
+          settled = handUnappliedAdmissionToSource(context, queue, upsert, indexed,
+              onDisk != null ? onDisk : currentSource(upsert.path()));
+        }
         if (!settled) {
           context.log().warn("Buffered UPSERT lacks its accepted target projection: {}", upsert.path());
           return false;
@@ -1666,6 +1679,44 @@ public final class KnowledgeServerMigrationOps {
       context.log().warn("Buffered UPSERT projection evidence is unreadable", unavailable);
       return false;
     }
+  }
+
+  /** {@link #currentSource} of a path that is not on disk. */
+  private static final String SOURCE_GONE = "gone";
+
+  /** The file's SHA-256 now, {@link #SOURCE_GONE} when it is absent, or null when unreadable. */
+  private static String currentSource(String path) {
+    try {
+      return io.justsearch.indexerworker.loop.SourceContentHash.sha256(Path.of(path));
+    } catch (NoSuchFileException absent) {
+      return SOURCE_GONE;
+    } catch (IOException | RuntimeException unreadable) {
+      return null;
+    }
+  }
+
+  /**
+   * Refusal cleanup only: an accepted admission A does not hold and no pending row owns. The
+   * Engine may have retired its row unwritten, so nothing would ever bring A to the file. Queue
+   * one ordinary A job for the path (A's removal path when the file is gone) and hand over by the
+   * pending rule; the job counts only as pending work until A's writer runs it after the restart.
+   * A file A already lacks and the disk lacks needs nothing. An unreadable file stays unproved.
+   */
+  private static boolean handUnappliedAdmissionToSource(DrainSwitchBufferContext context,
+      SwitchBufferCapableQueue queue, SwitchBufferUpsert upsert, String indexed, String onDisk)
+      throws IOException {
+    if (onDisk == null) return false;
+    if (SOURCE_GONE.equals(onDisk) && indexed == null
+        && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(upsert.path()) == 0) {
+      return true; // A already shows the removal.
+    }
+    Path file = Path.of(upsert.path());
+    var entry = new JobQueue.EnqueueEntry(file, JobQueue.EnqueueEntry.stat(file).sizeBytes(),
+        upsert.provenance(), null, upsert.ingestionRoot());
+    if (queue.enqueueEntries(List.of(entry), upsert.collection()) != 1) return false;
+    context.log().info("Refused candidate queued its unapplied admission on the source: {}",
+        upsert.path());
+    return queue.sourceOwnsFileAdmission(upsert.path(), upsert.unitRevision(), indexed);
   }
 
   /** A broad receipt used to supersede a file witness must prove its complete final scope. */

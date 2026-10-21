@@ -136,15 +136,14 @@ class RecordedMigrationRestartRecoveryTest {
 
   // M1+: hand-over to A is judged by A's committed effect, on the real queue
   @Test
-  void aLaterFinishedAdmissionDoesNotHandAnUnappliedUpdateToA(@TempDir Path tempDir)
+  void aLaterFinishedAdmissionQueuesTheUnappliedUpdateOnA(@TempDir Path tempDir)
       throws Exception {
     // A later admission of the file finished (its row is DONE) but A still holds stale bytes
-    // and no work is pending: nothing will ever bring the accepted update to A.
+    // and no work is pending: the row alone never hands over. Cleanup queues an ordinary A job
+    // and hands over by it, so this one restart ends the operation.
     try (var handover = new RealQueueHandover(tempDir, "DONE", "stale")) {
       handover.reconcile();
-      assertEquals(1, handover.journalSize(), "the unapplied update stays in the journal");
-      assertFalse(handover.restarted.get(), "Green is retained");
-      assertEquals(handover.building, handover.manager.readStateBestEffort().building_generation());
+      handover.assertQueuedOnAThenHandedOver();
     }
   }
 
@@ -163,6 +162,36 @@ class RecordedMigrationRestartRecoveryTest {
   @Test
   void aLaterAdmissionCommittedOnAHandsTheUpdateToA(@TempDir Path tempDir) throws Exception {
     try (var handover = new RealQueueHandover(tempDir, "DONE", "later")) {
+      handover.reconcile();
+      assertEquals(0, handover.journalSize());
+      assertTrue(handover.restarted.get());
+      assertEquals("IDLE", handover.manager.readStateBestEffort().migration_state());
+    }
+  }
+
+  // M1+: a later row retired or refused without writing is not A's effect
+  @Test
+  void aRetiredLaterAdmissionQueuesTheUnappliedUpdateOnA(@TempDir Path tempDir)
+      throws Exception {
+    // The refused walk retired the file's later row (DONE, nothing written). Its captured plan
+    // names the bytes A still holds, but the accepted watcher update never reached A. One
+    // restart after the crash reaches IDLE: cleanup queues an ordinary A job and hands over.
+    String onA = RealQueueHandover.STALE;
+    try (var handover = new RealQueueHandover(tempDir, "DONE", onA, null, onA)) {
+      handover.reconcile();
+      handover.assertQueuedOnAThenHandedOver();
+    }
+  }
+
+  // M1+: A committed a later captured revision whose bytes changed after its plan
+  @Test
+  void aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA(@TempDir Path tempDir)
+      throws Exception {
+    // The later admission's plan kept the captured bytes, its writer committed newer ones, and
+    // A holds them: the accepted update is superseded and nothing pending can improve on it.
+    String committed = RealQueueHandover.LATER;
+    try (var handover = new RealQueueHandover(
+        tempDir, "DONE", RealQueueHandover.STALE, committed, committed)) {
       handover.reconcile();
       assertEquals(0, handover.journalSize());
       assertTrue(handover.restarted.get());
@@ -527,8 +556,23 @@ class RecordedMigrationRestartRecoveryTest {
     final AtomicBoolean restarted = new AtomicBoolean();
     final String building;
     final KnowledgeServer server;
+    final String key;
+    final Path database;
+
+    static final String LATER = "c".repeat(64);
+    static final String STALE = "d".repeat(64);
 
     RealQueueHandover(Path tempDir, String laterState, String sourceHolds) throws Exception {
+      this(tempDir, laterState, LATER, "DONE".equals(laterState) ? LATER : null,
+          "later".equals(sourceHolds) ? LATER : STALE);
+    }
+
+    /**
+     * The later row carries {@code planned} as its plan and {@code committed} as its written
+     * content hash (null when it wrote nothing); A's committed source witness is {@code onA}.
+     */
+    RealQueueHandover(Path tempDir, String laterState, String planned, String committed,
+        String onA) throws Exception {
       var layout = preparedLayout(tempDir);
       var lifecycle = mock(RecordedIngestionLifecycle.class);
       server = new KnowledgeServer(new TestEngineExecutors(),
@@ -545,16 +589,15 @@ class RecordedMigrationRestartRecoveryTest {
       queue.open();
       assertTrue(queue.enqueueAndBufferFileForGeneration(
           building, JobQueue.EnqueueEntry.stat(file), null, null));
-      String key = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
-      String later = "c".repeat(64);
-      try (var connection = java.sql.DriverManager.getConnection(
-              "jdbc:sqlite:" + tempDir.resolve("handover.db").toAbsolutePath());
+      key = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
+      database = tempDir.resolve("handover.db").toAbsolutePath();
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database);
           var update = connection.prepareStatement("UPDATE jobs SET state = ?, unit_revision = ?, "
               + "planned_source_sha256 = ?, content_hash = ? WHERE path = ?")) {
         update.setString(1, laterState);
         update.setString(2, "later-revision");
-        update.setString(3, later);
-        update.setString(4, "DONE".equals(laterState) ? later : null);
+        update.setString(3, planned);
+        update.setString(4, committed);
         update.setString(5, key);
         assertEquals(1, update.executeUpdate());
       }
@@ -563,7 +606,7 @@ class RecordedMigrationRestartRecoveryTest {
       when(source.documentFieldOps()).thenReturn(fields);
       when(source.commitOps()).thenReturn(mock(CommitOps.class));
       when(fields.getDocumentFieldOrThrow(key, SchemaFields.SOURCE_SHA256))
-          .thenReturn("later".equals(sourceHolds) ? later : "d".repeat(64));
+          .thenReturn(onA);
       var owner = new Object();
       var producer = mock(DefaultWorkerAppServices.class);
       when(producer.mutationAdmission()).thenReturn(new WorkerMutationAdmission(owner));
@@ -591,6 +634,25 @@ class RecordedMigrationRestartRecoveryTest {
 
     int journalSize() {
       return queue.listSwitchBufferOpsStrict().size();
+    }
+
+    /** The journal is acknowledged only because an ordinary pending A job now owns the file. */
+    void assertQueuedOnAThenHandedOver() throws Exception {
+      assertEquals(0, journalSize(), "the accepted update is acknowledged");
+      assertTrue(restarted.get(), "cleanup finished in this process");
+      assertEquals("IDLE", manager.readStateBestEffort().migration_state());
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database);
+          var query = connection.prepareStatement("SELECT state, unit_revision, scan_id, "
+              + "planned_source_sha256 FROM jobs WHERE path = ?")) {
+        query.setString(1, key);
+        try (var row = query.executeQuery()) {
+          assertTrue(row.next());
+          assertEquals("PENDING", row.getString("state"), "A's writer runs it after the restart");
+          assertFalse("later-revision".equals(row.getString("unit_revision")), "a new admission");
+          assertNull(row.getString("scan_id"));
+          assertNull(row.getString("planned_source_sha256"), "the writer reads the file's bytes");
+        }
+      }
     }
 
     @Override

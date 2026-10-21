@@ -141,8 +141,9 @@ public interface SwitchBufferCapableQueue extends JobQueue {
   /**
    * True when the generation whose committed source witness is {@code indexedSourceSha256}
    * holds this admission's effect or a later one, or will: the path's row is pending (its
-   * writer has not run yet), or a later admission replaced {@code unitRevision} and finished
-   * with exactly the bytes that generation committed. A finished row alone never proves it.
+   * writer has not run yet), or the writer of this admission or of a later one that replaced
+   * {@code unitRevision} committed exactly the bytes that generation holds. A finished row alone
+   * never proves it: a retired, refused or skipped row wrote nothing.
    */
   default boolean sourceOwnsFileAdmission(
       String path, String unitRevision, String indexedSourceSha256) {

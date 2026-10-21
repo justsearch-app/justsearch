@@ -14,8 +14,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * A refused candidate's accepted file admission is handed to the surviving generation only by
- * that generation's committed effect: a pending row that will produce the file there, or a later
- * finished admission whose exact bytes that generation committed. A row's status alone is not.
+ * that generation's committed effect: a pending row that will produce the file there, or the
+ * accepted or a later admission whose writer committed exactly the bytes that generation holds. A row's status alone
+ * is not: a retired or refused row wrote nothing.
  */
 final class QueueAdmissionOwnershipTest {
   private static final String LATER = "c".repeat(64);
@@ -24,7 +25,7 @@ final class QueueAdmissionOwnershipTest {
   @TempDir Path tempDir;
 
   @Test
-  void onlyAPendingRowOrACommittedLaterAdmissionHandsTheFileToTheSource() throws Exception {
+  void onlyAPendingRowOrACommittedWriteHandsTheFileToTheSource() throws Exception {
     Path db = tempDir.resolve("ownership.db");
     Path file = Files.writeString(tempDir.resolve("owned.txt"), "first").toAbsolutePath();
     String key = PathNormalizer.normalizeKey(file);
@@ -39,8 +40,11 @@ final class QueueAdmissionOwnershipTest {
       assertTrue(queue.sourceOwnsFileAdmission(key, accepted, null), "a pending row will run");
 
       set(db, key, "DONE", accepted, LATER, LATER);
+      assertTrue(queue.sourceOwnsFileAdmission(key, accepted, LATER),
+          "the accepted admission's own write committed the bytes the source holds");
+      set(db, key, "DONE", accepted, LATER, null);
       assertFalse(queue.sourceOwnsFileAdmission(key, accepted, LATER),
-          "the accepted revision itself is proven by its exact projection, not here");
+          "the accepted admission retired without writing is no effect, even when its plan matches");
       set(db, key, "PROCESSING", "later-revision", LATER, null);
       assertFalse(queue.sourceOwnsFileAdmission(key, accepted, LATER), "a claim is not an effect");
 
@@ -51,6 +55,13 @@ final class QueueAdmissionOwnershipTest {
           "a later finished row with stale source bytes hands nothing over");
       assertFalse(queue.sourceOwnsFileAdmission(key, accepted, null),
           "a source without the file holds nothing");
+
+      set(db, key, "DONE", "later-revision", STALE, null);
+      assertFalse(queue.sourceOwnsFileAdmission(key, accepted, STALE),
+          "a later row retired without writing is no effect, even when its plan matches the source");
+      set(db, key, "DONE", "later-revision", STALE, LATER);
+      assertTrue(queue.sourceOwnsFileAdmission(key, accepted, LATER),
+          "the source committed a later captured revision whose bytes changed after its plan");
     }
   }
 

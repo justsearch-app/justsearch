@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T01:25:32.252Z",
-  "revision": "02d503739e40821ad5ca6c19abd3ee57d934390c",
-  "tree": "061000b97a2c0c7a88124a08288c5f0aa8b44e98",
+  "createdAt": "2026-10-21T03:35:32.932Z",
+  "revision": "c44f281a0f5222e80547d93ef1d22bba9966afc3",
+  "tree": "f31698ad7d27fcb2614ce9ff2703580ae404a3dc",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,29 +18,29 @@
   },
   "runs": [
     {
-      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.QueueAdmissionOwnershipTest.onlyAPendingRowOrACommittedLaterAdmissionHandsTheFileToTheSource\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.QueueAdmissionOwnershipTest.onlyAPendingRowOrACommittedWriteHandsTheFileToTheSource\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2423
+      "durationMs": 1773
     }
   ],
   "checks": [
     {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java#onlyAPendingRowOrACommittedLaterAdmissionHandsTheFileToTheSource",
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java#onlyAPendingRowOrACommittedWriteHandsTheFileToTheSource",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:b17b085ea8de423084b9d20e4e6e6fd0f53c0615e0fdb3f9d8dc6b6fa1abae92",
+      "contentDigest": "sha256:5f53487657835c5af635e12dc857b4fbf500382cc677208bf30e0b2144b3234f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "onlyAPendingRowOrACommittedLaterAdmissionHandsTheFileToTheSource()",
+          "name": "onlyAPendingRowOrACommittedWriteHandsTheFileToTheSource()",
           "status": "passed"
         }
       ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:bb838a65cbd1b62a0cf599650242160322496e6dc849b81717de35ad4960710f"
+  "digest": "sha256:043fed5fecc90dab376e710e35b2f819addf2d5ed8f786340ab5bd208486f76f"
 }
