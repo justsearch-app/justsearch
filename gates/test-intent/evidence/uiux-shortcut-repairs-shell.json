@@ -1,0 +1,135 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T01:34:09.578Z",
+  "revision": "8ab5d0fab01976b6a50dd83f2337364d12c34378",
+  "tree": "b886cd7655d59174d2bfd8a5f2decf1ae71b3078",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc7_registration_reason_contains_no_internal_error_text\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4202
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2466
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2785
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc7_registration_reason_contains_no_internal_error_text",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d539d665c4e1d6610bb904db43fb90471a94bad0b3777ce6a4ef253f5997463b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc7_registration_reason_contains_no_internal_error_text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d539d665c4e1d6610bb904db43fb90471a94bad0b3777ce6a4ef253f5997463b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d539d665c4e1d6610bb904db43fb90471a94bad0b3777ce6a4ef253f5997463b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "8ab5d0fab",
+    "revision": "8ab5d0fab01976b6a50dd83f2337364d12c34378",
+    "overlays": [
+      "modules/shell/src-tauri/tests/shortcut_x11_probe.py"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc7_registration_reason_contains_no_internal_error_text\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 14314,
+        "output": "\nrunning 1 test\ntest search_shortcut::tests::sc7_registration_reason_contains_no_internal_error_text ... FAILED\n\nfailures:\n\n---- search_shortcut::tests::sc7_registration_reason_contains_no_internal_error_text stdout ----\n\nthread 'search_shortcut::tests::sc7_registration_reason_contains_no_internal_error_text' (3231520) panicked at src/search_shortcut.rs:401:9:\nassertion failed: !reason.contains(\"HotKey\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    search_shortcut::tests::sc7_registration_reason_contains_no_internal_error_text\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-DjvzEs/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:947:15\n    |\n947 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.26s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/modules/shell/src-tauri/target/debug/deps/shell_lib-6dcccbf534b0ca9d)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 2436,
+        "output": "\nrunning 1 test\ntest search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client ... FAILED\n\nfailures:\n\n---- search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client stdout ----\n\nthread 'search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client' (3232353) panicked at src/search_shortcut.rs:428:13:\nassertion failed: probe().status.success()\n\nrunning 1 test\ntest search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client ... FAILED\n\nfailures:\n\nfailures:\n    search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.31s\n\n\n\nthread 'search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client' (3232376) panicked at src/search_shortcut.rs:492:17:\nassertion failed: probe().status.success()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.47s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-DjvzEs/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:947:15\n    |\n947 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.91s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/modules/shell/src-tauri/target/debug/deps/shell_lib-6dcccbf534b0ca9d)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 2276,
+        "output": "\nrunning 1 test\ntest search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden ... FAILED\n\nfailures:\n\n---- search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden stdout ----\n\nthread 'search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden' (3233271) panicked at src/search_shortcut.rs:428:13:\nassertion failed: count() > before\n\nrunning 1 test\ntest search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden ... FAILED\n\nfailures:\n\nfailures:\n    search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.38s\n\n\n\nthread 'search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden' (3233283) panicked at src/search_shortcut.rs:545:21:\nassertion failed: count() > before\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 160 filtered out; finished in 0.49s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-DjvzEs/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:947:15\n    |\n947 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.72s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/modules/shell/src-tauri/target/debug/deps/shell_lib-6dcccbf534b0ca9d)\nerror: test failed, to rerun pass `--lib`\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc7_registration_reason_contains_no_internal_error_text",
+        "classification": "assertion",
+        "detail": "search_shortcut::tests::sc7_registration_reason_contains_no_internal_error_text:  ---- search_shortcut::tests::sc7_registration_reason_contains_no_internal_error_text stdout ----\n\nthread 'search_shortcut::tests::sc7_registration_reason_contains_no_internal_error_text' (3231520) panicked at src/search_shortcut.rs:401:9:\nassertion failed: !reason.contains(\"HotKey\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    search_shortcut::tests::sc7_registration"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client",
+        "classification": "assertion",
+        "detail": "search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client:  ---- search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client stdout ----\n\nthread 'search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client' (3232353) panicked at src/search_shortcut.rs:428:13:\nassertion failed: probe().status.success()\n\nrunning 1 test\ntest search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client ... FAILED\n\nfailures:\n\nfailure"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden",
+        "classification": "assertion",
+        "detail": "search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden:  ---- search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden stdout ----\n\nthread 'search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden' (3233271) panicked at src/search_shortcut.rs:428:13:\nassertion failed: count() > before\n\nrunning 1 test\ntest search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidde"
+      }
+    ]
+  },
+  "digest": "sha256:60697548d66ba6df99a34528b2ffd98007af55f3433eda733052902697b43cb2"
+}
