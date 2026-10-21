@@ -84,6 +84,7 @@ import { copyToClipboard } from '../utils/clipboardCopy.js';
 import { whenKnown } from '../state/known.js';
 import {
   readinessNotice,
+  isIndexingObservation,
   reasonFor,
   isReindexCause,
   warrantsSearchDegradationBanner,
@@ -2596,7 +2597,7 @@ export class UnifiedChatView extends JfElement {
     const causes = dedupDegradationCauses(notice, verdict);
     return html`<jf-system-notice
       tone=${verdictTone(verdict.severity)}
-      live="status"
+      live=${verdict.reasons.some(isIndexingObservation) ? 'off' : 'status'}
       class="degradation-banner"
       data-testid="chat-degradation"
     >
@@ -2643,7 +2644,7 @@ export class UnifiedChatView extends JfElement {
     const count = causes.length;
     return html`<jf-system-notice
       tone=${verdictTone(verdict.severity)}
-      live="status"
+      live=${verdict.reasons.some(isIndexingObservation) ? 'off' : 'status'}
       class="degradation-banner degradation-banner-collapsed"
       data-testid="chat-degradation"
     >

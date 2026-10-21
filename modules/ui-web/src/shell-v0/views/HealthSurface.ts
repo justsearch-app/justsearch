@@ -909,12 +909,13 @@ export class HealthSurface extends JfElement {
     const memRatio = memMax > 0 ? memUsed / memMax : 0;
     // 813 §3b — the Queue card's number comes from the ONE indexing-progress projection, the same
     // authority `queueSubLabel` reads, so the card's value and its sub-text cannot disagree.
-    const queue = selectIndexingProgress(
+    const progress = selectIndexingProgress(
       this.status,
       this.aiState?.indexingStatusLive ?? false,
       this.aiState?.episodeMaxPendingJobs ?? 0,
       this.aiState?.enrichSettleSamples ?? [],
-    ).jobsPending;
+    );
+    const queue = progress.jobsPending;
     const memColor = memRatio > 0.9 ? 'red' : memRatio > 0.8 ? 'amber' : 'green';
     const memDot = memRatio > 0.9 ? 'error' : memRatio > 0.8 ? 'warning' : 'healthy';
     // §2.B: when no status has arrived, the honest value is "—" (unknown),
@@ -953,7 +954,7 @@ export class HealthSurface extends JfElement {
         { label: 'Files', value: filesDisp, icon: 'file-text', tone: !this.provisional && known && docs > 0 ? 'success' : 'neutral', sub: lastKnownIdx ? 'Last known' : undefined },
         { label: 'Size', value: sizeDisp, icon: 'database', tone: 'neutral', sub: lastKnownSize ? 'Last known' : undefined },
         { label: 'Memory', value: memVal, icon: 'memory-stick', tone: memDot === 'healthy' ? 'success' : memDot, sub: memMax > 0 ? `of ${formatBytes(memMax)}` : undefined },
-        { label: 'Queue', value: wkr(NUM.format(queue)), icon: 'zap', tone: !this.provisional && queue > 0 ? 'warning' : 'neutral', sub: this.queueSubLabel(queue, known) },
+        { label: 'Queue', value: wkr(NUM.format(queue)), icon: 'zap', tone: progress.activity.confirmed && !this.provisional && queue > 0 ? 'warning' : 'neutral', sub: this.queueSubLabel(queue, known) },
       ];
       // 594 §11.3 #4 — thread THIS surface's 571 altitude (read from the catalog, not re-declared) so
       // the engine renders absent capabilities as "<name> off" on this DIAGNOSTIC surface.
@@ -1021,8 +1022,8 @@ export class HealthSurface extends JfElement {
               <span class="card-label">Queue</span>
             </div>
             <jf-status-dot
-              tone=${!this.provisional && queue > 0 ? 'warning' : 'neutral'}
-              ?live=${!this.provisional && queue > 0}
+              tone=${progress.activity.confirmed && !this.provisional && queue > 0 ? 'warning' : 'neutral'}
+              ?live=${progress.activity.confirmed && !this.provisional && queue > 0}
             ></jf-status-dot>
           </div>
           <div class="card-value">${wkr(NUM.format(queue))}</div>

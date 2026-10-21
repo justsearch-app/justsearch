@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: builder-uiux-status-sweep-20261020
+author-session: builder-uiux-status-continuation-20261021
 ---
 
 # Test-intent entries
@@ -12,6 +12,8 @@ Durable WP3.3 checks, updated for the second verifier's S33.4 observation-age re
 Third-verifier follow-up: Brain honours explicit stale flags as well as observation age. Additional exact-candidate fail-before evidence is in `gates/test-intent/evidence/uiux-status-explicit-stale-a53780a50.json`; the original-base evidence is regenerated after the final test edits. The active measured fixture variants are stamped at response time; their registered gate checks are unchanged.
 
 Fourth-verifier follow-up: all remaining current indexing claims use shared confirmation and hold scope, including Health connection and summary, Brain deferral, file rows, both Search paths and declared liveness. The final durable sweep has original-base and exact-repair-base evidence. Existing fixture adaptations preserve their assertions; independent final acceptance remains required.
+
+Fifth-verifier follow-up: the independent inventory adds worker encoder/passage readiness, stale migration readouts and empty roots, overlay/fallback-dot animations, all indexing live regions, and Brain runtime queue counters. New regression evidence includes both the original and exact repair baseline; existing author evidence is regenerated after final test edits. No acceptance record is authored here.
 
 The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.1–S33.6. Each source retains its original ID in agreedScenario and its verbatim agreed quote.
 
@@ -215,7 +217,7 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
         "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts"
       ],
       "class": "New",
-      "behaviour": "Replace the old whole-queue paused expectation under energy saver with continued text indexing and enrichment deferral; the positive queued-work/power fixture remains the same. The handcrafted AiState fixture gains indexingStatusLive, following its existing live override unless explicitly supplied; all existing oracles are retained.",
+      "behaviour": "Replace the old whole-queue paused expectation under energy saver with continued text indexing and enrichment deferral; the positive queued-work/power fixture remains the same. The handcrafted AiState fixture gains indexingStatusLive, following its existing live override unless explicitly supplied; all existing oracles are retained. Migration announcements now use the single indexing region, supplied with a confirmed worker observation; the pre-existing polite role/hidden/headline expectations remain. An unconfirmed migration cannot emit a second current rebuild claim.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -228,7 +230,8 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
       ],
       "evidence": "gates/test-intent/evidence/uiux-status-ui.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts#S33.1 energy saver names continued text indexing and deferred enrichment"
+        "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts#S33.1 energy saver names continued text indexing and deferred enrichment",
+        "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts#595 \u00a715.1 (E1): a visually-hidden aria-live announcer mirrors the verdict, politely"
       ],
       "repaired": true
     },
@@ -458,7 +461,7 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
         "modules/ui-web/src/shell-v0/components/indexingSurfaceSweep.test.ts"
       ],
       "class": "New",
-      "behaviour": "S33.1–S33.6: sweep every live indexing/readiness/progress consumer across energy saver, game, external GPU, chat, expired observations, explicit staleness and Engine loss. Health connection, summary/header, rebuild, queues and chat-off reason; Brain runtime, enrichment and compatibility cards; both Library render paths; Tasks/stages, System self-view and running-job chip; AI-mode pill and declared liveness; both Search banners and composer. Retained file rows are last observed while independent agent tasks remain current. Deferred enrichment does not animate. Parked runtime mode alone cannot promise work; unfinished rebuild fractions stay below 100. The deck alone announces indexing activity. All 21 checks fail by assertion on f6a14b5a6 and 1427aad2f (additional exact evidence in uiux-status-sweep-1427aad2f.json). These are durable behavior checks using real renderers and the production observation clock, without transport or timer leakage. Brain runtime checks include awaitingChatEnable both false and true, and compatibility diagnostics include both coded and fallback leads; neither branch may hide hold reasons or confirmation.",
+      "behaviour": "S33.1\u2013S33.6: sweep every live indexing/readiness/progress consumer across energy saver, game, external GPU, chat, expired observations, explicit staleness and Engine loss. Health connection, summary/header, rebuild, queues and chat-off reason; Brain runtime, enrichment and compatibility cards; both Library render paths; Tasks/stages, System self-view and running-job chip; AI-mode pill and declared liveness; both Search banners and composer. Retained file rows are last observed while independent agent tasks remain current. Deferred enrichment does not animate. Parked runtime mode alone cannot promise work; unfinished rebuild fractions stay below 100. The deck alone announces indexing activity. All 21 checks fail by assertion on f6a14b5a6 and 1427aad2f (additional exact evidence in uiux-status-sweep-1427aad2f.json). These are durable behavior checks using real renderers and the production observation clock, without transport or timer leakage. Brain runtime checks include awaitingChatEnable both false and true, and compatibility diagnostics include both coded and fallback leads; neither branch may hide hold reasons or confirmation.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -554,7 +557,7 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
       "moved": [
         "input re-encoding"
       ],
-      "whatMoved": "Existing capability, empty-corpus remedy and readiness-banner scenarios now supply confirmed worker observations alongside their capability verdicts. The indexing case supplies a positive observed file queue rather than relying on runtime mode alone; idle cases supply an empty healthy queue. The same preconditions and all expected wording, availability, remedies and disclosure predicates are retained; one test title names confirmed status instead of runtime mode. All six adapted fixture suites (including TaskList/SystemSelfView rebuildPercent signature additions) pass 352 checks on 1427aad2f in tmp/uiux-status/resume-fixtures-before-1427.log. Candidate evidence is attached.",
+      "whatMoved": "Existing capability, empty-corpus remedy and readiness-banner scenarios now supply confirmed worker observations alongside their capability verdicts. The indexing case supplies a positive observed file queue rather than relying on runtime mode alone; idle cases supply an empty healthy queue. The same preconditions and all expected wording, availability, remedies and disclosure predicates are retained; one test title names confirmed status instead of runtime mode. All six adapted fixture suites (including TaskList/SystemSelfView rebuildPercent signature additions) pass 352 checks on 1427aad2f in tmp/uiux-status/resume-fixtures-before-1427.log. Candidate evidence is attached. The mounted Search v3 feed also supplies the same healthy IDLE worker observation as its pure projection fixtures; existing headline/remedy assertions remain unchanged. Both the mounted Search v3 and Brain Runtime fixture suites pass 53 checks on unchanged 8dbeb7557 (tmp/uiux-status/continuation-preservation-before.log). Final candidate fixture evidence is regenerated.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -582,6 +585,121 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-status-fixtures.json"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Verifier-5 independent inventory regressions: worker-derived encoder and passage readiness across both Search paths, Browse empty roots and migration mode/readout accessible names, conditional overlay animation through the real host with text indexing preserved and total-loss withdrawal, exactly one live indexing announcement (including migration) and silent repeated/numeric polls, Brain runtime queues from the shared worker projection during partial status loss, and Health fallback dot confirmation. Cases cover energy, game, external GPU, chat, expired observations, explicit worker/indexing staleness, unavailable worker and Engine loss. No lifecycle or wire change. Nine durable checks assertion-fail on 8dbeb7557 and f6a14b5a6; the exact-base evidence is uiux-status-missed-8dbeb7557.json. Unknown worker queues render dashes, never invented zero counts.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S331",
+          "quote": "S33.1 (broken today) With energy saver on and files queued, no surface says indexing as a whole is paused; surfaces say that text indexing continues and which enrichment waits and why. With the file queue empty but enrichment waiting, they say enrichment is deferred to save energy, not Ready and not Paused.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.1"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S332",
+          "quote": "S33.2 Under a game or external GPU load, surfaces name the reason and the work it holds, checked separately with enrichment on GPU and on CPU; they never claim that unaffected work stopped.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.2"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S333",
+          "quote": "S33.3 While chat generates, surfaces either name chat as the reason indexing is slower or show no reason; never a reason that is not present.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.3"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S334",
+          "quote": "S33.4 When a reason clears, its explanation disappears after the next fresh status observation; when status is stale or unavailable, surfaces mark the observation as unconfirmed instead of asserting current activity or quiescence.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.4"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S335",
+          "quote": "S33.5 (broken today) With positive remaining work, no progress figure claims completion; before any drain is observed, no percentage is invented (indexing and enrichment percent alike).",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.5"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S336",
+          "quote": "S33.6 The same state is described consistently on status deck, task list, Health, Library rows and the overlay; changes are announced once to screen readers, not on every poll.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.6"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.3 automatic-hold wording and read-only status observability; automatic hold actuation remains unchanged.",
+          "choice": "Decision 4: keep operating.indexing as is; the UI words reasons by the work they hold, and the contract docs state that PAUSED with automatic reasons means GPU bulk/enrichment held (no wire state change). Preserve old strict clients by retaining the original public status shape. Explain idle enrichment and interleaved sparse scheduling separately: energy saver defers idle work, GPU holds also defer sparse work between files on CPU. Placement is unreported; CPU-only idle work may continue under GPU holds. Fixed wording is authored once in the shared activity projection; the status deck owns its semantic live announcement.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-status-missed.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 encoder and passage readiness observations are qualified on both Search paths",
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 Browse empty roots never infer a current rebuild from unconfirmed migration",
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 migration mode pills qualify retained rebuilding while preserving fresh migration",
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 declared liveness readouts qualify retained migration and its accessible name",
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.1 S33.4 overlay activity animation stops during deferred work and uncertainty, then resumes",
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.6 Search and deck announce an indexing transition once, with silent numeric and identical polls",
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims",
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 Brain runtime queues use worker counts and confirmation even with fresh inference contact",
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 Health fallback queue dot cannot animate an unconfirmed observation"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The healthy Runtime preservation case supplies its original 4,789 pending embeddings through worker.enrichment.embeddingPendingCount as well as inference.embeddingQueueSize. The shared worker projection owns this readout now. All existing wording, count, control availability and tense assertions are identical; the enrichment-card fixtures and assertions retain their original 5,084 pending count. The complete adapted suite also passes on unchanged 8dbeb7557 (repair5-preservation-before.log).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S334",
+          "quote": "S33.4 When a reason clears, its explanation disappears after the next fresh status observation; when status is stale or unavailable, surfaces mark the observation as unconfirmed instead of asserting current activity or quiescence.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.4"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S336",
+          "quote": "S33.6 The same state is described consistently on status deck, task list, Health, Library rows and the overlay; changes are announced once to screen readers, not on every poll.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.6"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.3 automatic-hold wording and read-only status observability; automatic hold actuation remains unchanged.",
+          "choice": "Decision 4: keep operating.indexing as is; the UI words reasons by the work they hold, and the contract docs state that PAUSED with automatic reasons means GPU bulk/enrichment held (no wire state change). Preserve old strict clients by retaining the original public status shape. Explain idle enrichment and interleaved sparse scheduling separately: energy saver defers idle work, GPU holds also defer sparse work between files on CPU. Placement is unreported; CPU-only idle work may continue under GPU holds. Fixed wording is authored once in the shared activity projection; the status deck owns its semantic live announcement.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-status-missed-preservation.json"
     }
   ]
 }

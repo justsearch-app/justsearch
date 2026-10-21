@@ -352,10 +352,11 @@ describe('StatusDeck (slice 461)', () => {
 
   it('595 §15.1 (E1): a visually-hidden aria-live announcer mirrors the verdict, politely', async () => {
     const announcer = (el: StatusDeck) =>
-      el.shadowRoot?.querySelector('[data-testid="verdict-announcer"]');
+      el.shadowRoot?.querySelector('[data-testid="indexing-announcer"]');
     const el = make();
     el.aiState = makeAiState({
       verdict: { kind: 'transitioning', severity: 'busy', reasons: ['rebuilding'] },
+      status: { worker: { core: { indexState: 'INDEXING', pendingJobs: 4, indexHealthy: true } } } as AiState['status'],
     });
     await el.updateComplete;
     const a = announcer(el);

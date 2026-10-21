@@ -32,7 +32,7 @@ import {
 // Tempdoc 814 §D5 / §B.7 — the chip's yield rule reads the SAME banner-presence authority the chat
 // surface's banner does, and the SAME activeSurface Shell already publishes on every navigation.
 // No new signal, no state fork.
-import { readinessNotice, warrantsSearchDegradationBanner } from '../state/readinessNotice.js';
+import { isIndexingObservation, readinessNotice, warrantsSearchDegradationBanner } from '../state/readinessNotice.js';
 import { getShellContext, subscribeShellContext } from '../state/shellContextState.js';
 import { presentVerdict, type VerdictKind } from '../state/verdict.js';
 import { presentAiEngineVerdict, type AiEngineKind } from '../state/aiVerdict.js';
@@ -481,9 +481,12 @@ export class StatusDeck extends JfElement {
       ? statusWithoutVerdictFlavor(s)
       : { label: s?.statusLabel ?? 'offline', tone: this.inferencePillTone() };
     // Runtime mode says who owns the GPU, not whether its enrichment cycle is running.
-    if (s?.aiEngine.kind === 'indexing' && readout.label === 'Indexing') {
+    const indexingMode = s?.aiEngine.kind === 'indexing' && readout.label === 'Indexing';
+    const indexingTransition = s?.verdict.kind === 'transitioning' && s.verdict.reasons.some(isIndexingObservation);
+    if (s && (indexingMode || indexingTransition)) {
       const { activity } = selectIndexingProgress(s.status, s.indexingStatusLive, s.episodeMaxPendingJobs, s.enrichSettleSamples);
-      return { label: activity.summary, tone: activity.confirmed ? readout.tone : 'neutral' };
+      if (!activity.confirmed) return { label: activity.summary, tone: 'neutral' };
+      if (indexingMode) return { label: activity.summary, tone: readout.tone };
     }
     return readout;
   }
@@ -715,11 +718,16 @@ export class StatusDeck extends JfElement {
       this.status, this.aiState?.indexingStatusLive ?? false,
       this.aiState?.episodeMaxPendingJobs ?? 0, this.aiState?.enrichSettleSamples ?? [],
     );
-    const indexingAnnounce = [progress.activity.summary, progress.activity.detail].filter(Boolean).join(' — ');
+    const indexingTransition = this.aiState?.verdict.kind === 'transitioning' &&
+      this.aiState.verdict.reasons.some(isIndexingObservation);
+    // Migration and holds are one indexing subject, including when its observation expires.
+    const indexingAnnounce = [indexingTransition && progress.activity.confirmed
+      ? announce?.text ?? progress.activity.summary : progress.activity.summary,
+    progress.activity.detail].filter(Boolean).join(' — ');
     return html`
-      <jf-system-notice class="visually-hidden" live="polite" data-testid="indexing-announcer"
+      <jf-system-notice class="visually-hidden" live="status" data-testid="indexing-announcer"
         >${indexingAnnounce}</jf-system-notice>
-      ${announce
+      ${announce && !indexingTransition
         ? html`<jf-system-notice
             class="visually-hidden"
             live=${announce.politeness}

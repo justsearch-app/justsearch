@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-20T18:23:45.415Z",
-  "revision": "1427aad2f219fade000b3933f2cf48032409a9bf",
-  "tree": "f8e59128c72891d53f049cc837d013105ec8ecf5",
+  "createdAt": "2026-10-21T01:56:44.500Z",
+  "revision": "8dbeb755730762c155c9422302bf0b9f419020ab",
+  "tree": "e3ce4a21c3db1b28a89902241ba637b16798bfb2",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/shell-v0/state/availability.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.degradation.test.ts\" \"src/shell-v0/views/UnifiedChatView.test.ts\" \"src/shell-v0/components/CapabilityMap.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-vitest-2540156-1792520621914.json\"",
+      "command": "npx vitest run \"src/shell-v0/state/availability.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.degradation.test.ts\" \"src/shell-v0/views/UnifiedChatView.test.ts\" \"src/shell-v0/components/CapabilityMap.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-vitest-1761750-1792547799926.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3497
+      "durationMs": 4571
     }
   ],
   "checks": [
@@ -136,7 +136,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.degradation.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.degradation.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:89761c64f60ea90f97eed5315fc7353145681b4bf44c2235c24fff0d3c11520d",
+      "contentDigest": "sha256:ac0fefa00940a2e8644d7cba1811a004d0e3f43d6c8ebae61d62d53b2ca54806",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1271,5 +1271,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:041c5cbab2d3050f83479379a7b6054c12ba1b5f63381e22d5c383e12d0fe1af"
+  "digest": "sha256:b98eeec684f3a5434c61637a0b256a8584f916a34cc7f997fa720358560ea022"
 }

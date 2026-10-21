@@ -34,6 +34,7 @@ export class IndexingOverlay extends JfElement {
     embeddingQueueSize: { type: Number, attribute: 'embedding-queue-size' },
     vduQueueSize: { type: Number, attribute: 'vdu-queue-size' },
     activity: { attribute: false },
+    textIndexing: { type: Boolean },
     switching: { type: Boolean },
     dismissible: { type: Boolean },
   };
@@ -41,6 +42,7 @@ export class IndexingOverlay extends JfElement {
   declare embeddingQueueSize: number;
   declare vduQueueSize: number;
   declare activity: ReturnType<typeof selectIndexingProgress>['activity'];
+  declare textIndexing: boolean;
   declare switching: boolean;
   declare dismissible: boolean;
 
@@ -69,6 +71,7 @@ export class IndexingOverlay extends JfElement {
   constructor() {
     super();
     this.activity = selectIndexingProgress(null, false, 0, []).activity;
+    this.textIndexing = false;
     this.embeddingQueueSize = 0;
     this.vduQueueSize = 0;
     this.switching = false;
@@ -118,6 +121,8 @@ export class IndexingOverlay extends JfElement {
       background: var(--accent-chat-16);
       border-radius: 0.5rem;
       color: var(--text-chat);
+    }
+    .icon-box.active {
       animation: spin 3s linear infinite;
     }
     h3 {
@@ -225,12 +230,14 @@ export class IndexingOverlay extends JfElement {
   override render(): TemplateResult {
     const total = this.embeddingQueueSize + this.vduQueueSize;
     const hasWork = total > 0;
+    const active = this.activity.confirmed &&
+      (this.textIndexing || (hasWork && !this.activity.enrichmentDeferred));
     return html`
       <div class="backdrop">
         <div class="card" role="dialog" aria-modal="true">
           <div class="head">
             <div class="head-left">
-              <div class="icon-box">${icon({ name: 'cpu', size: 22 })}</div>
+              <div class=${active ? 'icon-box active' : 'icon-box'}>${icon({ name: 'cpu', size: 22 })}</div>
               <div>
                 <h3>${this.activity.summary}</h3>
                 <p class="sub">Chat &amp; Q&amp;A paused — search still works</p>
@@ -400,6 +407,7 @@ export class IndexingOverlayHost extends JfElement {
         @go-online=${() => void this.handleGoOnline()}
         @dismiss=${() => (this.userDismissed = true)}
         .activity=${progress.activity}
+        .textIndexing=${progress.phase === 'indexing'}
       ></jf-indexing-overlay>
     `;
   }

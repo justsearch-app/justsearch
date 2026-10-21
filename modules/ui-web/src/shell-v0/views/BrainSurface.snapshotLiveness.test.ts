@@ -438,7 +438,11 @@ describe('BrainSurface — Runtime card (807)', () => {
   });
 
   it('ANTI-REGRESSION: a healthy verdict leaves the Runtime readout and its controls alone', () => {
-    const dom = domOf(harness(true).renderRuntimeSection());
+    const el = harness(true);
+    // This preservation case describes one healthy queue observation on both transports.
+    const status = el.systemStatus as { worker: { enrichment: { embeddingPendingCount: number } } };
+    status.worker.enrichment.embeddingPendingCount = 4789;
+    const dom = domOf(el.renderRuntimeSection());
     expect(dom.textContent).not.toContain(DISCONNECTED);
     expect(dom.textContent).toContain('available'); // CUDA: available
     expect(dom.textContent).toContain(num(4789)); // embed queue, un-caveated

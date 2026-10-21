@@ -1034,6 +1034,14 @@ function pickRemedy(codes: readonly string[]): NoticeRemedy {
   return OPEN_HEALTH;
 }
 
+/** Worker-derived readiness and migration observations share the indexing confirmation clock. */
+export function isIndexingObservation(code: string): boolean {
+  return code.startsWith('index.') || code.startsWith('migration.') ||
+    code.startsWith('chunk_embedding.') || code.startsWith('encoders.health.') || code === 'encoders.reloading' ||
+    code === 'rebuilding' || code === 'generation-switch' || code === 'catching-up' ||
+    code === 'inference.gpu_yielded_to_indexing' || code === 'inference.up_for_background';
+}
+
 /**
  * Tempdoc 596 §17 — the per-affordance read-seam over the ONE reason vocabulary. The CONTROL-scoped
  * projection (`projectAvailability`) reads `{ wording, remedy }` for a single reason-code here, the
@@ -1041,11 +1049,6 @@ function pickRemedy(codes: readonly string[]): NoticeRemedy {
  * project from — so a control's reason and the window's reason, and their remedies, cannot drift. An
  * unknown code words generically (mirrors `wordCauses`' fallback), never silence.
  */
-function isIndexingObservation(code: string): boolean {
-  return code.startsWith('index.') || code.startsWith('migration.') ||
-    code === 'inference.gpu_yielded_to_indexing' || code === 'inference.up_for_background';
-}
-
 export function reasonFor(
   code: string,
   activity?: IndexingProgress['activity'],

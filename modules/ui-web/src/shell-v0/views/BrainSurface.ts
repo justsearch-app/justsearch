@@ -3179,6 +3179,7 @@ export class BrainSurface extends JfElement {
   // ---------- Render: runtime / variants / inference / LLM settings ----------
 
   private renderRuntimeSection(): TemplateResult {
+    const progress = this.indexingProgress();
     const variants = this.runtimeStatus?.variants ?? [];
     const activeId = this.runtimeStatus?.activation?.activeVariantId ?? null;
     const actState = this.runtimeStatus?.activation?.state ?? 'idle';
@@ -3330,13 +3331,10 @@ export class BrainSurface extends JfElement {
             >
               Reload
             </jf-button>
-            ${this.inference?.embeddingQueueSize !== undefined
+            ${this.systemStatus
               ? html`<span style="font-size: var(--font-size-xs); color: var(--text-secondary); align-self: center">
-                  embed queue: ${NUM.format(this.inference.embeddingQueueSize)}
-                  ${this.inference.vduQueueSize !== undefined
-                    ? html` · VDU queue: ${NUM.format(this.inference.vduQueueSize)}`
-                    : nothing}
-                  ${live ? nothing : html` (last observed)`}
+                  ${progress.activity.confirmed ? nothing : `${progress.activity.summary} — ${progress.phase === 'unknown' ? '' : 'last observed '}`}embed queue: ${progress.phase === 'unknown' ? '—' : NUM.format(progress.embeddingPending)}
+                  · VDU queue: ${progress.phase === 'unknown' ? '—' : NUM.format(progress.vduPending)}
                 </span>`
               : nothing}
           </div>

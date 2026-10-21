@@ -530,7 +530,7 @@ describe('the mounted window renders the banner from the observed-state authorit
     __feedForTest({
       inference: { mode: 'online', available: true, activeModelId: 'Qwen3' } as never,
       status: {
-        worker: { core: { indexedDocuments: 42 } },
+        worker: { core: { indexedDocuments: 42, indexState: 'IDLE', pendingJobs: 0, indexHealthy: true } },
         readiness: { composites },
       } as unknown as StatusSnapshot,
     });
