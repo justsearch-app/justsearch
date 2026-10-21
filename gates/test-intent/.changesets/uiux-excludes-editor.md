@@ -514,3 +514,14 @@ The before-state is ae50fbc4e. New repair checks run unchanged against it. Exist
 
 ## Acceptance records
 
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp32-verifier-6ndxmugk",
+  "verdict": "accept",
+  "digest": "sha256:22c05b60ed49a80799dd7e2928626304c74c8dce636111721ac777db1ee92247",
+  "note": "Accept test expectations: scenarios and delegated WX1/WX2 justify the changed oracles; independent repair checks pass candidate and fail baseline assertions. Product acceptance fails S32.7 (unlabelled confirmation input) and stale authorization prompts in other windows; live switching/refusal and rebuild decisions remain unverified."
+}
+```
