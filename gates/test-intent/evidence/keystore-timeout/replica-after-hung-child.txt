@@ -1,0 +1,32 @@
+18:52:09.088 [main] INFO com.tngtech.archunit.ArchConfiguration -- Reading ArchUnit properties from file:/home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/modules/app-services/build/resources/test/archunit.properties
+password publication step 2: not paused; elapsed=30004 ms
+Child output: 
+
+Test run finished after 30830 ms
+[         3 containers found      ]
+[         0 containers skipped    ]
+[         3 containers started    ]
+[         0 containers aborted    ]
+[         3 containers successful ]
+[         0 containers failed     ]
+[         1 tests found           ]
+[         0 tests skipped         ]
+[         1 tests started         ]
+[         0 tests aborted         ]
+[         0 tests successful      ]
+[         1 tests failed          ]
+
+
+Failures (1):
+  JUnit Jupiter:KeystoreReplicaRepairTest:killBetweenPublicationsRepairsCurrentWrapsOnRestart()
+    MethodSource [className = 'io.justsearch.app.services.encryption.KeystoreReplicaRepairTest', methodName = 'killBetweenPublicationsRepairsCurrentWrapsOnRestart', methodParameterTypes = '']
+    => org.opentest4j.AssertionFailedError: password publication step 2 did not pause within 30 s:  ==> expected: <true> but was: <false>
+       org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+       org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+       org.junit.jupiter.api.AssertTrue.failNotTrue(AssertTrue.java:63)
+       org.junit.jupiter.api.AssertTrue.assertTrue(AssertTrue.java:36)
+       org.junit.jupiter.api.Assertions.assertTrue(Assertions.java:214)
+       io.justsearch.app.services.encryption.KeystoreReplicaRepairTest.killBetweenPublicationsRepairsCurrentWrapsOnRestart(KeystoreReplicaRepairTest.java:162)
+       java.base/java.lang.reflect.Method.invoke(Method.java:565)
+       java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+       java.base/java.util.ArrayList.forEach(ArrayList.java:1604)

@@ -1,0 +1,270 @@
+GitHub Actions Windows evidence, collected 2026-10-21.
+Source: https://github.com/justsearch-app/justsearch/actions/runs/<run-id>
+Artifact: windows-native-contracts-attempt-N; XML: modules/<module>/build/test-results/test/TEST-<class>.xml.
+Below are extracted XML attributes, exact failure payloads and exact relevant log lines.
+These excerpts do not claim cached reports are separate executions.
+
+SOURCE run-39597325251/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.encryption.KeystoreDurabilityTest.xml
+XML sha256=f0e8dbd5ddc76b9b6045c2f70c874819e69a68ee29b8c80833834cca85598716
+SUITE {"errors": "0", "failures": "0", "hostname": "runnervmuzpk7", "name": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "skipped": "0", "tests": "12", "time": "48.991", "timestamp": "2026-10-21T12:30:43.964Z"}
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "name": "processKillAtEachPublicationStepRetainsUnlockableData()", "time": "27.022"}
+12:31:10.051 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-11568924655803199917\encryption\keystore.replica.json
+12:31:14.165 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-11568924655803199917\encryption\keystore.replica.json
+12:31:24.982 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-11568924655803199917\encryption\keystore.replica.json
+12:31:27.755 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-11568924655803199917\encryption\keystore.replica.json
+
+SOURCE run-39597325251/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.encryption.KeystoreReplicaRepairTest.xml
+XML sha256=8ed1e71fea1a0a10e7fa490e455cbe74dd5d68386dfd4ab71716a8f90c084427
+SUITE {"errors": "0", "failures": "0", "hostname": "runnervmuzpk7", "name": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "skipped": "0", "tests": "8", "time": "43.138", "timestamp": "2026-10-21T12:31:32.956Z"}
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "name": "killBetweenPublicationsRepairsCurrentWrapsOnRestart()", "time": "19.116"}
+12:31:36.592 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-1810365265379416189\encryption\keystore.replica.json
+12:31:41.704 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-1810365265379416189\encryption\keystore.replica.json
+12:31:46.587 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-1810365265379416189\encryption\keystore.replica.json
+12:31:50.734 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-1810365265379416189\encryption\keystore.replica.json
+
+SOURCE run-39605828637/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.encryption.KeystoreDurabilityTest.xml
+XML sha256=c12e7b8a709d96c737bd408fc714f2da5e425fd3f3e7c93b6804d2a700c71da6
+SUITE {"errors": "0", "failures": "3", "hostname": "runnervm0xl3a", "name": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "skipped": "0", "tests": "14", "time": "185.646", "timestamp": "2026-10-21T13:31:20.355Z"}
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "name": "processKillAtEachPublicationStepRetainsUnlockableData()", "time": "30.038"}
+FAILURE {"message": "java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds", "type": "java.util.concurrent.TimeoutException"}
+java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	Suppressed: java.lang.InterruptedException: sleep interrupted
+		at java.base/java.lang.Thread.sleepNanos0(Native Method)
+		at java.base/java.lang.Thread.sleepNanos(Thread.java:509)
+		at java.base/java.lang.Thread.sleep(Thread.java:540)
+		at io.justsearch.app.services.encryption.KeystoreDurabilityTest.processKillAtEachPublicationStepRetainsUnlockableData(KeystoreDurabilityTest.java:264)
+		at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+		... 2 more
+
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "name": "processKillAtEachPublicationStepRetainsUnlockableData()", "time": "30.099"}
+FAILURE {"message": "java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds", "type": "java.util.concurrent.TimeoutException"}
+java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	Suppressed: java.lang.InterruptedException: sleep interrupted
+		at java.base/java.lang.Thread.sleepNanos0(Native Method)
+		at java.base/java.lang.Thread.sleepNanos(Thread.java:509)
+		at java.base/java.lang.Thread.sleep(Thread.java:540)
+		at io.justsearch.app.services.encryption.KeystoreDurabilityTest.processKillAtEachPublicationStepRetainsUnlockableData(KeystoreDurabilityTest.java:264)
+		at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+		... 2 more
+
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "name": "processKillAtEachPublicationStepRetainsUnlockableData()", "time": "30.615"}
+FAILURE {"message": "java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds", "type": "java.util.concurrent.TimeoutException"}
+java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	Suppressed: java.io.UncheckedIOException: Encryption change failed; previous credentials remain in force
+		at io.justsearch.app.services.encryption.EncryptionKeystore$SaveResult.requireSaved(EncryptionKeystore.java:38)
+		at io.justsearch.app.services.encryption.DataKeyManager.changePassphrase(DataKeyManager.java:162)
+		at io.justsearch.app.services.encryption.KeystoreDurabilityTest.processKillAtEachPublicationStepRetainsUnlockableData(KeystoreDurabilityTest.java:279)
+		at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+		... 2 more
+	Caused by: java.nio.channels.ClosedByInterruptException
+		at java.base/java.nio.channels.spi.AbstractInterruptibleChannel.end(AbstractInterruptibleChannel.java:214)
+		at java.base/sun.nio.ch.FileChannelImpl.endBlocking(FileChannelImpl.java:181)
+		at java.base/sun.nio.ch.FileChannelImpl.implWrite(FileChannelImpl.java:364)
+		at java.base/sun.nio.ch.FileChannelImpl.write(FileChannelImpl.java:335)
+		at io.justsearch.configuration.persistence.AtomicFileWrites$NioFileAccess.writeForced(AtomicFileWrites.java:218)
+		at io.justsearch.configuration.persistence.AtomicFileWrites.replace(AtomicFileWrites.java:106)
+		at io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(AtomicFileWrites.java:38)
+		at io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(AtomicFileWrites.java:34)
+		at io.justsearch.app.services.encryption.EncryptionKeystore.save(EncryptionKeystore.java:177)
+		at io.justsearch.app.services.encryption.DataKeyManager.changePassphraseWithResult(DataKeyManager.java:169)
+		... 5 more
+
+13:31:45.934 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-16432212488465051878\encryption\keystore.replica.json
+13:31:50.411 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-16432212488465051878\encryption\keystore.replica.json
+13:32:04.128 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-16432212488465051878\encryption\keystore.replica.json
+13:32:07.692 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-16432212488465051878\encryption\keystore.replica.json
+13:33:26.018 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-9396953989923912867\encryption\keystore.replica.json
+13:33:31.165 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-9396953989923912867\encryption\keystore.replica.json
+13:33:44.547 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-9396953989923912867\encryption\keystore.replica.json
+13:34:07.040 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-15966660901092167809\encryption\keystore.replica.json
+13:34:16.147 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-15966660901092167809\encryption\keystore.replica.json
+
+SOURCE run-39605828637/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.encryption.KeystoreReplicaRepairTest.xml
+XML sha256=eadc55bb158f6d7aed89822c7420f282f6adfa3a42f91ecc8f7d8cbeadfe737f
+SUITE {"errors": "0", "failures": "0", "hostname": "runnervm0xl3a", "name": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "skipped": "0", "tests": "8", "time": "46.331", "timestamp": "2026-10-21T13:32:11.479Z"}
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "name": "killBetweenPublicationsRepairsCurrentWrapsOnRestart()", "time": "22.389"}
+13:32:16.726 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-6329072362661905877\encryption\keystore.replica.json
+13:32:22.673 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-6329072362661905877\encryption\keystore.replica.json
+13:32:28.049 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-6329072362661905877\encryption\keystore.replica.json
+13:32:32.599 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-6329072362661905877\encryption\keystore.replica.json
+
+SOURCE run-39605828637/windows-native-contracts-attempt-2/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.encryption.KeystoreDurabilityTest.xml
+XML sha256=4d85bc584b8ea74e23461ffa1d90fa782fd46325764132064795b760257586c6
+SUITE {"errors": "0", "failures": "0", "hostname": "runnervmuzpk7", "name": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "skipped": "0", "tests": "12", "time": "46.201", "timestamp": "2026-10-21T13:58:29.708Z"}
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "name": "processKillAtEachPublicationStepRetainsUnlockableData()", "time": "27.133"}
+13:58:53.242 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-18052198334277918972\encryption\keystore.replica.json
+13:58:57.338 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-18052198334277918972\encryption\keystore.replica.json
+13:59:08.031 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-18052198334277918972\encryption\keystore.replica.json
+13:59:10.892 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-18052198334277918972\encryption\keystore.replica.json
+
+SOURCE run-39605828637/windows-native-contracts-attempt-2/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.encryption.KeystoreReplicaRepairTest.xml
+XML sha256=c69a4a444fa9d2d00505b702fa05edfb194a27b239089eb00476087b3ef44c4b
+SUITE {"errors": "0", "failures": "0", "hostname": "runnervmuzpk7", "name": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "skipped": "0", "tests": "8", "time": "39.747", "timestamp": "2026-10-21T13:59:15.912Z"}
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "name": "killBetweenPublicationsRepairsCurrentWrapsOnRestart()", "time": "18.558"}
+13:59:19.547 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-6045079952381219418\encryption\keystore.replica.json
+13:59:24.519 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-6045079952381219418\encryption\keystore.replica.json
+13:59:29.280 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-6045079952381219418\encryption\keystore.replica.json
+13:59:33.332 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-6045079952381219418\encryption\keystore.replica.json
+
+SOURCE run-39615523562/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.encryption.KeystoreDurabilityTest.xml
+XML sha256=8bcf944f48dc77867042a9bb9a2672b557dabcc0724b2f0bdb74d12021a51280
+SUITE {"errors": "0", "failures": "0", "hostname": "runnervmuzpk7", "name": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "skipped": "0", "tests": "12", "time": "50.427", "timestamp": "2026-10-21T14:35:18.119Z"}
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "name": "processKillAtEachPublicationStepRetainsUnlockableData()", "time": "29.177"}
+14:35:44.300 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-937482533825355183\encryption\keystore.replica.json
+14:35:48.706 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-937482533825355183\encryption\keystore.replica.json
+14:36:00.028 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-937482533825355183\encryption\keystore.replica.json
+14:36:03.187 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-937482533825355183\encryption\keystore.replica.json
+
+SOURCE run-39615523562/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.encryption.KeystoreReplicaRepairTest.xml
+XML sha256=ca9a4be06f554445ee987bde600f8c6a68b621456ea142c8634db7aba60aa017
+SUITE {"errors": "0", "failures": "0", "hostname": "runnervmuzpk7", "name": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "skipped": "0", "tests": "8", "time": "42.551", "timestamp": "2026-10-21T14:36:08.548Z"}
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "name": "killBetweenPublicationsRepairsCurrentWrapsOnRestart()", "time": "19.685"}
+14:36:12.380 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-8948055311972096017\encryption\keystore.replica.json
+14:36:17.524 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-8948055311972096017\encryption\keystore.replica.json
+14:36:22.558 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-8948055311972096017\encryption\keystore.replica.json
+14:36:26.879 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-8948055311972096017\encryption\keystore.replica.json
+
+SOURCE run-39632460020/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.encryption.KeystoreDurabilityTest.xml
+XML sha256=cf09c399d7aef44aa63f3d2bd9c8ff2c890985383600854eff2d1409a8225640
+SUITE {"errors": "0", "failures": "2", "hostname": "runnervmuzpk7", "name": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "skipped": "0", "tests": "14", "time": "347.955", "timestamp": "2026-10-21T16:29:15.040Z"}
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "name": "processKillAtEachPublicationStepRetainsUnlockableData()", "time": "30.043"}
+FAILURE {"message": "java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds", "type": "java.util.concurrent.TimeoutException"}
+java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	Suppressed: java.lang.InterruptedException: sleep interrupted
+		at java.base/java.lang.Thread.sleepNanos0(Native Method)
+		at java.base/java.lang.Thread.sleepNanos(Thread.java:509)
+		at java.base/java.lang.Thread.sleep(Thread.java:540)
+		at io.justsearch.app.services.encryption.KeystoreDurabilityTest.processKillAtEachPublicationStepRetainsUnlockableData(KeystoreDurabilityTest.java:264)
+		at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+		... 2 more
+
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "name": "processKillAtEachPublicationStepRetainsUnlockableData()", "time": "30.144"}
+FAILURE {"message": "java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds", "type": "java.util.concurrent.TimeoutException"}
+java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	Suppressed: java.lang.InterruptedException: sleep interrupted
+		at java.base/java.lang.Thread.sleepNanos0(Native Method)
+		at java.base/java.lang.Thread.sleepNanos(Thread.java:509)
+		at java.base/java.lang.Thread.sleep(Thread.java:540)
+		at io.justsearch.app.services.encryption.KeystoreDurabilityTest.processKillAtEachPublicationStepRetainsUnlockableData(KeystoreDurabilityTest.java:264)
+		at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+		... 2 more
+
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "name": "processKillAtEachPublicationStepRetainsUnlockableData()", "time": "29.079"}
+16:30:24.723 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-14717492097670185152\encryption\keystore.replica.json
+16:30:34.490 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-14717492097670185152\encryption\keystore.replica.json
+16:33:42.654 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-344637427764211757\encryption\keystore.replica.json
+16:33:47.630 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-344637427764211757\encryption\keystore.replica.json
+16:34:00.100 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-344637427764211757\encryption\keystore.replica.json
+16:34:03.475 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-344637427764211757\encryption\keystore.replica.json
+16:34:41.730 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-6995020541307535625\encryption\keystore.replica.json
+16:34:45.833 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-6995020541307535625\encryption\keystore.replica.json
+16:34:56.716 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-6995020541307535625\encryption\keystore.replica.json
+16:34:59.744 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-6995020541307535625\encryption\keystore.replica.json
+
+SOURCE run-39632460020/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.encryption.KeystoreReplicaRepairTest.xml
+XML sha256=8b70925341bee83a37dda3714ba30cc1fd424ec3006bb3122cbdbe1c5d23b4b3
+SUITE {"errors": "0", "failures": "1", "hostname": "runnervmuzpk7", "name": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "skipped": "0", "tests": "9", "time": "214.541", "timestamp": "2026-10-21T16:30:52.317Z"}
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "name": "killBetweenPublicationsRepairsCurrentWrapsOnRestart()", "time": "31.442"}
+FAILURE {"message": "java.util.concurrent.TimeoutException: killBetweenPublicationsRepairsCurrentWrapsOnRestart() timed out after 30 seconds", "type": "java.util.concurrent.TimeoutException"}
+java.util.concurrent.TimeoutException: killBetweenPublicationsRepairsCurrentWrapsOnRestart() timed out after 30 seconds
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	Suppressed: java.io.UncheckedIOException: Encryption change failed; previous credentials remain in force
+		at io.justsearch.app.services.encryption.EncryptionKeystore$SaveResult.requireSaved(EncryptionKeystore.java:38)
+		at io.justsearch.app.services.encryption.DataKeyManager.regenerateRecovery(DataKeyManager.java:183)
+		at io.justsearch.app.services.encryption.KeystoreReplicaRepairTest.killBetweenPublicationsRepairsCurrentWrapsOnRestart(KeystoreReplicaRepairTest.java:140)
+		at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+		... 2 more
+	Caused by: java.nio.channels.ClosedByInterruptException
+		at java.base/java.nio.channels.spi.AbstractInterruptibleChannel.end(AbstractInterruptibleChannel.java:214)
+		at java.base/sun.nio.ch.FileChannelImpl.endBlocking(FileChannelImpl.java:181)
+		at java.base/sun.nio.ch.FileChannelImpl.implWrite(FileChannelImpl.java:364)
+		at java.base/sun.nio.ch.FileChannelImpl.write(FileChannelImpl.java:335)
+		at io.justsearch.configuration.persistence.AtomicFileWrites$NioFileAccess.writeForced(AtomicFileWrites.java:218)
+		at io.justsearch.configuration.persistence.AtomicFileWrites.replace(AtomicFileWrites.java:106)
+		at io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(AtomicFileWrites.java:38)
+		at io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(AtomicFileWrites.java:34)
+		at io.justsearch.app.services.encryption.EncryptionKeystore.save(EncryptionKeystore.java:189)
+		at io.justsearch.app.services.encryption.DataKeyManager.regenerateRecoveryWithResult(DataKeyManager.java:194)
+		at io.justsearch.app.services.encryption.DataKeyManager.regenerateRecovery(DataKeyManager.java:182)
+		... 4 more
+
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "name": "killBetweenPublicationsRepairsCurrentWrapsOnRestart()", "time": "22.561"}
+16:30:59.517 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-1828188121886358956\encryption\keystore.replica.json
+16:31:13.081 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-1828188121886358956\encryption\keystore.replica.json
+16:34:08.545 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-9197503604571946712\encryption\keystore.replica.json
+16:34:14.431 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-9197503604571946712\encryption\keystore.replica.json
+16:34:20.514 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-9197503604571946712\encryption\keystore.replica.json
+16:34:25.298 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-9197503604571946712\encryption\keystore.replica.json
+
+SOURCE run-39632831411/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.encryption.KeystoreDurabilityTest.xml
+XML sha256=483358cf7f63a918fca870c401b280340b753084da7d918afe21abbd2723790f
+SUITE {"errors": "0", "failures": "3", "hostname": "runnervm0xl3a", "name": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "skipped": "0", "tests": "14", "time": "178.605", "timestamp": "2026-10-21T16:29:53.428Z"}
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "name": "processKillAtEachPublicationStepRetainsUnlockableData()", "time": "30.046"}
+FAILURE {"message": "java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds", "type": "java.util.concurrent.TimeoutException"}
+java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	Suppressed: java.lang.InterruptedException: sleep interrupted
+		at java.base/java.lang.Thread.sleepNanos0(Native Method)
+		at java.base/java.lang.Thread.sleepNanos(Thread.java:509)
+		at java.base/java.lang.Thread.sleep(Thread.java:540)
+		at io.justsearch.app.services.encryption.KeystoreDurabilityTest.processKillAtEachPublicationStepRetainsUnlockableData(KeystoreDurabilityTest.java:264)
+		at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+		... 2 more
+
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "name": "processKillAtEachPublicationStepRetainsUnlockableData()", "time": "30.106"}
+FAILURE {"message": "java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds", "type": "java.util.concurrent.TimeoutException"}
+java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	Suppressed: java.lang.InterruptedException: sleep interrupted
+		at java.base/java.lang.Thread.sleepNanos0(Native Method)
+		at java.base/java.lang.Thread.sleepNanos(Thread.java:509)
+		at java.base/java.lang.Thread.sleep(Thread.java:540)
+		at io.justsearch.app.services.encryption.KeystoreDurabilityTest.processKillAtEachPublicationStepRetainsUnlockableData(KeystoreDurabilityTest.java:264)
+		at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+		... 2 more
+
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreDurabilityTest", "name": "processKillAtEachPublicationStepRetainsUnlockableData()", "time": "30.095"}
+FAILURE {"message": "java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds", "type": "java.util.concurrent.TimeoutException"}
+java.util.concurrent.TimeoutException: processKillAtEachPublicationStepRetainsUnlockableData() timed out after 30 seconds
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	Suppressed: java.lang.InterruptedException: sleep interrupted
+		at java.base/java.lang.Thread.sleepNanos0(Native Method)
+		at java.base/java.lang.Thread.sleepNanos(Thread.java:509)
+		at java.base/java.lang.Thread.sleep(Thread.java:540)
+		at io.justsearch.app.services.encryption.KeystoreDurabilityTest.processKillAtEachPublicationStepRetainsUnlockableData(KeystoreDurabilityTest.java:264)
+		at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+		... 2 more
+
+16:30:18.232 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-7405190591500905299\encryption\keystore.replica.json
+16:30:22.776 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-7405190591500905299\encryption\keystore.replica.json
+16:30:35.014 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-7405190591500905299\encryption\keystore.replica.json
+16:30:38.121 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-7405190591500905299\encryption\keystore.replica.json
+16:31:51.842 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-3764756899600742044\encryption\keystore.replica.json
+16:31:56.252 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-3764756899600742044\encryption\keystore.replica.json
+16:32:08.328 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-3764756899600742044\encryption\keystore.replica.json
+16:32:11.459 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-3764756899600742044\encryption\keystore.replica.json
+16:32:32.203 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-266443955130145766\encryption\keystore.replica.json
+16:32:38.823 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-266443955130145766\encryption\keystore.replica.json
+
+SOURCE run-39632831411/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.encryption.KeystoreReplicaRepairTest.xml
+XML sha256=a406786928d8235e17a18b72ab5f861b12e40c1dd2d7329290e380272905047f
+SUITE {"errors": "0", "failures": "0", "hostname": "runnervm0xl3a", "name": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "skipped": "0", "tests": "8", "time": "41.746", "timestamp": "2026-10-21T16:30:43.544Z"}
+TEST {"classname": "io.justsearch.app.services.encryption.KeystoreReplicaRepairTest", "name": "killBetweenPublicationsRepairsCurrentWrapsOnRestart()", "time": "19.963"}
+16:30:47.382 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-14883110353644509992\encryption\keystore.replica.json
+16:30:52.876 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-14883110353644509992\encryption\keystore.replica.json
+16:30:57.930 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-14883110353644509992\encryption\keystore.replica.json
+16:31:02.327 [Test worker] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: C:\Users\RUNNER~1\AppData\Local\Temp\junit-14883110353644509992\encryption\keystore.replica.json
