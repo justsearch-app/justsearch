@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T23:50:54.673Z",
+  "revision": "c00a0cb24b4c6000e090d5d09054c1e7e1d24e2f",
+  "tree": "bfa11f5f1019180daac4f38d641d52ee2922e868",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" \"src/shell-v0/views/SettingsSurface.searchShortcut.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-vitest-1704498-1792453846185.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3771
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC4 leaves a modal and an ordinary field in charge, including a modal button",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4c5680c8bd7f9819cc541297dc8987a665b1431e0481e207fdc9244dca37dba6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC4 leaves a modal and an ordinary field in charge, including a modal button",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts#SN6 hides native shortcut controls and makes no native calls in a browser",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4261a6e894c37fa5e0bafa41907846a0806415b6934df259958b21770fa4ec46",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "desktop search shortcut SN6 hides native shortcut controls and makes no native calls in a browser",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c00a0cb24",
+    "revision": "c00a0cb24b4c6000e090d5d09054c1e7e1d24e2f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" \"src/shell-v0/views/SettingsSurface.searchShortcut.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-vitest-1704498-1792453850931.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3598,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/uiux-shortcut/test-intent-vitest-1704498-1792453850931.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC4 leaves a modal and an ordinary field in charge, including a modal button",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts#SN6 hides native shortcut controls and makes no native calls in a browser",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:1d53cd5ed06ebbc20489ce4555a5e6cd7909f5a8064fc5adc5462e0e535dd544"
+}

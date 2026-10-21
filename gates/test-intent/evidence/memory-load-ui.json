@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T19:51:02.283Z",
+  "revision": "892243645459e5f5a16f8c555e380ca1403f967b",
+  "tree": "fcd25a861c2611e2eb08029bac625ba0b84608e9",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/MemorySurface.locked.test.ts\" --reporter=json --outputFile=\"/tmp/memory-load-evidence/tmp/test-intent-vitest-2047141-1792439447781.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4948
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/MemorySurface.locked.test.ts#shows unavailable on first open and revisit, then reloads after recovery",
+      "file": "modules/ui-web/src/shell-v0/views/MemorySurface.locked.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9cb868cf27f8598842631ea29ffdd1b1a8471465281012adbccf1e201ca3151e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "MemorySurface — 806 W1 locked-state truthfulness shows unavailable on first open and revisit, then reloads after recovery",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/MemorySurface.locked.test.ts#hides a stale list when a revisit fails to load",
+      "file": "modules/ui-web/src/shell-v0/views/MemorySurface.locked.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9cb868cf27f8598842631ea29ffdd1b1a8471465281012adbccf1e201ca3151e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "MemorySurface — 806 W1 locked-state truthfulness hides a stale list when a revisit fails to load",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "origin/main",
+    "revision": "892243645459e5f5a16f8c555e380ca1403f967b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/MemorySurface.locked.test.ts\" --reporter=json --outputFile=\"/tmp/memory-load-evidence/tmp/test-intent-vitest-2047141-1792439455608.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 6050,
+        "output": "JSON report written to /tmp/memory-load-evidence/tmp/test-intent-vitest-2047141-1792439455608.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/MemorySurface.locked.test.ts#shows unavailable on first open and revisit, then reloads after recovery",
+        "classification": "assertion",
+        "detail": "MemorySurface — 806 W1 locked-state truthfulness shows unavailable on first open and revisit, then reloads after recovery:  AssertionError: expected '\\n      \\n        \\n        Memory\\n\\…' to contain 'Memories are unavailable'\n    at /tmp/memory-load-evidence/tmp/test-intent-before-01ZC7Q/modules/ui-web/src/shell-v0/views/MemorySurface.locked.test.ts:87:22\n    at processTicksAndRejections (node:internal/process/task_que"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/MemorySurface.locked.test.ts#hides a stale list when a revisit fails to load",
+        "classification": "assertion",
+        "detail": "MemorySurface — 806 W1 locked-state truthfulness hides a stale list when a revisit fails to load:  AssertionError: expected '\\n      \\n        \\n        Memory\\n\\…' to contain 'Memories are unavailable'\n    at /tmp/memory-load-evidence/tmp/test-intent-before-01ZC7Q/modules/ui-web/src/shell-v0/views/MemorySurface.locked.test.ts:118:22\n    at processTicksAndRejections (node:internal/process/task_qu"
+      }
+    ]
+  },
+  "digest": "sha256:1703ef4524d63c8d6bc6af28b37540d399e85e69172ce556f1e8c4f2d88c1c60"
+}

@@ -26,6 +26,7 @@ import io.justsearch.configuration.JustSearchConfigurationLoader;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
+import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import java.nio.file.Files;
@@ -61,6 +62,9 @@ final class EngineRebuildPreparationTest {
     String currentFingerprint = new SsotCommitMetadataSource().build()
         .get(IndexFingerprint.COMMIT_META_KEY).toString();
     seedGeneration(layout.activeGenerationPath(), null);
+    try (var queue = new SqliteJobQueue(dataDir.resolve("jobs.db"))) {
+      queue.openWithIntegrityCheck();
+    }
     var inFlight = generations.startMigration("schema_mismatch");
     Path invalidBuildingPath = generations.resolveGenerationPathStrict(inFlight.building_generation());
     seedGeneration(invalidBuildingPath, FOREIGN_FINGERPRINT);

@@ -207,8 +207,7 @@ export async function enforceDeadCode(options) {
 
   // Baseline-shift detection (tempdoc 910). Without it the ratchet is only half a ratchet: the
   // live count is held to the pin, but the PIN ITSELF could be edited upward and the gate would
-  // report `rebalance-available` — a pass. Mirrors module-deps/enforcer.mjs, the closest
-  // sibling (same `<path> <count> <date>` shape, same per-file dynamic key set).
+  // report `rebalance-available` — a pass. Compare each `<path> <count> <date>` row to its prior pin.
   // null means "no prior state" (a new baseline, or a ref without the file) — skip, never "all grew".
   if (priorBaseline !== null) {
     const covering = decls.find(d => BASELINE_SHIFT_COVERING.includes(d.classification));

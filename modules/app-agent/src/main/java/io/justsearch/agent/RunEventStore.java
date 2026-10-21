@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import io.justsearch.configuration.persistence.StoreIds;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.agent.api.encryption.StoreCipher;
@@ -88,6 +89,7 @@ public final class RunEventStore {
    */
   public Map<String, Object> appendEvent(
       String sessionId, String shapeId, String eventType, Map<String, Object> payload) {
+    StoreIds.requireValid(sessionId);
     Map<String, Object> record = writeEventRecord(sessionId, shapeId, eventType, payload);
     if (record != null) {
       for (BiConsumer<String, Map<String, Object>> listener : eventListeners) {
@@ -138,6 +140,7 @@ public final class RunEventStore {
    * throws and the write fails soft without overwriting (mirrors {@link #writeEventRecord}).
    */
   public synchronized void appendRawEvents(String sessionId, List<?> records) {
+    StoreIds.requireValid(sessionId);
     if (!isEnabled() || records == null || records.isEmpty()) {
       return;
     }
@@ -189,6 +192,7 @@ public final class RunEventStore {
    * limitation" — it is an unfixed instance of a named defect class.
    */
   public synchronized List<Map<String, Object>> readEvents(String sessionId) {
+    StoreIds.requireValid(sessionId);
     if (!isEnabled()) {
       return List.of();
     }
@@ -234,6 +238,7 @@ public final class RunEventStore {
    * {@code AgentRunStore}; this is the shape-agnostic base both share.
    */
   public synchronized void writeRunMeta(String sessionId, Map<String, Object> meta) {
+    StoreIds.requireValid(sessionId);
     if (!isEnabled()) {
       return;
     }
@@ -247,7 +252,7 @@ public final class RunEventStore {
   }
 
   public Path runDir(String sessionId) {
-    return rootDir.resolve(sessionId);
+    return StoreIds.resolve(rootDir, sessionId);
   }
 
   public Path eventsPath(String sessionId) {

@@ -28,6 +28,10 @@ import org.slf4j.LoggerFactory;
 @ExtendWith(MockitoExtension.class)
 class NerBackfillOpsTest {
 
+  @BeforeEach void snapshots() throws Exception {
+    BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, true, Set.of());
+  }
+
   @Mock DocumentFieldOps documentFieldOps;
   @Mock IndexingCoordinator indexingCoordinator;
   @Mock CommitOps commitOps;
@@ -183,13 +187,11 @@ class NerBackfillOpsTest {
     @Test
     @DisplayName("increments retry count on first failure")
     void incrementsRetryCount() {
-      when(documentFieldOps.getDocumentField("doc1", SchemaFields.NER_RETRY_COUNT)).thenReturn(null);
+      lenient().when(documentFieldOps.getDocumentField("doc1", SchemaFields.NER_RETRY_COUNT)).thenReturn(null);
       when(indexingCoordinator.updateDocument(anyString(), anyMap())).thenReturn(true);
 
       int result =
-          NerBackfillOps.handleNerFailure(
-              documentFieldOps, indexingCoordinator, "doc1", "test error",
-              LoggerFactory.getLogger(NerBackfillOpsTest.class));
+          assertDoesNotThrow(() -> new EnrichmentBatch(documentFieldOps,indexingCoordinator,List.of("doc1")).failure("doc1",SchemaFields.NER_RETRY_COUNT,NerBackfillOps::computeNerFailureUpdate));
 
       assertEquals(0, result); // not permanently failed
       verify(indexingCoordinator)
@@ -202,14 +204,12 @@ class NerBackfillOpsTest {
     @Test
     @DisplayName("marks FAILED after max retries")
     void marksFailedAfterMaxRetries() {
-      when(documentFieldOps.getDocumentField("doc1", SchemaFields.NER_RETRY_COUNT))
+      lenient().when(documentFieldOps.getDocumentField("doc1", SchemaFields.NER_RETRY_COUNT))
           .thenReturn(String.valueOf(SchemaFields.NER_MAX_RETRIES - 1));
       when(indexingCoordinator.updateDocument(anyString(), anyMap())).thenReturn(true);
 
       int result =
-          NerBackfillOps.handleNerFailure(
-              documentFieldOps, indexingCoordinator, "doc1", "persistent error",
-              LoggerFactory.getLogger(NerBackfillOpsTest.class));
+          assertDoesNotThrow(() -> new EnrichmentBatch(documentFieldOps,indexingCoordinator,List.of("doc1")).failure("doc1",SchemaFields.NER_RETRY_COUNT,NerBackfillOps::computeNerFailureUpdate));
 
       assertEquals(1, result); // permanently failed
       verify(indexingCoordinator)

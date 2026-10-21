@@ -1,0 +1,507 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T22:26:57.502Z",
+  "revision": "917d7d60bdef568ab2173d045d6485ac00d99cb0",
+  "tree": "d428b47a59e1f2e1648edd5dee35902d8e69eda4",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/tmp/test-intent-vitest-282253-1792448801735.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6550
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends the earlier turns as context, oldest first, on the conversation’s own id",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) sends the earlier turns as context, oldest first, on the conversation’s own id",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#leaves out excluded messages and everything above the floor, and leads with the summary",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) leaves out excluded messages and everything above the floor, and leads with the summary",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#does not bring older turns back when the floor’s own message is excluded (S2.9)",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) does not bring older turns back when the floor’s own message is excluded (S2.9)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#places a floor that sits on a message not shown here by the saved order",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) places a floor that sits on a message not shown here by the saved order",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#leaves out a hidden message from INSIDE a combined answer, as the bar counts it",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) leaves out a hidden message from INSIDE a combined answer, as the bar counts it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#starts at a floor set INSIDE a combined answer, sending nothing saved before it",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) starts at a floor set INSIDE a combined answer, sending nothing saved before it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#starts at a floor on the LAST message of a combined answer, sending only that message",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) starts at a floor on the LAST message of a combined answer, sending only that message",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#does not send older turns before the conversation’s context settings have arrived",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) does not send older turns before the conversation’s context settings have arrived",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows in the inspector exactly the messages it sends — one hidden answer, not its turn",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) shows in the inspector exactly the messages it sends — one hidden answer, not its turn",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends no context with the first question of a new conversation",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) sends no context with the first question of a new conversation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends no older turns when the conversation’s context settings cannot be read",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) sends no older turns when the conversation’s context settings cannot be read",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows each note on its own turn live, after the record refresh, and after a reload",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the \"Interpreted as\" note survives a cold reload (S2.1) shows each note on its own turn live, after the record refresh, and after a reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#counts unique hidden messages not shown here beside the hidden turns on screen",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) counts unique hidden messages not shown here beside the hidden turns on screen",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows and undoes exclusions that are ALL off screen, without inventing a turn count",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) shows and undoes exclusions that are ALL off screen, without inventing a turn count",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#clears every recorded exclusion once each, on screen and off",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) clears every recorded exclusion once each, on screen and off",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#says the context starts at a message not shown here, shows and edits its summary, and restores",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) says the context starts at a message not shown here, shows and edits its summary, and restores",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#reports a PARTIALLY refused Include all as a failure and shows what was really saved",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) reports a PARTIALLY refused Include all as a failure and shows what was really saved",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#does not wipe the bar when the reload after Include all fails",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) does not wipe the bar when the reload after Include all fails",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows the saved state when Include all landed but its reload failed",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) shows the saved state when Include all landed but its reload failed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows the saved state when Restore landed but its reload failed",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) shows the saved state when Restore landed but its reload failed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#leaves the bar on the saved floor when Restore is refused AND its reload fails",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) leaves the bar on the saved floor when Restore is refused AND its reload fails",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the conversation the reader moved to on ITS saved state while the undo finishes",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the conversation the reader moved to on ITS saved state while the undo finishes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer saved state when an older write’s reload lands after a newer one",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the newer saved state when an older write’s reload lands after a newer one",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "117e89be9",
+    "revision": "117e89be9b56a5195185cfe4f64e2e13eb9793a2",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/tmp/test-intent-vitest-282253-1792448809624.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7604,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/tmp/test-intent-vitest-282253-1792448809624.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends the earlier turns as context, oldest first, on the conversation’s own id",
+        "classification": "assertion",
+        "detail": "a follow-up ask is sent WITH the conversation (S2.0) sends the earlier turns as context, oldest first, on the conversation’s own id:  AssertionError: expected undefined to deeply equal [ { role: 'user', …(1) }, …(3) ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1047:26\n    at file:///home/elias/dev/just"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#leaves out excluded messages and everything above the floor, and leads with the summary",
+        "classification": "assertion",
+        "detail": "a follow-up ask is sent WITH the conversation (S2.0) leaves out excluded messages and everything above the floor, and leads with the summary:  AssertionError: expected undefined to deeply equal [ { role: 'system', …(1) }, …(1) ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1072:44\n    at file:///home/elias/dev/ju"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#does not bring older turns back when the floor’s own message is excluded (S2.9)",
+        "classification": "assertion",
+        "detail": "a follow-up ask is sent WITH the conversation (S2.0) does not bring older turns back when the floor’s own message is excluded (S2.9):  AssertionError: expected undefined to deeply equal [ { role: 'assistant', …(1) } ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1087:44\n    at file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#places a floor that sits on a message not shown here by the saved order",
+        "classification": "assertion",
+        "detail": "a follow-up ask is sent WITH the conversation (S2.0) places a floor that sits on a message not shown here by the saved order:  AssertionError: expected undefined to deeply equal [ { role: 'assistant', …(1) }, …(1) ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1123:44\n    at file:///home/elias/dev"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#leaves out a hidden message from INSIDE a combined answer, as the bar counts it",
+        "classification": "assertion",
+        "detail": "a follow-up ask is sent WITH the conversation (S2.0) leaves out a hidden message from INSIDE a combined answer, as the bar counts it:  AssertionError: expected undefined to be '1 hidden message not shown here' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1166:7\n    at file:///home/el"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#starts at a floor set INSIDE a combined answer, sending nothing saved before it",
+        "classification": "assertion",
+        "detail": "a follow-up ask is sent WITH the conversation (S2.0) starts at a floor set INSIDE a combined answer, sending nothing saved before it:  AssertionError: expected undefined to deeply equal [ { role: 'assistant', …(1) }, …(1) ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1189:44\n    at file:///home/elias/dev"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#starts at a floor on the LAST message of a combined answer, sending only that message",
+        "classification": "assertion",
+        "detail": "a follow-up ask is sent WITH the conversation (S2.0) starts at a floor on the LAST message of a combined answer, sending only that message:  AssertionError: expected undefined to deeply equal [ { role: 'assistant', …(1) } ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1203:44\n    at file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#does not send older turns before the conversation’s context settings have arrived",
+        "classification": "assertion",
+        "detail": "a follow-up ask is sent WITH the conversation (S2.0) does not send older turns before the conversation’s context settings have arrived:  AssertionError: expected undefined to deeply equal [ { role: 'user', …(1) } ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1221:28\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows in the inspector exactly the messages it sends — one hidden answer, not its turn",
+        "classification": "assertion",
+        "detail": "a follow-up ask is sent WITH the conversation (S2.0) shows in the inspector exactly the messages it sends — one hidden answer, not its turn:  AssertionError: expected undefined to deeply equal [ { role: 'user', …(1) }, …(2) ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1252:44\n    at file:///home/elias/dev/just"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends no context with the first question of a new conversation",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends no older turns when the conversation’s context settings cannot be read",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows each note on its own turn live, after the record refresh, and after a reload",
+        "classification": "assertion",
+        "detail": "the \"Interpreted as\" note survives a cold reload (S2.1) shows each note on its own turn live, after the record refresh, and after a reload:  AssertionError: expected [ '', '', '' ] to deeply equal [ '', '', …(1) ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1316:19\n    at file:///home/elias/dev/justsearch/.cla"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#counts unique hidden messages not shown here beside the hidden turns on screen",
+        "classification": "assertion",
+        "detail": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) counts unique hidden messages not shown here beside the hidden turns on screen:  AssertionError: expected undefined to be '2 hidden messages not shown here' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1338:7\n    at file:///home/e"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows and undoes exclusions that are ALL off screen, without inventing a turn count",
+        "classification": "assertion",
+        "detail": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) shows and undoes exclusions that are ALL off screen, without inventing a turn count:  AssertionError: expected undefined to be '1 hidden message not shown here' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1353:7\n    at file:///home/el"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#clears every recorded exclusion once each, on screen and off",
+        "classification": "assertion",
+        "detail": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) clears every recorded exclusion once each, on screen and off:  AssertionError: expected [ Array(1) ] to deeply equal [ …(2) ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1378:54\n    at file:///home/elias/dev/justsearch/.claude/worktr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#says the context starts at a message not shown here, shows and edits its summary, and restores",
+        "classification": "assertion",
+        "detail": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) says the context starts at a message not shown here, shows and edits its summary, and restores:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#reports a PARTIALLY refused Include all as a failure and shows what was really saved",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) reports a PARTIALLY refused Include all as a failure and shows what was really saved:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#does not wipe the bar when the reload after Include all fails",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) does not wipe the bar when the reload after Include all fails:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows the saved state when Include all landed but its reload failed",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) shows the saved state when Include all landed but its reload failed:  AssertionError: expected [ 'gone-1' ] to deeply equal []\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1481:61\n    at file:///home/elias/dev/justsearch/.claude/worktrees/ui"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#shows the saved state when Restore landed but its reload failed",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) shows the saved state when Restore landed but its reload failed:  AssertionError: press: no control\n    at press (/home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:448:3)\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/tes"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#leaves the bar on the saved floor when Restore is refused AND its reload fails",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) leaves the bar on the saved floor when Restore is refused AND its reload fails:  AssertionError: press: no control\n    at press (/home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-q1OHVP/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:448:3)\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/tes"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the conversation the reader moved to on ITS saved state while the undo finishes",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the conversation the reader moved to on ITS saved state while the undo finishes:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer saved state when an older write’s reload lands after a newer one",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:5482843012615159691895506ad923729e2c6ebc8f6f5c73596bac9ecf51650e"
+}

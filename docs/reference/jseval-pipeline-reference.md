@@ -889,7 +889,9 @@ python -m jseval modes
 python -m jseval dev [--clean]
 
 # Send a single search and show full pipeline execution (CE status, timing)
-python -m jseval search --query "vitamin D" [--mode hybrid] [--ce] [--json]
+python -m jseval search --query "vitamin D" --mode hybrid --ce
+# Emit JSON using the root-group option
+python -m jseval --json search --query "vitamin D" --mode hybrid --ce
 
 # Tail the Engine log with structured filtering (one JVM, one log: <dataDir>/logs/engine.log)
 python -m jseval logs [--filter rerank] [--tail] [--level WARN]

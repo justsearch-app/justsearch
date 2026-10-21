@@ -1,5 +1,10 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from 'vitest';
+import indexHtml from '../../index.html?raw';
+
+it('the app entry has no automatic Google Fonts contacts', () => {
+  expect(indexHtml).not.toMatch(/fonts\.(?:googleapis|gstatic)\.com/i);
+});
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -16,7 +21,8 @@ vi.mock('../utils/logger.ts', async (importOriginal) => ({
 }));
 vi.mock('../utils/tauriRuntime.js', () => ({ isTauriRuntime: () => true }));
 vi.mock('../api/http', () => ({ resolveApiEndpoint: mocks.endpoint, invalidateSessionToken: vi.fn() }));
-vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: (command) => command === 'factory_reset_status'
+  ? Promise.resolve({ phase: 'idle', remaining: [] }) : mocks.invoke(command) }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: mocks.listen }));
 vi.mock('../api/registry/SurfaceCatalogClient.ts', () => ({ bootSurfaceRegistry: mocks.catalog }));
 vi.mock('../shell-v0/state/aiStateStore.ts', async (importOriginal) => {

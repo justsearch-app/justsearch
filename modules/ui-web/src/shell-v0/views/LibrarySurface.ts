@@ -57,7 +57,6 @@ import {
   selectIndexingProgress,
   type EnrichmentApplicability,
 } from '../state/indexingProgress.js';
-import { enrichmentProgress } from '../state/enrichmentCoverage.js';
 // Tempdoc 811 C-2a — the non-root (ad-hoc / MCP) sources the folder rows cannot describe.
 import {
   deriveOtherSources,
@@ -149,6 +148,7 @@ export class LibrarySurface extends JfElement {
     loading: { state: true },
     error: { state: true },
     excludesText: { state: true },
+    excludesInvalidPatterns: { state: true },
     excludesLoaded: { state: true },
     excludesBusy: { state: true },
     pendingPath: { state: true },
@@ -158,6 +158,7 @@ export class LibrarySurface extends JfElement {
     isTauri: { state: true },
     activeTab: { state: true },
     provisional: { state: true },
+    indexingActivity: { state: true },
     enrichmentStages: { state: true },
     enrichmentPending: { state: true },
     enrichmentBlocked: { state: true },
@@ -178,9 +179,11 @@ export class LibrarySurface extends JfElement {
   declare loading: boolean;
   declare error: string | null;
   declare excludesText: string;
+  declare excludesInvalidPatterns: string[];
   declare excludesLoaded: boolean;
   declare excludesBusy: boolean;
   private excludesWitness: SettingsWitness | null = null;
+  private excludesSavedText: string | null = null;
   private excludesAttempt: SettingsAttempt | null = null;
   private excludesLoadStarted = false;
   declare pendingPath: string;
@@ -211,6 +214,7 @@ export class LibrarySurface extends JfElement {
    * → "fully searchable") is computed from applicable stages only. `null` until the first poll
    * snapshot arrives, which the seam reads as "coverage unknown" (no percent).
    */
+  declare indexingActivity: ReturnType<typeof selectIndexingProgress>['activity'];
   declare enrichmentStages: EnrichmentApplicability | null;
   /**
    * 809 finding 1 — the enrichment backfill still owes work, so a drained folder is keyword-searchable
@@ -272,6 +276,7 @@ export class LibrarySurface extends JfElement {
     this.loading = false;
     this.error = null;
     this.excludesText = '';
+    this.excludesInvalidPatterns = [];
     this.excludesLoaded = false;
     this.excludesBusy = false;
     this.pendingPath = '';
@@ -281,6 +286,7 @@ export class LibrarySurface extends JfElement {
     this.isTauri = false;
     this.activeTab = 'folders';
     this.provisional = false;
+    this.indexingActivity = selectIndexingProgress(null, false, 0, []).activity;
     this.enrichmentStages = null;
     this.enrichmentPending = false;
     this.enrichmentBlocked = false;
@@ -580,17 +586,18 @@ export class LibrarySurface extends JfElement {
       // ONE index-wide progress derivation rather than re-reading the enrichment wire flags here.
       const progress = selectIndexingProgress(
         s.status,
-        s.snapshotLive,
+        s.indexingStatusLive,
         s.episodeMaxPendingJobs,
         s.enrichSettleSamples,
       );
+      this.indexingActivity = progress.activity;
       this.enrichmentStages = progress.stages;
       // Round-15 F1b — same projection, same tick: whether the semantic stage can run at all, so a
       // row cannot render an unqualified "✓ … Verified just now" over an index with no vectors.
       this.enrichmentBlocked = progress.phase === 'blocked';
       // 809 finding 1 — same tick, same store: whether the enrichment backfill is still running, so a
       // row cannot claim the terminal "✓ indexed" while semantic search is still being built.
-      this.enrichmentPending = enrichmentProgress(s.status).pending;
+      this.enrichmentPending = progress.enrichingPending > 0;
       // Tempdoc 811 C-2a — the facet probe runs under the DEFAULT search scope, so the
       // default-scope population is its exact bound; fall back to the whole-index count on a
       // backend that predates `searchableDocuments` (C-4).
@@ -675,8 +682,8 @@ export class LibrarySurface extends JfElement {
         pathHash,
         // Tempdoc 804 §B9 (F8) — never the raw hash as the row's name (see folderRowLabel).
         displayPath: folderRowLabel(pathHash, this.resolvedPaths[pathHash]).label,
-        status: fs.glyph,
-        metaText: fs.metaText,
+        status: !this.indexingActivity.confirmed && fs.glyph === 'indexed' ? 'pending' : fs.glyph,
+        metaText: this.folderActivityText(fs.metaText),
         walkError: undefined,
         // Tempdoc 599 §16/B1 — the clickable "N failed" chip's count (the declared renderer emits an
         // intent the surface handles by opening the failed-files drawer). Named `failed` (the seam's
@@ -964,6 +971,8 @@ export class LibrarySurface extends JfElement {
     try {
       const body = await readSettingsObservation((path, init) => this.doFetch(path, init));
       this.excludesText = (body.ui?.excludePatterns ?? []).join('\n');
+      this.excludesSavedText = this.excludesText;
+      this.excludesInvalidPatterns = body.ui?.invalidExcludePatterns ?? [];
       this.excludesWitness = body.witness;
       this.excludesLoaded = true;
       this.error = null;
@@ -978,6 +987,9 @@ export class LibrarySurface extends JfElement {
 
   private async persistExcludes(): Promise<boolean> {
     if (!this.excludesLoaded || !this.excludesWitness) return false;
+    // Existing literal fallbacks are readable, but cannot be submitted as new glob syntax.
+    if (!this.excludesAttempt && this.excludesInvalidPatterns.length > 0
+        && this.excludesText === this.excludesSavedText) return true;
     try {
       if (!this.excludesAttempt) {
         const patterns = this.excludesText.split('\n').map((value) => value.trim()).filter(Boolean);
@@ -986,6 +998,8 @@ export class LibrarySurface extends JfElement {
       const result = await executeSettingsAttempt((path, init) => this.doFetch(path, init), this.excludesAttempt);
       this.excludesWitness = result.witness;
       this.excludesAttempt = null;
+      this.excludesSavedText = this.excludesText;
+      this.excludesInvalidPatterns = [];
       return true;
     } catch (err) {
       // An uncertain save remains the same attempt on the next Preview/Apply click.
@@ -1258,7 +1272,7 @@ export class LibrarySurface extends JfElement {
         <span class="card-icon">${icon({ name: 'folder', size: 24 })}</span>
         <div class="card-info">
           <div class="card-path">
-            ${this.renderStatusIcon(status.glyph)}<span
+            ${this.renderStatusIcon(!this.indexingActivity.confirmed && status.glyph === 'indexed' ? 'pending' : status.glyph)}<span
               class="folder-name"
               title=${displayTitle}
               data-testid="library-folder-name"
@@ -1266,7 +1280,7 @@ export class LibrarySurface extends JfElement {
             >
           </div>
           <div class="card-meta">
-            ${status.metaText}${status.failed > 0
+            ${this.folderActivityText(status.metaText)}${status.failed > 0
               ? this.renderFailedChip(pathHash, status)
               : nothing}${status.state === 'unverified'
               ? html`<jf-button
@@ -1300,6 +1314,17 @@ export class LibrarySurface extends JfElement {
    * renders: the scan omits collections rather than undercounting them (see `otherSources.ts`), so
    * silence there would be the same invisibility this section exists to end.
    */
+  private folderActivityText(folderText: string): string {
+    const activity = this.indexingActivity;
+    if (!activity.confirmed || activity.detail) {
+      // The global reason is explicitly scoped to the index; per-folder failures and verification
+      // caveats remain owned by folderStatus, even when its observation is only last known.
+      const scope = activity.confirmed ? 'Index: ' : 'Index (folder observation last known): ';
+      return `${folderText} · ${scope}${activity.summary}${activity.detail ? ` — ${activity.detail}` : ''}`;
+    }
+    return folderText;
+  }
+
   private renderOtherSources(): TemplateResult | typeof nothing {
     const { sources, truncated } = this.otherSources;
     if (sources.length === 0 && !truncated) return nothing;
@@ -1515,7 +1540,9 @@ export class LibrarySurface extends JfElement {
       ${this.loading
         ? html`<div class="empty">Loading…</div>`
         : this.roots.length === 0
-          ? this.provisional
+          ? !this.indexingActivity.confirmed
+            ? html`<div class="empty">${this.indexingActivity.summary}</div>`
+            : this.provisional
             ? html`<div class="empty">
                 Rebuilding index… your watched folders will reappear when it finishes.
               </div>`
@@ -1537,6 +1564,10 @@ export class LibrarySurface extends JfElement {
             <p>
               One glob per line. Bare names like <code>node_modules</code> or
               <code>dist/</code> match at any depth.
+              <code>[ab]</code> matches one listed character; <code>[a-z]</code> matches a range;
+              <code>[!ab]</code> matches a character not listed.
+              <code>{draft,final}</code> matches either alternative.
+              These meanings also apply to patterns saved by earlier versions.
             </p>
           </div>
           <div class="actions">
@@ -1554,6 +1585,9 @@ export class LibrarySurface extends JfElement {
         </div>
         ${this.excludesAttempt && !this.excludesBusy
           ? html`<p>Save completion is unknown. Retry Preview or Apply to check the same save.</p>` : nothing}
+        ${this.excludesInvalidPatterns.length > 0
+          ? html`<div role="status"><ul>${this.excludesInvalidPatterns.map((pattern) => html`<li>“${pattern}” has invalid pattern syntax and is matched as a literal name. Correct or remove it.</li>`)}</ul></div>`
+          : nothing}
         <textarea
           aria-label="Exclude patterns"
           ?disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null}
@@ -1570,13 +1604,16 @@ export class LibrarySurface extends JfElement {
     if (!this.reindexCancelKey) return nothing;
     const decision = this.gapDecision;
     const waitingForGaps = this.observedGapKey === this.reindexCancelKey;
+    const confirmed = this.indexingActivity.confirmed;
     return html`<section class="gap-decision" aria-label=${waitingForGaps ? 'Migration gaps' : 'Rebuild control'}>
-      <h3>${waitingForGaps ? 'New index — activation requires your decision' : 'New index is being built'}</h3>
+      <h3>${!confirmed ? this.indexingActivity.summary
+        : waitingForGaps ? 'New index — activation requires your decision' : 'New index is being built'}</h3>
+      ${!confirmed ? html`<p>Rebuild details are last observed; current progress and index availability are unconfirmed.</p>` : nothing}
       ${waitingForGaps && decision ? html`
         <p>${decision.gaps.length} document${decision.gaps.length === 1 ? '' : 's'} could not be
-          included in the new index. Your current index stays available until you accept this list.</p>
+          included in the new index.${confirmed ? ' Your current index stays available until you accept this list.' : nothing}</p>
         <ul>${decision.gaps.map((gap) => html`<li>${gap.unitId}: ${gap.reason}</li>`)}</ul>
-      ` : waitingForGaps ? html`<p>Reading the migration gap list…</p>`
+      ` : !confirmed ? nothing : waitingForGaps ? html`<p>Reading the migration gap list…</p>`
         : html`<p>Your current index stays available during the rebuild.</p>`}
       <div class="actions">
         ${waitingForGaps && decision ? html`
@@ -1590,7 +1627,7 @@ export class LibrarySurface extends JfElement {
       </div>
       ${this.gapDecisionError ? html`<p role="alert">${this.gapDecisionError}</p>` : nothing}
       ${this.reindexCancelError ? html`<p role="alert">${this.reindexCancelError}</p>` : nothing}
-      ${this.reindexCancelRecorded ? html`<p role="status">Rebuild cancellation recorded. Your current index stays available.</p>` : nothing}
+      ${this.reindexCancelRecorded ? html`<p role="status">Rebuild cancellation recorded.</p>` : nothing}
     </section>`;
   }
 }

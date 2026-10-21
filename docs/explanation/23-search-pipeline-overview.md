@@ -37,7 +37,7 @@ these request choices. The pipeline executes across the two halves of one Engine
 
 2. **The index half** (`SearchOrchestrator`) runs retrieval. The
    enabled legs (BM25, Dense KNN, SPLADE) execute in parallel via virtual
-   threads. Their results are fused (RRF by default). If the query yields
+   threads. Their results are fused (CC by default). If the query yields
    zero hits, fuzzy correction retries. If chunks exist, a parallel chunk
    search is fused and collapsed by parent document. Match spans, excerpt
    regions, and facets are computed. The response returns from the port call.
@@ -175,7 +175,7 @@ RRF chunk merge.
 The interactive search pipeline above is the primary path. Two other paths
 share the same Lucene index but have their own orchestration:
 
-**RAG Retrieval** (`RagContextOps`, `indexer-worker`): Used by AI chat.
+**RAG Retrieval** (`RagContextOps`, `worker-services`): Used by AI chat.
 Retrieves chunks using BM25 or hybrid (BM25 + vector) search, then
 optionally reranks with a cross-encoder (GPU-aware, with deadline and VRAM
 arbitration). Optionally applies MMR diversification (opt-in via
@@ -240,25 +240,25 @@ for the full contract and test references.
 
 | Component                     | Primary File                   | Module            |
 | ----------------------------- | ------------------------------ | ----------------- |
-| Search orchestration (index half) | `SearchOrchestrator.java`      | `indexer-worker`  |
+| Search orchestration (index half) | `SearchOrchestrator.java`      | `worker-services`  |
 | Application-side adapter + reranking | `KnowledgeHttpApiAdapter.java` | `app-services`    |
 | Lucene runtime ops (read/write/lifecycle) | `ReadPathOps` / `WritePathOps` / `RunningRuntime` | `adapters-lucene` |
 | Hybrid fusion (RRF + CC)      | `HybridFusionUtils.java`       | `adapters-lucene` |
 | BM25 query building           | `TextQueryOps.java`            | `adapters-lucene` |
 | Chunk retrieval               | `ChunkSearchOps.java`          | `adapters-lucene` |
 | Cross-encoder reranker        | `CrossEncoderReranker.java`    | `reranker`        |
-| SPLADE encoder                | `SpladeEncoder.java`           | `indexer-worker`  |
-| Dense embedding               | `EmbeddingService.java`        | `indexer-worker`  |
+| SPLADE encoder                | `SpladeEncoder.java`           | `worker-core`  |
+| Dense embedding               | `EmbeddingService.java`        | `worker-core`  |
 | Field mapping                 | `FieldMapper.java`             | `adapters-lucene` |
 | Analyzer pipeline             | `SsotAnalyzerRegistry.java`    | `adapters-lucene` |
 | Pipeline presets              | `PipelineConfigs.java`         | `ipc-common`      |
-| RAG context retrieval         | `RagContextOps.java`           | `indexer-worker`  |
+| RAG context retrieval         | `RagContextOps.java`           | `worker-services`  |
 | Autocomplete / suggest        | `SuggestOps.java`              | `adapters-lucene` |
 | Query understanding           | `QueryUnderstandingService.java` | `app-services`  |
 | Context sufficiency           | `ContextSufficiencyService.java` | `app-services`  |
 | Filter normalization          | `FilterNormalizationService.java` | `app-services` |
 | NER backfill                  | `NerBackfillOps.java`          | `worker-services` |
-| BIO tag decoding              | `BioTagDecoder.java`           | `worker-services` |
+| BIO tag decoding              | `BioTagDecoder.java`           | `worker-core`     |
 
 For tuning parameters (RRF K, vector weights, BM25 k1/b, HNSW M, ef_search),
 see [18-adapters-lucene-deep-dive.md § Configuration](18-adapters-lucene-deep-dive.md).

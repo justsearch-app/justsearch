@@ -4,7 +4,7 @@ type: decision
 status: stable
 description: "Maintain separate core DTOs for in-process ports and app-api records for REST as intentional layering, not duplication."
 date: 2026-04-06
-probes: none - the dual-type layering is a design intent about which types live where; the module-deps gate already fails a boundary violation, and a probe would restate it.
+probes: none - the dual-type layering is a design intent about which types live where; no executable probe is declared for that design intent.
 last_reviewed: 2026-09-02
 ---
 

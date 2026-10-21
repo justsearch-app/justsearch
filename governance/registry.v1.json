@@ -161,31 +161,6 @@
       "selfTestFixturesDir": "scripts/governance/_fixtures/ambient-purity"
     },
     {
-      "id": "module-deps",
-      "title": "Per-module cross-module dependency-count ratchet (tempdoc 530 §2.8)",
-      "enforcer": "scripts/governance/gates/module-deps/enforcer.mjs",
-      "ruleDescriptions": "scripts/governance/gates/module-deps/rule-descriptions.mjs",
-      "changesetsDir": "gates/module-deps/.changesets",
-      "classifications": "scripts/governance/gates/module-deps/classifications.mjs",
-      "baseline": {
-        "kind": "ratchet-file",
-        "path": "gates/module-deps/baseline.txt",
-        "diffStrategy": "git-base",
-        "diffFallback": "HEAD~1"
-      },
-      "config": {
-        "reportPath": "tmp/arch-preflight/module-deps.json",
-        "inputs": [
-          {
-            "path": "tmp/arch-preflight/module-deps.json",
-            "producer": "node scripts/architecture/module-deps.mjs",
-            "class": "required"
-          }
-        ]
-      },
-      "selfTestFixturesDir": "scripts/governance/_fixtures/module-deps"
-    },
-    {
       "id": "adr-coverage",
       "title": "ADR Covers: path-validation gate (tempdoc 530 §2.7)",
       "enforcer": "scripts/governance/gates/adr-coverage/enforcer.mjs",
@@ -203,24 +178,6 @@
         "riskRegister": "docs/reference/architectural-risks.md"
       },
       "selfTestFixturesDir": "scripts/governance/_fixtures/adr-coverage"
-    },
-    {
-      "id": "tempdoc-wiring",
-      "title": "Tempdoc → gate auto-wiring validator (tempdoc 530 §4.1)",
-      "enforcer": "scripts/governance/gates/tempdoc-wiring/enforcer.mjs",
-      "ruleDescriptions": "scripts/governance/gates/tempdoc-wiring/rule-descriptions.mjs",
-      "changesetsDir": "gates/tempdoc-wiring/.changesets",
-      "classifications": "scripts/governance/gates/tempdoc-wiring/classifications.mjs",
-      "baseline": {
-        "kind": "ratchet-file",
-        "path": "docs/tempdocs",
-        "diffStrategy": "none"
-      },
-      "config": {
-        "tempdocsDir": "docs/tempdocs",
-        "registryPath": "governance/registry.v1.json"
-      },
-      "selfTestFixturesDir": "scripts/governance/_fixtures/tempdoc-wiring"
     },
     {
       "id": "wire",

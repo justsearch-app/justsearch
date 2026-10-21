@@ -15,6 +15,9 @@ import java.util.function.BooleanSupplier;
 
 /** Indexer-local attachment for the Engine's recorded-ingestion owner. */
 public interface RecordedIngestionLifecycle {
+  /** Application authority observable before a corrupt queue can be opened or replaced. */
+  default boolean generationPendingAtBoot() throws IOException { return false; }
+
   /** Observe application authority once, before generation fallback or any writable runtime opens. */
   default IndexGenerationManager.BootOwnership bootOwnership(JobQueue queue) throws IOException {
     return new IndexGenerationManager.BootOwnership.Native();

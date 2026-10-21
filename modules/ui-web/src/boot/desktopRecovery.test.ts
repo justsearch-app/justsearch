@@ -9,7 +9,8 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('../utils/tauriRuntime.js', () => ({ isTauriRuntime: mocks.native }));
 vi.mock('../api/http', () => ({ resolveApiEndpoint: mocks.endpoint }));
-vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: (command: string) => command === 'factory_reset_status'
+  ? Promise.resolve({ phase: 'idle', remaining: [] }) : mocks.invoke(command) }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: mocks.listen }));
 
 import { mountBootApplication, resolveBootWithRecovery } from './desktopRecovery.js';
@@ -127,6 +128,25 @@ describe('desktop boot recovery', () => {
     expect(mocks.invoke).toHaveBeenCalledWith('check_for_app_update');
     expect(recovery.shadowRoot?.querySelector('[role="alert"]')).toBeNull();
     expect(recovery.shadowRoot?.textContent).toContain('You have the latest version');
+  });
+
+  it.each(['Check for updates', 'Install update'])('shows administrator refusal for %s with the Engine down', async (label) => {
+    const refusal = 'App updates are disabled by administrator policy (appUpdatesEnabled=false).';
+    const root = document.getElementById('root')!;
+    await resolveBootWithRecovery(root);
+    const recovery = root.querySelector('jf-engine-recovery') as EngineRecovery;
+    await recovery.updateComplete;
+    const button = [...recovery.shadowRoot!.querySelectorAll('jf-button')]
+      .find((candidate) => candidate.textContent?.trim() === label) as HTMLElement & { onActivate: () => Promise<void> };
+    expect(button).toBeDefined();
+    mocks.invoke.mockImplementation(async (command) => {
+      if (command === 'app_update_status') return { state: 'available', currentVersion: '1.0', availableVersion: '1.1' };
+      throw refusal;
+    });
+    await button.onActivate();
+    await recovery.updateComplete;
+    expect(recovery.shadowRoot?.querySelector('[role="alert"]')?.textContent).toContain(refusal);
+    expect(mocks.endpoint).toHaveBeenCalledOnce();
   });
 
   it('keeps browser unresolved behavior and never invokes native recovery commands', async () => {

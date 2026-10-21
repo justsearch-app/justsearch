@@ -56,6 +56,10 @@ class EmbeddingBackfillOpsTest {
   @Nested
   @DisplayName("processChunkEmbeddingBackfill()")
   class ProcessChunkEmbeddingBackfill {
+    @org.junit.jupiter.api.BeforeEach void snapshots() throws Exception {
+      BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, false, java.util.Set.of());
+    }
+
 
     private void stubTwoPendingChunks() {
       when(documentFieldOps.queryDocIdsByField(
@@ -145,7 +149,7 @@ class EmbeddingBackfillOpsTest {
           .thenReturn(List.of());
       when(embeddingProvider.embedDocument(eq("content one"), any(InferenceRequest.class))).thenReturn(new float[] {1f, 2f});
       when(embeddingProvider.embedDocument(eq("content two"), any(InferenceRequest.class))).thenReturn(new float[0]);
-      when(documentFieldOps.getDocumentField("chunk2", SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT))
+      lenient().when(documentFieldOps.getDocumentField("chunk2", SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT))
           .thenReturn(null);
 
       StageOutcome result =
@@ -165,6 +169,10 @@ class EmbeddingBackfillOpsTest {
   @Nested
   @DisplayName("processEmbeddingBackfill() (doc-level sibling)")
   class ProcessEmbeddingBackfill {
+    @org.junit.jupiter.api.BeforeEach void snapshots() throws Exception {
+      BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, true, java.util.Set.of());
+    }
+
 
     private void stubTwoPendingDocs() {
       when(documentFieldOps.queryDocIdsByField(

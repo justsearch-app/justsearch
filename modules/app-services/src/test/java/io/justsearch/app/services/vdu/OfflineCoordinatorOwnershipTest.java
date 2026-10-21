@@ -99,7 +99,7 @@ class OfflineCoordinatorOwnershipTest {
     HandleFixture handle = new HandleFixture(TestEngineContexts.durableInternal()
         .withWorkId(UUID.randomUUID()));
     // The batch's own cleanup (closing its VDU hold) blocks; the procedure owns it until it ends.
-    KnowledgeClient client = mock(KnowledgeClient.class);
+    KnowledgeClient client = VduAttemptTestSupport.client();
     when(client.countPendingVdu(handle.context)).thenReturn(1);
     VduBatchProcessor batch = mock(VduBatchProcessor.class);
     CountDownLatch cleanupEntered = new CountDownLatch(1);
@@ -144,7 +144,7 @@ class OfflineCoordinatorOwnershipTest {
     EngineContext caller = TestEngineContexts.durableInternal();
     EngineContext admitted = caller.withWorkId(UUID.randomUUID());
     HandleFixture handle = new HandleFixture(admitted);
-    KnowledgeClient client = mock(KnowledgeClient.class);
+    KnowledgeClient client = VduAttemptTestSupport.client();
     when(client.countPendingVdu(admitted)).thenReturn(1);
     when(client.countPendingEmbeddings(admitted)).thenReturn(0);
     VduBatchProcessor batch = mock(VduBatchProcessor.class);
@@ -196,7 +196,7 @@ class OfflineCoordinatorOwnershipTest {
     ControlledRegistry registry = new ControlledRegistry(executor);
     HandleFixture handle = new HandleFixture(TestEngineContexts.durableInternal()
         .withWorkId(UUID.randomUUID()));
-    KnowledgeClient client = mock(KnowledgeClient.class);
+    KnowledgeClient client = VduAttemptTestSupport.client();
     when(client.countPendingVdu(handle.context)).thenReturn(1);
     VduBatchProcessor batch = mock(VduBatchProcessor.class);
     IllegalStateException modeFailure = new IllegalStateException("Failed to enter VDU mode");

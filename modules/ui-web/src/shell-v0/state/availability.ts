@@ -38,6 +38,7 @@
  * "degraded" (595 §10's over-alarming case) never marks an affordance unavailable.
  */
 import type { AiState } from './aiStateStore.js';
+import { selectIndexingProgress } from './indexingProgress.js';
 import { isKnown } from './known.js';
 import {
   classifyConsequence,
@@ -132,7 +133,10 @@ export function projectAvailability(
   // Spec A step 7 (F1): when chat failed, the control says why ("The local AI model file could not
   // be loaded"), in the same words as the readiness notice, instead of a bare "offline".
   if (!s.capabilities.chat) {
-    return unavailableFor(s.chatFailureReason ?? 'inference.offline', false);
+    const activity = selectIndexingProgress(s.status, s.indexingStatusLive, s.episodeMaxPendingJobs, s.enrichSettleSamples).activity;
+    const code = s.chatFailureReason ?? 'inference.offline';
+    const cause = reasonFor(code, activity);
+    return { kind: 'unavailable', reason: cause.wording, ...(cause.remedy ? { remedy: cause.remedy } : {}), transient: false };
   }
 
   // Documents (RAG) additionally needs at least one indexed document. `capabilities.rag`
@@ -145,11 +149,12 @@ export function projectAvailability(
       // not the settled "No documents indexed yet" dead-end. The resolving condition is known to the FE
       // (runtime.mode / index.pendingJobs); there is no numeric ETA in the snapshot, so we say the
       // CONDITION, never a fabricated "~Ns".
-      if (indexingInFlight(s)) {
+      const progress = selectIndexingProgress(s.status, s.indexingStatusLive, s.episodeMaxPendingJobs, s.enrichSettleSamples);
+      if (!progress.activity.confirmed || progress.phase === 'indexing' || progress.phase === 'enriching') {
         return {
           kind: 'unavailable',
-          reason: 'Indexing in progress — available once indexing finishes',
-          transient: true,
+          reason: [progress.activity.summary, progress.activity.detail].filter(Boolean).join(' — '),
+          transient: progress.activity.confirmed,
         };
       }
       return unavailableFor('no_documents', false);
@@ -215,21 +220,6 @@ function unavailableFor(code: string, transient: boolean, estimate?: string | nu
   return remedy
     ? { kind: 'unavailable', reason, transient, remedy }
     : { kind: 'unavailable', reason, transient };
-}
-
-/**
- * Is indexing actively in flight (so a zero-doc state is a passing phase, not a settled empty corpus)?
- * Tempdoc 596 §16.4 — the resolving condition behind the forward-looking documents reason. Reads the
- * observed-state index/runtime signals; `unknown` Maybe fields are treated as "not in flight" (we never
- * promise "indexing" without positive evidence, mirroring the no-fabrication rule for zero-docs).
- */
-function indexingInFlight(s: AiState): boolean {
-  if (s.runtime?.mode === 'indexing') return true;
-  const pending = s.index?.pendingJobs;
-  if (pending !== undefined && isKnown(pending) && pending.value > 0) return true;
-  const embedding = s.index?.embeddingPending;
-  if (embedding !== undefined && isKnown(embedding) && embedding.value > 0) return true;
-  return false;
 }
 
 /**

@@ -37,7 +37,7 @@ JustSearch employs a rigorous 4-tier testing strategy (`modules/system-tests`), 
     *   `InferenceLifecycleManagerExternalServerTest` (adopting an already-running `llama-server` on the configured port)
     *   `LlamaServerPropsParsingTest` (robust `/props` parsing for `n_ctx` / `model_alias`)
     *   `LocalApiCorsPolicyTest` (regression for loopback-only CORS allowlist / local bind safety)
-    *   `LuceneIndexRuntimeTest` (regressions for user-safe query parsing, facets, and cursor-based `searchAfter` paging)
+    *   `TextSearchIntegrationTest` and `FacetingIntegrationTest` (query parsing, cursor-based `searchAfter` paging, and facets)
     *   `WorkerSearchServiceSearchPayloadTest` (ensures interactive search hits do not ship `content`)
     *   `VduEligibilityPdfFixturesTest` (real PDF fixtures → correct `vdu_status` marking without llama-server)
     *   `TimeboxedContentExtractorTest` (deterministic extraction timeout guardrail)
@@ -45,7 +45,6 @@ JustSearch employs a rigorous 4-tier testing strategy (`modules/system-tests`), 
     *   `WorkerSearchServiceRetrieveContextTest` (retrieveContext respects `maxChars` via strict budgeting)
     *   `WorkerSearchServiceReasonCodeContractTest` (allowlisted reason codes for vector/hybrid fallback and RAG retrieval mode/reason)
     *   `RemoteDocumentServiceContextBudgetTest` (fallback full-doc context retrieval is budgeted)
-    *   `SummaryControllerRagSectionTruncationTest` (head-side truncation filters citations/sections consistently)
     *   `ChunkDocumentWriterTest` (chunk regeneration consistency: offsets + metadata)
     *   `WorkerIngestServiceChunkRegenerationTest` (VDU update path regenerates chunks without drift)
 
@@ -75,9 +74,9 @@ These tests exist to prevent architectural drift and contract breakage in a mult
 
 ## Tier 3: System Tests (Slow)
 This tier verifies behaviour that spans a real boundary the Engine still has.
-*   **Mechanism:** the surviving classes compose the Engine's index half **in process** (`EngineRoot`) and drive a real external dependency — `llama-server` for the AI/VDU lanes, a real extraction-sandbox child process for `ExtractionSandboxChaosTest`.
+*   **Mechanism:** the surviving classes compose the Engine's index half **in process** (`EngineRoot`) and drive a real external dependency — `llama-server` for the AI/VDU lanes. `EngineExtractionSandboxChaosTest` drives a real extraction-sandbox child process from `modules/app-engine/src/test/java/io/justsearch/app/engine/`, tagged `stress`.
 *   **Retired with the split (lane F stage A item A12):** `WorkerSpawnTest`, `GrpcCommunicationTest` and `ConfigPropagationTest` asserted that a Worker process spawned, that it published a port over the memory-mapped signal file, that gRPC framing round-tripped, and that config crossed the process boundary via the config snapshot. None of those propositions is true of one JVM. The "Suicide Pact" (stale-heartbeat self-termination) went the same way: item A10 deleted the memory-mapped bus that carried the heartbeat, so there is no pact left to verify.
-*   **Chaos:** the corruption, locking, migration and read-while-write flows survive as *product* properties and now run in `modules/app-engine`'s unit suite — see the list below. `ExtractionSandboxChaosTest` stays in this tier because its subject is a real child process.
+*   **Chaos:** the corruption, locking, migration and read-while-write flows survive as *product* properties and now run in `modules/app-engine`'s unit suite — see the list below. `EngineExtractionSandboxChaosTest` belongs conceptually to this tier because its subject is a real child process, but lives in app-engine's own tests, outside the `system-tests` module and the default `test` run.
 *   **Performance benchmarks** — all benchmark + eval capabilities now in `scripts/jseval/` (slice 3a-1-8f §B.14, 2026-05-12 — the prior `scripts/bench/` infrastructure was deleted by commit `a9c484f59` 2026-03-16; jseval covers Claim A/B/C/D + Track G + agent + RAG via `engine-bench`, `ingest-bench`, `bench-concurrency`, `knn-bench`, `agent-eval`, `rag-eval`, `retrieval-eval`, etc.):
     *   **Claim A (engine-only):** `python -m jseval engine-bench` — isolated Lucene throughput
     *   **Claim B (pipeline):** `python -m jseval ingest-bench` — full Worker pipeline throughput
@@ -97,7 +96,6 @@ are covered **in process** in `modules/app-engine/src/test/java/io/justsearch/ap
 * `EngineForegroundPacingTest` (indexing is throttled but not stopped under foreground search load; status/health polling never throttles it — the ADR-0048 witness)
 * `EngineReadWhileWriteTest` (real searches during a real ingest; many concurrent callers)
 * `EngineFormatCapabilityMatrixTest` (every format-matrix row through admission, extraction, indexing, search, fetch and ledger reconciliation)
-* `EngineFileLockContentionTest` (antivirus-style file-lock contention during boot and during ingest) — **`@Tag("stress")`, opt in with `-PincludeStress=true`.** Its instrument (`FileIntruder`) promises 10-50 ms lock holds, and that promise is a claim about the OS scheduler: on a box saturated by a concurrent whole-repo build the holds stretch and the writer starves, so the test stops measuring survival and starts measuring machine load. Registered in `scripts/ci/stress-suite-policy.v1.json`.
 * `EngineVduRecoveryTest` (documents stuck in VDU `PROCESSING` are recovered)
 * `EngineSoakTest` (scaled-down search stress, repeated open/close, sustained load)
 
@@ -286,7 +284,7 @@ See [Agent Analytics Pipeline](21-agent-analytics-pipeline.md) for the behaviora
 
 ## The `TCK` (Technology Compatibility Kit)
 *   **Module:** `modules/app-api-tck`
-*   **Purpose:** Since we have strict interfaces (`SearchPort`, `IngestPort`, etc.), the TCK ensures that both the "Real" implementation (Worker) and the "Mock" implementations used in tests behave identically.
+*   **Purpose:** Since we have strict interfaces (`SearchPort`, `IndexingService`, etc.), the TCK ensures that both the "Real" in-process index implementation and the "Mock" implementations used in tests behave identically.
 
 ## Stress & Soak Testing
 *   **Module:** `modules/app-engine` (`EngineSoakTest`). The `soakTest` source set and its Gradle

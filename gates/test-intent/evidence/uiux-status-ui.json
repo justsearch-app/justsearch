@@ -1,0 +1,407 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T19:11:44.527Z",
+  "revision": "8dbeb755730762c155c9422302bf0b9f419020ab",
+  "tree": "be22faab9aee5cecaa8c13ad8114633737b0e935",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/indexingStatus.test.ts\" \"src/shell-v0/components/indexingStatusSurfaces.test.ts\" \"src/shell-v0/state/folderStatus.test.ts\" \"src/shell-v0/state/indexingProgress.test.ts\" \"src/shell-v0/views/SystemSelfView.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" \"src/shell-v0/views/HealthSurface.render.test.ts\" \"src/shell-v0/components/IndexingOverlay.test.ts\" \"src/shell-v0/components/TaskList.test.ts\" \"src/shell-v0/state/indexingFreshness.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-vitest-3260788-1792523499764.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1847
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingStatus.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/indexingStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:955e8906d137665e657920ee4c19a2875e8c2abd7656d2d48f7bc8767e2abfd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 shared indexing activity S33.2 the strict status shape adds no placement key that old clients reject",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared indexing activity S33.1 scopes energy deferral to idle enrichment while sparse work can continue between files",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared indexing activity S33.2 scopes GPU holds to GPU idle work and all between-file sparse work without guessing placement",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared indexing activity S33.3 names only a present chat reason and S33.4 clears it on the next observation",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared indexing activity S33.4 marks stale, unavailable and missing worker observations unconfirmed",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared indexing activity S33.1 does not call an empty file queue Ready while energy-deferred enrichment waits even with wire IDLE",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared indexing activity S33.5 caps indexing with a positive tail",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared indexing activity S33.5 caps enrichment with denominator-less pending work",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared indexing activity S33.2 reports simultaneous reasons without losing the energy hold on CPU",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared indexing activity S33.5 withholds an invented starting percentage for indexing and enrichment alike",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a4907c83f15504d137016db9b275a69167ae34a64bdc4d80ee5f2fe51ece0e57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 shared status surfaces S33.1 S33.6 every surface says text indexing continues and enrichment waits for energy",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.2 S33.4 all surfaces replace and clear the reason after a fresh observation",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.4 retained stale observations are unconfirmed on every surface",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.4 aged observations with 4 queued files expire on every surface while inference stays live and recover on fresh status",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.4 aged observations with 0 queued files expire on every surface while inference stays live and recover on fresh status",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.1 empty file queues still describe energy-deferred enrichment on every surface",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.2 every surface distinguishes CPU enrichment under game and external GPU holds",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.3 every surface names chat only while that reason is observed",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces N33.3 deferred enrichment retains the measured aggregate without an active progress bar",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.5 Library with no settled documents stays enriching without inventing a percentage",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.6 announces one semantic change once across identical polls",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/folderStatus.test.ts#S33.5 zero settled stays enriching without a fabricated starting percentage",
+      "file": "modules/ui-web/src/shell-v0/state/folderStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5321e8d6cc1ea27a08dda8643b410b4d27355d5e2651cd88e49398af4e08d78c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "folderStatus — per-root enrichment tier (813 §4) S33.5 zero settled stays enriching without a fabricated starting percentage",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingProgress.test.ts#S33.5 an undrained stage with pending above its total has no percentage",
+      "file": "modules/ui-web/src/shell-v0/state/indexingProgress.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fc15bd46b43aebe71fb8bdad90be91518bf4cc63b8594c4cbeee8ab0abec2993",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "selectIndexingProgress — denominator honesty S33.5 an undrained stage with pending above its total has no percentage",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SystemSelfView.test.ts#S33.4 strip variant keeps the body and marks a missing observation unconfirmed",
+      "file": "modules/ui-web/src/shell-v0/views/SystemSelfView.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a57fff87020616a3d3e52dc6df389c5c4d841c0c21633a07cf091510a829c3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "jf-system-self-view — strip variant (578 Workstream A) S33.4 strip variant keeps the body and marks a missing observation unconfirmed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts#S33.1 energy saver names continued text indexing and deferred enrichment",
+      "file": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9adf0867284d6c3dd2b4ad43c763383f15ea71822d1e377eb8a52807a105bf6c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "StatusDeck (slice 461) S33.1 energy saver names continued text indexing and deferred enrichment",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts#S33.1 energy saver explains enrichment deferral while text indexing continues",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5de5896fc0a8596ff204992fd59523ad45c26bf2fe4c156eaebb7ac0084b844a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HealthSurface — Queue card status vocabulary (630 D1) S33.1 energy saver explains enrichment deferral while text indexing continues",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts#S33.4 without an observation renders an unconfirmed header and explanation",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f54faf8fd1b1e4d24d94384050c22120bd832ee318689860a58771497bd1aaa7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IndexingOverlay (slice 460) S33.4 without an observation renders an unconfirmed header and explanation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/TaskList.test.ts#S33.4 unknown indexing is unconfirmed without a phase, bar or counts",
+      "file": "modules/ui-web/src/shell-v0/components/TaskList.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:75bc74d5d40bb5e3a671e68d52b8f343d58d66b4dce06c28f6733c2765d9373e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "<jf-task-list> — aggregate card (813 §5) S33.4 unknown indexing is unconfirmed without a phase, bar or counts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ebfd592dec064239968862d3de84e151be4a88b7e25ab9c4ca675a91b366f404",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S33.4 the store timer expires the worker observation while SSE alone keeps the Engine reachable and fresh status restores it",
+          "status": "passed"
+        },
+        {
+          "name": "S33.4 a status without a worker timestamp expires by receipt age using its reported freshness window",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:38c47f8e6cf5c5173ef0b9531b2166d3573b800c622b3f302ae7faa5ff0db44f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "BrainSurface — enrichment progress card (807) S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 a fresh timestamp with 'worker RPC stale' is unconfirmed, then recovers",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:38c47f8e6cf5c5173ef0b9531b2166d3573b800c622b3f302ae7faa5ff0db44f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "BrainSurface — enrichment progress card (807) S33.4 a fresh timestamp with 'worker RPC stale' is unconfirmed, then recovers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 a fresh timestamp with 'indexing lane stale' is unconfirmed, then recovers",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:38c47f8e6cf5c5173ef0b9531b2166d3573b800c622b3f302ae7faa5ff0db44f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "BrainSurface — enrichment progress card (807) S33.4 a fresh timestamp with 'indexing lane stale' is unconfirmed, then recovers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts#595 §15.1 (E1): a visually-hidden aria-live announcer mirrors the verdict, politely",
+      "file": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9adf0867284d6c3dd2b4ad43c763383f15ea71822d1e377eb8a52807a105bf6c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "StatusDeck (slice 461) 595 §15.1 (E1): a visually-hidden aria-live announcer mirrors the verdict, politely",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f6a14b5a6",
+    "revision": "f6a14b5a66e7b879c711ef9ca54280723de2c242",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/state/indexingStatus.test.ts\" \"src/shell-v0/components/indexingStatusSurfaces.test.ts\" \"src/shell-v0/state/folderStatus.test.ts\" \"src/shell-v0/state/indexingProgress.test.ts\" \"src/shell-v0/views/SystemSelfView.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" \"src/shell-v0/views/HealthSurface.render.test.ts\" \"src/shell-v0/components/IndexingOverlay.test.ts\" \"src/shell-v0/components/TaskList.test.ts\" \"src/shell-v0/state/indexingFreshness.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-vitest-3260788-1792523502604.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1794,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-vitest-3260788-1792523502604.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingStatus.test.ts",
+        "classification": "assertion",
+        "detail": "WP3.3 shared indexing activity S33.1 scopes energy deferral to idle enrichment while sparse work can continue between files:  AssertionError: expected undefined to match object { …(4) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-status/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-s | WP3.3 shared indexing activity S33.2 scopes GPU holds to GPU idle work "
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+        "classification": "assertion",
+        "detail": "WP3.3 shared status surfaces S33.1 S33.6 every surface says text indexing continues and enrichment waits for energy:  AssertionError: jf-status-deck: expected '\\n      All systems operational\\n    …' to contain 'Text indexing continues'\n    at /home/elias/dev/justsearch/tmp/test-intent-before-tVKjkf/modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts:83:44\n    at processTicksAndRejections (node:in | WP3.3 shared status surfaces S33.2 S33.4 all surfaces replace and clear the rea"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/folderStatus.test.ts#S33.5 zero settled stays enriching without a fabricated starting percentage",
+        "classification": "assertion",
+        "detail": "folderStatus — per-root enrichment tier (813 §4) S33.5 zero settled stays enriching without a fabricated starting percentage:  AssertionError: expected 'default · 312 files · keyword search …' not to match /\\d+%/\n    at /home/elias/dev/justsearch/tmp/test-intent-before-tVKjkf/modules/ui-web/src/shell-v0/state/folderStatus.test.ts:259:31\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-status/modules/ui-web/no"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingProgress.test.ts#S33.5 an undrained stage with pending above its total has no percentage",
+        "classification": "assertion",
+        "detail": "selectIndexingProgress — denominator honesty S33.5 an undrained stage with pending above its total has no percentage:  AssertionError: expected +0 to be null\n    at /home/elias/dev/justsearch/tmp/test-intent-before-tVKjkf/modules/ui-web/src/shell-v0/state/indexingProgress.test.ts:355:32\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-status/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifa"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SystemSelfView.test.ts#S33.4 strip variant keeps the body and marks a missing observation unconfirmed",
+        "classification": "assertion",
+        "detail": "jf-system-self-view — strip variant (578 Workstream A) S33.4 strip variant keeps the body and marks a missing observation unconfirmed:  AssertionError: expected '\\n      \\n      \\n        \\n        \\…' to contain 'Indexing status unconfirmed'\n    at /home/elias/dev/justsearch/tmp/test-intent-before-tVKjkf/modules/ui-web/src/shell-v0/views/SystemSelfView.test.ts:81:40\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-st"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts#S33.1 energy saver names continued text indexing and deferred enrichment",
+        "classification": "assertion",
+        "detail": "StatusDeck (slice 461) S33.1 energy saver names continued text indexing and deferred enrichment:  AssertionError: expected '\\n            \\n    \\n  \\n           …' to contain 'Text indexing continues'\n    at /home/elias/dev/justsearch/tmp/test-intent-before-tVKjkf/modules/ui-web/src/shell-v0/components/StatusDeck.test.ts:240:27\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-stat"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts#S33.1 energy saver explains enrichment deferral while text indexing continues",
+        "classification": "assertion",
+        "detail": "HealthSurface — Queue card status vocabulary (630 D1) S33.1 energy saver explains enrichment deferral while text indexing continues:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/tmp/test-intent-before-tVKjkf/modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts:769:71\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-status/modules/ui-web/node_modules/@vi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts#S33.4 without an observation renders an unconfirmed header and explanation",
+        "classification": "assertion",
+        "detail": "IndexingOverlay (slice 460) S33.4 without an observation renders an unconfirmed header and explanation:  AssertionError: expected 'Batch Processing Active' to be 'Indexing status unconfirmed' // Object.is equality\n    at /home/elias/dev/justsearch/tmp/test-intent-before-tVKjkf/modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts:28:61\n    at processTicksAndRejections (node:internal/process/ta"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/TaskList.test.ts#S33.4 unknown indexing is unconfirmed without a phase, bar or counts",
+        "classification": "assertion",
+        "detail": "<jf-task-list> — aggregate card (813 §5) S33.4 unknown indexing is unconfirmed without a phase, bar or counts:  AssertionError: expected 'Tasks' to be 'Indexing status unconfirmed' // Object.is equality\n    at /home/elias/dev/justsearch/tmp/test-intent-before-tVKjkf/modules/ui-web/src/shell-v0/components/TaskList.test.ts:323:48\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-status/modules/ui-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+        "classification": "assertion",
+        "detail": "S33.4 the store timer expires the worker observation while SSE alone keeps the Engine reachable and fresh status restores it:  AssertionError: expected undefined to be true // Object.is equality\n    at /home/elias/dev/justsearch/tmp/test-intent-before-tVKjkf/modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts:50:46\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-status/modules/ui-web/node_modules/@vi | S33.4 a status without a worker timestamp expires by receipt age using"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers",
+        "classification": "assertion",
+        "detail": "BrainSurface — enrichment progress card (807) S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers:  AssertionError: expected '\\n      \\n        \\n          \\n    \\…' to contain 'Indexing status unconfirmed'\n    at /home/elias/dev/justsearch/tmp/test-intent-before-tVKjkf/modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts:143:31\n    at file:///home/elias/dev/justsearch/.claude/w"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 a fresh timestamp with 'worker RPC stale' is unconfirmed, then recovers",
+        "classification": "assertion",
+        "detail": "BrainSurface — enrichment progress card (807) S33.4 a fresh timestamp with 'worker RPC stale' is unconfirmed, then recovers:  AssertionError: expected '\\n      \\n        \\n          \\n    \\…' to contain 'Indexing status unconfirmed'\n    at /home/elias/dev/justsearch/tmp/test-intent-before-tVKjkf/modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts:125:34\n    at file:///home/elias/dev/justsearch/.claude/w"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 a fresh timestamp with 'indexing lane stale' is unconfirmed, then recovers",
+        "classification": "assertion",
+        "detail": "BrainSurface — enrichment progress card (807) S33.4 a fresh timestamp with 'indexing lane stale' is unconfirmed, then recovers:  AssertionError: expected '\\n      \\n        \\n          \\n    \\…' to contain 'Indexing status unconfirmed'\n    at /home/elias/dev/justsearch/tmp/test-intent-before-tVKjkf/modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts:125:34\n    at file:///home/elias/dev/justsearch/.claude/w"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts#595 §15.1 (E1): a visually-hidden aria-live announcer mirrors the verdict, politely",
+        "classification": "assertion",
+        "detail": "StatusDeck (slice 461) 595 §15.1 (E1): a visually-hidden aria-live announcer mirrors the verdict, politely:  AssertionError: expected null not to be null\n    at /home/elias/dev/justsearch/tmp/test-intent-before-tVKjkf/modules/ui-web/src/shell-v0/components/StatusDeck.test.ts:363:19\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-status/modules/ui-web/node_modules/@vitest/runner/dist/chunk-a"
+      }
+    ]
+  },
+  "digest": "sha256:18c299a39d9860d04b3acf6f9079ccc990509ef37ec55bd247919f7856917be9"
+}

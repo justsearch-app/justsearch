@@ -478,8 +478,13 @@ public final class WritePathOps {
       String docId,
       Map<String, Object> updates,
       ParentSliceCache parentCache,
-      Map<String, Object> expectedFields)
-      throws IOException {
+      Map<String, Object> expectedFields) throws IOException {
+    return readModifyWrite(searcher, docId, updates, parentCache, expectedFields, null);
+  }
+
+  private boolean readModifyWrite(IndexSearcher searcher, String docId, Map<String, Object> updates,
+      ParentSliceCache parentCache, Map<String, Object> expectedFields,
+      DocumentFieldOps.EnrichmentInput input) throws IOException {
     var topDocs = searcher.search(new TermQuery(new Term(idField, docId)), 1);
     if (topDocs.scoreDocs.length == 0) {
       log.debug("readModifyWrite: document not found: {}", docId);
@@ -515,6 +520,36 @@ public final class WritePathOps {
     for (var expected : expectedFields.entrySet()) {
       if (!java.util.Objects.equals(fields.get(expected.getKey()), expected.getValue())) {
         return false;
+      }
+    }
+
+    if (input != null) {
+      Map<String, String> current = new HashMap<>();
+      for (String name : DocumentFieldOps.ENRICHMENT_FIELDS) {
+        Object stored = fields.get(name);
+        if (stored != null) current.put(name, stored.toString());
+      }
+      session.readPathOps.projectDocValues(searcher, globalDocId, DocumentFieldOps.ENRICHMENT_FIELDS, current);
+      if (!matchesEnrichmentInput(input.fields(), current, updates)) return false;
+    }
+
+    if (updates.containsKey(SchemaFields.CONTENT)
+        && !java.util.Objects.equals(fields.get(SchemaFields.CONTENT), updates.get(SchemaFields.CONTENT))) {
+      updates = new HashMap<>(updates);
+      // An explicit new artifact belongs to the replacement text; omitted artifacts belong
+      // to the old text and must bypass the ordinary RMW preservation policies.
+      for (String artifact : List.of(SchemaFields.VECTOR, SchemaFields.CHUNK_VECTOR, SchemaFields.SPLADE,
+          SchemaFields.ENTITY_PERSONS_RAW, SchemaFields.ENTITY_ORGANIZATIONS_RAW, SchemaFields.ENTITY_LOCATIONS_RAW)) {
+        updates.putIfAbsent(artifact, null);
+      }
+      for (String stage : asBoolean(fields.get(SchemaFields.IS_CHUNK))
+          ? List.of("chunk_embedding", "splade") : List.of("embedding", "splade", "ner")) {
+        String status = stage + "_status";
+        if (session.fieldMapper.fieldDef(status) != null) {
+          updates.putIfAbsent(status, STATUS_PENDING);
+          String retry=stage + "_retry_count";
+          if (session.fieldMapper.fieldDef(retry) != null && !updates.containsKey(retry)) updates.put(retry,"0");
+        }
       }
     }
 
@@ -997,6 +1032,71 @@ public final class WritePathOps {
       log.error("Failed to batch-update {} documents", batchUpdates.size(), e);
       throw new IndexRuntimeIOException(
           classifyIOException(e), "Failed to batch update documents", e);
+    }
+  }
+
+  private static final Set<String> ENRICHMENT_REVISION_FIELDS = Set.of(
+      SchemaFields.CONTENT, SchemaFields.CONTENT_SHA256, SchemaFields.SOURCE_SHA256,
+      SchemaFields.DOC_UID, SchemaFields.IS_CHUNK, SchemaFields.PARENT_DOC_ID,
+      SchemaFields.CHUNK_START_CHAR, SchemaFields.CHUNK_END_CHAR,
+      SchemaFields.CHUNK_PARENT_CONTENT_SHA256, SchemaFields.COLLECTION);
+
+  private static final Map<String, String> ENRICHMENT_STAGE_FIELDS = Map.of(
+      SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_RETRY_COUNT,
+      SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT,
+      SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_RETRY_COUNT,
+      SchemaFields.NER_STATUS, SchemaFields.NER_RETRY_COUNT,
+      SchemaFields.VDU_STATUS, SchemaFields.VDU_RETRY_COUNT);
+
+  private static boolean matchesEnrichmentInput(
+      Map<String, String> expected, Map<String, String> current, Map<String, Object> updates) {
+    for (String field : ENRICHMENT_REVISION_FIELDS) {
+      if (!java.util.Objects.equals(expected.get(field), current.get(field))) return false;
+    }
+    for (var stage : ENRICHMENT_STAGE_FIELDS.entrySet()) {
+      String status = stage.getKey(), retry = stage.getValue();
+      if (!updates.containsKey(status) && !updates.containsKey(retry)) continue;
+      if (!java.util.Objects.equals(expected.get(status), current.get(status))
+          || !java.util.Objects.equals(expected.get(retry), current.get(retry))) return false;
+    }
+    return true;
+  }
+
+  LuceneRuntimeTypes.BatchUpdateResult updateDocumentsBatchIf(
+      List<Map.Entry<String, Map<String, Object>>> updates,
+      Map<String, DocumentFieldOps.EnrichmentInput> inputs) {
+    guardWritable();
+    try {
+      var snap = session.snapshot;
+      if (snap != null && snap.searcherManager() != null) snap.searcherManager().maybeRefreshBlocking();
+      return bridge.withSearcherNoRefresh(searcher -> {
+        var cache = new ParentSliceCache();
+        Map<String, Map<String, String>> parents = new HashMap<>();
+        Map<String, java.util.IdentityHashMap<Map<String, String>, Boolean>> parentComparisons = new HashMap<>();
+        org.apache.lucene.index.StoredFields parentStoredFields = null;
+        int updated = 0;
+        for (var update : updates) {
+          var input = inputs.get(update.getKey());
+          if (input == null) continue;
+          if (input.parentId() != null && !input.parentId().isBlank()) {
+            if (!parents.containsKey(input.parentId())) {
+              if (parentStoredFields == null) parentStoredFields = searcher.storedFields();
+              parents.put(input.parentId(), session.documentFieldOps.enrichmentFields(
+                  searcher, parentStoredFields, input.parentId(), DocumentFieldOps.PARENT_REVISION_FIELDS));
+            }
+            // Shared captured proof is compared once per parent, including hashless full text.
+            // Different expectations for the same parent retain independent comparisons.
+            if (input.parentFields() == null || !parentComparisons
+                .computeIfAbsent(input.parentId(), ignored -> new java.util.IdentityHashMap<>())
+                .computeIfAbsent(input.parentFields(), expected -> expected.equals(parents.get(input.parentId())))) continue;
+            cache.putContentIfAbsent(input.parentId(), parents.get(input.parentId()).get(SchemaFields.CONTENT));
+          }
+          if (readModifyWrite(searcher, update.getKey(), update.getValue(), cache, Map.of(), input)) updated++;
+        }
+        return new LuceneRuntimeTypes.BatchUpdateResult(updated, updates.size() - updated);
+      });
+    } catch (IOException e) {
+      throw new IndexRuntimeIOException(classifyIOException(e), "Failed conditional batch update", e);
     }
   }
 
