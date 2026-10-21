@@ -64,7 +64,9 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
 
     // Use chunk-aware testing catalog with explicit vdu_retry_count support for markVduProcessing tests.
     var layout = new IndexGenerationManager(tempDir.resolve("indexBase")).initializeOrLoad();
-    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTestingWithVduRetryCount(0)).atPath(layout.activeGenerationPath()).withExecutorRegistrations(testLuceneExecutors()).open();
+    var fields=new java.util.ArrayList<>(FieldCatalogDef.forChunkTestingWithVduRetryCount(0).fields());
+    fields.add(new FieldCatalogDef.FieldDef(SchemaFields.SOURCE_SHA256,"keyword",true,false,List.of(),null,null,false));
+    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(new FieldCatalogDef("vdu-hardening-revision",fields)).atPath(layout.activeGenerationPath()).withExecutorRegistrations(testLuceneExecutors()).open();
 
     // Create service with the real lifecycle
     IndexingLoop stubLoop = stubIndexingLoop();
@@ -106,7 +108,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(3)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
 
       // Should be rejected (invariant violation: SUCCESS_TEXT requires non-blank)
       assertTrue(!response.getSuccess(),
@@ -125,7 +127,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(1)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
 
       // New behavior: should be rejected
       assertTrue(!response.getSuccess(),
@@ -147,7 +149,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(5)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
 
       assertTrue(response.getSuccess());
 
@@ -173,7 +175,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(1)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
 
       assertTrue(response.getSuccess());
 
@@ -205,7 +207,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(0)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
 
       assertTrue(response.getSuccess());
 
@@ -238,7 +240,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(1)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
 
       assertTrue(response.getSuccess());
 
@@ -277,7 +279,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(1)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
 
       // Should fail: SUCCESS_TEXT requires non-blank content
       assertTrue(!response.getSuccess() || response.getError().contains("non-blank"),
@@ -299,7 +301,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(3)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
 
       assertTrue(response.getSuccess(), "Should succeed");
 
@@ -331,7 +333,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(2)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
 
       assertTrue(response.getSuccess());
 
@@ -363,7 +365,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(0)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
 
       assertTrue(response.getSuccess());
 
@@ -386,7 +388,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(1)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
 
       assertTrue(response.getSuccess());
 
@@ -706,6 +708,17 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
   /**
    * Creates a test document in the index and returns its doc_id.
    */
+  private UpdateVduResultResponse updateWithClaim(UpdateVduResultRequest request) throws Exception {
+    var base=CallContext.none();var ctx=new CallContext(null,null,null,
+        base.engineContext().withWorkId(java.util.UUID.randomUUID()),base.provenance(),base.childLifetime());
+    try { VduResultWriter.validate(request); }
+    catch (IllegalArgumentException invalid) { return service.updateVduResult(request,ctx); }
+    String attempt=java.util.UUID.randomUUID().toString();
+    var claim=service.markVduProcessing(MarkVduProcessingRequest.newBuilder().setDocId(request.getDocId()).setAttemptId(attempt).build(),ctx);
+    assertTrue(claim.getSuccess(),claim.getError());
+    return service.updateVduResult(request.toBuilder().setAttemptId(attempt).build(),ctx);
+  }
+
   private String indexTestDocument(String name) throws Exception {
     String docId = tempDir.resolve(name + ".pdf").toAbsolutePath().toString();
     // Normalize path for consistency
@@ -716,6 +729,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
     fields.put(SchemaFields.DOC_UID, java.util.UUID.randomUUID().toString());
     fields.put(SchemaFields.PATH, docId);
     fields.put(SchemaFields.CONTENT, "Initial Tika content");
+    fields.put(SchemaFields.SOURCE_SHA256,"a".repeat(64));
     fields.put(SchemaFields.CONTENT_PREVIEW, "Initial Tika content");
     fields.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING);
     fields.put(SchemaFields.INDEXED_AT, System.currentTimeMillis());
@@ -870,7 +884,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(1)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
       lifecycle.commitOps().commitAndTrack();
       lifecycle.commitOps().maybeRefreshBlocking();
 
@@ -895,7 +909,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(1)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
       lifecycle.commitOps().commitAndTrack();
       lifecycle.commitOps().maybeRefreshBlocking();
 
@@ -920,7 +934,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(1)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
       lifecycle.commitOps().commitAndTrack();
       lifecycle.commitOps().maybeRefreshBlocking();
 
@@ -945,7 +959,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           .setPageCount(1)
           .build();
 
-      UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+      UpdateVduResultResponse response = updateWithClaim(request);
       lifecycle.commitOps().commitAndTrack();
       lifecycle.commitOps().maybeRefreshBlocking();
 

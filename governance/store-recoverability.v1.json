@@ -386,7 +386,8 @@
       "status": "READY",
       "implementationSources": [
         "modules/app-services/src/main/java/io/justsearch/app/services/policy/UserPolicyWriter.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/policy/EnterprisePolicyServiceImpl.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/policy/EnterprisePolicyServiceImpl.java",
+        "modules/shell/src-tauri/src/updater.rs"
       ],
       "tests": [
         "modules/app-services/src/test/java/io/justsearch/app/services/policy/UserPolicyWriterTest.java"

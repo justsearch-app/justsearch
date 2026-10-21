@@ -42,8 +42,6 @@ const EXEMPT = {
     'register EDIT, and there is no measured value held against a numeric pin to advance.',
   'register-guard-resolution':
     'guard-downgrade licenses a register guard string weakening; no numeric ratchet.',
-  'tempdoc-wiring':
-    'emergency-override suppresses a wiring finding; there is no baseline file to advance.',
   'adr-coverage':
     'loads changesets for vocabulary validation only — its verdicts come from probe evaluation ' +
     'and review windows, not from a measured value against a pin.',
@@ -121,7 +119,6 @@ const WIRED = [
   'atom-fork-ratchet',
   'config-surface',
   'dead-code',
-  'module-deps',
   'npm-audit',
   'test-efficacy',
 ];

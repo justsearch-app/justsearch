@@ -1,0 +1,116 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T08:19:34.802Z",
+  "revision": "ca0e3518e07594388926af04442085cd30c1fbd5",
+  "tree": "cff1747e7bdb0236b813de38134565a6bd388cfa",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.AiInstallServicePolicyPreservationTest\" --tests \"io.justsearch.app.services.ai.install.AiInstallServicePolicyTest.absentServiceAndPermissiveServiceKeepAllThreePlans\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9310
+    },
+    {
+      "command": "./gradlew :modules:ui:integrationTest --tests \"io.justsearch.ui.api.AiInstallPolicyIntegrationTest.missingPolicyKeepsPermissiveDefaults\" --tests \"io.justsearch.ui.api.AiInstallPolicyIntegrationTest.allowlistedOfflineImportStillWorksWithDownloadsDisabled\" --tests \"io.justsearch.ui.api.AiInstallPolicyIntegrationTest.corruptDetectedMachinePolicyKeepsFailClosedDefaults\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8079
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServicePolicyPreservationTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServicePolicyPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1fd2fec39308090263c84015bbb2724f6859746e802dfc5a6288ea1ab90bfc73",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "noPolicyPreviewAndNormalizedContractKeepAllThreeProfiles()",
+          "status": "passed"
+        },
+        {
+          "name": "savedCudaPreferencesSurviveInstallSelectionAndReloadWithCpuDevicePlan()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServicePolicyTest.java#absentServiceAndPermissiveServiceKeepAllThreePlans",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServicePolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c3f55c399b641097f9eaacce198a3e5741b85707d9d5c41cd28f86f44b0912d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "absentServiceAndPermissiveServiceKeepAllThreePlans()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/AiInstallPolicyIntegrationTest.java#missingPolicyKeepsPermissiveDefaults",
+      "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/AiInstallPolicyIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1e2f1268905572bd807f5f51b806a2378c2b19dc5d7b394e8ac20179bb70b605",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missingPolicyKeepsPermissiveDefaults()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/AiInstallPolicyIntegrationTest.java#allowlistedOfflineImportStillWorksWithDownloadsDisabled",
+      "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/AiInstallPolicyIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1e2f1268905572bd807f5f51b806a2378c2b19dc5d7b394e8ac20179bb70b605",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "allowlistedOfflineImportStillWorksWithDownloadsDisabled()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/AiInstallPolicyIntegrationTest.java#corruptDetectedMachinePolicyKeepsFailClosedDefaults",
+      "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/AiInstallPolicyIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1e2f1268905572bd807f5f51b806a2378c2b19dc5d7b394e8ac20179bb70b605",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "corruptDetectedMachinePolicyKeepsFailClosedDefaults()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:56c43c998d0b5b3b4dc8a368157e1e0672a4c19ed33f34b595a532f65302663d"
+}
