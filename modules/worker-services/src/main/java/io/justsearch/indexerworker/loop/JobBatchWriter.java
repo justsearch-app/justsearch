@@ -68,6 +68,8 @@ public final class JobBatchWriter {
   private final BooleanSupplier chunkSpladeEnabledSupplier;
   private final Supplier<RunningRuntime> activeLexicalSource;
   private final FileMutationFence fileMutationFence;
+  private java.util.function.BiPredicate<java.nio.file.Path, java.nio.file.Path> fileExclusions =
+      io.justsearch.indexerworker.ingest.IngestionSkipPolicy::shouldSkipWithinRoot;
 
   public JobBatchWriter(
       IndexingCoordinator indexingCoordinator,
@@ -104,6 +106,10 @@ public final class JobBatchWriter {
     this.fileMutationFence = fileMutationFence;
   }
 
+  void useFileExclusions(java.util.function.BiPredicate<java.nio.file.Path, java.nio.file.Path> exclusions) {
+    fileExclusions = Objects.requireNonNull(exclusions, "exclusions");
+  }
+
   /** Builds and writes an already-extracted job. Mirrors prior IndexingLoop.writeExtractedJob. */
   public void write(ExtractedJob ex, float[] precomputedEmbedding) {
     Span writeSpan = maybeSpan("indexing.write");
@@ -118,6 +124,15 @@ public final class JobBatchWriter {
         journal.recordOutcomeSafely(ex.filePath(), "SUPERSEDED_BEFORE_WRITE",
             () -> jobQueue.markClaimDone(ex.claim(),
                 journal.skipped(IngestionReasonCodes.DELETED_AFTER_SNAPSHOT),
+                LedgerEntryFactory.forEnvelope(ex.envelope(), ex.collection(), ex.artifact(),
+                    contentExtractor.extractionPolicy(), ex.provenance())));
+        batchStats.recordSkipped();
+        return;
+      }
+      if (fileExclusions.test(ex.filePath(), ex.claim().ingestionRoot())) {
+        journal.recordOutcomeSafely(ex.filePath(), "EXCLUDED_BEFORE_WRITE",
+            () -> jobQueue.markClaimDone(ex.claim(),
+                journal.skipped(IngestionReasonCodes.SKIPPED_TEMP_OR_SYSTEM),
                 LedgerEntryFactory.forEnvelope(ex.envelope(), ex.collection(), ex.artifact(),
                     contentExtractor.extractionPolicy(), ex.provenance())));
         batchStats.recordSkipped();
