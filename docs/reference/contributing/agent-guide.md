@@ -349,7 +349,9 @@ The public repository has two CI postures:
   public hosted lane. PRs and pushes to `main` run the full required set.
   Merge-queue runs check governance, build and secrets on the combined tree;
   runtime, unit and Windows tests do not rerun there.
-  Measured axe, Integration tests and CI wall-clock attribution run only on manual dispatch.
+  Advisory Measured axe runs on PRs, pushes to main and manual dispatch, gathering stability
+  evidence before promotion to required. Integration tests and CI wall-clock attribution
+  run only on manual dispatch.
 - Self-hosted, release, and benchmark/specialty workflows stay manually dispatched unless a
   later ADR changes their trigger policy. ADR-0026 remains the historical basis for that posture.
   CodeQL runs weekly on Mondays at 04:17 UTC and can also be dispatched manually (ADR-0052).
