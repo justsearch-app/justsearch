@@ -120,7 +120,10 @@ and tempdoc-heavy agent work:
    node scripts/ci/preview-squash-message.mjs --repo justsearch-app/justsearch --pr <number>
    ```
 
-6. Enter the squash merge queue after the required checks are green.
+6. Enter the squash merge queue after the required checks are green. PRs and pushes to
+   `main` run the full required set; merge-queue runs check governance, build and secrets
+   on the combined tree. Runtime, unit and Windows tests do not rerun on that tree.
+   Measured axe, Integration tests and CI wall-clock attribution run only on manual dispatch.
 7. Let GitHub delete the source branch after merge.
 
 The review-record command owns its hidden PR/head/body marker, paginates the PR

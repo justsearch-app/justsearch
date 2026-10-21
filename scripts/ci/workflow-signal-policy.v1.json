@@ -12,6 +12,7 @@
       "class": "public-hosted-fact-lanes",
       "expectedTriggers": ["workflow_dispatch", "pull_request", "push", "merge_group"],
       "owner": "ADR-0044 / public hosted CI fact lanes",
+      "note": "PRs and pushes to main run the full required set; merge-queue work is governance, build and secrets. Measured axe, Integration tests and CI wall-clock attribution run only on manual dispatch.",
       "failureDefault": "product-regression",
       "staleDays": 14,
       "blocking": true,
