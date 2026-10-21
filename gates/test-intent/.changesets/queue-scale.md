@@ -7,7 +7,7 @@ author-session: 01a1562b-b2e9-7510-832f-04ea6ad6da28
 
 # Test-intent entries
 
-Author: builder Codex session 01a1562b-b2e9-7510-832f-04ea6ad6da28. Scope is the final branch diff against merge-base f6d92d768 with origin/main, not intermediate commit diffs. The user adopted scenarios Q1–Q27 on2026-10-20: “i agree, proceed accordingly”. Every scenario source below is **agent-drafted, owner-adopted**; no brief text is attributed as owner words. Choices are **agent choice** under the separately quoted delegation. Q20 uses its aggregate-queued amendment; Q25–Q27 are included. Q6 retains the agreed whole-call limit: pollPending(16) under10ms p95, including its durable commit. Selection-only timing is additional reporting, not a substitute threshold. Q24 packaged-system verification belongs to the independent verifier, not this test-intent delivery.
+Author: builder Codex session 01a1562b-b2e9-7510-832f-04ea6ad6da28. Scope is the final branch diff against merge-base 947be754d with origin/main, not intermediate commit diffs. The user adopted scenarios Q1–Q27 on2026-10-20: “i agree, proceed accordingly”. Every scenario source below is **agent-drafted, owner-adopted**; no brief text is attributed as owner words. Choices are **agent choice** under the separately quoted delegation. Q20 uses its aggregate-queued amendment; Q25–Q27 are included. Q6 retains the agreed whole-call limit: pollPending(16) under10ms p95, including its durable commit. Selection-only timing is additional reporting, not a substitute threshold. Q24 packaged-system verification belongs to the independent verifier, not this test-intent delivery.
 
 For modified files with both retired oracles and added checks, separate entries name the portions. All full-table and per-file-PENDING state/input changes are Obsolete, not hidden as adaptations. Old→new assertion inventories are attached to those entries; remaining original assertions stay unchanged. The two Adaptation entries identify exactly unchanged assertions and old/new transport encoding. Repaired checks require an assertion fail-before; new instrumentation and preservation checks are explicitly identified and do not pretend a missing old API/table was a defect.
 
@@ -1074,7 +1074,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
         "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts"
       ],
       "class": "New",
-      "behaviour": "Appended Resource window notice/exact outside-window totals/unavailable status; bounded long-run label LRU retains Windows/UNC identities. Existing Resource/resolver assertions unchanged, including merged main cases.",
+      "behaviour": "Appended Resource window notice/exact outside-window totals/unavailable status; bounded long-run label LRU retains Windows/UNC identities. All merged main cases and branch assertions retained. Main now drives Resource stream opening through the controlled fetch SSE transport; no test source or assertion changed after this merge. Fresh evidence runs the two repaired expectations against merge-base 947be754d with no overlays.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1127,7 +1127,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/queue-scale-merge-f6a14b5a6.json",
+      "evidence": "gates/test-intent/evidence/queue-scale-merge-947be754d.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts#names the bounded window and reads totals outside it from status",
         "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts#bounds the label cache over a long run, retaining recent Windows and UNC identities"
