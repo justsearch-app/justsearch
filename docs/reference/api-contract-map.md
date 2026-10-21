@@ -11,6 +11,22 @@ This doc answers: "Where is the source of truth for JustSearch API schemas and s
 
 ## HTTP (Local API)
 
+### Production authentication
+
+Every production request requires `X-JustSearch-Session`, including reads and streams, except
+OPTIONS and GET/HEAD on `/api/health`, `/api/runtime/live`, `/api/runtime/ready`, `/api/status`,
+`/api/runtime/manifest`, and `/.well-known/justsearch/manifest.json`. Public responses never carry
+the credential. The only published credential source is the owner-only canonical
+`runtime/manifest.json` (`head.sessionToken`, POSIX 0600; Windows owner and SYSTEM only).
+`GET /api/mcp/token` is removed: 401 without a token, 404 with a valid token. No stdout token
+line is emitted. Browser SSE uses authenticated fetch headers, with no credential in URLs.
+Development mode remains token-free. See [ADR-0046](../decisions/0046-local-api-trust-boundary.md).
+
+The route and OpenAPI captures are generated together with
+`JUSTSEARCH_SESSION_TOKEN` set from that owner-only manifest:
+`node scripts/codegen/gen-api-client.mjs --from-live=http://127.0.0.1:<port>`.
+The prose in this contract map is maintained by hand; the repository has no generator for it.
+
 ### Status publication metadata (additive)
 
 Every head API response carries `X-JustSearch-Status-Epoch` (opaque process identity) and
@@ -81,7 +97,7 @@ uses the component's current configuration and bounded attempt budget.
 The HTTP route returns 202 when accepted, 429 when an attempt is already running,
 409 when recovery is not applicable, 404 for an unknown component, and 503 when
 the owner is unavailable or the budget is exhausted. The normal error envelope
-distinguishes these outcomes. The mutation token and local API trust checks apply.
+distinguishes these outcomes. The session token and local API trust checks apply.
 
 The former `POST /api/worker/restart` route is retained for one release solely to
 return 410 with permanent `ENDPOINT_RETIRED` and the replacement route in its
@@ -897,7 +913,7 @@ and `modules/ui/src/main/java/io/justsearch/ui/api/ResourceApiModule.java`.
 - Response is `OperationInvocationResponse`: `success`, `message`, optional error fields and `structuredData` containing `operationKey`, `operationRecordId` and state metadata. HTTP 200 alone does not imply operation success. Acceptance does not mean indexing completed and supplies no accepted-file count or `scanId`.
 - Poll `GET /api/operation-history/{operationKey}` for durable state, phase, committed units and terminal outcome. A read does not cancel the operation when its client disconnects.
 - Reuse a canonical UUIDv7 `idempotencyKey` with the same public arguments after an interrupted response. Known keys answer from their recorded invocation/outcome without fresh preparation; changed arguments receive HTTP 409 `OPERATION_KEY_REUSED`.
-- MCP bridges send `X-JustSearch-Transport: MCP`; the request owner supplies the MCP client partition and server-resolved identity (anonymous when unresolved). Existing Host/Origin/mutation-token protections apply. HTTP 428 retains the pending authorization, operation key, preparation nonce and approval preview; it is a refusal pending approval, never a successful ingest.
+- MCP bridges send `X-JustSearch-Transport: MCP`; the request owner supplies the MCP client partition and server-resolved identity (anonymous when unresolved). Existing Host/Origin/session-token protections apply. HTTP 428 retains the pending authorization, operation key, preparation nonce and approval preview; it is a refusal pending approval, never a successful ingest.
 
 `DELETE /api/indexing/collections`:
 
@@ -990,6 +1006,13 @@ operation-invocation error body it replaced: `{"success": false, "message": "...
 - Query parameter: `counts=true` -- includes a per-root bounded file count (capped scan, `-1` if the count itself failed).
 - Response: `{"roots": [{collection, path, fileCount, lastIndexed?}]}` -- `collection` defaults to `"default"` when the root was added without one; `lastIndexed` is omitted (not empty-string) when the root has never completed a scan.
 
+`POST /api/indexing-roots/preview` previews a proposed Library folder without changing registrations.
+
+- Request body: `{"path": string}`; the path is normalized to an absolute path.
+- Response: `{exists, isDir, fileCount, capped, alreadyWatched, overlap?}`. Existing fields retain their meanings. `alreadyWatched` describes exact path membership only.
+- Optional additive `overlap: {path: string, relationship: "inside" | "containing"}` names one normalized watched folder that overlaps the proposed folder; the relationship describes the proposed folder relative to that watched folder. It is omitted for exact re-add (even with legacy nesting) and when no overlap is found. Path-segment ancestry is used, so a sibling sharing a text prefix is not an overlap.
+- Library explains an overlap and makes Add unavailable before submission. Older clients may ignore this additional field; older Engines may omit it. The Engine still refuses new nested additions at submission, including races after preview; exact re-add remains idempotent.
+
 `POST /api/indexing/roots` adds a folder to the Library.
 
 - Request body: `{"path": string, "collection"?: string}` -- `path` is required and must resolve (after `Path.of(path).toAbsolutePath().normalize()`) to an **existing directory**; `collection` is optional and defaults to `"default"` when omitted.
@@ -1076,7 +1099,7 @@ JustSearch's loopback HTTP server exposes a minimal OpenAI-compatible surface th
 - Method, body, and most request headers are forwarded. Hop-by-hop headers (`Host`, `Connection`, `Transfer-Encoding`, etc.) are dropped per RFC 7230.
 - Status code, response headers, and body are streamed back unchanged.
 - When `llama-server` is offline (port unset, connect refused, or no chat package installed), the proxy responds `503 SERVICE_UNAVAILABLE` using the project's standard error envelope.
-- Token enforcement: `POST /v1/chat/completions` is subject to the same session-token requirement as the rest of the non-GET API surface in prod mode. Third-party agents read the token from JustSearch's stdout `JUSTSEARCH_SESSION_TOKEN=...` line on launch (or via the Tauri bridge for in-app agents).
+- Token enforcement: `POST /v1/chat/completions` requires the production session token, as do all non-public routes. Third-party agents read `head.sessionToken` from the owner-only canonical runtime manifest (the Tauri bridge supplies it to in-app agents).
 
 **Out of scope:**
 - `/v1/embeddings` — JustSearch's embedding encoder is in-process in the Worker; no HTTP server hosts it.

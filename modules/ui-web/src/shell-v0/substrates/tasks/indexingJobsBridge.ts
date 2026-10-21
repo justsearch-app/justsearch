@@ -382,7 +382,7 @@ export function projectJobsToTasks(
  * case; it opens its own, same as before 662 for any non-bridge consumer.
  *
  * SSR/headless-safe: when no `eventSourceFactory`/`multiplex` is supplied and
- * the global `EventSource` is unavailable, the bridge is a no-op (returns a
+ * the global `fetch` is unavailable, the bridge is a no-op (returns a
  * stop fn that does nothing) — it never tries to connect.
  */
 export function startIndexingJobsBridge(
@@ -392,7 +392,8 @@ export function startIndexingJobsBridge(
     multiplex?: MultiplexedStream;
   } = {},
 ): () => void {
-  if (!opts.multiplex && !opts.eventSourceFactory && typeof EventSource === 'undefined') {
+  // eslint-disable-next-line no-restricted-globals -- Availability probe; requests use authorizedFetch.
+  if (!opts.multiplex && !opts.eventSourceFactory && typeof fetch === 'undefined') {
     return () => {};
   }
   const url = `${(apiBase || '').replace(/\/$/, '')}${STREAM_PATH}`;

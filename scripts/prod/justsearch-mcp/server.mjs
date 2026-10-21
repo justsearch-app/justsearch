@@ -72,11 +72,29 @@ function ensureLoopbackUrl(urlStr, label = 'url') {
  * request inside one tool call, can reach an endpoint that is not that Engine.
  */
 let engineTarget = null;
+let rediscover = null;
+
+/** Retry only failures known to precede execution; never replay an ambiguous POST failure. */
+async function withReconnect(send) {
+  const result = await send();
+  let tokenRejected = false;
+  if (result.statusCode === 401) {
+    try { tokenRejected = JSON.parse(result.text).errorCode === 'UI_TOKEN_REQUIRED'; } catch { /* not a token refusal */ }
+  }
+  if (!rediscover || !(tokenRejected || result.error?.message === 'engine_gone' || result.error?.code === 'ECONNREFUSED')) return result;
+  try { await rediscover(); } catch { return result; }
+  return send();
+}
+
+
+function sessionHeaders() {
+  return engineTarget?.token ? { 'X-JustSearch-Session': engineTarget.token } : {};
+}
 
 function transportFailure(err) {
   return err?.code === 'ENGINE_NOT_PROVEN'
     ? { message: 'engine_gone', detail: `${err.status}: ${err.detail}` }
-    : { message: err?.message || String(err) };
+    : { message: err?.message || String(err), code: err?.code };
 }
 
 function engineGoneError(res) {
@@ -92,7 +110,7 @@ function engineGoneError(res) {
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:96-161.
  */
 function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
-  return new Promise((resolve) => {
+  return withReconnect(() => new Promise((resolve) => {
     let u;
     try {
       u = new URL(urlStr);
@@ -112,7 +130,7 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
       {
         path: u.pathname + u.search,
         timeoutMs,
-        headers: { Accept: 'application/json', 'User-Agent': 'justsearch-mcp/0.1.0', ...headers },
+        headers: { Accept: 'application/json', 'User-Agent': 'justsearch-mcp/0.1.0', ...headers, ...sessionHeaders() },
       },
       (res) => {
         const statusCode = typeof res.statusCode === 'number' ? res.statusCode : null;
@@ -151,7 +169,7 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
     });
     req.on('error', (err) => finish({ ok: false, statusCode: null, text: null, error: transportFailure(err) }));
     req.end();
-  });
+  }));
 }
 
 /**
@@ -159,7 +177,7 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, headers = {} }) {
  * Adapted from scripts/dev/justsearch-dev-mcp/server.mjs:164-237.
  */
 function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }) {
-  return new Promise((resolve) => {
+  return withReconnect(() => new Promise((resolve) => {
     let u;
     try {
       u = new URL(urlStr);
@@ -188,6 +206,7 @@ function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }
           Accept: 'application/json',
           'User-Agent': 'justsearch-mcp/0.1.0',
           ...headers,
+          ...sessionHeaders(),
         },
       },
       (res) => {
@@ -228,7 +247,7 @@ function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, headers = {} }
     req.on('error', (err) => finish({ ok: false, statusCode: null, text: null, error: transportFailure(err) }));
     req.write(bodyStr);
     req.end();
-  });
+  }));
 }
 
 /**
@@ -445,34 +464,13 @@ export async function main() {
 
   log('Starting JustSearch production MCP server...');
 
-  // Discover backend
-  const backend = await discover({ port: args.port, verbose: args.verbose });
-  const { baseUrl, token } = backend;
-  engineTarget = { port: backend.port, engine: backend.engine || null };
-
-  ensureLoopbackUrl(baseUrl, 'baseUrl');
-  log(`Backend: ${baseUrl}`);
-  // token is:
-  //   non-empty string → prod mode, include in POST headers
-  //   "" (empty string) → dev mode, no token enforcement (POST works without header)
-  //   null              → endpoint not available (old JustSearch), POST may fail
-  log(`Token: ${token ? 'available (prod mode)' : token === '' ? 'empty (dev mode)' : 'unavailable (old version?)'}`);
-
-  // Build header helpers — include token header only when we have a real token
-  const tokenHeaders = token ? { 'X-JustSearch-Session': token } : {};
-
-  function requireToken() {
-    // In dev mode (token === ""), POST works without a token — don't block.
-    // Only block when the token endpoint wasn't available at all (null).
-    if (token === null) {
-      return makeError(
-        'NO_TOKEN',
-        'Session token unavailable. This JustSearch version may not support the token endpoint. ' +
-          'Update JustSearch to the latest version, or use GET-only tools (suggest, status).',
-      );
-    }
-    return null;
-  }
+  rediscover = async () => {
+    const backend = await discover({ port: args.port, verbose: args.verbose });
+    ensureLoopbackUrl(backend.baseUrl, 'baseUrl');
+    engineTarget = { port: backend.port, engine: backend.engine || null, token: backend.token };
+    return backend;
+  };
+  const { baseUrl } = await rediscover();
 
   // Create MCP server
   const mcpServer = new McpServer({
@@ -503,8 +501,6 @@ export async function main() {
     async (rawArgs) => {
       const input = AnswerInputSchema.parse(rawArgs);
 
-      const tokenErr = requireToken();
-      if (tokenErr) return tokenErr;
 
       const url = `${baseUrl}/api/knowledge/retrieve-context`;
       const body = {
@@ -523,7 +519,7 @@ export async function main() {
       const res = await httpPostJsonLimited(url, body, {
         timeoutMs: 15_000,
         maxBytes: 2_000_000,
-        headers: tokenHeaders,
+        headers: {},
       });
 
       const { parsed, error } = parseJsonResponse(res);
@@ -560,7 +556,7 @@ export async function main() {
             { field: 'entity_persons_raw', size: 5 },
             { field: 'entity_organizations_raw', size: 5 },
           ]},
-        }, { timeoutMs: 5_000, maxBytes: 100_000, headers: tokenHeaders });
+        }, { timeoutMs: 5_000, maxBytes: 100_000 });
         const facetParsed = facetRes?.statusCode === 200 ? JSON.parse(facetRes.body) : null;
         if (facetParsed?.facets) {
           answerFacets = normalizeEntityFacetKeys(facetParsed.facets);
@@ -608,7 +604,7 @@ export async function main() {
           const citRes = await httpPostJsonLimited(citUrl, citBody, {
             timeoutMs: 10_000,
             maxBytes: 1_000_000,
-            headers: tokenHeaders,
+            headers: {},
           });
           const { parsed: citParsed } = parseJsonResponse(citRes);
           if (citParsed) {
@@ -653,8 +649,6 @@ export async function main() {
     async (rawArgs) => {
       const input = SearchInputSchema.parse(rawArgs);
 
-      const tokenErr = requireToken();
-      if (tokenErr) return tokenErr;
 
       const url = `${baseUrl}/api/knowledge/search`;
       // Note: Zod defaults (limit=10, mode='hybrid', querySyntax='SIMPLE') are always populated,
@@ -701,7 +695,7 @@ export async function main() {
       const res = await httpPostJsonLimited(url, body, {
         timeoutMs: 15_000,
         maxBytes: 2_000_000,
-        headers: tokenHeaders,
+        headers: {},
       });
 
       const { parsed, error } = parseJsonResponse(res);
@@ -790,8 +784,6 @@ export async function main() {
     async (rawArgs) => {
       const input = IngestInputSchema.parse(rawArgs);
 
-      const tokenErr = requireToken();
-      if (tokenErr) return tokenErr;
 
       const url = `${baseUrl}/api/knowledge/ingest`;
       const body = {
@@ -807,7 +799,7 @@ export async function main() {
       const res = await httpPostJsonLimited(url, body, {
         timeoutMs: 30_000,
         maxBytes: 2_000_000,
-        headers: { ...tokenHeaders, 'X-JustSearch-Transport': 'MCP' },
+        headers: { 'X-JustSearch-Transport': 'MCP' },
       });
       if (res.error?.message === 'engine_gone') return engineGoneError(res);
 

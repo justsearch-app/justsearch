@@ -3,7 +3,8 @@
  * join.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fetchSseHarness, flushStreamWork } from '../../../test/fetchSse.js';
 import {
   AdvisoryStore,
   advisoryKey,
@@ -108,50 +109,17 @@ function makeEnvelope(
   };
 }
 
-class MockEventSource {
-  static instances: MockEventSource[] = [];
-  url: string;
-  readyState: number = 0;
-  withCredentials = false;
-  onopen: ((ev: Event) => unknown) | null = null;
-  onmessage: ((ev: MessageEvent) => unknown) | null = null;
-  onerror: ((ev: Event) => unknown) | null = null;
-  readonly CONNECTING = 0;
-  readonly OPEN = 1;
-  readonly CLOSED = 2;
-  private listeners = new Map<string, Set<(e: Event) => void>>();
-
-  constructor(url: string) {
-    this.url = url;
-    MockEventSource.instances.push(this);
-  }
-  addEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
-    let set = this.listeners.get(type);
-    if (!set) {
-      set = new Set();
-      this.listeners.set(type, set);
-    }
-    set.add(listener as (e: Event) => void);
-  }
-  removeEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
-    this.listeners.get(type)?.delete(listener as (e: Event) => void);
-  }
-  dispatchEvent(_e: Event): boolean {
-    return true;
-  }
-  fireFrame(envelope: SseEnvelope): void {
-    const e = new MessageEvent('frame', { data: JSON.stringify(envelope) });
-    for (const l of this.listeners.get('frame') ?? []) l(e);
-  }
-  fireOpen(): void {
-    this.readyState = this.OPEN;
-    for (const l of this.listeners.get('open') ?? []) l(new Event('open'));
-  }
-  close(): void {
-    this.readyState = this.CLOSED;
-    this.listeners.clear();
-  }
-}
+let streams: ReturnType<typeof fetchSseHarness>;
+const running: Array<{ stop(): void }> = [];
+beforeEach(() => {
+  streams = fetchSseHarness();
+  vi.stubGlobal('fetch', streams.fetch);
+  vi.stubGlobal('EventSource', undefined);
+});
+afterEach(() => {
+  for (const stream of running.splice(0)) stream.stop();
+  vi.unstubAllGlobals();
+});
 
 describe('advisoryReducer', () => {
   it('LIFECYCLE with snapshot replaces the advisory list and stamps lastFrameKind', () => {
@@ -205,20 +173,12 @@ describe('AdvisoryStore', () => {
   beforeEach(() => {
     __resetUserStateForTest();
     __resetResourceCatalogForTest();
-    MockEventSource.instances = [];
-    // Make our MockEventSource the default factory globally — most tests
-    // instantiate AdvisoryStore directly with an explicit factory, but
-    // setting the global ensures createAdvisoryStore-driven paths in
-    // chrome-level tests would also use the mock.
-    (globalThis as unknown as { EventSource: typeof EventSource }).EventSource =
-      MockEventSource as unknown as typeof EventSource;
   });
 
   function makeStore(): AdvisoryStore {
-    return new AdvisoryStore({
-      eventSourceFactory: (url) =>
-        new MockEventSource(url) as unknown as EventSource,
-    });
+    const store = new AdvisoryStore();
+    running.push(store);
+    return store;
   }
 
   it('subscribes synchronously with the current snapshot (empty catalog → empty)', () => {
@@ -233,19 +193,20 @@ describe('AdvisoryStore', () => {
 
   it(
     'P2.2 — discovers advisory Resources from catalog and spawns one stream each',
-    () => {
+    async () => {
       seedCatalog(
         advisoryResource('core.advisory-operation-completed', '/api/advisory/op-completed/stream'),
       );
       const store = makeStore();
       store.start();
-      // One advisory Resource discovered → one MockEventSource constructed.
-      expect(MockEventSource.instances.length).toBe(1);
-      expect(MockEventSource.instances[0]?.url).toBe('/api/advisory/op-completed/stream');
+      await flushStreamWork();
+      // One advisory Resource discovered → one HTTP SSE request issued.
+      expect(streams.connections.length).toBe(1);
+      expect(streams.connections[0]?.url).toBe('/api/advisory/op-completed/stream');
     },
   );
 
-  it('P2.2 — non-advisory Resources are ignored (no streams spawned)', () => {
+  it('P2.2 — non-advisory Resources are ignored (no streams spawned)', async () => {
     const nonAdvisory: Resource = {
       ...advisoryResource('core.health-events', '/api/health/events/stream'),
       kind: 'health-event-stream',
@@ -254,16 +215,18 @@ describe('AdvisoryStore', () => {
     seedCatalog(nonAdvisory);
     const store = makeStore();
     store.start();
-    expect(MockEventSource.instances.length).toBe(0);
+    await flushStreamWork();
+    expect(streams.connections.length).toBe(0);
   });
 
-  it('joins streamed events with persisted ack state from UserStateDocument', () => {
+  it('joins streamed events with persisted ack state from UserStateDocument', async () => {
     seedCatalog(
       advisoryResource('core.advisory-operation-completed', '/api/advisory/op-completed/stream'),
     );
     const store = makeStore();
     store.start();
-    const es = MockEventSource.instances[0];
+    await flushStreamWork();
+    const es = streams.connections[0];
     expect(es).toBeDefined();
 
     let lastSnapshot: { unreadCount: number; advisories: { acknowledged: boolean }[] } = {
@@ -273,7 +236,7 @@ describe('AdvisoryStore', () => {
     store.subscribe((s) => {
       lastSnapshot = { unreadCount: s.unreadCount, advisories: [...s.advisories] };
     });
-    es!.fireFrame(makeEnvelope('LIFECYCLE', { kind: 'snapshot', advisories: [SAMPLE_EVENT] }));
+    await es!.emitFrame(makeEnvelope('LIFECYCLE', { kind: 'snapshot', advisories: [SAMPLE_EVENT] }));
     expect(lastSnapshot.unreadCount).toBe(1);
     expect(lastSnapshot.advisories[0]?.acknowledged).toBe(false);
 
@@ -283,38 +246,40 @@ describe('AdvisoryStore', () => {
     expect(getDocument().acknowledgedAdvisories).toContain(advisoryKey(SAMPLE_EVENT));
   });
 
-  it('slice 494 — sourceRenderHint comes from wire record, not Resource', () => {
+  it('slice 494 — sourceRenderHint comes from wire record, not Resource', async () => {
     seedCatalog(
       advisoryResource('core.advisory-ephemeral', '/api/advisory/ephemeral/stream', 'EPHEMERAL'),
     );
     const store = makeStore();
     store.start();
-    const es = MockEventSource.instances[0];
+    await flushStreamWork();
+    const es = streams.connections[0];
     const ephemeralEvent: AdvisoryEvent = { ...SAMPLE_EVENT, renderHint: 'EPHEMERAL' };
-    es!.fireFrame(
+    await es!.emitFrame(
       makeEnvelope('LIFECYCLE', { kind: 'snapshot', advisories: [ephemeralEvent] }),
     );
     const snap = store.snapshot();
     expect(snap.advisories[0]?.sourceRenderHint).toBe('EPHEMERAL');
   });
 
-  it('P2.2 — aggregates events from multiple advisory Resources sorted by occurredAt', () => {
+  it('P2.2 — aggregates events from multiple advisory Resources sorted by occurredAt', async () => {
     seedCatalog(
       advisoryResource('core.advisory-a', '/api/advisory/a/stream', 'PERSISTED'),
       advisoryResource('core.advisory-b', '/api/advisory/b/stream', 'EPHEMERAL'),
     );
     const store = makeStore();
     store.start();
-    expect(MockEventSource.instances.length).toBe(2);
-    const esA = MockEventSource.instances[0]!;
-    const esB = MockEventSource.instances[1]!;
+    await flushStreamWork();
+    expect(streams.connections.length).toBe(2);
+    const esA = streams.connections[0]!;
+    const esB = streams.connections[1]!;
 
     const eventA1: AdvisoryEvent = { ...SAMPLE_EVENT, id: 'op:a1', occurredAt: '2026-05-12T10:00:00Z', renderHint: 'PERSISTED' };
     const eventB1: AdvisoryEvent = { ...SAMPLE_EVENT, id: 'op:b1', occurredAt: '2026-05-12T10:00:30Z', renderHint: 'EPHEMERAL' };
     const eventA2: AdvisoryEvent = { ...SAMPLE_EVENT, id: 'op:a2', occurredAt: '2026-05-12T10:01:00Z', renderHint: 'PERSISTED' };
 
-    esA.fireFrame(makeEnvelope('LIFECYCLE', { kind: 'snapshot', advisories: [eventA1, eventA2] }));
-    esB.fireFrame(makeEnvelope('LIFECYCLE', { kind: 'snapshot', advisories: [eventB1] }));
+    await esA.emitFrame(makeEnvelope('LIFECYCLE', { kind: 'snapshot', advisories: [eventA1, eventA2] }));
+    await esB.emitFrame(makeEnvelope('LIFECYCLE', { kind: 'snapshot', advisories: [eventB1] }));
 
     const snap = store.snapshot();
     expect(snap.advisories.map((r) => r.event.id)).toEqual(['op:a1', 'op:b1', 'op:a2']);
@@ -324,37 +289,39 @@ describe('AdvisoryStore', () => {
     expect(snap.advisories[2]?.sourceRenderHint).toBe('PERSISTED');
   });
 
-  it('P2.2 — isConnected = false until ALL streams connected', () => {
+  it('P2.2 — isConnected = false until ALL streams connected', async () => {
     seedCatalog(
       advisoryResource('core.advisory-a', '/api/advisory/a/stream'),
       advisoryResource('core.advisory-b', '/api/advisory/b/stream'),
     );
     const store = makeStore();
     store.start();
-    expect(MockEventSource.instances.length).toBe(2);
+    await flushStreamWork();
+    expect(streams.connections.length).toBe(2);
     expect(store.snapshot().isConnected).toBe(false);
 
     // Both streams connect; aggregate flips true.
-    MockEventSource.instances[0]!.fireOpen();
+    await streams.connections[0]!.open();
     expect(store.snapshot().isConnected).toBe(false);
-    MockEventSource.instances[1]!.fireOpen();
+    await streams.connections[1]!.open();
     expect(store.snapshot().isConnected).toBe(true);
   });
 
-  it('acknowledgeAll marks every current advisory acknowledged', () => {
+  it('acknowledgeAll marks every current advisory acknowledged', async () => {
     seedCatalog(
       advisoryResource('core.advisory-operation-completed', '/api/advisory/op-completed/stream'),
     );
     const store = makeStore();
     store.start();
-    const es = MockEventSource.instances[0];
+    await flushStreamWork();
+    const es = streams.connections[0];
 
     const second: AdvisoryEvent = {
       ...SAMPLE_EVENT,
       id: 'operation.completed:core.ping-backend:FAILURE',
       occurredAt: '2026-05-12T10:01:00Z',
     };
-    es!.fireFrame(
+    await es!.emitFrame(
       makeEnvelope('LIFECYCLE', { kind: 'snapshot', advisories: [SAMPLE_EVENT, second] }),
     );
     expect(store.snapshot().unreadCount).toBe(2);
@@ -373,6 +340,7 @@ describe('AdvisoryStore', () => {
     );
     const store = makeStore();
     store.start();
+    await flushStreamWork();
     // Acknowledge CAP + 50 unique keys; observe FIFO eviction.
     for (let i = 0; i < ACKNOWLEDGED_ADVISORIES_CAP + 50; i++) {
       store.acknowledge(`core.test-${i}@2026-05-12T10:00:00Z`);
@@ -386,36 +354,38 @@ describe('AdvisoryStore', () => {
     );
   });
 
-  it('UPDATE-stream event appends and bumps unreadCount', () => {
+  it('UPDATE-stream event appends and bumps unreadCount', async () => {
     seedCatalog(
       advisoryResource('core.advisory-operation-completed', '/api/advisory/op-completed/stream'),
     );
     const store = makeStore();
     store.start();
-    const es = MockEventSource.instances[0];
+    await flushStreamWork();
+    const es = streams.connections[0];
 
-    es!.fireFrame(makeEnvelope('LIFECYCLE', { kind: 'snapshot', advisories: [] }, 1));
+    await es!.emitFrame(makeEnvelope('LIFECYCLE', { kind: 'snapshot', advisories: [] }, 1));
     expect(store.snapshot().unreadCount).toBe(0);
 
-    es!.fireFrame(makeEnvelope('UPDATE', SAMPLE_EVENT, 2));
+    await es!.emitFrame(makeEnvelope('UPDATE', SAMPLE_EVENT, 2));
     expect(store.snapshot().unreadCount).toBe(1);
     expect(store.snapshot().advisories[0]?.event.classId).toBe('operation.completed');
   });
 
-  it('P2.2 — stop() unsubscribes from catalog AND stops all streams', () => {
+  it('P2.2 — stop() unsubscribes from catalog AND stops all streams', async () => {
     seedCatalog(
       advisoryResource('core.advisory-a', '/api/advisory/a/stream'),
       advisoryResource('core.advisory-b', '/api/advisory/b/stream'),
     );
     const store = makeStore();
     store.start();
-    expect(MockEventSource.instances.length).toBe(2);
-    const esA = MockEventSource.instances[0]!;
-    const esB = MockEventSource.instances[1]!;
+    await flushStreamWork();
+    expect(streams.connections.length).toBe(2);
+    const esA = streams.connections[0]!;
+    const esB = streams.connections[1]!;
     store.stop();
-    // Both EventSources closed (readyState === CLOSED).
-    expect(esA.readyState).toBe(esA.CLOSED);
-    expect(esB.readyState).toBe(esB.CLOSED);
+    // Both HTTP SSE requests were aborted.
+    expect(esA.closed).toBe(true);
+    expect(esB.closed).toBe(true);
   });
 
   // Tempdoc 559 Authority III — the client-originated ephemeral channel folds
@@ -522,43 +492,40 @@ describe('AdvisoryStore — tempdoc 662 multiplexed path', () => {
   beforeEach(() => {
     __resetUserStateForTest();
     __resetResourceCatalogForTest();
-    MockEventSource.instances = [];
   });
 
-  function multiplexOn(): { multiplex: MultiplexedStream; source: MockEventSource } {
-    let source!: MockEventSource;
-    const multiplex = new MultiplexedStream({
-      url: 'http://test/api/shell-events/stream',
-      eventSourceFactory: (url) => {
-        source = new MockEventSource(url);
-        return source as unknown as EventSource;
-      },
-    });
+  async function multiplexOn() {
+    const multiplex = new MultiplexedStream({ url: 'http://test/api/shell-events/stream' });
+    running.push(multiplex);
     multiplex.start();
-    source.fireOpen(); // realistic EventSource ordering: 'open' precedes any 'frame'
+    await flushStreamWork();
+    const source = streams.connections[0]!;
+    await source.open(); // HTTP headers precede any frame bytes.
     return { multiplex, source };
   }
 
-  it('a Resource whose endpoint is recognized subscribes on the multiplexer — no EventSource opened', () => {
+  it('a Resource whose endpoint is recognized subscribes on the multiplexer — no direct SSE request', async () => {
     seedCatalog(
       advisoryResource(
         'core.advisory-operation-completed',
         '/api/advisory/operation-completed/stream',
       ),
     );
-    const { multiplex, source } = multiplexOn();
+    const { multiplex, source } = await multiplexOn();
     const store = new AdvisoryStore({ multiplex });
+    running.push(store);
     store.start();
+    await flushStreamWork();
 
-    // Only the ONE multiplexed connection's EventSource was opened — no per-Resource socket.
-    expect(MockEventSource.instances.length).toBe(1);
-    expect(MockEventSource.instances[0]).toBe(source);
+    // Only the ONE multiplexed connection's HTTP request was opened — no per-Resource socket.
+    expect(streams.connections.length).toBe(1);
+    expect(streams.connections[0]).toBe(source);
 
     let lastSnapshot: { unreadCount: number } = { unreadCount: 0 };
     store.subscribe((s) => {
       lastSnapshot = { unreadCount: s.unreadCount };
     });
-    source.fireFrame({
+    await source.emitFrame({
       streamId: 'surface:advisory-operation-completed',
       frameKind: 'LIFECYCLE',
       seq: 1,
@@ -569,23 +536,23 @@ describe('AdvisoryStore — tempdoc 662 multiplexed path', () => {
     expect(lastSnapshot.unreadCount).toBe(1);
   });
 
-  it('an unrecognized advisory endpoint falls back to its own direct EnvelopeStream', () => {
+  it('an unrecognized advisory endpoint falls back to its own direct EnvelopeStream', async () => {
     seedCatalog(
       advisoryResource('core.advisory-future-class', '/api/advisory/future-class/stream'),
     );
-    const { multiplex } = multiplexOn();
-    (globalThis as unknown as { EventSource: typeof EventSource }).EventSource =
-      MockEventSource as unknown as typeof EventSource;
+    const { multiplex } = await multiplexOn();
     const store = new AdvisoryStore({ multiplex });
+    running.push(store);
     store.start();
+    await flushStreamWork();
 
     // The multiplexed connection's socket (1) PLUS a direct fallback socket for the
     // unrecognized endpoint (2) — the new advisory class is not silently dropped.
-    expect(MockEventSource.instances.length).toBe(2);
-    expect(MockEventSource.instances[1]?.url).toBe('/api/advisory/future-class/stream');
+    expect(streams.connections.length).toBe(2);
+    expect(streams.connections[1]?.url).toBe('/api/advisory/future-class/stream');
   });
 
-  it('two recognized Resources share the one multiplexed connection (no second socket)', () => {
+  it('two recognized Resources share the one multiplexed connection (no second socket)', async () => {
     seedCatalog(
       advisoryResource(
         'core.advisory-operation-completed',
@@ -596,17 +563,19 @@ describe('AdvisoryStore — tempdoc 662 multiplexed path', () => {
         '/api/advisory/health-recoverable/stream',
       ),
     );
-    const { multiplex, source } = multiplexOn();
+    const { multiplex, source } = await multiplexOn();
     const store = new AdvisoryStore({ multiplex });
+    running.push(store);
     store.start();
+    await flushStreamWork();
 
-    expect(MockEventSource.instances.length).toBe(1); // both Resources share the ONE socket
+    expect(streams.connections.length).toBe(1); // both Resources share the ONE socket
 
     let lastSnapshot: { advisories: { event: { classId: string } }[] } = { advisories: [] };
     store.subscribe((s) => {
       lastSnapshot = { advisories: s.advisories.map((a) => ({ event: { classId: a.event.classId } })) };
     });
-    source.fireFrame({
+    await source.emitFrame({
       streamId: 'surface:advisory-operation-completed',
       frameKind: 'LIFECYCLE',
       seq: 1,
@@ -615,7 +584,7 @@ describe('AdvisoryStore — tempdoc 662 multiplexed path', () => {
       resumeToken: 'tok-a-1',
     });
     const healthEvent: AdvisoryEvent = { ...SAMPLE_EVENT, classId: 'health.recoverable', id: 'hr-1' };
-    source.fireFrame({
+    await source.emitFrame({
       streamId: 'surface:advisory-health-recoverable',
       frameKind: 'LIFECYCLE',
       seq: 1,

@@ -118,6 +118,8 @@ describe('agent stream ownership', () => {
     runs.push(controller.send('start'));
     streams[0]!.onEvent('session_started', { sessionId: 'same-run' });
     streams[0]!.onEvent('tool_call_pending', pending);
+    // Let token resolution finish; keep the lookup pending across the reattach.
+    await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
     runs.push(controller.attachToRun('same-run'));
     streams[1]!.onEvent('tool_call_pending', pending);
     resolveLookup(new Response(JSON.stringify({ callId: pending.callId, operationId: 'core.test',

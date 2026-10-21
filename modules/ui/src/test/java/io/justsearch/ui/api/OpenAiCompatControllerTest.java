@@ -262,10 +262,10 @@ class OpenAiCompatControllerTest {
       var uri = URI.create("http://127.0.0.1:" + app.port() + "/v1/models");
       for (String origin : java.util.List.of("https://foreign.example", "tauri://localhost")) {
         var request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(5))
-            .header("Origin", origin).GET().build();
+            .header("Origin", origin).header(LocalApiServer.SESSION_TOKEN_HEADER, "test-session-token").GET().build();
         var response = http.send(request, HttpResponse.BodyHandlers.ofString());
         boolean shell = origin.equals("tauri://localhost");
-        assertEquals(200, response.statusCode(), "exercise the token-exempt production GET");
+        assertEquals(200, response.statusCode(), "exercise the authenticated production GET");
         assertEquals("{\"object\":\"list\",\"data\":[]}", response.body());
         assertEquals(shell ? java.util.List.of(origin) : java.util.List.of(),
             response.headers().allValues("Access-Control-Allow-Origin"));

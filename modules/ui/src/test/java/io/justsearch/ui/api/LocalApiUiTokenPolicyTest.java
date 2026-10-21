@@ -65,7 +65,7 @@ class LocalApiUiTokenPolicyTest {
   }
 
   @Test
-  @DisplayName("GET requests succeed without token")
+  @DisplayName("Public status read succeeds without token")
   void getSucceedsWithoutToken() throws Exception {
     startTokenTestServer(true, TEST_TOKEN);
 
@@ -177,6 +177,9 @@ class LocalApiUiTokenPolicyTest {
 
     // Should succeed even without token
     assertEquals(200, resp.statusCode());
+    var read = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/private"))
+        .GET().build();
+    assertEquals(200, client.send(read, HttpResponse.BodyHandlers.ofString()).statusCode());
   }
 
   @Test
@@ -197,8 +200,8 @@ class LocalApiUiTokenPolicyTest {
   }
 
   @Test
-  @DisplayName("GET /api/mcp/token returns session token in prod mode")
-  void getMcpTokenReturnsTokenInProdMode() throws Exception {
+  @DisplayName("Removed bootstrap requires authentication in prod mode")
+  void getMcpTokenRequiresAuthenticationInProdMode() throws Exception {
     startTokenTestServer(true, TEST_TOKEN);
 
     HttpResponse<String> resp =
@@ -209,13 +212,13 @@ class LocalApiUiTokenPolicyTest {
                 .build(),
             HttpResponse.BodyHandlers.ofString());
 
-    assertEquals(200, resp.statusCode());
-    assertTrue(resp.body().contains(TEST_TOKEN), "Response should contain the session token");
+    assertEquals(401, resp.statusCode());
+    assertFalse(resp.body().contains(TEST_TOKEN));
   }
 
   @Test
-  @DisplayName("GET /api/mcp/token returns empty token in dev mode")
-  void getMcpTokenReturnsEmptyInDevMode() throws Exception {
+  @DisplayName("Removed bootstrap is absent in dev mode")
+  void getMcpTokenIsAbsentInDevMode() throws Exception {
     startTokenTestServer(false, null);
 
     HttpResponse<String> resp =
@@ -226,8 +229,18 @@ class LocalApiUiTokenPolicyTest {
                 .build(),
             HttpResponse.BodyHandlers.ofString());
 
-    assertEquals(200, resp.statusCode());
-    assertTrue(resp.body().contains("\"token\":\"\""), "Token should be empty string in dev mode");
+    assertEquals(404, resp.statusCode());
+  }
+
+  @Test
+  void nonPublicReadsAndOtherMethodsNeedToken() throws Exception {
+    startTokenTestServer(true, TEST_TOKEN);
+    for (String method : java.util.List.of("GET", "HEAD", "PATCH", "TRACE")) {
+      var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/private"))
+          .method(method, HttpRequest.BodyPublishers.noBody()).build();
+      assertEquals(401, client.send(request, HttpResponse.BodyHandlers.ofString()).statusCode(), method);
+    }
+
   }
 
   /**
@@ -245,20 +258,18 @@ class LocalApiUiTokenPolicyTest {
 
     // Register no-op exception handler to preserve ctx.json() body (mirrors LocalApiServer)
     app.exception(io.javalin.http.HttpResponseException.class, (e, ctx) -> {
-      // Body and status already set by handler; do nothing.
+      ctx.status(e.getStatus()); // Preserve bodies and propagate routing errors, as production does.
     });
 
     executor = Executors.newSingleThreadExecutor();
     new ApiSecurityFilters(prodMode, sessionToken, new EventBuffer(), executor, null).install(app);
 
+    app.get("/api/private", ctx -> ctx.result("private"));
     // Test endpoints
     app.get("/api/status", ctx -> ctx.json(Map.of("status", "ok")));
     app.post("/api/settings/v2", ctx -> ctx.json(Map.of("success", true)));
     app.delete("/api/indexing/roots", ctx -> ctx.json(Map.of("success", true)));
-    String finalToken = sessionToken;
-    app.get(
-        "/api/mcp/token",
-        ctx -> ctx.json(Map.of("token", finalToken != null ? finalToken : "")));
+
 
     app.start("127.0.0.1", 0);
     port = app.port();
