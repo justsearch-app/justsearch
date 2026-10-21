@@ -1,0 +1,187 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T01:31:28.043Z",
+  "revision": "11c359f4918b7aa1ca02aee3e517bdcf2cb67171",
+  "tree": "756fc7449e4f4a4f6184bd14a911336fdaf991d4",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-vitest-3186767-1792459874480.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6428
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#refuses the follow-up when the conversation’s context settings cannot be read",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) refuses the follow-up when the conversation’s context settings cannot be read",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends the submitted question after a context wait and keeps later input: A newer unsent question",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) sends the submitted question after a context wait and keeps later input: A newer unsent question",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends the submitted question after a context wait and keeps later input: Submitted question",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) sends the submitted question after a context wait and keeps later input: Submitted question",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#warns after a failed history read on load and refuses Ask with its draft kept",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) warns after a failed history read on load and refuses Ask with its draft kept",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#warns after a failed history read on reload and refuses Ask with its draft kept",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) warns after a failed history read on reload and refuses Ask with its draft kept",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#recovers a failed load history read on backoff without another action",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) recovers a failed load history read on backoff without another action",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#refuses Ask when a load read is still pending and its confirmation read fails",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86ae24bb5da8e1e0fcc6baed55979d1f049dabacb43a22a2f74c878c13766053",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) refuses Ask when a load read is still pending and its confirmation read fails",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "11c359f49",
+    "revision": "11c359f4918b7aa1ca02aee3e517bdcf2cb67171",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-vitest-3186767-1792459881933.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5897,
+        "output": "JSON report written to /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-vitest-3186767-1792459881933.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#refuses the follow-up when the conversation’s context settings cannot be read",
+        "classification": "assertion",
+        "detail": "a follow-up ask is sent WITH the conversation (S2.0) refuses the follow-up when the conversation’s context settings cannot be read:  AssertionError: expected [ { shapeId: 'core.rag-ask', …(4) } ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/eli"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends the submitted question after a context wait and keeps later input: A newer unsent question",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) sends the submitted question after a context wait and keeps later input: A newer unsent question:  AssertionError: expected '' to be 'A newer unsent question' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-AY9gr1/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1735:90\n    at file:///home/elias/dev/justse"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends the submitted question after a context wait and keeps later input: Submitted question",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) sends the submitted question after a context wait and keeps later input: Submitted question:  AssertionError: expected '' to be 'Submitted question' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-AY9gr1/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1735:90\n    at file:///home/elias/dev/justsearch/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#warns after a failed history read on load and refuses Ask with its draft kept",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) warns after a failed history read on load and refuses Ask with its draft kept:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-AY9gr1/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1754:39\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#warns after a failed history read on reload and refuses Ask with its draft kept",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) warns after a failed history read on reload and refuses Ask with its draft kept:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-AY9gr1/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1754:39\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#recovers a failed load history read on backoff without another action",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) recovers a failed load history read on backoff without another action:  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-_6dwtuzl/tmp/test-intent-before-AY9gr1/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1800:39\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#refuses Ask when a load read is still pending and its confirmation read fails",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) refuses Ask when a load read is still pending and its confirmation read fails:  AssertionError: expected [ { shapeId: 'core.rag-ask', …(4) } ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/eli"
+      }
+    ]
+  },
+  "digest": "sha256:ae4da3265a228b5223dd4125dc1ebb447b5fb980a2e90720eb9cd0669d5d30f2"
+}

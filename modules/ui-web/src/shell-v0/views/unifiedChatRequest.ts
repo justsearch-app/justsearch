@@ -47,6 +47,9 @@ export interface ThreadMessage {
   // (from the `rag.rewrite` SSE event). Persisted per-turn so the "Interpreted as: …" transparency
   // line survives turn completion + restored history, not just the live stream.
   standaloneQuestion?: string;
+  // The reader stopped this turn (the record's `CANCELLED` disposition, written by the Engine for a
+  // Stop): it says so, and an answer cut off before any text is not shown as an empty answer.
+  stopped?: boolean;
   // Slice 513 — stable id from backend (real UUID for post-513 writes,
   // synthetic idx-N for legacy). Required for "Branch here" affordance.
   id?: string;

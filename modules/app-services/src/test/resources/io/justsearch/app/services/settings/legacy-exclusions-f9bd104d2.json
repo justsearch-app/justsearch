@@ -1,0 +1,46 @@
+{
+  "schemaVersion" : 5,
+  "settings" : {
+    "apiPort" : null,
+    "chatEnabled" : null,
+    "citationScorerModelPath" : "",
+    "contextLength" : 0,
+    "declinedAiPackages" : [ ],
+    "defaultAction" : "open",
+    "density" : "comfort",
+    "embedOnnxModelPath" : "",
+    "excludePatterns" : [ "[legacy", "private", "{broken", "report[1].txt", "{take,omit}.txt" ],
+    "gpuGameDetection" : null,
+    "gpuLayers" : null,
+    "highContrast" : false,
+    "indexBasePath" : "",
+    "inspectorWidth" : 0,
+    "llamaLibPath" : "",
+    "llmModelPath" : "",
+    "maxTokens" : 1024,
+    "mode" : "simple",
+    "nerModelPath" : "",
+    "pauseIndexingDuringAi" : false,
+    "rerankerModelPath" : "",
+    "resultsDividerPosition" : 0.5,
+    "schemaVersion" : 1,
+    "serverExecutablePath" : "",
+    "spladeModelPath" : "",
+    "splits" : {
+      "leftPane" : 0.5,
+      "rightPane" : 0.5
+    },
+    "theme" : "system",
+    "trustLoopNudgeSeen" : false,
+    "version" : 1,
+    "vimMode" : false,
+    "window" : {
+      "height" : 800.0,
+      "lastShownAt" : "2026-10-20T03:42:54.383681206Z",
+      "maximized" : true,
+      "width" : 1280.0
+    }
+  },
+  "acceptedRevision" : 1,
+  "lastCommittedOperationKey" : "01993ba0-0000-7000-8000-000000000001"
+}

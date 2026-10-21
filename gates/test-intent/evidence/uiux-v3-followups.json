@@ -1,0 +1,1458 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T02:55:04.190Z",
+  "revision": "9c3251ff18ba2d786b1fa4fac7a2a6df423e9bc9",
+  "tree": "60863ffa238ca5526341d2524463b5314c9d48e8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.rewrittenFollowUpPersistsTheStandaloneQuestion\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.rewriteThenRetrievalFailureKeepsTheNote\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.rewriteThenFailedRetrievalWithoutMetadataKeepsTheTurnAndItsNote\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.rewriteThenGenerationFailureKeepsTheNote\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.unrevisedTurnCarriesNoStandaloneQuestion\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.forwardedContextCountsAsConversationInTheBreakdown\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.compactionSummaryFoldsIntoTheLeadingSystemMessage\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.forwardedSummaryFoldsIntoTheLeadingSystemMessage\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.summaryWithoutSystemPromptLeadsTheList\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.contextWithoutSystemMessagesIsUnchanged\" --tests \"io.justsearch.app.services.conversation.FileConversationStoreTest.excludingTheFloorMessageKeepsTheFloor\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.aStopOnARunningTurnCancelsItAtOnce\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.aStopBeforeTheTurnStartsCancelsItWhenItStarts\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.anEarlyStopIsUsedOnce\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.anEarlyStopNamesOnlyItsOwnTurn\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.onlyTheNewestEarlyStopsAreKept\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.aStopAfterTheTurnFinishedIsNotKept\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.aStopOnWorkAlreadyCancelledForAnotherReasonDoesNotSayItStopped\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.aStopOnceTheAnswerIsBeingSavedChangesNothingAndSaysSo\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2296
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.InteractionThreadControllerTest.surfacesTheStandaloneQuestionFromTheRecord\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.stopRightAfterTheRewriteSavesTheTurnStoppedWithItsNote\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.stopWhileTheDocumentsAreRetrievedSavesTheTurnStoppedNotFailed\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.stopWhileTheAnswerIsCheckedSavesTheWholeTextAsStopped\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.lateStopSavesWhatStreamedAsStopped\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aClosedConnectionWithoutStopKeepsTheTurnRunningToItsAnswer\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStopAfterTheTurnFinishedChangesNothing\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStopNamingAnotherTurnLeavesTheRunningTurnAlone\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStopThatOvertakesItsDispatchStopsTheTurnWhenItStarts\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStopForAFinishedTurnIsNotKeptForALaterDispatch\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStoppedTurnIsSavedWithTheThinkingAndSourcesItShowed\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStopWhileTheDocumentsAreRetrievedEndsTheStreamStoppedNotFailed\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStopAfterTheAnswerIsSavedChangesNothingAndSaysSo\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4450
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-record.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.record.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/search-v3/sv3-branch.test.ts\" \"src/shell-v0/views/search-v3/sv3-context.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.ask.test.ts\" \"src/shell-v0/views/AskTerminalReload.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/test-intent-vitest-262135-1792464863342.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4767
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#rewrittenFollowUpPersistsTheStandaloneQuestion",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd4a5f03ecac36371f5890b71eb52e9dea140f203caf9dc2bd331e5f3fd43cb2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rewrittenFollowUpPersistsTheStandaloneQuestion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#rewriteThenRetrievalFailureKeepsTheNote",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd4a5f03ecac36371f5890b71eb52e9dea140f203caf9dc2bd331e5f3fd43cb2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rewriteThenRetrievalFailureKeepsTheNote()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#rewriteThenFailedRetrievalWithoutMetadataKeepsTheTurnAndItsNote",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd4a5f03ecac36371f5890b71eb52e9dea140f203caf9dc2bd331e5f3fd43cb2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rewriteThenFailedRetrievalWithoutMetadataKeepsTheTurnAndItsNote()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#rewriteThenGenerationFailureKeepsTheNote",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd4a5f03ecac36371f5890b71eb52e9dea140f203caf9dc2bd331e5f3fd43cb2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rewriteThenGenerationFailureKeepsTheNote()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#unrevisedTurnCarriesNoStandaloneQuestion",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd4a5f03ecac36371f5890b71eb52e9dea140f203caf9dc2bd331e5f3fd43cb2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unrevisedTurnCarriesNoStandaloneQuestion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#forwardedContextCountsAsConversationInTheBreakdown",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd4a5f03ecac36371f5890b71eb52e9dea140f203caf9dc2bd331e5f3fd43cb2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "forwardedContextCountsAsConversationInTheBreakdown()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#compactionSummaryFoldsIntoTheLeadingSystemMessage",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd4a5f03ecac36371f5890b71eb52e9dea140f203caf9dc2bd331e5f3fd43cb2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "compactionSummaryFoldsIntoTheLeadingSystemMessage()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#forwardedSummaryFoldsIntoTheLeadingSystemMessage",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd4a5f03ecac36371f5890b71eb52e9dea140f203caf9dc2bd331e5f3fd43cb2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "forwardedSummaryFoldsIntoTheLeadingSystemMessage()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#summaryWithoutSystemPromptLeadsTheList",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd4a5f03ecac36371f5890b71eb52e9dea140f203caf9dc2bd331e5f3fd43cb2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "summaryWithoutSystemPromptLeadsTheList()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#contextWithoutSystemMessagesIsUnchanged",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dd4a5f03ecac36371f5890b71eb52e9dea140f203caf9dc2bd331e5f3fd43cb2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "contextWithoutSystemMessagesIsUnchanged()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java#excludingTheFloorMessageKeepsTheFloor",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:951d5a64d0a5d9bb17ed1b5c496d4c45e67ea7c6e3fc357fe838dd10704c6de9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "excludingTheFloorMessageKeepsTheFloor(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java#surfacesTheStandaloneQuestionFromTheRecord",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:107104998b165a3a431f888049fcf7a4ffe0f286609d7d7cfeef50843d0a8853",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "surfacesTheStandaloneQuestionFromTheRecord()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts#reads each turn’s note off its own answer, and none onto a turn that was not rewritten",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0d00ac39184cf2e3742f4b18b50ff04c9a0a9546024a60a7434f7f86b81ed9f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the \"Interpreted as\" note comes back from the record, on its own turn reads each turn’s note off its own answer, and none onto a turn that was not rewritten",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts#keeps the note on a turn whose rewrite was followed by a failure",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0d00ac39184cf2e3742f4b18b50ff04c9a0a9546024a60a7434f7f86b81ed9f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the \"Interpreted as\" note comes back from the record, on its own turn keeps the note on a turn whose rewrite was followed by a failure",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts#shows no note for a record written before the field existed, or a blank one",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0d00ac39184cf2e3742f4b18b50ff04c9a0a9546024a60a7434f7f86b81ed9f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the \"Interpreted as\" note comes back from the record, on its own turn shows no note for a record written before the field existed, or a blank one",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts#reads the /history COMPANION record when a conversation is opened (852 §2.3c)",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:03454f6c22dcfd7980309dff600b79b9024f3788bb98b10c0122ba5cbfe11f6f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the transcript projects from the canonical record (D1) reads the /history COMPANION record when a conversation is opened (852 §2.3c)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#retries a tool-less Delegate turn as a Delegate, after reload, while the composer shows Ask",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7718236e7a46f43e8acc089aafe7fc9a7180a199bf4eda916cb015aff2bd275f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version retries a tool-less Delegate turn as a Delegate, after reload, while the composer shows Ask",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#edits the FIRST question of a Delegate conversation at the empty-prefix sentinel",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7718236e7a46f43e8acc089aafe7fc9a7180a199bf4eda916cb015aff2bd275f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version edits the FIRST question of a Delegate conversation at the empty-prefix sentinel",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#runs even when no documents are indexed — the Ask-only gate does not apply",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7718236e7a46f43e8acc089aafe7fc9a7180a199bf4eda916cb015aff2bd275f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version runs even when no documents are indexed — the Ask-only gate does not apply",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#re-edits a branch’s own Delegate turn as a SIBLING of that branch",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7718236e7a46f43e8acc089aafe7fc9a7180a199bf4eda916cb015aff2bd275f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version re-edits a branch’s own Delegate turn as a SIBLING of that branch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#re-edits a retry’s own first turn as a third version of the original, not a branch of the retry",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7718236e7a46f43e8acc089aafe7fc9a7180a199bf4eda916cb015aff2bd275f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version re-edits a retry’s own first turn as a third version of the original, not a branch of the retry",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#branches from a Delegate turn without running anything, and leaves the composer in Delegate",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7718236e7a46f43e8acc089aafe7fc9a7180a199bf4eda916cb015aff2bd275f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version branches from a Delegate turn without running anything, and leaves the composer in Delegate",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#re-edits a branch’s own question as a THIRD version of the base, not a branch of the branch",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7718236e7a46f43e8acc089aafe7fc9a7180a199bf4eda916cb015aff2bd275f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the version pager re-edits a branch’s own question as a THIRD version of the base, not a branch of the branch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#keeps Ask turns re-running as Ask, even when the composer shows Delegate",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7718236e7a46f43e8acc089aafe7fc9a7180a199bf4eda916cb015aff2bd275f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version keeps Ask turns re-running as Ask, even when the composer shows Delegate",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#refuses while the model is unavailable, keeps the edited text, and forks nothing",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7718236e7a46f43e8acc089aafe7fc9a7180a199bf4eda916cb015aff2bd275f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead refuses while the model is unavailable, keeps the edited text, and forks nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#keeps the edited text and says why when the agent becomes unavailable during the fork",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7718236e7a46f43e8acc089aafe7fc9a7180a199bf4eda916cb015aff2bd275f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead keeps the edited text and says why when the agent becomes unavailable during the fork",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#refuses while another run is active, and says so",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7718236e7a46f43e8acc089aafe7fc9a7180a199bf4eda916cb015aff2bd275f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead refuses while another run is active, and says so",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#says the branch failed and runs nothing when the store refuses the fork",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7718236e7a46f43e8acc089aafe7fc9a7180a199bf4eda916cb015aff2bd275f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead says the branch failed and runs nothing when the store refuses the fork",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#gives an INHERITED Delegate turn no Retry or Edit — it belongs to the parent",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7718236e7a46f43e8acc089aafe7fc9a7180a199bf4eda916cb015aff2bd275f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead gives an INHERITED Delegate turn no Retry or Edit — it belongs to the parent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-branch.test.ts#reads a TOOL-LESS delegate turn as an agent turn, and offers it the acts on its store ids",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2bfa1cf35aaa7b784072427e63ee51bbf36929b9fcda2f4e18c848747893eb5e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the KIND a re-run reads comes from the RECORD, not from what the turn happened to do reads a TOOL-LESS delegate turn as an agent turn, and offers it the acts on its store ids",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-branch.test.ts#an agent turn with fully valid STORE ids offers what the same ask turn offers",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2bfa1cf35aaa7b784072427e63ee51bbf36929b9fcda2f4e18c848747893eb5e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an agent turn is gated like an ask turn — by its ids, not its KIND (WP1.2 S2.5) an agent turn with fully valid STORE ids offers what the same ask turn offers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-context.test.ts#drops out-of-context and hidden turns, and leads with the standing summary",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:20978f92103c68167653c664ecbd8045d0aff0a7c871b1ff069ad9a4d5852877",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the inspector renders the prompt the transcript claims drops out-of-context and hidden turns, and leads with the standing summary",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#stopRightAfterTheRewriteSavesTheTurnStoppedWithItsNote",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "stopRightAfterTheRewriteSavesTheTurnStoppedWithItsNote()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#stopWhileTheDocumentsAreRetrievedSavesTheTurnStoppedNotFailed",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "stopWhileTheDocumentsAreRetrievedSavesTheTurnStoppedNotFailed()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#stopWhileTheAnswerIsCheckedSavesTheWholeTextAsStopped",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "stopWhileTheAnswerIsCheckedSavesTheWholeTextAsStopped()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#lateStopSavesWhatStreamedAsStopped",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lateStopSavesWhatStreamedAsStopped()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aClosedConnectionWithoutStopKeepsTheTurnRunningToItsAnswer",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aClosedConnectionWithoutStopKeepsTheTurnRunningToItsAnswer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopAfterTheTurnFinishedChangesNothing",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStopAfterTheTurnFinishedChangesNothing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopNamingAnotherTurnLeavesTheRunningTurnAlone",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStopNamingAnotherTurnLeavesTheRunningTurnAlone()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#asks the Engine to stop the very turn it dispatched, and halts it on screen",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3991b396cba104603af29f954cb6e3dc6f406b4d68298110891bdf18cd0758cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) asks the Engine to stop the very turn it dispatched, and halts it on screen",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#names each turn apart, so a Stop can only reach the turn it was pressed on",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3991b396cba104603af29f954cb6e3dc6f406b4d68298110891bdf18cd0758cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) names each turn apart, so a Stop can only reach the turn it was pressed on",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#sends no stop for an answer that finished, nor when the window goes away mid-answer",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3991b396cba104603af29f954cb6e3dc6f406b4d68298110891bdf18cd0758cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) sends no stop for an answer that finished, nor when the window goes away mid-answer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts#reads a turn the Engine saved as stopped as the reader’s halt, with its note and its text",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0d00ac39184cf2e3742f4b18b50ff04c9a0a9546024a60a7434f7f86b81ed9f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the \"Interpreted as\" note comes back from the record, on its own turn reads a turn the Engine saved as stopped as the reader’s halt, with its note and its text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopThatOvertakesItsDispatchStopsTheTurnWhenItStarts",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStopThatOvertakesItsDispatchStopsTheTurnWhenItStarts()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopForAFinishedTurnIsNotKeptForALaterDispatch",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStopForAFinishedTurnIsNotKeptForALaterDispatch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#aStopOnARunningTurnCancelsItAtOnce",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8cd386fbd26834566b2b53ebb64ff39edd5cbd9790503e096969ef22443716e9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStopOnARunningTurnCancelsItAtOnce()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#aStopBeforeTheTurnStartsCancelsItWhenItStarts",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8cd386fbd26834566b2b53ebb64ff39edd5cbd9790503e096969ef22443716e9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStopBeforeTheTurnStartsCancelsItWhenItStarts()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#anEarlyStopIsUsedOnce",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8cd386fbd26834566b2b53ebb64ff39edd5cbd9790503e096969ef22443716e9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anEarlyStopIsUsedOnce()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#anEarlyStopNamesOnlyItsOwnTurn",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8cd386fbd26834566b2b53ebb64ff39edd5cbd9790503e096969ef22443716e9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anEarlyStopNamesOnlyItsOwnTurn()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#onlyTheNewestEarlyStopsAreKept",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8cd386fbd26834566b2b53ebb64ff39edd5cbd9790503e096969ef22443716e9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "onlyTheNewestEarlyStopsAreKept()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#aStopAfterTheTurnFinishedIsNotKept",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8cd386fbd26834566b2b53ebb64ff39edd5cbd9790503e096969ef22443716e9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStopAfterTheTurnFinishedIsNotKept()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts#reloaded Unified Chat shows a turn the reader stopped as stopped, with its note, not as an answer",
+      "file": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:71fa97f736fa8258b507af93f912ccf8a764957c6f0d53ffe7326db9964d0008",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reloaded Unified Chat shows a turn the reader stopped as stopped, with its note, not as an answer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#aStopOnWorkAlreadyCancelledForAnotherReasonDoesNotSayItStopped",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8cd386fbd26834566b2b53ebb64ff39edd5cbd9790503e096969ef22443716e9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStopOnWorkAlreadyCancelledForAnotherReasonDoesNotSayItStopped()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#aStopOnceTheAnswerIsBeingSavedChangesNothingAndSaysSo",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8cd386fbd26834566b2b53ebb64ff39edd5cbd9790503e096969ef22443716e9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStopOnceTheAnswerIsBeingSavedChangesNothingAndSaysSo()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStoppedTurnIsSavedWithTheThinkingAndSourcesItShowed",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStoppedTurnIsSavedWithTheThinkingAndSourcesItShowed()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopWhileTheDocumentsAreRetrievedEndsTheStreamStoppedNotFailed",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStopWhileTheDocumentsAreRetrievedEndsTheStreamStoppedNotFailed()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopAfterTheAnswerIsSavedChangesNothingAndSaysSo",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2cec7f098f4b0a325a3318010ac8996d55ed01a1f411fc771f6309393e975685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStopAfterTheAnswerIsSavedChangesNothingAndSaysSo()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#halts on Stop, keeps what streamed, and says the reader stopped it",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3991b396cba104603af29f954cb6e3dc6f406b4d68298110891bdf18cd0758cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the primary slot renders exactly one of Send and Stop halts on Stop, keeps what streamed, and says the reader stopped it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#says \"Stopping…\" until the Engine ends the turn, and keeps every word it sent before that",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3991b396cba104603af29f954cb6e3dc6f406b4d68298110891bdf18cd0758cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) says \"Stopping…\" until the Engine ends the turn, and keeps every word it sent before that",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#shows the finished answer, not \"Stopped by you.\", when the Stop came after it was saved",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3991b396cba104603af29f954cb6e3dc6f406b4d68298110891bdf18cd0758cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) shows the finished answer, not \"Stopped by you.\", when the Stop came after it was saved",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#says so when the Stop was refused, and lets the answer go on",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3991b396cba104603af29f954cb6e3dc6f406b4d68298110891bdf18cd0758cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) says so when the Stop was refused, and lets the answer go on",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#says so when the Stop was unanswered, and lets the answer go on",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3991b396cba104603af29f954cb6e3dc6f406b4d68298110891bdf18cd0758cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) says so when the Stop was unanswered, and lets the answer go on",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#still sends a question stopped while it waits for Engine capacity, so the Engine saves it stopped",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3991b396cba104603af29f954cb6e3dc6f406b4d68298110891bdf18cd0758cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) still sends a question stopped while it waits for Engine capacity, so the Engine saves it stopped",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#reads the saved record after a stopped turn, as after a finished one",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3991b396cba104603af29f954cb6e3dc6f406b4d68298110891bdf18cd0758cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) reads the saved record after a stopped turn, as after a finished one",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts#does not call leaving mid-answer a Stop: back in the conversation, the saved answer shows",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:03454f6c22dcfd7980309dff600b79b9024f3788bb98b10c0122ba5cbfe11f6f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New session detaches from everything in flight (A13, abort half) does not call leaving mid-answer a Stop: back in the conversation, the saved answer shows",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts#appends NOTHING to the fresh thread when a late delta arrives",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:03454f6c22dcfd7980309dff600b79b9024f3788bb98b10c0122ba5cbfe11f6f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New session detaches from everything in flight (A13, abort half) appends NOTHING to the fresh thread when a late delta arrives",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts#does not call an answer left streaming \"stopped\" when the reader starts a new session",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d979d2ed345e458ca1a1aa330e19f4c132078a1cd62d2b9c6793e7373c866789",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New session parks the conversation and returns the window to the hero does not call an answer left streaming \"stopped\" when the reader starts a new session",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts#never routes the reader's own Stop through that mapping",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:59d004c5b5dad55b76eaf59880e8f8d1f9528fa6070d4a978d5626e2993fd473",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a stream failure is worded by the shared mapping, and an abort is not a failure never routes the reader's own Stop through that mapping",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-context.test.ts#keeps a turn saved after the last /history read in context, below a floor not shown here",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:20978f92103c68167653c664ecbd8045d0aff0a7c871b1ff069ad9a4d5852877",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "what the effective context does with each turn keeps a turn saved after the last /history read in context, below a floor not shown here",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "117e89be9",
+    "revision": "117e89be9b56a5195185cfe4f64e2e13eb9793a2",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/uiux-v3-followups-compat.patch",
+        "contentDigest": "sha256:955abe5822d9240d96707d4c7bae4a881f00a29adb7a9f520768a5c2fd8125aa"
+      }
+    ],
+    "runs": [
+      {
+        "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.rewrittenFollowUpPersistsTheStandaloneQuestion\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.rewriteThenRetrievalFailureKeepsTheNote\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.rewriteThenFailedRetrievalWithoutMetadataKeepsTheTurnAndItsNote\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.rewriteThenGenerationFailureKeepsTheNote\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.unrevisedTurnCarriesNoStandaloneQuestion\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.forwardedContextCountsAsConversationInTheBreakdown\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.compactionSummaryFoldsIntoTheLeadingSystemMessage\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.forwardedSummaryFoldsIntoTheLeadingSystemMessage\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.summaryWithoutSystemPromptLeadsTheList\" --tests \"io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.contextWithoutSystemMessagesIsUnchanged\" --tests \"io.justsearch.app.services.conversation.FileConversationStoreTest.excludingTheFloorMessageKeepsTheFloor\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.aStopOnARunningTurnCancelsItAtOnce\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.aStopBeforeTheTurnStartsCancelsItWhenItStarts\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.anEarlyStopIsUsedOnce\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.anEarlyStopNamesOnlyItsOwnTurn\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.onlyTheNewestEarlyStopsAreKept\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.aStopAfterTheTurnFinishedIsNotKept\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.aStopOnWorkAlreadyCancelledForAnotherReasonDoesNotSayItStopped\" --tests \"io.justsearch.app.services.conversation.TurnStopsTest.aStopOnceTheAnswerIsBeingSavedChangesNothingAndSaysSo\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4573,
+        "output": "Calculating task graph as no cached configuration is available for tasks: :modules:app-services:test --tests io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.rewrittenFollowUpPersistsTheStandaloneQuestion --tests io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.rewriteThenRetrievalFailureKeepsTheNote --tests io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.rewriteThenFailedRetrievalWithoutMetadataKeepsTheTurnAndItsNote --tests io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.rewriteThenGenerationFailureKeepsTheNote --tests io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.unrevisedTurnCarriesNoStandaloneQuestion --tests io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.forwardedContextCountsAsConversationInTheBreakdown --tests io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.compactionSummaryFoldsIntoTheLeadingSystemMessage --tests io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.forwardedSummaryFoldsIntoTheLeadingSystemMessage --tests io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.summaryWithoutSystemPromptLeadsTheList --tests io.justsearch.app.services.conversation.SubstrateDrivenEngineTest.contextWithoutSystemMessagesIsUnchanged --tests io.justsearch.app.services.conversation.FileConversationStoreTest.excludingTheFloorMessageKeepsTheFloor --tests io.justsearch.app.services.conversation.TurnStopsTest.aStopOnARunningTurnCancelsItAtOnce --tests io.justsearch.app.services.conversation.TurnStopsTest.aStopBeforeTheTurnStartsCancelsItWhenItStarts --tests io.justsearch.app.services.conversation.TurnStopsTest.anEarlyStopIsUsedOnce --tests io.justsearch.app.services.conversation.TurnStopsTest.anEarlyStopNamesOnlyItsOwnTurn --tests io.justsearch.app.services.conversation.TurnStopsTest.onlyTheNewestEarlyStopsAreKept --tests io.justsearch.app.services.conversation.TurnStopsTest.aStopAfterTheTurnFinishedIsNotKept --tests io.justsearch.app.services.conversation.TurnStopsTest.aStopOnWorkAlreadyCancelledForAnotherReasonDoesNotSayItStopped --tests io.justsearch.app.services.conversation.TurnStopsTest.aStopOnceTheAnswerIsBeingSavedChangesNothingAndSaysSo --rerun\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :build-logic:compileKotlin FROM-CACHE\n> Task :build-logic:compileJava NO-SOURCE\n> Task :build-logic:pluginDescriptors\n> Task :build-logic:processResources\n> Task :build-logic:classes\n> Task :build-logic:jar\n\n> Configure project :\nThe com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.\nThe 'val name by creating { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = create(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:180)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:adapters-lucene\nThe Configuration.setVisible(boolean) method has been deprecated. This is scheduled to be removed in Gradle 11. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#deprecate-visible-property\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:48)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:88)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ai-backend\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:27)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:40)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:22)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:39)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:141)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api-tck\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:34)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-config\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:15)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-engine\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:86)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-inference\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:31)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-launcher\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$12$1.execute(build.gradle.kts:189)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-observability\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:59)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:103)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-util\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:17)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:dead-code-audit\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:58)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:gpu-bridge\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:16)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexer-worker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:137)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexing\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:52)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:infra-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:24)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ort-common\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:prompt-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:18)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:reranker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ssot-tools\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:system-tests\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:119)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:123)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:131)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:telemetry\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:42)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:test-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$8$1.execute(build.gradle.kts:377)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ui\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:94)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:196)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:217)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:225)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:240)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:265)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:314)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:345)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:366)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:471)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:488)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:543)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:625)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:690)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:741)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:839)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:880)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:953)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:972)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1036)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1082)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1148)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1203)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1269)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1356)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1417)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1541)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1566)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:191)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:app-agent:processResources NO-SOURCE\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:app-services:processTestFixturesResources NO-SOURCE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:app-config:processResources NO-SOURCE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:api-contract-projection-java:extractProto\n> Task :modules:configuration:processTestFixturesResources NO-SOURCE\n> Task :modules:app-inference:processResources NO-SOURCE\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:app-engine:processResources\n> Task :modules:infra-core:processResources NO-SOURCE\n> Task :modules:app-services:processTestResources\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos\n> Task :modules:ipc-common:extractProto\n> Task :modules:configuration:processResources\n> Task :modules:ai-backend:processResources\n> Task :modules:app-services:processResources\n> Task :modules:app-observability:processResources\n> Task :modules:extension-substrate:compileJava FROM-CACHE\n> Task :modules:infra-core:compileJava FROM-CACHE\n> Task :modules:core-contracts:compileJava FROM-CACHE\n> Task :modules:infra-core:classes UP-TO-DATE\n> Task :modules:app-util:processResources NO-SOURCE\n> Task :modules:prompt-support:processResources NO-SOURCE\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:telemetry:processTestFixturesResources NO-SOURCE\n> Task :modules:reranker:processResources NO-SOURCE\n> Task :modules:gpu-bridge:processResources NO-SOURCE\n> Task :modules:ort-common:processResources NO-SOURCE\n> Task :modules:prompt-support:compileJava FROM-CACHE\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:prompt-support:classes UP-TO-DATE\n> Task :modules:ipc-common:processProtoResources\n> Task :modules:core-contracts:jar\n> Task :modules:ipc-common:processResources\n> Task :modules:prompt-support:jar\n> Task :modules:infra-core:jar\n> Task :modules:api-contract-projection-java:processProtoResources\n> Task :modules:core:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:processResources\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:extension-substrate:jar\n> Task :modules:api-contract-projection-java:extractIncludeProto\n> Task :modules:core:jar\n> Task :modules:core:compileTestFixturesJava FROM-CACHE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:indexing:compileJava FROM-CACHE\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:core:testFixturesJar\n> Task :modules:telemetry:compileJava FROM-CACHE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:configuration:compileJava FROM-CACHE\n> Task :modules:configuration:classes\n> Task :modules:indexing:jar\n> Task :modules:telemetry:jar\n> Task :modules:telemetry:compileTestFixturesJava FROM-CACHE\n> Task :modules:telemetry:testFixturesClasses UP-TO-DATE\n> Task :modules:telemetry:testFixturesJar\n> Task :modules:configuration:jar\n> Task :modules:configuration:compileTestFixturesJava FROM-CACHE\n> Task :modules:configuration:testFixturesClasses UP-TO-DATE\n> Task :modules:app-config:compileJava FROM-CACHE\n> Task :modules:app-config:classes UP-TO-DATE\n> Task :modules:configuration:testFixturesJar\n> Task :modules:app-util:compileJava FROM-CACHE\n> Task :modules:app-config:jar\n> Task :modules:app-util:classes UP-TO-DATE\n> Task :modules:app-util:jar\n> Task :modules:api-contract-projection-java:generateProto FROM-CACHE\n> Task :modules:ort-common:compileJava FROM-CACHE\n> Task :modules:ort-common:classes UP-TO-DATE\n> Task :modules:app-agent-api:compileJava FROM-CACHE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:ort-common:jar\n> Task :modules:adapters-lucene:compileJava FROM-CACHE\n> Task :modules:reranker:compileJava FROM-CACHE\n> Task :modules:reranker:classes UP-TO-DATE\n> Task :modules:reranker:jar\n> Task :modules:app-api:buildLinuxBoundExec\n> Task :modules:app-agent-api:jar\n> Task :modules:app-api:processResources\n> Task :modules:ipc-common:extractIncludeProto\n> Task :modules:ipc-common:generateProto FROM-CACHE\n> Task :modules:api-contract-projection-java:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:classes\n> Task :modules:api-contract-projection-java:jar\n> Task :modules:app-api:compileJava FROM-CACHE\n> Task :modules:app-api:classes\n> Task :modules:ai-backend:compileJava FROM-CACHE\n> Task :modules:ai-backend:classes\n> Task :modules:gpu-bridge:compileJava FROM-CACHE\n> Task :modules:gpu-bridge:classes UP-TO-DATE\n> Task :modules:app-agent:compileJava FROM-CACHE\n> Task :modules:app-agent:classes UP-TO-DATE\n> Task :modules:ai-backend:jar\n> Task :modules:gpu-bridge:jar\n> Task :modules:app-api:jar\n> Task :modules:app-agent:jar\n> Task :modules:app-inference:compileJava FROM-CACHE\n> Task :modules:app-inference:classes UP-TO-DATE\n> Task :modules:worker-core:compileJava FROM-CACHE\n> Task :modules:app-inference:jar\n> Task :modules:ipc-common:compileJava FROM-CACHE\n> Task :modules:ipc-common:classes\n> Task :modules:app-observability:compileJava FROM-CACHE\n> Task :modules:app-observability:classes\n> Task :modules:ipc-common:jar\n> Task :modules:app-observability:jar\n> Task :modules:worker-services:compileJava FROM-CACHE\n> Task :modules:indexer-worker:compileJava FROM-CACHE\n> Task :modules:app-services:compileJava FROM-CACHE\n> Task :modules:app-services:classes\n> Task :modules:app-services:compileTestFixturesJava NO-SOURCE\n> Task :modules:app-services:testFixturesClasses UP-TO-DATE\n> Task :modules:app-services:testFixturesJar\n> Task :modules:app-engine:compileJava FROM-CACHE\n> Task :modules:app-engine:classes\n> Task :modules:app-services:jar\n> Task :modules:app-engine:jar\n> Task :modules:app-services:compileTestJava FROM-CACHE\n> Task :modules:app-services:testClasses\n\n> Task :modules:app-services:test FAILED\n\nFileConversationStoreTest > excludingTheFloorMessageKeepsTheFloor(Path) FAILED\n    org.opentest4j.AssertionFailedError at FileConversationStoreTest.java:617\n\nSubstrateDrivenEngineTest > summaryWithoutSystemPromptLeadsTheList() FAILED\n    org.opentest4j.AssertionFailedError at SubstrateDrivenEngineTest.java:378\n\nSubstrateDrivenEngineTest > rewrittenFollowUpPersistsTheStandaloneQuestion() FAILED\n    org.opentest4j.AssertionFailedError at SubstrateDrivenEngineTest.java:171\n\nSubstrateDrivenEngineTest > rewriteThenRetrievalFailureKeepsTheNote() FAILED\n    org.opentest4j.AssertionFailedError at SubstrateDrivenEngineTest.java:198\n\nSubstrateDrivenEngineTest > forwardedSummaryFoldsIntoTheLeadingSystemMessage() FAILED\n    org.opentest4j.AssertionFailedError at SubstrateDrivenEngineTest.java:326\n\nSubstrateDrivenEngineTest > rewriteThenGenerationFailureKeepsTheNote() FAILED\n    org.opentest4j.AssertionFailedError at SubstrateDrivenEngineTest.java:253\n\nSubstrateDrivenEngineTest > forwardedContextCountsAsConversationInTheBreakdown() FAILED\n    org.opentest4j.AssertionFailedError at SubstrateDrivenEngineTest.java:274\n\nSubstrateDrivenEngineTest > rewriteThenFailedRetrievalWithoutMetadataKeepsTheTurnAndItsNote() FAILED\n    org.opentest4j.AssertionFailedError at SubstrateDrivenEngineTest.java:235\n\nSubstrateDrivenEngineTest > compactionSummaryFoldsIntoTheLeadingSystemMessage() FAILED\n    org.opentest4j.AssertionFailedError at SubstrateDrivenEngineTest.java:299\n\nTurnStopsTest > onlyTheNewestEarlyStopsAreKept() FAILED\n    org.opentest4j.AssertionFailedError at TurnStopsTest.java:104\n\nTurnStopsTest > anEarlyStopIsUsedOnce() FAILED\n    org.opentest4j.AssertionFailedError at TurnStopsTest.java:57\n\nTurnStopsTest > aStopOnARunningTurnCancelsItAtOnce() FAILED\n    org.opentest4j.AssertionFailedError at TurnStopsTest.java:35\n\nTurnStopsTest > aStopBeforeTheTurnStartsCancelsItWhenItStarts() FAILED\n    org.opentest4j.AssertionFailedError at TurnStopsTest.java:41\n\nTurnStopsTest > anEarlyStopNamesOnlyItsOwnTurn() FAILED\n    org.opentest4j.AssertionFailedError at TurnStopsTest.java:73\n\n> Task :modules:app-services:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/build/reports/problems/problems-report.html\n82 actionable tasks: 48 executed, 34 from cache\nConfiguration cache entry stored.\n\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\n\n19 tests completed, 14 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:app-services:test'.\n> There were failing tests. See the report at: file:///home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/app-services/build/reports/tests/test/index.html\n\nBUILD FAILED in 4s\n"
+      },
+      {
+        "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.InteractionThreadControllerTest.surfacesTheStandaloneQuestionFromTheRecord\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.stopRightAfterTheRewriteSavesTheTurnStoppedWithItsNote\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.stopWhileTheDocumentsAreRetrievedSavesTheTurnStoppedNotFailed\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.stopWhileTheAnswerIsCheckedSavesTheWholeTextAsStopped\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.lateStopSavesWhatStreamedAsStopped\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aClosedConnectionWithoutStopKeepsTheTurnRunningToItsAnswer\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStopAfterTheTurnFinishedChangesNothing\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStopNamingAnotherTurnLeavesTheRunningTurnAlone\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStopThatOvertakesItsDispatchStopsTheTurnWhenItStarts\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStopForAFinishedTurnIsNotKeptForALaterDispatch\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStoppedTurnIsSavedWithTheThinkingAndSourcesItShowed\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStopWhileTheDocumentsAreRetrievedEndsTheStreamStoppedNotFailed\" --tests \"io.justsearch.ui.api.ChatStopTurnHttpTest.aStopAfterTheAnswerIsSavedChangesNothingAndSaysSo\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 26209,
+        "output": "Calculating task graph as no cached configuration is available for tasks: :modules:ui:test --tests io.justsearch.ui.api.InteractionThreadControllerTest.surfacesTheStandaloneQuestionFromTheRecord --tests io.justsearch.ui.api.ChatStopTurnHttpTest.stopRightAfterTheRewriteSavesTheTurnStoppedWithItsNote --tests io.justsearch.ui.api.ChatStopTurnHttpTest.stopWhileTheDocumentsAreRetrievedSavesTheTurnStoppedNotFailed --tests io.justsearch.ui.api.ChatStopTurnHttpTest.stopWhileTheAnswerIsCheckedSavesTheWholeTextAsStopped --tests io.justsearch.ui.api.ChatStopTurnHttpTest.lateStopSavesWhatStreamedAsStopped --tests io.justsearch.ui.api.ChatStopTurnHttpTest.aClosedConnectionWithoutStopKeepsTheTurnRunningToItsAnswer --tests io.justsearch.ui.api.ChatStopTurnHttpTest.aStopAfterTheTurnFinishedChangesNothing --tests io.justsearch.ui.api.ChatStopTurnHttpTest.aStopNamingAnotherTurnLeavesTheRunningTurnAlone --tests io.justsearch.ui.api.ChatStopTurnHttpTest.aStopThatOvertakesItsDispatchStopsTheTurnWhenItStarts --tests io.justsearch.ui.api.ChatStopTurnHttpTest.aStopForAFinishedTurnIsNotKeptForALaterDispatch --tests io.justsearch.ui.api.ChatStopTurnHttpTest.aStoppedTurnIsSavedWithTheThinkingAndSourcesItShowed --tests io.justsearch.ui.api.ChatStopTurnHttpTest.aStopWhileTheDocumentsAreRetrievedEndsTheStreamStoppedNotFailed --tests io.justsearch.ui.api.ChatStopTurnHttpTest.aStopAfterTheAnswerIsSavedChangesNothingAndSaysSo --rerun\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :build-logic:compileKotlin UP-TO-DATE\n> Task :build-logic:compileJava NO-SOURCE\n> Task :build-logic:pluginDescriptors UP-TO-DATE\n> Task :build-logic:processResources UP-TO-DATE\n> Task :build-logic:classes UP-TO-DATE\n> Task :build-logic:jar UP-TO-DATE\n\n> Configure project :\nThe com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.\nThe 'val name by creating { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = create(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:180)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:adapters-lucene\nThe Configuration.setVisible(boolean) method has been deprecated. This is scheduled to be removed in Gradle 11. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#deprecate-visible-property\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:48)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:88)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ai-backend\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:27)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:40)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:22)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:39)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:141)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api-tck\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:34)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-config\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:15)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-engine\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:86)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-inference\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:31)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-launcher\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$12$1.execute(build.gradle.kts:189)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-observability\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:59)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:103)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-util\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:17)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:dead-code-audit\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:58)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:gpu-bridge\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:16)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexer-worker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:137)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexing\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:52)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:infra-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:24)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ort-common\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:prompt-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:18)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:reranker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ssot-tools\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:system-tests\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:119)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:123)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:131)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:telemetry\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:42)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:test-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$8$1.execute(build.gradle.kts:377)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ui\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:94)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:196)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:217)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:225)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:240)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:265)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:314)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:345)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:366)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:471)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:488)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:543)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:625)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:690)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:741)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:839)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:880)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:953)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:972)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1036)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1082)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1148)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1203)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1269)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1356)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1417)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1541)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1566)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.0/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:191)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nSkipping ui-web build/copy (skipWebBuild=true).\n\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:app-api:buildLinuxBoundExec UP-TO-DATE\n> Task :modules:app-agent:processResources NO-SOURCE\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:app-config:processResources NO-SOURCE\n> Task :modules:api-contract-projection-java:extractProto UP-TO-DATE\n> Task :modules:ipc-common:extractProto UP-TO-DATE\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:configuration:processTestFixturesResources NO-SOURCE\n> Task :modules:app-util:processResources NO-SOURCE\n> Task :modules:app-engine:processResources UP-TO-DATE\n> Task :modules:app-observability:processResources UP-TO-DATE\n> Task :modules:extension-substrate:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractIncludeProto UP-TO-DATE\n> Task :modules:gpu-bridge:processResources NO-SOURCE\n> Task :modules:configuration:processResources UP-TO-DATE\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:infra-core:processResources NO-SOURCE\n> Task :modules:app-inference:processResources NO-SOURCE\n> Task :modules:prompt-support:processResources NO-SOURCE\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:reranker:processResources NO-SOURCE\n> Task :modules:ort-common:processResources NO-SOURCE\n> Task :modules:indexer-worker:processResources NO-SOURCE\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:app-api:processResources UP-TO-DATE\n> Task :modules:ai-backend:processResources UP-TO-DATE\n> Task :modules:app-services:processResources UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos UP-TO-DATE\n> Task :modules:ipc-common:processProtoResources UP-TO-DATE\n> Task :modules:worker-core:processResources NO-SOURCE\n> Task :modules:worker-services:processResources NO-SOURCE\n> Task :modules:extension-substrate:jar UP-TO-DATE\n> Task :modules:ipc-common:processResources UP-TO-DATE\n> Task :modules:infra-core:compileJava UP-TO-DATE\n> Task :modules:infra-core:classes UP-TO-DATE\n> Task :modules:api-contract-projection-java:processProtoResources UP-TO-DATE\n> Task :modules:adapters-lucene:syncSsotCatalogs\n> Task :modules:api-contract-projection-java:processResources UP-TO-DATE\n> Task :modules:core-contracts:compileJava UP-TO-DATE\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:prompt-support:compileJava UP-TO-DATE\n> Task :modules:prompt-support:classes UP-TO-DATE\n> Task :modules:core-contracts:jar UP-TO-DATE\n> Task :modules:prompt-support:jar UP-TO-DATE\n> Task :modules:ipc-common:extractIncludeProto UP-TO-DATE\n> Task :modules:adapters-lucene:processResources\n> Task :modules:ui:processTestResources\n> Task :modules:core:compileJava UP-TO-DATE\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:core:jar UP-TO-DATE\n> Task :modules:ui:syncSsotSchemas\n> Task :modules:core:compileTestFixturesJava UP-TO-DATE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:core:testFixturesJar UP-TO-DATE\n> Task :modules:indexing:compileJava UP-TO-DATE\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:indexing:jar UP-TO-DATE\n> Task :modules:telemetry:compileJava UP-TO-DATE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:telemetry:jar UP-TO-DATE\n> Task :modules:ui:processResources\n> Task :modules:infra-core:jar UP-TO-DATE\n> Task :modules:api-contract-projection-java:generateProto UP-TO-DATE\n> Task :modules:app-agent-api:compileJava UP-TO-DATE\n> Task :modules:configuration:compileJava UP-TO-DATE\n> Task :modules:configuration:classes UP-TO-DATE\n> Task :modules:ipc-common:generateProto UP-TO-DATE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:configuration:jar UP-TO-DATE\n> Task :modules:app-agent-api:jar UP-TO-DATE\n> Task :modules:configuration:compileTestFixturesJava UP-TO-DATE\n> Task :modules:configuration:testFixturesClasses UP-TO-DATE\n> Task :modules:app-config:compileJava UP-TO-DATE\n> Task :modules:app-config:classes UP-TO-DATE\n> Task :modules:app-util:compileJava UP-TO-DATE\n> Task :modules:app-config:jar UP-TO-DATE\n> Task :modules:app-util:classes UP-TO-DATE\n> Task :modules:app-util:jar UP-TO-DATE\n> Task :modules:configuration:testFixturesJar UP-TO-DATE\n> Task :modules:ort-common:compileJava UP-TO-DATE\n> Task :modules:ort-common:classes UP-TO-DATE\n> Task :modules:ort-common:jar UP-TO-DATE\n> Task :modules:reranker:compileJava UP-TO-DATE\n> Task :modules:adapters-lucene:compileJava UP-TO-DATE\n> Task :modules:reranker:classes UP-TO-DATE\n> Task :modules:adapters-lucene:classes\n> Task :modules:reranker:jar UP-TO-DATE\n> Task :modules:api-contract-projection-java:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:classes UP-TO-DATE\n> Task :modules:api-contract-projection-java:jar UP-TO-DATE\n> Task :modules:adapters-lucene:jar\n> Task :modules:app-api:compileJava UP-TO-DATE\n> Task :modules:app-api:classes UP-TO-DATE\n> Task :modules:app-api:jar UP-TO-DATE\n> Task :modules:gpu-bridge:compileJava UP-TO-DATE\n> Task :modules:gpu-bridge:classes UP-TO-DATE\n> Task :modules:ai-backend:compileJava UP-TO-DATE\n> Task :modules:ai-backend:classes UP-TO-DATE\n> Task :modules:ai-backend:jar UP-TO-DATE\n> Task :modules:gpu-bridge:jar UP-TO-DATE\n> Task :modules:app-agent:compileJava UP-TO-DATE\n> Task :modules:app-agent:classes UP-TO-DATE\n> Task :modules:app-agent:jar UP-TO-DATE\n> Task :modules:app-inference:compileJava UP-TO-DATE\n> Task :modules:app-inference:classes UP-TO-DATE\n> Task :modules:app-inference:jar UP-TO-DATE\n> Task :modules:worker-core:compileJava UP-TO-DATE\n> Task :modules:worker-core:classes UP-TO-DATE\n> Task :modules:ipc-common:compileJava UP-TO-DATE\n> Task :modules:ipc-common:classes UP-TO-DATE\n> Task :modules:ipc-common:jar UP-TO-DATE\n> Task :modules:worker-core:jar\n> Task :modules:app-observability:compileJava UP-TO-DATE\n> Task :modules:app-observability:classes UP-TO-DATE\n> Task :modules:app-observability:jar UP-TO-DATE\n> Task :modules:worker-services:compileJava UP-TO-DATE\n> Task :modules:worker-services:classes UP-TO-DATE\n> Task :modules:indexer-worker:compileJava UP-TO-DATE\n> Task :modules:indexer-worker:classes UP-TO-DATE\n> Task :modules:app-services:compileJava UP-TO-DATE\n> Task :modules:app-services:classes UP-TO-DATE\n> Task :modules:app-services:jar UP-TO-DATE\n> Task :modules:indexer-worker:jar\n> Task :modules:app-engine:compileJava UP-TO-DATE\n> Task :modules:app-engine:classes UP-TO-DATE\n> Task :modules:app-engine:jar UP-TO-DATE\n> Task :modules:worker-services:jar\n> Task :modules:ui:compileJava FROM-CACHE\n> Task :modules:ui:classes\n> Task :modules:ui:jar\n> Task :modules:ui:compileTestJava FROM-CACHE\n> Task :modules:ui:testClasses\n\n> Task :modules:ui:test\n\nChatStopTurnHttpTest > aStopWhileTheDocumentsAreRetrievedEndsTheStreamStoppedNotFailed() FAILED\n    org.opentest4j.AssertionFailedError at ChatStopTurnHttpTest.java:316\n\nChatStopTurnHttpTest > stopWhileTheAnswerIsCheckedSavesTheWholeTextAsStopped() FAILED\n    org.opentest4j.AssertionFailedError at ChatStopTurnHttpTest.java:432\n\nChatStopTurnHttpTest > stopWhileTheDocumentsAreRetrievedSavesTheTurnStoppedNotFailed() FAILED\n    org.opentest4j.AssertionFailedError at ChatStopTurnHttpTest.java:432\n\nChatStopTurnHttpTest > aStoppedTurnIsSavedWithTheThinkingAndSourcesItShowed() FAILED\n    org.opentest4j.AssertionFailedError at ChatStopTurnHttpTest.java:287\n\nChatStopTurnHttpTest > aClosedConnectionWithoutStopKeepsTheTurnRunningToItsAnswer() FAILED\n    org.opentest4j.AssertionFailedError at ChatStopTurnHttpTest.java:243\n\nChatStopTurnHttpTest > aStopAfterTheAnswerIsSavedChangesNothingAndSaysSo() FAILED\n    org.opentest4j.AssertionFailedError at ChatStopTurnHttpTest.java:334\n\nChatStopTurnHttpTest > aStopNamingAnotherTurnLeavesTheRunningTurnAlone() FAILED\n    org.opentest4j.AssertionFailedError at ChatStopTurnHttpTest.java:270\n\nChatStopTurnHttpTest > stopRightAfterTheRewriteSavesTheTurnStoppedWithItsNote() FAILED\n    org.opentest4j.AssertionFailedError at ChatStopTurnHttpTest.java:432\n\nChatStopTurnHttpTest > aStopAfterTheTurnFinishedChangesNothing() FAILED\n    org.opentest4j.AssertionFailedError at ChatStopTurnHttpTest.java:259\n\nChatStopTurnHttpTest > lateStopSavesWhatStreamedAsStopped() FAILED\n    org.opentest4j.AssertionFailedError at ChatStopTurnHttpTest.java:432\n\nChatStopTurnHttpTest > aStopForAFinishedTurnIsNotKeptForALaterDispatch() FAILED\n    org.opentest4j.AssertionFailedError at ChatStopTurnHttpTest.java:158\n\nChatStopTurnHttpTest > aStopThatOvertakesItsDispatchStopsTheTurnWhenItStarts() FAILED\n    org.opentest4j.AssertionFailedError at ChatStopTurnHttpTest.java:129\n\nInteractionThreadControllerTest > surfacesTheStandaloneQuestionFromTheRecord() FAILED\n    org.opentest4j.AssertionFailedError at InteractionThreadControllerTest.java:492\n\n> Task :modules:ui:test FAILED\n> Task :modules:ui:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/build/reports/problems/problems-report.html\n89 actionable tasks: 11 executed, 2 from cache, 76 up-to-date\nConfiguration cache entry stored.\n\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\n\n13 tests completed, 13 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:ui:test'.\n> There were failing tests. See the report at: file:///home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui/build/reports/tests/test/index.html\n\nBUILD FAILED in 26s\n"
+      },
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/sv3-record.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.record.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/search-v3/sv3-branch.test.ts\" \"src/shell-v0/views/search-v3/sv3-context.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.ask.test.ts\" \"src/shell-v0/views/AskTerminalReload.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/test-intent-vitest-262135-1792464900015.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4015,
+        "output": "JSON report written to /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/test-intent-vitest-262135-1792464900015.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#rewrittenFollowUpPersistsTheStandaloneQuestion",
+        "classification": "assertion",
+        "detail": "rewrittenFollowUpPersistsTheStandaloneQuestion(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <What does the second report say?> but was: <null>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#rewriteThenRetrievalFailureKeepsTheNote",
+        "classification": "assertion",
+        "detail": "rewriteThenRetrievalFailureKeepsTheNote(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <What does the second report say?> but was: <null>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#rewriteThenFailedRetrievalWithoutMetadataKeepsTheTurnAndItsNote",
+        "classification": "assertion",
+        "detail": "rewriteThenFailedRetrievalWithoutMetadataKeepsTheTurnAndItsNote(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the question and its outcome survive a reload ==> expected: <2> but was: <0>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#rewriteThenGenerationFailureKeepsTheNote",
+        "classification": "assertion",
+        "detail": "rewriteThenGenerationFailureKeepsTheNote(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <What does the second report say?> but was: <null>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#unrevisedTurnCarriesNoStandaloneQuestion",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#forwardedContextCountsAsConversationInTheBreakdown",
+        "classification": "assertion",
+        "detail": "forwardedContextCountsAsConversationInTheBreakdown(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the forwarded turns are conversation ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#compactionSummaryFoldsIntoTheLeadingSystemMessage",
+        "classification": "assertion",
+        "detail": "compactionSummaryFoldsIntoTheLeadingSystemMessage(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[{role=system, content=SYS&#10;&#10;Summary of earlier conversation:&#10;The user asked about renewals.}, {role=user, content=new question}]> but was: <[{role=system, content=SYS}, {role=system, content=Summary of earlier conversation:&#10;The user ask"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#forwardedSummaryFoldsIntoTheLeadingSystemMessage",
+        "classification": "assertion",
+        "detail": "forwardedSummaryFoldsIntoTheLeadingSystemMessage(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <{role=system, content=SYS&#10;&#10;Summary of earlier conversation:&#10;Churn was discussed.}> but was: <{role=system, content=SYS}>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#summaryWithoutSystemPromptLeadsTheList",
+        "classification": "assertion",
+        "detail": "summaryWithoutSystemPromptLeadsTheList(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[{role=system, content=Summary of earlier conversation:&#10;Churn was discussed.}, {role=user, content=What does the first report say?}]> but was: <[{role=user, content=What does the first report say?}, {role=system, content=Summary of earlier conversa"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#contextWithoutSystemMessagesIsUnchanged",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java#excludingTheFloorMessageKeepsTheFloor",
+        "classification": "assertion",
+        "detail": "excludingTheFloorMessageKeepsTheFloor(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[a2]> but was: <[q1, a1, a2]>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java#surfacesTheStandaloneQuestionFromTheRecord",
+        "classification": "assertion",
+        "detail": "surfacesTheStandaloneQuestionFromTheRecord(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: each rewritten turn carries its note ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts#reads each turn’s note off its own answer, and none onto a turn that was not rewritten",
+        "classification": "assertion",
+        "detail": "the \"Interpreted as\" note comes back from the record, on its own turn reads each turn’s note off its own answer, and none onto a turn that was not rewritten:  AssertionError: expected [ '', '', '', '' ] to deeply equal [ '', …(3) ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts:676:52\n    at file:///home/elias/dev/justsearch/."
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts#keeps the note on a turn whose rewrite was followed by a failure",
+        "classification": "assertion",
+        "detail": "the \"Interpreted as\" note comes back from the record, on its own turn keeps the note on a turn whose rewrite was followed by a failure:  AssertionError: expected '' to be 'What does the second report say?' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts:694:38\n    at file:///home/elia"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts#shows no note for a record written before the field existed, or a blank one",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts#reads the /history COMPANION record when a conversation is opened (852 §2.3c)",
+        "classification": "assertion",
+        "detail": "the transcript projects from the canonical record (D1) reads the /history COMPANION record when a conversation is opened (852 §2.3c):  AssertionError: expected { parentSessionId: 'uc-parent', …(7) } to deeply equal { parentSessionId: 'uc-parent', …(8) }\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.te"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#retries a tool-less Delegate turn as a Delegate, after reload, while the composer shows Ask",
+        "classification": "assertion",
+        "detail": "Retry and Edit on a Delegate turn run the agent again, in a new version retries a tool-less Delegate turn as a Delegate, after reload, while the composer shows Ask:  AssertionError: no menu entry Retry from here\n    at chooseFromTurnMenu (/home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:512:3)\n    at /home/elias/.cache/agent-method/s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#edits the FIRST question of a Delegate conversation at the empty-prefix sentinel",
+        "classification": "assertion",
+        "detail": "Retry and Edit on a Delegate turn run the agent again, in a new version edits the FIRST question of a Delegate conversation at the empty-prefix sentinel:  AssertionError: press: no control\n    at press (/home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:486:3)\n    at editTurn (/home/elias/.cache/agent-method/sessions/agent-s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#runs even when no documents are indexed — the Ask-only gate does not apply",
+        "classification": "assertion",
+        "detail": "Retry and Edit on a Delegate turn run the agent again, in a new version runs even when no documents are indexed — the Ask-only gate does not apply:  AssertionError: press: no control\n    at press (/home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:486:3)\n    at editTurn (/home/elias/.cache/agent-method/sessions/agent-s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#re-edits a branch’s own Delegate turn as a SIBLING of that branch",
+        "classification": "assertion",
+        "detail": "Retry and Edit on a Delegate turn run the agent again, in a new version re-edits a branch’s own Delegate turn as a SIBLING of that branch:  AssertionError: press: no control\n    at press (/home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:486:3)\n    at editTurn (/home/elias/.cache/agent-method/sessions/agent-s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#re-edits a retry’s own first turn as a third version of the original, not a branch of the retry",
+        "classification": "assertion",
+        "detail": "Retry and Edit on a Delegate turn run the agent again, in a new version re-edits a retry’s own first turn as a third version of the original, not a branch of the retry:  AssertionError: press: no control\n    at press (/home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:486:3)\n    at editTurn (/home/elias/.cache/agent-method/sessions/agent-s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#branches from a Delegate turn without running anything, and leaves the composer in Delegate",
+        "classification": "assertion",
+        "detail": "Retry and Edit on a Delegate turn run the agent again, in a new version branches from a Delegate turn without running anything, and leaves the composer in Delegate:  AssertionError: no menu entry Branch to new thread\n    at chooseFromTurnMenu (/home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:512:3)\n    at /home/elias/.cache/agent-met"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#re-edits a branch’s own question as a THIRD version of the base, not a branch of the branch",
+        "classification": "assertion",
+        "detail": "the version pager re-edits a branch’s own question as a THIRD version of the base, not a branch of the branch:  AssertionError: expected [ { parent: 'uc-branch', …(1) }, …(1) ] to deeply equal [ { parent: 'uc-branch', …(1) }, …(1) ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch."
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#keeps Ask turns re-running as Ask, even when the composer shows Delegate",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#refuses while the model is unavailable, keeps the edited text, and forks nothing",
+        "classification": "assertion",
+        "detail": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead refuses while the model is unavailable, keeps the edited text, and forks nothing:  AssertionError: press: no control\n    at press (/home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:486:3)\n    at editTurn (/home/elias/.cache/agent-method/sessions/agent-s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#keeps the edited text and says why when the agent becomes unavailable during the fork",
+        "classification": "assertion",
+        "detail": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead keeps the edited text and says why when the agent becomes unavailable during the fork:  AssertionError: press: no control\n    at press (/home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:486:3)\n    at editTurn (/home/elias/.cache/agent-method/sessions/agent-s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#refuses while another run is active, and says so",
+        "classification": "assertion",
+        "detail": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead refuses while another run is active, and says so:  AssertionError: no menu entry Retry from here\n    at chooseFromTurnMenu (/home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:512:3)\n    at /home/elias/.cache/agent-method/s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#says the branch failed and runs nothing when the store refuses the fork",
+        "classification": "assertion",
+        "detail": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead says the branch failed and runs nothing when the store refuses the fork:  AssertionError: press: no control\n    at press (/home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts:486:3)\n    at editTurn (/home/elias/.cache/agent-method/sessions/agent-s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#gives an INHERITED Delegate turn no Retry or Edit — it belongs to the parent",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-branch.test.ts#reads a TOOL-LESS delegate turn as an agent turn, and offers it the acts on its store ids",
+        "classification": "assertion",
+        "detail": "the KIND a re-run reads comes from the RECORD, not from what the turn happened to do reads a TOOL-LESS delegate turn as an agent turn, and offers it the acts on its store ids:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/sv3-branch.test.ts:424:33\n    at file:///home/elias/dev/justsearch/.claude/wo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-branch.test.ts#an agent turn with fully valid STORE ids offers what the same ask turn offers",
+        "classification": "assertion",
+        "detail": "an agent turn is gated like an ask turn — by its ids, not its KIND (WP1.2 S2.5) an agent turn with fully valid STORE ids offers what the same ask turn offers:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/sv3-branch.test.ts:475:33\n    at file:///home/elias/dev/justsearch/.claude/wo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-context.test.ts#drops out-of-context and hidden turns, and leads with the standing summary",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#stopRightAfterTheRewriteSavesTheTurnStoppedWithItsNote",
+        "classification": "assertion",
+        "detail": "stopRightAfterTheRewriteSavesTheTurnStoppedWithItsNote(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: after the Stop only the question was saved: no note and no stopped outcome — [{role=user, content=And who owns it?, shapeId=core.test-stoppable-ask, id=902eda16-f438-46fd-a24c-4206404d5328, hash=0ba07994b56980a83c4815ef72bf049f9af5456f82404dcf7c3ad0d85116dec0, ts"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#stopWhileTheDocumentsAreRetrievedSavesTheTurnStoppedNotFailed",
+        "classification": "assertion",
+        "detail": "stopWhileTheDocumentsAreRetrievedSavesTheTurnStoppedNotFailed(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: after the Stop only the question was saved: no note and no stopped outcome — [] ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#stopWhileTheAnswerIsCheckedSavesTheWholeTextAsStopped",
+        "classification": "assertion",
+        "detail": "stopWhileTheAnswerIsCheckedSavesTheWholeTextAsStopped(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: after the Stop only the question was saved: no note and no stopped outcome — [{role=user, content=And who owns it?, shapeId=core.test-stoppable-ask, id=6f8d91f3-441a-4910-afff-cadcce8c4606, hash=0ba07994b56980a83c4815ef72bf049f9af5456f82404dcf7c3ad0d85116dec0, ts"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#lateStopSavesWhatStreamedAsStopped",
+        "classification": "assertion",
+        "detail": "lateStopSavesWhatStreamedAsStopped(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: after the Stop only the question was saved: no note and no stopped outcome — [{role=user, content=And who owns it?, shapeId=core.test-stoppable-ask, id=aaf3e614-8418-4418-b701-0b43ace46e48, hash=0ba07994b56980a83c4815ef72bf049f9af5456f82404dcf7c3ad0d85116dec0, ts"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aClosedConnectionWithoutStopKeepsTheTurnRunningToItsAnswer",
+        "classification": "assertion",
+        "detail": "aClosedConnectionWithoutStopKeepsTheTurnRunningToItsAnswer(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: [{role=user, content=And who owns it?, shapeId=core.test-stoppable-ask, id=2cbbd07b-3e57-4023-8877-6fd6538eed67, hash=0ba07994b56980a83c4815ef72bf049f9af5456f82404dcf7c3ad0d85116dec0, ts=2026-10-20T02:54:48.577193287Z}, {role=assistant, content=Ada owns it., shap"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopAfterTheTurnFinishedChangesNothing",
+        "classification": "assertion",
+        "detail": "aStopAfterTheTurnFinishedChangesNothing(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Endpoint POST /api/chat/conversations/conv-1/stop not found ==> expected: <200> but was: <404>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopNamingAnotherTurnLeavesTheRunningTurnAlone",
+        "classification": "assertion",
+        "detail": "aStopNamingAnotherTurnLeavesTheRunningTurnAlone(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Endpoint POST /api/chat/conversations/conv-1/stop not found ==> expected: <200> but was: <404>"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#asks the Engine to stop the very turn it dispatched, and halts it on screen",
+        "classification": "assertion",
+        "detail": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) asks the Engine to stop the very turn it dispatched, and halts it on screen:  AssertionError: expected 'undefined' to be 'string' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts:460:38\n    at file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#names each turn apart, so a Stop can only reach the turn it was pressed on",
+        "classification": "assertion",
+        "detail": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) names each turn apart, so a Stop can only reach the turn it was pressed on:  AssertionError: expected undefined not to be undefined // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts:632:35\n    at file:///home/elias/dev/ju"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#sends no stop for an answer that finished, nor when the window goes away mid-answer",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts#reads a turn the Engine saved as stopped as the reader’s halt, with its note and its text",
+        "classification": "assertion",
+        "detail": "the \"Interpreted as\" note comes back from the record, on its own turn reads a turn the Engine saved as stopped as the reader’s halt, with its note and its text:  AssertionError: expected [ '', '' ] to deeply equal [ 'Who owns Project Cobalt?', …(1) ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/sv3-record.test.ts:714:52\n    at file:///home/elias/"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopThatOvertakesItsDispatchStopsTheTurnWhenItStarts",
+        "classification": "assertion",
+        "detail": "aStopThatOvertakesItsDispatchStopsTheTurnWhenItStarts(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Endpoint POST /api/chat/conversations/conv-1/stop not found ==> expected: <200> but was: <404>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopForAFinishedTurnIsNotKeptForALaterDispatch",
+        "classification": "assertion",
+        "detail": "aStopForAFinishedTurnIsNotKeptForALaterDispatch(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Endpoint POST /api/chat/conversations/conv-1/stop not found ==> expected: <200> but was: <404>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#aStopOnARunningTurnCancelsItAtOnce",
+        "classification": "assertion",
+        "detail": "aStopOnARunningTurnCancelsItAtOnce(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <STOPPED> but was: <UNCHANGED>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#aStopBeforeTheTurnStartsCancelsItWhenItStarts",
+        "classification": "assertion",
+        "detail": "aStopBeforeTheTurnStartsCancelsItWhenItStarts(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: nothing was running to stop yet ==> expected: <PENDING> but was: <UNCHANGED>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#anEarlyStopIsUsedOnce",
+        "classification": "assertion",
+        "detail": "anEarlyStopIsUsedOnce(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[user_stop]> but was: <[]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#anEarlyStopNamesOnlyItsOwnTurn",
+        "classification": "assertion",
+        "detail": "anEarlyStopNamesOnlyItsOwnTurn(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[user_stop]> but was: <[]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#onlyTheNewestEarlyStopsAreKept",
+        "classification": "assertion",
+        "detail": "onlyTheNewestEarlyStopsAreKept(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[user_stop]> but was: <[]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#aStopAfterTheTurnFinishedIsNotKept",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts#reloaded Unified Chat shows a turn the reader stopped as stopped, with its note, not as an answer",
+        "classification": "assertion",
+        "detail": "reloaded Unified Chat shows a turn the reader stopped as stopped, with its note, not as an answer:  AssertionError: expected undefined to be 'Stopped by you.' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts:83:31\n    at file:///home/elias/dev/justsear"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#aStopOnWorkAlreadyCancelledForAnotherReasonDoesNotSayItStopped",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/TurnStopsTest.java#aStopOnceTheAnswerIsBeingSavedChangesNothingAndSaysSo",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStoppedTurnIsSavedWithTheThinkingAndSourcesItShowed",
+        "classification": "assertion",
+        "detail": "aStoppedTurnIsSavedWithTheThinkingAndSourcesItShowed(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Endpoint POST /api/chat/conversations/conv-1/stop not found ==> expected: <200> but was: <404>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopWhileTheDocumentsAreRetrievedEndsTheStreamStoppedNotFailed",
+        "classification": "assertion",
+        "detail": "aStopWhileTheDocumentsAreRetrievedEndsTheStreamStoppedNotFailed(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: HTTP/1.1 200 OK&#13;&#10;Date: Tue, 20 Oct 2026 02:54:38 GMT&#13;&#10;Connection: &#13;&#10;Content-Type: text/event-stream; charset=utf-8&#13;&#10;X-JustSearch-Status-Epoch: 28fdc3b8-47be-44f9-b54b-db968d313cbc&#13;&#10;X-JustSearch-Status-Change: 0&#13;&#10;Cac"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatStopTurnHttpTest.java#aStopAfterTheAnswerIsSavedChangesNothingAndSaysSo",
+        "classification": "assertion",
+        "detail": "aStopAfterTheAnswerIsSavedChangesNothingAndSaysSo(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Endpoint POST /api/chat/conversations/conv-1/stop not found ==> expected: <200> but was: <404>"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#halts on Stop, keeps what streamed, and says the reader stopped it",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#says \"Stopping…\" until the Engine ends the turn, and keeps every word it sent before that",
+        "classification": "assertion",
+        "detail": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) says \"Stopping…\" until the Engine ends the turn, and keeps every word it sent before that:  AssertionError: expected 'halted' to be 'streaming' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts:488:33\n    at file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#shows the finished answer, not \"Stopped by you.\", when the Stop came after it was saved",
+        "classification": "assertion",
+        "detail": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) shows the finished answer, not \"Stopped by you.\", when the Stop came after it was saved:  AssertionError: expected 'halted' to be 'complete' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts:524:33\n    at file:///home/elias/dev/justse"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#says so when the Stop was refused, and lets the answer go on",
+        "classification": "assertion",
+        "detail": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) says so when the Stop was refused, and lets the answer go on:  AssertionError: expected 'halted' to be 'streaming' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts:545:33\n    at file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#says so when the Stop was unanswered, and lets the answer go on",
+        "classification": "assertion",
+        "detail": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) says so when the Stop was unanswered, and lets the answer go on:  AssertionError: expected 'halted' to be 'streaming' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts:545:33\n    at file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#still sends a question stopped while it waits for Engine capacity, so the Engine saves it stopped",
+        "classification": "assertion",
+        "detail": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) still sends a question stopped while it waits for Engine capacity, so the Engine saves it stopped:  AssertionError: expected [ [ …(2) ] ] to have a length of 2 but got 1\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts#reads the saved record after a stopped turn, as after a finished one",
+        "classification": "assertion",
+        "detail": "Stop is told to the Engine, so the saved turn says what the live one did (S2.3) reads the saved record after a stopped turn, as after a finished one:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts:613:23\n    at file:///home/elias/dev/justsearch/.claude/wo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts#does not call leaving mid-answer a Stop: back in the conversation, the saved answer shows",
+        "classification": "assertion",
+        "detail": "New session detaches from everything in flight (A13, abort half) does not call leaving mid-answer a Stop: back in the conversation, the saved answer shows:  AssertionError: expected 'halted' to be 'complete' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts:942:30\n    at file:///home/elias/dev/jus"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts#appends NOTHING to the fresh thread when a late delta arrives",
+        "classification": "assertion",
+        "detail": "New session detaches from everything in flight (A13, abort half) appends NOTHING to the fresh thread when a late delta arrives:  AssertionError: expected [ { …(18) } ] to deeply equal []\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.record.test.ts:887:30\n    at file:///home/elias/dev/justsearch/.claude"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessions.test.ts#does not call an answer left streaming \"stopped\" when the reader starts a new session",
+        "classification": "assertion",
+        "detail": "New session parks the conversation and returns the window to the hero does not call an answer left streaming \"stopped\" when the reader starts a new session:  AssertionError: expected [ 'halted' ] to not include 'halted'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktree"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts#never routes the reader's own Stop through that mapping",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-context.test.ts#keeps a turn saved after the last /history read in context, below a floor not shown here",
+        "classification": "assertion",
+        "detail": "what the effective context does with each turn keeps a turn saved after the last /history read in context, below a floor not shown here:  AssertionError: expected [ false, false, false ] to deeply equal [ true, true, false ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-q0am2_9s/tmp/wp12-evidence/test-intent-before-kUZHg8/modules/ui-web/src/shell-v0/views/search-v3/sv3-context.test.ts:97:49\n    at file:///home/elias/de"
+      }
+    ]
+  },
+  "digest": "sha256:7bfefc3424af486d982d0d3a655e8c081b1868593afa1921347db5f5c40f9928"
+}

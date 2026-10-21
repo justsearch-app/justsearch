@@ -57,12 +57,12 @@ are:
 
 `EngineRoot` registers the `index` and `encoders` component handles beside the shared executor,
 admission, and publication owners. The component registry is the D1 lifecycle and readiness
-authority. Its public contract is a registry, snapshot, subscriptions, and serialized apply lease. (`modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java:70-126,443-467`,
+authority. Its public contract is a registry, snapshot, subscriptions, and serialized apply lease. (`modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java:70-126,953-958`,
 `modules/core/src/main/java/io/justsearch/core/component/EngineComponentRegistry.java:7-29`)
 
 ## Current module roles
 
-These roles describe the modules that are actually in the Gradle graph:
+These roles summarize the main modules; this is not an exhaustive inventory of the Gradle graph:
 
 | Module group | Current responsibility |
 | --- | --- |
@@ -74,8 +74,10 @@ These roles describe the modules that are actually in the Gradle graph:
 | `app-engine` | composition root that binds the application and index halves |
 | `ui`, `app-launcher`, `ui-web`, `shell` | HTTP/desktop entry points and the Lit/Tauri clients; `ui-web` and `shell` are not Gradle projects |
 
-The generated dependency graph lists the exact edges and also records test-only coupling. A module
-role in this table does not override those generated edges.
+The generated dependency graph is a discovery aid, not proof of production coupling: its parser
+currently counts project dependencies inside test-suite blocks as production edges and omits
+`compileOnly`. Check the declaring build file when the distinction matters; for example,
+`ui` → `worker-services` / `indexer-worker` are test-suite declarations.
 
 ## Inference and lifecycle ownership
 
