@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter.EngineIdentity;
 import io.justsearch.app.api.runtime.ledger.LedgerRecordType;
@@ -41,13 +43,23 @@ final class WindowsJobWitnessReserveTest {
     recordingGate.setAccessible(true);
     var appendStarted = new CountDownLatch(1);
     var releaseAppend = new CountDownLatch(1);
+    var finishStarted = new AtomicLong();
+    var fenced = new AtomicBoolean();
+    var allowance = Duration.ofMillis(150);
     // Observe the real fence call, after finish has closed admission and cleared pending work.
     // Release storage here instead of racing a producer against the drain deadline.
     recordingGate.set(witness, new ReentrantLock() {
       @Override public boolean tryLock(long timeout, TimeUnit unit) throws InterruptedException {
-        assertTrue(timeout > 0, "the in-flight append must receive a positive fence reserve");
+        assertTrue(timeout >= 0 && unit.toNanos(timeout) <= allowance.toNanos(),
+            "the fence must stay within the total allowance");
+        if (timeout == 0) {
+          assertTrue(System.nanoTime() - finishStarted.get() >= allowance.toNanos(),
+              "the in-flight append must receive the reserve until the allowance expires");
+        }
         releaseAppend.countDown();
-        return super.tryLock(timeout, unit);
+        boolean acquired = super.tryLock(timeout, unit);
+        fenced.set(acquired);
+        return acquired;
       }
     });
     try {
@@ -62,8 +74,20 @@ final class WindowsJobWitnessReserveTest {
       for (int i = 0; i < 2; i++) enqueue.invoke(witness, LedgerRecordType.LEDGER_GAP,
           Map.of("reason", "WRITE_FAILED"));
       // The whole allowance is the 150 ms reserve, making the drain deadline immediate.
-      assertDoesNotThrow(() -> witness.finish(Duration.ofMillis(150)),
-          "an append held until the fence must finish within its reserve; pending writes stop");
+      finishStarted.set(System.nanoTime());
+      boolean finished;
+      try {
+        witness.finish(allowance);
+        finished = true;
+      } catch (IllegalStateException refused) {
+        assertEquals("Exit witness storage is still active; retain the instance lock",
+            refused.getMessage());
+        finished = false;
+      }
+      // A cold or descheduled Windows runner can consume the allowance before the fence.
+      // Success still requires the real storage lock; otherwise ownership must be retained.
+      assertEquals(fenced.get(), finished,
+          "finish may succeed only after the in-flight append has been fenced");
       assertEquals(0, releaseAppend.getCount(), "finish must reach the storage fence");
       // Wait for the writer to settle, so a forbidden pending append cannot escape the count.
       long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);

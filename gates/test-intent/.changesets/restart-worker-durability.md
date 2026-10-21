@@ -154,7 +154,7 @@ The scenarios are delegated orchestrator choices, not owner words. Linux and Win
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/restart-worker-queue.json",
+      "evidence": "gates/test-intent/evidence/restart-worker-schema-pin.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java#migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion"
       ]
@@ -447,6 +447,69 @@ The scenarios are delegated orchestrator choices, not owner words. Linux and Win
           "location": "task t-20261019-91c3ab request (Builder A, round 9)"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Replaying V23 after user_version rewinds to 20 or 22 tolerates already-applied admission structure, preserves the monotonic count when no buffer rows remain, recreates the trigger after V21 table reconstruction, and increments exactly once for each later write across repeated reopens. The reopen is asserted not to throw so the bfe0a9cba before-state fails an assertion for the duplicate-table defect.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Every other migration step tolerates already-applied structure; V23 should too, without ever lowering an existing counter. The counter is monotonic, and a rollback that rewinds user_version must keep it.",
+          "location": "task t-20261019-91c3ab request (restart-a builder CI repair brief, 2026-10-21)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/restart-worker-v23-replay.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java#replayingV23PreservesAdmissionsAndCountsNewWritesOnce"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PreOpenSchemaMismatchBootTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The interruptedBackupWithAbsentActiveReconcilesAndStartsSourceRebuild fixture now creates and closes its real jobs.db before moving the active generation into its backup. It represents healthy interrupted recovery, which retains its journal; omitting jobs.db contradicts the R9 refusal obligation. The real server boot, recovery fault, document counts, migration phase/source, assertions, tags and timeouts are unchanged. Missing-journal refusal remains covered by MigrationJournalDurabilityBootTest.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.\nyou can work autonomously, no need to ask me for these type of thigns",
+          "delegationLocation": "task t-20261018-6108b0 user turn (owner turns, orchestrator session cc6d91b2-5314-42fd-867b-dbc2d8a68699, 2026-10-18 and 2026-10-19)",
+          "delegationScope": "the testing task t-20261018-6108b0 and the fix tasks routed from it, including choosing fix-or-defer and the scenarios for each fix",
+          "choice": "R9 and R9b-v3: refuse missing, zero-byte, corrupt, triage-replaced or witness-stale migration journals without replacing queue evidence; show a named refusal in the UI. Future switch-buffer acknowledgements need a durable monotonic admission witness outside jobs.db. Existing unfinished migrations without a witness resume as today, with their historical completeness gap recorded. R9c: index-root lock and authority precede triage. R10: healthy legacy migrations, import, path readers and conditional replay removal remain intact.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Fix production code, not the existing tests, unless a test asserts something the agreed design contradicts. If so, say which and why.",
+          "location": "task t-20261019-91c3ab request (restart-a builder CI repair brief, 2026-10-21)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/restart-worker-backup-fixture.json",
+      "unresolvedRisks": "No new product expectation. Evidence covers the repaired healthy-recovery setup on Linux, not Windows."
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessReserveTest.java"
+      ],
+      "class": "Structural rule kept",
+      "rule": "An append in flight at the drain deadline must finish through the storage fence within the remaining allowance, or stop must be refused and instance ownership retained; pending writes cannot append after the drain deadline.",
+      "whySurvives": "The test retains the held append, deadline-sized 150 ms allowance, real timed storage lock, pending writes, settled-writer observation, final append count, platform condition and tag. It observes whether the real fence acquired the lock and requires finish success exactly in that case, otherwise the retain-instance-lock refusal. A zero remaining reserve is accepted only after the measured total allowance has expired; a lost reserve before expiry still fails. This removes the unsupported scheduling assumption that a Windows runner cannot spend the entire allowance before reaching the fence; production deadlines and behavior are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Never weaken the property it protects (an append in flight at the deadline finishes within the reserve, or the stop is refused).",
+          "location": "task t-20261019-91c3ab request (restart-a builder CI repair brief, 2026-10-21)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/restart-worker-witness-reserve-unverified.json",
+      "unresolvedRisks": "UNVERIFIED ON WINDOWS. run-evidence.mjs on Linux with windowsOnly selection records the check as skipped by EnabledOnOs, executed=false, and exits 1. Compilation is not a native execution pass. The supplied Windows CI logs show three original failures at the positive-reserve assertion; an independent Windows run is still required."
     }
   ]
 }

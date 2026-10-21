@@ -1,6 +1,7 @@
 package io.justsearch.indexerworker.queue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -37,6 +38,38 @@ import org.junit.jupiter.params.provider.ValueSource;
 final class JobQueueMigrationTest {
 
   @TempDir Path tempDir;
+
+  @ParameterizedTest(name = "replayingV23PreservesAdmissionsAndCountsNewWritesOnce({0})")
+  @ValueSource(ints = {20, 22})
+  void replayingV23PreservesAdmissionsAndCountsNewWritesOnce(int version) throws Exception {
+    Path db = tempDir.resolve("replayed-v23.db");
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+    }
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+        var statement = connection.createStatement()) {
+      // The count includes admissions no longer present in the buffer. A rewind must never
+      // reset it, including when V21 rebuilds the buffer and removes its old trigger.
+      statement.execute("UPDATE switch_buffer_admissions SET count = 41 WHERE id = 1");
+      statement.execute("PRAGMA user_version = " + version);
+    }
+    for (int replay = 0; replay < 2; replay++) {
+      try (var queue = new SqliteJobQueue(db)) {
+        assertDoesNotThrow(queue::open,
+            "replaying applied migration structure must preserve the admission counter");
+        assertEquals(41 + replay, queue.switchBufferAdmissions());
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+            var statement = connection.createStatement()) {
+          statement.execute("INSERT INTO switch_buffer "
+              + "(generation, key, op, payload, last_updated, revision, accepted_order) "
+              + "VALUES ('', 'write-" + replay + "', 'DELETE', '{}', 1, 'revision', 1)");
+          statement.execute("DELETE FROM switch_buffer");
+          statement.execute("PRAGMA user_version = 22");
+        }
+        assertEquals(42 + replay, queue.switchBufferAdmissions());
+      }
+    }
+  }
 
   @Test
   void failedBackupPreservesLiveDatabaseAndCompletedBackup() throws Exception {
