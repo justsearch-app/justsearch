@@ -160,6 +160,7 @@ export class LibrarySurface extends JfElement {
     loading: { state: true },
     error: { state: true },
     excludesText: { state: true },
+    excludesInvalidPatterns: { state: true },
     excludesLoaded: { state: true },
     excludesBusy: { state: true },
     addBusy: { state: true },
@@ -196,9 +197,11 @@ export class LibrarySurface extends JfElement {
   declare loading: boolean;
   declare error: string | null;
   declare excludesText: string;
+  declare excludesInvalidPatterns: string[];
   declare excludesLoaded: boolean;
   declare excludesBusy: boolean;
   private excludesWitness: SettingsWitness | null = null;
+  private excludesSavedText: string | null = null;
   private excludesAttempt: SettingsAttempt | null = null;
   private excludesLoadStarted = false;
   declare addBusy: boolean;
@@ -304,6 +307,7 @@ export class LibrarySurface extends JfElement {
     this.loading = false;
     this.error = null;
     this.excludesText = '';
+    this.excludesInvalidPatterns = [];
     this.excludesLoaded = false;
     this.excludesBusy = false;
     this.addBusy = false;
@@ -1033,6 +1037,8 @@ export class LibrarySurface extends JfElement {
     try {
       const body = await readSettingsObservation((path, init) => this.doFetch(path, init));
       this.excludesText = (body.ui?.excludePatterns ?? []).join('\n');
+      this.excludesSavedText = this.excludesText;
+      this.excludesInvalidPatterns = body.ui?.invalidExcludePatterns ?? [];
       this.excludesWitness = body.witness;
       this.excludesLoaded = true;
       this.error = null;
@@ -1047,6 +1053,9 @@ export class LibrarySurface extends JfElement {
 
   private async persistExcludes(): Promise<boolean> {
     if (!this.excludesLoaded || !this.excludesWitness) return false;
+    // Existing literal fallbacks are readable, but cannot be submitted as new glob syntax.
+    if (!this.excludesAttempt && this.excludesInvalidPatterns.length > 0
+        && this.excludesText === this.excludesSavedText) return true;
     try {
       if (!this.excludesAttempt) {
         const patterns = this.excludesText.split('\n').map((value) => value.trim()).filter(Boolean);
@@ -1055,6 +1064,8 @@ export class LibrarySurface extends JfElement {
       const result = await executeSettingsAttempt((path, init) => this.doFetch(path, init), this.excludesAttempt);
       this.excludesWitness = result.witness;
       this.excludesAttempt = null;
+      this.excludesSavedText = this.excludesText;
+      this.excludesInvalidPatterns = [];
       return true;
     } catch (err) {
       // An uncertain save remains the same attempt on the next Preview/Apply click.
@@ -1813,6 +1824,10 @@ export class LibrarySurface extends JfElement {
             <p>
               One glob per line. Bare names like <code>node_modules</code> or
               <code>dist/</code> match at any depth.
+              <code>[ab]</code> matches one listed character; <code>[a-z]</code> matches a range;
+              <code>[!ab]</code> matches a character not listed.
+              <code>{draft,final}</code> matches either alternative.
+              These meanings also apply to patterns saved by earlier versions.
             </p>
           </div>
           <div class="actions">
@@ -1830,6 +1845,9 @@ export class LibrarySurface extends JfElement {
         </div>
         ${this.excludesAttempt && !this.excludesBusy
           ? html`<p>Save completion is unknown. Retry Preview or Apply to check the same save.</p>` : nothing}
+        ${this.excludesInvalidPatterns.length > 0
+          ? html`<div role="status"><ul>${this.excludesInvalidPatterns.map((pattern) => html`<li>“${pattern}” has invalid pattern syntax and is matched as a literal name. Correct or remove it.</li>`)}</ul></div>`
+          : nothing}
         <textarea
           aria-label="Exclude patterns"
           ?disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null}

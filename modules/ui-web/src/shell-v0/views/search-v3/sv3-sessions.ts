@@ -163,6 +163,14 @@ export interface Sv3Turn {
   readonly question: string;
   /** Accumulated answer text. Whatever streamed before a halt is KEPT — it was really received. */
   readonly answer: string;
+  /**
+   * The answer as the RECORD saved it: each assistant message of the turn, oldest first, with its
+   * id; {@link answer} is their texts joined. The floor and the exclusions name MESSAGES, and one
+   * turn can hold several, so a follow-up's context is built from these, message by message (S2.0).
+   * Set only by the record projection (`sv3-record.ts`); absent on a live turn, whose answer is the
+   * one message the store has not numbered yet.
+   */
+  readonly answerMessages?: readonly Sv3AnswerMessage[];
   readonly status: Sv3TurnStatus;
   /**
    * The evidence the backend minted for this answer — `null` until it reports any, which is not the
@@ -240,6 +248,12 @@ export interface Sv3Turn {
   readonly evidencePaths?: readonly string[];
 }
 
+/** One saved assistant message of a turn's answer: its record id and its text. */
+export interface Sv3AnswerMessage {
+  readonly id: string;
+  readonly content: string;
+}
+
 /**
  * What `GET /api/chat/conversations/{id}/history` knows about a conversation that
  * `GET /api/thread/{id}` does not (tempdoc 852 §2.3c). The shipped window reads BOTH records at
@@ -273,6 +287,12 @@ export interface Sv3SessionHistory {
   readonly excludedMessageIds?: readonly string[];
   /** Retrieved-source ids the reader hid from retrieval (§J.3); the Worker drops those chunks. */
   readonly excludedSourceIds?: readonly string[];
+  /**
+   * Every user/assistant message id `/history` holds, in the order the store SAVED them — the order
+   * it trims the prompt by. Used only to place a floor that names a message no turn on screen names
+   * (`sv3-context.ts` placeFloor); never to resolve a message to a turn, which stays BY ID.
+   */
+  readonly messageIds?: readonly string[];
   /**
    * The conversation store answered 423 — encrypted and LOCKED (tempdoc 629). The window already
    * derives its own lock state from observed status; this is the load's own report of the same
@@ -640,6 +660,24 @@ export const settleTurn = (
     durationMs: Math.max(0, now - turn.askedAt),
     modelLabel,
   }));
+
+/**
+ * A turn this window let go of mid-stream (it left the conversation) is taken off the transcript:
+ * the Engine goes on and saves it as it ends, so the partial copy here would be neither what the
+ * reader stopped nor what was saved. The record puts back whatever the Engine saved, the next time
+ * the conversation is read. Only a turn still streaming is dropped, so a settled one never is.
+ */
+export function dropTurn(list: Sv3SessionList, ref: Sv3TurnRef): Sv3SessionList {
+  const session = sessionById(list, ref.sessionId);
+  const turn = session?.turns.find((t) => t.id === ref.turnId);
+  if (session === null || turn === undefined || turn.status !== 'streaming') return list;
+  return {
+    ...list,
+    sessions: list.sessions.map((s) =>
+      s.id === ref.sessionId ? { ...s, turns: s.turns.filter((t) => t.id !== ref.turnId) } : s,
+    ),
+  };
+}
 
 /**
  * The agent run's terminal (tempdoc 822 Phase F2): the turn settles AND becomes its own receipt in

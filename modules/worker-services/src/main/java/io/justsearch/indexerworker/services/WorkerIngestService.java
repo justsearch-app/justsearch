@@ -750,6 +750,7 @@ public final class WorkerIngestService {
     for (Path root : declared) {
       roots.add(root.toAbsolutePath().normalize());
     }
+    bootExclusionRoots = List.copyOf(roots);
     try {
       if (rootVolumes.beginUpgradeSeeding(roots)) {
         log.info("Upgrade: the volume of {} declared roots is confirmed on evidence", roots.size());
@@ -1215,6 +1216,43 @@ public final class WorkerIngestService {
     }
   }
 
+  private volatile java.util.Collection<Path> bootExclusionRoots = List.of();
+  private volatile Supplier<java.util.Collection<Path>> exclusionRoots = () -> bootExclusionRoots;
+
+  /**
+   * The composing owner binds its current file policy and Head-owned watched membership before
+   * publication. Construction alone must not bind: temporary replay services share the runtime
+   * but never own its processing policy.
+   */
+  public void useExclusionRoots(Supplier<java.util.Collection<Path>> roots) {
+    exclusionRoots = java.util.Objects.requireNonNull(roots, "roots");
+    if (ingestLifecycle != null) {
+      ingestLifecycle.useSourceProcessingPolicy(this::sourceProcessingAllowed);
+    }
+  }
+
+  /** Current user policy, including saved roots not yet registered with a native watcher. */
+  public boolean isUserExcluded(Path file, Path root) {
+    var patterns = io.justsearch.configuration.excludes.ExclusionPatterns.current();
+    if (patterns.isEmpty()) return false;
+    if (patterns.isExcludedPath(root, file) || rootWatcherRegistry.isUserExcluded(file)) return true;
+    for (Path watched : exclusionRoots.get()) {
+      if (patterns.isExcludedPath(watched, file)) return true;
+    }
+    return false;
+  }
+
+  private boolean sourceProcessingAllowed(String source) {
+    if (source == null || source.isBlank()) return true;
+    try {
+      Path file = Path.of(source);
+      // Projection and non-file document IDs have no filesystem exclusion scope.
+      return !file.isAbsolute() || !isUserExcluded(file, file);
+    } catch (InvalidPathException nonFile) {
+      return true;
+    }
+  }
+
   public BatchResponse submitBatch(BatchRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       List<String> filePaths = request.getFilePathsList();
@@ -1251,10 +1289,10 @@ public final class WorkerIngestService {
 
         for (String pathStr : filePaths) {
           Path sanitized = sanitizePath(pathStr);
-          if (sanitized != null) {
-            validPaths.add(sanitized);
-          } else {
+          if (sanitized == null) {
             rejected++;
+          } else if (!isUserExcluded(sanitized, sanitized)) {
+            validPaths.add(sanitized);
           }
         }
 
@@ -1263,7 +1301,8 @@ public final class WorkerIngestService {
         }
 
         if (validPaths.isEmpty()) {
-          return batchErrorResponse("All paths were invalid or unsafe");
+          return rejected == filePaths.size()
+              ? batchErrorResponse("All paths were invalid or unsafe") : batchSuccessResponse(0);
         }
         if (request.getRootAdded()) {
           // Round 8b (decision 1): an explicit ingest request is a deliberate add and records the
@@ -1638,6 +1677,9 @@ public final class WorkerIngestService {
           try {
             applied = withFileMutationFence(() -> {
               try {
+                if (ingestLifecycle.documentFieldOps().excludedProcessingIds(List.of(docId)).contains(docId)) {
+                  return false;
+                }
                 return VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled());
               } catch (IOException e) {
                 throw new java.io.UncheckedIOException(e);
@@ -1647,6 +1689,10 @@ public final class WorkerIngestService {
             throw e.getCause();
           }
           if (!applied) {
+            if (ingestLifecycle.documentFieldOps().excludedProcessingIds(List.of(docId)).contains(docId)) {
+              releaseVduProcessing(docId, ctx);
+              return updateVduErrorResponse("Source is excluded by the current policy");
+            }
             return updateVduErrorResponse("Document not found: " + docId);
           }
           vduProcessingClaims.remove(docId);
@@ -2429,6 +2475,9 @@ public final class WorkerIngestService {
         requireServingVduTarget();
 
         try {
+          if (ingestLifecycle.documentFieldOps().excludedProcessingIds(List.of(docId)).contains(docId)) {
+            return markVduErrorResponse("Source is excluded by the current policy");
+          }
           int currentCount = readVduRetryCount(docId);
           return applyMarkVduProcessing(
               docId, currentCount, maxRetries, ctx.engineContext().workId().orElse(null));
@@ -2699,6 +2748,11 @@ public final class WorkerIngestService {
         String rawOldPath = mapping.getOldPath();
         String rawNewPath = mapping.getNewPath();
         if (rawOldPath.isBlank() || rawNewPath.isBlank()) {
+          failedPaths.add(rawOldPath);
+          continue;
+        }
+        Path destination = Path.of(rawNewPath);
+        if (isUserExcluded(destination, destination)) {
           failedPaths.add(rawOldPath);
           continue;
         }

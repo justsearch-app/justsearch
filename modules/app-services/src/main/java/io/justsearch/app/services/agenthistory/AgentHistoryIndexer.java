@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.agenthistory;
 
+import io.justsearch.configuration.persistence.StoreIds;
 import io.justsearch.core.context.EngineContext;
 
 import io.justsearch.app.services.worker.KnowledgeClient;
@@ -161,6 +162,7 @@ public final class AgentHistoryIndexer implements AutoCloseable {
    * transcript write + ingest off the hot path. Non-terminal events are ignored.
    */
   public void onEvent(String sessionId, Map<String, Object> record) {
+    StoreIds.requireValid(sessionId);
     if (record == null) {
       return;
     }
@@ -191,6 +193,7 @@ public final class AgentHistoryIndexer implements AutoCloseable {
    */
   @SuppressWarnings("unchecked")
   public void reindexRestoredRun(String sessionId, List<?> events) {
+    StoreIds.requireValid(sessionId);
     if (events == null) {
       return;
     }
@@ -267,9 +270,7 @@ public final class AgentHistoryIndexer implements AutoCloseable {
     int preserved = 0;
     int resubmitted = 0;
     for (String sessionId : ids) {
-      if (sessionId == null || sessionId.isBlank()) {
-        continue;
-      }
+      StoreIds.requireValid(sessionId);
       if (isReadableTranscript(transcriptPath(sessionId))) {
         // Tempdoc 909 §E item 1: healthy bytes are not evidence of a healthy INDEX. A transcript
         // written while the knowledge client was null never reached submitBatch, and every later
@@ -331,7 +332,8 @@ public final class AgentHistoryIndexer implements AutoCloseable {
   }
 
   private Path transcriptPath(String sessionId) {
-    return historyDir.resolve(sessionId + ".md");
+    StoreIds.requireValid(sessionId);
+    return StoreIds.resolve(historyDir, sessionId + ".md");
   }
 
   /**
@@ -384,9 +386,9 @@ public final class AgentHistoryIndexer implements AutoCloseable {
   }
 
   private void writeAndIndex(String sessionId, Map<String, Object> payload, boolean errored) {
+    Path target = transcriptPath(sessionId);
     try {
       Files.createDirectories(historyDir);
-      Path target = transcriptPath(sessionId);
       atomicWrite(target, renderTranscript(sessionId, payload, errored));
       // Tempdoc 909 §E item 1: the marker is written BEFORE the submit, so every window in which
       // the ingest can be lost — no client (Worker down / not yet connected), a throwing RPC, a
@@ -422,7 +424,8 @@ public final class AgentHistoryIndexer implements AutoCloseable {
 
   /** The durable "written but not yet indexed" marker, a sibling of the transcript it names. */
   private Path pendingMarkerPath(String sessionId) {
-    return historyDir.resolve(sessionId + PENDING_SUFFIX);
+    StoreIds.requireValid(sessionId);
+    return StoreIds.resolve(historyDir, sessionId + PENDING_SUFFIX);
   }
 
   private boolean isPending(String sessionId) {

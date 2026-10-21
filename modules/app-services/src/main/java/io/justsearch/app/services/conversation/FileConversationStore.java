@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation;
 
+import io.justsearch.configuration.persistence.StoreIds;
 import io.justsearch.agent.api.conversation.BranchesPreventDeletionException;
 import io.justsearch.agent.api.conversation.ConversationStore;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
@@ -46,6 +47,8 @@ public final class FileConversationStore implements ConversationStore {
 
   public static final int CURRENT_SCHEMA_VERSION = 1;
   private static final Logger LOG = LoggerFactory.getLogger(FileConversationStore.class);
+  private static final java.util.Set<Path> SKIPPED_INVALID_FOLDERS =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
   private final Path rootDir;
@@ -68,6 +71,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public List<Map<String, Object>> loadHistory(String sessionId) {
+    StoreIds.requireValid(sessionId);
     return loadHistory(sessionId, new java.util.HashSet<>());
   }
 
@@ -94,7 +98,8 @@ public final class FileConversationStore implements ConversationStore {
     if (meta != null) {
       Object parent = meta.get("parentSessionId");
       Object branchPoint = meta.get("branchPointMessageId");
-      if (parent instanceof String parentId && !parentId.isBlank()) {
+      // Saved links can predate portable id validation. An unaddressable parent is missing.
+      if (parent instanceof String parentId && StoreIds.isValid(parentId)) {
         List<Map<String, Object>> parentHistory = loadHistory(parentId, seen);
         if (branchPoint instanceof String bp && EMPTY_PREFIX_SENTINEL.equals(bp)) {
           // Tempdoc 610 Phase A — empty-prefix branch: inherit nothing from the
@@ -190,6 +195,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void appendMessage(String sessionId, String shapeId, Map<String, Object> message) {
+    StoreIds.requireValid(sessionId);
     Path sessionDir = resolveSessionDir(sessionId);
     try {
       Files.createDirectories(sessionDir);
@@ -264,7 +270,8 @@ public final class FileConversationStore implements ConversationStore {
     List<SessionSummary> summaries = new ArrayList<>();
     try (DirectoryStream<Path> dirs = Files.newDirectoryStream(rootDir)) {
       for (Path sessionDir : dirs) {
-        if (!Files.isDirectory(sessionDir)) continue;
+        if (!isValidSessionEntry(sessionDir) || !Files.isDirectory(sessionDir)) continue;
+        String sessionId = sessionDir.getFileName().toString();
         Path metaFile = sessionDir.resolve("meta.json");
         if (!Files.exists(metaFile)) continue;
         {
@@ -293,7 +300,7 @@ public final class FileConversationStore implements ConversationStore {
             title = null;
           }
           summaries.add(new SessionSummary(
-              sessionDir.getFileName().toString(),
+              sessionId,
               metaShape,
               ((Number) meta.getOrDefault("createdAtMs", 0L)).longValue(),
               ((Number) meta.getOrDefault("lastActiveAtMs", 0L)).longValue(),
@@ -317,6 +324,8 @@ public final class FileConversationStore implements ConversationStore {
   @Override
   public void branchFrom(
       String parentSessionId, String branchPointMessageId, String newSessionId) {
+    StoreIds.requireValid(parentSessionId);
+    StoreIds.requireValid(newSessionId);
     Objects.requireNonNull(parentSessionId, "parentSessionId");
     Objects.requireNonNull(branchPointMessageId, "branchPointMessageId");
     Objects.requireNonNull(newSessionId, "newSessionId");
@@ -362,6 +371,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public Optional<SessionSummary> getSessionMeta(String sessionId) {
+    StoreIds.requireValid(sessionId);
     Map<String, Object> meta = readMeta(sessionId);
     if (meta == null) return Optional.empty();
     String metaShape = (String) meta.getOrDefault("shapeId", "");
@@ -391,6 +401,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void setContextFloor(String sessionId, String floorMessageId) {
+    StoreIds.requireValid(sessionId);
     // Tempdoc 610 Phase C — persist (or clear) the effective-context floor in
     // meta.json, atomically, mirroring the branchFrom meta-write pattern.
     Path sessionDir = resolveSessionDir(sessionId);
@@ -420,6 +431,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void setTitle(String sessionId, String title, String titleSource) {
+    StoreIds.requireValid(sessionId);
     synchronized (titleWrites) {
       writeTitle(sessionId, readMeta(sessionId), title, titleSource);
     }
@@ -427,6 +439,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public boolean setTitleIfUntitled(String sessionId, String title, String titleSource) {
+    StoreIds.requireValid(sessionId);
     if (title == null || title.isBlank()) return false;
     synchronized (titleWrites) {
       Map<String, Object> existing = readMeta(sessionId);
@@ -462,6 +475,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void compactContext(String sessionId, String floorMessageId, String summaryText) {
+    StoreIds.requireValid(sessionId);
     // Tempdoc 610 Phase D — like setContextFloor, but attach the summary of the
     // messages above the floor. loadEffectiveContext prepends it.
     if (floorMessageId == null || floorMessageId.isBlank()) {
@@ -485,6 +499,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void excludeMessage(String sessionId, String messageId, boolean excluded) {
+    StoreIds.requireValid(sessionId);
     // Tempdoc 610 §E.3 — toggle a message id in the meta.json excludedMessageIds list. Excluded
     // messages stay in the transcript (loadHistory) but are dropped from loadEffectiveContext.
     toggleStringInMeta(sessionId, "excludedMessageIds", messageId, excluded);
@@ -492,11 +507,13 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public List<String> excludedMessageIds(String sessionId) {
+    StoreIds.requireValid(sessionId);
     return readStringList(sessionId, "excludedMessageIds");
   }
 
   @Override
   public void excludeSource(String sessionId, String sourceId, boolean excluded) {
+    StoreIds.requireValid(sessionId);
     // Tempdoc 610 §J.3 — toggle a retrieved-source id in the meta.json excludedSourceIds list. The
     // engine seeds these onto each turn's context; the Worker drops the matching chunks pre-search.
     toggleStringInMeta(sessionId, "excludedSourceIds", sourceId, excluded);
@@ -504,17 +521,16 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public List<String> excludedSourceIds(String sessionId) {
+    StoreIds.requireValid(sessionId);
     return readStringList(sessionId, "excludedSourceIds");
   }
 
   @Override
   public void setTurnOpen(String sessionId, boolean open) {
+    StoreIds.requireValid(sessionId);
     // Tempdoc 834 §4.3 — one boolean on meta.json, written through the same atomic path the floor
     // and exclusion toggles use. Written only for sessions that already exist (a turn cannot be
     // open on a conversation with no record); clearing an unknown session is a no-op.
-    if (sessionId == null || sessionId.isBlank()) {
-      return;
-    }
     Map<String, Object> existing = readMeta(sessionId);
     if (existing == null && !open) {
       return;
@@ -532,6 +548,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public boolean isTurnOpen(String sessionId) {
+    StoreIds.requireValid(sessionId);
     Map<String, Object> meta = readMeta(sessionId);
     return meta != null && Boolean.TRUE.equals(meta.get("turnOpen"));
   }
@@ -588,6 +605,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public List<Map<String, Object>> loadEffectiveContext(String sessionId) {
+    StoreIds.requireValid(sessionId);
     // Tempdoc 610 Phase C/D — the prompt history: the full resolved history
     // trimmed to start at the context floor (floor message inclusive), with the
     // compaction summary (if any) prepended as a synthetic system message. No
@@ -595,17 +613,9 @@ public final class FileConversationStore implements ConversationStore {
     List<Map<String, Object>> full = loadHistory(sessionId);
     Map<String, Object> meta = readMeta(sessionId);
     if (meta == null) return full;
-    // Tempdoc 610 §E.3 — per-message exclusion is applied to the WHOLE history first (before the
-    // floor trim): an excluded message is dropped from the prompt regardless of where the floor sits.
-    Object excludedRaw = meta.get("excludedMessageIds");
-    if (excludedRaw instanceof List<?> exList && !exList.isEmpty()) {
-      java.util.Set<Object> excluded = new java.util.HashSet<>(exList);
-      List<Map<String, Object>> kept = new ArrayList<>(full.size());
-      for (Map<String, Object> m : full) {
-        if (!excluded.contains(m.get("id"))) kept.add(m);
-      }
-      full = kept;
-    }
+    // Tempdoc 610 §E.3 — the floor is located in the FULL history, before exclusion: excluding the
+    // floor message itself must not move the floor (if the trim looked for it among the kept messages
+    // it would miss, fail safe to the whole history, and bring back everything the floor hid).
     Object floor = meta.get("contextFloor");
     Object summary = meta.get("contextFloorSummary");
     List<Map<String, Object>> trimmed = new ArrayList<>(full);
@@ -618,6 +628,12 @@ public final class FileConversationStore implements ConversationStore {
         }
       }
       if (idx >= 0) trimmed = new ArrayList<>(full.subList(idx, full.size()));
+    }
+    // Per-message exclusion then drops an excluded message wherever it sits at or after the floor.
+    Object excludedRaw = meta.get("excludedMessageIds");
+    if (excludedRaw instanceof List<?> exList && !exList.isEmpty()) {
+      java.util.Set<Object> excluded = new java.util.HashSet<>(exList);
+      trimmed.removeIf(m -> excluded.contains(m.get("id")));
     }
     if (summary instanceof String s && !s.isBlank()) {
       Map<String, Object> summaryMsg = new LinkedHashMap<>();
@@ -638,7 +654,7 @@ public final class FileConversationStore implements ConversationStore {
     List<String> children = new ArrayList<>();
     try (DirectoryStream<Path> dirs = Files.newDirectoryStream(rootDir)) {
       for (Path sessionDir : dirs) {
-        if (!Files.isDirectory(sessionDir)) continue;
+        if (!isValidSessionEntry(sessionDir) || !Files.isDirectory(sessionDir)) continue;
         Map<String, Object> meta = readMeta(sessionDir.getFileName().toString());
         if (meta != null && parentSessionId.equals(meta.get("parentSessionId"))) {
           children.add(sessionDir.getFileName().toString());
@@ -735,6 +751,7 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void deleteSession(String sessionId) {
+    StoreIds.requireValid(sessionId);
     Path sessionDir = resolveSessionDir(sessionId);
     if (!Files.isDirectory(sessionDir)) return;
     // Slice 515 FIX-3 — block deletion when child branches exist. The
@@ -764,11 +781,16 @@ public final class FileConversationStore implements ConversationStore {
     }
   }
 
+  private static boolean isValidSessionEntry(Path sessionDir) {
+    if (StoreIds.isValid(sessionDir.getFileName().toString())) return true;
+    if (SKIPPED_INVALID_FOLDERS.add(sessionDir.toAbsolutePath().normalize())) {
+      LOG.warn("Skipping conversation folder with invalid id: {}", sessionDir.toUri().toASCIIString());
+    }
+    return false;
+  }
+
   private Path resolveSessionDir(String sessionId) {
-    // Session dirs are stored flat under rootDir; shapeId is in meta.json.
-    // But for listSessions we need shapeId-based directories. Let the meta
-    // carry it and use shapeId subdirs.
-    return rootDir.resolve(sessionId);
+    return StoreIds.resolve(rootDir, sessionId);
   }
 
   private Path resolveMessagesFile(String sessionId) {

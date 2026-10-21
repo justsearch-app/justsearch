@@ -28,7 +28,7 @@ import {
 } from '../../state/aiStateStore.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
 import { reasonFor } from '../../state/readinessNotice.js';
-import { TURN_HALTED } from './fixtures.js';
+import { TURN_HALTED, TURN_STOP_FAILED, TURN_STOPPING } from './fixtures.js';
 import { __resetConversationListForTest } from '../../state/conversationListStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
@@ -51,11 +51,16 @@ interface FakeStream {
   end(): void;
 }
 
+/** How the Engine answers the Stop's own request: a status and body, or no answer at all. */
+type StopReply = { readonly status: number; readonly body: unknown } | 'unreachable';
+
 /**
  * Stub the dispatch with an SSE body the test drives frame by frame. `read()` waits when the queue
  * is empty, so a streaming assertion can observe the half-finished answer instead of racing it.
  */
-function stubStream(): FakeStream {
+function stubStream(
+  stopReply: StopReply = { status: 200, body: { stopped: true, pending: false } },
+): FakeStream {
   const encoder = new TextEncoder();
   const queued: Array<{ done: boolean; value?: Uint8Array }> = [];
   let wake: (() => void) | null = null;
@@ -65,7 +70,20 @@ function stubStream(): FakeStream {
     wake?.();
     wake = null;
   };
-  fetchMock.mockImplementation(async (_url: unknown, init: { signal?: AbortSignal }) => {
+  fetchMock.mockImplementation(async (url: unknown, init: { signal?: AbortSignal }) => {
+    // The stream stands in for the dispatch alone; the Stop's own request is answered as the case
+    // says, and every other read plainly.
+    if (/\/api\/chat\/conversations\/[^/]+\/stop$/.test(String(url))) {
+      if (stopReply === 'unreachable') throw new TypeError('Failed to fetch');
+      return {
+        ok: stopReply.status >= 200 && stopReply.status < 300,
+        status: stopReply.status,
+        json: () => Promise.resolve(stopReply.body),
+      };
+    }
+    if (!String(url).includes('/api/chat/dispatch')) {
+      return { ok: true, status: 200, json: () => Promise.resolve({}) };
+    }
     signal = init?.signal ?? null;
     return {
       ok: true,
@@ -398,6 +416,10 @@ describe('the primary slot renders exactly one of Send and Stop', () => {
     const composer = await region(el, 'jf-sv3-composer');
     (q(composer, 'sv3-composer-stop') as HTMLButtonElement).click();
     await settle(el);
+    // The Engine ends the turn as stopped: that terminal, not the press, is what halts it.
+    stream.emit('error', { error: 'Stopped by the user', errorCode: 'CANCELLED' });
+    stream.end();
+    await settle(el);
 
     const main = await region(el, 'jf-sv3-main');
     const turn = turnsOf(main)[0] as HTMLElement;
@@ -408,6 +430,230 @@ describe('the primary slot renders exactly one of Send and Stop', () => {
     // The slot is back to Send, so the next question is sendable.
     await composer.updateComplete;
     expect(q(composer, 'sv3-composer-send')).not.toBeNull();
+  });
+});
+
+describe('Stop is told to the Engine, so the saved turn says what the live one did (S2.3)', () => {
+  const stops = (): unknown[][] =>
+    fetchMock.mock.calls.filter((call) =>
+      /\/api\/chat\/conversations\/[^/]+\/stop$/.test(String(call[0])),
+    );
+  const sent = (call: unknown[] | undefined): Record<string, unknown> =>
+    JSON.parse(String((call?.[1] as RequestInit | undefined)?.body ?? '{}')) as Record<string, unknown>;
+
+  it('asks the Engine to stop the very turn it dispatched, and halts it on screen', async () => {
+    aiOnline();
+    const stream = stubStream();
+    const el = await mount();
+    await ask(el, 'and who owns it?');
+    stream.emit('rag.rewrite', { standalone: 'Who owns Project Cobalt?' });
+    await settle(el);
+
+    const composer = await region(el, 'jf-sv3-composer');
+    (q(composer, 'sv3-composer-stop') as HTMLButtonElement).click();
+    await settle(el);
+    stream.emit('error', { error: 'Stopped by the user', errorCode: 'CANCELLED' });
+    stream.end();
+    await settle(el);
+
+    const dispatched = sent(dispatches()[0]);
+    expect(typeof dispatched.turnId).toBe('string');
+    expect(dispatched.turnId).not.toBe('');
+    expect(stops()).toHaveLength(1);
+    const stop = stops()[0];
+    expect(String(stop?.[0])).toBe(
+      `http://127.0.0.1:9999/api/chat/conversations/${encodeURIComponent(String(dispatched.conversationId))}/stop`,
+    );
+    expect((stop?.[1] as RequestInit).method).toBe('POST');
+    expect(sent(stop)).toEqual({ turnId: dispatched.turnId });
+    const turn = turnsOf(await region(el, 'jf-sv3-main'))[0] as HTMLElement;
+    expect(turn.dataset.status).toBe('halted');
+    expect(textIn(turn, 'sv3-turn-note')).toBe(TURN_HALTED);
+  });
+
+  it('says "Stopping…" until the Engine ends the turn, and keeps every word it sent before that', async () => {
+    aiOnline();
+    const stream = stubStream();
+    const el = await mount();
+    await ask(el, 'and who owns it?');
+    stream.emit('chunk', { text: 'Half' });
+    await settle(el);
+
+    const composer = await region(el, 'jf-sv3-composer');
+    (q(composer, 'sv3-composer-stop') as HTMLButtonElement).click();
+    await settle(el);
+    const main = await region(el, 'jf-sv3-main');
+    let turn = turnsOf(main)[0] as HTMLElement;
+    // Asked, not yet done: nothing says "stopped" before the Engine has saved it so.
+    expect(turn.dataset.status).toBe('streaming');
+    expect(textIn(turn, 'sv3-turn-stopping')).toBe(TURN_STOPPING);
+    expect(turn.querySelector('[data-testid="sv3-turn-stopping"]')?.getAttribute('role')).toBe('status');
+
+    // What the Engine sent before its Stop landed is what it saves, so the reader sees it too.
+    stream.emit('chunk', { text: ' an ans' });
+    stream.emit('rag.rewrite', { standalone: 'Who owns Project Cobalt?' });
+    stream.emit('error', { error: 'Stopped by the user', errorCode: 'CANCELLED' });
+    stream.end();
+    await settle(el);
+
+    turn = turnsOf(main)[0] as HTMLElement;
+    expect(turn.dataset.status).toBe('halted');
+    expect(answerTextIn(turn)).toBe('Half an ans');
+    expect(textIn(turn, 'sv3-turn-note')).toBe(TURN_HALTED);
+    expect(el.sessions.sessions[0]?.turns[0]?.standaloneQuestion).toBe('Who owns Project Cobalt?');
+    expect(turn.querySelector('[data-testid="sv3-turn-stopping"]')).toBeNull();
+  });
+
+  it('shows the finished answer, not "Stopped by you.", when the Stop came after it was saved', async () => {
+    aiOnline();
+    const stream = stubStream({ status: 200, body: { stopped: false, pending: false } });
+    const el = await mount();
+    await ask(el, 'what changed?');
+    stream.emit('chunk', { text: 'Every' });
+    await settle(el);
+
+    const composer = await region(el, 'jf-sv3-composer');
+    (q(composer, 'sv3-composer-stop') as HTMLButtonElement).click();
+    await settle(el);
+    stream.emit('chunk', { text: 'thing.' });
+    stream.emit('done', {});
+    stream.end();
+    await settle(el);
+
+    const turn = turnsOf(await region(el, 'jf-sv3-main'))[0] as HTMLElement;
+    expect(turn.dataset.status).toBe('complete');
+    expect(answerTextIn(turn)).toBe('Everything.');
+    expect(textIn(turn, 'sv3-turn-note')).not.toBe(TURN_HALTED);
+  });
+
+  it.each<[string, StopReply]>([
+    ['refused', { status: 500, body: { errorCode: 'INTERNAL' } }],
+    ['unanswered', 'unreachable'],
+  ])('says so when the Stop was %s, and lets the answer go on', async (_, reply) => {
+    aiOnline();
+    const stream = stubStream(reply);
+    const el = await mount();
+    await ask(el, 'what changed?');
+    stream.emit('chunk', { text: 'Every' });
+    await settle(el);
+
+    const composer = await region(el, 'jf-sv3-composer');
+    (q(composer, 'sv3-composer-stop') as HTMLButtonElement).click();
+    await settle(el);
+    const main = await region(el, 'jf-sv3-main');
+    let turn = turnsOf(main)[0] as HTMLElement;
+    expect(turn.dataset.status).toBe('streaming');
+    expect(textIn(turn, 'sv3-turn-stopping')).toBe(TURN_STOP_FAILED);
+    // Stop is still there to press again.
+    await composer.updateComplete;
+    expect(q(composer, 'sv3-composer-stop')).not.toBeNull();
+
+    stream.emit('chunk', { text: 'thing.' });
+    stream.emit('done', {});
+    stream.end();
+    await settle(el);
+    turn = turnsOf(main)[0] as HTMLElement;
+    expect(turn.dataset.status).toBe('complete');
+    expect(answerTextIn(turn)).toBe('Everything.');
+  });
+
+  it('still sends a question stopped while it waits for Engine capacity, so the Engine saves it stopped', async () => {
+    aiOnline();
+    const stream = stubStream();
+    const streamed = fetchMock.getMockImplementation() as ((url: unknown, init: unknown) => unknown) | undefined;
+    let refused = false;
+    // The first dispatch is refused for capacity; the window waits, then sends it again.
+    fetchMock.mockImplementation(async (url: unknown, init: unknown) => {
+      if (String(url).includes('/api/chat/dispatch') && !refused) {
+        refused = true;
+        return new Response(
+          JSON.stringify({ errorCode: 'ADMISSION_ENGINE_LIMIT', retrySafe: true }),
+          { status: 429, headers: { 'Retry-After': '0' } },
+        );
+      }
+      return streamed?.(url, init);
+    });
+    const el = await mount();
+    await ask(el, 'what changed?');
+    expect(dispatches()).toHaveLength(1);
+
+    const composer = await region(el, 'jf-sv3-composer');
+    (q(composer, 'sv3-composer-stop') as HTMLButtonElement).click();
+    await new Promise<void>((resolve) => setTimeout(resolve, 150));
+    await settle(el);
+
+    // The question went out after all, naming the turn the Stop named.
+    expect(dispatches()).toHaveLength(2);
+    expect(stops().map(sent)).toEqual([{ turnId: sent(dispatches()[1]).turnId }]);
+    stream.emit('error', { error: 'Stopped by the user', errorCode: 'CANCELLED' });
+    stream.end();
+    await settle(el);
+    const turn = turnsOf(await region(el, 'jf-sv3-main'))[0] as HTMLElement;
+    expect(turn.dataset.status).toBe('halted');
+  });
+
+  it('reads the saved record after a stopped turn, as after a finished one', async () => {
+    aiOnline();
+    const stream = stubStream();
+    const el = await mount();
+    await ask(el, 'what changed?');
+    stream.emit('chunk', { text: 'Every' });
+    await settle(el);
+    const records = (): number =>
+      fetchMock.mock.calls.filter((call) => String(call[0]).includes('/api/thread/')).length;
+    const before = records();
+
+    const composer = await region(el, 'jf-sv3-composer');
+    (q(composer, 'sv3-composer-stop') as HTMLButtonElement).click();
+    await settle(el);
+    stream.emit('error', { error: 'Stopped by the user', errorCode: 'CANCELLED' });
+    stream.end();
+    await settle(el);
+
+    expect(records()).toBe(before + 1);
+  });
+
+  it('names each turn apart, so a Stop can only reach the turn it was pressed on', async () => {
+    aiOnline();
+    const first = stubStream();
+    const el = await mount();
+    await ask(el, 'first');
+    first.emit('done', {});
+    first.end();
+    await settle(el);
+    // The second answer streams and is stopped; the stream's own frames do not matter here.
+    stubStream();
+    await ask(el, 'second');
+    const composer = await region(el, 'jf-sv3-composer');
+    (q(composer, 'sv3-composer-stop') as HTMLButtonElement).click();
+    await settle(el);
+
+    const [firstSent, secondSent] = dispatches().map(sent);
+    expect(firstSent?.turnId).not.toBe(secondSent?.turnId);
+    expect(stops().map(sent)).toEqual([{ turnId: secondSent?.turnId }]);
+  });
+
+  it('sends no stop for an answer that finished, nor when the window goes away mid-answer', async () => {
+    aiOnline();
+    let stream = stubStream();
+    const el = await mount();
+    await ask(el, 'what changed?');
+    stream.emit('chunk', { text: 'Everything.' });
+    stream.emit('done', {});
+    stream.end();
+    await settle(el);
+    expect(stops()).toHaveLength(0);
+
+    // Leaving is not stopping: the Engine keeps the turn running and saves its answer.
+    stream = stubStream();
+    await ask(el, 'and then?');
+    stream.emit('chunk', { text: 'Half' });
+    await settle(el);
+    el.remove();
+    await settle(el);
+    expect(stops()).toHaveLength(0);
+    stream.end();
+    await settle(el);
   });
 });
 

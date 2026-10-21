@@ -5689,6 +5689,7 @@ export class UnifiedChatView extends JfElement {
           ),
           sourceCoverage: readSourceCoverage(it.attributes.claimMatches),
           ...(standalone ? { standaloneQuestion: standalone } : {}),
+          ...(it.attributes.disposition === 'CANCELLED' ? { stopped: true } : {}),
         };
         return this.renderMessage(enriched, idx);
       }
@@ -5949,6 +5950,8 @@ export class UnifiedChatView extends JfElement {
     const coverageNoteText = m.isExtract
       ? null
       : coverageNote(groundingCoverage(marks, m.content, m.coverage ?? null));
+    // A turn the reader stopped before any text came has no answer to show or to frame.
+    const unanswered = m.stopped === true && m.content.trim() === '';
     return html`
       ${floorDivider}
       <div class="message assistant${inheritedClass}" data-item-id=${m.id ?? nothing} data-msg-idx=${idx}>
@@ -5973,8 +5976,10 @@ export class UnifiedChatView extends JfElement {
         ${/* Search Thread S7 — the transform-shaped "unmissable" warning stays PRE-content (its
             established position abutting the extracted result); every other frame's line is now the
             quiet receipt UNDER the answer. Exactly one of the two ever renders per turn. */ ''}
-        ${frame === 'transform' ? this.renderAnswerFrameLine(frame, degraded, receipt, coverageNoteText) : nothing}
-        ${m.isExtract
+        ${frame === 'transform' && !unanswered ? this.renderAnswerFrameLine(frame, degraded, receipt, coverageNoteText) : nothing}
+        ${unanswered
+          ? nothing
+          : m.isExtract
           ? // Tempdoc 565 §15.B — extract is verbatim text: the ONE renderer in `plain` format.
             html`<jf-markdown-block format="plain" .text=${m.content} frame=${frame}></jf-markdown-block>`
           : (m.claims?.length ?? 0) > 0
@@ -5990,7 +5995,10 @@ export class UnifiedChatView extends JfElement {
               ></jf-markdown-block>`
             : // Tempdoc 565 §15.B — the canonical answer block for every other mode (agent/chat).
               html`<jf-markdown-block .text=${m.content} frame=${frame}></jf-markdown-block>`}
-        ${frame !== 'transform' ? this.renderAnswerFrameLine(frame, degraded, receipt, coverageNoteText) : nothing}
+        ${m.stopped
+          ? html`<div class="turn-stopped" role="note" data-testid="chat-turn-stopped">Stopped by you.</div>`
+          : nothing}
+        ${frame !== 'transform' && !unanswered ? this.renderAnswerFrameLine(frame, degraded, receipt, coverageNoteText) : nothing}
         ${(m.sources?.length ?? 0) > 0 || (m.citations?.length ?? 0) > 0
           ? html`<jf-citations-panel
               .sources=${m.sources ?? []}

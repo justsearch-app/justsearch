@@ -327,6 +327,36 @@ describe('UnifiedChatView retrieve-tier degradation banner (ports SearchSurface.
     view.requestUpdate();
   }
 
+  it('M09 names the migration journal refusal in the rendered user notice', async () => {
+    const view = mountView();
+    await view.updateComplete;
+    setVerdict(view, { kind: 'degraded', severity: 'error', reasons: ['index.migration_journal_unavailable'] });
+    await view.updateComplete;
+    const notice = view.shadowRoot!.querySelector('[data-testid="chat-degradation"]');
+    expect(notice?.textContent).toContain('job journal');
+    expect(notice?.textContent).toContain('kept for repair');
+    expect(notice?.querySelector('[data-testid="chat-degradation-remedy-nav"]')?.textContent).toContain('Open Health');
+  });
+
+  it('M26 keeps the journal refusal visible across renders and repeated status updates until resolved', async () => {
+    const view = mountView();
+    await view.updateComplete;
+    const refused = { kind: 'degraded', severity: 'error', reasons: ['index.migration_journal_unavailable'] };
+    setVerdict(view, refused);
+    await view.updateComplete;
+    for (let poll = 0; poll < 3; poll++) {
+      view.requestUpdate();
+      await view.updateComplete;
+      expect(view.shadowRoot!.querySelector('[data-testid="chat-degradation"]')?.textContent ?? '').toContain('job journal');
+      setVerdict(view, { ...refused, reasons: [...refused.reasons] });
+      await view.updateComplete;
+      expect(view.shadowRoot!.querySelector('[data-testid="chat-degradation"]')?.textContent ?? '').toContain('kept for repair');
+    }
+    setVerdict(view, { kind: 'ready', severity: 'info', reasons: [] });
+    await view.updateComplete;
+    expect(view.shadowRoot!.querySelector('[data-testid="chat-degradation"]')).toBeNull();
+  });
+
   it('621/595 — an impairing degradation renders "Semantic search degraded" (warn) while on the retrieve tier', async () => {
     const view = mountView();
     await view.updateComplete;

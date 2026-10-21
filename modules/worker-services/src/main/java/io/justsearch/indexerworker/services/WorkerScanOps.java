@@ -7,14 +7,11 @@ import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.ipc.ScanRootProgress;
 import java.io.IOException;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.PathMatcher;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
@@ -211,7 +208,7 @@ final class WorkerScanOps {
       return terminal;
     }
 
-    List<PathMatcher> excludes = buildExcludeMatchers(request.excludeGlobs(), request.recordedEpoch() != null);
+    var excludes = io.justsearch.configuration.excludes.ExclusionPatterns.fromPatterns(request.excludeGlobs());
     long[] counters = new long[3]; // [walked, admitted, skipped]
     long[] bytes = new long[1];
     String[] currentDir = new String[] {root.toString()};
@@ -270,7 +267,8 @@ final class WorkerScanOps {
               return FileVisitResult.TERMINATE;
             }
             counters[0]++; // walked
-            if (excludedByOwnership(request, file)
+            if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root)
+                || excludedByOwnership(request, file)
                 || (request.recordedEpoch() != null && matchesAny(excludes, root, file))) {
               counters[2]++;
               return FileVisitResult.CONTINUE;
@@ -279,10 +277,6 @@ final class WorkerScanOps {
               throw new IOException("Recorded member is unreadable");
             }
             if (!attrs.isRegularFile() || !Files.isReadable(file)) {
-              counters[2]++;
-              return FileVisitResult.CONTINUE;
-            }
-            if (IngestionSkipPolicy.shouldSkip(file)) {
               counters[2]++;
               return FileVisitResult.CONTINUE;
             }
@@ -485,36 +479,9 @@ final class WorkerScanOps {
     return request.excludedSubtrees().stream().anyMatch(normalized::startsWith);
   }
 
-  private static List<PathMatcher> buildExcludeMatchers(List<String> globs, boolean strict) {
-    if (globs == null || globs.isEmpty()) return List.of();
-    FileSystem fs = FileSystems.getDefault();
-    List<PathMatcher> matchers = new ArrayList<>(globs.size());
-    for (String glob : globs) {
-      if (glob == null || glob.isBlank()) continue;
-      try {
-        matchers.add(fs.getPathMatcher("glob:" + glob.trim()));
-      } catch (IllegalArgumentException ignored) {
-        if (strict) throw new IllegalArgumentException("Invalid recorded scan-exclude glob", ignored);
-        log.debug("Ignoring invalid scan-exclude glob: {}", glob);
-      }
-    }
-    return List.copyOf(matchers);
-  }
-
-  private static boolean matchesAny(List<PathMatcher> matchers, Path root, Path file) {
-    if (matchers.isEmpty()) return false;
-    Path relative;
-    try {
-      relative = root.equals(file) ? file.getFileName() : root.relativize(file);
-    } catch (IllegalArgumentException ignored) {
-      relative = file;
-    }
-    for (PathMatcher matcher : matchers) {
-      if (matcher.matches(relative) || matcher.matches(file)) {
-        return true;
-      }
-    }
-    return false;
+  private static boolean matchesAny(
+      io.justsearch.configuration.excludes.ExclusionPatterns excludes, Path root, Path file) {
+    return excludes.isExcludedPath(root, file);
   }
 
   /**

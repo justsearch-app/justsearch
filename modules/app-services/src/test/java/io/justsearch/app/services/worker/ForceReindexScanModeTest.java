@@ -55,7 +55,7 @@ final class ForceReindexScanModeTest {
             // A non-empty exclude set on BOTH arms. force=false without excludes takes the
             // syncDirectory branch and never scans at all, so this is what makes the two arms
             // differ ONLY in `force` — otherwise the unforced case would prove nothing.
-            () -> ExcludeMatcher.fromPatterns(java.util.List.of("*.tmp"), true),
+            () -> ExcludeMatcher.fromRawJsonStrict("[\"*.tmp\"]", true),
             (rootPath, collection, mode, globs, progress, engineContext) -> {
               scannedMode.set(mode);
               return null;
