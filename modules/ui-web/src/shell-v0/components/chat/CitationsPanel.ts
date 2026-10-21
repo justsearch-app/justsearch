@@ -576,7 +576,8 @@ export class CitationsPanel extends JfElement {
       // the run reported that its grounding pass did not complete — that is a fact the reader can act
       // on. The `!hasCitations` proxy stays the rule for every run that says nothing.
       return this.retrievalMode === 'FULLTEXT_FALLBACK' ||
-        (!hasCitations && !this.groundingIncomplete)
+        (!hasCitations && !this.groundingIncomplete &&
+          !this.sourceCoverage.some((c) => c.windowsScored === 0))
         ? this.renderFlatSources()
         : this.renderTieredSources();
     }

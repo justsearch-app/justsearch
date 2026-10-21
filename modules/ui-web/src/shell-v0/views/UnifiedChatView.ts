@@ -241,6 +241,7 @@ import {
   claimsFromRecord,
   matchesFromRecord,
   readScorer,
+  readSourceCoverage,
 } from '../components/chat/recordEvidence.js';
 import type { CitationSelectDetail, SourceCoverage } from '../components/chat/citationTypes.js';
 // Tempdoc 561 surface tier: the one window is the view for EVERY interaction shape.
@@ -432,30 +433,6 @@ function dedupDegradationCauses(
  */
 function rungLabel(base: string, active: boolean): string {
   return active ? `${base} (current mode)` : base;
-}
-
-/** Tempdoc 836 S2S3-A.1 — read the per-source examination facts off a payload or a record. */
-function readSourceCoverage(payload: unknown): SourceCoverage[] {
-  if (!payload || typeof payload !== 'object') return [];
-  const raw = (payload as { sourceCoverage?: unknown }).sourceCoverage;
-  if (!Array.isArray(raw)) return [];
-  const out: SourceCoverage[] = [];
-  for (const c of raw) {
-    if (!c || typeof c !== 'object') continue;
-    const r = c as Record<string, unknown>;
-    if (
-      typeof r.sourceIndex === 'number' &&
-      typeof r.windowsConsidered === 'number' &&
-      typeof r.windowsScored === 'number'
-    ) {
-      out.push({
-        sourceIndex: r.sourceIndex,
-        windowsConsidered: r.windowsConsidered,
-        windowsScored: r.windowsScored,
-      });
-    }
-  }
-  return out;
 }
 
 export class UnifiedChatView extends JfElement {
