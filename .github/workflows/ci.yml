@@ -297,6 +297,9 @@ jobs:
       - name: Store-recoverability register agrees with the code
         run: node scripts/ci/check-store-recoverability.mjs
 
+      - name: Windows Tauri conformance step fails on either run
+        run: node --test scripts/ci/check-supervisor-conformance-step.test.mjs
+
       - name: Test dead-config scanner (config-surface gate)
         run: node scripts/ci/test-config-surface-dead-config.mjs
 
@@ -1514,9 +1517,12 @@ jobs:
 
       - name: Supervisor conformance (Tauri adapter)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           node scripts/supervisor-conformance/run.mjs --adapter tauri
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/supervisor-conformance/run.mjs --adapter tauri --case fileless-clean-local-restart-is-not-counted --repeat 50
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   # `:modules:system-tests:integrationTest` ran in NO lane until now: ci.yml ran only
   # `:modules:system-tests:test`, and the module's `check` depends on `test` alone
