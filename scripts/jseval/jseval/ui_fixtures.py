@@ -735,6 +735,9 @@ def _status_body(variant: str) -> str:
         return json.dumps(d)
     if variant == "enriching":
         d = json.loads(_BODY_STATUS)
+        # This capture measures confirmed work. Stamp each response when served, rather than
+        # presenting the canonical January 2024 observation as current (S33.4 / N33.3).
+        d["meta"]["workerRpcAtMs"] = int(datetime.now(timezone.utc).timestamp() * 1000)
         core = d["worker"]["core"]
         core["indexState"] = "IDLE"
         core["indexHealthy"] = True
@@ -759,6 +762,8 @@ def _status_body(variant: str) -> str:
         return json.dumps(d)
     if variant == "indexing":
         d = json.loads(_BODY_STATUS)
+        # Keep the active task aggregate confirmed throughout the capture's status polls.
+        d["meta"]["workerRpcAtMs"] = int(datetime.now(timezone.utc).timestamp() * 1000)
         core = d["worker"]["core"]
         core["indexState"] = "INDEXING"
         core["indexHealthy"] = True

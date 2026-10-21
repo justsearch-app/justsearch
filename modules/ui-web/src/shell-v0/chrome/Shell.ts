@@ -619,7 +619,7 @@ export class Shell extends JfElement {
       /* Tempdoc 813 §5c — the rail track reads its width from the ONE --rail-width token
          (tokens.css) instead of an inline literal, so a viewport-docked overlay can reserve the
          same band the rail actually occupies rather than re-deriving it. */
-      grid-template-columns: var(--rail-width) 1fr;
+      grid-template-columns: var(--rail-width) minmax(0, 1fr);
       grid-template-rows: 2.5rem auto 1fr 1.75rem;
       grid-template-areas:
         'topbar topbar'
