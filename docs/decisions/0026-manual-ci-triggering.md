@@ -207,7 +207,7 @@ as §22.2 follow-up 5.
 
 **Decision.** `.github/workflows/ci.yml` gains a `measured-axe` job
 (`Measured axe (advisory)`, `ubuntu-latest`) running `jseval ui-a11y-gate` on
-`pull_request`, `push` to `main`, `merge_group` and `workflow_dispatch` — the
+`push` to `main` and `workflow_dispatch` (current scheduling: ADR-0053) — the
 triggers ADR-0044 already grants that workflow. This adds no trigger and
 touches no self-hosted runner, so the manual-only policy for self-hosted and
 specialty workflows is unchanged.
@@ -239,7 +239,7 @@ an axe rule id. That is a separate judgement, not an oversight.
 The 2026-05-08 amendment's requirement that every workflow expose manual
 dispatch is historical. [ADR-0044](0044-public-hosted-ci-fact-lanes.md) permits
 event-driven public hosted checks; `.github/workflows/cla.yml` handles
-`issue_comment`, `pull_request_target` and `merge_group` without
+`issue_comment` and `pull_request_target` without
 `workflow_dispatch`.
 
 [ADR-0052](0052-weekly-codeql-on-hosted-runners.md) also narrows item 4 of that
@@ -248,3 +248,8 @@ well as `workflow_dispatch`, on hosted runners. Self-hosted workstation workflow
 remain manual. Use `scripts/ci/workflow-signal-policy.v1.json` and its trigger
 check for the per-workflow posture rather than reinstating the historical
 repository-wide ban.
+
+## Amendment 2026-10-21: one PR run
+
+[ADR-0053](0053-one-pr-ci-run-and-squash-auto-merge.md) supersedes the hosted CI event-selection
+and publication rules. Main and dispatch run all slow suites; PRs run their input closure.

@@ -4,6 +4,7 @@
  * baseline are identity-based so advisory swaps cannot cancel through counts.
  */
 
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -20,6 +21,7 @@ import {
   GITHUB_API_VERSION,
   REQUIRED_ADVISORY_TARGETS,
   sha256,
+  packageSpecsFromLockfileText,
   unavailableAdvisoryTargetReason,
 } from '../../../ci/lib/github-advisory-report.mjs';
 import { NPM_AUDIT_CLASSIFICATIONS, aggregateNpmAuditClassifications } from './classifications.mjs';
@@ -93,6 +95,27 @@ export async function enforceNpmAudit(options) {
     }]);
   }
 
+  const prMode = !fixtureMode && (options.eventName ?? process.env.GITHUB_EVENT_NAME) === 'pull_request';
+  const baseSpecs = new Map();
+  if (prMode) {
+    try {
+      const base = options.prBaseSha ?? process.env.PR_BASE_SHA;
+      if (!/^[a-f0-9]{40}$/.test(base ?? '')) throw new Error('PR base commit is missing or invalid');
+      for (const target of REQUIRED_ADVISORY_TARGETS) {
+        let text;
+        try {
+          text = execFileSync('git', ['show', `${base}:${target.lockfile}`], { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+        } catch (error) {
+          throw new Error(`${target.lockfile} at PR base ${base} cannot be read: ${String(error.stderr || error.message).trim()}`);
+        }
+        baseSpecs.set(target.targetId, new Set(packageSpecsFromLockfileText(text)));
+      }
+    } catch (error) {
+      return result('fail', [{ ruleId: 'npm-audit/base-unavailable', level: 'error', uri: reportRel,
+        message: `PR advisory comparison failed: ${error.message}` }]);
+    }
+  }
+
   const declarations = gate.changesetsDir
     ? loadChangesets({
         repoRoot: sourceRoot,
@@ -116,8 +139,9 @@ export async function enforceNpmAudit(options) {
     const baselineMap = liveBaseline.get(target) ?? new Map();
     for (const [id, advisory] of currentMap) {
       if (!trackedSeverities.has(advisory.severity)) continue;
+      if (prMode && advisory.affected.every((entry) => baseSpecs.get(target).has(`${entry.package}@${entry.version}`))) continue;
       const accepted = baselineMap.get(id);
-      if (accepted && severityRank(accepted.severity) >= severityRank(advisory.severity)) continue;
+      if (!prMode && accepted && severityRank(accepted.severity) >= severityRank(advisory.severity)) continue;
       hasRegression = true;
       verdict = 'fail';
       if (classification === 'silent-regression') {

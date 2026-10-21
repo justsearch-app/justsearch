@@ -29,21 +29,21 @@ test('only required hosted gate-mode production commands count', () => {
   assert.equal(check(command + ' --fixture tmp/tree').issues.length, 1);
   assert.equal(check('node scripts/governance/gates/engine-port/enforcer.test.mjs').issues.length, 1);
 });
-test('only the exact merge-queue exclusion retains PR and push production credit', () => {
+test('only exact fail-safe lane conditions retain PR and push production credit', () => {
   const command = 'node scripts/governance/run.mjs --gate engine-port --mode gate';
-  assert.deepEqual(check(command, "    if: github.event_name != 'merge_group'\n").issues, []);
+  assert.deepEqual(check(command, "    if: needs.changes.outputs.services != 'false'\n").issues, []);
   for (const condition of [
     "github.event_name == 'workflow_dispatch'",
     "always() && github.event_name == 'workflow_dispatch'",
     "github.event_name == 'pull_request'",
     "github.event_name != 'push'",
-    "github.event_name != 'merge_group' && false",
+    "needs.changes.outputs.services != 'false' && false",
   ]) assert.equal(check(command, `    if: ${condition}\n`).rows[0].production, false, condition);
 });
 
 test('matrix step exclusion retains production credit only on PRs and pushes', () => {
   const command = 'node scripts/governance/run.mjs --gate engine-port --mode gate';
-  for (const condition of ["github.event_name != 'merge_group'", "always() && github.event_name != 'merge_group'"]) {
+  for (const condition of ["needs.changes.outputs.services != 'false'", "always()"]) {
     assert.deepEqual(check(command + `\n        if: ${condition}`).issues, []);
   }
   for (const condition of ["github.event_name == 'workflow_dispatch'", "github.event_name != 'push'"]) {
@@ -114,7 +114,7 @@ test('snapshot production gates remain enforced through a fail-closed required a
   for (const altered of [
     workflowText.replace('needs: [app-ui-ui, app-ui-services]', 'needs: [app-ui-ui]'),
     workflowText.replace('  app-ui-services:\n', '  app-ui-services:\n    continue-on-error: true\n'),
-    workflowText.replace('test "$SERVICES_RESULT" = success', 'true'),
+    workflowText.replace('[[ "$SERVICES_RESULT" = success || "$SERVICES_RESULT" = skipped ]]', 'true'),
     workflowText.replace(':modules:app-services:exportRegistrySnapshot', ':modules:app-services:classes'),
     workflowText.replace("includes('snapshot-missing')", "includes('ignored')"),
   ]) {

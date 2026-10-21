@@ -38,6 +38,8 @@ const advisory = (id, severity = 'high') => ({
   ghsa_id: id,
   severity,
   html_url: `https://github.com/advisories/${id}`,
+  vulnerabilities: [{ package: { ecosystem: 'npm', name: 'lodash' }, vulnerable_version_range: '< 4.17.21' }],
+  affected: [{ package: 'lodash', version: '4.17.20' }],
 });
 let calls = 0;
 const fetched = await queryGitHubAdvisories(['lodash@4.17.20'], {
@@ -61,6 +63,24 @@ const fetched = await queryGitHubAdvisories(['lodash@4.17.20'], {
 });
 assert.equal(calls, 2, 'a full page must trigger pagination');
 assert.deepEqual(fetched.map((row) => row.ghsa_id), ['GHSA-29MW-WPGM-HMR9', 'GHSA-35JH-R3H4-6JHM']);
+
+assert.deepEqual(fetched[0].affected, [{ package: 'lodash', version: '4.17.20' }]);
+const attributed = await queryGitHubAdvisories(['lodash@4.17.20', 'lodash@4.17.19', 'unrelated@1.0.0'], {
+  fetchImpl: async () => ({ ok: true, json: async () => [advisory('GHSA-35JH-R3H4-6JHM')] }),
+  retries: 0,
+  timeoutSignalFactory: () => undefined,
+});
+assert.deepEqual(attributed[0].affected, [
+  { package: 'lodash', version: '4.17.19' }, { package: 'lodash', version: '4.17.20' },
+], 'retain each queried version of the matching package, never attribute unrelated packages');
+await assert.rejects(queryGitHubAdvisories(['unrelated@1.0.0'], {
+  fetchImpl: async () => ({ ok: true, json: async () => [advisory('GHSA-35JH-R3H4-6JHM')] }),
+  retries: 0, timeoutSignalFactory: () => undefined,
+}), /matches no queried package/);
+assert.match(unavailableAdvisoryTargetReason({
+  available: true, lockfile_sha256: 'a'.repeat(64), package_versions: 1,
+  advisories: [{ ...advisory('GHSA-35JH-R3H4-6JHM'), affected: undefined }],
+}), /no package\/version attribution/);
 
 let retryCalls = 0;
 const retried = await queryGitHubAdvisories(['lodash@4.17.20'], {

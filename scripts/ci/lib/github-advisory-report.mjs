@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export const GITHUB_ADVISORY_REPORT_SCHEMA = 'github-advisory-report.v1';
+export const GITHUB_ADVISORY_REPORT_SCHEMA = 'github-advisory-report.v2';
 export const GITHUB_ADVISORY_PROVIDER = 'github-global-security-advisories';
 export const GITHUB_API_VERSION = '2026-03-10';
 export const REQUIRED_ADVISORY_TARGETS = Object.freeze([
@@ -148,7 +148,20 @@ export async function queryGitHubAdvisories(specs, {
         if (prior && (prior.severity !== advisory.severity || prior.html_url !== advisory.html_url)) {
           throw new Error(`GitHub advisory ${advisory.ghsa_id} changed within one report`);
         }
-        byId.set(advisory.ghsa_id, advisory);
+        if (!Array.isArray(row.vulnerabilities) || !row.vulnerabilities.length) {
+          throw new Error(`GitHub advisory ${advisory.ghsa_id} has no package attribution`);
+        }
+        const names = new Set(row.vulnerabilities.filter((v) => v?.package?.ecosystem === 'npm').map((v) => v.package.name));
+        // No semver library is a declared direct dependency. Conservatively keep
+        // every queried version of the matching package; never silently miss one.
+        const affected = batch.flatMap((spec) => {
+          const at = spec.lastIndexOf('@');
+          const name = spec.slice(0, at);
+          return names.has(name) ? [{ package: name, version: spec.slice(at + 1) }] : [];
+        });
+        if (!affected.length) throw new Error(`GitHub advisory ${advisory.ghsa_id} matches no queried package`);
+        const unique = new Map([...(prior?.affected ?? []), ...affected].map((entry) => [`${entry.package}@${entry.version}`, entry]));
+        byId.set(advisory.ghsa_id, { ...advisory, affected: [...unique.values()].sort((a, b) => `${a.package}@${a.version}`.localeCompare(`${b.package}@${b.version}`)) });
       }
       if (rows.length < 100) break;
       if (page === maxPages) throw new Error(`GitHub advisory pagination exceeded ${maxPages} pages`);
@@ -169,6 +182,14 @@ export function unavailableAdvisoryTargetReason(row) {
       const normalized = normalizeAdvisory(advisory);
       if (ids.has(normalized.ghsa_id)) return `duplicate advisory ${normalized.ghsa_id}`;
       ids.add(normalized.ghsa_id);
+      if (!Array.isArray(advisory.affected) || !advisory.affected.length) return `${normalized.ghsa_id} has no package/version attribution`;
+      const specs = new Set();
+      for (const entry of advisory.affected) {
+        if (typeof entry?.package !== 'string' || !entry.package || typeof entry.version !== 'string' || !entry.version) return `${normalized.ghsa_id} has invalid package/version attribution`;
+        const spec = `${entry.package}@${entry.version}`;
+        if (specs.has(spec)) return `${normalized.ghsa_id} has duplicate package/version attribution`;
+        specs.add(spec);
+      }
     }
   } catch (error) {
     return error instanceof Error ? error.message : String(error);

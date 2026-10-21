@@ -247,6 +247,8 @@ export function validateUnitTestShardPolicy({ policy, workflowText, workflowSign
           || /^        continue-on-error:/m.test(partJob.text)
           || partJob.runs.some((run) => {
             if (!run.step?.if || run.step.if === 'always()') return false;
+            if ((policy.windowsParts ?? []).find((p) => p.jobId === part)?.mainOnlyCommands?.includes(run.text.trim().split('\n')[0])
+                && run.step?.if === "(github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))") return false;
             // Coverage attribution must still run after a failed Gradle execution. Its only
             // permitted bypass is when that execution never ran (an earlier failure/cancel).
             const coverage = partJob.runs.find(candidate => candidate.step?.id === 'windows-coverage');

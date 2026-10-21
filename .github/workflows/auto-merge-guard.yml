@@ -1,0 +1,28 @@
+name: Auto-merge head guard
+on:
+  pull_request_target:
+    types: [synchronize]
+permissions:
+  pull-requests: write
+  contents: read
+jobs:
+  disable-auto-merge:
+    name: Require enqueue for the new head
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      # This workflow never checks out or executes pull-request code.
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              ...context.repo, pull_number: context.issue.number
+            });
+            if (pr.auto_merge) {
+              await github.graphql(`mutation($id: ID!) {
+                disablePullRequestAutoMerge(input: {pullRequestId: $id}) { pullRequest { number } }
+              }`, { id: pr.node_id });
+              core.info(`Disabled auto-merge for PR #${pr.number}: its head changed; run enqueue again.`);
+            } else {
+              core.info(`PR #${pr.number}: auto-merge is already disabled.`);
+            }

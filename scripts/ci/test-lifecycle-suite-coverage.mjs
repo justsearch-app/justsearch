@@ -15,7 +15,7 @@ test('model-free lifecycle task has a required hosted job and a matching explici
     /(?:^|\s):modules:system-tests:lifecycleIntegrationTest(?:\s|$)/.test(r.text)));
   assert.ok(job, 'lifecycleIntegrationTest must be scheduled in hosted CI');
   assert.equal(job['runs-on'], 'windows-latest');
-  assert.equal(job.if, "github.event_name != 'merge_group'", 'lifecycle coverage runs outside the merge queue');
+  assert.equal(job.if, "needs.changes.outputs.lifecycle != 'false'", 'lifecycle coverage uses fail-safe input selection');
   assert.notEqual(job['continue-on-error'], 'true');
   assert.ok(signal.workflows.find((w) => w.name === 'CI').requiredStatusChecks.includes(job.name));
   const command = job.runs.find((r) => r.text.includes(':modules:system-tests:lifecycleIntegrationTest'));
@@ -64,37 +64,19 @@ test('both installed Engine tiers always collect and upload additional child log
   }
 });
 
-test('CI does full required work outside the queue and advisory work only on dispatch', () => {
+test('PRs scope fixed jobs and main runs every slow tier', () => {
   const jobs = load(workflow).jobs;
-  const skipQueue = "github.event_name != 'merge_group'";
-  for (const id of ['jseval-suite', 'license-and-notices', 'app-ui-ui', 'app-ui-services',
+  const mainOnly = "github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')";
+  for (const id of ['jseval-suite', 'license-and-notices', 'build', 'app-ui-ui', 'app-ui-services',
+    'unit-tests-search-worker', 'unit-tests-platform-contracts', 'shell-rust-tests', 'shell-rust-tests-linux',
     'windows-native-node', 'windows-native-contracts', 'lifecycle-integration-tests']) {
-    assert.equal(jobs[id].if, skipQueue, id);
+    assert.equal(jobs[id].needs, 'changes', id);
+    assert.match(jobs[id].if, /^needs\.changes\.outputs\.[a-z]+ != 'false'$/, id);
+    assert.ok(!jobs[id].strategy, `${id}: literal check names must report even when skipped`);
   }
-  for (const id of ['app-ui', 'windows-native-tests']) {
-    assert.equal(jobs[id].if, `always() && ${skipQueue}`, id);
-  }
-  for (const id of ['public-claims', 'build', 'secret-scan']) assert.equal(jobs[id].if, undefined, id);
-  for (const id of ['measured-axe', 'integration-tests']) {
-    assert.equal(jobs[id].if, "github.event_name == 'workflow_dispatch'", id);
-  }
-  assert.equal(jobs['ci-walltime'].if, "always() && github.event_name == 'workflow_dispatch'");
+  for (const id of ['app-ui', 'windows-native-tests', 'secret-scan', 'public-claims']) assert.equal(jobs[id].if, 'always()', id);
+  for (const id of ['measured-axe', 'integration-tests']) assert.equal(jobs[id].if, mainOnly, id);
+  assert.notEqual(jobs['integration-tests']['continue-on-error'], true);
+  assert.equal(jobs['ci-walltime'].if, `always() && (${mainOnly})`);
   assert.ok(jobs['ci-walltime'].needs.includes('integration-tests'));
-  const originalConditions = {
-    'Report unit-test attribution': 'always()',
-    'Report unit-test advisory budget': 'always()',
-    'Upload unit-test attribution': 'always()',
-    'Linux shell build dependencies': "runner.os == 'Linux'",
-    'Stage Linux process-lifetime helper': "runner.os == 'Linux'",
-    'Build the supervisor conformance driver': "runner.os == 'Windows'",
-    'Supervisor conformance (Tauri adapter)': "runner.os == 'Windows'",
-  };
-  for (const id of ['unit-tests', 'shell-rust-tests']) {
-    assert.equal(jobs[id].if, undefined, `${id}: job must expand its matrix check names on the queue`);
-    assert.ok(jobs[id].strategy.matrix);
-    for (const step of jobs[id].steps) {
-      const original = originalConditions[step.name] ? `${originalConditions[step.name]} && ` : '';
-      assert.equal(step.if, original + skipQueue, `${id}/${step.name}: no work on the queue`);
-    }
-  }
 });

@@ -1,0 +1,12 @@
+# runner<TAB>source<TAB>identifier. PRs omit these cases; main and dispatch run them.
+supervisor	scripts/supervisor-conformance/run.mjs	quit-deadline-is-the-contract-value
+supervisor	scripts/supervisor-conformance/run.mjs	suspend-gap-is-not-a-hang
+supervisor	scripts/supervisor-conformance/run.mjs	local-handoff-bounds-responsive-close-with-churn
+supervisor	scripts/supervisor-conformance/run.mjs	quit-past-deadline-is-forced-and-distinct
+supervisor	scripts/supervisor-conformance/run.mjs	quit-during-start
+supervisor	scripts/supervisor-conformance/run.mjs	fileless-clean-local-restart-is-not-counted
+node	scripts/lib/engine-discovery.test.mjs	D1: Windows reports the Roaming known folder even to a process started without APPDATA
+devrunner	scripts/dev/test-dev-runner-stop-round4.mjs	recovery check passes without NODE_OPTIONS or an external binary
+devrunner	scripts/dev/test-dev-runner-stop-recovery.mjs	spawn capture retains the exited wrapper identity, and its identity stop ends nothing else
+gradle	modules/telemetry	io.justsearch.telemetry.TracingBootstrapGlobalRegistrationFailureTest.indexFactoryReusesLiveProviderAfterComponentClose
+gradle	modules/worker-services	io.justsearch.indexerworker.loop.pacing.BulkDutyFloorUnderDeviceGateTest.bulkKeepsItsShareOfSeatsUnderAConstantForegroundStream

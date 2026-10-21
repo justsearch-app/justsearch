@@ -424,7 +424,7 @@ console.log('test-report-ci-evidence-digest: PASS');
   assert.ok(!report.warnings.some((w) => /windows-native-node|undefined-attempt/.test(w)));
 }
 
-// Queue skips have no test artifacts; a job that did work still needs evidence.
+// Unselected lane skips have no test artifacts; a job that did work still needs evidence.
 {
   const skippedJobs = [
     job('Unit tests (app-ui-ui)', 'skipped', 1, 1),
@@ -434,7 +434,7 @@ console.log('test-report-ci-evidence-digest: PASS');
       step('Tests', 'skipped', 1, 1), step('Complete job', 'success', 1, 1),
     ]),
   ];
-  const check = (jobs) => buildDigest({ policy, run: { ...greenRun, event: 'merge_group' }, jobsDoc: { jobs } });
+  const check = (jobs) => buildDigest({ policy, run: { ...greenRun, event: 'pull_request' }, jobsDoc: { jobs } });
   const report = check(skippedJobs);
   assert.equal(report.unitAttribution.length, 0);
   assert.equal(report.partEvidence.length, 0);

@@ -160,12 +160,12 @@ console.log('test-verify-unit-test-shard-policy: PASS');
 `;
   const check = (workflowText) => validate({ policyDoc: p, workflowText });
   assert.equal(check(text).ok, true, check(text).issues.join('\n'));
-  const lightQueue = text.replace('    if: always()\n', "    if: always() && github.event_name != 'merge_group'\n")
-    .replace('  one:\n', "  one:\n    if: github.event_name != 'merge_group'\n")
-    .replace('  two:\n', "  two:\n    if: github.event_name != 'merge_group'\n");
-  assert.equal(check(lightQueue).ok, true, check(lightQueue).issues.join('\n'));
-  for (const condition of ["github.event_name == 'workflow_dispatch'", "github.event_name != 'push'", "github.event_name != 'merge_group' && false"]) {
-    assert.equal(check(lightQueue.replaceAll("github.event_name != 'merge_group'", condition)).ok, false, condition);
+  const scoped = text.replace('    if: always()\n', "    if: always()\n")
+    .replace('  one:\n', "  one:\n    if: needs.changes.outputs.windows != 'false'\n")
+    .replace('  two:\n', "  two:\n    if: needs.changes.outputs.windows != 'false'\n");
+  assert.equal(check(scoped).ok, true, check(scoped).issues.join('\n'));
+  for (const condition of ["github.event_name == 'workflow_dispatch'", "github.event_name != 'push'", "needs.changes.outputs.windows != 'false' && false"]) {
+    assert.equal(check(scoped.replaceAll("needs.changes.outputs.windows != 'false'", condition)).ok, false, condition);
   }
   for (const altered of [
     text.replace('needs: [one, two]', 'needs: [one]'),

@@ -3,7 +3,7 @@
   "kind": "adr-premise-probe-register.v1",
   "tempdoc": 884,
   "note": "ADR premise probes. An ADR's load-bearing premise is a claim about the code; a probe is the cheapest mechanical restatement of that claim, and it fails when the code drifts away from the decision. Enforced by the adr-coverage kernel gate (rule adr-coverage/probe-failed). Referenced from each ADR's frontmatter as 'probes: [<id>]'. When a probe fails, the fix is to re-examine and amend the ADR per docs/decisions/README.md - never to edit the probe until it passes. Kinds in preference order (tempdoc 884 design decision 2): test/gate first (a named test or an existing enforcement already IS the probe), then absence probes, then counts - and counts only where the premise IS the count (ADR-0015 is the one).",
-  "amendmentProcedure": "docs/decisions/README.md § How to re-examine an ADR",
+  "amendmentProcedure": "docs/decisions/README.md \u00a7 How to re-examine an ADR",
   "reviewStaleDays": 183,
   "probes": [
     {
@@ -18,7 +18,7 @@
     {
       "id": "adr-0049-engine-port-boundary",
       "adr": "0049",
-      "premise": "Only the Engine composition root, the index half itself and the Lucene adapters may reach into the index half’s internals. This is the process half of ADR-0001 invariant 1, re-expressed as a module boundary now that there is no process boundary to carry it: rule 6b permits io.justsearch.app.engine.., io.justsearch.indexerworker.. and io.justsearch.adapters.. to depend on io.justsearch.indexerworker.{server,services,loop}.., and nothing else. Losing it means application code can call the index half directly, which is the drift one address space makes possible and two did not.",
+      "premise": "Only the Engine composition root, the index half itself and the Lucene adapters may reach into the index half\u2019s internals. This is the process half of ADR-0001 invariant 1, re-expressed as a module boundary now that there is no process boundary to carry it: rule 6b permits io.justsearch.app.engine.., io.justsearch.indexerworker.. and io.justsearch.adapters.. to depend on io.justsearch.indexerworker.{server,services,loop}.., and nothing else. Losing it means application code can call the index half directly, which is the drift one address space makes possible and two did not.",
       "kind": "test",
       "file": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/LayeringEnforcementTest.java",
       "test": "io.justsearch.app.launcher.LayeringEnforcementTest#onlyEngineAndWorkerMayDependOnWorkerInternals",
@@ -126,7 +126,7 @@
           ]
         }
       ],
-      "note": "Two alternatives, one premise across a planned migration. In C0 alternative 1 proves the functional configuration and query machinery are absent while the physical entity_*_text fields remain for C2. After C2, alternative 2 additionally proves catalog absence. The protobuf/status entityBoost compatibility tombstone is deliberately outside the scanned paths and remains field 9, always projected as 0.0. This is NOT a probe that gives a failure a second chance: BOTH failing means query machinery returned while the physical fields exist — exactly the drift to catch."
+      "note": "Two alternatives, one premise across a planned migration. In C0 alternative 1 proves the functional configuration and query machinery are absent while the physical entity_*_text fields remain for C2. After C2, alternative 2 additionally proves catalog absence. The protobuf/status entityBoost compatibility tombstone is deliberately outside the scanned paths and remains field 9, always projected as 0.0. This is NOT a probe that gives a failure a second chance: BOTH failing means query machinery returned while the physical fields exist \u2014 exactly the drift to catch."
     },
     {
       "id": "adr-0008-settings-reset-surfaced",
@@ -247,14 +247,14 @@
     {
       "id": "adr-0024-per-user-install",
       "adr": "0024",
-      "premise": "The NSIS bundle installs per-user (currentUser), non-elevated — the decision that makes post-install model download into LocalAppData work without UAC.",
+      "premise": "The NSIS bundle installs per-user (currentUser), non-elevated \u2014 the decision that makes post-install model download into LocalAppData work without UAC.",
       "kind": "json-path",
       "file": "modules/shell/src-tauri/tauri.windows.conf.json",
       "pointer": "/bundle/windows/nsis/installMode",
       "expect": {
         "equals": "currentUser"
       },
-      "note": "This probe covers the CONFIG assertion only. scripts/ci/check-installer-execution-level.mjs — uninvoked when 884 §F row 7 routed it, now wired into ci.yml (config half + its unit test) and build-installer.yml's installer_verify job (artifact half) — additionally byte-scans the BUILT installer's embedded manifest, which is the half this json-path cannot see: an installer-hooks.nsh change can leave installMode correct while the shipped setup.exe still requests elevation."
+      "note": "This probe covers the CONFIG assertion only. scripts/ci/check-installer-execution-level.mjs \u2014 uninvoked when 884 \u00a7F row 7 routed it, now wired into ci.yml (config half + its unit test) and build-installer.yml's installer_verify job (artifact half) \u2014 additionally byte-scans the BUILT installer's embedded manifest, which is the half this json-path cannot see: an installer-hooks.nsh change can leave installMode correct while the shipped setup.exe still requests elevation."
     },
     {
       "id": "adr-0026-workflow-triggers-checked",
@@ -285,7 +285,7 @@
     {
       "id": "adr-0029-bridge-idiom-present",
       "adr": "0029",
-      "premise": "ADR-0029 is a criteria ADR: it tells the next MetricCatalog adopter which of TWO shipped idioms to pick. The bridge idiom must still exist for that choice to be real — a domain-owned *TelemetryEvents interface implemented by an adapter in a module that may depend on the catalog package. The three shipped bridge instances are WorkerLuceneTelemetryAdapter, OrtSessionTelemetryAdapter and EmbeddingTelemetry.",
+      "premise": "ADR-0029 is a criteria ADR: it tells the next MetricCatalog adopter which of TWO shipped idioms to pick. The bridge idiom must still exist for that choice to be real \u2014 a domain-owned *TelemetryEvents interface implemented by an adapter in a module that may depend on the catalog package. The three shipped bridge instances are WorkerLuceneTelemetryAdapter, OrtSessionTelemetryAdapter and EmbeddingTelemetry.",
       "kind": "grep-present",
       "pattern": "class \\w+ implements [\\w.]*TelemetryEvents\\b",
       "paths": [
@@ -294,12 +294,12 @@
         "modules/worker-services/src/main/java/io/justsearch/indexerworker/embed/EmbeddingTelemetry.java"
       ],
       "expect": 3,
-      "note": "The count is the named bridge population, not a growth ratchet: `paths` lists exactly the three files ADR-0029 cites as its bridge instances, so a FOURTH bridge elsewhere in the tree does not move this number. It fails when one of the three stops implementing a *TelemetryEvents interface — i.e. when the bridge idiom is being converted away, which is the drift that makes a two-idiom criteria ADR moot."
+      "note": "The count is the named bridge population, not a growth ratchet: `paths` lists exactly the three files ADR-0029 cites as its bridge instances, so a FOURTH bridge elsewhere in the tree does not move this number. It fails when one of the three stops implementing a *TelemetryEvents interface \u2014 i.e. when the bridge idiom is being converted away, which is the drift that makes a two-idiom criteria ADR moot."
     },
     {
       "id": "adr-0029-direct-emit-idiom-present",
       "adr": "0029",
-      "premise": "The other half of ADR-0029's choice: the direct-emit facade idiom — a thin Telemetry class holding catalog instruments directly, implementing NO events interface. The two shipped instances are AgentTelemetry (over AgentMetricCatalog + GenAiMetricCatalog) and IpcTelemetry (over IpcMetricCatalog).",
+      "premise": "The other half of ADR-0029's choice: the direct-emit facade idiom \u2014 a thin Telemetry class holding catalog instruments directly, implementing NO events interface. The two shipped instances are AgentTelemetry (over AgentMetricCatalog + GenAiMetricCatalog) and IpcTelemetry (over IpcMetricCatalog).",
       "kind": "grep-present",
       "pattern": "final class (AgentTelemetry|IpcTelemetry) \\{",
       "paths": [
@@ -307,7 +307,7 @@
         "modules/app-services/src/main/java/io/justsearch/app/services/worker/IpcTelemetry.java"
       ],
       "expect": 2,
-      "note": "The count is the named direct-emit population, not a growth ratchet: `paths` lists exactly the two files ADR-0029 cites, so a third direct-emit facade elsewhere does not move it. The literal `{` after the class name is the discriminator — converting either class to the bridge idiom (`... implements XxxTelemetryEvents {`) drops the count and fails the probe, which is exactly when a two-idiom criteria ADR should be re-read."
+      "note": "The count is the named direct-emit population, not a growth ratchet: `paths` lists exactly the two files ADR-0029 cites, so a third direct-emit facade elsewhere does not move it. The literal `{` after the class name is the discriminator \u2014 converting either class to the bridge idiom (`... implements XxxTelemetryEvents {`) drops the count and fails the probe, which is exactly when a two-idiom criteria ADR should be re-read."
     },
     {
       "id": "adr-0030-consult-region-present",
@@ -333,7 +333,7 @@
     {
       "id": "adr-0036-observed-happening-gate",
       "adr": "0036",
-      "premise": "Resource carries a typed Category axis, and operator-trace data is not Resource truth — the boundary is gate-enforced.",
+      "premise": "Resource carries a typed Category axis, and operator-trace data is not Resource truth \u2014 the boundary is gate-enforced.",
       "kind": "gate",
       "gate": "observed-happening"
     },
@@ -384,7 +384,7 @@
     {
       "id": "adr-0039-one-contract-category",
       "adr": "0039",
-      "premise": "Narrowed by the ADR's 2026-09-02 amendment: ADR-0039 decides the contract substrate for exactly the one Category that exists, wire. The plugin-SDK, catalog and registry-serialization Categories its Decision section names were never registered and are not decided by the ADR. A second entry in /categories reopens it — the Category must be decided here before it is registered.",
+      "premise": "Narrowed by the ADR's 2026-09-02 amendment: ADR-0039 decides the contract substrate for exactly the one Category that exists, wire. The plugin-SDK, catalog and registry-serialization Categories its Decision section names were never registered and are not decided by the ADR. A second entry in /categories reopens it \u2014 the Category must be decided here before it is registered.",
       "kind": "json-path",
       "file": "contracts/registry.v1.json",
       "pointer": "/categories",
@@ -445,7 +445,7 @@
     {
       "id": "adr-0045-agent-enqueue-validated",
       "adr": "0045",
-      "premise": "The repository-owned agent enqueue gateway validates the live public squash and managed review records before requesting the merge queue, and its fail-closed regression stays invoked by hosted CI.",
+      "premise": "The repository-owned agent enqueue gateway validates the live public squash and managed review records before enabling squash auto-merge, and its fail-closed regression stays invoked by hosted CI.",
       "kind": "gate",
       "script": "scripts/dev/run-gh.test.mjs"
     },
@@ -520,7 +520,7 @@
     {
       "id": "adr-0047-ladder-policy-test",
       "adr": "0047",
-      "premise": "The rung the Head contributes at ordinal 150 and the rung LlamaServerOps actually launches are the same number, and the backend (GPU layers vs -ngl 0) is what selects the top rung. ContextWindowPolicyTest#autoTopRungByBackend pins that identity. HONEST LIMIT: kind 'test' checks only that the file still declares the member — a gutted body satisfies it; the sibling probe adr-0047-fit-off-explicit and the exact-argv assertion in LlamaServerLaunchFlagsTest are what pin behaviour.",
+      "premise": "The rung the Head contributes at ordinal 150 and the rung LlamaServerOps actually launches are the same number, and the backend (GPU layers vs -ngl 0) is what selects the top rung. ContextWindowPolicyTest#autoTopRungByBackend pins that identity. HONEST LIMIT: kind 'test' checks only that the file still declares the member \u2014 a gutted body satisfies it; the sibling probe adr-0047-fit-off-explicit and the exact-argv assertion in LlamaServerLaunchFlagsTest are what pin behaviour.",
       "kind": "test",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ContextWindowPolicyTest.java",
       "test": "io.justsearch.app.inference.ContextWindowPolicyTest#autoTopRungByBackend"
@@ -528,14 +528,14 @@
     {
       "id": "adr-0047-budgets-are-window-fractions",
       "adr": "0047",
-      "premise": "Every prompt-side budget is min(fraction x inputBudget, cap) computed per request from the LIVE window — not a constant, and not a static final resolved at class-init. ContextBudget is the single authority; the four capped accessors (section target, external context, read page, tool result) each derive from inputBudget.",
+      "premise": "Every prompt-side budget is min(fraction x inputBudget, cap) computed per request from the LIVE window \u2014 not a constant, and not a static final resolved at class-init. ContextBudget is the single authority; the four capped accessors (section target, external context, read page, tool result) each derive from inputBudget.",
       "kind": "grep-present",
       "pattern": "capped\\(inputBudget\\s*/",
       "paths": [
         "modules/core/src/main/java/io/justsearch/core/util/ContextBudget.java"
       ],
       "expect": 4,
-      "note": "expect 4 is the population, not a growth ratchet: there are exactly four capped fractions in the design table (ADR-0047 section 6). The uncapped fifth quantity, hierarchicalThreshold(), IS the input budget and so has no 'capped(' call — adding a fifth CAPPED budget is a design change that should re-open this ADR's table, which is why the count is pinned rather than left open."
+      "note": "expect 4 is the population, not a growth ratchet: there are exactly four capped fractions in the design table (ADR-0047 section 6). The uncapped fifth quantity, hierarchicalThreshold(), IS the input budget and so has no 'capped(' call \u2014 adding a fifth CAPPED budget is a design change that should re-open this ADR's table, which is why the count is pinned rather than left open."
     },
     {
       "id": "adr-0047-no-window-blind-threshold",
@@ -576,7 +576,7 @@
     {
       "id": "adr-0048-no-eval-breath-hold-hatch",
       "adr": "0048",
-      "premise": "The eval-only escape hatch justsearch.eval.disable_breath_holding was deleted with the pause. Its return would mean measurement and production diverge again — and 885 [R1] showed the hatch could never even reach the Worker, so it measured nothing.",
+      "premise": "The eval-only escape hatch justsearch.eval.disable_breath_holding was deleted with the pause. Its return would mean measurement and production diverge again \u2014 and 885 [R1] showed the hatch could never even reach the Worker, so it measured nothing.",
       "kind": "grep-absent",
       "pattern": "disable_breath_holding",
       "paths": [
@@ -588,7 +588,7 @@
     {
       "id": "adr-0048-chaos-witness",
       "adr": "0048",
-      "premise": "The duty-cycle claim is a live property, not a stubbed one: indexing must be throttled rather than stopped while real foreground searches are in flight, and status/health polling must not throttle it at all. Retargeted at lane F stage A item A12 — the witness kept its subject and both arms, and moved from ChaosSuiteTest$TimeLordTests (an opt-in systemTest tier that had been unreachable since item A9 deleted the gRPC server the spawned Worker published a port on) to a test that composes the same index half in-process and runs on every build. The witness is stronger, not weaker: in one JVM it can also assert the gauge itself (ForegroundLoad.startedTotal), which the wire test could not see.",
+      "premise": "The duty-cycle claim is a live property, not a stubbed one: indexing must be throttled rather than stopped while real foreground searches are in flight, and status/health polling must not throttle it at all. Retargeted at lane F stage A item A12 \u2014 the witness kept its subject and both arms, and moved from ChaosSuiteTest$TimeLordTests (an opt-in systemTest tier that had been unreachable since item A9 deleted the gRPC server the spawned Worker published a port on) to a test that composes the same index half in-process and runs on every build. The witness is stronger, not weaker: in one JVM it can also assert the gauge itself (ForegroundLoad.startedTotal), which the wire test could not see.",
       "kind": "test",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForegroundPacingTest.java",
       "test": "io.justsearch.app.engine.EngineForegroundPacingTest#indexingRunsAtAReducedDutyUnderForegroundSearchLoad"
@@ -600,7 +600,7 @@
       "kind": "test",
       "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ForegroundLoadGateTest.java",
       "test": "io.justsearch.app.engine.ForegroundLoadGateTest#normalExceptionCancellationAndErrorAlwaysBalanceInteractiveWork",
-      "note": "RETARGETED, not weakened, by lane F stage A item A9 (2026-09-07). The premise is unchanged and is now MORE true: ADR-0048 predicted that the interceptor was the throwaway adapter and that the gauge would survive the Head/Worker merge, and A9 is where the adapter was thrown away. The named file moved with the producer — ForegroundLoadInterceptorTest went with the interceptor; ForegroundLoadGateTest pins the same balance property (ok / exception / cancellation / Error, plus never-negative under concurrency) on ForegroundLoadGate, which is now the gauge's only producer. Per this register's own amendment rule the probe was not edited to make a violation pass: the violation is that the pin's SUBJECT was deleted by a decision this ADR anticipated. 2026-09-09 amendment: Re-examined against ForegroundLoadGate and its current tests after C1 replaced the operation-name predicate with explicit EngineContext urgency and work ownership. The former method was replaced; the normal/error/cancel/Error assertions remain, and separate probes pin both survival axes and durable held lifetime. The actual Engine producer probe remains unchanged."
+      "note": "RETARGETED, not weakened, by lane F stage A item A9 (2026-09-07). The premise is unchanged and is now MORE true: ADR-0048 predicted that the interceptor was the throwaway adapter and that the gauge would survive the Head/Worker merge, and A9 is where the adapter was thrown away. The named file moved with the producer \u2014 ForegroundLoadInterceptorTest went with the interceptor; ForegroundLoadGateTest pins the same balance property (ok / exception / cancellation / Error, plus never-negative under concurrency) on ForegroundLoadGate, which is now the gauge's only producer. Per this register's own amendment rule the probe was not edited to make a violation pass: the violation is that the pin's SUBJECT was deleted by a decision this ADR anticipated. 2026-09-09 amendment: Re-examined against ForegroundLoadGate and its current tests after C1 replaced the operation-name predicate with explicit EngineContext urgency and work ownership. The former method was replaced; the normal/error/cancel/Error assertions remain, and separate probes pin both survival axes and durable held lifetime. The actual Engine producer probe remains unchanged."
     },
     {
       "id": "adr-0048-foreground-urgency-is-explicit",
@@ -658,6 +658,13 @@
       "kind": "test",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/EngineObserverPacingTest.java",
       "test": "io.justsearch.ui.api.EngineObserverPacingTest#observerRequestsThroughRealFiltersNeverStartForegroundWork"
+    },
+    {
+      "id": "adr-0053-one-run-policy",
+      "adr": "0053",
+      "premise": "Required names report on scoped PRs; main keeps running CI and runs every slow tier; validated auto-merge is guarded after a head change.",
+      "kind": "gate",
+      "script": "scripts/ci/one-run-policy.test.mjs"
     }
   ]
 }

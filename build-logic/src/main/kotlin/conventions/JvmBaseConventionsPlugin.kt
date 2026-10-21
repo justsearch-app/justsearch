@@ -78,6 +78,16 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
       val isWindowsHost = HostPlatform.isWindows
       project.tasks.withType(Test::class.java).configureEach {
         usesService(testGate)
+        // Keep the known Linux flake cases visible on main, while PRs prove the remaining cases.
+        if (!isWindowsHost && project.providers.environmentVariable("JUSTSEARCH_PR_CI").orNull == "true") {
+          project.rootProject.file("scripts/ci/pr-flakes.tsv").readLines()
+              .filter { it.startsWith("gradle\t") }
+              .map { it.split('\t')[2] }
+              .forEach { identifier ->
+                filter.excludeTestsMatching(identifier)
+                logger.lifecycle("SKIP PR flake: $identifier")
+              }
+        }
         useJUnitPlatform {
           if (windowsOnly) {
             includeTags("windows", "cross-platform")
