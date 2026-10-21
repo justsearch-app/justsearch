@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.server;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -18,7 +19,6 @@ import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
 import io.justsearch.indexerworker.loop.SourceContentHash;
-import io.justsearch.indexerworker.loop.SourcePresence;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
@@ -28,6 +28,7 @@ import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -317,7 +318,8 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
   }
 
   // round 6, rule 3: an outcome that settles nothing is not re-admitted for the same file
-  // state; a changed file or a restart admits it once more
+  // state; a changed file admits it once more. Round 9: a restart does not, since the queue row
+  // records the admission.
   @Test
   void anUnsettledOutcomeIsAdmittedOncePerFileState() throws Exception {
     try (var fixture = new Fixture(temp, "original A source")) {
@@ -344,7 +346,8 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
       assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount());
       fixture.restart();
       assertFalse(fixture.drain());
-      fixture.assertQueuedOnA();
+      assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(),
+          "a restart keeps the admission of the same file state");
     }
   }
 
@@ -495,17 +498,121 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
     }
   }
 
+  // P1 (round 9): only a confirmed path state settles. The accepted new file's folder is
+  // replaced by an unreadable one, with a folder at the file's path: uncertainty, never a delete.
+  @Test
+  void aFolderSeenThroughAnUnreadableReplacedFolderSettlesNothing() throws Exception {
+    try (var fixture = new Fixture(temp, "accepted new file", "volume")) {
+      fixture.forgetOnA();
+      fixture.capture();
+      fixture.admitOnGreen();
+      fixture.retire();
+      Path folder = fixture.file.getParent();
+      Path away = temp.resolve("volume-away");
+      Files.move(folder, away);
+      Files.createDirectories(fixture.file);
+      Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("--x------"));
+      try {
+        assumeFalse(Files.isReadable(folder), "this user can read any folder");
+        assertTrue(Files.isDirectory(fixture.file), "a folder stands at the file's path");
+        assertFalse(fixture.drain(), "a path seen through an unreadable folder proves nothing");
+        assertFalse(fixture.drain(), "it stays unproved");
+        assertEquals(1, fixture.journalSize(), "the accepted file stays owed to A");
+        assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(),
+            "nothing is admitted on uncertainty");
+      } finally {
+        Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("rwx------"));
+        Files.delete(fixture.file);
+        Files.delete(folder);
+        Files.move(away, folder);
+      }
+      assertFalse(fixture.drain(), "the returned file gets its admission on A");
+      fixture.assertQueuedOnA();
+      fixture.aWriterCommitsTheFile();
+      assertTrue(fixture.drain(), "A holds the accepted bytes");
+      assertEquals(0, fixture.journalSize());
+    }
+  }
+
+  // P1 (round 9): under a watched root, every folder from the root down to the path must be
+  // readable for its state to count. An unreadable subfolder hides what is at the path.
+  @Test
+  void aFolderSeenThroughAnUnreadableSubfolderOfTheRootSettlesNothing() throws Exception {
+    try (var fixture = new Fixture(temp, "accepted new file", "root/sub")) {
+      Path root = temp.resolve("root");
+      Path sub = fixture.file.getParent();
+      fixture.forgetOnA();
+      fixture.capture();
+      fixture.admitOnGreenWithin(root);
+      fixture.retire();
+      Path away = temp.resolve("sub-away");
+      Files.move(sub, away);
+      Files.createDirectories(fixture.file);
+      Files.setPosixFilePermissions(sub, PosixFilePermissions.fromString("--x------"));
+      try {
+        assumeFalse(Files.isReadable(sub), "this user can read any folder");
+        assertFalse(fixture.drain(), "the root vouches, but the subfolder cannot be read");
+        assertEquals(1, fixture.journalSize(), "the accepted file stays owed to A");
+        assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(),
+            "nothing is admitted on uncertainty");
+      } finally {
+        Files.setPosixFilePermissions(sub, PosixFilePermissions.fromString("rwx------"));
+        Files.delete(fixture.file);
+        Files.delete(sub);
+        Files.move(away, sub);
+      }
+      assertFalse(fixture.drain(), "the returned file gets its admission on A");
+      fixture.assertQueuedOnA();
+      fixture.aWriterCommitsTheFile();
+      assertTrue(fixture.drain(), "A holds the accepted bytes");
+      assertEquals(0, fixture.journalSize());
+    }
+  }
+
+  // P2 (round 9): a restart keeps an existing admission for the same file state: the same job
+  // and the same retry deadline. The queue row is the record, so a new process rebuilds it.
+  @Test
+  void aRestartKeepsTheBackedOffAdmissionOfAnUnchangedState() throws Exception {
+    try (var fixture = new Fixture(temp, "original A source")) {
+      fixture.capture();
+      fixture.edit("accepted watcher update");
+      fixture.admitOnGreen();
+      fixture.retire();
+      assertFalse(fixture.drain());
+      fixture.assertQueuedOnA();
+      Files.setPosixFilePermissions(fixture.file, java.util.Set.of());
+      try {
+        assumeFalse(Files.isReadable(fixture.file), "this user can read any file");
+        fixture.aWriterFindsTheFileUnreadable();
+        assertFalse(fixture.drain(), "a failed A job is no effect");
+        fixture.assertQueuedOnA(); // The unreadable state's one admission.
+        fixture.aWriterFindsTheFileUnreadable();
+        List<Object> backedOff = fixture.job();
+        assertNotNull(backedOff.get(3), "the job waits out a back-off");
+        fixture.restart();
+        assertFalse(fixture.drain(), "still no effect");
+        assertFalse(fixture.drain());
+        assertEquals(backedOff, fixture.job(), "the same job keeps its retry deadline");
+        assertEquals(1, fixture.journalSize(), "the journal is kept");
+      } finally {
+        fixture.makeReadable();
+      }
+      assertFalse(fixture.drain(), "the readable state is admitted at once");
+      fixture.assertQueuedOnA();
+      fixture.aWriterCommitsTheFile();
+      assertTrue(fixture.drain(), "A holds the accepted bytes");
+      assertEquals(0, fixture.journalSize());
+    }
+  }
+
   private final class Fixture implements AutoCloseable {
     final Path file;
     final String original;
     SqliteJobQueue queue;
     final RunningRuntime source;
 
-    /**
-     * The live Worker's root authority, as the Engine's cleanup is given: a folder vouches while
-     * it is a present, listable directory.
-     */
-    final WorkerIngestService publisher = org.mockito.Mockito.mock(WorkerIngestService.class);
+    /** The live Worker's root authority, as the Engine's cleanup is given. */
+    final WorkerIngestService publisher = VouchingRootAuthority.publisher();
 
     Fixture(Path dir, String content) throws Exception {
       this(dir, content, "");
@@ -515,17 +622,6 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
     Fixture(Path dir, String content, String folder) throws Exception {
       Files.createDirectories(dir.resolve(folder));
       file = Files.writeString(dir.resolve(folder).resolve("watched.txt"), content).toAbsolutePath();
-      org.mockito.Mockito.when(publisher.rootCheck()).thenReturn(new SourcePresence.RootCheck() {
-        @Override
-        public boolean vouches(Path vouching) {
-          return Files.isDirectory(vouching) && Files.isReadable(vouching);
-        }
-
-        @Override
-        public boolean admits(Path vouching) {
-          return vouches(vouching);
-        }
-      });
       original = SourceContentHash.sha256(file);
       queue = new SqliteJobQueue(dir.resolve("jobs.db"));
       queue.open();
@@ -574,6 +670,12 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
     void admitOnGreen() {
       assertTrue(queue.enqueueAndBufferFileForGeneration(
           GREEN, JobQueue.EnqueueEntry.stat(file), null, null));
+    }
+
+    /** A watcher admission of the file under the watched root {@code root}. */
+    void admitOnGreenWithin(Path root) {
+      assertTrue(queue.enqueueAndBufferFileForGeneration(
+          GREEN, JobQueue.EnqueueEntry.stat(file).withinRoot(root), null, null));
     }
 
     void readmitByEnumeration() {
@@ -658,7 +760,7 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
 
     void makeReadable() throws Exception {
       Files.setPosixFilePermissions(file,
-          java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+          PosixFilePermissions.fromString("rw-------"));
     }
 
     /** The file's row is pending; returns its revision. */
@@ -690,6 +792,21 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
           assertNull(row.getObject("walk_seen_epoch"));
           assertNull(row.getString("planned_source_sha256"), "the writer reads the file's bytes");
           return row.getString("unit_revision");
+        }
+      }
+    }
+
+    /** The file's job as the queue holds it: its identity, attempts and retry deadline. */
+    List<Object> job() throws Exception {
+      try (var connection = java.sql.DriverManager.getConnection(
+              "jdbc:sqlite:" + temp.resolve("jobs.db").toAbsolutePath());
+          var query = connection.prepareStatement("SELECT unit_revision, state, attempts,"
+              + " retry_after, first_failed_at FROM jobs WHERE path = ?")) {
+        query.setString(1, file.toString());
+        try (var row = query.executeQuery()) {
+          assertTrue(row.next(), "the file has a queue row");
+          return java.util.Arrays.asList(row.getString(1), row.getString(2), row.getLong(3),
+              row.getObject(4), row.getObject(5));
         }
       }
     }

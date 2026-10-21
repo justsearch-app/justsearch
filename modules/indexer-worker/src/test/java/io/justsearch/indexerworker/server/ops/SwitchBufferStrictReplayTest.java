@@ -24,6 +24,7 @@ import io.justsearch.adapters.lucene.runtime.IndexCountOps;
 import io.justsearch.app.api.indexing.AcceptedProjection;
 import io.justsearch.app.api.indexing.ProjectionSeedSource;
 import io.justsearch.indexing.api.IndexDocument;
+import io.justsearch.indexerworker.server.VouchingRootAuthority;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
@@ -476,7 +477,7 @@ final class SwitchBufferStrictReplayTest {
     when(queue.removeReplayedSwitchBufferOps(List.of(selected))).thenReturn(1);
 
     assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
-        scopedContext("green")));
+        scopedContext("green").withPublisher(VouchingRootAuthority.publisher())));
     verify(queue, never()).enqueueEntries(anyList(), isNull());
     var order = inOrder(fields, queue);
     order.verify(fields).getDocumentFieldOrThrow(file.toString(), SchemaFields.SOURCE_SHA256);
@@ -508,7 +509,8 @@ final class SwitchBufferStrictReplayTest {
     doAnswer(ignored -> { refreshed.set(true); return null; })
         .when(commits).maybeRefreshBlocking();
 
-    assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(scopedContext("green")));
+    assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
+        scopedContext("green").withPublisher(VouchingRootAuthority.publisher())));
     var order = inOrder(commits, fields, queue);
     order.verify(commits).maybeRefreshBlocking();
     order.verify(fields).getDocumentFieldOrThrow(path, SchemaFields.SOURCE_SHA256);

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T15:19:46.533Z",
-  "revision": "95654a5af80f39815801598127fe3c779b2966a5",
-  "tree": "f69c7fc363f14f7248d0fd543f6d2de431dcce73",
+  "createdAt": "2026-10-21T16:29:37.894Z",
+  "revision": "7e662d2f08d79b59f6de7b68f1a2e3e76792e1e6",
+  "tree": "efe02291fbe5195253670e4654093584a0076401",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RefusedRecoveryRetiredAdmissionTest.aRetiredReadmissionOfAnUnchangedFileIsHandedToA\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3960
+      "durationMs": 3433
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredReadmissionOfAnUnchangedFileIsHandedToA",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:3b757abc7cbe2354ad0c08357ee180b88df4e28ee3c921d87abbe250f8f9c721",
+      "contentDigest": "sha256:10195421d32afb5f666ac4ada7a13248ead564dba89817c2554d6b62c09d95ad",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,14 +44,16 @@
   "failBefore": {
     "ref": "c44f281a0",
     "revision": "c44f281a0f5222e80547d93ef1d22bba9966afc3",
-    "overlays": [],
+    "overlays": [
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/VouchingRootAuthority.java"
+    ],
     "patches": [],
     "runs": [
       {
         "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RefusedRecoveryRetiredAdmissionTest.aRetiredReadmissionOfAnUnchangedFileIsHandedToA\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 12477
+        "durationMs": 6299
       }
     ],
     "checks": [
@@ -62,5 +64,5 @@
       }
     ]
   },
-  "digest": "sha256:9a7a06bde498d7fd24c991996b26f6434adcc1b4d412d3ca812ccbd053822fe7"
+  "digest": "sha256:b050470b2c39bdfa0fa6549c1349191cc2a238e312dc21214180ad34d531b8e9"
 }

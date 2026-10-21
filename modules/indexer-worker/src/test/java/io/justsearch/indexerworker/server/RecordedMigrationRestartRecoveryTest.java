@@ -566,6 +566,8 @@ class RecordedMigrationRestartRecoveryTest {
       when(producer.mutationAdmission()).thenReturn(admission);
       when(producer.mutationOwnerToken()).thenReturn(owner);
       when(producer.pauseProducerForCutover(10_000)).thenReturn(true);
+      var publisher = VouchingRootAuthority.publisher();
+      when(producer.ingestService()).thenReturn(publisher);
       var closed = new AtomicBoolean();
       Mockito.doAnswer(invocation -> { closed.set(true); return null; }).when(producer).close();
       when(producer.producerClosed()).thenAnswer(ignored -> closed.get());
@@ -684,6 +686,8 @@ class RecordedMigrationRestartRecoveryTest {
       when(producer.mutationAdmission()).thenReturn(new WorkerMutationAdmission(owner));
       when(producer.mutationOwnerToken()).thenReturn(owner);
       when(producer.pauseProducerForCutover(10_000)).thenReturn(true);
+      var publisher = VouchingRootAuthority.publisher();
+      when(producer.ingestService()).thenReturn(publisher);
       var closed = new AtomicBoolean();
       Mockito.doAnswer(invocation -> { closed.set(true); return null; }).when(producer).close();
       when(producer.producerClosed()).thenAnswer(ignored -> closed.get());

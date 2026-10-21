@@ -438,7 +438,7 @@ builder.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java"
       ],
       "class": "New",
-      "behaviour": "Round 6, failing on 5bb3ff9ec and passing after. Refusal cleanup judges A's committed effect from A's index: an accepted update settles when A holds the file's current bytes, from the accepted revision or a later one, also when a rescan left the row DONE/UNCHANGED with no content hash (M8: the saved FAILED/RUNNING store after one restart, and a later revision A durably holds). A terminal outcome of A's normal policy for the file's current state settles it the way it would outside a migration: a file replaced by a link (NON_REGULAR_SOURCE) and a file too large (BUDGET_EXCEEDED) are admitted once and settle. Cleanup admits a path at most once per file state: an outcome that settles nothing is not re-admitted until the file changes or the process restarts.",
+      "behaviour": "Round 6, failing on 5bb3ff9ec and passing after. Refusal cleanup judges A's committed effect from A's index: an accepted update settles when A holds the file's current bytes, from the accepted revision or a later one, also when a rescan left the row DONE/UNCHANGED with no content hash (M8: the saved FAILED/RUNNING store after one restart, and a later revision A durably holds). A terminal outcome of A's normal policy for the file's current state settles it the way it would outside a migration: a file replaced by a link (NON_REGULAR_SOURCE) and a file too large (BUDGET_EXCEEDED) are admitted once and settle. Cleanup admits a path at most once per file state: an outcome that settles nothing is not re-admitted until the file changes (round 9: a restart keeps the admission too, because the queue row records it).",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -611,6 +611,36 @@ builder.
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#anAcceptedNewFileUnderAnUnavailableFolderIsKeptUntilItReturns",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aTerminalFailureOnEarlierBytesDoesNotHoldBackTheDeletedState"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/VouchingRootAuthority.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 9, failing on 7e662d2f0 and passing after. One observation decides a path's state for refusal cleanup, and only a confirmed state settles: confirmed needs the folder that answers for the path (its watched root, or an explicit file's own folder) to vouch through the Worker's root authority, and every folder from it down to the path to be listable. An accepted new file A never held, whose folder is replaced by an unreadable one with a folder at the file's path, keeps Green and the journal with nothing queued; so does one under a watched root whose subfolder became unreadable. Once the folder returns, the file gets its admission and settles when A holds its bytes. A restart keeps an existing admission for the same file state: the backed-off job for an unreadable file keeps its unit revision, attempts, retry deadline and first-failure time, because the job's unit revision names the state and the queue row is the record. VouchingRootAuthority is the test support every refusal-cleanup fixture now needs: a root authority that vouches for present, listable folders, since no settle happens without one.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M10",
+          "quote": "A result is confirmed only when the watched root is present, readable and on its recorded volume, and every parent folder from the root down to the path can be read. Anything else is uncertain, which means fail-closed.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "A restart keeps an existing admission for the same file state (same job, same deadline). The once-per-state record must be rebuilt from the queue rows, not only kept in memory.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/migration-recovery-r9-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aFolderSeenThroughAnUnreadableReplacedFolderSettlesNothing",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aFolderSeenThroughAnUnreadableSubfolderOfTheRootSettlesNothing",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRestartKeepsTheBackedOffAdmissionOfAnUnchangedState"
       ]
     }
   ]

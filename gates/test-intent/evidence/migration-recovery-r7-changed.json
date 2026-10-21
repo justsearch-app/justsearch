@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T13:27:34.740Z",
-  "revision": "18a242439e636df73dd3effdba8bed170a7c4936",
-  "tree": "c942144eef082b04780b0cf09b8b8720b5c6a7ae",
+  "createdAt": "2026-10-21T16:27:50.524Z",
+  "revision": "7e662d2f08d79b59f6de7b68f1a2e3e76792e1e6",
+  "tree": "ffbf62b0917cbf5e4f86ada5af5525688b85cae8",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerRecordedIngestionTest\" --tests \"io.justsearch.indexerworker.server.ops.SwitchBufferStrictReplayTest.refusalRetiresOnlySettledAcceptedUpsertAfterSourceProjectionIsProved\" --tests \"io.justsearch.indexerworker.server.ops.SwitchBufferStrictReplayTest.capturedReplayRefreshesBeforeCertifyingPlannedH1AndIndexedH2\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 32462
+      "durationMs": 31424
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecordedIngestionTest.java",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecordedIngestionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1b0ee94fced7b7f9b61adc5b98049b7fc6e95daa989f425034babce01b82dd9b",
+      "contentDigest": "sha256:9776e60ccb1aae4da75532beb2cc5a8dcd085f3794e525510f86d4b6aaed4896",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -176,7 +176,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java#refusalRetiresOnlySettledAcceptedUpsertAfterSourceProjectionIsProved",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1692372b0f1bc9c215da48e8f4345bc7e7600ff9dc6d9b0356c733e59ba7103e",
+      "contentDigest": "sha256:6d176d20819e7dab20e7242e30976f09fbe052b6735cf4260264398875eaad6c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -191,7 +191,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java#capturedReplayRefreshesBeforeCertifyingPlannedH1AndIndexedH2",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:1692372b0f1bc9c215da48e8f4345bc7e7600ff9dc6d9b0356c733e59ba7103e",
+      "contentDigest": "sha256:6d176d20819e7dab20e7242e30976f09fbe052b6735cf4260264398875eaad6c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -206,14 +206,16 @@
   "failBefore": {
     "ref": "18a242439",
     "revision": "18a242439e636df73dd3effdba8bed170a7c4936",
-    "overlays": [],
+    "overlays": [
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/VouchingRootAuthority.java"
+    ],
     "patches": [],
     "runs": [
       {
         "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerRecordedIngestionTest\" --tests \"io.justsearch.indexerworker.server.ops.SwitchBufferStrictReplayTest.refusalRetiresOnlySettledAcceptedUpsertAfterSourceProjectionIsProved\" --tests \"io.justsearch.indexerworker.server.ops.SwitchBufferStrictReplayTest.capturedReplayRefreshesBeforeCertifyingPlannedH1AndIndexedH2\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 59790
+        "durationMs": 33724
       }
     ],
     "checks": [
@@ -234,5 +236,5 @@
       }
     ]
   },
-  "digest": "sha256:8da5760bbe762312675b69168fd0ac6a76e8030d4bbf965ebe1335a7a80da918"
+  "digest": "sha256:199c301fca1a94bf8f26a52d9a01d72a9f41b8bf0f6cfea2e15672be50fcd076"
 }

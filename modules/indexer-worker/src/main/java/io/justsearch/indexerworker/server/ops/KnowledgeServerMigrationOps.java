@@ -1695,80 +1695,173 @@ public final class KnowledgeServerMigrationOps {
 
   /**
    * Refusal cleanup only: whether A's committed effect settles an accepted admission, judged
-   * from A's index against the path as it is now, never from a queue row about earlier bytes.
-   * A regular file settles when A holds its current bytes, or when the cleanup's own admission of
-   * this file state ended by A's normal policy (excluded, too large). Unreadable bytes settle
-   * nothing. A path that is no longer a regular file (gone, a folder, a link) settles once A no
-   * longer holds it: A's normal policy retires such a source's text, and its retirement reaches
-   * A while a candidate exists. A path counts as gone only when its absence is confirmed: the
-   * folder that answers for it (its root, or an explicit file's own folder) is present, listable
-   * and the same folder on the same volume. A missing, unreadable or replaced folder proves
-   * nothing, so nothing settles. A pending or claimed A job only waits.
+   * from A's index against the path as {@link #observeForCleanup} confirms it now, never from a
+   * queue row about earlier bytes. A regular file settles when A holds its current bytes, or when
+   * the cleanup's own admission of this file state ended by A's normal policy (excluded, too
+   * large). Unreadable bytes settle nothing. A path confirmed to be no longer a regular file
+   * (gone, a folder, a link) settles once A no longer holds it: A's normal policy retires such a
+   * source's text, and its retirement reaches A while a candidate exists. An uncertain path
+   * settles nothing and admits nothing. A pending or claimed A job only waits.
    *
    * <p>Otherwise the Engine may have retired the admission's row unwritten, so nothing would ever
-   * bring A to the path: queue one ordinary A job for it, once per file state. A path that
-   * changes, or a restart, may admit it again; the same state is never admitted twice. A failed
-   * row (terminal, or retrying after a back-off) is the outcome for the state its writer ran on,
-   * so it never holds back the admission of a state this cleanup has not admitted.
+   * bring A to the path: queue one ordinary A job for it, once per file state. The job's unit
+   * revision names the state, so the queue row itself records the admission and a restart keeps
+   * the same job and its retry deadline. A path that changes may admit it again; the same state
+   * is not admitted twice while its row stands. A failed row (terminal, or retrying after a
+   * back-off) is the outcome for the state its writer ran on, so it never holds back the
+   * admission of a state this cleanup has not admitted.
    */
   private static boolean sourceHoldsAdmission(DrainSwitchBufferContext context,
       SwitchBufferCapableQueue queue, SwitchBufferUpsert upsert, String indexed) throws IOException {
-    Path file = Path.of(upsert.path());
-    BasicFileAttributes attributes;
-    try {
-      attributes = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-    } catch (NoSuchFileException absent) {
-      if (!confirmedAbsent(context, upsert)) return false; // Not found proves nothing yet.
-      attributes = null;
-    } catch (IOException | RuntimeException unknown) {
-      return false; // What the path is now is unknown, so is A's effect for it.
-    }
-    String state;
-    boolean readableFile = false;
-    if (attributes == null || !attributes.isRegularFile()) {
-      if (indexed == null
-          && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(upsert.path()) == 0) {
-        return true; // A shows the retirement.
+    CleanupPathState now = observeForCleanup(context.publisher(), Path.of(upsert.path()),
+        upsert.ingestionRoot());
+    switch (now.kind()) {
+      case UNCERTAIN -> {
+        return false; // Fail-closed: Green and the journal stay until the path can be judged.
       }
-      state = attributes == null ? SOURCE_GONE
-          : (attributes.isSymbolicLink() ? "link/" : attributes.isDirectory() ? "directory/" : "other/")
-              + attributes.lastModifiedTime().toMillis() + '/' + attributes.fileKey();
-    } else {
-      String onDisk = currentSource(upsert.path());
-      if (onDisk != null && onDisk.equals(indexed)) return true;
-      readableFile = onDisk != null;
-      state = "file/" + attributes.size() + '/' + attributes.lastModifiedTime().toMillis() + '/'
-          + attributes.fileKey() + '/' + (readableFile ? onDisk : "unreadable");
+      case ABSENT, NON_REGULAR -> {
+        if (indexed == null
+            && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(upsert.path()) == 0) {
+          return true; // A shows the retirement.
+        }
+      }
+      case REGULAR -> {
+        if (now.sha256() != null && now.sha256().equals(indexed)) return true;
+      }
     }
+    String admission = cleanupAdmission(context.replayGeneration(), upsert.path(), now.fileState());
     var work = queue.sourceFileWork(upsert.path(), indexed);
-    boolean admittedNow = state.equals(
-        queue.refusalCleanupAdmission(context.replayGeneration(), upsert.path()));
+    boolean admittedNow = queue.holdsRefusalCleanupAdmission(upsert.path(), admission);
     // The policy outcome must be the writer's answer to this file state, which only an
     // admission of that state that it finished proves.
-    if (readableFile && work == SwitchBufferCapableQueue.SourceFileWork.POLICY && admittedNow) {
+    if (now.kind() == CleanupPathKind.REGULAR && now.sha256() != null
+        && work == SwitchBufferCapableQueue.SourceFileWork.POLICY && admittedNow) {
       return true;
     }
     if (work == SwitchBufferCapableQueue.SourceFileWork.OUTSTANDING || admittedNow) return false;
+    Path file = Path.of(upsert.path());
     var entry = new JobQueue.EnqueueEntry(file, JobQueue.EnqueueEntry.stat(file).sizeBytes(),
         upsert.provenance(), null, upsert.ingestionRoot());
-    if (queue.enqueueEntries(List.of(entry), upsert.collection()) == 1) {
-      queue.recordRefusalCleanupAdmission(context.replayGeneration(), upsert.path(), state);
+    if (queue.enqueueRefusalCleanupAdmission(entry, upsert.collection(), admission) == 1) {
       context.log().info("Refused candidate queued its unapplied admission on the source: {}",
           upsert.path());
     }
     return false;
   }
 
+  /** The unit revision refusal cleanup gives its admission of one file state of a path. */
+  static String cleanupAdmission(String generation, String path, String fileState) {
+    try {
+      byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(
+          (generation + '\u0000' + path + '\u0000' + fileState)
+              .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      return java.util.HexFormat.of().formatHex(digest, 0, 16);
+    } catch (java.security.NoSuchAlgorithmException unavailable) {
+      throw new IllegalStateException("SHA-256 is unavailable", unavailable);
+    }
+  }
+
+  /** What refusal cleanup may say about an accepted path now. */
+  enum CleanupPathKind {
+    /** A regular file; its bytes when they could be read. */
+    REGULAR,
+    /** Something other than a regular file: a folder, a link or a special file. */
+    NON_REGULAR,
+    /** Confirmed absent. */
+    ABSENT,
+    /** Nothing can be confirmed: settle nothing, admit nothing. */
+    UNCERTAIN
+  }
+
   /**
-   * Whether {@code upsert}'s path is confirmed absent, by the live Worker's root authority: the
-   * same answer that authorises any deletion. Without that authority nothing is confirmed.
+   * A path's state for refusal cleanup: its kind, a string naming the state (kind, size, modified
+   * time, file key and bytes), and the SHA-256 of a regular file's bytes, null when unreadable.
    */
-  private static boolean confirmedAbsent(DrainSwitchBufferContext context,
-      SwitchBufferUpsert upsert) {
-    if (context.publisher() == null) return false;
-    return io.justsearch.indexerworker.loop.SourcePresence.classify(Path.of(upsert.path()),
-        upsert.ingestionRoot(), context.publisher().rootCheck())
-        == io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT;
+  record CleanupPathState(CleanupPathKind kind, String fileState, String sha256) {
+    static final CleanupPathState UNCERTAIN =
+        new CleanupPathState(CleanupPathKind.UNCERTAIN, null, null);
+  }
+
+  /**
+   * The one answer refusal cleanup acts on about an accepted path's current state; only a
+   * confirmed answer can settle, acknowledge or let Green go. An answer is confirmed only while
+   * the folder that answers for the path (its watched root, or an explicit file's own folder)
+   * vouches through the live Worker's root authority: present, listable, and the same folder on
+   * its recorded volume. Every folder from it down to the path must also be listable, and the
+   * path must look the same before and after those checks. Anything else, including no root
+   * authority at all, is {@link CleanupPathKind#UNCERTAIN}.
+   */
+  static CleanupPathState observeForCleanup(WorkerIngestService publisher, Path path, Path root) {
+    if (publisher == null || path == null) return CleanupPathState.UNCERTAIN;
+    var rootCheck = publisher.rootCheck();
+    if (rootCheck == null) return CleanupPathState.UNCERTAIN;
+    Path file = path.toAbsolutePath().normalize();
+    String before = observedKind(file);
+    if (before == null) return CleanupPathState.UNCERTAIN;
+    boolean asRoot = io.justsearch.indexerworker.loop.SourcePresence.answersAsRoot(file, root);
+    Path folder = asRoot ? root.toAbsolutePath().normalize() : file.getParent();
+    if (folder == null
+        || !(asRoot ? rootCheck.vouches(folder) : rootCheck.vouchesForFile(folder))) {
+      return CleanupPathState.UNCERTAIN;
+    }
+    for (Path dir = file.getParent(); dir != null && !dir.equals(folder) && dir.startsWith(folder);
+        dir = dir.getParent()) {
+      var presence = io.justsearch.adapters.lucene.runtime.PathPresence.probe(dir);
+      if (presence == io.justsearch.adapters.lucene.runtime.PathPresence.UNKNOWN
+          || (presence == io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT
+              && !listableFolder(dir))) {
+        return CleanupPathState.UNCERTAIN;
+      }
+    }
+    if (SOURCE_GONE.equals(before)) {
+      // Not found, re-probed beneath its vouching folder: the deletion authority's own answer.
+      return io.justsearch.indexerworker.loop.SourcePresence.classify(file, root, rootCheck)
+              == io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT
+          ? new CleanupPathState(CleanupPathKind.ABSENT, SOURCE_GONE, null)
+          : CleanupPathState.UNCERTAIN;
+    }
+    if (!before.startsWith("file/")) {
+      return before.equals(observedKind(file))
+          ? new CleanupPathState(CleanupPathKind.NON_REGULAR, before, null)
+          : CleanupPathState.UNCERTAIN;
+    }
+    String sha = currentSource(file.toString());
+    if (SOURCE_GONE.equals(sha) || !before.equals(observedKind(file))) {
+      return CleanupPathState.UNCERTAIN; // It changed while it was being read.
+    }
+    return new CleanupPathState(CleanupPathKind.REGULAR,
+        before + '/' + (sha == null ? "unreadable" : sha), sha);
+  }
+
+  /**
+   * The path's kind, size, modified time and file key without following links: {@link
+   * #SOURCE_GONE} when not found, null when it cannot be observed.
+   */
+  private static String observedKind(Path file) {
+    BasicFileAttributes attributes;
+    try {
+      attributes = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+    } catch (NoSuchFileException absent) {
+      return SOURCE_GONE;
+    } catch (IOException | RuntimeException unknown) {
+      return null;
+    }
+    String kind = attributes.isRegularFile() ? "file" : attributes.isSymbolicLink() ? "link"
+        : attributes.isDirectory() ? "directory" : "other";
+    return kind + '/' + attributes.size() + '/' + attributes.lastModifiedTime().toMillis() + '/'
+        + attributes.fileKey();
+  }
+
+  /** A folder on the way to the path whose entries can be listed (it is traversed as the OS does). */
+  private static boolean listableFolder(Path dir) {
+    if (!Files.isDirectory(dir)) return false;
+    try (var entries = Files.newDirectoryStream(dir)) {
+      // Reading the first entry is what proves the folder can be listed; empty is fine.
+      boolean firstEntryRead = entries.iterator().hasNext();
+      return firstEntryRead || Files.isDirectory(dir);
+    } catch (IOException | RuntimeException unreadable) {
+      return false;
+    }
   }
 
   /** A broad receipt used to supersede a file witness must prove its complete final scope. */

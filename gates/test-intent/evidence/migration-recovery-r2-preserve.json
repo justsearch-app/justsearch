@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T13:19:33.435Z",
-  "revision": "18a242439e636df73dd3effdba8bed170a7c4936",
-  "tree": "c013a9be2bacbee930d9509974ff046156cbba64",
+  "createdAt": "2026-10-21T16:31:12.483Z",
+  "revision": "7e662d2f08d79b59f6de7b68f1a2e3e76792e1e6",
+  "tree": "3ff851bd1ea775351fe59af3d9faa8b3f68969f9",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAProjectionObligationKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.anUnlatchedMigratingCandidateKeepsBuilding\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aLaterAdmissionCommittedOnAHandsTheUpdateToA\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 8852
+      "durationMs": 6843
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aCandidateWithAProjectionObligationKeepsWaiting",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a433af2e33346011e4c0b8410db5dd9faa558ce711d6a9d555fa5fbfc1f98bbf",
+      "contentDigest": "sha256:f5d60dcafe12804f42bcb9aac4b90d6f7b95dccfd8e658240059ee6a00435da6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#anUnlatchedMigratingCandidateKeepsBuilding",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a433af2e33346011e4c0b8410db5dd9faa558ce711d6a9d555fa5fbfc1f98bbf",
+      "contentDigest": "sha256:f5d60dcafe12804f42bcb9aac4b90d6f7b95dccfd8e658240059ee6a00435da6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterAdmissionCommittedOnAHandsTheUpdateToA",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a433af2e33346011e4c0b8410db5dd9faa558ce711d6a9d555fa5fbfc1f98bbf",
+      "contentDigest": "sha256:f5d60dcafe12804f42bcb9aac4b90d6f7b95dccfd8e658240059ee6a00435da6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,14 +74,16 @@
   "failBefore": {
     "ref": "02d503739",
     "revision": "02d503739e40821ad5ca6c19abd3ee57d934390c",
-    "overlays": [],
+    "overlays": [
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/VouchingRootAuthority.java"
+    ],
     "patches": [],
     "runs": [
       {
         "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAProjectionObligationKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.anUnlatchedMigratingCandidateKeepsBuilding\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aLaterAdmissionCommittedOnAHandsTheUpdateToA\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 12301
+        "durationMs": 10434
       }
     ],
     "checks": [
@@ -102,5 +104,5 @@
       }
     ]
   },
-  "digest": "sha256:1c3824362b79b2180f0d6992a4a64e752f32c29d6132dd895904d24677e36412"
+  "digest": "sha256:9cb76535bc3999bce438b3a0ed4c36b0ee4e6fbda048b096e6ddc21a18569970"
 }

@@ -770,6 +770,8 @@ final class KnowledgeServerRecordedIngestionTest {
         new io.justsearch.indexerworker.services.WorkerMutationAdmission(owner));
     org.mockito.Mockito.when(producer.mutationOwnerToken()).thenReturn(owner);
     org.mockito.Mockito.when(producer.pauseProducerForCutover(10_000)).thenReturn(true);
+    var publisher = VouchingRootAuthority.publisher();
+    org.mockito.Mockito.when(producer.ingestService()).thenReturn(publisher);
     var closed = new AtomicBoolean();
     org.mockito.Mockito.doAnswer(invocation -> { closed.set(true); return null; })
         .when(producer).close();

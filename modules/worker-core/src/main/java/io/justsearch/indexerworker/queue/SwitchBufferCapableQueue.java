@@ -175,15 +175,22 @@ public interface SwitchBufferCapableQueue extends JobQueue {
   }
 
   /**
-   * Refusal cleanup only: the file state at which this queue's process last admitted {@code
-   * path} to the source for {@code generation}'s cleanup, or null. A restart forgets it.
+   * Refusal cleanup only: admits {@code entry} to the source as the job whose unit revision is
+   * {@code admission}, the name refusal cleanup gives one file state of the path. Returns 1 when
+   * accepted. The queue row is the durable record of that admission.
    */
-  default String refusalCleanupAdmission(String generation, String path) {
-    return null;
+  default int enqueueRefusalCleanupAdmission(
+      JobQueue.EnqueueEntry entry, String collection, String admission) {
+    return enqueueEntries(List.of(entry), collection);
   }
 
-  /** Records that refusal cleanup admitted {@code path} at {@code fileState} in this process. */
-  default void recordRefusalCleanupAdmission(String generation, String path, String fileState) {}
+  /**
+   * Refusal cleanup only: whether {@code path}'s queue row is still the admission named {@code
+   * admission}. A restart keeps the answer, so it keeps the same job and its retry deadline.
+   */
+  default boolean holdsRefusalCleanupAdmission(String path, String admission) {
+    return false;
+  }
 
   /**
    * Exact captured-plan evidence for a file already removed by a later broad replay receipt.

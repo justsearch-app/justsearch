@@ -1048,6 +1048,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private int enqueueEntries(
       List<JobQueue.EnqueueEntry> entries, String collection, String scanId,
       boolean exactCollection) {
+    return enqueueEntries(entries, collection, scanId, exactCollection, null);
+  }
+
+  /** {@code unitRevision} names the admission; null mints a fresh one. */
+  private int enqueueEntries(
+      List<JobQueue.EnqueueEntry> entries, String collection, String scanId,
+      boolean exactCollection, String unitRevision) {
     if (entries == null || entries.isEmpty()) {
       return 0;
     }
@@ -1087,7 +1094,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String scan = (scanId != null && !scanId.isBlank()) ? scanId : null;
 
       int count = inTransaction(
-          () -> enqueueEntriesInTransaction(entries, col, scan, now, exactCollection));
+          () -> enqueueEntriesInTransaction(entries, col, scan, now, exactCollection, unitRevision));
 
       meters.recordEnqueued(count);
       log.debug("Enqueued {} jobs (collection={}, scanId={})", count, col, scan);
@@ -1102,7 +1109,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private int enqueueEntriesInTransaction(
       List<JobQueue.EnqueueEntry> entries, String collection, String scanId, long now,
-      boolean exactCollection)
+      boolean exactCollection, String unitRevision)
       throws SQLException {
     String sql = """
         INSERT OR REPLACE INTO jobs
@@ -1114,7 +1121,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           ?,
           COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
           COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
-          lower(hex(randomblob(16))), ?, ?,
+          COALESCE(?, lower(hex(randomblob(16)))), ?, ?,
           COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)))
         """;
     int accepted = 0;
@@ -1144,12 +1151,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         stmt.setString(10, normalizedPath);
         stmt.setString(11, entry.provenance() == null ? null : entry.provenance().transport());
         stmt.setString(12, normalizedPath);
-        if (membership.epoch() == null) stmt.setNull(13, java.sql.Types.BIGINT);
-        else stmt.setLong(13, membership.epoch());
-        stmt.setString(14, membership.plannedSourceSha256() == null
+        stmt.setString(13, unitRevision);
+        if (membership.epoch() == null) stmt.setNull(14, java.sql.Types.BIGINT);
+        else stmt.setLong(14, membership.epoch());
+        stmt.setString(15, membership.plannedSourceSha256() == null
             ? entry.plannedSourceSha256() : membership.plannedSourceSha256());
-        stmt.setString(15, PathNormalizer.normalizeKey(entry.ingestionRoot()));
-        stmt.setString(16, normalizedPath);
+        stmt.setString(16, PathNormalizer.normalizeKey(entry.ingestionRoot()));
+        stmt.setString(17, normalizedPath);
         stmt.executeUpdate();
         if (membership.epoch() != null) {
           SqliteIngestionWalkOps.noteMutation(connection, membership.key());
@@ -1237,7 +1245,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
         int accepted = enqueueEntriesInTransaction(
-            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis(), false);
+            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis(), false, null);
         if (accepted != admitted.size()) {
           throw new SQLException("Atomic file batch did not accept every entry");
         }
@@ -1402,18 +1410,37 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     };
   }
 
-  /** Refusal cleanup admissions this process made: generation and path to the file state. */
-  private final Map<String, String> refusalCleanupAdmissions =
-      new java.util.concurrent.ConcurrentHashMap<>();
-
   @Override
-  public String refusalCleanupAdmission(String generation, String path) {
-    return refusalCleanupAdmissions.get(generation + '\u0000' + path);
+  public int enqueueRefusalCleanupAdmission(
+      JobQueue.EnqueueEntry entry, String collection, String admission) {
+    if (entry == null || !isAdmissionRevision(admission)) return 0;
+    return enqueueEntries(List.of(entry), collection, null, false, admission);
   }
 
   @Override
-  public void recordRefusalCleanupAdmission(String generation, String path, String fileState) {
-    refusalCleanupAdmissions.put(generation + '\u0000' + path, fileState);
+  public boolean holdsRefusalCleanupAdmission(String path, String admission) {
+    if (path == null || !isAdmissionRevision(admission)) return false;
+    lock.lock();
+    try {
+      ensureOpen();
+      try (PreparedStatement query =
+          connection.prepareStatement("SELECT unit_revision FROM jobs WHERE path = ?")) {
+        query.setString(1, path);
+        try (ResultSet row = query.executeQuery()) {
+          return row.next() && admission.equals(row.getString(1));
+        }
+      }
+    } catch (SQLException unavailable) {
+      recordDbError();
+      throw new IllegalStateException("Queue admission ownership evidence is unreadable", unavailable);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /** The shape of a minted unit revision: 32 lowercase hex digits. */
+  private static boolean isAdmissionRevision(String revision) {
+    return revision != null && revision.matches("[0-9a-f]{32}");
   }
 
   @Override
