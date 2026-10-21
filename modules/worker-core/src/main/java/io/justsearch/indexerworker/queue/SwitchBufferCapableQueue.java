@@ -150,6 +150,12 @@ public interface SwitchBufferCapableQueue extends JobQueue {
      * a new job, decides. It is no effect until that writer commits.
      */
     OUTSTANDING,
+    /**
+     * The row's last writer ended it by the generation's normal policy for a source that is not
+     * indexable as it was then: not a regular file, excluded, or too large. That handling is the
+     * generation's committed effect for the file in that state.
+     */
+    POLICY,
     /** No row, or a finished row that wrote nothing the generation holds. */
     NONE
   }
@@ -162,6 +168,17 @@ public interface SwitchBufferCapableQueue extends JobQueue {
   default SourceFileWork sourceFileWork(String path, String indexedSourceSha256) {
     throw new UnsupportedOperationException("Queue admission ownership evidence is unavailable");
   }
+
+  /**
+   * Refusal cleanup only: the file state at which this queue's process last admitted {@code
+   * path} to the source for {@code generation}'s cleanup, or null. A restart forgets it.
+   */
+  default String refusalCleanupAdmission(String generation, String path) {
+    return null;
+  }
+
+  /** Records that refusal cleanup admitted {@code path} at {@code fileState} in this process. */
+  default void recordRefusalCleanupAdmission(String generation, String path, String fileState) {}
 
   /**
    * Exact captured-plan evidence for a file already removed by a later broad replay receipt.

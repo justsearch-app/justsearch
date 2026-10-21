@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T06:04:25.729Z",
-  "revision": "a26eaf3e3c1acd65a71652443a75080c080890e0",
-  "tree": "dc9ea39c8531195b152f4112912a36b293e37392",
+  "createdAt": "2026-10-21T11:49:56.535Z",
+  "revision": "2397a837648dfd5f8479e8ae2724c8394c12baa8",
+  "tree": "3f1b9f8f281e883b15370b6e89c216a563a9415f",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.claimedRowStillRetainsGreen\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.unprovedAdmissionStillRetainsGreen\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithADocumentKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAPlannedUnitKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAJournalObligationKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAPendingRowKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWhoseEnumeratorRunsKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAnUnreadableWalkKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.keywordOnlyEmptyCandidateIsNotRefused\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 13873
+      "durationMs": 14218
     }
   ],
   "checks": [
@@ -171,7 +171,7 @@
         "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.claimedRowStillRetainsGreen\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.unprovedAdmissionStillRetainsGreen\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithADocumentKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAPlannedUnitKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAJournalObligationKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAPendingRowKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWhoseEnumeratorRunsKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAnUnreadableWalkKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.keywordOnlyEmptyCandidateIsNotRefused\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 16006
+        "durationMs": 16886
       }
     ],
     "checks": [
@@ -222,5 +222,5 @@
       }
     ]
   },
-  "digest": "sha256:ced29a2c1380a354379098370f109f9c32cdc36d87a2e21bff71ec432671ba8f"
+  "digest": "sha256:f33e6ddaa488de24f0166545e94b4e475c0e665f72aace8518147cff844f3245"
 }

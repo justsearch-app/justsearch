@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T06:04:29.413Z",
-  "revision": "a26eaf3e3c1acd65a71652443a75080c080890e0",
-  "tree": "091d9b5aef7c88f4af9508d3c56b948c197dab7f",
+  "createdAt": "2026-10-21T11:50:00.289Z",
+  "revision": "2397a837648dfd5f8479e8ae2724c8394c12baa8",
+  "tree": "0e8bd28dcde74b3a823e3037850ac6c851321402",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.QueueAdmissionOwnershipTest.onlyACommittedWriteHandsTheFileToTheSource\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1830
+      "durationMs": 1825
     }
   ],
   "checks": [
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:67a785b39624a26f06b003758d5b76d7a2a41cfa5d33aab1c840cd02674d2ba5"
+  "digest": "sha256:86095bedb7b6416ecf5cd7311d69e63df02c0a703e58f31562f7372dc0811a60"
 }

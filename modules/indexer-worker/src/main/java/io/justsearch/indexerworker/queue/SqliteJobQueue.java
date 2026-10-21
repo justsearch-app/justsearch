@@ -1380,6 +1380,42 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
+  /**
+   * A terminal outcome of A's normal policy for a source that is not indexable as it is: not a
+   * regular file, excluded, unsupported or too large. Outside a migration nothing more happens
+   * to the file until it changes. Writes and UNCHANGED are judged by the index instead; failures
+   * (I/O, unreadable, parser, sandbox, write), stale sources, deferrals and every retirement
+   * reason (refused, stopped enumeration, missing boundary, removed) are no such effect.
+   */
+  private static boolean endedByPolicy(String state, String outcomeClass, String reason,
+      String retryPolicy) {
+    boolean terminal = STATE_DONE.equals(state) || (STATE_FAILED.equals(state)
+        && io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE.name().equals(retryPolicy));
+    if (!terminal || outcomeClass == null) return false;
+    return switch (outcomeClass) {
+      case "UNSUPPORTED", "BUDGET_EXCEEDED" -> true;
+      case "SKIPPED_POLICY" ->
+          io.justsearch.indexerworker.ingest.IngestionReasonCodes.NON_REGULAR_SOURCE.equals(reason)
+              || io.justsearch.indexerworker.ingest.IngestionReasonCodes.SKIPPED_TEMP_OR_SYSTEM
+                  .equals(reason);
+      default -> false;
+    };
+  }
+
+  /** Refusal cleanup admissions this process made: generation and path to the file state. */
+  private final Map<String, String> refusalCleanupAdmissions =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+  @Override
+  public String refusalCleanupAdmission(String generation, String path) {
+    return refusalCleanupAdmissions.get(generation + '\u0000' + path);
+  }
+
+  @Override
+  public void recordRefusalCleanupAdmission(String generation, String path, String fileState) {
+    refusalCleanupAdmissions.put(generation + '\u0000' + path, fileState);
+  }
+
   @Override
   public SourceFileWork sourceFileWork(String path, String indexedSourceSha256) {
     if (path == null) return SourceFileWork.NONE;
@@ -1387,11 +1423,17 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     try {
       ensureOpen();
       try (PreparedStatement query = connection.prepareStatement(
-          "SELECT state, content_hash FROM jobs WHERE path = ?")) {
+          "SELECT state, content_hash, last_outcome_class, last_reason_code, last_retry_policy"
+              + " FROM jobs WHERE path = ?")) {
         query.setString(1, path);
         try (ResultSet row = query.executeQuery()) {
           if (!row.next()) return SourceFileWork.NONE;
-          if (!STATE_DONE.equals(row.getString("state"))) return SourceFileWork.OUTSTANDING;
+          String state = row.getString("state");
+          if (endedByPolicy(state, row.getString("last_outcome_class"),
+              row.getString("last_reason_code"), row.getString("last_retry_policy"))) {
+            return SourceFileWork.POLICY;
+          }
+          if (!STATE_DONE.equals(state)) return SourceFileWork.OUTSTANDING;
           // Only a write records content_hash, and every admission clears it, so a hash here
           // was written by this admission or a later one; a retired, refused or skipped row has
           // none. A later admission's bytes supersede the accepted ones even when they differ

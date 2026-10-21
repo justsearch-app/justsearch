@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -224,10 +225,141 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
     }
   }
 
+  // M8 (round 6, P1): A durably holds a revision later than the accepted one, and a rescan
+  // after the restart found it unchanged, so A's row records no write: A's index decides.
+  @Test
+  void aLaterRevisionAHoldsSettlesThoughARescanFoundItUnchanged() throws Exception {
+    try (var fixture = new Fixture(temp, "original A source")) {
+      fixture.capture();
+      fixture.edit("accepted watcher update");
+      fixture.admitOnGreen();
+      fixture.retire();
+      fixture.edit("later revision");
+      fixture.admitOnA();
+      fixture.aWriterCommitsTheFile();
+      fixture.admitOnA();
+      fixture.aWriterFindsTheFileUnchanged();
+      assertTrue(fixture.drain(), "A holds the file's current bytes");
+      assertEquals(0, fixture.journalSize());
+      assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(), "nothing was queued");
+    }
+  }
+
+  // M8 (round 6, P1): the saved FAILED/RUNNING store. Its journal witnesses the captured bytes;
+  // A got the file's offline change before the upgrade, and the upgraded boot's rescan found
+  // it unchanged. One restart settles it.
+  @Test
+  void aSavedFailedRunningStoreSettlesWhereAHoldsTheCurrentBytes() throws Exception {
+    try (var fixture = new Fixture(temp, "original A source")) {
+      fixture.capture();
+      fixture.readmitByEnumeration();
+      fixture.retire();
+      fixture.edit("offline changed source");
+      fixture.admitOnA();
+      fixture.aWriterCommitsTheFile();
+      fixture.restart();
+      fixture.admitOnA();
+      fixture.aWriterFindsTheFileUnchanged();
+      assertTrue(fixture.drain(), "A holds the file's current bytes");
+      assertEquals(0, fixture.journalSize());
+      assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(), "nothing was queued");
+    }
+  }
+
+  // round 6, P2: the accepted file became a link. A's job ends it by A's policy (not a regular
+  // file); that is A's committed effect, so cleanup admits it once and settles.
+  @Test
+  void aSymlinkReplacementAdmitsOnceAndSettlesByAsPolicy() throws Exception {
+    try (var fixture = new Fixture(temp, "original A source")) {
+      fixture.capture();
+      fixture.edit("accepted watcher update");
+      fixture.admitOnGreen();
+      fixture.retire();
+      Path target = Files.writeString(temp.resolve("target.txt"), "link target");
+      Files.delete(fixture.file);
+      Files.createSymbolicLink(fixture.file, target);
+      assertFalse(fixture.drain(), "A has not answered the link yet");
+      fixture.assertQueuedOnA();
+      fixture.aWriterEndsTheFile(IngestionOutcomeClass.SKIPPED_POLICY,
+          IngestionReasonCodes.NON_REGULAR_SOURCE, true);
+      assertTrue(fixture.drain(), "A's policy retired the link");
+      assertEquals(0, fixture.journalSize());
+      assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(), "admitted once");
+    }
+  }
+
+  // round 6: too large for A's policy is A's answer to the file as it is
+  @Test
+  void aTooLargeFileSettlesByAsPolicy() throws Exception {
+    try (var fixture = new Fixture(temp, "original A source")) {
+      fixture.capture();
+      fixture.edit("accepted watcher update");
+      fixture.admitOnGreen();
+      fixture.retire();
+      assertFalse(fixture.drain());
+      fixture.assertQueuedOnA();
+      fixture.aWriterFailsTheFile(IngestionOutcomeClass.BUDGET_EXCEEDED,
+          IngestionReasonCodes.INPUT_TOO_LARGE);
+      assertTrue(fixture.drain(), "A's size policy ended the file");
+      assertEquals(0, fixture.journalSize());
+    }
+  }
+
+  // round 6, rule 3: an outcome that settles nothing is not re-admitted for the same file
+  // state; a changed file or a restart admits it once more
+  @Test
+  void anUnsettledOutcomeIsAdmittedOncePerFileState() throws Exception {
+    try (var fixture = new Fixture(temp, "original A source")) {
+      fixture.capture();
+      fixture.edit("accepted watcher update");
+      fixture.admitOnGreen();
+      fixture.retire();
+      assertFalse(fixture.drain());
+      String first = fixture.assertQueuedOnA();
+      fixture.aWriterEndsTheFile(IngestionOutcomeClass.SKIPPED_POLICY,
+          IngestionReasonCodes.MISSING_INGESTION_BOUNDARY, false);
+      for (int attempt = 0; attempt < 3; attempt++) {
+        assertFalse(fixture.drain(), "a retired row is no effect");
+      }
+      assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(),
+          "the same file state is not admitted again");
+      assertEquals(1, fixture.journalSize());
+      fixture.edit("changed again");
+      assertFalse(fixture.drain());
+      assertNotEquals(first, fixture.assertQueuedOnA(), "the changed file is admitted once more");
+      fixture.aWriterEndsTheFile(IngestionOutcomeClass.SKIPPED_POLICY,
+          IngestionReasonCodes.MISSING_INGESTION_BOUNDARY, false);
+      assertFalse(fixture.drain());
+      assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount());
+      fixture.restart();
+      assertFalse(fixture.drain());
+      fixture.assertQueuedOnA();
+    }
+  }
+
+  // round 6, preserved: an I/O failure ends nothing; the journal waits and nothing is re-queued
+  @Test
+  void anIoFailedFileStillWaits() throws Exception {
+    try (var fixture = new Fixture(temp, "original A source")) {
+      fixture.capture();
+      fixture.edit("accepted watcher update");
+      fixture.admitOnGreen();
+      fixture.retire();
+      assertFalse(fixture.drain());
+      fixture.assertQueuedOnA();
+      fixture.aWriterFailsTheFile(IngestionOutcomeClass.IO_FAILED, IngestionReasonCodes.IO_ERROR);
+      for (int attempt = 0; attempt < 3; attempt++) {
+        assertFalse(fixture.drain(), "an I/O failure is no effect");
+      }
+      assertEquals(1, fixture.journalSize(), "the journal is kept");
+      assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(), "nothing is re-queued");
+    }
+  }
+
   private final class Fixture implements AutoCloseable {
     final Path file;
     final String original;
-    final SqliteJobQueue queue;
+    SqliteJobQueue queue;
     final RunningRuntime source;
 
     Fixture(Path dir, String content) throws Exception {
@@ -244,6 +376,18 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
           SchemaFields.SOURCE_SHA256, original)));
       source.commitOps().commitAndTrack(CommitReason.DRAIN);
       source.commitOps().maybeRefreshBlocking();
+    }
+
+    /** A new Engine process: the queue reopens and cleanup remembers nothing it admitted. */
+    void restart() throws Exception {
+      queue.close();
+      queue = new SqliteJobQueue(temp.resolve("jobs.db"));
+      queue.open();
+    }
+
+    /** An ordinary A admission of the file, as a watcher event or a rescan makes. */
+    void admitOnA() {
+      assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file)), "default"));
     }
 
     void capture() throws Exception {
@@ -278,6 +422,7 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
     }
 
     boolean drain(Runnable beforeAck) {
+      // A new context per attempt, as the Engine's cleanup builds.
       return KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
           new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
               queue, source, null, IndexingPacing.unthrottled(), temp, temp, new ObjectMapper(),
@@ -310,6 +455,22 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
       queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claim, null)),
           IngestionOutcome.of(IngestionOutcomeClass.SKIPPED_POLICY, IngestionReasonCodes.UNCHANGED,
               IngestionRetryPolicy.NONE));
+    }
+
+    /** A's writer claims the job and ends it without a write; {@code retire} drops A's copy. */
+    void aWriterEndsTheFile(IngestionOutcomeClass outcome, String reason, boolean retire)
+        throws Exception {
+      var claim = onlyClaim();
+      if (retire) source.indexingCoordinator().deleteByIdAndChunks(file.toString());
+      queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claim, null)),
+          IngestionOutcome.of(outcome, reason, IngestionRetryPolicy.NONE));
+    }
+
+    /** A's writer claims the job and fails it terminally. */
+    void aWriterFailsTheFile(IngestionOutcomeClass outcome, String reason) {
+      var claim = onlyClaim();
+      assertTrue(queue.markClaimFailed(claim,
+          IngestionOutcome.of(outcome, reason, IngestionRetryPolicy.NONE), null));
     }
 
     /** A's writer claims the job and cannot read the file; the row retries later. */

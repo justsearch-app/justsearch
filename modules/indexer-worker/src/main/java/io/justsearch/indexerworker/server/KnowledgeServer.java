@@ -355,6 +355,10 @@ public final class KnowledgeServer implements Closeable {
   private static final long REAP_INTERVAL_MS = 2 * 60_000L; // check every 2 min (poll cadence, not a window)
   /** How long a refused recorded candidate's cleanup retries each second after readiness. */
   private static final long REFUSAL_SETTLE_BOUND_MS = 60_000L;
+  /** Held by the one loop that retries refusal cleanup every second; the reaper tick yields. */
+  private final AtomicBoolean refusalCleanupRetrying = new AtomicBoolean();
+  /** The last refusal cleanup failure logged as an error; repeats log at debug. */
+  private volatile String lastRefusalCleanupFailure;
   private static final long EARLY_REFUSAL_FENCE_WAIT_MS = 100L;
   private java.util.concurrent.ScheduledExecutorService stuckJobReaper;
   private java.util.concurrent.ScheduledFuture<?> stuckJobReapTask;
@@ -2153,6 +2157,11 @@ public final class KnowledgeServer implements Closeable {
    * The reaper's own tick keeps retrying after the bound.
    */
   private void retryRefusedCandidateCleanup(long deadlineNanos) {
+    if (refusalCleanupRetrying.compareAndSet(false, true)) retryRefusedCandidateCleanupOwned(deadlineNanos);
+  }
+
+  /** One step of the retry loop that owns {@link #refusalCleanupRetrying}. */
+  private void retryRefusedCandidateCleanupOwned(long deadlineNanos) {
     boolean settled;
     try {
       settled = reconcileRefusedRecordedCandidate();
@@ -2162,15 +2171,21 @@ public final class KnowledgeServer implements Closeable {
     }
     var reaper = stuckJobReaper;
     if (settled || closeStarted || !running || reaper == null
-        || System.nanoTime() >= deadlineNanos || !refusedCandidateAwaitsCleanup()) return;
+        || System.nanoTime() >= deadlineNanos || !refusedCandidateAwaitsCleanup()) {
+      refusalCleanupRetrying.set(false);
+      return;
+    }
     try {
-      reaper.schedule(() -> retryRefusedCandidateCleanup(deadlineNanos), 1, TimeUnit.SECONDS);
+      reaper.schedule(() -> retryRefusedCandidateCleanupOwned(deadlineNanos), 1, TimeUnit.SECONDS);
     } catch (java.util.concurrent.RejectedExecutionException closing) {
+      refusalCleanupRetrying.set(false);
       if (!closeStarted) log.warn("Refused candidate cleanup retry could not be scheduled", closing);
     }
   }
 
   private void reconcileRefusedCandidateSafely() {
+    // The prompt retry loop, while it runs, already retries every second.
+    if (refusalCleanupRetrying.get()) return;
     try {
       reconcileRefusedRecordedCandidate();
     } catch (RuntimeException failure) {
@@ -8440,15 +8455,21 @@ public final class KnowledgeServer implements Closeable {
    */
   private void settleRefusedRecordedCandidate(long deadlineNanos) {
     if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded)) return;
-    while (true) {
-      if (reconcileRefusedRecordedCandidate() || closeStarted || !running) return;
-      if (!refusedCandidateAwaitsCleanup() || System.nanoTime() >= deadlineNanos) return;
-      try {
-        Thread.sleep(1_000);
-      } catch (InterruptedException interrupted) {
-        Thread.currentThread().interrupt();
-        return;
+    // One retry loop per cleanup: one already running retries for this monitor too.
+    if (!refusalCleanupRetrying.compareAndSet(false, true)) return;
+    try {
+      while (true) {
+        if (reconcileRefusedRecordedCandidate() || closeStarted || !running) return;
+        if (!refusedCandidateAwaitsCleanup() || System.nanoTime() >= deadlineNanos) return;
+        try {
+          Thread.sleep(1_000);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          return;
+        }
       }
+    } finally {
+      refusalCleanupRetrying.set(false);
     }
   }
 
@@ -9145,7 +9166,14 @@ public final class KnowledgeServer implements Closeable {
           if (encoderComponent != null) encoderComponent.transition(
               io.justsearch.core.component.ComponentState.UNAVAILABLE, null,
               "Refused candidate cleanup requires recovery: " + failure.getMessage());
-          log.error("Refused candidate still owns its Green resources", failure);
+          // Cleanup retries every second while it waits: report each distinct reason once.
+          String reason = failure.toString();
+          if (!reason.equals(lastRefusalCleanupFailure)) {
+            lastRefusalCleanupFailure = reason;
+            log.error("Refused candidate still owns its Green resources", failure);
+          } else {
+            log.debug("Refused candidate still owns its Green resources: {}", reason);
+          }
         }
       }
     } finally {

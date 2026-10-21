@@ -453,6 +453,64 @@ builder.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterAdmissionCommittedOnAHandsTheUpdateToA",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA"
       ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 6, failing on 5bb3ff9ec and passing after. Refusal cleanup judges A's committed effect from A's index: an accepted update settles when A holds the file's current bytes, from the accepted revision or a later one, also when a rescan left the row DONE/UNCHANGED with no content hash (M8: the saved FAILED/RUNNING store after one restart, and a later revision A durably holds). A terminal outcome of A's normal policy for the file's current state settles it the way it would outside a migration: a file replaced by a link (NON_REGULAR_SOURCE) and a file too large (BUDGET_EXCEEDED) are admitted once and settle. Cleanup admits a path at most once per file state: an outcome that settles nothing is not re-admitted until the file changes or the process restarts.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "A's committed effect is judged from A's index, not from the queue row. The obligation is settled when A's index holds content for the path that matches the file's current bytes on disk, from the accepted revision or any later one. A missing queue hash or an UNCHANGED outcome must not stop that check. If A holds the current bytes, the obligation is settled.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "A terminal outcome by A's normal policy settles the obligation the same way it would outside a migration. Examples: non-regular source, unsupported or excluded type, too large.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "At most one cleanup admission per path and current file state. Never admit again for the same state. Re-admit only after the file changes (a watcher event or a changed stat or hash) or after a restart.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/migration-recovery-r6-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aLaterRevisionAHoldsSettlesThoughARescanFoundItUnchanged",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aSavedFailedRunningStoreSettlesWhereAHoldsTheCurrentBytes",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aSymlinkReplacementAdmitsOnceAndSettlesByAsPolicy",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aTooLargeFileSettlesByAsPolicy",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#anUnsettledOutcomeIsAdmittedOncePerFileState"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 6 preservation, passing on 5bb3ff9ec and after. A's job for the accepted file ends in an I/O failure: that is no effect, so refusal cleanup keeps Green and the journal over repeated attempts and queues nothing more.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "Failure outcomes (I/O error, unreadable, a crash) never settle; they wait, as now.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/migration-recovery-r6-preserve.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#anIoFailedFileStillWaits"
+      ]
     }
   ]
 }

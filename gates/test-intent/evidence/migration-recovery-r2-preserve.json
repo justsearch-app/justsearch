@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T06:05:39.670Z",
-  "revision": "a26eaf3e3c1acd65a71652443a75080c080890e0",
-  "tree": "e2280fc2405d5f32b7a78d8127de2df7776e1229",
+  "createdAt": "2026-10-21T11:51:10.537Z",
+  "revision": "2397a837648dfd5f8479e8ae2724c8394c12baa8",
+  "tree": "56e269bc73412b7c98277020663a0bb39abe30f8",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAProjectionObligationKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.anUnlatchedMigratingCandidateKeepsBuilding\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aLaterAdmissionCommittedOnAHandsTheUpdateToA\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7242
+      "durationMs": 7058
     }
   ],
   "checks": [
@@ -81,7 +81,7 @@
         "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAProjectionObligationKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.anUnlatchedMigratingCandidateKeepsBuilding\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aLaterAdmissionCommittedOnAHandsTheUpdateToA\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 8220
+        "durationMs": 8945
       }
     ],
     "checks": [
@@ -102,5 +102,5 @@
       }
     ]
   },
-  "digest": "sha256:0b57659ea7eca0d375869d3805420b9ff9c8b1743020435546fdf6771f4f38a3"
+  "digest": "sha256:d93630214f4a5fec437128abea789ef0ee6ba83928eb8134b9ddaf73f8a5332a"
 }

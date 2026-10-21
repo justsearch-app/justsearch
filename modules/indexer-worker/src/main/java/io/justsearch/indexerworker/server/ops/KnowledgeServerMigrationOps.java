@@ -34,6 +34,7 @@ import io.justsearch.ipc.SyncDirectoryRequest;
 import io.justsearch.ipc.SyncDirectoryResponse;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -1634,6 +1635,8 @@ public final class KnowledgeServerMigrationOps {
       context.log().warn("Buffered UPSERT reader could not refresh", unavailable);
       return false;
     }
+    int awaited = 0;
+    String firstAwaited = null;
     try {
       for (var op : upserts) {
         var upsert = SwitchBufferUpsert.decode(op.payload());
@@ -1650,33 +1653,29 @@ public final class KnowledgeServerMigrationOps {
         }
         String indexed = context.ingestLifecycle().documentFieldOps()
             .getDocumentFieldOrThrow(upsert.path(), SchemaFields.SOURCE_SHA256);
-        // A refused candidate hands its admission to A only by A's committed effect: A holds
-        // the bytes this admission or a later one wrote. A pending or failed A job only waits.
-        SwitchBufferCapableQueue.SourceFileWork work = null;
         if (refusedSourceRecovery) {
-          work = queue.sourceFileWork(upsert.path(), indexed);
-          if (work == SwitchBufferCapableQueue.SourceFileWork.COMMITTED) continue;
+          // The writer of this very admission committed the other bytes A holds (a captured
+          // witness); A holding the accepted bytes proves nothing about the file's current ones.
+          // Judge every admission, so each one A lacks gets its A job in this attempt.
+          boolean proved = queue.matchesAcceptedFileProjection(upsert.path(),
+              upsert.unitRevision(), upsert.sourceSha256(), indexed)
+              && !upsert.sourceSha256().equals(indexed);
+          if (!proved && !sourceHoldsAdmission(context, queue, upsert, indexed)) {
+            if (awaited++ == 0) firstAwaited = upsert.path();
+          }
+          continue;
         }
         boolean settled = queue.matchesAcceptedFileProjection(
             upsert.path(), upsert.unitRevision(), upsert.sourceSha256(), indexed);
-        String onDisk = null;
-        if (refusedSourceRecovery && upsert.sourceSha256().equals(indexed)) {
-          // A holds the accepted bytes, whatever the row says: the exact projection also
-          // accepts a row that wrote nothing (retired or refused), and a later admission that
-          // found A unchanged moved the row's revision on without writing. A captured witness
-          // names the plan's bytes, not the bytes a later watcher update admitted, so A must
-          // hold the file's current bytes as well.
-          onDisk = currentSource(upsert.path());
-          settled = indexed.equals(onDisk);
-        }
-        if (!settled && refusedSourceRecovery) {
-          settled = handUnappliedAdmissionToSource(context, queue, upsert, indexed,
-              onDisk != null ? onDisk : currentSource(upsert.path()), work);
-        }
         if (!settled) {
           context.log().warn("Buffered UPSERT lacks its accepted target projection: {}", upsert.path());
           return false;
         }
+      }
+      if (awaited != 0) {
+        context.log().warn("Refused candidate awaits A's effect on {} accepted file(s), first: {}",
+            awaited, firstAwaited);
+        return false;
       }
       return !finalEffects || certifyReplayFileDeleteScopes(context, orderedOps, deleteOrder);
     } catch (IOException | RuntimeException unavailable) {
@@ -1700,31 +1699,58 @@ public final class KnowledgeServerMigrationOps {
   }
 
   /**
-   * Refusal cleanup only: an accepted admission A does not hold. The Engine may have retired its
-   * row unwritten, so nothing would ever bring A to the file: queue one ordinary A job for the
-   * path (A's removal path when the file is gone) unless the path's own A job is outstanding.
-   * Either way the admission settles only once A's writer commits its effect, on a later attempt;
-   * a job that fails keeps the journal. A file A already lacks and the disk lacks needs nothing.
-   * An unreadable file is not queued and stays unproved.
+   * Refusal cleanup only: whether A's committed effect settles an accepted admission. A
+   * candidate hands its admission to A only by that effect, judged from A's index: A holds the
+   * file's current bytes (from this admission or any later one), the bytes a later admission's
+   * writer committed, the removal of a file that is gone, or A's normal policy ended the file's
+   * current state (not a regular file, excluded, too large). A pending or failed A job only
+   * waits, and an unreadable file stays unproved.
+   *
+   * <p>Otherwise the Engine may have retired the admission's row unwritten, so nothing would ever
+   * bring A to the file: queue one ordinary A job for the path, once per file state. A file that
+   * changes, or a restart, may admit it again; the same state is never admitted twice.
    */
-  private static boolean handUnappliedAdmissionToSource(DrainSwitchBufferContext context,
-      SwitchBufferCapableQueue queue, SwitchBufferUpsert upsert, String indexed, String onDisk,
-      SwitchBufferCapableQueue.SourceFileWork work) throws IOException {
+  private static boolean sourceHoldsAdmission(DrainSwitchBufferContext context,
+      SwitchBufferCapableQueue queue, SwitchBufferUpsert upsert, String indexed) throws IOException {
+    var work = queue.sourceFileWork(upsert.path(), indexed);
+    if (work == SwitchBufferCapableQueue.SourceFileWork.COMMITTED) return true;
+    String onDisk = currentSource(upsert.path());
+    if (onDisk == null) return false; // Unreadable: A's effect for it is unknown.
+    if (indexed != null && indexed.equals(onDisk)) return true;
+    Path file = Path.of(upsert.path());
     if (SOURCE_GONE.equals(onDisk) && indexed == null
         && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(upsert.path()) == 0) {
-      return true; // A already shows the removal.
+      return true; // A shows the removal.
     }
-    if (onDisk == null || work == SwitchBufferCapableQueue.SourceFileWork.OUTSTANDING) {
-      return false;
-    }
-    Path file = Path.of(upsert.path());
+    String state = fileState(file, onDisk);
+    boolean admittedNow = state.equals(
+        queue.refusalCleanupAdmission(context.replayGeneration(), upsert.path()));
+    // The policy outcome must be the writer's answer to this file state, which only an
+    // admission of that state that it finished proves.
+    if (work == SwitchBufferCapableQueue.SourceFileWork.POLICY && admittedNow) return true;
+    if (work == SwitchBufferCapableQueue.SourceFileWork.OUTSTANDING || admittedNow) return false;
     var entry = new JobQueue.EnqueueEntry(file, JobQueue.EnqueueEntry.stat(file).sizeBytes(),
         upsert.provenance(), null, upsert.ingestionRoot());
     if (queue.enqueueEntries(List.of(entry), upsert.collection()) == 1) {
+      queue.recordRefusalCleanupAdmission(context.replayGeneration(), upsert.path(), state);
       context.log().info("Refused candidate queued its unapplied admission on the source: {}",
           upsert.path());
     }
     return false;
+  }
+
+  /** The file's kind, size, modification time, identity and bytes, links not followed. */
+  private static String fileState(Path file, String bytes) {
+    try {
+      var attributes = Files.readAttributes(file, BasicFileAttributes.class,
+          LinkOption.NOFOLLOW_LINKS);
+      String kind = attributes.isRegularFile() ? "file" : attributes.isSymbolicLink() ? "link"
+          : attributes.isDirectory() ? "directory" : "other";
+      return kind + '/' + attributes.size() + '/' + attributes.lastModifiedTime().toMillis() + '/'
+          + attributes.fileKey() + '/' + bytes;
+    } catch (IOException | RuntimeException absent) {
+      return SOURCE_GONE + '/' + bytes;
+    }
   }
 
   /** A broad receipt used to supersede a file witness must prove its complete final scope. */
@@ -2029,7 +2055,7 @@ public final class KnowledgeServerMigrationOps {
       content = Files.readString(rootsFile);
     } catch (NoSuchFileException absent) {
       // A missing registry is valid only when the path itself is absent, not a dangling link.
-      if (!Files.notExists(rootsFile, java.nio.file.LinkOption.NOFOLLOW_LINKS)) throw absent;
+      if (!Files.notExists(rootsFile, LinkOption.NOFOLLOW_LINKS)) throw absent;
       content = null;
     }
     if (content != null) {
@@ -2073,7 +2099,7 @@ public final class KnowledgeServerMigrationOps {
 
   private static void requireMigrationRoot(Path root) throws IOException {
     if (root == null) throw new IOException("Null migration root");
-    BasicFileAttributes attributes = Files.readAttributes(root, BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+    BasicFileAttributes attributes = Files.readAttributes(root, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
     if ((!attributes.isDirectory() && !attributes.isRegularFile()) || !Files.isReadable(root)) {
       throw new IOException("Unreadable migration root: " + root);
     }
@@ -2145,7 +2171,7 @@ public final class KnowledgeServerMigrationOps {
         while (iterator.hasNext()) {
           Path path = iterator.next();
           requireEnumerationRunning(context);
-          BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+          BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
           if (attributes.isDirectory()) continue;
           if (help && !path.toString().endsWith(".md")) continue;
           if (!attributes.isRegularFile() || !Files.isReadable(path)) {
