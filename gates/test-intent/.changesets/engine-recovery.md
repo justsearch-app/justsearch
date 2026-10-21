@@ -9,7 +9,7 @@ author-session: 01a1563a-7f02-7081-9d04-646e3ac0b504
 
 Owner adopted the E1–E21 scenarios on 2026-10-20. Entries below quote the relevant
 scenarios verbatim. Engine-side queue scenarios E8–E15 belong to a later assignment.
-Coverage is against the merge-base with origin/main, 2ba7d810e. There are thirteen flagged items;
+Coverage is against the merge-base with origin/main, f6d92d768. There are thirteen flagged items;
 separate entries distinguish new assertions from unchanged test formatting in the same item.
 No acceptance record is written by the builder. Governance tooling is unchanged. The current
 correction refreshes Java execution evidence for the expanded fatal-header checks; all existing
@@ -395,7 +395,7 @@ acceptance on the changed digest.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/engine-recovery-updater.json",
+      "evidence": "gates/test-intent/evidence/engine-recovery-merge-856.json",
       "newChecks": [
         "modules/shell/src-tauri/src/updater.rs#updater::tests::download_failures_and_rejections_return_to_actionable_error"
       ],
@@ -428,7 +428,7 @@ acceptance on the changed digest.
         "modules/ui-web/src/boot/desktopRecovery.test.ts"
       ],
       "class": "New",
-      "behaviour": "Four added tests cover restart_engine invocation and refused-update reason with usable controls (E3/E5); Java spawn obstacle, retained native frame, crash-folder reveal with spaces and daily restart count (E1/E3/E6/E19); running-but-not-ready cause even when the API responds (E20); and locked-profile explanation with no automatic retry (E7). The existing terminal-recovery assertion changes from \"Try connecting again\" to \"Restart JustSearch\", as E3 requires. Other existing expectations stay. Whole-file execution covers all eleven tests; baseline assertions fail and candidate passes.",
+      "behaviour": "Four added tests cover restart_engine invocation and refused-update reason with usable controls (E3/E5); Java spawn obstacle, retained native frame, crash-folder reveal with spaces and daily restart count (E1/E3/E6/E19); running-but-not-ready cause even when the API responds (E20); and locked-profile explanation with no automatic retry (E7). The existing terminal-recovery assertion changes from \"Try connecting again\" to \"Restart JustSearch\", as E3 requires. Other existing expectations stay. Whole-file execution covers all thirteen cases after the #856 merge. The two administrator-refusal cases from main and every existing branch test are retained byte-for-byte; these are preservation checks. Recovery assertions fail on current main f6d92d768 and all thirteen cases pass on the merged candidate.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -480,7 +480,7 @@ acceptance on the changed digest.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/engine-recovery-ui.json",
+      "evidence": "gates/test-intent/evidence/engine-recovery-merge-856.json",
       "newChecks": [
         "modules/ui-web/src/boot/desktopRecovery.test.ts"
       ],
@@ -522,6 +522,38 @@ execution evidence is refreshed with the unmodified evidence runner in a disposa
 its temporary before checkout writes no registration into the source repository. The runner is
 held under js-gradle-slot for its complete Gradle execution. All older evidence files and every
 acceptance/rejection record are preserved; a new independent acceptance is required for this digest.
+
+## Merge of main's app-update switch (2026-10-21)
+
+Merge commit e333bcdf5 has parents 4e918cce5 and origin/main f6d92d768, without rebasing.
+The updater conflict keeps both main authorization checks (including reauthorization just before
+artifact download), enters downloading only after authorization, and retains the recovery branch's
+checked_installer_bytes path that publishes actionable error state on download/validation failure.
+The boot-test conflict is split into independent test groups: main's two administrator-refusal
+cases are copied verbatim; removing that copied group leaves the first parent's whole test file
+byte-identical. Every pre-existing recovery expectation and crash-artifact implementation is kept.
+No oracle is weakened or deleted and no new test case is introduced by this merge resolution.
+
+Entries 10 and 12 now use the unmodified execution-evidence runner's fresh combined artifact,
+engine-recovery-merge-856.json. The updater recovery check and all 13 boot cases pass on the merged
+candidate. Against f6d92d768, the updater assertion observes downloading instead of error, and the
+recovery UI assertions fail for the missing restart/crash/not-ready behavior. Main's administrator
+refusal cases stay green before and after. The unchanged updater compatibility patch only extracts
+the predecessor's inline download acceptance into a callable helper; it adds no error transition.
+The runner executes in a disposable shared clone under TMPDIR and writes no worktree registration
+into the source repository. No Gradle invocation is needed for these Rust/Vitest checks.
+
+The full shell suite reproduces exactly the seven user-excluded updater_probe::handoff_tests
+failures; they are baseline failure, unchanged. Those fixture files are byte-identical to main.
+Filtering only the seven named failures leaves the remaining library and binary suite green.
+The six related Vitest files pass all 29 cases; store-recoverability's test gate passes 85
+assertions and its register gate recognizes 56 durable authorities. Clippy succeeds with warnings.
+Conformance passes the self-test 35/35, dev-runner adapter 50/50 and freshly built Tauri adapter
+60/60, including exit-2 exhaustion, delayed/manual recovery, update holds and quit. The final gate
+covers all 13 flagged items and requires only fresh independent acceptance; its nonblocking audit
+warning reports third-reviewer tie-breaks on 1 of 8 audited PRs (12.5%).
+Every older evidence artifact and every existing acceptance/rejection record is preserved.
+The merge is the only commit; this changeset and its new execution evidence remain uncommitted.
 
 ## Acceptance records
 
