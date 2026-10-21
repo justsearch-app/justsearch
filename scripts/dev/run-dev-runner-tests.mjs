@@ -19,7 +19,6 @@
  * Exit code: 0 iff every discovered test file exited 0.
  */
 
-import { PR_FLAKES } from '../ci/pr-flakes.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,10 +51,6 @@ if (files.length < MIN_EXPECTED_FILES) {
 let passed = 0;
 let skipped = 0;
 const failures = [];
-
-if (process.env.JUSTSEARCH_PR_CI === 'true') {
-  for (const row of PR_FLAKES.filter((row) => row.runner === 'supervisor')) console.log(`SKIP PR flake (main-only conformance): ${row.identifier}`);
-}
 
 for (const file of files) {
   const rel = path.relative(process.cwd(), file);

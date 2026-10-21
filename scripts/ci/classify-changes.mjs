@@ -4,37 +4,35 @@ import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export const LANES = Object.freeze(['build', 'license', 'ui', 'services', 'search', 'platform', 'windows', 'devrunner', 'rust', 'lifecycle', 'integration', 'jseval']);
-const java = ['build', 'ui', 'services', 'search', 'platform', 'windows', 'lifecycle', 'integration'];
-const contracts = [...java, 'rust', 'jseval', 'devrunner'];
+const java = ['build', 'ui', 'services', 'search', 'platform', 'windows', 'devrunner', 'jseval', 'lifecycle', 'integration'];
+const contracts = [...java, 'rust'];
 // Unclaimed paths deliberately select everything. Rules overlap: a mixed diff and
 // a file consumed by several lanes both take the union, never first-match wins.
 export const RULES = [
   [/^(?:docs\/|\.claude\/|\.codex\/|\.agents\/|AGENTS\.md$|[^/]+\.md$)/, []],
   [/^modules\/(?:adapters-lucene|ai-backend|api-contract-projection-java|app-agent|app-agent-api|app-api|app-config|app-engine|app-inference|app-observability|app-services|app-util|configuration|core|core-contracts|extension-substrate|gpu-bridge|indexer-worker|indexing|infra-core|ipc-common|ort-common|prompt-support|reranker|telemetry|worker-core|worker-services)\//, java],
   [/^modules\/ui\//, java.filter((lane) => lane !== 'search')],
-  [/^modules\/system-tests\//, ['build', 'services', 'platform', 'integration', 'lifecycle']],
-  [/^modules\/(?:app-api-tck|app-launcher|benchmarks|dead-code-audit|ssot-tools|test-support)\//, ['build', 'services', 'platform']],
-  [/^modules\/ui-web\//, ['build', 'ui', 'services', 'lifecycle', 'integration']],
+  [/^modules\/system-tests\//, ['build', 'services', 'platform', 'windows', 'devrunner', 'jseval', 'integration', 'lifecycle']],
+  [/^modules\/(?:app-api-tck|app-launcher|benchmarks|dead-code-audit|ssot-tools|test-support)\//, ['build', 'services', 'platform', 'windows', 'devrunner', 'jseval']],
+  [/^modules\/ui-web\//, ['build', 'ui', 'services', 'devrunner', 'windows', 'jseval', 'lifecycle', 'integration']],
   [/^modules\/ui-web\/(?:scripts\/|[^/]*(?:config|package)[^/]*$)/, ['devrunner']],
   [/^modules\/ui-web\/src\/api\/backendRestart\.ts$/, ['rust']],
   [/^modules\/app-services\/src\/test\/resources\/policy\/app-update-policy-cases\.json$/, ['rust']],
-  [/^(?:modules\/shell\/|native\/)/, ['build', 'rust', 'services', 'platform', 'windows', 'devrunner', 'lifecycle', 'integration']],
-  [/^(?:build-logic\/|gradle\/|gradlew|settings\.gradle|build\.gradle|gradle\.properties)/, contracts],
+  [/^(?:modules\/shell\/|native\/)/, ['build', 'rust', 'services', 'platform', 'windows', 'devrunner', 'jseval', 'lifecycle', 'integration']],
+  [/^(?:build-logic\/|gradle\/|gradlew|settings\.gradle|build\.gradle|gradle\.properties)/, LANES],
   [/^(?:schemas?\/|contracts?\/|catalog\/|ssot\/|scripts\/(?:codegen|wire-contract)\/)/, contracts],
-  [/^(?:packages\/runtime-client\/)/, ['build', 'ui', 'services', 'lifecycle', 'integration']],
-  [/^(?:scripts\/jseval\/)/, ['jseval', 'services', 'platform', 'lifecycle', 'integration']],
-  [/^(?:scripts\/dev\/(?:.*dev-runner.*|.*supervisor.*)|scripts\/supervisor-conformance\/|scripts\/lib\/|scripts\/.*launcher.*|dev-runner\.cjs$)/, ['devrunner', 'windows', 'rust', 'lifecycle', 'integration']],
+  [/^packages\//, contracts],
+  [/^(?:scripts\/jseval\/)/, ['jseval', 'services', 'platform', 'devrunner', 'windows', 'lifecycle', 'integration']],
+  [/^(?:scripts\/dev\/|scripts\/supervisor-conformance\/|scripts\/lib\/|scripts\/.*launcher.*|dev-runner\.cjs$)/, contracts],
   [/^(?:scripts\/release\/|scripts\/ci\/(?:test-.*(?:sign|codesign|release-compatibility|pe-signatures).*|.*release-signing.*))/, ['windows', 'lifecycle', 'integration']],
-  [/^governance\/supervision-contract\.v1\.json$/, ['services', 'rust', 'devrunner', 'windows', 'lifecycle', 'integration']],
-  [/^governance\/(?:store-recoverability\.v1\.json|exit-ledger\.v1\.schema\.json)$/, ['rust', 'devrunner']],
-  [/^governance\/platform-paths/, ['rust', 'windows', 'devrunner']],
+  [/^governance\//, LANES],
   [/^gates\/config-surface\//, ['platform', 'services']],
-  [/^(?:governance\/|gates\/)/, ['services', 'platform', 'jseval']],
-  [/^(?:package(?:-lock)?\.json$)/, ['build', 'license', 'devrunner', 'ui', 'services']],
+  [/^gates\//, ['services', 'platform', 'jseval']],
+  [/^(?:package(?:-lock)?\.json$)/, ['build', 'license', 'devrunner', 'jseval', 'ui', 'services']],
   [/(?:^|\/)(?:package(?:-lock)?\.json|Cargo\.(?:toml|lock)|[^/]*\.gradle\.kts|gradle\.lockfile|libs\.versions\.toml)$/, ['license']],
   [/^(?:modules\/configuration\/src\/main\/resources\/ai\/model-registry\.v2\.json|scripts\/codegen\/(?:gen-notices\.mjs|.*license.*\.json)|packaging\/runtime\/(?:tesseract-.*\.json|NOTICE-MODELS\.txt)|THIRD_PARTY_NOTICES)$/, ['license']],
-  [/^(?:models\/|licenses?\/|notices?\/|NOTICE|LICENSE|native-licenses\/)/, ['license']],
-  [/^docs\/reference\/legal\/ai-runtime-and-model-redistribution\.md$/, ['license']],
+  [/^models\//, [...contracts, 'license']],
+  [/^(?:licenses?\/|notices?\/|NOTICE|LICENSE|native-licenses\/)/, ['license']],
 ];
 
 export function classifyPaths(paths, eventName = 'pull_request') {
@@ -46,6 +44,13 @@ export function classifyPaths(paths, eventName = 'pull_request') {
     const rules = RULES.filter(([pattern]) => pattern.test(path));
     if (!rules.length) return all();
     for (const [, lanes] of rules) for (const lane of lanes) selected[lane] = true;
+  }
+  // Both Windows lanes consume the dev-runner and Java inputs. Keep their
+  // selection together even when a shared non-module file selected a Java lane.
+  if (selected.devrunner || selected.build || selected.ui || selected.services || selected.search
+      || selected.platform || selected.lifecycle || selected.integration) {
+    selected.devrunner = true;
+    selected.windows = true;
   }
   return selected;
 }
@@ -59,7 +64,7 @@ export function classifyDiff({ eventName, base, head, git = (args) => execFileSy
     if (fields.pop() !== '' || !fields.length || fields.length % 2) throw new Error('incomplete diff');
     const paths = [];
     for (let i = 0; i < fields.length; i += 2) {
-      if (!/^[ACDMRTUXB]$/.test(fields[i])) throw new Error('malformed diff status');
+      if (!/^[ADMT]$/.test(fields[i])) throw new Error('malformed diff status');
       paths.push(fields[i + 1]);
     }
     return classifyPaths(paths, eventName);

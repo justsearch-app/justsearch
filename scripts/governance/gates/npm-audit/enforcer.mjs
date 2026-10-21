@@ -141,14 +141,22 @@ export async function enforceNpmAudit(options) {
       if (!trackedSeverities.has(advisory.severity)) continue;
       if (prMode && advisory.affected.every((entry) => baseSpecs.get(target).has(`${entry.package}@${entry.version}`))) continue;
       const accepted = baselineMap.get(id);
-      if (!prMode && accepted && severityRank(accepted.severity) >= severityRank(advisory.severity)) continue;
+      if (accepted && severityRank(accepted.severity) >= severityRank(advisory.severity)
+          && (!prMode || classification !== 'silent-regression')) {
+        // Introducing another affected version still needs deliberate acceptance on PRs.
+        // The baseline-shift check below independently enforces a newly added pin.
+        if (prMode) hasRegression = true;
+        continue;
+      }
       hasRegression = true;
       verdict = 'fail';
       if (classification === 'silent-regression') {
         findings.push({
           ruleId: 'npm-audit/silent-regression', level: 'error', uri: gate.baseline.path,
           message: accepted
-            ? `${target} ${id} severity increased ${accepted.severity} → ${advisory.severity} without a declared changeset.`
+            ? (severityRank(advisory.severity) > severityRank(accepted.severity)
+              ? `${target} ${id} severity increased ${accepted.severity} → ${advisory.severity} without a declared changeset.`
+              : `${target} introduces an affected package version for accepted advisory ${id} without a declared changeset.`)
             : `${target} has new ${advisory.severity} advisory ${id} without a declared changeset.`,
         });
       } else {

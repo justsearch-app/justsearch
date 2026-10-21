@@ -9,6 +9,7 @@ import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.plugins.quality.Pmd
 import org.gradle.api.plugins.quality.PmdExtension
 import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.withType
@@ -25,6 +26,35 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
     project.plugins.apply("conventions.coverage")
     project.plugins.apply("conventions.errorprone")
     project.plugins.apply("conventions.spotbugs")
+
+    // Separate Test tasks preserve one owner per hosted shard. They use the same
+    // compiled test source set and conventions as the complete local `test` task.
+    val shardPolicy = groovy.json.JsonSlurper().parseText(project.providers.fileContents(
+        project.rootProject.layout.projectDirectory.file("scripts/ci/unit-test-class-shards.v1.json")
+    ).asText.get()) as Map<*, *>
+    val moduleShards = (shardPolicy["modules"] as Map<*, *>)[project.name] as? Map<*, *>
+    if (moduleShards != null) {
+      val count = (moduleShards["count"] as Number).toInt()
+      val overrides = (moduleShards["classes"] as Map<*, *>).map { (name, bucket) ->
+        name.toString() to (bucket as Number).toInt()
+      }.toMap()
+      val testSources = project.extensions.getByType(SourceSetContainer::class.java).named("test")
+      for (bucket in 0 until count) {
+        project.tasks.register("ciUnitTest${bucket + 1}", Test::class.java) {
+          group = "verification"
+          description = "Disjoint hosted unit-test shard ${bucket + 1}/$count"
+          testClassesDirs = testSources.get().output.classesDirs
+          classpath = testSources.get().runtimeClasspath
+          include { element ->
+            if (element.isDirectory) true else {
+              val name = element.relativePath.pathString.removeSuffix(".class")
+                  .substringBefore('$').replace('/', '.')
+              (overrides[name] ?: Math.floorMod(name.hashCode(), count)) == bucket
+            }
+          }
+        }
+      }
+    }
 
     // Serialize test tasks across parallel project builds to avoid memory pressure.
     // Default: 3 concurrent test JVMs locally (32GB RAM, 12-core 12700K), 1 in CI (conservative).

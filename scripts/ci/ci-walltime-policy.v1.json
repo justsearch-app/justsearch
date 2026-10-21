@@ -22,9 +22,19 @@
       "requiredCheck": "Unit tests (app-ui)",
       "owner": "app and UI hosted unit evidence",
       "hardTimeoutSeconds": 1500,
-      "notes": "Initial split budget: preserves all tests and per-test budgets; review after comparable uncached hosted runs.",
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21; confirm total wall time after rollout.",
       "advisoryBudgets": {
-        "maxWallSeconds": 1200
+        "maxWallSeconds": 660
+      }
+    },
+    {
+      "job": "Unit tests (app-ui-ui-2)",
+      "requiredCheck": "Unit tests (app-ui)",
+      "owner": "app and UI hosted unit evidence",
+      "hardTimeoutSeconds": 1500,
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21; confirm total wall time after rollout.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 660
       }
     },
     {
@@ -32,9 +42,29 @@
       "requiredCheck": "Unit tests (app-ui)",
       "owner": "app and UI hosted unit evidence",
       "hardTimeoutSeconds": 1800,
-      "notes": "Initial split budget: preserves all tests and per-test budgets; review after comparable uncached hosted runs.",
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21; confirm total wall time after rollout.",
       "advisoryBudgets": {
-        "maxWallSeconds": 1440
+        "maxWallSeconds": 660
+      }
+    },
+    {
+      "job": "Unit tests (app-ui-services-2)",
+      "requiredCheck": "Unit tests (app-ui)",
+      "owner": "app and UI hosted unit evidence",
+      "hardTimeoutSeconds": 1800,
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21; confirm total wall time after rollout.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 660
+      }
+    },
+    {
+      "job": "Unit tests (app-ui-services-3)",
+      "requiredCheck": "Unit tests (app-ui)",
+      "owner": "app and UI hosted unit evidence",
+      "hardTimeoutSeconds": 1800,
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21; confirm total wall time after rollout.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 660
       }
     },
     {
@@ -51,20 +81,60 @@
       "job": "Unit tests (search-worker)",
       "requiredCheck": "Unit tests (search-worker)",
       "owner": "search and worker hosted unit evidence",
-      "hardTimeoutSeconds": 1500,
-      "notes": "Recent median 89s, observed max 330s.",
+      "hardTimeoutSeconds": 120,
+      "notes": "Required aggregate over disjoint shards.",
       "advisoryBudgets": {
-        "maxWallSeconds": 390
+        "maxWallSeconds": 30
+      }
+    },
+    {
+      "job": "Unit tests (search-worker-1)",
+      "requiredCheck": "Unit tests (search-worker)",
+      "owner": "search and worker hosted unit evidence",
+      "hardTimeoutSeconds": 1500,
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21; confirm total wall time after rollout.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 660
+      }
+    },
+    {
+      "job": "Unit tests (search-worker-2)",
+      "requiredCheck": "Unit tests (search-worker)",
+      "owner": "search and worker hosted unit evidence",
+      "hardTimeoutSeconds": 1500,
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21; confirm total wall time after rollout.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 660
       }
     },
     {
       "job": "Unit tests (platform-contracts)",
       "requiredCheck": "Unit tests (platform-contracts)",
       "owner": "platform, inference, contract, and governance hosted unit evidence",
-      "hardTimeoutSeconds": 1500,
-      "notes": "Recent median 92s, observed max 248s. PMD does not run here, and the record of why is the point of this note: tempdoc 930 \u00a722.2 follow-up 10 briefly put the `Static analysis (PMD, all source sets)` step in this lane (matrix `if`) on the expectation that a lane already compiling test sources would run `pmdAll` cheaper than `Build (no model blobs)`, where it measured 188s. Measured, the expectation was wrong \u2014 201s here, and the lane at 487-488s (259s tests + 201s PMD) OVER its 360s advisory budget, while the origin job runs 469s against 600s. `pmdAll` needs main AND every non-main source set for all ~30 modules, whereas this lane compiles `test` for only fifteen and `assemble` had already compiled all of main. The step went back to `Build (no model blobs)`. Do not relocate it here again without re-measuring \u2014 that is the move this note exists to stop.",
+      "hardTimeoutSeconds": 120,
+      "notes": "Required aggregate over disjoint shards.",
       "advisoryBudgets": {
-        "maxWallSeconds": 360
+        "maxWallSeconds": 30
+      }
+    },
+    {
+      "job": "Unit tests (platform-contracts-1)",
+      "requiredCheck": "Unit tests (platform-contracts)",
+      "owner": "platform, inference, contract, and governance hosted unit evidence",
+      "hardTimeoutSeconds": 1500,
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21; confirm total wall time after rollout.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 660
+      }
+    },
+    {
+      "job": "Unit tests (platform-contracts-2)",
+      "requiredCheck": "Unit tests (platform-contracts)",
+      "owner": "platform, inference, contract, and governance hosted unit evidence",
+      "hardTimeoutSeconds": 1500,
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21; confirm total wall time after rollout.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 660
       }
     },
     {

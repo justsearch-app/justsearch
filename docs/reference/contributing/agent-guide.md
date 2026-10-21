@@ -357,9 +357,11 @@ license and notices, no-model build, unit tests, secret scan, and the
 `jseval Python suite` (required since 2026-09-05, ADR-0044 amendment). A red
 check should name the fact that failed rather than one generic build bucket.
 
-The public unit-test signal runs in four lanes: `Unit tests (app-ui-ui)`,
-`Unit tests (app-ui-services)`, `Unit tests (search-worker)`, and
-`Unit tests (platform-contracts)`. `Unit tests (app-ui)` aggregates the first two lanes.
+The public unit-test signal uses nine execution shards across UI, services, search-worker
+and platform-contracts. `Unit tests (app-ui)`, `Unit tests (search-worker)` and
+`Unit tests (platform-contracts)` aggregate their selected shards, accepting intentional skips
+and failing on a shard failure or cancellation. The expensive source sets use disjoint
+class partitions from `scripts/ci/unit-test-class-shards.v1.json`; local `test` tasks remain complete.
 Each execution lane publishes a unit-test attribution report from Gradle/JUnit XML. Use those reports to
 identify slow modules, slow suites, skipped counts, and hosted runner image
 identity before proposing another workflow split. Do not split the lanes solely

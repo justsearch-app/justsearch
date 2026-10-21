@@ -112,9 +112,9 @@ test('snapshot production gates remain enforced through a fail-closed required a
   };
   assert.deepEqual(checkCoverage({ ...options, workflowText }).issues, []);
   for (const altered of [
-    workflowText.replace('needs: [app-ui-ui, app-ui-services]', 'needs: [app-ui-ui]'),
+    workflowText.replace('needs: [app-ui-ui, app-ui-ui-2, app-ui-services, app-ui-services-2, app-ui-services-3]', 'needs: [app-ui-ui]'),
     workflowText.replace('  app-ui-services:\n', '  app-ui-services:\n    continue-on-error: true\n'),
-    workflowText.replace('[[ "$SERVICES_RESULT" = success || "$SERVICES_RESULT" = skipped ]]', 'true'),
+    workflowText.replace('[[ "$PART_C" = success || "$PART_C" = skipped ]]', 'true'),
     workflowText.replace(':modules:app-services:exportRegistrySnapshot', ':modules:app-services:classes'),
     workflowText.replace("includes('snapshot-missing')", "includes('ignored')"),
   ]) {

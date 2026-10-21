@@ -67,14 +67,14 @@ test('both installed Engine tiers always collect and upload additional child log
 test('PRs scope fixed jobs and main runs every slow tier', () => {
   const jobs = load(workflow).jobs;
   const mainOnly = "github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')";
-  for (const id of ['jseval-suite', 'license-and-notices', 'build', 'app-ui-ui', 'app-ui-services',
-    'unit-tests-search-worker', 'unit-tests-platform-contracts', 'shell-rust-tests', 'shell-rust-tests-linux',
+  for (const id of ['jseval-suite', 'license-and-notices', 'build', 'app-ui-ui', 'app-ui-ui-2', 'app-ui-services', 'app-ui-services-2', 'app-ui-services-3',
+    'unit-tests-search-worker-1', 'unit-tests-search-worker-2', 'unit-tests-platform-contracts-1', 'unit-tests-platform-contracts-2', 'shell-rust-tests', 'shell-rust-tests-linux',
     'windows-native-node', 'windows-native-contracts', 'lifecycle-integration-tests']) {
     assert.equal(jobs[id].needs, 'changes', id);
     assert.match(jobs[id].if, /^needs\.changes\.outputs\.[a-z]+ != 'false'$/, id);
     assert.ok(!jobs[id].strategy, `${id}: literal check names must report even when skipped`);
   }
-  for (const id of ['app-ui', 'windows-native-tests', 'secret-scan', 'public-claims']) assert.equal(jobs[id].if, 'always()', id);
+  for (const id of ['app-ui', 'unit-tests-search-worker', 'unit-tests-platform-contracts', 'windows-native-tests', 'secret-scan', 'public-claims']) assert.equal(jobs[id].if, 'always()', id);
   for (const id of ['measured-axe', 'integration-tests']) assert.equal(jobs[id].if, mainOnly, id);
   assert.notEqual(jobs['integration-tests']['continue-on-error'], true);
   assert.equal(jobs['ci-walltime'].if, `always() && (${mainOnly})`);

@@ -388,7 +388,7 @@ console.log('test-report-ci-evidence-digest: PASS');
   assert.equal(report.partEvidence.find((p) => p.job === windows.name).artifactPresent, false);
   assert.ok(report.warnings.some((w) => w.includes('windows-native-contracts-attempt-2')));
   assert.ok(report.jobs.find((j) => j.name === ui.name).factLane.required);
-  assert.match(report.jobs.find((j) => j.name === ui.name).localReproduction[0], /:modules:ui:test/);
+  assert.match(report.jobs.find((j) => j.name === ui.name).localReproduction[0], /:modules:ui:ciUnitTest1/);
 }
 
 // Hosted CP5: GitHub gives unchanged parts the current workflow attempt number
@@ -441,4 +441,24 @@ console.log('test-report-ci-evidence-digest: PASS');
   assert.ok(!report.warnings.some((warning) => /has no .*artifact listed/.test(warning)), report.warnings.join('\n'));
   const worked = check([job('Unit tests (search-worker)', 'success', 1, 2, [step('Tests', 'success', 1, 2)])]);
   assert.ok(worked.warnings.some((warning) => /has no .*artifact listed/.test(warning)));
+}
+
+// Every new shard owns an artifact and inherits its parent's required status;
+// aggregates never expect a JUnit payload from a shard's previous generation.
+{
+  const shardPolicy = JSON.parse(fs.readFileSync(new URL('./unit-test-shard-policy.v1.json', import.meta.url), 'utf8'));
+  const jobs = shardPolicy.lanes.map(lane => job(lane.jobName, 'success', 1, 2));
+  jobs.push(...shardPolicy.aggregates.filter(aggregate => aggregate.jobId !== 'windows-native-tests')
+    .map(aggregate => job(aggregate.requiredCheck, 'success', 3, 4)));
+  const report = buildDigest({ policy, run: greenRun, jobsDoc: { jobs },
+    artifactsDoc: artifacts(shardPolicy.lanes.map(lane => lane.artifact)) });
+  assert.equal(report.unitAttribution.length, shardPolicy.lanes.length);
+  for (const lane of shardPolicy.lanes) {
+    const result = report.jobs.find(entry => entry.name === lane.jobName);
+    assert.equal(result.factLane.required, true, lane.jobName);
+    assert.equal(result.unitAttributionArtifact, lane.artifact);
+  }
+  for (const aggregate of shardPolicy.aggregates.filter(entry => entry.jobId !== 'windows-native-tests')) {
+    assert.equal(report.jobs.find(entry => entry.name === aggregate.requiredCheck).unitAttributionArtifact, null);
+  }
 }

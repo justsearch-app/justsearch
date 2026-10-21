@@ -44,7 +44,8 @@ Gradle cache that PRs read. PR pushes cancel their predecessor; main keeps its r
 The PR advisory gate compares attributed lockfile/package/version findings with the actual PR
 base. New advisories against versions already on the base do not block a PR; added vulnerable
 versions do, including nested versions. Missing base or provider evidence fails closed. Accepted
-baselines and severity tracking remain in force on main.
+baselines and severity tracking remain in force. On PRs, introducing an affected version
+covered by a baseline pin still requires a declared acceptance changeset.
 
 ## Consequences
 
@@ -53,3 +54,7 @@ with full-suite regressions visible on main. Hosted timings are measured after r
 flake cases run on main and dispatch; deterministic failures in selected PR lanes still block.
 The queue ruleset must be drained and removed before rollout by its owner; this code never
 requires a queue. No new PR secrets or write permissions are introduced.
+
+The Linux Java lanes use disjoint class shards balanced from hosted per-class attribution.
+Selected PR lanes run supervisor conformance with only the six listed exclusions; main and
+manual runs exercise every case. Repository-wide static documentation checks run in Public claims.

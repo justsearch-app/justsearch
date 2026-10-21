@@ -203,3 +203,30 @@ console.log('test-verify-unit-test-shard-policy: PASS');
   const omitted = original.slice(0, windowsTask) + original.slice(windowsTask).replace(':modules:app-api:test ', '');
   assert.equal(check(omitted).ok, false, 'omitting a Windows module must fail ownership');
 }
+
+// Distinct tasks own complete class partitions; removing or duplicating one cannot
+// silently reduce the source-set coverage when both workflow and policy are edited.
+{
+  const read = file => fs.readFileSync(new URL('../../' + file, import.meta.url), 'utf8');
+  const original = JSON.parse(read('scripts/ci/unit-test-shard-policy.v1.json'));
+  const classShards = JSON.parse(read('scripts/ci/unit-test-class-shards.v1.json'));
+  const options = { workflowText: read('.github/workflows/ci.yml'),
+    workflowSignalPolicy: JSON.parse(read('scripts/ci/workflow-signal-policy.v1.json')), classShards };
+  const check = policy => validateUnitTestShardPolicy({ ...options, policy });
+  assert.equal(check(original).ok, true);
+  const duplicate = structuredClone(original);
+  duplicate.lanes[1].gradleTasks.push(duplicate.lanes[0].gradleTasks[0]);
+  assert.match(check(duplicate).issues.join('\n'), /exactly one shard owner/);
+  const missing = structuredClone(original);
+  missing.lanes[0].gradleTasks.shift();
+  assert.match(check(missing).issues.join('\n'), /unit test task inventory differs/);
+  for (const [module, partition] of Object.entries(classShards.modules)) {
+    const tasks = original.lanes.flatMap(lane => lane.gradleTasks).filter(task => task.startsWith(`:modules:${module}:`));
+    assert.deepEqual(tasks.sort(), Array.from({ length: partition.count }, (_, i) => `:modules:${module}:ciUnitTest${i + 1}`).sort());
+    assert.ok(Number.isInteger(partition.count) && partition.count >= 2);
+    for (const [name, bucket] of Object.entries(partition.classes)) {
+      assert.match(name, /^io\.justsearch\./);
+      assert.ok(Number.isInteger(bucket) && bucket >= 0 && bucket < partition.count, `${module}/${name}`);
+    }
+  }
+}

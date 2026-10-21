@@ -71,7 +71,7 @@ author-session: ci-one-run-builder-20261021
         "split",
         "instrumentation"
       ],
-      "whatMoved": "Replace matrix job IDs with literal jobs preserving task membership and all required names. Record the existing supervisor conformance commands as main-only; engine-discovery uses the shared Node test wrapper to exclude the listed Windows case only on PRs. No assertions are edited. O12 authorizes the changed PR selection in the workflow entry.",
+      "whatMoved": "Replace matrices with literal jobs and preserve the required names. The repair splits Linux Java unit lanes into disjoint measured class partitions and gives each Gradle task one shard owner. Windows supervisor conformance runs on selected PR lanes; only the six listed cases are skipped on PRs, and every case runs on main and dispatch. Engine-discovery retains its listed PR exclusion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -93,6 +93,40 @@ author-session: ci-one-run-builder-20261021
           "scenario": "O12",
           "quote": "Known flake families no longer block PRs; deterministic failures in the PR lanes still do.",
           "label": "agent-drafted, owner-adopted"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ActionLedgerControllerTest.java",
+        "scripts/dev/test-dev-runner-vite-launchers.mjs",
+        "scripts/ci/check-action-ledger-docs.test.mjs",
+        "scripts/ci/check-model-license-docs.test.mjs",
+        "scripts/ci/check-vite-launchers.test.mjs",
+        "scripts/ci/unit-test-class-shards.v1.json",
+        "modules/app-engine/build.gradle.kts",
+        "modules/app-launcher/build.gradle.kts",
+        "modules/app-services/build.gradle.kts",
+        "modules/ui/build.gradle.kts",
+        "modules/indexer-worker/build.gradle.kts",
+        "modules/worker-services/build.gradle.kts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "split",
+        "instrumentation"
+      ],
+      "whatMoved": "Move the repository-wide Vite scan, the action-ledger documentation check and the registry-projected legal table check into always-on Public claims so docs-only PRs retain those assertions. Action-ledger kind and limit checks read the Java declarations directly. Preserve every other controller assertion. Split expensive Java test source sets into measured per-class Test tasks with the same JVM and module configurations; nested classes remain together and unlisted classes are assigned automatically. Local test tasks remain complete.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Tests that are cheap static scans of the whole repository (for example the vite-launcher scan over docs) move into the always-on Public claims lane instead of making docs select the dev-runner lane. Keep a test in its lane where it needs that lane's runtime.",
+          "location": "task ci-one-run request; repair brief R1a, 2026-10-21"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Split each Linux Java unit lane over 12 min into shards so no shard should exceed about 10 min, balanced from the per-class timings in tmp/ci-attribution/ (the attribution artifacts of the candidate's own hosted run).",
+          "location": "task ci-one-run request; repair brief R2, 2026-10-21"
         }
       ]
     }

@@ -22,15 +22,16 @@ test('all twelve required names have literal jobs or aggregates on every PR', ()
   assert.equal(signal.branchProtection.requireBranchesUpToDateBeforeMerging, false);
 });
 test('aggregates accept success/intentional skip and reject failures and cancellations', () => {
-  for (const id of ['app-ui', 'windows-native-tests']) {
+  for (const id of ['app-ui', 'windows-native-tests', 'unit-tests-search-worker', 'unit-tests-platform-contracts']) {
     const job = workflow.jobs[id];
     assert.equal(job.if, 'always()');
     const step = job.steps[0];
     const variables = Object.keys(step.env);
-    for (const left of ['success', 'skipped', 'failure', 'cancelled']) {
-      for (const right of ['success', 'skipped', 'failure', 'cancelled']) {
-        const result = spawnSync('bash', ['-c', step.run], { env: { ...process.env, [variables[0]]: left, [variables[1]]: right } });
-        assert.equal(result.status === 0, ['success', 'skipped'].includes(left) && ['success', 'skipped'].includes(right), `${id}: ${left}/${right}`);
+    for (let index = 0; index < variables.length; index++) {
+      for (const result of ['success', 'skipped', 'failure', 'cancelled']) {
+        const env = Object.fromEntries(variables.map((variable, i) => [variable, i === index ? result : 'success']));
+        const checked = spawnSync('bash', ['-c', step.run], { env: { ...process.env, ...env } });
+        assert.equal(checked.status === 0, ['success', 'skipped'].includes(result), `${id}: ${variables[index]}/${result}`);
       }
     }
   }
@@ -55,10 +56,12 @@ test('main keeps the running run and runs all slow tiers without masking failure
     assert.equal(workflow.jobs[id].if, mainOnly);
     assert.notEqual(workflow.jobs[id]['continue-on-error'], true);
   }
-  for (const job of Object.values(workflow.jobs)) {
-    for (const step of job.steps) {
-      if (step.name?.startsWith('Supervisor conformance (')) assert.ok(step.if.includes(mainOnly), step.name);
-    }
+  const contracts = workflow.jobs['windows-native-contracts'].steps.find(step => step.name === 'Supervisor conformance (dev-runner adapter)');
+  assert.equal(contracts.if, "needs.changes.outputs.devrunner != 'false' || needs.changes.outputs.rust != 'false'");
+  const tauri = workflow.jobs['shell-rust-tests'].steps.find(step => step.name === 'Supervisor conformance (Tauri adapter)');
+  assert.equal(tauri.if, undefined, 'the selected Rust lane exercises conformance on PRs');
+  for (const job of Object.values(workflow.jobs)) for (const step of job.steps) {
+    if (step.name?.startsWith('Supervisor conformance repeated')) assert.equal(step.if, `(${mainOnly})`);
   }
   const runner = read('scripts/dev/run-dev-runner-tests.mjs');
   assert.match(runner, /JUSTSEARCH_PR_CI === 'true'.*test-dev-runner-stop-census\.mjs/);

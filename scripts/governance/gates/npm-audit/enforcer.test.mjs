@@ -138,16 +138,20 @@ assert.deepEqual(rebalanceRemovesResolved.writtenBaseline.targets.root.advisorie
 console.log('npm-audit identity enforcer tests: PASS');
 
 // Real git base reads, including all five lockfiles and nested/transitive versions.
-async function prFixture({ added = false, newPackage = false, secondVersion = false, accepted = false, unreadable = false, unavailable = false, missingAttribution = false } = {}, target = REQUIRED_ADVISORY_TARGETS[0]) {
+async function prFixture({ added = false, newPackage = false, secondVersion = false, accepted = false, acceptedOnBase = false, declared = false, unreadable = false, unavailable = false, missingAttribution = false } = {}, target = REQUIRED_ADVISORY_TARGETS[0]) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'justsearch-advisory-pr-'));
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   try {
     for (const [file, text] of Object.entries(lockfiles)) put(root, file, text);
+    const priorPin = baseline();
+    if (acceptedOnBase) priorPin.targets[target.targetId].advisories = [advisory()];
+    put(root, baselinePath, priorPin);
     git('init', '--quiet'); git('add', '.');
     git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '--quiet', '-m', 'base lockfiles');
     const base = git('rev-parse', 'HEAD');
     const packageName = newPackage ? 'introduced' : target.targetId === 'ui-web' ? 'ui-example' : 'example';
     const finding = { ...advisory(), affected: [{ package: packageName, version: secondVersion || added ? '2.0.0' : '1.0.0' }] };
+    if (secondVersion) finding.affected.push({ package: packageName, version: '1.0.0' });
     const currentReport = report();
     const row = currentReport.targets.find((row) => row.target_id === target.targetId);
     const packages = JSON.parse(lockfiles[target.lockfile]).packages;
@@ -163,6 +167,7 @@ async function prFixture({ added = false, newPackage = false, secondVersion = fa
     const pin = baseline();
     if (accepted) pin.targets[target.targetId].advisories = [advisory()];
     put(root, baselinePath, pin);
+    if (declared) put(root, `${gate.changesetsDir}/accept.md`, declaration);
     return await enforceNpmAudit({ repoRoot: root, gate, eventName: 'pull_request', prBaseSha: unreadable ? 'f'.repeat(40) : base, baselineRef: base });
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
@@ -175,8 +180,20 @@ for (const target of REQUIRED_ADVISORY_TARGETS) {
   const added = await prFixture({ added: true }, target);
   assert.equal(added.verdict, 'fail', target.lockfile);
   assert.ok(added.findings.some((row) => row.ruleId === 'npm-audit/silent-regression'));
-  const second = await prFixture({ secondVersion: true, accepted: true }, target);
+  const acceptedIntroduced = await prFixture({ newPackage: true, accepted: true, declared: true }, target);
+  assert.equal(acceptedIntroduced.verdict, 'pass', `${target.lockfile}: an explicit baseline acceptance and declaration must work on PRs: ${JSON.stringify(acceptedIntroduced.findings)}`);
+  const silentAccepted = await prFixture({ newPackage: true, accepted: true }, target);
+  assert.equal(silentAccepted.verdict, 'fail', `${target.lockfile}: baseline acceptance without a declaration must fail`);
+  const existingAcceptance = await prFixture({ newPackage: true, accepted: true, acceptedOnBase: true, declared: true }, target);
+  assert.equal(existingAcceptance.verdict, 'pass', `${target.lockfile}: existing pins plus a declared acceptance must work`);
+  const silentExistingAcceptance = await prFixture({ newPackage: true, accepted: true, acceptedOnBase: true }, target);
+  assert.equal(silentExistingAcceptance.verdict, 'fail');
+  assert.ok(silentExistingAcceptance.findings.some(row => row.ruleId === 'npm-audit/silent-regression'));
+  assert.ok(!silentExistingAcceptance.findings.some(row => row.ruleId === 'npm-audit/silent-baseline-shift'));
+  const second = await prFixture({ secondVersion: true, accepted: true, acceptedOnBase: true }, target);
   assert.equal(second.verdict, 'fail', `${target.lockfile}: a nested second vulnerable version of an accepted advisory must block`);
+  assert.ok(second.findings.some(row => row.ruleId === 'npm-audit/silent-regression'));
+  assert.ok(!second.findings.some(row => row.ruleId === 'npm-audit/silent-baseline-shift'), 'this fails for the introduced version, not for a pin change');
 }
 const noBase = await prFixture({ unreadable: true });
 assert.equal(noBase.verdict, 'fail');
