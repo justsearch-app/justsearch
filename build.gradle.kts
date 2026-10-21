@@ -4,7 +4,6 @@ import org.gradle.kotlin.dsl.register
 plugins {
   id("base")
   jacoco
-  pmd
   alias(libs.plugins.spotless)
   alias(libs.plugins.licenseReport)
   alias(libs.plugins.dependencyAnalysis)
@@ -14,11 +13,6 @@ plugins {
   id("conventions.locking")
   id("conventions.build-attribution")
 }
-
-// Note: PMD toolVersion is configured in JvmBaseConventionsPlugin (currently 7.16.0).
-// The root `pmd` block above is applied because root build files were once
-// PMD-scanned, but root has no Java sources and the root extension has no
-// effect — version drift here was tempdoc 516 Slice 0 cleanup.
 
 jacoco {
   toolVersion = "0.8.14"
@@ -556,7 +550,7 @@ tasks.named("check") {
 // (reverted) buildscript locking removed
 
 // Dependency locking is enabled and managed via the `conventions.locking` plugin.
-// Strict enforcement is handled in CI via lockfile drift checks.
+// CI does not regenerate Gradle lockfiles or check their freshness by diffing them.
 
 // Note: Source artifact verification is handled via trusted-artifacts in verification-metadata.xml
 

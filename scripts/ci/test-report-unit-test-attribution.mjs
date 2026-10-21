@@ -229,4 +229,83 @@ withTempRoot((root) => {
   assert.equal(report.modules[0].module, 'modules/system-tests', 'module must resolve, not fall back to <unknown>');
 });
 
+// The blocking Windows check uses every parsed suite, independent of the slow-suite limit.
+withTempRoot((root) => {
+  const policy = JSON.parse(fs.readFileSync(new URL('./unit-test-shard-policy.v1.json', import.meta.url), 'utf8'));
+  const requiredClasses = policy.windowsParts.find((part) => part.jobId === 'windows-native-contracts').requiredClasses;
+  const resultPath = (name) => path.join(root, `modules/example/build/test-results/test/TEST-${name}.xml`);
+  const testcase = (name, body = '') => `<testcase classname="${requiredClasses.at(-1).name}" name="${name}">${body}</testcase>`;
+  for (const entry of requiredClasses) {
+    write(resultPath(entry.name), suiteXml({ name: entry.name, tests: 1, skipped: 0 }));
+  }
+  const report = buildReport({ root, top: 1, requiredClasses });
+  assert.equal(report.slowestSuites.length, 1);
+  assert.equal(report.requiredClassCoverage.length, 15);
+  assert.ok(report.requiredClassCoverage.every((entry) => entry.executed === 1 && !entry.issues.length));
+  const run = () => spawnSync(process.execPath, [scriptPath, '--results-root', root,
+    '--require-windows-classes', '--json'], { encoding: 'utf8' });
+  assert.equal(run().status, 0);
+  for (const name of [
+    'io.justsearch.app.services.ai.install.AiInstallServiceCudaPolicyTest',
+    'io.justsearch.ui.HeadlessAppCudaPolicyTest',
+  ]) {
+    assert.ok(requiredClasses.some((entry) => entry.name === name), `${name} must be required`);
+    fs.rmSync(resultPath(name));
+    const missingCuda = run();
+    assert.equal(missingCuda.status, 1);
+    assert.ok(missingCuda.stderr.includes(`${name}: no tests executed`));
+    write(resultPath(name), suiteXml({ name, tests: 1, skipped: 0 }));
+    assert.equal(run().status, 0);
+  }
+  const atomic = requiredClasses[0];
+  const atomicCases = Array.from({ length: 12 }, (_, i) =>
+    `<testcase classname="${atomic.name}" name="case${i}">`
+    + (i ? '<skipped message="unlisted skip"/>' : '') + '</testcase>').join('');
+  write(resultPath(atomic.name), `<testsuite name="${atomic.name}" tests="12" skipped="11">`
+    + atomicCases + '</testsuite>');
+  const unlisted = run();
+  assert.equal(unlisted.status, 1, 'one executed case must not excuse eleven unlisted skips');
+  const atomicCoverage = JSON.parse(unlisted.stdout).requiredClassCoverage.find((entry) => entry.name === atomic.name);
+  assert.equal(atomicCoverage.executed, 1);
+  assert.equal(atomicCoverage.issues.length, 11);
+  assert.match(unlisted.stderr, /AtomicFileWritesTest: unexpected skip: case1: unlisted skip/);
+  write(resultPath(atomic.name), suiteXml({ name: atomic.name, tests: 1, skipped: 0 }));
+
+  // The newest hosted Windows XML has an empty <skipped/> for this Linux-only case.
+  const contended = requiredClasses.find((entry) => entry.name.endsWith('.ContendedFileReadsTest'));
+  const rotation = contended.allowedSkips[0];
+  write(resultPath(contended.name), `<testsuite name="${contended.name}" tests="2" skipped="1">`
+    + `<testcase classname="${contended.name}" name="portableCase()"/>`
+    + `<testcase classname="${contended.name}" name="${rotation.name}"><skipped/></testcase></testsuite>`);
+  assert.equal(run().status, 0, 'preserve the named @EnabledOnOs(OS.LINUX) skip');
+  const prune = requiredClasses.at(-1);
+  const allowed = prune.allowedSkips[0];
+  const skip = (name, message) => testcase(name, `<skipped message="${message}"/>`);
+  write(resultPath(prune.name), `<testsuite name="${prune.name}" tests="2" skipped="1">`
+    + testcase('theSameVolumeAfterARestartStillPrunesAGenuineDelete()')
+    + skip(allowed.name, 'Assumption failed: needs a second volume besides C:/temp') + '</testsuite>');
+  const allowedReport = buildReport({ root, requiredClasses });
+  assert.equal(run().status, 0);
+  assert.match(renderMarkdown(allowedReport), /Skipped .*aDifferentVolumeAtTheSameLetterAfterARestartPrunesNothing/);
+  assert.match(renderMarkdown(allowedReport), /needs a second volume/);
+  for (const [name, message] of [
+    ['theSameVolumeAfterARestartStillPrunesAGenuineDelete()', 'needs a second volume besides C:/temp'],
+    [allowed.name, 'SUBST drive letters and volume identity exist on Windows only'],
+  ]) {
+    write(resultPath(prune.name), `<testsuite name="${prune.name}">`
+      + testcase('anotherCase()') + skip(name, message) + '</testsuite>');
+    const result = run();
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /unexpected skip/);
+  }
+  // Even permitted prerequisite skips cannot make an entirely skipped class pass.
+  write(resultPath(prune.name), `<testsuite name="${prune.name}">`
+    + skip(allowed.name, 'needs a second volume besides C:/temp') + '</testsuite>');
+  assert.match(run().stderr, /no tests executed/);
+  fs.rmSync(resultPath(requiredClasses[0].name));
+  const missing = run();
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /AtomicFileWritesTest: no tests executed/);
+});
+
 console.log('test-report-unit-test-attribution: PASS');

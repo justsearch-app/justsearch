@@ -8,7 +8,15 @@
  * it), focus cannot leave an open palette and returns to whatever opened it, and the two spec
  * fills are mutually exclusive by selector rather than by declaration order.
  */
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest';
+
+// Incidental requests are outside these render/event scenarios. Keep their
+// unavailable-backend behavior explicit, without contacting a real server.
+const originalFetch = globalThis.fetch;
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Test backend unavailable')));
+});
+afterEach(() => { globalThis.fetch = originalFetch; });
 // Side-effect imports, kept separate from the type-only ones below: a class named ONLY in a type
 // position is elided from the emitted bundle, and with it the `customElements.define` that makes
 // `document.createElement` return anything but an un-upgraded element.

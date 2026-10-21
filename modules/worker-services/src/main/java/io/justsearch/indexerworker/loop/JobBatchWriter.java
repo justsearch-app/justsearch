@@ -26,7 +26,6 @@ import java.util.Objects;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongConsumer;
 import java.util.function.Supplier;
-import java.util.concurrent.locks.Lock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,7 +67,9 @@ public final class JobBatchWriter {
   // live resolved config on every write, so flipping it takes effect without a worker restart.
   private final BooleanSupplier chunkSpladeEnabledSupplier;
   private final Supplier<RunningRuntime> activeLexicalSource;
-  private final Lock fileMutationFence;
+  private final FileMutationFence fileMutationFence;
+  private java.util.function.BiPredicate<java.nio.file.Path, java.nio.file.Path> fileExclusions =
+      io.justsearch.indexerworker.ingest.IngestionSkipPolicy::shouldSkipWithinRoot;
 
   public JobBatchWriter(
       IndexingCoordinator indexingCoordinator,
@@ -86,7 +87,7 @@ public final class JobBatchWriter {
       BooleanSupplier detailedTracingSupplier,
       BooleanSupplier chunkSpladeEnabledSupplier,
       Supplier<RunningRuntime> activeLexicalSource,
-      Lock fileMutationFence) {
+      FileMutationFence fileMutationFence) {
     this.indexingCoordinator = indexingCoordinator;
     this.signalBus = signalBus;
     this.embeddingLifecycle = embeddingLifecycle;
@@ -105,6 +106,10 @@ public final class JobBatchWriter {
     this.fileMutationFence = fileMutationFence;
   }
 
+  void useFileExclusions(java.util.function.BiPredicate<java.nio.file.Path, java.nio.file.Path> exclusions) {
+    fileExclusions = Objects.requireNonNull(exclusions, "exclusions");
+  }
+
   /** Builds and writes an already-extracted job. Mirrors prior IndexingLoop.writeExtractedJob. */
   public void write(ExtractedJob ex, float[] precomputedEmbedding) {
     Span writeSpan = maybeSpan("indexing.write");
@@ -112,11 +117,22 @@ public final class JobBatchWriter {
     String embeddingSource = precomputedEmbedding != null ? "batch" : "inline_or_pending";
     writeSpan.setAttribute("embedding.source", embeddingSource);
     fileMutationFence.lock();
+    // Set once this write may have published rows: a prune scanning meanwhile judges the file again.
+    String publishedPath = null;
     try {
       if (!jobQueue.ownsClaimForPublication(ex.claim())) {
         journal.recordOutcomeSafely(ex.filePath(), "SUPERSEDED_BEFORE_WRITE",
             () -> jobQueue.markClaimDone(ex.claim(),
                 journal.skipped(IngestionReasonCodes.DELETED_AFTER_SNAPSHOT),
+                LedgerEntryFactory.forEnvelope(ex.envelope(), ex.collection(), ex.artifact(),
+                    contentExtractor.extractionPolicy(), ex.provenance())));
+        batchStats.recordSkipped();
+        return;
+      }
+      if (fileExclusions.test(ex.filePath(), ex.claim().ingestionRoot())) {
+        journal.recordOutcomeSafely(ex.filePath(), "EXCLUDED_BEFORE_WRITE",
+            () -> jobQueue.markClaimDone(ex.claim(),
+                journal.skipped(IngestionReasonCodes.SKIPPED_TEMP_OR_SYSTEM),
                 LedgerEntryFactory.forEnvelope(ex.envelope(), ex.collection(), ex.artifact(),
                     contentExtractor.extractionPolicy(), ex.provenance())));
         batchStats.recordSkipped();
@@ -153,6 +169,7 @@ public final class JobBatchWriter {
           chunkPlan);
 
       long writeStart = System.currentTimeMillis();
+      publishedPath = String.valueOf(doc.fields().get(SchemaFields.PATH));
       RunningRuntime lexicalSource = activeLexicalSource.get();
       if (lexicalSource != null && needsActiveLexicalProjection(lexicalSource, ex, doc)) {
         // Green enumeration must not replace an unchanged A document with a lexical-only
@@ -257,8 +274,12 @@ public final class JobBatchWriter {
         batchStats.recordFailed();
       }
     } finally {
-      try { writeSpan.end(); }
-      finally { fileMutationFence.unlock(); }
+      try {
+        if (publishedPath != null) fileMutationFence.published(publishedPath);
+        writeSpan.end();
+      } finally {
+        fileMutationFence.unlock();
+      }
     }
   }
 

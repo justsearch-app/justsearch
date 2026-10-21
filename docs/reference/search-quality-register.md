@@ -113,8 +113,8 @@ the `cpu_fallback_counts` projection alongside it. See
 
 > Generated from `scripts/jseval/release.v1.json` (tempdoc 623). Each per-corpus number below is a
 > **projection** of one cohort-identical release (same config/commit/hardware), not a hand-typed value.
-> The (config × mode) ablation tables in each corpus block stay hand-authored. Reproduction tolerance
-> is the within-machine ±2σ envelope, scoped to equivalent hardware/setup (tempdoc 623 F-α).
+> The (config × mode) ablation tables in each corpus block stay hand-authored. No calibrated reproduction envelope
+> is published; compare each run's measured spread directly (see the benchmark methodology).
 
 **Release:** `832-rebaseline-2026-08-14` · default mode `hybrid` · NVIDIA GeForce RTX 4070 · driver 610.88 · ORT 1.24.3
 
@@ -1710,12 +1710,12 @@ above)*
   `TextSearchIntegrationTest#searchTextHonoursTheCallersQuerySyntax`: the SIMPLE-built `Query` still
   carries the SIMPLE-only prefix expansion (`alpha*`) and still differs from the LUCENE-built one for
   the same text (a divergence pin, which a tautological "both overloads agree" comparison would not
-  give). **Every number in this register is a SIMPLE-syntax number:** jseval's retriever sends no
-  `querySyntax` (`scripts/jseval/jseval/retriever.py`), so nothing measured here changes parse. The
-  only LUCENE sender in jseval is `metadata_eval.py`'s `*:*` facet probe, which sends no pipeline and
-  so rides whatever the Head's default preset resolves to — on any multi-leg resolution that probe
-  was matching the literal string `\*\:\*` before this fix (unverified for the sparse-only
-  resolution, where it always worked).
+  give). **Every number in this register is a SIMPLE-syntax number:** jseval's retriever omits
+  `querySyntax` by default (`scripts/jseval/jseval/retriever.py`); explicit syntax selection is
+  available through `--query-syntax`. The retired `*:*` facet probe sent LUCENE without a pipeline,
+  so it used the Head's default preset — on a multi-leg resolution that probe was matching the
+  literal string `\*\:\*` before this fix (unverified for the sparse-only resolution, where it
+  always worked).
 - **NOT syntax-neutral, and outside every eval:** the Head re-issues a **LUCENE** request when LLM
   query expansion fires, and expansion runs only for SIMPLE requests
   (`KnowledgeSearchEngine.java:644-645`). So expansion-path retrieval genuinely CHANGES for every
@@ -3489,8 +3489,8 @@ above)*
 - **Question:** F-046 made `query_syntax: "lucene"` actually reach every retrieval leg (it was
   silently downgraded to SIMPLE on all multi-leg paths). Every number in this register — every
   baseline, every finding — was measured with the DEFAULT (SIMPLE) syntax, because jseval's
-  retriever sends no `querySyntax` (`scripts/jseval/jseval/retriever.py`; the only LUCENE sender is
-  `metadata_eval.py`'s `*:*` facet probe). So the retrieval quality of the LUCENE path is
+  retriever omits `querySyntax` by default (`scripts/jseval/jseval/retriever.py`), unless
+  `--query-syntax` is explicitly selected. So the retrieval quality of the LUCENE path is
   **unmeasured**: we know it now parses what the caller asked for, not whether phrase/boolean
   queries retrieve better or worse than the SIMPLE parse of the same intent.
 - **Why it matters:** the MCP tool description advertises exact phrases and AND/OR/NOT to agents,

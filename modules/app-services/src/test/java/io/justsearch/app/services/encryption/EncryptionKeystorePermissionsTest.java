@@ -16,7 +16,9 @@ class EncryptionKeystorePermissionsTest {
   private DataKeyManager restart() { return new DataKeyManager(new EncryptionKeystore(data)); }
   private void assertPrivate() throws Exception {
     assertEquals(PosixFilePermissions.fromString("rwx------"), Files.getPosixFilePermissions(data.resolve("encryption")));
-    assertEquals(PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(data.resolve("encryption/keystore.json")));
+    for (var name : java.util.List.of("keystore.json", "keystore.replica.json")) {
+      assertEquals(PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(data.resolve("encryption").resolve(name)));
+    }
   }
 
   @Test void setupReplacementAndRestartKeepPrivateAndUsable() throws Exception {
@@ -43,10 +45,11 @@ class EncryptionKeystorePermissionsTest {
     keys.setup("passphrase".toCharArray());
     var dek = keys.dek();
     Files.setPosixFilePermissions(data.resolve("encryption"), PosixFilePermissions.fromString("rwxrwxr-x"));
-    Files.setPosixFilePermissions(data.resolve("encryption/keystore.json"), PosixFilePermissions.fromString("rw-rw-r--"));
+    for (var name : java.util.List.of("keystore.json", "keystore.replica.json")) {
+      Files.setPosixFilePermissions(data.resolve("encryption").resolve(name), PosixFilePermissions.fromString("rw-rw-r--"));
+    }
     var next = restart();
-    assertEquals(PosixFilePermissions.fromString("rwx------"), Files.getPosixFilePermissions(data.resolve("encryption")));
-    assertEquals(PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(data.resolve("encryption/keystore.json")));
+    assertPrivate();
     next.unlock("passphrase".toCharArray());
     assertArrayEquals(dek, next.dek());
   }
@@ -56,18 +59,24 @@ class EncryptionKeystorePermissionsTest {
     var recovery = keys.setup("passphrase".toCharArray());
     var dek = keys.dek();
     var file = data.resolve("encryption/keystore.json");
+    var replica = data.resolve("encryption/keystore.replica.json");
     var before = Files.readAllBytes(file);
+    var beforeReplica = Files.readAllBytes(replica);
     Thread.currentThread().interrupt();
     try { assertThrows(UncheckedIOException.class, keys::regenerateRecovery); }
     finally { Thread.interrupted(); }
     assertArrayEquals(before, Files.readAllBytes(file));
+    assertArrayEquals(beforeReplica, Files.readAllBytes(replica));
     var next = restart();
     next.unlock("passphrase".toCharArray());
     assertArrayEquals(dek, next.dek());
     next.lock();
     next.recover(recovery);
     assertArrayEquals(dek, next.dek());
-    try (var paths = Files.list(file.getParent())) { assertEquals(1, paths.count()); }
+    try (var paths = Files.list(file.getParent())) {
+      assertEquals(java.util.Set.of("keystore.json", "keystore.replica.json"),
+          paths.map(path -> path.getFileName().toString()).collect(java.util.stream.Collectors.toSet()));
+    }
   }
 
   @Test void missingDataDirectoryCanStillBeConfigured() throws Exception {

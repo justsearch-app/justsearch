@@ -4,7 +4,7 @@ type: decision
 status: stable
 description: "Maintain separate core DTOs for in-process ports and app-api records for REST as intentional layering, not duplication."
 date: 2026-04-06
-probes: none - the dual-type layering is a design intent about which types live where; the module-deps gate already fails a boundary violation, and a probe would restate it.
+probes: none - the dual-type layering is a design intent about which types live where; no executable probe is declared for that design intent.
 last_reviewed: 2026-09-02
 ---
 
@@ -17,7 +17,7 @@ Accepted
 > The historical gRPC channel was deleted at A9-A11; A14 removed the remaining service blocks,
 > infra-health service and code generator. Two type families, proto-aligned `core` DTOs on the inside and
 > JSON-aligned `app-api` records on the outside, with field-by-field translation in
-> `DefaultAppFacade` and `KnowledgeClient` — that is unchanged, and the reasoning below is still
+> `SearchServiceImpl` and `KnowledgeClient` — the layering is unchanged, and the reasoning below is still
 > the reasoning. See [ADR-0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md).
 
 ## Context

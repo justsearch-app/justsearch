@@ -24,7 +24,7 @@ import { JfElement } from '../primitives/JfElement.js';
 import { surfaceLayoutStyles } from '../primitives/surfaceLayout.js';
 import { subscribeTasks, listTasks, type Task } from '../substrates/tasks/index.js';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
-import { selectIndexingProgress, type IndexingProgress } from '../state/indexingProgress.js';
+import { selectIndexingProgress, indexingTaskStatus, type IndexingProgress } from '../state/indexingProgress.js';
 import { ENRICHMENT_BODY } from '../state/enrichmentCoverage.js';
 import {
   subscribeInstallStatus,
@@ -54,7 +54,7 @@ import {
  * {@link enrichingLabel} applies.
  */
 export function visibleIndexQueueCount(progress: IndexingProgress): number | null {
-  if (!progress.live || progress.phase === 'unknown') return null;
+  if (!progress.live || !progress.activity.confirmed || progress.phase === 'unknown') return null;
   return progress.jobsPending > 0 ? progress.jobsPending : null;
 }
 
@@ -65,7 +65,7 @@ export function visibleIndexQueueCount(progress: IndexingProgress): number | nul
  * all yield `null`, so the confident "System idle" close is preserved everywhere it was true.
  */
 export function enrichingLabel(progress: IndexingProgress): string | null {
-  if (!progress.live || progress.phase !== 'enriching') return null;
+  if (!progress.live || !progress.activity.confirmed || progress.activity.enrichmentDeferred || progress.phase !== 'enriching') return null;
   return progress.enrichingPercent === null
     ? `Enriching — ${ENRICHMENT_BODY}`
     : `Enriching — ${progress.enrichingPercent}% · ${ENRICHMENT_BODY}`;
@@ -206,26 +206,30 @@ export class SystemSelfView extends JfElement {
     // can no longer contradict each other the way §1a's "0 running · 1218 queued" vs "queue 0" did.
     const progress = selectIndexingProgress(
       this.aiState?.status,
-      this.aiState?.snapshotLive ?? false,
+      this.aiState?.indexingStatusLive ?? false,
       this.aiState?.episodeMaxPendingJobs ?? 0,
       this.aiState?.enrichSettleSamples ?? [],
     );
     // On the projection's `unknown` arm the worker reported nothing, so there is no honest split to
     // show — the section keeps its label and drops the numbers rather than rendering a fabricated
     // "0 running · 0 queued" beside a list of task rows.
+    const activity = progress.activity;
+    const explainActivity = !activity.confirmed || activity.detail !== null;
     const indexingHeadline =
-      progress.phase === 'unknown'
+      !activity.confirmed
+        ? activity.summary
+        : progress.phase === 'unknown'
         ? 'Indexing'
         : `Indexing — ${progress.jobsRunning} running · ${progress.jobsQueued} queued`;
-    const enriching = enrichingLabel(progress);
+    const enriching = explainActivity ? null : enrichingLabel(progress);
     const indexQueueCount = visibleIndexQueueCount(progress);
-    const indexQueueBusy = indexQueueCount !== null && tasks.length === 0;
+    const indexQueueBusy = !explainActivity && indexQueueCount !== null && tasks.length === 0;
     const idle =
       tasks.length === 0 &&
       aiLabel === null &&
       !installRunning &&
       !indexQueueBusy &&
-      enriching === null;
+      enriching === null && !explainActivity;
     const strip = this.variant === 'strip';
 
     return html`
@@ -240,6 +244,11 @@ export class SystemSelfView extends JfElement {
             </div>
           `}
       <div class="body">
+        ${explainActivity
+          ? html`<div class="row" data-testid="self-view-indexing-activity">
+              <span>${activity.summary}${activity.detail ? ` — ${activity.detail}` : ''}</span>
+            </div>`
+          : nothing}
         ${aiLabel !== null
           ? html`
               <div class="section-label">AI runtime</div>
@@ -269,7 +278,7 @@ export class SystemSelfView extends JfElement {
                 (t) => html`
                   <div class="row" data-testid="self-view-task">
                     <span class="label">${t.label}</span>
-                    <span class="badge badge-${t.status}">${t.status}</span>
+                    <span class="badge badge-${indexingTaskStatus(t, activity) === t.status ? t.status : 'stale'}">${indexingTaskStatus(t, activity)}</span>
                   </div>
                 `,
               )}

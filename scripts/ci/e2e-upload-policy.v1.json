@@ -1,0 +1,31 @@
+{
+  "sourceRef": "f9bd104d228c80173d58068cfe0f24c6d9ced149",
+  "sourcePath": ".github/workflows/ci.yml",
+  "uploads": [
+    {
+      "job": "integration-tests",
+      "step": "Upload integration-test results",
+      "uses": "actions/upload-artifact@v7",
+      "condition": "always()",
+      "paths": [
+        "modules/system-tests/build/test-results/integrationTest/TEST-*.xml",
+        "modules/system-tests/build/reports/tests/integrationTest/**",
+        "modules/system-tests/build/reports/isolated-backend/**",
+        "tmp/lane-f-takeover/writer-junit-*/**",
+        "build/ci/integration-test-attribution.json",
+        "build/ci/integration-test-attribution.md"
+      ]
+    },
+    {
+      "job": "lifecycle-integration-tests",
+      "step": "Upload lifecycle-test results",
+      "uses": "actions/upload-artifact@v7",
+      "condition": "always()",
+      "paths": [
+        "modules/system-tests/build/test-results/lifecycleIntegrationTest/TEST-*.xml",
+        "modules/system-tests/build/reports/tests/lifecycleIntegrationTest/**",
+        "tmp/lane-f-takeover/writer-junit-*/**"
+      ]
+    }
+  ]
+}

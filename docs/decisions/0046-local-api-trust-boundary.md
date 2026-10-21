@@ -27,6 +27,8 @@ they deliberately do not*. Root `CLAUDE.md` hard invariant #2 said "Local API bi
 only" — true, but a description of one control rather than of the posture. This ADR is the posture;
 the invariant line now points here.
 
+Current implementation corrections are recorded in the 2026-10-20 amendment below.
+
 ## Context
 
 JustSearch's Head process serves a local HTTP API (Javalin) consumed by three kinds of caller:
@@ -45,7 +47,7 @@ what makes the control set legible:
 - **Another local OS account**, which can reach loopback but cannot read the credential file.
 - **Another native process running as the owning user.**
 
-The third one is the important admission: a same-user native process can already read the data
+The last one is the important admission: a same-user native process can already read the data
 directory and the runtime manifest, which is exactly where the desktop shell itself obtains the
 session token (`modules/shell/src-tauri/src/binding.rs:116`). No HTTP-layer control can exclude a
 caller that can read the token off disk. `docs/reference/security/threat-model.md` (Elevation of
@@ -174,3 +176,19 @@ variant) inherits a silent downgrade.
 - [ADR-0030](0030-policy-on-operations-vs-mcp-hints.md) — what the MCP surface is allowed to
   express; this ADR governs who may reach it.
 - Root `CLAUDE.md` hard invariant #2 — the always-loaded one-line projection of this decision.
+
+## Amendment 2026-10-20: current security-control entry points
+
+The original five controls remain, and the owner-only canonical credential file is
+the sixth control described above. The numerical source references above are historical.
+Current entry points are `LocalApiServer`'s explicit
+`app.start("127.0.0.1", bindPort)` and `ApiSecurityFilters.install`, which installs
+Host validation, MCP Origin validation, CORS and session-token enforcement.
+`ApiSecurityFilters.requiresSessionToken` owns the route predicate and
+`HeadlessApp` calls `LocalApiServer.generateSessionToken` for production startup.
+Evidence: `modules/ui/src/main/java/io/justsearch/ui/api/LocalApiServer.java:620`,
+`modules/ui/src/main/java/io/justsearch/ui/api/ApiSecurityFilters.java:167`, and
+`modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java:505`.
+These locations update the source pointers. The owner-only credential file and
+authentication on every non-public production route define the current boundary
+described in this ADR; no HTTP bootstrap or stdout line provides the token.

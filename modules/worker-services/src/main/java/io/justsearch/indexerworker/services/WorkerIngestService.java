@@ -173,7 +173,8 @@ public final class WorkerIngestService {
   private final Map<String, VduProcessingClaim> vduProcessingClaims = new HashMap<>();
 
   private record VduProcessingClaim(
-      java.util.UUID owner, int previousRetryCount, int claimedRetryCount) {}
+      java.util.UUID owner, String attemptId, Map<String, Object> expectedRevision,
+      int previousRetryCount, int claimedRetryCount) {}
 
   /**
    * Creates a new WorkerIngestService backed by the specified lifecycle managers.
@@ -359,9 +360,161 @@ public final class WorkerIngestService {
         ? mutation.get() : indexingLoop.withFileMutationFence(mutation);
   }
 
-  /** A prune applies each batch of deletions inside the same fence as the file writers. */
+  /**
+   * A prune applies each batch of deletions inside the same fence as the file writers, and judges
+   * again the files the loop's writers published while it scanned.
+   */
   private final io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence pruneWriterFence =
-      batch -> withFileMutationFence(batch::getAsBoolean);
+      new io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence() {
+        @Override
+        public boolean hold(java.util.function.BooleanSupplier batch) {
+          return withFileMutationFence(batch::getAsBoolean);
+        }
+
+        @Override
+        public io.justsearch.adapters.lucene.runtime.PruneOps.Publications watch() {
+          io.justsearch.indexerworker.loop.FileMutationFence fence = fileMutationFence();
+          // No loop, or one without a fence of its own (a test double), records nothing.
+          return fence == null
+              ? io.justsearch.adapters.lucene.runtime.PruneOps.Publications.NONE : fence.watch();
+        }
+      };
+
+  private io.justsearch.indexerworker.loop.FileMutationFence fileMutationFence() {
+    return mutationAdmission == null || indexingLoop == null
+        ? null : indexingLoop.fileMutationFence();
+  }
+
+  /**
+   * Tells a running prune that rows of {@code path} were published, as the loop's writers do; call
+   * it inside the fence, before it is released. A prune whose scan ran before these rows existed
+   * judges {@code path} in its last pass.
+   */
+  private void publishedUnderFence(String path) {
+    io.justsearch.indexerworker.loop.FileMutationFence fence = fileMutationFence();
+    if (fence != null) {
+      fence.published(path);
+    }
+  }
+
+  /**
+   * Runs {@code mutation} inside this Worker's file-mutation fence, the one its indexing loop's
+   * writers and its prunes hold: for a replayed write that must not interleave with a prune. The
+   * mutation checks, inside the fence, that what it writes for still exists.
+   */
+  public <T> T underFileMutationFence(Supplier<T> mutation) {
+    return withFileMutationFence(mutation);
+  }
+
+  /** {@link #confirmedAbsent} under the root that holds the path; an invalid path is not. */
+  private boolean confirmedGone(String normalizedPath) {
+    try {
+      return confirmedAbsent(normalizedPath, pruneRootFor(normalizedPath));
+    } catch (InvalidPathException invalid) {
+      return false;
+    }
+  }
+
+  /**
+   * A rename's Lucene half, inside the fence (the caller holds it, so the cleanup below takes no
+   * fence of its own). A destination confirmed absent here was deleted after the move, possibly
+   * after a prune already judged it: no row is moved, and the old path's rows are removed as a
+   * prune removes them, each only when its own backing file is confirmed absent. Otherwise the rows
+   * move, and the new path is reported to a running prune even when the move fails part way,
+   * because rows it wrote before failing still reach a commit.
+   *
+   * @return whether the rename is settled in Lucene: rows moved, or the file is gone from both
+   *     paths and rows of it were removed
+   */
+  private boolean moveRowsUnderFence(String oldPath, String newPath) {
+    if (confirmedGone(newPath)) {
+      // Renames are refused during a candidate build, so there is no serving copy to project to.
+      // Each row of the old path is judged as a prune judges it, by its own backing path: a
+      // chunk whose explicit path names a live file keeps its row.
+      Path oldRoot;
+      try {
+        oldRoot = pruneRootFor(oldPath);
+      } catch (InvalidPathException invalid) {
+        return false;
+      }
+      int removed = ingestLifecycle.pruneOps().pruneFile(
+          oldPath, oldRoot, pruneGuard(oldRoot),
+          io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence.NONE);
+      log.info("updateDocumentPaths: {} is gone; rows of {} are not moved, {} removed",
+          newPath, oldPath, removed);
+      return removed > 0;
+    }
+    try {
+      return ingestLifecycle.indexingCoordinator().updateDocumentPaths(oldPath, newPath) > 0;
+    } finally {
+      publishedUnderFence(newPath);
+    }
+  }
+
+  /**
+   * For a replay service that stands in for {@code publisher}, the live Worker whose indexing loop
+   * writes while the replay runs: its prunes are vouched for by {@code publisher}'s root authority
+   * (the identity a watch registered, the recorded volume) and applied inside {@code publisher}'s
+   * file-mutation fence.
+   */
+  public void prunesUnder(WorkerIngestService publisher) {
+    java.util.Objects.requireNonNull(publisher, "publisher");
+    syncOps.setPruneGuardFactory(publisher::pruneGuard);
+    syncOps.setPruneWriterFence(publisher.pruneWriterFence);
+  }
+
+  /**
+   * Replays a buffered prune of {@code pathPrefix} into {@code target}: vouched for by the root
+   * that holds the prefix, as this service's own prunes are (present, listable, the identity a
+   * watch registered, the volume recorded when the person added it), and applied inside this
+   * service's file-mutation fence, the one its indexing loop's writers hold. A file the prune
+   * removed that is present again once the removal is committed is queued for indexing before
+   * this returns: it was recreated after its last absence check.
+   *
+   * @return the prune's result and how many recreated files were queued again
+   * @param firstRemoval runs once, at the prune's first removal, before anything is committed
+   *     (the harness stop point); ordinary replays pass a no-op
+   */
+  public ReplayedPrune replayBufferedPrune(
+      io.justsearch.adapters.lucene.runtime.RunningRuntime target, String pathPrefix,
+      Runnable firstRemoval) {
+    java.util.Objects.requireNonNull(target, "target");
+    java.util.Objects.requireNonNull(firstRemoval, "firstRemoval");
+    Path pruneRoot = pruneRootFor(pathPrefix);
+    Set<String> removed = new java.util.LinkedHashSet<>();
+    var result = target.pruneOps().pruneByPathPrefix(
+        pathPrefix,
+        () -> false,
+        100,
+        pruneGuard(pruneRoot),
+        path -> {
+          if (removed.isEmpty()) firstRemoval.run();
+          removed.add(path);
+        },
+        pruneWriterFence);
+    List<JobQueue.EnqueueEntry> reappeared = new ArrayList<>();
+    for (String path : removed) {
+      Path file = Path.of(path);
+      if (io.justsearch.adapters.lucene.runtime.PathPresence.probe(file)
+              == io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT
+          && file.toAbsolutePath().normalize().startsWith(pruneRoot)
+          && !io.justsearch.indexerworker.ingest.IngestionSkipPolicy
+              .shouldSkipWithinRoot(file, pruneRoot)) {
+        reappeared.add(JobQueue.EnqueueEntry.stat(file).withinRoot(pruneRoot));
+      }
+    }
+    int queued = 0;
+    if (!reappeared.isEmpty()) {
+      queued = jobQueue.enqueueEntries(reappeared);
+      log.info("Replayed prune of {}: {} removed files were present again, {} queued for indexing",
+          pathPrefix, reappeared.size(), queued);
+    }
+    return new ReplayedPrune(result, queued);
+  }
+
+  /** A replayed prune's result, and the number of files it removed that were queued again. */
+  public record ReplayedPrune(
+      io.justsearch.adapters.lucene.runtime.PruneOps.PruneResult result, int requeued) {}
 
   private boolean hasDistinctWritableServingTarget() {
     return searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active
@@ -598,6 +751,7 @@ public final class WorkerIngestService {
     for (Path root : declared) {
       roots.add(root.toAbsolutePath().normalize());
     }
+    bootExclusionRoots = List.copyOf(roots);
     try {
       if (rootVolumes.beginUpgradeSeeding(roots)) {
         log.info("Upgrade: the volume of {} declared roots is confirmed on evidence", roots.size());
@@ -1063,6 +1217,43 @@ public final class WorkerIngestService {
     }
   }
 
+  private volatile java.util.Collection<Path> bootExclusionRoots = List.of();
+  private volatile Supplier<java.util.Collection<Path>> exclusionRoots = () -> bootExclusionRoots;
+
+  /**
+   * The composing owner binds its current file policy and Head-owned watched membership before
+   * publication. Construction alone must not bind: temporary replay services share the runtime
+   * but never own its processing policy.
+   */
+  public void useExclusionRoots(Supplier<java.util.Collection<Path>> roots) {
+    exclusionRoots = java.util.Objects.requireNonNull(roots, "roots");
+    if (ingestLifecycle != null) {
+      ingestLifecycle.useSourceProcessingPolicy(this::sourceProcessingAllowed);
+    }
+  }
+
+  /** Current user policy, including saved roots not yet registered with a native watcher. */
+  public boolean isUserExcluded(Path file, Path root) {
+    var patterns = io.justsearch.configuration.excludes.ExclusionPatterns.current();
+    if (patterns.isEmpty()) return false;
+    if (patterns.isExcludedPath(root, file) || rootWatcherRegistry.isUserExcluded(file)) return true;
+    for (Path watched : exclusionRoots.get()) {
+      if (patterns.isExcludedPath(watched, file)) return true;
+    }
+    return false;
+  }
+
+  private boolean sourceProcessingAllowed(String source) {
+    if (source == null || source.isBlank()) return true;
+    try {
+      Path file = Path.of(source);
+      // Projection and non-file document IDs have no filesystem exclusion scope.
+      return !file.isAbsolute() || !isUserExcluded(file, file);
+    } catch (InvalidPathException nonFile) {
+      return true;
+    }
+  }
+
   public BatchResponse submitBatch(BatchRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       List<String> filePaths = request.getFilePathsList();
@@ -1099,10 +1290,10 @@ public final class WorkerIngestService {
 
         for (String pathStr : filePaths) {
           Path sanitized = sanitizePath(pathStr);
-          if (sanitized != null) {
-            validPaths.add(sanitized);
-          } else {
+          if (sanitized == null) {
             rejected++;
+          } else if (!isUserExcluded(sanitized, sanitized)) {
+            validPaths.add(sanitized);
           }
         }
 
@@ -1111,7 +1302,8 @@ public final class WorkerIngestService {
         }
 
         if (validPaths.isEmpty()) {
-          return batchErrorResponse("All paths were invalid or unsafe");
+          return rejected == filePaths.size()
+              ? batchErrorResponse("All paths were invalid or unsafe") : batchSuccessResponse(0);
         }
         if (request.getRootAdded()) {
           // Round 8b (decision 1): an explicit ingest request is a deliberate add and records the
@@ -1475,18 +1667,44 @@ public final class WorkerIngestService {
         requireServingVduTarget();
         var procedureOwner = ctx.engineContext().workId();
         VduProcessingClaim claim = vduProcessingClaims.get(docId);
-        if (procedureOwner.isPresent()
-            && (claim == null || !procedureOwner.get().equals(claim.owner()))) {
+        if (procedureOwner.isEmpty() || claim == null
+            || !procedureOwner.get().equals(claim.owner())
+            || !request.getAttemptId().equals(claim.attemptId())) {
+          if (request.getAttemptId().isBlank()) {
+            try {
+              withFileMutationFence(() -> {
+                try { refreshLegacyVduSource(docId); return true; }
+                catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+              });
+            } catch (java.io.UncheckedIOException failure) {
+              return updateVduErrorResponse(failure.getCause().getMessage());
+            }
+          }
           return updateVduErrorResponse("VDU procedure no longer owns this document: " + docId);
         }
         try {
           // The chunk replacement holds the file-mutation fence, so a prune of this file never
           // sees part of it and no replacement chunk lands after the file was removed.
-          boolean applied;
+          String refusal;
           try {
-            applied = withFileMutationFence(() -> {
+            refusal = withFileMutationFence(() -> {
               try {
-                return VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled());
+                ingestLifecycle.commitOps().maybeRefreshBlocking();
+                if (ingestLifecycle.documentFieldOps().excludedProcessingIds(List.of(docId)).contains(docId)) {
+                  // Already under the mutation lease, monitor and file fence: reset this exact
+                  // claim directly instead of re-entering the public release admission path.
+                  if (resetVduStatusToPending(docId, claim.owner(), Set.of(claim.attemptId()))) {
+                    ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
+                    ingestLifecycle.commitOps().maybeRefreshBlocking();
+                  }
+                  requireServingVduTarget();
+                  return "Source is excluded by the current policy";
+                }
+                if (!vduClaimMatches(docId, claim)
+                    || !VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled(), claim.expectedRevision())) {
+                  return "VDU source revision changed: " + docId;
+                }
+                return null;
               } catch (IOException e) {
                 throw new java.io.UncheckedIOException(e);
               }
@@ -1494,8 +1712,9 @@ public final class WorkerIngestService {
           } catch (java.io.UncheckedIOException e) {
             throw e.getCause();
           }
-          if (!applied) {
-            return updateVduErrorResponse("Document not found: " + docId);
+          if (refusal != null) {
+            vduProcessingClaims.remove(docId, claim);
+            return updateVduErrorResponse(refusal);
           }
           vduProcessingClaims.remove(docId);
           ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_UPDATE);
@@ -2277,14 +2496,42 @@ public final class WorkerIngestService {
         requireServingVduTarget();
 
         try {
-          int currentCount = readVduRetryCount(docId);
-          return applyMarkVduProcessing(
-              docId, currentCount, maxRetries, ctx.engineContext().workId().orElse(null));
+          if (ctx.engineContext().workId().isEmpty() || request.getAttemptId().isBlank()) {
+            return markVduErrorResponse("VDU requires a procedure owner and unique attempt_id");
+          }
+          return withFileMutationFence(() -> {
+            try {
+              ingestLifecycle.commitOps().maybeRefreshBlocking();
+              if (ingestLifecycle.documentFieldOps().excludedProcessingIds(List.of(docId)).contains(docId)) {
+                return markVduErrorResponse("Source is excluded by the current policy");
+              }
+              var input = ingestLifecycle.documentFieldOps().getEnrichmentInputs(List.of(docId)).get(docId);
+              if (input == null) return markVduErrorResponse("Document not found: " + docId);
+              if (input.fields().getOrDefault(SchemaFields.SOURCE_SHA256, "").isBlank()) {
+                refreshLegacyVduSource(docId);
+                return markVduErrorResponse("VDU source revision needs a targeted refresh: " + docId);
+              }
+              var previousClaim = vduProcessingClaims.get(docId);
+              if (previousClaim != null) {
+                if (vduClaimMatches(docId, previousClaim)) {
+                  return markVduErrorResponse("VDU document already has a claim: " + docId);
+                }
+                vduProcessingClaims.remove(docId, previousClaim);
+              }
+              return applyMarkVduProcessing(docId, readVduRetryCount(docId), maxRetries,
+                  ctx.engineContext().workId().orElseThrow(), request.getAttemptId(), input.fields());
+            } catch (RuntimeException failure) {
+              throw failure;
+            } catch (Exception failure) {
+              throw new java.io.UncheckedIOException(new IOException(failure.getMessage(), failure));
+            }
+          });
         } catch (WorkerServiceException failure) {
           throw failure;
         } catch (Exception e) {
           log.error("markVduProcessing failed for doc: {}", docId, e);
-          return markVduErrorResponse(e.getMessage());
+          return markVduErrorResponse(e instanceof java.io.UncheckedIOException io
+              ? io.getCause().getMessage() : e.getMessage());
         }
       }
     }
@@ -2300,8 +2547,8 @@ public final class WorkerIngestService {
   }
 
   private MarkVduProcessingResponse applyMarkVduProcessing(
-      String docId, int currentCount, int maxRetries, java.util.UUID procedureOwner)
-      throws Exception {
+      String docId, int currentCount, int maxRetries, java.util.UUID procedureOwner,
+      String attemptId, Map<String, String> fields) throws Exception {
     MarkVduRetryDecision decision = decideMarkVduRetry(currentCount, maxRetries);
 
     // Check if max retries exceeded.
@@ -2329,12 +2576,9 @@ public final class WorkerIngestService {
 
     boolean updated = ingestLifecycle.indexingCoordinator().updateDocument(docId, updates);
     if (updated) {
-      if (procedureOwner == null) {
-        vduProcessingClaims.remove(docId);
-      } else {
-        vduProcessingClaims.put(docId,
-            new VduProcessingClaim(procedureOwner, currentCount, decision.retryCount()));
-      }
+      Map<String, Object> expected = vduRevision(fields);
+      vduProcessingClaims.put(docId,
+          new VduProcessingClaim(procedureOwner, attemptId, expected, currentCount, decision.retryCount()));
       ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_MARK_PROCESSING);
       ingestLifecycle.commitOps().maybeRefreshBlocking();
       requireServingVduTarget();
@@ -2355,33 +2599,75 @@ public final class WorkerIngestService {
    * is absent or no longer PROCESSING; nothing is changed then.
    */
   public boolean releaseVduProcessing(String docId, CallContext ctx) {
+    return releaseVduProcessing(docId, "", ctx);
+  }
+
+  public boolean releaseVduProcessing(String docId, String attemptId, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       if (docId == null || docId.isBlank()) {
         throw new WorkerServiceException(WorkerServiceException.Status.INVALID_ARGUMENT, "doc_id is required");
       }
       requireEnrichmentReader(ctx);
       requireServingVduTarget();
-      // Serialized with marks, results and recovery, which own the process-local claims.
       synchronized (vduMutationMonitor) {
+        var claim = vduProcessingClaims.get(docId);
+        if (claim == null || !claim.attemptId().equals(attemptId)
+            || ctx.engineContext().workId().filter(claim.owner()::equals).isEmpty()) return false;
         try {
-          String status = ingestLifecycle.documentFieldOps().getDocumentFieldOrThrow(docId, SchemaFields.VDU_STATUS);
-          if (!SchemaFields.VDU_STATUS_PROCESSING.equals(status)) return false;
-          Map<String, Object> updates = new HashMap<>();
-          updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING);
-          updates.put(SchemaFields.VDU_RETRY_COUNT, String.valueOf(Math.max(0, readVduRetryCount(docId) - 1)));
-          if (!ingestLifecycle.indexingCoordinator().updateDocument(docId, updates)) return false;
-          // The released attempt was never made: its claim may not authorize a later result.
-          vduProcessingClaims.remove(docId);
-          ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
-          ingestLifecycle.commitOps().maybeRefreshBlocking();
+          boolean reset = withFileMutationFence(() -> {
+            try { return resetVduStatusToPending(docId, claim.owner(), Set.of(attemptId)); }
+            catch (Exception failure) { throw new IllegalStateException(failure); }
+          });
+          if (reset) {
+            ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
+            ingestLifecycle.commitOps().maybeRefreshBlocking();
+          }
           requireServingVduTarget();
-          return true;
+          return reset;
         } catch (WorkerServiceException failure) {
           throw failure;
-        } catch (Exception e) {
-          throw new WorkerServiceException(WorkerServiceException.Status.INTERNAL, "VDU release failed", e);
+        } catch (Exception failure) {
+          throw new WorkerServiceException(WorkerServiceException.Status.INTERNAL, "VDU release failed", failure);
         }
       }
+    }
+  }
+
+  private static Map<String, Object> vduRevision(Map<String, String> fields) {
+    Map<String, Object> expected = new HashMap<>();
+    for (String field : List.of(SchemaFields.DOC_UID, SchemaFields.SOURCE_SHA256,
+        SchemaFields.CONTENT, SchemaFields.CONTENT_SHA256)) expected.put(field, fields.get(field));
+    return expected;
+  }
+
+  private boolean vduClaimMatches(String docId, VduProcessingClaim claim) throws IOException {
+    var input = ingestLifecycle.documentFieldOps().getEnrichmentInputs(List.of(docId)).get(docId);
+    return input != null && claim.expectedRevision().equals(vduRevision(input.fields()))
+        && SchemaFields.VDU_STATUS_PROCESSING.equals(input.fields().get(SchemaFields.VDU_STATUS))
+        && Integer.toString(claim.claimedRetryCount()).equals(input.fields().get(SchemaFields.VDU_RETRY_COUNT));
+  }
+
+  /** Refresh just an unverifiable legacy source, with the queue's existing durable source witness. */
+  public void refreshLegacyVduSource(String docId) throws IOException {
+    ingestLifecycle.commitOps().maybeRefreshBlocking();
+    if (ingestLifecycle.documentFieldOps().excludedProcessingIds(List.of(docId)).contains(docId)) return;
+    var input = ingestLifecycle.documentFieldOps().getEnrichmentInputs(List.of(docId)).get(docId);
+    if (input == null || !input.fields().getOrDefault(SchemaFields.SOURCE_SHA256, "").isBlank()) return;
+    var expected = vduRevision(input.fields());
+    ingestLifecycle.indexingCoordinator().updateDocumentIf(docId, expected,
+        Map.of(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING));
+    ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
+    if (jobQueue == null) return;
+    try {
+      Path path = Path.of(docId);
+      var stat = JobQueue.EnqueueEntry.stat(path);
+      var entry = new JobQueue.EnqueueEntry(path, stat.sizeBytes(), stat.provenance(),
+          io.justsearch.indexerworker.loop.SourceContentHash.sha256(path));
+      if (jobQueue.enqueueEntriesWithExactCollection(List.of(entry), input.fields().get(SchemaFields.COLLECTION)) != 1) {
+        throw new IOException("Legacy VDU source refresh was not admitted: " + docId);
+      }
+    } catch (java.nio.file.FileSystemException unavailable) {
+      log.info("Legacy VDU source refresh deferred for {}: {}", docId, unavailable.getMessage());
     }
   }
 
@@ -2390,15 +2676,15 @@ public final class WorkerIngestService {
         SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING, RECOVER_VDU_QUERY_LIMIT);
   }
 
-  private boolean resetVduStatusToPending(String docId, java.util.UUID procedureOwner)
-      throws Exception {
+  private boolean resetVduStatusToPending(String docId, java.util.UUID procedureOwner, Set<String> attemptIds)
+      throws IOException {
     synchronized (vduMutationMonitor) {
       VduProcessingClaim claim = vduProcessingClaims.get(docId);
       if (procedureOwner != null
-          && (claim == null || !procedureOwner.equals(claim.owner()))) {
+          && (claim == null || !procedureOwner.equals(claim.owner()) || !attemptIds.contains(claim.attemptId()))) {
         return false;
       }
-      Map<String, Object> expected = new HashMap<>();
+      Map<String, Object> expected = procedureOwner == null ? new HashMap<>() : new HashMap<>(claim.expectedRevision());
       expected.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING);
       Map<String, Object> updates = new HashMap<>();
       updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING);
@@ -2449,9 +2735,12 @@ public final class WorkerIngestService {
   }
 
   private VduRecoveryResult recoverProcessingDocs(
-      List<String> processingDocIds, java.util.UUID procedureOwner) {
+      List<String> processingDocIds, java.util.UUID procedureOwner, Set<String> attemptIds) {
+    // The conditional RMW already compares source/UID/status/retry under the coordinator lock.
+    // Keep the same monitor order as claims/results; taking the file fence before this monitor
+    // would invert their monitor -> fence order during concurrent cancellation.
     return recoverProcessingDocsWithResetOp(
-        processingDocIds, docId -> resetVduStatusToPending(docId, procedureOwner));
+        processingDocIds, docId -> resetVduStatusToPending(docId, procedureOwner, attemptIds));
   }
 
   private static java.util.UUID recoveryProcedureOwner(
@@ -2490,7 +2779,7 @@ public final class WorkerIngestService {
 
       log.info("recoverVduProcessing: found {} stuck documents", processingDocIds.size());
 
-      VduRecoveryResult result = recoverProcessingDocs(processingDocIds, procedureOwner);
+      VduRecoveryResult result = recoverProcessingDocs(processingDocIds, procedureOwner, new java.util.HashSet<>(request.getAttemptIdsList()));
       int recovered = result.recovered();
 
       if (recovered > 0) {
@@ -2550,6 +2839,11 @@ public final class WorkerIngestService {
           failedPaths.add(rawOldPath);
           continue;
         }
+        Path destination = Path.of(rawNewPath);
+        if (isUserExcluded(destination, destination)) {
+          failedPaths.add(rawOldPath);
+          continue;
+        }
         String oldPath = PathNormalizer.normalizeKey(Path.of(rawOldPath));
         String newPath = PathNormalizer.normalizeKey(Path.of(rawNewPath));
 
@@ -2561,15 +2855,14 @@ public final class WorkerIngestService {
             documentIdentityStore.rekey(oldPathHash, newPathHash, System.currentTimeMillis());
 
         // Inside the file-mutation fence: a prune applying a batch never sees a rename half done.
-        int count = withFileMutationFence(
-            () -> ingestLifecycle.indexingCoordinator().updateDocumentPaths(oldPath, newPath));
+        boolean settled = withFileMutationFence(() -> moveRowsUnderFence(oldPath, newPath));
         // Green may not contain the document yet while Blue still serves it. Moving the durable
         // identity is therefore a successful rename even when this generation has no Lucene row.
         // Store-first is deliberate: if Lucene throws after the move, the RPC fails and retry or
         // boot reconciliation converges from the store-authoritative uid without ever re-minting.
         if (identityRekey
                 != io.justsearch.indexerworker.identity.DocumentIdentityStore.RekeyResult.NOT_FOUND
-            || count > 0) {
+            || settled) {
           updatedCount++;
         } else {
           failedPaths.add(mapping.getOldPath());

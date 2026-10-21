@@ -186,7 +186,7 @@ snapshot (`shell-v0/state/indexingProgress.ts`). Numbers may differ between surf
     *   **Facets**: optional facet counts (first page only)
     *   Active filters are shown as removable chips, with a one-click “Clear”.
 4.  **Typo Correction:** If a query returns zero hits and a fuzzy match finds better results, the response includes `correctionApplied: true` and `correctedQuery`. Zone C shows a banner: "Showing results for **X** instead of *Y*". Per-term correction also replaces results when a corrected query returns significantly more hits.
-5.  **Results:** Rendered in `VirtualResultList` (Zone C) with a highlighted snippet sourced from `content_preview`.
+5.  **Results:** Rendered by the Lit search results components (Zone C) with a highlighted snippet sourced from `content_preview`.
 6.  **Pagination:** When more results exist, Zone C shows a **Load more** control (cursor-based paging for TEXT mode).
 7.  **Browse (cursor) vs select (commit):**
     *   Arrow keys move a **cursor** (highlighted row) without opening the Inspector.

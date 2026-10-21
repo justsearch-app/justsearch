@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import io.justsearch.configuration.persistence.StoreIds;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.agent.api.encryption.StoreCipher;
@@ -21,6 +22,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -59,6 +62,9 @@ public final class AgentRunStore {
   private final RunEventStore events;
   private final StoreCipher cipher; // tempdoc 629 (LAYER) — seals meta.json when enabled
 
+  /** WP6.2 — runs a loop in THIS process is still running; see {@link #markLive}. */
+  private final Set<String> liveRuns = ConcurrentHashMap.newKeySet();
+
   public AgentRunStore(Path rootDir) {
     this(rootDir, StoreCipher.disabled());
   }
@@ -72,7 +78,8 @@ public final class AgentRunStore {
     this.events = new RunEventStore(rootDir, cipher);
     if (rootDir != null) {
       DiagnosticFileRetention.pruneDirectoriesBefore(
-          rootDir, Instant.now().minus(java.time.Duration.ofDays(30)));
+          rootDir, Instant.now().minus(java.time.Duration.ofDays(30)),
+          path -> StoreIds.isValid(path.getFileName().toString()));
     }
   }
 
@@ -89,11 +96,13 @@ public final class AgentRunStore {
    * conversation exactly like a workflow run (§15.C — the run-event store is already multi-shape, so
    * this is a third shape sharing the same store, not a new persistence substrate). Returns the
    * persisted event's projected wire id (the same id {@link AgentInteractionMapper#fromRunEvent}
-   * derives for it), or {@code null} if the store is disabled, {@code conversationId} is blank, or the
-   * write failed.
+   * derives for it), or {@code null} if the store is disabled or the write failed.
+   * An absent conversation id returns null; unsafe ids are rejected before any store access.
    */
   public synchronized String appendSearchEvent(String conversationId, Map<String, Object> attributes) {
-    if (!isEnabled() || conversationId == null || conversationId.isBlank()) {
+    if (conversationId == null || conversationId.isBlank()) return null;
+    StoreIds.requireValid(conversationId);
+    if (!isEnabled()) {
       return null;
     }
     String sessionId = java.util.UUID.randomUUID().toString();
@@ -134,6 +143,7 @@ public final class AgentRunStore {
 
   synchronized void startRun(
       String sessionId, AgentRequest request, List<Map<String, Object>> messages, int initialBudget) {
+    StoreIds.requireValid(sessionId);
     if (!isEnabled()) {
       return;
     }
@@ -232,6 +242,7 @@ public final class AgentRunStore {
       int toolCallsExecuted,
       int totalTokensUsed,
       String resumeNote) {
+    StoreIds.requireValid(sessionId);
     if (!isEnabled()) {
       return;
     }
@@ -268,6 +279,7 @@ public final class AgentRunStore {
    */
   synchronized void setHandoffState(
       String sessionId, String activeAgentId, List<Map<String, Object>> handoffHistory) {
+    StoreIds.requireValid(sessionId);
     if (!isEnabled()) {
       return;
     }
@@ -298,6 +310,7 @@ public final class AgentRunStore {
    * {@code cancelTrigger} (nullable) fields.
    */
   synchronized void setTerminationReason(String sessionId, TerminationReason terminationReason) {
+    StoreIds.requireValid(sessionId);
     if (!isEnabled()) {
       return;
     }
@@ -333,6 +346,7 @@ public final class AgentRunStore {
   }
 
   void appendEvent(String sessionId, AgentEvent event) {
+    StoreIds.requireValid(sessionId);
     // Tempdoc 565 §15.C — map the AgentEvent to the generic (eventType, payload) and persist through the
     // shape-agnostic event log (which writes the record on disk before firing listeners, so the ledger
     // projection can never get ahead of the durable record). The agent vocabulary mapping stays here.
@@ -351,7 +365,7 @@ public final class AgentRunStore {
       return null;
     }
     String sessionId = readLastSessionId();
-    if (sessionId == null || sessionId.isBlank()) {
+    if (!StoreIds.isValid(sessionId)) {
       return null;
     }
     return readMeta(sessionId);
@@ -362,9 +376,7 @@ public final class AgentRunStore {
    * id). Tempdoc 415 follow-up (C20).
    */
   public synchronized Map<String, Object> readSnapshot(String sessionId) {
-    if (sessionId == null || sessionId.isBlank()) {
-      return null;
-    }
+    StoreIds.requireValid(sessionId);
     return readMeta(sessionId);
   }
 
@@ -380,6 +392,7 @@ public final class AgentRunStore {
     int safeLimit = Math.max(1, limit);
     try (var stream = Files.list(rootDir)) {
       return stream
+          .filter(path -> StoreIds.isValid(path.getFileName().toString()))
           .filter(Files::isDirectory)
           .sorted(
               java.util.Comparator.<Path, java.nio.file.attribute.FileTime>comparing(
@@ -393,6 +406,7 @@ public final class AgentRunStore {
                   .reversed())
           .map(p -> readMeta(p.getFileName().toString()))
           .filter(java.util.Objects::nonNull)
+          .filter(meta -> meta.get("sessionId") instanceof String id && StoreIds.isValid(id))
           // Tempdoc 565 §15.C fix — the Sessions view is agent-run-only; exclude workflow runs that now
           // share the run-event root (filter BEFORE the limit so it bounds AGENT runs, not all runs).
           .filter(AgentRunStore::isAgentRun)
@@ -441,6 +455,7 @@ public final class AgentRunStore {
     try (var stream = Files.list(rootDir)) {
       List<Path> dirs =
           stream
+              .filter(path -> StoreIds.isValid(path.getFileName().toString()))
               .filter(Files::isDirectory)
               .sorted(
                   java.util.Comparator.<Path, java.nio.file.attribute.FileTime>comparing(
@@ -459,7 +474,7 @@ public final class AgentRunStore {
           continue;
         }
         if (!(meta.get("conversationId") instanceof String conversationId)
-            || conversationId.isBlank()) {
+            || !StoreIds.isValid(conversationId)) {
           continue; // a standalone run is its own thread; it is not a conversation of the sidebar's
         }
         Map<String, Object> row = byConversation.get(conversationId);
@@ -542,7 +557,8 @@ public final class AgentRunStore {
    * everything. Irreversible: the run's meta AND its event log go with the directory.
    */
   public synchronized int deleteConversationRuns(String conversationId) {
-    if (!isEnabled() || conversationId == null || conversationId.isBlank()) {
+    StoreIds.requireValid(conversationId);
+    if (!isEnabled()) {
       return 0;
     }
     int deleted = 0;
@@ -564,7 +580,8 @@ public final class AgentRunStore {
    * completed run is no longer checkpointed, so marking after completion is stable.
    */
   public synchronized void markBackground(String sessionId) {
-    if (!isEnabled() || sessionId == null || sessionId.isBlank()) {
+    StoreIds.requireValid(sessionId);
+    if (!isEnabled()) {
       return;
     }
     try {
@@ -577,6 +594,26 @@ public final class AgentRunStore {
     } catch (Exception e) {
       LOG.warn("Failed to mark run {} background", sessionId, e);
     }
+  }
+
+  /**
+   * WP6.2 — the running loop owns {@code sessionId} from before its first write until after its last
+   * ({@link #clearLive}). Recovery ({@link AgentRunReconciler}) can run while this process still runs
+   * agents — the unlock listener re-runs it — and must leave an owned run alone: it is not
+   * interrupted, and its loop reports its directions' outcomes itself.
+   */
+  void markLive(String sessionId) {
+    liveRuns.add(sessionId);
+  }
+
+  /** WP6.2 — the loop made its last write for {@code sessionId}; see {@link #markLive}. */
+  void clearLive(String sessionId) {
+    liveRuns.remove(sessionId);
+  }
+
+  /** WP6.2 — whether a loop in this process still owns {@code sessionId}; see {@link #markLive}. */
+  boolean isLive(String sessionId) {
+    return liveRuns.contains(sessionId);
   }
 
   /**
@@ -594,7 +631,8 @@ public final class AgentRunStore {
    * re-unlock can all run the pass safely. Returns whether this call stamped the run.
    */
   public synchronized boolean markInterrupted(String sessionId, Instant at) {
-    if (!isEnabled() || sessionId == null || sessionId.isBlank()) {
+    StoreIds.requireValid(sessionId);
+    if (!isEnabled()) {
       return false;
     }
     try {
@@ -626,9 +664,11 @@ public final class AgentRunStore {
     }
     try (var stream = Files.list(rootDir)) {
       return stream
+          .filter(path -> StoreIds.isValid(path.getFileName().toString()))
           .filter(Files::isDirectory)
           .map(p -> readMeta(p.getFileName().toString()))
           .filter(java.util.Objects::nonNull)
+          .filter(meta -> meta.get("sessionId") instanceof String id && StoreIds.isValid(id))
           // Tempdoc 565 §15.C fix — presence is the agent-run inbox; exclude workflow runs (defense in
           // depth — workflow also sets background=false, but the shape filter is the explicit invariant).
           .filter(AgentRunStore::isAgentRun)
@@ -668,11 +708,13 @@ public final class AgentRunStore {
    * sorts all events by their own timestamps.
    */
   public synchronized List<String> listRunIdsByConversation(String conversationId) {
-    if (!isEnabled() || conversationId == null || conversationId.isBlank()) {
+    StoreIds.requireValid(conversationId);
+    if (!isEnabled()) {
       return List.of();
     }
     try (var stream = Files.list(rootDir)) {
       return stream
+          .filter(path -> StoreIds.isValid(path.getFileName().toString()))
           .filter(Files::isDirectory)
           .map(p -> p.getFileName().toString())
           .filter(
@@ -743,6 +785,7 @@ public final class AgentRunStore {
 
   /** Tempdoc 565 §15.C — delegate to the shape-agnostic event log (incl. the legacy-payload upcast). */
   synchronized List<Map<String, Object>> readEvents(String sessionId) {
+    StoreIds.requireValid(sessionId);
     return events.readEvents(sessionId);
   }
 
@@ -901,7 +944,7 @@ public final class AgentRunStore {
       return null;
     }
     try {
-      return Files.readString(lastSessionPath(), StandardCharsets.UTF_8).trim();
+      return Files.readString(lastSessionPath(), StandardCharsets.UTF_8);
     } catch (Exception e) {
       LOG.warn("Failed to read last session pointer", e);
       return null;
@@ -909,7 +952,7 @@ public final class AgentRunStore {
   }
 
   private Path runDir(String sessionId) {
-    return rootDir.resolve(sessionId);
+    return StoreIds.resolve(rootDir, sessionId);
   }
 
   private Path metaPath(String sessionId) {

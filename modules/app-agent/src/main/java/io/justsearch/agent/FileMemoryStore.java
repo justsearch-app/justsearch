@@ -2,6 +2,7 @@
 package io.justsearch.agent;
 
 import io.justsearch.agent.api.encryption.StoreCipher;
+import io.justsearch.agent.api.memory.MemoriesUnavailableException;
 import io.justsearch.agent.api.memory.MemoryRecord;
 import io.justsearch.agent.api.memory.MemoryStore;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -36,7 +38,9 @@ public final class FileMemoryStore implements MemoryStore {
 
   private final Path file;
   private final StoreCipher cipher;
-  private final Map<String, MemoryRecord> byId = new LinkedHashMap<>();
+  private Map<String, MemoryRecord> byId = new LinkedHashMap<>();
+  private boolean loaded;
+  private MemoriesUnavailableException unavailable;
 
   public FileMemoryStore(Path rootDir) {
     this(rootDir, StoreCipher.disabled());
@@ -45,8 +49,8 @@ public final class FileMemoryStore implements MemoryStore {
   /**
    * Tempdoc 629 (LAYER) — {@code memory.json} is an AUTHORED store, sealed whole-file by {@code cipher}
    * when at-rest encryption is enabled. Because this store eager-loads at construction, a launch in the
-   * LOCKED state skips the read (cache stays empty); the owner must re-call {@link #onKeyUnlocked()} on
-   * unlock and {@link #onKeyLocked()} on lock (wired from the {@code DataKeyManager} listener).
+   * LOCKED state skips the read. Key listeners invalidate the cache on transitions; each unlocked
+   * access also establishes readiness, including before the unlock listener has run.
    */
   public FileMemoryStore(Path rootDir, StoreCipher cipher) {
     this.file = rootDir.resolve("memory.json");
@@ -56,12 +60,14 @@ public final class FileMemoryStore implements MemoryStore {
 
   /** Tempdoc 629: re-read after unlock (the constructor load was skipped while locked). */
   public synchronized void onKeyUnlocked() {
+    loaded = false;
     byId.clear();
-    load();
+    requireReady();
   }
 
   /** Tempdoc 629: drop plaintext memory from RAM when the key locks (reads return empty until unlock). */
   public synchronized void onKeyLocked() {
+    loaded = false;
     byId.clear();
   }
 
@@ -86,6 +92,35 @@ public final class FileMemoryStore implements MemoryStore {
    */
   private void requireUnlocked() {
     if (isLocked()) {
+      loaded = false;
+      byId.clear();
+      throw new io.justsearch.agent.api.encryption.KeyLockedException();
+    }
+    requireReady();
+  }
+
+  /**
+   * A published key does not imply that the unlock listener has loaded the store. Every access
+   * establishes readiness itself, with one load attempt and no background retry. StoreCipher only
+   * calls DataKeyManager's monitor-free enabled(), locked() and dek() methods; it never acquires
+   * the manager monitor while this store monitor is held (listeners acquire them in the other order).
+   */
+  private void requireReady() {
+    if (loaded) {
+      return;
+    }
+    try {
+      load();
+    } catch (RuntimeException e) {
+      // Keep one error identity per unavailable episode, including retries, for passive-log dedup.
+      if (unavailable == null) {
+        unavailable = new MemoriesUnavailableException(e);
+      }
+      throw unavailable;
+    }
+    if (!loaded) {
+      // The key can lock between the access pre-check and load's own check. A skipped load is
+      // never readiness, even if another unlock publishes its key before this access returns.
       throw new io.justsearch.agent.api.encryption.KeyLockedException();
     }
   }
@@ -118,7 +153,13 @@ public final class FileMemoryStore implements MemoryStore {
 
   @Override
   public synchronized List<MemoryRecord> whatItKnows() {
-    // Newest first — the inspectable projection. Empty while locked; pair it with isLocked().
+    // Preserve the locked projection; an unlocked failed load must never look empty or partial.
+    if (isLocked()) {
+      loaded = false;
+      byId.clear();
+      return List.of();
+    }
+    requireReady();
     List<MemoryRecord> out = new ArrayList<>(byId.values());
     out.sort((a, b) -> b.createdAt().compareTo(a.createdAt()));
     return List.copyOf(out);
@@ -150,15 +191,13 @@ public final class FileMemoryStore implements MemoryStore {
   }
 
   private void load() {
-    if (!Files.exists(file)) {
-      return;
-    }
     if (cipher.enabled() && cipher.locked()) {
       // Sealed + locked: leave the cache empty and reload on unlock. Do NOT read-and-swallow into a
       // false-empty (the §L4 "locked must not look deleted" invariant, applied to the eager cache).
       return;
     }
     try {
+      Map<String, MemoryRecord> candidate = new LinkedHashMap<>();
       String plaintext = cipher.open(Files.readString(file, StandardCharsets.UTF_8));
       JsonNode root = MAPPER.readTree(plaintext);
       if (root == null || (!root.isArray() && !root.isObject())) {
@@ -183,8 +222,16 @@ public final class FileMemoryStore implements MemoryStore {
       }
       for (Map<String, Object> r : rows) {
         MemoryRecord rec = fromMap(r);
-        byId.put(rec.id(), rec);
+        candidate.put(rec.id(), rec);
       }
+      byId = candidate;
+      loaded = true;
+      unavailable = null;
+    } catch (NoSuchFileException e) {
+      // Only a definite absence is a first run; exists() also returns false on access failures.
+      byId = new LinkedHashMap<>();
+      loaded = true;
+      unavailable = null;
     } catch (CorruptDurableStoreException
         | io.justsearch.configuration.persistence.UnsupportedStoreVersionException e) {
       throw e;

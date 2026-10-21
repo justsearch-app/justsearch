@@ -6,7 +6,7 @@ description: "Every service process is bound to its owner's lifetime, so nothing
 date: 2026-10-05
 amends:
   - "0049-one-engine-jvm-and-the-boundaries-that-survive.md"
-probes: "none - the probes land with the implementing branches; the candidates are listed under Enforcement"
+probes: "none - ADR-specific probes are not registered; the Enforcement section lists candidates, not executed checks"
 last_reviewed: 2026-10-05
 ---
 
@@ -14,7 +14,9 @@ last_reviewed: 2026-10-05
 
 ## Status
 
-Accepted by the owner on 2026-10-05 (decisions D2, D7 and D9 of the co-residence design). Not yet built.
+Accepted by the owner on 2026-10-05 (decisions D2, D7 and D9 of the co-residence design).
+Implemented in #759 (`1d272de4b`); Linux parent-death containment followed in #761
+(`abe1aff3a`). ADR-specific probes are not registered in `governance/adr-probes.v1.json`.
 
 ## Context
 
@@ -93,7 +95,7 @@ How lifetimes and exits are handled today:
 - A required child must outlive the Engine.
 - Conformance cannot keep the two actuators equivalent.
 
-## Enforcement (probe candidates, added with the implementation)
+## Enforcement (unregistered probe candidates)
 
 - The Engine creates and joins its job at boot, in one place.
 - No adoption code path remains in the chat-server decider or the reconciler.

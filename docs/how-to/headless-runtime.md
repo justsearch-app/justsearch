@@ -9,7 +9,7 @@ description: "Launch the JustSearch backend as a local loopback service without 
 
 ## What this does
 
-Runs the JustSearch backend (the Head process + its Worker) as a local, loopback-only
+Runs the JustSearch backend (one Engine JVM with API and index halves) as a local, loopback-only
 service **without** the Tauri desktop shell, in a chosen install/runtime **mode** (tempdoc 657):
 
 | Mode | What it is | Model tiers |
@@ -43,18 +43,20 @@ On Windows, the PowerShell form is:
 .\justsearch-headless.ps1 -Mode mcp-lite
 ```
 
-To reuse an existing install's data and models, set these before launching:
+To reuse the desktop app's index, settings, and models, quit the desktop app first, then
+set both roots to its data folder before launching. Do not run two Engines against the same data:
 
 ```bat
-set JUSTSEARCH_DATA_DIR=%LOCALAPPDATA%\JustSearch\data
+set JUSTSEARCH_DATA_DIR=%APPDATA%\io.justsearch.shell
 set JUSTSEARCH_HOME=%APPDATA%\io.justsearch.shell
 ```
 
-On Linux, set the corresponding paths in Bash before invoking the launcher:
+On Linux, use the desktop app's default data folder (or its folder under
+`XDG_DATA_HOME` if set):
 
 ```sh
-export JUSTSEARCH_DATA_DIR=/absolute/path/to/engine-data
-export JUSTSEARCH_HOME=/absolute/path/to/ai-assets
+export JUSTSEARCH_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/io.justsearch.shell"
+export JUSTSEARCH_HOME="$JUSTSEARCH_DATA_DIR"
 ```
 
 The desktop shell retains its platform app-data directory. On Linux its private
@@ -99,23 +101,31 @@ on each boot; missing or incorrect tokens receive HTTP `401` on protected reques
 
 ## Confirm the active mode
 
-The runtime manifest reports the mode. With the API port known (default dev port `33221`):
+The launcher prints `JUSTSEARCH_API_PORT=<port>` when it is up: normally `8080`,
+unless taken or overridden with `JUSTSEARCH_API_PORT` (`33221` for the dev
+`runHeadless` task). The actual port is also recorded as `head.apiPort` in
+`<JUSTSEARCH_DATA_DIR>/runtime/manifest.json`.
+
+The runtime manifest reports the mode. Set the printed port in your terminal
+(replace `8080` below if different):
 
 ```bash
-curl -s http://127.0.0.1:33221/api/runtime/manifest | jq '.mode'
+export JUSTSEARCH_API_PORT=8080
+curl -s "http://127.0.0.1:$JUSTSEARCH_API_PORT/api/runtime/manifest" | jq '.mode'
 # { "intent": "mcp-lite", "realized": "retrieval-only" }
 ```
 
 - `intent` is the mode you launched with.
 - `realized` is the coarse capability actually up: `full` (retrieval + LLM ready),
-  `retrieval-only` (retrieval up, LLM not present/needed), or `degraded` (worker not ready).
+  `retrieval-only` (retrieval up, LLM not present/needed), or `degraded` (index half not ready).
   `realized` reflects reality, so it can differ from `intent` while things start up or if a
   component is down.
 
 To see the download weight a mode implies before installing:
 
 ```bash
-curl -s -H "X-JustSearch-Session: $SESSION_TOKEN" http://127.0.0.1:33221/api/ai/install/plan-preview | jq '.tiers'
+curl -s -H "X-JustSearch-Session: $SESSION_TOKEN" \
+  "http://127.0.0.1:$JUSTSEARCH_API_PORT/api/ai/install/plan-preview" | jq '.tiers'
 ```
 
 ## Notes

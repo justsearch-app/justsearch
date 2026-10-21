@@ -2,10 +2,10 @@
 title: "ADR-0037: Universal SSE envelope"
 type: decision
 status: accepted
-description: "Streaming Resources share one multi-frame SSE envelope (initial snapshot frame + subsequent delta frames) rather than per-endpoint ad-hoc stream shapes."
+description: "Streaming Resources share one SSE envelope (event frame: a LIFECYCLE snapshot followed by UPDATE frames); chat and agent run streams are outside this envelope contract."
 date: 2026-06-09
 probes: none - the SSE envelope shape is owned by the wire contract Category and its projection gate.
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-20
 ---
 
 
@@ -20,7 +20,10 @@ last_reviewed: 2026-09-02
 
 ## Status
 
-Accepted. Describes the live SSE Resource transport (capabilities stream, health stream, chat/agent streams).
+Accepted. Describes the live SSE Resource transport, including capabilities and health streams.
+Chat and agent run streams use their own event/data protocol and are outside this envelope contract.
+
+Current implementation corrections are recorded in the 2026-10-20 amendment below.
 
 ## Decision
 
@@ -227,3 +230,16 @@ same server lifetime.
   per-connection helper); `modules/app-observability/.../SseStreamChannel.java`
   (per-stream coordinator). The implementation surfaces correspond
   one-to-one with the wire contract above.
+
+## Amendment 2026-10-20: current envelope implementation locations
+
+The Source Evidence path for the per-connection writer is historical.
+`SseEnvelopeWriter` lives in
+`modules/ui/src/main/java/io/justsearch/ui/api/SseEnvelopeWriter.java` and emits
+event `frame` with `LIFECYCLE` and `UPDATE` frame kinds.
+`SseStreamChannel` remains in
+`modules/app-observability/src/main/java/io/justsearch/app/observability/stream/SseStreamChannel.java`.
+The Resource envelope excludes language/run streams:
+`modules/ui/src/main/java/io/justsearch/ui/api/RunStreamWriter.java` sends the
+run frame's event/data directly. The Status section's Resource-only scope is
+the current contract; it must not be widened to chat/agent run streams.

@@ -3,8 +3,11 @@ package io.justsearch.ui.api;
 
 import io.javalin.http.Context;
 import io.justsearch.app.services.encryption.DataKeyManager;
+import io.justsearch.app.services.encryption.EncryptionKeystore;
 import io.justsearch.app.services.encryption.WrongPassphraseException;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -37,7 +40,10 @@ final class ConversationEncryptionController {
   }
 
   void handleStatus(Context ctx) {
-    ctx.json(Map.of("state", state()));
+    var response = new LinkedHashMap<String, Object>();
+    response.put("state", state());
+    if (keys.warning() != null) response.put("warning", keys.warning());
+    ctx.json(response);
   }
 
   void handleSetup(Context ctx) {
@@ -47,8 +53,8 @@ final class ConversationEncryptionController {
       return;
     }
     try {
-      String recoveryKey = keys.setup(pass);
-      ctx.json(Map.of("state", state(), "recoveryKey", recoveryKey));
+      var result = keys.setupWithResult(pass);
+      writeSaveResult(ctx, result.save(), result.recoveryKey());
     } catch (IllegalStateException e) {
       ctx.status(409).json(Map.of("error", e.getMessage()));
     } finally {
@@ -78,8 +84,8 @@ final class ConversationEncryptionController {
   /** Tempdoc 629 (#4): issue a fresh recovery key (re-wrap; requires unlocked). Shown once. */
   void handleRegenerateRecovery(Context ctx) {
     try {
-      String recoveryKey = keys.regenerateRecovery();
-      ctx.json(Map.of("state", state(), "recoveryKey", recoveryKey));
+      var result = keys.regenerateRecoveryWithResult();
+      writeSaveResult(ctx, result.save(), result.recoveryKey());
     } catch (IllegalStateException e) {
       ctx.status(409).json(Map.of("error", e.getMessage()));
     }
@@ -107,8 +113,7 @@ final class ConversationEncryptionController {
       return;
     }
     try {
-      keys.changePassphrase(oldPass, newPass);
-      ctx.json(Map.of("state", state()));
+      writeSaveResult(ctx, keys.changePassphraseWithResult(oldPass, newPass), null);
     } catch (WrongPassphraseException e) {
       ctx.status(401).json(Map.of("error", "wrong passphrase"));
     } catch (IllegalStateException e) {
@@ -117,6 +122,20 @@ final class ConversationEncryptionController {
       Arrays.fill(oldPass, '\0');
       Arrays.fill(newPass, '\0');
     }
+  }
+
+  private void writeSaveResult(Context ctx, EncryptionKeystore.SaveResult result, String recoveryKey) {
+    var response = new LinkedHashMap<String, Object>();
+    response.put("state", state());
+    response.put("saveOutcome", result.outcome().name().toLowerCase(Locale.ROOT));
+    if (result.outcome() == EncryptionKeystore.SaveOutcome.FAILED_ROLLED_BACK) {
+      ctx.status(503);
+      response.put("error", "Encryption change failed; the previous encryption state was restored.");
+    } else {
+      if (recoveryKey != null) response.put("recoveryKey", recoveryKey);
+      if (result.warning() != null) response.put("warning", result.warning());
+    }
+    ctx.json(response);
   }
 
   private static String field(Context ctx, String name) {

@@ -2,7 +2,7 @@
 title: "ADR-0047: Context window is a derived resource"
 type: decision
 status: stable
-description: "The LLM context window is derived at activation from a ladder of explicit rungs (32k on GPU, 8k on CPU, stepped down on a launch abort) rather than configured as a user preference, and every prompt-side budget is a fraction of the live window rather than a constant."
+description: "The LLM context window is derived at activation from a ladder of explicit rungs (up to 32k on GPU, capped by the per-card profile; 8k on CPU; stepped down on a launch abort) rather than configured as a user preference, and every prompt-side budget is a fraction of the live window rather than a constant."
 date: 2026-09-02
 probes:
   - adr-0047-fit-off-explicit
@@ -10,14 +10,16 @@ probes:
   - adr-0047-ladder-policy-test
   - adr-0047-budgets-are-window-fractions
   - adr-0047-no-window-blind-threshold
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0047: Context window is a derived resource
 
 ## Status
 
-Accepted (2026-09-02).
+Accepted (2026-09-02). Amended by
+[ADR-0050](0050-gpu-co-residence-by-prevention.md): the per-card GPU profile may lower the
+ladder's top rung.
 
 Implemented across tempdoc 883 PR 1 (the window itself) and PR 2 (the budgets derived from it).
 This record is written after the fact but before the lane closes, because the live measurements
@@ -247,3 +249,13 @@ it was chasing — which is what left the window under observation but un-re-dec
 context trimmer whose firing on essentially every ask was the symptom that made the window's size
 legible. **208** is the 2026-02 argument for 4096 → 8192 that was written into the resolver and
 never into `UiSettings`, so it never shipped.
+
+## Amendment 2026-10-20: profile-selected top rung
+
+[ADR-0050](0050-gpu-co-residence-by-prevention.md) amends the original
+backend-only top-rung choice. `ContextWindowPolicy.auto(gpuBacked,
+freeVramBytes, plannedTopRung)` starts no higher than the GPU profile's planned
+rung, then retains the same descending retry ladder. Free VRAM remains
+diagnostic and does not select the rung. Evidence:
+`modules/app-inference/src/main/java/io/justsearch/app/inference/ContextWindowPolicy.java`
+(the three-argument `auto` overload).

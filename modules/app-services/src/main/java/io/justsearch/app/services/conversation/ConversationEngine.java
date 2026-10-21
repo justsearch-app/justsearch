@@ -96,6 +96,16 @@ public final class ConversationEngine {
   private final io.justsearch.agent.api.conversation.ConversationStore conversationStore;
   private final io.justsearch.app.api.EngineAdmissionService admission;
 
+  /** The dispatch body key naming the turn, so the reader's Stop can name the turn it means. */
+  public static final String TURN_ID_KEY = "turnId";
+  /** The cancellation reason of the reader's own Stop, the one cancellation saved as theirs. */
+  public static final String USER_STOP_REASON = "user_stop";
+  /** The disposition a stopped turn is saved with; the record reads it as "stopped by you". */
+  static final String STOPPED_DISPOSITION = "CANCELLED";
+
+  /** The recording turns a Stop can reach: running now, or stopped before they started. */
+  private final TurnStops turnStops = new TurnStops(USER_STOP_REASON);
+
   /**
    * Constructs the engine. Phase B-compatible overload (registries + LLM source default to
    * empty / unavailable) — used by tests and pre-substrate-driven assembly.
@@ -270,6 +280,26 @@ public final class ConversationEngine {
     }
   }
 
+  /** What the reader's Stop did to its turn ({@link #stopTurn}). */
+  public enum TurnStop {
+    /** The running turn was stopped now; it is saved as stopped. */
+    STOPPED,
+    /** The turn has not started yet; it is stopped, and saved as stopped, when it starts. */
+    PENDING,
+    /** Nothing changed: the turn's answer was already saved, or it ended for another reason. */
+    UNCHANGED
+  }
+
+  /**
+   * The reader pressed Stop on a turn: its work is cancelled with {@link #USER_STOP_REASON}, and
+   * the turn is saved as stopped, with its question, its rewrite note, its sources and whatever had
+   * streamed and been thought. A Stop that overtook its dispatch stops the turn the moment it
+   * starts ({@link TurnStops}); a turn whose answer is already saved is left alone.
+   */
+  public TurnStop stopTurn(String conversationId, String turnId) {
+    return turnStops.stop(new TurnStops.Turn(conversationId, turnId));
+  }
+
   @FunctionalInterface
   public interface OperationScopeFactory {
     OperationScope open(ConversationShapeRef shapeId, EngineContext engineContext);
@@ -436,7 +466,7 @@ public final class ConversationEngine {
     try {
       Map<String, Object> answer =
           persistedAssistant(
-              assistantMessage(finalResponse instanceof String s ? s : ""), payload, null);
+              assistantMessage(finalResponse instanceof String s ? s : ""), payload, null, null);
       if (runId != null && !runId.isBlank()) {
         answer.put("runId", runId);
       }
@@ -468,9 +498,12 @@ public final class ConversationEngine {
     // "interrupted" — the inverse dishonesty. Only a process death leaves the mark set, which is
     // exactly the condition it encodes.
     var openTurnKey = new AtomicReference<String>();
+    TurnStops.Turn running = runningTurn(shape, body, work);
+    if (running != null) turnStops.started(running, work);
     try {
-      dispatchSubstrateDrivenBody(shape, body, audience, sink, openTurnKey, engineContext, work);
+      dispatchSubstrateDrivenBody(shape, body, audience, sink, openTurnKey, engineContext, work, running);
     } finally {
+      if (running != null) turnStops.finished(running, work);
       String key = openTurnKey.get();
       if (key != null && conversationStore != null) {
         try {
@@ -482,12 +515,23 @@ public final class ConversationEngine {
     }
   }
 
+  /** The turn a Stop can name: one that is recorded, names itself and runs as Engine work. */
+  private static TurnStops.Turn runningTurn(
+      ConversationShape shape, Map<String, Object> body, io.justsearch.app.api.EngineWorkHandle work) {
+    String conversationId = persistenceKey(shape, body);
+    return work != null && conversationId != null
+            && body.get(TURN_ID_KEY) instanceof String turnId && !turnId.isBlank()
+        ? new TurnStops.Turn(conversationId, turnId)
+        : null;
+  }
+
   private void dispatchSubstrateDrivenBody(
       ConversationShape shape,
       Map<String, Object> body,
       Audience audience,
       Consumer<SseEvent> sink,
-      AtomicReference<String> openTurnKey, EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work) {
+      AtomicReference<String> openTurnKey, EngineContext engineContext, io.justsearch.app.api.EngineWorkHandle work,
+      TurnStops.Turn running) {
     LOG.debug("Dispatching substrate-driven {} (audience={})", shape.id().value(), audience);
 
     // Resolve SPI implementations from registries.
@@ -551,15 +595,36 @@ public final class ConversationEngine {
     // re-render would produce identical output).
     String systemPrompt = assembleSystemPrompt(contributors, ctx);
 
+    String retrievalRecordId = sessionId != null ? sessionId : threadId;
+    if (stoppedByUser(work)) {
+      // Stopped before it began (a Stop that overtook the dispatch): nothing was rewritten,
+      // retrieved or answered.
+      recordStopped(retrievalRecordId, shape, body, false, Map.of(), List.of(), null, "", null, sink);
+      return;
+    }
+
     // Run injectors once per request (iteration 0 only). Each injector may emit SSE events
     // (forwarded to sink) and may declare a terminal error that aborts before the LLM call.
-    InjectorRunResult injectorRun = runInjectors(injectors, ctx, sink);
-    String retrievalRecordId = sessionId != null ? sessionId : threadId;
+    InjectorRunResult injectorRun = runInjectors(injectors, ctx, sink, work);
+    // Read once, after the injectors: the rewrite (if any) happened among them, and every outcome
+    // row this turn writes below carries it.
+    String standalone = standaloneQuestion(ctx);
+    if (stoppedByUser(work)) {
+      // Stopped while the question was being rewritten or its documents retrieved: nothing was
+      // answered, and the question has not been recorded yet.
+      recordStopped(retrievalRecordId, shape, body, false, injectorRun.retrievalMetadata,
+          injectorRun.citations, standalone, "", null, sink);
+      return;
+    }
     if (injectorRun.terminated) {
+      // A turn whose retrieval reported what it did, or whose question was rewritten (the reader saw
+      // "Interpreted as" live), is saved with its outcome even though it ends here: a retrieval that
+      // could not run at all reports no metadata, and the rewrite is then all that says what it was.
       if (retrievalRecordId != null && conversationStore != null
-          && !injectorRun.retrievalMetadata.isEmpty() && injectorRun.terminalError != null) {
+          && (!injectorRun.retrievalMetadata.isEmpty() || standalone != null)
+          && injectorRun.terminalError != null) {
         conversationStore.appendMessage(retrievalRecordId, shape.id().value(), threadUserMessage(body));
-        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
+        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
             String.valueOf(injectorRun.terminalError.payload().getOrDefault("error", "Retrieval failed")),
             injectorRun.terminalError.payload().get("errorCode"));
       }
@@ -586,13 +651,17 @@ public final class ConversationEngine {
     // the FE presents these as the split (scaled/≈), never false precision.
     Map<String, Object> contextBreakdown = new LinkedHashMap<>();
     contextBreakdown.put("system", TokenEstimation.estimateTokens(systemPrompt));
-    contextBreakdown.put("conversation", estimatePhaseTokens(initialMessages));
-    contextBreakdown.put("retrieved", estimatePhaseTokens(injectorRun.messages));
+    // The turns a caller forwards in the request body's `context` (an EPHEMERAL ask's follow-up
+    // history) are conversation, not retrieved documents, even though an injector supplies them.
+    contextBreakdown.put("conversation",
+        estimatePhaseTokens(initialMessages) + estimatePhaseTokens(injectorRun.forwarded));
+    contextBreakdown.put("retrieved",
+        estimatePhaseTokens(injectorRun.messages) - estimatePhaseTokens(injectorRun.forwarded));
 
     OnlineAiService ai = onlineAiSupplier.get();
     if (ai == null || !ai.isAvailable()) {
       emitError(sink, "AI service unavailable", "AI_OFFLINE");
-      persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
+      persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
           "AI service unavailable", "AI_OFFLINE");
       return;
     }
@@ -622,122 +691,152 @@ public final class ConversationEngine {
 
     String accumulatedFinalText = "";
     Map<String, Object> mergedDoneEntries = new LinkedHashMap<>();
-    for (int i = 0; i < hardCap; i++) {
-      List<Map<String, Object>> llmInput = buildLlmInput(systemPrompt, ctx.messages());
+    // Whether this iteration's answer is already recorded: a Stop after that changes nothing saved.
+    boolean answerRecorded = false;
+    // The thinking of the call whose text a late Stop saves.
+    List<ReasoningTrace> stoppedReasoning = null;
+    try {
+      for (int i = 0; i < hardCap; i++) {
+        answerRecorded = false;
+        List<Map<String, Object>> llmInput = buildLlmInput(systemPrompt, ctx.messages());
 
-      String finalText;
-      AtomicReference<OnlineAiService.AiUsage> usageRef = new AtomicReference<>();
-      // Tempdoc 848 §2.2 — per-`streamLlm` (therefore per-iteration) by construction: an ITERATING
-      // shape's iteration-3 record carries iteration-3's thinking, with no cross-iteration bleed.
-      AtomicReference<List<ReasoningTrace>> reasoningRef = new AtomicReference<>();
-      try {
-        finalText =
-            streamLlm(
-                ai, llmInput, maxTokens, sampling, consumers, ctx, usageRef, reasoningRef, sink);
-      } catch (LlmStreamException e) {
-        emitError(sink, e.getMessage(), e.errorCode);
-        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
-            e.getMessage(), e.errorCode);
-        return;
-      }
-      accumulatedFinalText = finalText;
-      checkWork(work);
-
-      // Stream consumers: onDone dispatch. Collect message deltas + done-payload entries.
-      List<Map<String, Object>> aggregateDeltas = new ArrayList<>();
-      mergedDoneEntries.clear();
-      for (StreamConsumer consumer : consumers) {
-        checkWork(work);
-        StreamConsumerResult result;
+        String finalText;
+        AtomicReference<OnlineAiService.AiUsage> usageRef = new AtomicReference<>();
+        // Tempdoc 848 §2.2 — per-`streamLlm` (therefore per-iteration) by construction: an ITERATING
+        // shape's iteration-3 record carries iteration-3's thinking, with no cross-iteration bleed.
+        AtomicReference<List<ReasoningTrace>> reasoningRef = new AtomicReference<>();
         try {
-          result = consumer.onDone(finalText, ctx);
-        } catch (Exception e) {
-          LOG.warn("StreamConsumer {} onDone threw; emitting error event", consumer.id(), e);
-          emitError(sink, "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
-          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
-              "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
+          finalText =
+              streamLlm(
+                  ai, llmInput, maxTokens, sampling, consumers, ctx, usageRef, reasoningRef, sink);
+        } catch (LlmStreamException e) {
+          if (stoppedByUser(work)) {
+            recordStopped(retrievalRecordId, shape, body, true, injectorRun.retrievalMetadata,
+                injectorRun.citations, standalone, e.partialText, e.reasoning, sink);
+            return;
+          }
+          emitError(sink, e.getMessage(), e.errorCode);
+          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+              e.getMessage(), e.errorCode);
           return;
         }
-        result.events().forEach(sink);
-        aggregateDeltas.addAll(result.messageDeltas());
-        mergedDoneEntries.putAll(result.donePayloadEntries());
-      }
-      mergedDoneEntries.putAll(injectorRun.retrievalMetadata);
+        accumulatedFinalText = finalText;
+        stoppedReasoning = reasoningRef.get();
+        checkWork(work);
 
-      // Tempdoc 610 §E.4 / §G — surface the prompt-token occupancy on the done payload so the FE can
-      // render a context-budget meter. The model context window (the meter's denominator) is FE-side
-      // (aiState). The usage is captured per LLM call; the last iteration's value is what the meter shows.
-      OnlineAiService.AiUsage usage = usageRef.get();
-      if (usage != null && usage.promptTokens() != null) {
-        mergedDoneEntries.put("promptTokens", usage.promptTokens());
-        if (usage.totalTokens() != null) {
-          mergedDoneEntries.put("totalTokens", usage.totalTokens());
-        }
-      }
-      // Tempdoc 835 §9c.4 — completionTokens was captured on AiUsage and dropped here. It is the
-      // denominator for every reasoning-budget decision (reasoning and answer tokens share this
-      // number), so a turn's cost is unmeasurable without it.
-      if (usage != null && usage.completionTokens() != null) {
-        mergedDoneEntries.put("completionTokens", usage.completionTokens());
-      }
-      // Tempdoc 610 §I.2 — the per-phase split rides the done payload alongside the real total.
-      mergedDoneEntries.put("contextBreakdown", contextBreakdown);
-
-      // Append the assistant message and any consumer message deltas before the next
-      // iteration's decision + LLM call.
-      Map<String, Object> assistantMsg = assistantMessage(finalText);
-      checkWork(work);
-      ctx.appendMessage(assistantMsg);
-      ctx.appendMessages(aggregateDeltas);
-      // Slice 496 §3.B / tempdoc 561 P-A: persist the assistant message WITH its evidence (citations +
-      // producer calibration from the done-payload), so the unified thread surfaces grounding FROM the
-      // record, not an FE-side content re-match. Evidence is kept off the LLM-context copy so it never
-      // pollutes the next prompt. PERSISTENT shapes record under sessionId; recordsToThread ephemeral
-      // shapes (RAG) record under threadId (the request's conversationId).
-      if (sessionId != null && conversationStore != null) {
-        conversationStore.appendMessage(
-            sessionId,
-            shape.id().value(),
-            persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get()));
-      } else if (threadId != null && conversationStore != null) {
-        conversationStore.appendMessage(
-            threadId,
-            shape.id().value(),
-            persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get()));
-      }
-
-      // Iteration decision.
-      IterationDecision decision;
-      try {
-        decision = controller.next(ctx);
-      } catch (Exception e) {
-        LOG.warn("IterationController {} threw; treating as STOP_ERROR", controller.id(), e);
-        emitError(sink, "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
-        persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
-            "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
-        return;
-      }
-
-      switch (decision) {
-        case STOP_SUCCESS -> {
+        // Stream consumers: onDone dispatch. Collect message deltas + done-payload entries.
+        List<Map<String, Object>> aggregateDeltas = new ArrayList<>();
+        mergedDoneEntries.clear();
+        for (StreamConsumer consumer : consumers) {
           checkWork(work);
-          emitDone(sink, accumulatedFinalText, ctx.iteration() + 1, mergedDoneEntries);
-          return;
+          StreamConsumerResult result;
+          try {
+            result = consumer.onDone(finalText, ctx);
+          } catch (Exception e) {
+            // A consumer cut off by the reader's Stop has not failed: the turn was stopped.
+            if (stoppedByUser(work)) checkWork(work);
+            LOG.warn("StreamConsumer {} onDone threw; emitting error event", consumer.id(), e);
+            emitError(sink, "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
+            persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+                "StreamConsumer " + consumer.id() + " failed: " + e.getMessage(), "CONSUMER_ERROR");
+            return;
+          }
+          result.events().forEach(sink);
+          aggregateDeltas.addAll(result.messageDeltas());
+          mergedDoneEntries.putAll(result.donePayloadEntries());
         }
-        case STOP_ERROR -> {
-          emitError(sink, "Conversation terminated with error", "CONTROLLER_STOP");
-          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata,
-              "Conversation terminated with error", "CONTROLLER_STOP");
-          return;
-        }
-        case CONTINUE -> ctx.incrementIteration();
-      }
-    }
+        mergedDoneEntries.putAll(injectorRun.retrievalMetadata);
 
-    // Reached hard cap without STOP_*
-    LOG.warn("Substrate-driven shape {} reached iteration hard cap {}", shape.id().value(), hardCap);
-    checkWork(work);
-    emitDone(sink, accumulatedFinalText, hardCap, mergedDoneEntries);
+        // Tempdoc 610 §E.4 / §G — surface the prompt-token occupancy on the done payload so the FE can
+        // render a context-budget meter. The model context window (the meter's denominator) is FE-side
+        // (aiState). The usage is captured per LLM call; the last iteration's value is what the meter shows.
+        OnlineAiService.AiUsage usage = usageRef.get();
+        if (usage != null && usage.promptTokens() != null) {
+          mergedDoneEntries.put("promptTokens", usage.promptTokens());
+          if (usage.totalTokens() != null) {
+            mergedDoneEntries.put("totalTokens", usage.totalTokens());
+          }
+        }
+        // Tempdoc 835 §9c.4 — completionTokens was captured on AiUsage and dropped here. It is the
+        // denominator for every reasoning-budget decision (reasoning and answer tokens share this
+        // number), so a turn's cost is unmeasurable without it.
+        if (usage != null && usage.completionTokens() != null) {
+          mergedDoneEntries.put("completionTokens", usage.completionTokens());
+        }
+        // Tempdoc 610 §I.2 — the per-phase split rides the done payload alongside the real total.
+        mergedDoneEntries.put("contextBreakdown", contextBreakdown);
+
+        // Append the assistant message and any consumer message deltas before the next
+        // iteration's decision + LLM call.
+        Map<String, Object> assistantMsg = assistantMessage(finalText);
+        // The turn's last answer is saved as complete below, so a Stop from here on changes nothing,
+        // and says so; one that landed before carries the turn's work, and the check below sees it.
+        if (running != null && i == hardCap - 1) turnStops.completing(running, work);
+        checkWork(work);
+        ctx.appendMessage(assistantMsg);
+        ctx.appendMessages(aggregateDeltas);
+        // Slice 496 §3.B / tempdoc 561 P-A: persist the assistant message WITH its evidence (citations +
+        // producer calibration from the done-payload), so the unified thread surfaces grounding FROM the
+        // record, not an FE-side content re-match. Evidence is kept off the LLM-context copy so it never
+        // pollutes the next prompt. PERSISTENT shapes record under sessionId; recordsToThread ephemeral
+        // shapes (RAG) record under threadId (the request's conversationId).
+        if (sessionId != null && conversationStore != null) {
+          conversationStore.appendMessage(
+              sessionId,
+              shape.id().value(),
+              persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone));
+        } else if (threadId != null && conversationStore != null) {
+          conversationStore.appendMessage(
+              threadId,
+              shape.id().value(),
+              persistedAssistant(assistantMsg, mergedDoneEntries, reasoningRef.get(), standalone));
+        }
+        answerRecorded = true;
+
+        // Iteration decision.
+        IterationDecision decision;
+        try {
+          decision = controller.next(ctx);
+        } catch (Exception e) {
+          LOG.warn("IterationController {} threw; treating as STOP_ERROR", controller.id(), e);
+          emitError(sink, "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
+          persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+              "IterationController " + controller.id() + " failed: " + e.getMessage(), "CONTROLLER_ERROR");
+          return;
+        }
+
+        switch (decision) {
+          case STOP_SUCCESS -> {
+            checkWork(work);
+            emitDone(sink, accumulatedFinalText, ctx.iteration() + 1, mergedDoneEntries);
+            return;
+          }
+          case STOP_ERROR -> {
+            emitError(sink, "Conversation terminated with error", "CONTROLLER_STOP");
+            persistRetrievalError(retrievalRecordId, shape, injectorRun.retrievalMetadata, standalone,
+                "Conversation terminated with error", "CONTROLLER_STOP");
+            return;
+          }
+          case CONTINUE -> ctx.incrementIteration();
+        }
+      }
+
+      // Reached hard cap without STOP_*
+      LOG.warn("Substrate-driven shape {} reached iteration hard cap {}", shape.id().value(), hardCap);
+      checkWork(work);
+      emitDone(sink, accumulatedFinalText, hardCap, mergedDoneEntries);
+    } catch (io.justsearch.app.api.EngineWorkCancelledException cancelled) {
+      // The reader's Stop landed after the text was produced but before the answer was recorded
+      // (while its citations were checked, say): the text is saved, as stopped.
+      if (answerRecorded || !stoppedByUser(work)) throw cancelled;
+      recordStopped(retrievalRecordId, shape, body, true, injectorRun.retrievalMetadata,
+          injectorRun.citations, standalone, accumulatedFinalText, stoppedReasoning, sink);
+    }
+  }
+
+  /** Whether the turn's work was cancelled by the reader's Stop ({@link #stopTurn}), not otherwise. */
+  private static boolean stoppedByUser(io.justsearch.app.api.EngineWorkHandle work) {
+    return work != null && work.cancellationReason().filter(USER_STOP_REASON::equals).isPresent();
   }
 
   private static void checkWork(io.justsearch.app.api.EngineWorkHandle work) {
@@ -907,9 +1006,17 @@ public final class ConversationEngine {
     if (error.get() != null) {
       Throwable err = error.get();
       if (err instanceof io.justsearch.app.api.EngineWorkCancelledException cancelled) {
-        throw new LlmStreamException(cancelled.getMessage(), cancelled.reasonCode());
+        // What the model had thought when it was cancelled was streamed to the reader, so a stopped
+        // turn keeps it, region by region, as a finished call does below.
+        long openRegion = reasoningStartNanos.getAndSet(-1);
+        if (openRegion >= 0) {
+          flushReasoningRegion(reasoningBlocks, reasoningText, openRegion, System.nanoTime());
+        }
+        throw new LlmStreamException(cancelled.getMessage(), cancelled.reasonCode(), fullText.toString(),
+            reasoningBlocks.isEmpty() ? null : List.copyOf(reasoningBlocks));
       }
-      throw new LlmStreamException(err.getMessage() == null ? err.toString() : err.getMessage(), "LLM_ERROR");
+      throw new LlmStreamException(err.getMessage() == null ? err.toString() : err.getMessage(), "LLM_ERROR",
+          fullText.toString(), null);
     }
 
     // Tempdoc 848 §2.1 — a region still open at stream end (the turn ended on thinking, or thought
@@ -1068,14 +1175,19 @@ public final class ConversationEngine {
    *       call is made.
    *   <li>An Engine refusal terminates with a typed error before any LLM call. Other throwing
    *       injectors are logged and skipped; the conversation continues with the remaining context.
+   *   <li>An injector cut off by the reader's Stop sends no error of its own: the turn ends as
+   *       stopped, and that is its one terminal.
    * </ul>
    */
   private static InjectorRunResult runInjectors(
       List<ContextInjector> injectors,
       EngineConversationContext ctx,
-      Consumer<SseEvent> sink) {
+      Consumer<SseEvent> sink,
+      io.justsearch.app.api.EngineWorkHandle work) {
     List<Map<String, Object>> out = new ArrayList<>();
+    List<Map<String, Object>> forwarded = new ArrayList<>();
     Map<String, Object> retrievalMetadata = new LinkedHashMap<>();
+    List<Map<String, Object>> citations = new ArrayList<>();
     for (ContextInjector inj : injectors) {
       InjectorResult result;
       try {
@@ -1083,8 +1195,8 @@ public final class ConversationEngine {
       } catch (Exception e) {
         SseEvent refusal = refusalEvent(e);
         if (refusal != null) {
-          sink.accept(refusal);
-          return new InjectorRunResult(out, true, retrievalMetadata, refusal);
+          if (!stoppedByUser(work)) sink.accept(refusal);
+          return new InjectorRunResult(out, forwarded, true, retrievalMetadata, citations, refusal);
         }
         LOG.warn("ContextInjector {} threw; skipping injection", inj.id(), e);
         continue;
@@ -1099,31 +1211,94 @@ public final class ConversationEngine {
           copyRetrievalFact(retrievalMetadata, "retrievalModeReason", event.payload().get("retrieval_mode_reason"));
           copyRetrievalFact(retrievalMetadata, "retrievalModeCause", event.payload().get("retrieval_mode_cause"));
         }
+        // The sources the reader is shown before any answer; a stopped turn is saved with them.
+        if ("rag.citations".equals(event.name()) && event.payload().get("citations") instanceof List<?> shown) {
+          citations.clear();
+          for (Object citation : shown) {
+            if (citation instanceof Map<?, ?> map) citations.add(stringKeyed(map));
+          }
+        }
         sink.accept(event);
       }
       if (result.terminalError().isPresent()) {
-        sink.accept(result.terminalError().get());
-        return new InjectorRunResult(out, true, retrievalMetadata, result.terminalError().get());
+        if (!stoppedByUser(work)) sink.accept(result.terminalError().get());
+        return new InjectorRunResult(out, forwarded, true, retrievalMetadata, citations,
+            result.terminalError().get());
       }
       out.addAll(result.messages());
+      if (io.justsearch.app.services.conversation.spi.ExternalContextInjector.ID.equals(inj.id())) {
+        forwarded.addAll(result.messages());
+      }
     }
-    return new InjectorRunResult(out, false, retrievalMetadata, null);
+    return new InjectorRunResult(out, forwarded, false, retrievalMetadata, citations, null);
   }
 
-  /** Output of {@link #runInjectors}: accumulated messages + whether any injector aborted. */
-  private record InjectorRunResult(List<Map<String, Object>> messages, boolean terminated,
-      Map<String, Object> retrievalMetadata, SseEvent terminalError) {}
+  private static Map<String, Object> stringKeyed(Map<?, ?> map) {
+    Map<String, Object> copy = new LinkedHashMap<>();
+    map.forEach((key, value) -> copy.put(String.valueOf(key), value));
+    return copy;
+  }
+
+  /**
+   * Output of {@link #runInjectors}: accumulated messages + whether any injector aborted. {@code
+   * forwarded} is the subset of {@code messages} that is the caller's forwarded conversation;
+   * {@code citations} the sources announced live ({@code rag.citations}).
+   */
+  private record InjectorRunResult(List<Map<String, Object>> messages,
+      List<Map<String, Object>> forwarded, boolean terminated,
+      Map<String, Object> retrievalMetadata, List<Map<String, Object>> citations,
+      SseEvent terminalError) {}
 
   private void persistRetrievalError(String recordId, ConversationShape shape,
-      Map<String, Object> retrievalMetadata, String message, Object errorCode) {
-    if (recordId == null || conversationStore == null || retrievalMetadata.isEmpty()) return;
+      Map<String, Object> retrievalMetadata, String standaloneQuestion, String message,
+      Object errorCode) {
+    if (recordId == null || conversationStore == null
+        || (retrievalMetadata.isEmpty() && standaloneQuestion == null)) {
+      return;
+    }
     var error = new LinkedHashMap<String, Object>();
     error.put("role", "assistant");
     error.put("content", message);
     error.put("terminalError", true);
     if (errorCode instanceof String code && !code.isBlank()) error.put("errorCode", code);
     error.putAll(retrievalMetadata);
+    // The "Interpreted as" note belongs to the turn whatever its outcome: a rewrite that was followed
+    // by a failed retrieval, a failed generation or a Stop was still shown live, so the record keeps it.
+    putIfPresent(error, "standaloneQuestion", standaloneQuestion);
     conversationStore.appendMessage(recordId, shape.id().value(), error);
+  }
+
+  /**
+   * The reader's Stop, saved as the turn's outcome: the text that had streamed (none, for an early
+   * Stop), the thinking and the sources the reader was shown, the rewrite note and the
+   * {@link #STOPPED_DISPOSITION} the record reads as "stopped by you". An answer row rather than an
+   * error row, so the turn keeps what it said and stays addressable.
+   */
+  private void recordStopped(String recordId, ConversationShape shape, Map<String, Object> body,
+      boolean questionRecorded, Map<String, Object> retrievalMetadata,
+      List<Map<String, Object>> citations, String standaloneQuestion, String text,
+      List<ReasoningTrace> reasoning, Consumer<SseEvent> sink) {
+    if (recordId != null && conversationStore != null) {
+      if (!questionRecorded) {
+        conversationStore.appendMessage(recordId, shape.id().value(), threadUserMessage(body));
+      }
+      Map<String, Object> outcome = new LinkedHashMap<>(retrievalMetadata);
+      outcome.put("citations", citations);
+      outcome.put("disposition", STOPPED_DISPOSITION);
+      conversationStore.appendMessage(recordId, shape.id().value(),
+          persistedAssistant(assistantMessage(text), outcome, reasoning, standaloneQuestion));
+    }
+    emitError(sink, "Stopped by the user", STOPPED_DISPOSITION);
+  }
+
+  /**
+   * The standalone question {@code QueryRewriteInjector} retrieved on, when it rewrote this turn's
+   * follow-up; null when it did not (first turn, unchanged, rewrite failed, AI down).
+   */
+  private static String standaloneQuestion(EngineConversationContext ctx) {
+    return ctx.attributes().get(
+            io.justsearch.app.services.conversation.spi.QueryRewriteInjector.ATTR_STANDALONE_QUESTION)
+        instanceof String s && !s.isBlank() ? s : null;
   }
 
   private static void copyRetrievalFact(Map<String, Object> target, String key, Object value) {
@@ -1175,19 +1350,36 @@ public final class ConversationEngine {
    * and would inflate the prompt in proportion to conversation length. The boundary is the one
    * place a guarantee can hold for every future persisted field, so it PROJECTS to the contract's
    * keys rather than blacklisting today's known extras.
+   *
+   * <p>System-role context messages (the store's compaction summary, a summary the caller forwards
+   * in {@code context}) are FOLDED into message[0], in order, after the system prompt. The served
+   * model runs its own chat template ({@code --jinja}), and Qwen3.5's raises "System message must
+   * be at the beginning." for any later system message, so the list carries one system message,
+   * first. Every other message keeps its order.
    */
   private static List<Map<String, Object>> buildLlmInput(
       String systemPrompt, List<Map<String, Object>> contextMessages) {
-    List<Map<String, Object>> out = new ArrayList<>(contextMessages.size() + 1);
-    if (!systemPrompt.isEmpty()) {
+    StringBuilder systemText = new StringBuilder(systemPrompt);
+    List<Map<String, Object>> rest = new ArrayList<>(contextMessages.size());
+    for (Map<String, Object> message : contextMessages) {
+      if ("system".equals(message.get("role"))) {
+        String text = Objects.toString(message.get("content"), "");
+        if (!text.isBlank()) {
+          if (!systemText.isEmpty()) systemText.append("\n\n");
+          systemText.append(text);
+        }
+      } else {
+        rest.add(projectForLlm(message));
+      }
+    }
+    List<Map<String, Object>> out = new ArrayList<>(rest.size() + 1);
+    if (!systemText.isEmpty()) {
       Map<String, Object> system = new LinkedHashMap<>();
       system.put("role", "system");
-      system.put("content", systemPrompt);
+      system.put("content", systemText.toString());
       out.add(system);
     }
-    for (Map<String, Object> message : contextMessages) {
-      out.add(projectForLlm(message));
-    }
+    out.addAll(rest);
     return out;
   }
 
@@ -1291,7 +1483,8 @@ public final class ConversationEngine {
   private static Map<String, Object> persistedAssistant(
       Map<String, Object> assistantMsg,
       Map<String, Object> mergedDoneEntries,
-      List<ReasoningTrace> reasoning) {
+      List<ReasoningTrace> reasoning,
+      String standaloneQuestion) {
     Map<String, Object> persisted = new LinkedHashMap<>(assistantMsg);
     // Tempdoc 863 §4.A.4 (A-3) — "present ⇒ carried, absent ⇒ no key", where EMPTY counts as absent.
     // The agent `done` payload always writes `sources`/`citations` keys (empty lists when nothing
@@ -1331,6 +1524,9 @@ public final class ConversationEngine {
     if (reasoning != null && !reasoning.isEmpty()) {
       persisted.put("reasoning", reasoning.stream().map(ReasoningTrace::asBlock).toList());
     }
+    // The follow-up's rewritten question, so the "Interpreted as" note survives a reload. Persisted
+    // only — the live reader already got it on `rag.rewrite`, so it stays off the `done` payload.
+    putIfPresent(persisted, "standaloneQuestion", standaloneQuestion);
     return persisted;
   }
 
@@ -1469,10 +1665,21 @@ public final class ConversationEngine {
   private static final class LlmStreamException extends Exception {
     private static final long serialVersionUID = 1L;
     final String errorCode;
+    /** The text that had streamed when the call ended; a stopped turn keeps it. */
+    final String partialText;
+    /** The thinking that had streamed when the call was cancelled, or null; a stopped turn keeps it. */
+    final transient List<ReasoningTrace> reasoning;
 
     LlmStreamException(String message, String errorCode) {
+      this(message, errorCode, "", null);
+    }
+
+    LlmStreamException(
+        String message, String errorCode, String partialText, List<ReasoningTrace> reasoning) {
       super(message);
       this.errorCode = errorCode;
+      this.partialText = partialText;
+      this.reasoning = reasoning;
     }
   }
 }

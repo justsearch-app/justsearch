@@ -1,0 +1,287 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T01:32:17.671Z",
+  "revision": "8ab5d0fab01976b6a50dd83f2337364d12c34378",
+  "tree": "0ae11e4085490674c4529c064bf590770677e0c8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-vitest-3193960-1792459927889.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4796
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 SC3 focuses the current default once without changing draft, URL or journal",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f6329b7cc79a7d22ce1d776a1c6dcc4cd757152eaf223ba1bdb6ad7804308a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC2 SC3 focuses the current default once without changing draft, URL or journal",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC4 navigates from a non-modal view once with the prior view one Back away",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f6329b7cc79a7d22ce1d776a1c6dcc4cd757152eaf223ba1bdb6ad7804308a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC4 navigates from a non-modal view once with the prior view one Back away",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC5 drains a request already pending before subscription and never replays it on reconnect",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f6329b7cc79a7d22ce1d776a1c6dcc4cd757152eaf223ba1bdb6ad7804308a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC5 drains a request already pending before subscription and never replays it on reconnect",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 preserves a composer override and uses it as the destination",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f6329b7cc79a7d22ce1d776a1c6dcc4cd757152eaf223ba1bdb6ad7804308a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC2 preserves a composer override and uses it as the destination",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 falls back temporarily for an override without a composer and preserves the saved override",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f6329b7cc79a7d22ce1d776a1c6dcc4cd757152eaf223ba1bdb6ad7804308a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC2 falls back temporarily for an override without a composer and preserves the saved override",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 reuses a secondary search pane and never focuses the other composer",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f6329b7cc79a7d22ce1d776a1c6dcc4cd757152eaf223ba1bdb6ad7804308a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC2 reuses a secondary search pane and never focuses the other composer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC9 a pending explicit deep link keeps its destination instead of focusing Search",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f6329b7cc79a7d22ce1d776a1c6dcc4cd757152eaf223ba1bdb6ad7804308a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC9 a pending explicit deep link keeps its destination instead of focusing Search",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC5 does not wait for the Engine schema request before consuming a ready focus request",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f6329b7cc79a7d22ce1d776a1c6dcc4cd757152eaf223ba1bdb6ad7804308a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC5 does not wait for the Engine schema request before consuming a ready focus request",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC5 SC6 late subscription cleanup cannot disable the reloaded view shortcut guard",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f6329b7cc79a7d22ce1d776a1c6dcc4cd757152eaf223ba1bdb6ad7804308a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC5 SC6 late subscription cleanup cannot disable the reloaded view shortcut guard",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 ignores a missing override target without changing the saved override",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f6329b7cc79a7d22ce1d776a1c6dcc4cd757152eaf223ba1bdb6ad7804308a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC2 ignores a missing override target without changing the saved override",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 targets the real Search v3 composer with no chat model and preserves its draft",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f6329b7cc79a7d22ce1d776a1c6dcc4cd757152eaf223ba1bdb6ad7804308a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC2 targets the real Search v3 composer with no chat model and preserves its draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 respects a changed override after a temporary core fallback",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f6329b7cc79a7d22ce1d776a1c6dcc4cd757152eaf223ba1bdb6ad7804308a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC2 respects a changed override after a temporary core fallback",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c00a0cb24",
+    "revision": "c00a0cb24b4c6000e090d5d09054c1e7e1d24e2f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-vitest-3193960-1792459933634.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3872,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-vitest-3193960-1792459933634.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 SC3 focuses the current default once without changing draft, URL or journal",
+        "classification": "assertion",
+        "detail": "native search summon shared destination SC2 SC3 focuses the current default once without changing draft, URL or journal:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-iqWawv/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:111:35\n    at file:///home/elias/dev/justsearch/.clau"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC4 navigates from a non-modal view once with the prior view one Back away",
+        "classification": "assertion",
+        "detail": "native search summon shared destination SC4 navigates from a non-modal view once with the prior view one Back away:  AssertionError: expected 'core.library-surface' to be 'core.unified-chat-surface' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-iqWawv/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:142:28\n    at file:///"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC5 drains a request already pending before subscription and never replays it on reconnect",
+        "classification": "assertion",
+        "detail": "native search summon shared destination SC5 drains a request already pending before subscription and never replays it on reconnect:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-iqWawv/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:150:41\n    at runNextTicks (node:internal/process/tas"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 preserves a composer override and uses it as the destination",
+        "classification": "assertion",
+        "detail": "native search summon shared destination SC2 preserves a composer override and uses it as the destination:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-iqWawv/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:162:36\n    at file:///home/elias/dev/justsearch/.clau"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 falls back temporarily for an override without a composer and preserves the saved override",
+        "classification": "assertion",
+        "detail": "native search summon shared destination SC2 falls back temporarily for an override without a composer and preserves the saved override:  AssertionError: expected null to be truthy\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-iqWawv/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:170:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steeri"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 reuses a secondary search pane and never focuses the other composer",
+        "classification": "assertion",
+        "detail": "native search summon shared destination SC2 reuses a secondary search pane and never focuses the other composer:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-iqWawv/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:232:34\n    at file:///home/elias/dev/justsearch/.clau"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC9 a pending explicit deep link keeps its destination instead of focusing Search",
+        "classification": "assertion",
+        "detail": "native search summon shared destination SC9 a pending explicit deep link keeps its destination instead of focusing Search:  AssertionError: expected 'core.unified-chat-surface' to be 'core.library-surface' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-iqWawv/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:240:28\n    at file:///"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC5 does not wait for the Engine schema request before consuming a ready focus request",
+        "classification": "assertion",
+        "detail": "native search summon shared destination SC5 does not wait for the Engine schema request before consuming a ready focus request:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-iqWawv/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:250:43\n    at file:///home/elias/dev/justsearch/.clau"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC5 SC6 late subscription cleanup cannot disable the reloaded view shortcut guard",
+        "classification": "assertion",
+        "detail": "native search summon shared destination SC5 SC6 late subscription cleanup cannot disable the reloaded view shortcut guard:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-iqWawv/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:270:40\n    at file:///home/elias/dev/justsearch/.claude/worktr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 ignores a missing override target without changing the saved override",
+        "classification": "assertion",
+        "detail": "native search summon shared destination SC2 ignores a missing override target without changing the saved override:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-iqWawv/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:194:41\n    at file:///home/elias/dev/justsearch/.clau"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 targets the real Search v3 composer with no chat model and preserves its draft",
+        "classification": "assertion",
+        "detail": "native search summon shared destination SC2 targets the real Search v3 composer with no chat model and preserves its draft:  AssertionError: expected <button></button> to be <textarea rows=\"1\" …(2)></textarea> // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-iqWawv/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:214:33\n    at file:"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC2 respects a changed override after a temporary core fallback",
+        "classification": "assertion",
+        "detail": "native search summon shared destination SC2 respects a changed override after a temporary core fallback:  AssertionError: expected null to be truthy\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-before-iqWawv/modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts:179:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steeri"
+      }
+    ]
+  },
+  "digest": "sha256:c92b93c11e3626eeb7c762bcec50802406de50a877db5c51216bc848271b5dcd"
+}

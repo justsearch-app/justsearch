@@ -8,8 +8,8 @@ amends:
   - "0004-single-tenant-gpu-policy.md"
   - "0047-context-window-is-a-derived-resource.md"
   - "0048-extraction-isolation-and-indexing-pacing.md"
-probes: "none - the probes land with the implementing branches; the candidates are listed under Enforcement"
-last_reviewed: 2026-10-05
+probes: "none - ADR-specific probes are not registered; the Enforcement section lists candidates, not executed checks"
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0050: GPU co-residence by prevention, measured profiles and explicit degradation
@@ -18,7 +18,7 @@ last_reviewed: 2026-10-05
 
 Accepted by the owner on 2026-10-05 (decisions D1-D10 of the co-residence design).
 - It replaces the 2026-10-02 interim policy recorded in ADR-0004's amendment: "match shipped behaviour; chat going Online never yields the encoders". It is the "budget-aware policy" follow-up that amendment names.
-- The implementation is not yet built. Until it is, the shipped behaviour is the one in ADR-0004's amendment.
+- Implemented in #759 (`1d272de4b`); ADR-0004's interim amendment no longer describes the shipped policy. ADR-specific probes are not registered in `governance/adr-probes.v1.json`.
 
 ## Context
 
@@ -108,7 +108,7 @@ Accepted by the owner on 2026-10-05 (decisions D1-D10 of the co-residence design
 - A supported card class exceeds its profile's measured footprint in the field.
 - The encoders move out of process.
 
-## Enforcement (probe candidates, added with the implementation)
+## Enforcement (unregistered probe candidates)
 
 - No `isUserActive`-style starving pause. ADR-0048's `adr-0048-no-user-active-pause` stays.
 - Indexing keeps a minimum rate under a continuous agent-search loop with chat generating (an effect-at-the-far-end probe, per ADR-0048's 2026-09-07 amendment).

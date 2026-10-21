@@ -655,3 +655,104 @@ describe('a restored turn stands on the evidence the record carries (847 §2.4)'
     expect(turn?.id).toBe('e1');
   });
 });
+
+describe('the "Interpreted as" note comes back from the record, on its own turn', () => {
+  it('reads each turn’s note off its own answer, and none onto a turn that was not rewritten', () => {
+    clock = 0;
+    const turns = project([
+      event('q1', 'USER_MESSAGE', 'what do the quarterly reports say about churn?'),
+      event('a1', 'ASSISTANT_MESSAGE', 'Churn fell.'),
+      event('q2', 'USER_MESSAGE', 'and the second one?'),
+      event('a2', 'ASSISTANT_MESSAGE', 'It rose.', {
+        standaloneQuestion: 'What does the second quarterly report say about churn?',
+      }),
+      event('q3', 'USER_MESSAGE', 'thanks, now summarize the lease'),
+      event('a3', 'ASSISTANT_MESSAGE', 'The lease runs to 2027.'),
+      event('q4', 'USER_MESSAGE', 'and its break clause?'),
+      event('a4', 'ASSISTANT_MESSAGE', 'It lapsed.', {
+        standaloneQuestion: 'What is the break clause of the lease?',
+      }),
+    ]);
+    expect(turns.map((t) => t.standaloneQuestion)).toEqual([
+      '',
+      'What does the second quarterly report say about churn?',
+      '',
+      'What is the break clause of the lease?',
+    ]);
+  });
+
+  it('keeps the note on a turn whose rewrite was followed by a failure', () => {
+    clock = 0;
+    const [turn] = project([
+      event('q1', 'USER_MESSAGE', 'and the second one?'),
+      event('e1', 'ERROR', 'No matching documents found', {
+        errorCode: 'NO_CONTENT',
+        standaloneQuestion: 'What does the second report say?',
+      }),
+    ]);
+    expect(turn?.status).toBe('failed');
+    expect(turn?.standaloneQuestion).toBe('What does the second report say?');
+  });
+
+  it('reads a turn the Engine saved as stopped as the reader’s halt, with its note and its text', () => {
+    // The row the Engine writes for the reader's Stop (S2.3): an answer holding what had streamed
+    // (nothing, for an early Stop), the CANCELLED disposition and the rewrite note.
+    clock = 0;
+    const turns = project([
+      event('q1', 'USER_MESSAGE', 'and who owns it?'),
+      event('8f1c2a4e-1b7d-4c3e-9a51-0d2b6f7e8a11', 'ASSISTANT_MESSAGE', '', {
+        disposition: 'CANCELLED',
+        standaloneQuestion: 'Who owns Project Cobalt?',
+      }),
+      event('q2', 'USER_MESSAGE', 'and when does it ship?'),
+      event('3b9e7d10-5c2a-4f8b-8e64-7a1d9c0b2f22', 'ASSISTANT_MESSAGE', 'It ships on', {
+        disposition: 'CANCELLED',
+        standaloneQuestion: 'When does Project Cobalt ship?',
+      }),
+    ]);
+    expect(turns.map((t) => t.status)).toEqual(['halted', 'halted']);
+    expect(turns.map((t) => t.standaloneQuestion)).toEqual([
+      'Who owns Project Cobalt?',
+      'When does Project Cobalt ship?',
+    ]);
+    expect(turns.map((t) => t.answer)).toEqual(['', 'It ships on']);
+    // Still addressable: Retry, Edit and the context menu name the saved answer.
+    expect(turns.map((t) => t.assistantRecordId)).toEqual([
+      '8f1c2a4e-1b7d-4c3e-9a51-0d2b6f7e8a11',
+      '3b9e7d10-5c2a-4f8b-8e64-7a1d9c0b2f22',
+    ]);
+  });
+
+  it('shows no note for a record written before the field existed, or a blank one', () => {
+    clock = 0;
+    const turns = project([
+      event('q1', 'USER_MESSAGE', 'old question'),
+      event('a1', 'ASSISTANT_MESSAGE', 'old answer'),
+      event('q2', 'USER_MESSAGE', 'blank'),
+      event('a2', 'ASSISTANT_MESSAGE', 'answer', { standaloneQuestion: '   ' }),
+    ]);
+    expect(turns.map((t) => t.standaloneQuestion)).toEqual(['', '']);
+  });
+});
+
+// WP6.2 S8.2 — a reloaded direction keeps the outcome it had live, under the same label.
+describe('a reloaded direction', () => {
+  it('becomes a note labelled by its recorded outcome', () => {
+    clock = 0;
+    const direction = (id: string, content: string, attributes: Record<string, unknown>): ThreadEvent => ({
+      id, occurredAt: at(), kind: 'PROGRESS', originator: 'user', content,
+      attributes: { steer: true, phase: 'direction', ...attributes },
+    });
+    const [turn] = project([
+      event('e1', 'USER_MESSAGE', 'index the vendor folder'),
+      direction('e2', 'Focus on Q3.', { directiveOutcome: 'applied' }),
+      event('e3', 'ASSISTANT_MESSAGE', 'done'),
+      direction('e4', 'Too late.', { directiveOutcome: 'not_applied', directiveReason: 'run_interrupted' }),
+    ]);
+    const notes = turn!.activity.filter((i) => i.kind === 'note');
+    expect(notes.map((n) => (n.kind === 'note' ? [n.label, n.text] : null))).toEqual([
+      ['Steered', 'Focus on Q3.'],
+      ['Not applied', 'Too late. (the run was interrupted when JustSearch restarted)'],
+    ]);
+  });
+});

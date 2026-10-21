@@ -4,6 +4,7 @@
 > [issues](https://github.com/justsearch-app/justsearch/issues) are welcome and will be credited. Every cell is
 > sourced in the per-row footnote blocks; "Not documented" means we checked official sources and found no
 > statement — it is not a euphemism for "no".
+> JustSearch's network disclosures below reflect the current product; competitor rows retain that survey date.
 >
 > **Headline finding:** this survey **narrowed our own claim**. Self-hosted server stacks — RAGFlow, Open WebUI,
 > QAnything — each combine {true hybrid retrieval × fully offline × multilingual × OCR} as Docker/server
@@ -15,7 +16,7 @@
 
 ## What this document is
 
-JustSearch claims to occupy a specific feature cell: **true hybrid retrieval** (lexical + dense + learned-sparse, with cross-encoder reranking) **× fully offline × multilingual × OCR for scanned documents**, packaged as a Windows desktop app with an MCP retrieval backend. A claim like that is only worth anything if it is checkable, so this page is the public version of the survey behind it: one row per tool a buyer would realistically consider, every cell sourced, every competitor represented at its current best — including the places where it beats JustSearch.
+JustSearch claims to occupy a specific feature cell: **true hybrid retrieval** (lexical + dense + learned-sparse, with cross-encoder reranking) **× local indexing and inference × multilingual × OCR for scanned documents**, packaged as a Windows desktop app with an MCP retrieval backend. A claim like that is only worth anything if it is checkable, so this page is the public version of the survey behind it: one row per tool a buyer would realistically consider, every cell sourced, every competitor represented at its current best — including the places where it beats JustSearch.
 
 JustSearch's own weaknesses, stated up front and repeated in its table row: **Windows-only; alpha (0.1.0); unsigned installer (SmartScreen warnings); ~9 GB model download; very young and unproven (repo created June 2026, 2 GitHub stars at survey date); retrieval benchmarked only in English, German, and French** despite a 70+-language embedding model.
 
@@ -23,15 +24,17 @@ JustSearch's own weaknesses, stated up front and repeated in its table row: **Wi
 
 ## Matrix
 
-Legend: **Offline** = no cloud calls after initial setup/model download. "Optional" = local operation possible but cloud is the default or an equal path. **Retrieval** names the actual components. **MCP** = Model Context Protocol; "server" means the tool exposes retrieval to external AI clients, "client" means it consumes other MCP servers.
+Legend: **Offline** = indexing, retrieval, and built-in inference can work without a network connection after setup/model download. This describes processing capability; background update checks and optional integrations are called out separately. "Optional" = local operation possible but cloud is the default or an equal path. **Retrieval** names the actual components. **MCP** = Model Context Protocol; "server" means the tool exposes retrieval to external AI clients, "client" means it consumes other MCP servers.
 
 ### JustSearch (baseline row)
 
 | Tool | Offline | Retrieval | Reranker | OCR | Multilingual | Cited answers | MCP | Formats | Platforms | License / price | Maturity |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| **JustSearch 0.1.0 (alpha)** | Yes (after ~9 GB model download) | Hybrid: BM25 + dense embeddings + SPLADE learned-sparse | Yes, cross-encoder | Yes (scanned PDFs, images) | Claimed 70+ languages; **benchmarked only EN (BEIR/SciFact, Enron-QA, CLERC), DE (MIRACL-de), FR (MIRACL-fr)** | Yes (answers with cited passages) | Native server (6 tools in 0.1.0; 7 on main) | PDF, email, Office, "hundreds of formats" (claimed, not independently verified) | **Windows only** | Apache-2.0 / free | **Alpha.** Repo created 2026-06-23; 2 stars; unsigned installer; unproven |
+| **JustSearch 0.1.0 (alpha)** | Yes for local processing after model download; desktop builds with an embedded release URL check for updates by default (including CI-built branch candidates and pre-releases). Current update controls: `JUSTSEARCH_AUTO_UPDATE_CHECK=false` suppresses automatic checks; policy `"appUpdatesEnabled": false` forbids all new updater checks and downloads. See [update controls and version caveat](reference/configuration/environment-variables.md#desktop-app-update-traffic-and-policy). | Hybrid: BM25 + dense embeddings + SPLADE learned-sparse | Yes, cross-encoder | Yes (scanned PDFs, images) | Claimed 70+ languages; **benchmarked only EN (BEIR/SciFact, Enron-QA, CLERC), DE (MIRACL-de), FR (MIRACL-fr)** | Yes (answers with cited passages) | Native server (6 tools in 0.1.0; 7 on main) | PDF, email, Office, "hundreds of formats" (claimed, not independently verified) | **Windows only** | Apache-2.0 / free | **Alpha.** Repo created 2026-06-23; 2 stars; unsigned installer; unproven |
 
 Sources: https://github.com/justsearch-app/justsearch (README) and https://api.github.com/repos/justsearch-app/justsearch — accessed 2026-07-14.
+
+JustSearch also downloads models and runtimes with consent. Trace export requires both enabled tracing and an OTLP endpoint; traces can include paths and excerpts. Connected MCP clients receive retrieved data. See [Privacy](../README.md#privacy) for the current network behavior.
 
 ### Tier A — local file search and desktop RAG apps
 
@@ -181,9 +184,9 @@ These self-hosted platforms are where JustSearch's uniqueness claim goes to die 
 
 ## Verdict: does the uniqueness claim survive?
 
-**The claim as currently worded in the README does not survive. It must be narrowed.**
+**The README claim evaluated in the original survey did not survive. The narrower claim is below.**
 
-The README says JustSearch combines "{true hybrid retrieval × fully offline × multilingual × OCR} at once" and that "we're not aware of another local tool that combines these." This survey found three local tools that combine all four:
+The README claim evaluated in the original survey said JustSearch combines "{true hybrid retrieval × fully offline × multilingual × OCR} at once" and that "we're not aware of another local tool that combines these." This survey found three local tools that combine all four:
 
 1. **RAGFlow** (Apache-2.0, Docker Compose) — hybrid weighted keyword + vector retrieval with fused reranking, fully self-hostable with local models via Ollama/Xinference, built-in local DeepDoc OCR, and documented local serving of the multilingual bge-m3 embedder. The one caveat: first-run OCR weights download from HuggingFace, so a true air gap requires one-time pre-caching. This is the clearest counterexample.
 2. **Open WebUI** (Docker/pip server) — BM25 + vector hybrid (`ENABLE_RAG_HYBRID_SEARCH`), local cross-encoder reranking (`RAG_RERANKING_MODEL`), local OCR via Docling/Tika/PaddleOCR, and any local Sentence-Transformers embedder including multilingual ones. Caveats: hybrid and reranking are **off by default**, and the default embedder is English-leaning — the cell is reached by configuration, not out of the box.
@@ -195,7 +198,7 @@ The README says JustSearch combines "{true hybrid retrieval × fully offline × 
 
 A narrower, still-checkable claim survives this survey:
 
-> **Among single-install desktop applications, we found no tool that ships {lexical + dense + learned-sparse hybrid retrieval with cross-encoder reranking} × {fully offline} × {multilingual} × {OCR} out of the box.** Every tool we found that combines all four axes is a self-hosted Docker/server deployment requiring technical setup, and in Open WebUI's case the combination is opt-in configuration rather than default behavior. The tools that come closest are listed below — if you know another, open an issue and we will add it.
+> **Among single-install desktop applications, we found no tool that ships {lexical + dense + learned-sparse hybrid retrieval with cross-encoder reranking} × {local indexing and inference} × {multilingual} × {OCR} out of the box.** Every tool we found that combines all four axes is a self-hosted Docker/server deployment requiring technical setup, and in Open WebUI's case the combination is opt-in configuration rather than default behavior. The tools that come closest are listed below — if you know another, open an issue and we will add it.
 
 The nearest misses, by deployment class:
 - **Desktop apps:** AnythingLLM (3/4 — offline + OCR + optional reranker; vector-only, no lexical leg); Cherry Studio (~2.5/4 — local OCR options; embedding-only retrieval, cloud default preprocessor); Msty (vector-only, cloud-key reranker, no documented OCR).

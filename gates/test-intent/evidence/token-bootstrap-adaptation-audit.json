@@ -1,21 +1,21 @@
 {
   "schema": "token-bootstrap-adaptation-audit.v1",
-  "baseline": "c00a0cb24b4c6000e090d5d09054c1e7e1d24e2f",
-  "candidate": "b7970713685eca09ce9e3bef361ae74709887a78",
-  "producerSourceSha256": "25c764f8bb95ccc5fd69a22d3e334ad0c58627f2cf6b21e6c4ad96cf2ff0618a",
+  "baseline": "f6d92d768f86d778ea805012b176c3349705018c",
+  "candidate": "734f9f25ba0f416c55b28f9ae5dca0095d45c62c",
+  "producerSourceSha256": "08226df01a60fe01cdfed9d24e8d7d5de8a7734fd628c8872523c0eb94ade3b0",
   "executionAdapter": "// Execution-policy adapter for run-evidence.mjs; no test results or assertions are changed.\n// Use with node --require <this file> scripts/governance/gates/test-intent/run-evidence.mjs.\nconst cp = require('node:child_process');\nconst fs = require('node:fs');\nconst { syncBuiltinESMExports } = require('node:module');\nconst original = cp.spawnSync;\nconst clones = new Set();\n// Generated only in the caller's temporary directory; never loaded by a product build.\nconst javaPolicy = String.raw`// Test-only execution policy: isolate temporary files and Engine homes without JAVA_TOOL_OPTIONS.\ndef requestedRoot = System.getenv('TOKEN_TEST_TEMP_ROOT')\nif (!requestedRoot) throw new GradleException('TOKEN_TEST_TEMP_ROOT must name the evidence sandbox')\nallprojects { p ->\n  def sandbox = new File(requestedRoot,\n      Integer.toHexString(p.rootDir.absolutePath.hashCode()) + '/' + p.path.replace(':', '_'))\n  tasks.withType(Test).configureEach {\n    def taskRoot = new File(sandbox, name)\n    systemProperty('java.io.tmpdir', new File(taskRoot, 'temp').absolutePath)\n    environment('JUSTSEARCH_HOME', new File(taskRoot, 'home').absolutePath)\n    environment('JUSTSEARCH_DATA_DIR', new File(taskRoot, 'data').absolutePath)\n    doFirst {\n      ['temp', 'home', 'data'].each { new File(taskRoot, it).mkdirs() }\n    }\n  }\n}\n`;\n\ncp.spawnSync = function (command, args, options) {\n  if (typeof command === 'string' && command.startsWith('./gradlew ')) {\n    // The complete producer (candidate, report extraction and before run) holds one slot.\n    const heldLock = fs.readlinkSync(`/proc/${process.ppid}/fd/9`);\n    if (!heldLock.startsWith('/tmp/js-linux-port/gradle.lock')) {\n      throw new Error('Run the complete evidence producer under js-gradle-slot');\n    }\n    const init = require('node:path').join(process.env.TMPDIR, 'token-bootstrap-java-policy.init.gradle');\n    fs.writeFileSync(init, javaPolicy);\n    const quotedInit = \"'\" + init.replaceAll(\"'\", \"'\\\\''\") + \"'\";\n    const actual = `${command} --init-script ${quotedInit} --max-workers=6`;\n    const env = { ...args.env };\n    delete env.JAVA_TOOL_OPTIONS;\n    env.JAVA_OPTS = `${env.JAVA_OPTS ?? ''} -Djava.io.tmpdir=${env.TMPDIR}`.trim();\n    process.stderr.write(`[execution-policy] existing whole-producer slot: ${actual}\\n`);\n    return original(actual, { ...args, env });\n  }\n  if (typeof command === 'string' && command.startsWith('npx vitest run ')) {\n    // Copying node_modules dereferences .bin symlinks; invoke the same installed CLI\n    // at its package location so its relative imports remain valid in isolated clones.\n    const actual = `${command.replace(/^npx vitest run /, \"node node_modules/vitest/vitest.mjs run \")} --maxWorkers=4`;\n    process.stderr.write(`[execution-policy] ${actual}\\n`);\n    const result = original(actual, args);\n    const report = /--outputFile=(\"[^\"\\n]+\")/.exec(command);\n    if (process.env.TOKEN_EVIDENCE_RAW && report) {\n      const file = JSON.parse(report[1]);\n      if (fs.existsSync(file)) fs.copyFileSync(file, `${process.env.TOKEN_EVIDENCE_RAW}-${clones.has(args.cwd.replace(/\\/modules\\/ui-web$/, \"\")) ? \"before\" : \"candidate\"}.json`);\n    }\n    return result;\n  }\n  if (command === 'git' && Array.isArray(args) && args[2] === 'worktree') {\n    if (args[3] === 'add') {\n      const [, , , , , destination, revision] = args;\n      process.stderr.write(`[execution-policy] shared clone ${destination}; detached checkout ${revision}\\n`);\n      const clone = original('git', ['clone', '--quiet', '--shared', '--no-checkout', options.cwd, destination], options);\n      if (clone.status !== 0) return clone;\n      clones.add(destination);\n      return original('git', ['-C', destination, 'checkout', '--quiet', '--detach', revision], options);\n    }\n    if (args[3] === 'remove') {\n      const destination = args[5];\n      if (!clones.delete(destination)) throw new Error(`refusing to remove an unowned clone: ${destination}`);\n      fs.rmSync(destination, { recursive: true });\n      return { status: 0, signal: null, stdout: '', stderr: '' };\n    }\n  }\n  return original(command, args, options);\n};\nsyncBuiltinESMExports();\n",
   "executionEvidence": [
     {
-      "file": "gates/test-intent/evidence/token-bootstrap-web-preservation.json",
+      "file": "gates/test-intent/evidence/token-bootstrap-main-20261021-web.json",
       "evidence": {
         "schema": "test-intent-evidence.v1",
         "producer": {
           "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
           "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
         },
-        "createdAt": "2026-10-20T07:13:30.171Z",
-        "revision": "0073e38aab1b158e5e4a9f4b02c14f887095bd9b",
-        "tree": "e32082120c91acc50a6b3bdca8410beba5ef6486",
+        "createdAt": "2026-10-21T08:48:33.047Z",
+        "revision": "734f9f25ba0f416c55b28f9ae5dca0095d45c62c",
+        "tree": "5807cd31abb587ac1a304b46f4a9a8e363d28248",
         "environment": {
           "platform": "linux",
           "arch": "x64",
@@ -27,10 +27,10 @@
         },
         "runs": [
           {
-            "command": "npx vitest run \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/components/ResourceView.history-reconnect.test.ts\" \"src/shell-v0/components/ResourceView.render.test.ts\" \"src/shell-v0/components/advisory/AdvisoryStore.test.ts\" \"src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts\" \"src/shell-v0/utils/aiInstallPoll.test.ts\" \"src/shell-v0/views/HealthLitView.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/justsearch-token-builder/test-intent-01a15693/test-intent-vitest-493705-1792480406215.json\"",
+            "command": "npx vitest run \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/components/ResourceView.history-reconnect.test.ts\" \"src/shell-v0/components/ResourceView.render.test.ts\" \"src/shell-v0/components/advisory/AdvisoryStore.test.ts\" \"src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts\" \"src/shell-v0/utils/aiInstallPoll.test.ts\" \"src/shell-v0/views/HealthLitView.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/main-20261021/test-intent-vitest-2654763-1792572509379.json\"",
             "cwd": "modules/ui-web",
             "exitCode": 0,
-            "durationMs": 3952
+            "durationMs": 3667
           }
         ],
         "checks": [
@@ -76,7 +76,7 @@
             "id": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts",
             "file": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts",
             "runner": "vitest",
-            "contentDigest": "sha256:fe3d1c4b1fd598fb8b64847605d99c512e5643fbaac8d2d8e75494a2c2b35a77",
+            "contentDigest": "sha256:6b555cce77d8877302852f11ccd0b4a25453b8911a699ce1a8d5723a623d6ff1",
             "executed": true,
             "skipped": false,
             "outcome": "passed",
@@ -475,7 +475,7 @@
             "id": "modules/ui-web/src/shell-v0/views/HealthLitView.test.ts",
             "file": "modules/ui-web/src/shell-v0/views/HealthLitView.test.ts",
             "runner": "vitest",
-            "contentDigest": "sha256:dd03fc9866874ba5984e0fd0921fe88c67aad42079983b5c2f7cc6270b16d667",
+            "contentDigest": "sha256:70bfa3012e9097b9cf3a1c580caff7aa3e5a92bc9cac66b27eef1288b3676f31",
             "executed": true,
             "skipped": false,
             "outcome": "passed",
@@ -524,7 +524,7 @@
           }
         ],
         "failBefore": null,
-        "digest": "sha256:b579dd9e0529b06f1eee70cbba8be7701fad6764b75bb2eef10142f823708ff2"
+        "digest": "sha256:578b4cc7b8194343f61f1084a1621be08231f600643139e107aa4f73ea31ab31"
       }
     },
     {
@@ -1044,43 +1044,31 @@
       }
     },
     {
-      "file": "gates/test-intent/evidence/token-bootstrap-original-preservation.json",
+      "file": "gates/test-intent/evidence/token-bootstrap-main-20261021-base-preservation.json",
       "evidence": {
         "schema": "test-intent-evidence.v1",
         "producer": {
           "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
           "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
         },
-        "createdAt": "2026-10-20T07:36:02.726Z",
-        "revision": "c00a0cb24b4c6000e090d5d09054c1e7e1d24e2f",
-        "tree": "47de464b9f3efb6923e97d28b581303672109f56",
+        "createdAt": "2026-10-21T08:48:34.176Z",
+        "revision": "f6d92d768f86d778ea805012b176c3349705018c",
+        "tree": "9e58a50bddef9684b0932c1e86d89e4d80e41c04",
         "environment": {
           "platform": "linux",
           "arch": "x64",
           "osRelease": "7.0.0-38-generic",
           "node": "v24.22.0",
-          "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+          "java": null,
           "cargo": null,
           "ci": false
         },
         "runs": [
           {
-            "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.DeclaredSurvivalHttpAdmissionTest\" --tests \"io.justsearch.ui.api.OpenAiCompatControllerTest\" --tests \"io.justsearch.ui.api.McpOriginValidationTest\" --rerun -PskipWebBuild=true --console=plain",
-            "cwd": ".",
-            "exitCode": 0,
-            "durationMs": 852200
-          },
-          {
-            "command": "./gradlew :modules:ui:integrationTest --tests \"io.justsearch.ui.api.ProdModeSettingsPersistenceIntegrationTest\" --rerun -PskipWebBuild=true --console=plain",
-            "cwd": ".",
-            "exitCode": 0,
-            "durationMs": 8684
-          },
-          {
-            "command": "npx vitest run \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/components/ResourceView.history-reconnect.test.ts\" \"src/shell-v0/components/ResourceView.render.test.ts\" \"src/shell-v0/components/advisory/AdvisoryStore.test.ts\" \"src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts\" \"src/shell-v0/utils/aiInstallPoll.test.ts\" \"src/shell-v0/views/HealthLitView.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/justsearch-token-builder/test-intent-01a15693/test-intent-vitest-661514-1792481759349.json\"",
+            "command": "npx vitest run \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/components/ResourceView.history-reconnect.test.ts\" \"src/shell-v0/components/ResourceView.render.test.ts\" \"src/shell-v0/components/advisory/AdvisoryStore.test.ts\" \"src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts\" \"src/shell-v0/utils/aiInstallPoll.test.ts\" \"src/shell-v0/views/HealthLitView.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/main-20261021/test-intent-vitest-2655078-1792572510545.json\"",
             "cwd": "modules/ui-web",
             "exitCode": 0,
-            "durationMs": 3375
+            "durationMs": 3630
           }
         ],
         "checks": [
@@ -1126,7 +1114,7 @@
             "id": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts",
             "file": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts",
             "runner": "vitest",
-            "contentDigest": "sha256:4c9192a3c07e0db056964a82446c096cd626f22f8ae25ece59e967e25e004b65",
+            "contentDigest": "sha256:d52737a70b26151fdbe89f24fcbe647be3fd64adec848230f5c7a14f6aa92362",
             "executed": true,
             "skipped": false,
             "outcome": "passed",
@@ -1525,7 +1513,7 @@
             "id": "modules/ui-web/src/shell-v0/views/HealthLitView.test.ts",
             "file": "modules/ui-web/src/shell-v0/views/HealthLitView.test.ts",
             "runner": "vitest",
-            "contentDigest": "sha256:ae48e8d19b41e0a1582a0e6d1f3abdba63525bb8e73367f7add3d6b196346a65",
+            "contentDigest": "sha256:1e9dcf388f31385f6ef79ce4775e92c88d31023c4cf2e70f4327c12750857064",
             "executed": true,
             "skipped": false,
             "outcome": "passed",
@@ -1571,222 +1559,10 @@
                 "status": "passed"
               }
             ]
-          },
-          {
-            "id": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredSurvivalHttpAdmissionTest.java",
-            "file": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredSurvivalHttpAdmissionTest.java",
-            "runner": "gradle",
-            "contentDigest": "sha256:cb6521fd1dc1ba9deaeb0ea085f12c087191f51a100240909a7d870e834cb0d5",
-            "executed": true,
-            "skipped": false,
-            "outcome": "passed",
-            "cases": [
-              {
-                "name": "nonOperationStreamKeepsItsRetainedRequestOwnerForeground()",
-                "status": "passed"
-              },
-              {
-                "name": "unknownOperationPreservesItsExistingErrorWithoutDispatchOrRetainedWork()",
-                "status": "passed"
-              },
-              {
-                "name": "[1] INGEST_ALIAS",
-                "status": "passed"
-              },
-              {
-                "name": "[2] GENERIC_INVOKE",
-                "status": "passed"
-              },
-              {
-                "name": "[3] MIGRATION_ALIAS",
-                "status": "passed"
-              },
-              {
-                "name": "[4] UNDO",
-                "status": "passed"
-              },
-              {
-                "name": "actualSecurityFiltersStillGuardDeclaredSurvivalRoutes()",
-                "status": "passed"
-              }
-            ]
-          },
-          {
-            "id": "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatControllerTest.java",
-            "file": "modules/ui/src/test/java/io/justsearch/ui/api/OpenAiCompatControllerTest.java",
-            "runner": "gradle",
-            "contentDigest": "sha256:01728a36edf502c7e90a11f939b8e7535b8cb2c8e9d4d6a618681569b05d5ff5",
-            "executed": true,
-            "skipped": false,
-            "outcome": "passed",
-            "cases": [
-              {
-                "name": "upstreamWildcardCannotOverrideProductionCorsPolicy()",
-                "status": "passed"
-              },
-              {
-                "name": "failedResponseHandoffClosesUpstreamAndRetainedAdmission()",
-                "status": "passed"
-              },
-              {
-                "name": "cancellationClosesUpstreamButAdmissionWaitsForDownstreamClose()",
-                "status": "passed"
-              },
-              {
-                "name": "streamingBodyKeepsAggregateAdmissionAfterHeaders()",
-                "status": "passed"
-              },
-              {
-                "name": "upstream success → forwards status, headers (filtered), and body stream",
-                "status": "passed"
-              },
-              {
-                "name": "streamingBodyKeepsPerContextAdmissionAfterHeaders()",
-                "status": "passed"
-              },
-              {
-                "name": "upstream connect refused → 503 SERVICE_UNAVAILABLE",
-                "status": "passed"
-              },
-              {
-                "name": "cancellationInterruptsUpstreamBeforeResponseHeaders()",
-                "status": "passed"
-              },
-              {
-                "name": "port unset (== 0) → 503 SERVICE_UNAVAILABLE without contacting upstream",
-                "status": "passed"
-              },
-              {
-                "name": "modelMetadataDoesNotEnterGenerationLifetime()",
-                "status": "passed"
-              },
-              {
-                "name": "connectionNominatedStreamingHeadersAreNotForwarded()",
-                "status": "passed"
-              }
-            ]
-          },
-          {
-            "id": "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java",
-            "file": "modules/ui/src/test/java/io/justsearch/ui/api/McpOriginValidationTest.java",
-            "runner": "gradle",
-            "contentDigest": "sha256:1276500ad7e68c276dab0c98a520afb3557685cb2dad63fc71919010f2864fdf",
-            "executed": true,
-            "skipped": false,
-            "outcome": "passed",
-            "cases": [
-              {
-                "name": "Live: POST /mcp from a foreign Origin is 403 with a JSON-RPC error body",
-                "status": "passed"
-              },
-              {
-                "name": "Live: GET /api/mcp/token with absent or loopback Origin is served — no legitimate caller regresses",
-                "status": "passed"
-              },
-              {
-                "name": "Live: DELETE /mcp is validated too — the check covers all methods on the endpoint",
-                "status": "passed"
-              },
-              {
-                "name": "The opaque `null` origin is rejected — it carries no host that can be verified",
-                "status": "passed"
-              },
-              {
-                "name": "Live: a denied request still runs after-handlers (no scope/inflight leak) and keeps its body",
-                "status": "passed"
-              },
-              {
-                "name": "Live: GET /mcp with no Origin is 405 + Allow — the spec's answer for a server with no SSE stream",
-                "status": "passed"
-              },
-              {
-                "name": "Unparseable values and non-web schemes are rejected",
-                "status": "passed"
-              },
-              {
-                "name": "Live: GET /mcp from a loopback Origin is 405 + Allow — the guard admits it, the method rejects it",
-                "status": "passed"
-              },
-              {
-                "name": "Absent Origin is allowed — native MCP hosts are not browsers and send none",
-                "status": "passed"
-              },
-              {
-                "name": "Loopback origins are allowed: 127.0.0.1 / localhost / ::1, any port, http or https",
-                "status": "passed"
-              },
-              {
-                "name": "Live: POST /mcp from a loopback-lookalike Origin is 403",
-                "status": "passed"
-              },
-              {
-                "name": "Live: POST /mcp with no Origin is served (native MCP host)",
-                "status": "passed"
-              },
-              {
-                "name": "Live: POST /mcp from a loopback Origin is served",
-                "status": "passed"
-              },
-              {
-                "name": "Live: the MCP guard is endpoint-scoped — other routes keep browser-enforced CORS",
-                "status": "passed"
-              },
-              {
-                "name": "Live: GET /mcp from a foreign Origin is 403 — the guard wins over the 405",
-                "status": "passed"
-              },
-              {
-                "name": "Foreign web origins are rejected",
-                "status": "passed"
-              },
-              {
-                "name": "Loopback LOOKALIKE origins are rejected (host equality, never substring matching)",
-                "status": "passed"
-              },
-              {
-                "name": "Live: GET /api/mcp/token from a foreign Origin is 403 — the token never leaves",
-                "status": "passed"
-              },
-              {
-                "name": "An over-long Origin is truncated before it reaches logs and the event buffer",
-                "status": "passed"
-              },
-              {
-                "name": "Desktop-shell origins are allowed (tauri://localhost, https://tauri.localhost)",
-                "status": "passed"
-              }
-            ]
-          },
-          {
-            "id": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/ProdModeSettingsPersistenceIntegrationTest.java",
-            "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/ProdModeSettingsPersistenceIntegrationTest.java",
-            "runner": "gradle",
-            "contentDigest": "sha256:6e578a408d55ec53333fae506c6798533ff342325a1772e39d2b82028acb5f7e",
-            "executed": true,
-            "skipped": false,
-            "outcome": "passed",
-            "cases": [
-              {
-                "name": "prod boot really enforces the session token on mutating calls",
-                "status": "passed"
-              },
-              {
-                "name": "(B7 probe) empty activate body returns a non-empty 400 JSON body in prod mode",
-                "status": "passed"
-              },
-              {
-                "name": "(b)+(c) settings are writable and survive a fresh store load",
-                "status": "passed"
-              },
-              {
-                "name": "(a) activation resolves the installed chat model instead of MODEL_PATH_REQUIRED",
-                "status": "passed"
-              }
-            ]
           }
         ],
         "failBefore": null,
-        "digest": "sha256:62b5beef8c5b4440b3d89e5ff1f524ae89e5d6e1d471e2dd32157d810d077c01"
+        "digest": "sha256:da2dedf05688ad5057779b386d319905061ce2a3971483ba894bcb0a86f3d3a4"
       }
     }
   ],
@@ -2073,118 +1849,118 @@
     {
       "file": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts",
       "assertionScope": "whole file",
-      "beforeSha256": "4c9192a3c07e0db056964a82446c096cd626f22f8ae25ece59e967e25e004b65",
-      "afterSha256": "fe3d1c4b1fd598fb8b64847605d99c512e5643fbaac8d2d8e75494a2c2b35a77",
+      "beforeSha256": "d52737a70b26151fdbe89f24fcbe647be3fd64adec848230f5c7a14f6aa92362",
+      "afterSha256": "6b555cce77d8877302852f11ccd0b4a25453b8911a699ce1a8d5723a623d6ff1",
       "beforeCount": 13,
       "afterCount": 13,
       "preserved": [
         {
           "before": {
-            "line": 132,
+            "line": 140,
             "text": "expect(text).toContain('Resource not found')"
           },
           "after": {
-            "line": 106,
+            "line": 109,
             "text": "expect(text).toContain('Resource not found')"
           }
         },
         {
           "before": {
-            "line": 138,
+            "line": 146,
             "text": "expect(text).toContain('No resource-id')"
           },
           "after": {
-            "line": 112,
+            "line": 115,
             "text": "expect(text).toContain('No resource-id')"
           }
         },
         {
           "before": {
-            "line": 150,
+            "line": 158,
             "text": "expect(header?.textContent).toContain('registry-resource.indexing-jobs.label')"
           },
           "after": {
-            "line": 124,
+            "line": 127,
             "text": "expect(header?.textContent).toContain('registry-resource.indexing-jobs.label')"
           }
         },
         {
           "before": {
-            "line": 159,
+            "line": 167,
             "text": "expect(['idle', 'connecting', 'connected', 'error']).toContain( el.connectionState, )"
           },
           "after": {
-            "line": 133,
+            "line": 136,
             "text": "expect(['idle', 'connecting', 'connected', 'error']).toContain( el.connectionState, )"
           }
         },
         {
           "before": {
-            "line": 186,
+            "line": 194,
             "text": "expect(el.connectionState).toBe('connecting')"
           },
           "after": {
-            "line": 161,
+            "line": 164,
             "text": "expect(el.connectionState).toBe('connecting')"
           }
         },
         {
           "before": {
-            "line": 187,
+            "line": 195,
             "text": "expect(el.shadowRoot?.textContent ?? '').not.toContain('Resource not found')"
           },
           "after": {
-            "line": 162,
+            "line": 165,
             "text": "expect(el.shadowRoot?.textContent ?? '').not.toContain('Resource not found')"
           }
         },
         {
           "before": {
-            "line": 202,
+            "line": 210,
             "text": "expect(el.connectionState).not.toBe('error')"
           },
           "after": {
-            "line": 179,
+            "line": 182,
             "text": "expect(el.connectionState).not.toBe('error')"
           }
         },
         {
           "before": {
-            "line": 203,
+            "line": 211,
             "text": "expect(el.shadowRoot?.textContent ?? '').not.toContain('Resource not found')"
           },
           "after": {
-            "line": 180,
+            "line": 183,
             "text": "expect(el.shadowRoot?.textContent ?? '').not.toContain('Resource not found')"
           }
         },
         {
           "before": {
-            "line": 213,
+            "line": 221,
             "text": "expect(el.connectionState).toBe('error')"
           },
           "after": {
-            "line": 190,
+            "line": 193,
             "text": "expect(el.connectionState).toBe('error')"
           }
         },
         {
           "before": {
-            "line": 214,
+            "line": 222,
             "text": "expect(el.shadowRoot?.textContent ?? '').toContain('Resource not found')"
           },
           "after": {
-            "line": 191,
+            "line": 194,
             "text": "expect(el.shadowRoot?.textContent ?? '').toContain('Resource not found')"
           }
         },
         {
           "before": {
-            "line": 264,
+            "line": 272,
             "text": "expect(el.connectionState).not.toBe('error')"
           },
           "after": {
-            "line": 241,
+            "line": 244,
             "text": "expect(el.connectionState).not.toBe('error')"
           }
         }
@@ -2192,28 +1968,28 @@
       "remapped": [
         {
           "before": {
-            "line": 174,
+            "line": 182,
             "text": "expect(NoopEventSource.urls).toContain('http://127.0.0.1:8080/api/indexing-jobs/stream')"
           },
           "after": {
-            "line": 149,
+            "line": 152,
             "text": "expect(streams.connections.map((connection) => connection.url)).toContain('http://127.0.0.1:8080/api/indexing-jobs/stream')"
           }
         },
         {
           "before": {
-            "line": 258,
+            "line": 266,
             "text": "expect(NoopEventSource.urls).toContain( 'http://127.0.0.1:33221/api/operation-history/stream', )"
           },
           "after": {
-            "line": 236,
+            "line": 239,
             "text": "expect(streams.connections.map((connection) => connection.url)).toContain( 'http://127.0.0.1:33221/api/operation-history/stream', )"
           }
         }
       ],
       "removed": [],
       "added": [],
-      "diff": "diff --git a/modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts b/modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts\nindex b38b56273..e8a00bda8 100644\n--- a/modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts\n+++ b/modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts\n@@ -10,45 +10,14 @@\n  * lives in Phase 8's integration test (live-stack smoke against\n  * runHeadlessEval).\n  *\n- * The EnvelopeStream / EventSource path is NOT exercised here; that\n- * runs against the real backend in Phase 8 verification.\n+ * Stream-open checks use the default fetch transport with controlled HTTP responses.\n  */\n \n-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';\n+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';\n import './ResourceView.js';\n \n-// Stub EventSource at module level to a no-op that drops connections\n-// silently. Avoids unhandled-error noise from happy-dom attempting a\n-// real network call against /api/indexing-jobs/stream.\n-class NoopEventSource extends EventTarget {\n-  static urls: string[] = [];\n-  readyState = 0;\n-  url: string;\n-  CONNECTING = 0;\n-  OPEN = 1;\n-  CLOSED = 2;\n-  withCredentials = false;\n-  onopen: ((this: EventSource, ev: Event) => unknown) | null = null;\n-  onmessage: ((this: EventSource, ev: MessageEvent) => unknown) | null = null;\n-  onerror: ((this: EventSource, ev: Event) => unknown) | null = null;\n-  constructor(url: string | URL) {\n-    super();\n-    this.url = String(url);\n-    NoopEventSource.urls.push(this.url);\n-  }\n-  close(): void {\n-    this.readyState = this.CLOSED;\n-  }\n-}\n+import { fetchSseHarness, flushStreamWork } from '../../test/fetchSse.js';\n \n-beforeAll(() => {\n-  vi.stubGlobal(\n-    'EventSource',\n-    function StubES(url: string | URL) {\n-      return new NoopEventSource(url) as unknown as EventSource;\n-    },\n-  );\n-});\n import type { ResourceView } from './ResourceView.js';\n import {\n   __resetForTest as resetResourceCatalog,\n@@ -59,6 +28,8 @@ import {\n } from '../../api/registry/schemaFetcher.js';\n import type { Resource, ResourceCatalog } from '../../api/types/registry.js';\n \n+let streams: ReturnType<typeof fetchSseHarness>;\n+\n function tabularResource(): Resource {\n   return {\n     id: 'core.indexing-jobs',\n@@ -107,6 +78,7 @@ async function mountIsolated(resourceId: string): Promise<ResourceView> {\n   // Wait one tick for connectedCallback's async bind() to settle.\n   await Promise.resolve();\n   await el.updateComplete;\n+  await flushStreamWork();\n   return el;\n }\n \n@@ -114,12 +86,14 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {\n   beforeEach(() => {\n     resetResourceCatalog();\n     resetSchemaFetcher();\n-    NoopEventSource.urls = [];\n+    streams = fetchSseHarness(async () => Response.json({ type: 'object', properties: {} }));\n+    vi.stubGlobal('fetch', streams.fetch);\n   });\n   afterEach(() => {\n     resetResourceCatalog();\n     resetSchemaFetcher();\n     document.body.innerHTML = '';\n+    vi.unstubAllGlobals();\n   });\n \n   it('shows a placeholder when resource-id is unknown', async () => {\n@@ -141,7 +115,7 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {\n   it('renders header with localized label key when resource is found', async () => {\n     seedResourceCatalog(catalogOf(tabularResource()));\n     const el = await mountIsolated('core.indexing-jobs');\n-    // The element starts the stream (real EventSource against\n+    // The element starts the stream (real fetch SSE against\n     // /api/indexing-jobs/stream) but we don't drive frames here; the\n     // header renders synchronously from the Resource entry.\n     const header = el.shadowRoot?.querySelector('h2');\n@@ -154,7 +128,7 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {\n   it('exposes connectionState as reactive property', async () => {\n     seedResourceCatalog(catalogOf(tabularResource()));\n     const el = await mountIsolated('core.indexing-jobs');\n-    // Either 'connecting' (initial) or 'error' if EventSource fails;\n+    // Either 'connecting' (initial) or 'error' if fetch SSE fails;\n     // both demonstrate the state is a real lifecycle signal.\n     expect(['idle', 'connecting', 'connected', 'error']).toContain(\n       el.connectionState,\n@@ -170,8 +144,9 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {\n     document.body.appendChild(el);\n     await Promise.resolve();\n     await el.updateComplete;\n+    await flushStreamWork();\n \n-    expect(NoopEventSource.urls).toContain('http://127.0.0.1:8080/api/indexing-jobs/stream');\n+    expect(streams.connections.map((connection) => connection.url)).toContain('http://127.0.0.1:8080/api/indexing-jobs/stream');\n     el.remove();\n   });\n \n@@ -190,14 +165,16 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {\n     // re-runs.\n     seedResourceCatalog(catalogOf(tabularResource()));\n     await el.updateComplete;\n+    await flushStreamWork();\n     // bind() is async; wait one more microtask for it to progress\n     // past the lookup.\n     await Promise.resolve();\n     await el.updateComplete;\n+    await flushStreamWork();\n \n     // The view has progressed past the empty-catalog wait — either\n     // 'connecting' (stream opening) or 'connected' / 'error' from\n-    // the stub EventSource. The defining post-fix property: it is\n+    // the stub fetch SSE. The defining post-fix property: it is\n     // NOT in the \"Resource not found\" error state.\n     expect(el.connectionState).not.toBe('error');\n     expect(el.shadowRoot?.textContent ?? '').not.toContain('Resource not found');\n@@ -215,7 +192,7 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {\n     el.remove();\n   });\n \n-  it('727 F-4 — opens the api-base-prefixed EventSource for an operation-history-shaped resource', async () => {\n+  it('727 F-4 — opens the api-base-prefixed fetch SSE for an operation-history-shaped resource', async () => {\n     // Mirrors \"prefixes SSE resource endpoints with api-base\" above, for the exact\n     // EVENT_STREAM×SSE_STREAM shape of core.operation-history. This isolated component-level\n     // check passed even before the 727 F-4 fix — <jf-resource-view> itself was never buggy;\n@@ -254,12 +231,12 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {\n     document.body.appendChild(el);\n     await Promise.resolve();\n     await el.updateComplete;\n+    await flushStreamWork();\n \n-    expect(NoopEventSource.urls).toContain(\n+    expect(streams.connections.map((connection) => connection.url)).toContain(\n       'http://127.0.0.1:33221/api/operation-history/stream',\n     );\n-    // 'connecting' here (not 'connected') is expected and correct: NoopEventSource never fires\n-    // 'open'/'frame'. The property under test is that the stream-open attempt happened at all,\n+    // 'connecting' here is expected: the HTTP response is still pending. The property under test is that the stream-open attempt happened at all,\n     // against the right URL — 'error' would mean bind() rejected before reaching that point.\n     expect(el.connectionState).not.toBe('error');\n     el.remove();\n"
+      "diff": "diff --git a/modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts b/modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts\nindex 671fc6c31..e547ab589 100644\n--- a/modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts\n+++ b/modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts\n@@ -10,53 +10,14 @@\n  * lives in Phase 8's integration test (live-stack smoke against\n  * runHeadlessEval).\n  *\n- * The EnvelopeStream / EventSource path is NOT exercised here; that\n- * runs against the real backend in Phase 8 verification.\n+ * Stream-open checks use the default fetch transport with controlled HTTP responses.\n  */\n \n-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';\n-\n-// Incidental requests are outside these render/event scenarios. Keep their\n-// unavailable-backend behavior explicit, without contacting a real server.\n-const originalFetch = globalThis.fetch;\n-beforeEach(() => {\n-  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Test backend unavailable')));\n-});\n-afterEach(() => { globalThis.fetch = originalFetch; });\n+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';\n import './ResourceView.js';\n \n-// Stub EventSource at module level to a no-op that drops connections\n-// silently. Avoids unhandled-error noise from happy-dom attempting a\n-// real network call against /api/indexing-jobs/stream.\n-class NoopEventSource extends EventTarget {\n-  static urls: string[] = [];\n-  readyState = 0;\n-  url: string;\n-  CONNECTING = 0;\n-  OPEN = 1;\n-  CLOSED = 2;\n-  withCredentials = false;\n-  onopen: ((this: EventSource, ev: Event) => unknown) | null = null;\n-  onmessage: ((this: EventSource, ev: MessageEvent) => unknown) | null = null;\n-  onerror: ((this: EventSource, ev: Event) => unknown) | null = null;\n-  constructor(url: string | URL) {\n-    super();\n-    this.url = String(url);\n-    NoopEventSource.urls.push(this.url);\n-  }\n-  close(): void {\n-    this.readyState = this.CLOSED;\n-  }\n-}\n+import { fetchSseHarness, flushStreamWork } from '../../test/fetchSse.js';\n \n-beforeAll(() => {\n-  vi.stubGlobal(\n-    'EventSource',\n-    function StubES(url: string | URL) {\n-      return new NoopEventSource(url) as unknown as EventSource;\n-    },\n-  );\n-});\n import type { ResourceView } from './ResourceView.js';\n import {\n   __resetForTest as resetResourceCatalog,\n@@ -67,6 +28,8 @@ import {\n } from '../../api/registry/schemaFetcher.js';\n import type { Resource, ResourceCatalog } from '../../api/types/registry.js';\n \n+let streams: ReturnType<typeof fetchSseHarness>;\n+\n function tabularResource(): Resource {\n   return {\n     id: 'core.indexing-jobs',\n@@ -115,6 +78,7 @@ async function mountIsolated(resourceId: string): Promise<ResourceView> {\n   // Wait one tick for connectedCallback's async bind() to settle.\n   await Promise.resolve();\n   await el.updateComplete;\n+  await flushStreamWork();\n   return el;\n }\n \n@@ -122,12 +86,17 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {\n   beforeEach(() => {\n     resetResourceCatalog();\n     resetSchemaFetcher();\n-    NoopEventSource.urls = [];\n+    // Incidental requests stay isolated from the real backend, as on main.\n+    streams = fetchSseHarness(async () => {\n+      throw new TypeError('Test backend unavailable');\n+    });\n+    vi.stubGlobal('fetch', streams.fetch);\n   });\n   afterEach(() => {\n     resetResourceCatalog();\n     resetSchemaFetcher();\n     document.body.innerHTML = '';\n+    vi.unstubAllGlobals();\n   });\n \n   it('shows a placeholder when resource-id is unknown', async () => {\n@@ -149,7 +118,7 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {\n   it('renders header with localized label key when resource is found', async () => {\n     seedResourceCatalog(catalogOf(tabularResource()));\n     const el = await mountIsolated('core.indexing-jobs');\n-    // The element starts the stream (real EventSource against\n+    // The element starts the stream (real fetch SSE against\n     // /api/indexing-jobs/stream) but we don't drive frames here; the\n     // header renders synchronously from the Resource entry.\n     const header = el.shadowRoot?.querySelector('h2');\n@@ -162,7 +131,7 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {\n   it('exposes connectionState as reactive property', async () => {\n     seedResourceCatalog(catalogOf(tabularResource()));\n     const el = await mountIsolated('core.indexing-jobs');\n-    // Either 'connecting' (initial) or 'error' if EventSource fails;\n+    // Either 'connecting' (initial) or 'error' if fetch SSE fails;\n     // both demonstrate the state is a real lifecycle signal.\n     expect(['idle', 'connecting', 'connected', 'error']).toContain(\n       el.connectionState,\n@@ -178,8 +147,9 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {\n     document.body.appendChild(el);\n     await Promise.resolve();\n     await el.updateComplete;\n+    await flushStreamWork();\n \n-    expect(NoopEventSource.urls).toContain('http://127.0.0.1:8080/api/indexing-jobs/stream');\n+    expect(streams.connections.map((connection) => connection.url)).toContain('http://127.0.0.1:8080/api/indexing-jobs/stream');\n     el.remove();\n   });\n \n@@ -198,14 +168,16 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {\n     // re-runs.\n     seedResourceCatalog(catalogOf(tabularResource()));\n     await el.updateComplete;\n+    await flushStreamWork();\n     // bind() is async; wait one more microtask for it to progress\n     // past the lookup.\n     await Promise.resolve();\n     await el.updateComplete;\n+    await flushStreamWork();\n \n     // The view has progressed past the empty-catalog wait — either\n     // 'connecting' (stream opening) or 'connected' / 'error' from\n-    // the stub EventSource. The defining post-fix property: it is\n+    // the stub fetch SSE. The defining post-fix property: it is\n     // NOT in the \"Resource not found\" error state.\n     expect(el.connectionState).not.toBe('error');\n     expect(el.shadowRoot?.textContent ?? '').not.toContain('Resource not found');\n@@ -223,7 +195,7 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {\n     el.remove();\n   });\n \n-  it('727 F-4 — opens the api-base-prefixed EventSource for an operation-history-shaped resource', async () => {\n+  it('727 F-4 — opens the api-base-prefixed fetch SSE for an operation-history-shaped resource', async () => {\n     // Mirrors \"prefixes SSE resource endpoints with api-base\" above, for the exact\n     // EVENT_STREAM×SSE_STREAM shape of core.operation-history. This isolated component-level\n     // check passed even before the 727 F-4 fix — <jf-resource-view> itself was never buggy;\n@@ -262,12 +234,12 @@ describe('ResourceView (jf-resource-view) — placeholders', () => {\n     document.body.appendChild(el);\n     await Promise.resolve();\n     await el.updateComplete;\n+    await flushStreamWork();\n \n-    expect(NoopEventSource.urls).toContain(\n+    expect(streams.connections.map((connection) => connection.url)).toContain(\n       'http://127.0.0.1:33221/api/operation-history/stream',\n     );\n-    // 'connecting' here (not 'connected') is expected and correct: NoopEventSource never fires\n-    // 'open'/'frame'. The property under test is that the stream-open attempt happened at all,\n+    // 'connecting' here is expected: the HTTP response is still pending. The property under test is that the stream-open attempt happened at all,\n     // against the right URL — 'error' would mean bind() rejected before reaching that point.\n     expect(el.connectionState).not.toBe('error');\n     el.remove();\n"
     },
     {
       "file": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryStore.test.ts",
@@ -3975,228 +3751,228 @@
     {
       "file": "modules/ui-web/src/shell-v0/views/HealthLitView.test.ts",
       "assertionScope": "whole file",
-      "beforeSha256": "ae48e8d19b41e0a1582a0e6d1f3abdba63525bb8e73367f7add3d6b196346a65",
-      "afterSha256": "dd03fc9866874ba5984e0fd0921fe88c67aad42079983b5c2f7cc6270b16d667",
+      "beforeSha256": "1e9dcf388f31385f6ef79ce4775e92c88d31023c4cf2e70f4327c12750857064",
+      "afterSha256": "70bfa3012e9097b9cf3a1c580caff7aa3e5a92bc9cac66b27eef1288b3676f31",
       "beforeCount": 22,
       "afterCount": 22,
       "preserved": [
         {
           "before": {
-            "line": 121,
-            "text": "expect(el.shadowRoot?.textContent).toContain('No active conditions')"
-          },
-          "after": {
-            "line": 89,
-            "text": "expect(el.shadowRoot?.textContent).toContain('No active conditions')"
-          }
-        },
-        {
-          "before": {
-            "line": 122,
-            "text": "expect(el.shadowRoot?.textContent).toContain('No occurrences yet')"
-          },
-          "after": {
-            "line": 90,
-            "text": "expect(el.shadowRoot?.textContent).toContain('No occurrences yet')"
-          }
-        },
-        {
-          "before": {
             "line": 129,
+            "text": "expect(el.shadowRoot?.textContent).toContain('No active conditions')"
+          },
+          "after": {
+            "line": 93,
+            "text": "expect(el.shadowRoot?.textContent).toContain('No active conditions')"
+          }
+        },
+        {
+          "before": {
+            "line": 130,
+            "text": "expect(el.shadowRoot?.textContent).toContain('No occurrences yet')"
+          },
+          "after": {
+            "line": 94,
+            "text": "expect(el.shadowRoot?.textContent).toContain('No occurrences yet')"
+          }
+        },
+        {
+          "before": {
+            "line": 137,
             "text": "expect(fake.url).toBe('http://127.0.0.1:33221/api/health/events/stream')"
           },
           "after": {
-            "line": 97,
+            "line": 101,
             "text": "expect(fake.url).toBe('http://127.0.0.1:33221/api/health/events/stream')"
           }
         },
         {
           "before": {
-            "line": 153,
+            "line": 161,
             "text": "expect(cards?.length).toBe(2)"
           },
           "after": {
-            "line": 121,
+            "line": 125,
             "text": "expect(cards?.length).toBe(2)"
           }
         },
         {
           "before": {
-            "line": 173,
+            "line": 181,
             "text": "expect(el.shadowRoot?.querySelectorAll('jf-status-card').length).toBe(1)"
           },
           "after": {
-            "line": 141,
+            "line": 145,
             "text": "expect(el.shadowRoot?.querySelectorAll('jf-status-card').length).toBe(1)"
           }
         },
         {
           "before": {
-            "line": 188,
+            "line": 196,
             "text": "expect(cards?.length).toBe(1)"
           },
           "after": {
-            "line": 156,
+            "line": 160,
             "text": "expect(cards?.length).toBe(1)"
           }
         },
         {
           "before": {
-            "line": 189,
+            "line": 197,
             "text": "expect(cards?.[0]?.getAttribute('subject')).toBe('SubjAModified')"
           },
           "after": {
-            "line": 157,
+            "line": 161,
             "text": "expect(cards?.[0]?.getAttribute('subject')).toBe('SubjAModified')"
           }
         },
         {
           "before": {
-            "line": 204,
+            "line": 212,
             "text": "expect(cards?.length).toBe(0)"
           },
           "after": {
-            "line": 172,
+            "line": 176,
             "text": "expect(cards?.length).toBe(0)"
           }
         },
         {
           "before": {
-            "line": 235,
+            "line": 243,
             "text": "expect(card).not.toBeNull()"
-          },
-          "after": {
-            "line": 203,
-            "text": "expect(card).not.toBeNull()"
-          }
-        },
-        {
-          "before": {
-            "line": 237,
-            "text": "expect(card?.getAttribute('severity')).toBe('INFO')"
-          },
-          "after": {
-            "line": 205,
-            "text": "expect(card?.getAttribute('severity')).toBe('INFO')"
-          }
-        },
-        {
-          "before": {
-            "line": 239,
-            "text": "expect(card?.getAttribute('reason')).toBe('Cannot evaluate yet')"
           },
           "after": {
             "line": 207,
+            "text": "expect(card).not.toBeNull()"
+          }
+        },
+        {
+          "before": {
+            "line": 245,
+            "text": "expect(card?.getAttribute('severity')).toBe('INFO')"
+          },
+          "after": {
+            "line": 209,
+            "text": "expect(card?.getAttribute('severity')).toBe('INFO')"
+          }
+        },
+        {
+          "before": {
+            "line": 247,
+            "text": "expect(card?.getAttribute('reason')).toBe('Cannot evaluate yet')"
+          },
+          "after": {
+            "line": 211,
             "text": "expect(card?.getAttribute('reason')).toBe('Cannot evaluate yet')"
           }
         },
         {
           "before": {
-            "line": 240,
+            "line": 248,
             "text": "expect(card?.getAttribute('subject')).toBe('head.memory')"
           },
           "after": {
-            "line": 208,
+            "line": 212,
             "text": "expect(card?.getAttribute('subject')).toBe('head.memory')"
           }
         },
         {
           "before": {
-            "line": 262,
+            "line": 270,
             "text": "expect(occurrences?.length).toBe(3)"
           },
           "after": {
-            "line": 230,
+            "line": 234,
             "text": "expect(occurrences?.length).toBe(3)"
           }
         },
         {
           "before": {
-            "line": 282,
+            "line": 290,
             "text": "expect(el.shadowRoot?.querySelectorAll('jf-status-card').length).toBe(1)"
           },
           "after": {
-            "line": 250,
+            "line": 254,
             "text": "expect(el.shadowRoot?.querySelectorAll('jf-status-card').length).toBe(1)"
           }
         },
         {
           "before": {
-            "line": 293,
-            "text": "expect(el.shadowRoot?.querySelectorAll('jf-status-card').length).toBe(0)"
-          },
-          "after": {
-            "line": 261,
-            "text": "expect(el.shadowRoot?.querySelectorAll('jf-status-card').length).toBe(0)"
-          }
-        },
-        {
-          "before": {
-            "line": 294,
-            "text": "expect(el.shadowRoot?.querySelectorAll('.occurrence').length).toBe(0)"
-          },
-          "after": {
-            "line": 262,
-            "text": "expect(el.shadowRoot?.querySelectorAll('.occurrence').length).toBe(0)"
-          }
-        },
-        {
-          "before": {
-            "line": 304,
-            "text": "expect(dot?.getAttribute('tone')).toBe('info')"
-          },
-          "after": {
-            "line": 272,
-            "text": "expect(dot?.getAttribute('tone')).toBe('info')"
-          }
-        },
-        {
-          "before": {
-            "line": 309,
-            "text": "expect(dot?.getAttribute('tone')).toBe('info')"
-          },
-          "after": {
-            "line": 277,
-            "text": "expect(dot?.getAttribute('tone')).toBe('info')"
-          }
-        },
-        {
-          "before": {
-            "line": 332,
-            "text": "expect(dot?.getAttribute('tone')).toBe('warning')"
-          },
-          "after": {
-            "line": 300,
-            "text": "expect(dot?.getAttribute('tone')).toBe('warning')"
-          }
-        },
-        {
-          "before": {
-            "line": 333,
-            "text": "expect(dot?.getAttribute('label')).toContain('paused')"
-          },
-          "after": {
             "line": 301,
+            "text": "expect(el.shadowRoot?.querySelectorAll('jf-status-card').length).toBe(0)"
+          },
+          "after": {
+            "line": 265,
+            "text": "expect(el.shadowRoot?.querySelectorAll('jf-status-card').length).toBe(0)"
+          }
+        },
+        {
+          "before": {
+            "line": 302,
+            "text": "expect(el.shadowRoot?.querySelectorAll('.occurrence').length).toBe(0)"
+          },
+          "after": {
+            "line": 266,
+            "text": "expect(el.shadowRoot?.querySelectorAll('.occurrence').length).toBe(0)"
+          }
+        },
+        {
+          "before": {
+            "line": 312,
+            "text": "expect(dot?.getAttribute('tone')).toBe('info')"
+          },
+          "after": {
+            "line": 276,
+            "text": "expect(dot?.getAttribute('tone')).toBe('info')"
+          }
+        },
+        {
+          "before": {
+            "line": 317,
+            "text": "expect(dot?.getAttribute('tone')).toBe('info')"
+          },
+          "after": {
+            "line": 281,
+            "text": "expect(dot?.getAttribute('tone')).toBe('info')"
+          }
+        },
+        {
+          "before": {
+            "line": 340,
+            "text": "expect(dot?.getAttribute('tone')).toBe('warning')"
+          },
+          "after": {
+            "line": 304,
+            "text": "expect(dot?.getAttribute('tone')).toBe('warning')"
+          }
+        },
+        {
+          "before": {
+            "line": 341,
+            "text": "expect(dot?.getAttribute('label')).toContain('paused')"
+          },
+          "after": {
+            "line": 305,
             "text": "expect(dot?.getAttribute('label')).toContain('paused')"
           }
         },
         {
           "before": {
-            "line": 364,
+            "line": 372,
             "text": "expect(card?.getAttribute('details')).toContain('ratio_pct=92')"
           },
           "after": {
-            "line": 332,
+            "line": 336,
             "text": "expect(card?.getAttribute('details')).toContain('ratio_pct=92')"
           }
         },
         {
           "before": {
-            "line": 365,
+            "line": 373,
             "text": "expect(card?.getAttribute('reason')).toBe('FIRING')"
           },
           "after": {
-            "line": 333,
+            "line": 337,
             "text": "expect(card?.getAttribute('reason')).toBe('FIRING')"
           }
         }
@@ -4204,7 +3980,7 @@
       "remapped": [],
       "removed": [],
       "added": [],
-      "diff": "diff --git a/modules/ui-web/src/shell-v0/views/HealthLitView.test.ts b/modules/ui-web/src/shell-v0/views/HealthLitView.test.ts\nindex 3d6a5df30..879e516c4 100644\n--- a/modules/ui-web/src/shell-v0/views/HealthLitView.test.ts\n+++ b/modules/ui-web/src/shell-v0/views/HealthLitView.test.ts\n@@ -3,7 +3,7 @@\n /**\n  * Render tests for HealthLitView (slice 3a.2).\n  *\n- * Uses a fake EventSource so the substrate's SSE consumption is\n+ * Uses controlled fetch SSE responses so the substrate's SSE consumption is\n  * exercised end-to-end (frame parsing → reducer → re-render →\n  * StatusCard mount) without a network.\n  *\n@@ -19,37 +19,23 @@\n  *  - reset frame clears the local state.\n  */\n \n-import { describe, expect, it } from 'vitest';\n+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';\n+import { fetchSseHarness, flushStreamWork } from '../../test/fetchSse.js';\n import './HealthLitView.js';\n // Side-effect: register <jf-status-card> so the dispatched child mounts.\n import '../components/StatusCard.js';\n import type { HealthLitView } from './HealthLitView.js';\n-import type { SseEnvelope } from '../streaming/envelope-types.js';\n import type { HealthEvent } from '../../api/domains/health.js';\n \n-class FakeEventSource extends EventTarget {\n-  url: string;\n-  closed = false;\n-  constructor(url: string) {\n-    super();\n-    this.url = url;\n-    Object.defineProperty(globalThis, '__lastFakeES', {\n-      value: this,\n-      configurable: true,\n-    });\n-  }\n-  emitFrame(env: SseEnvelope): void {\n-    this.dispatchEvent(\n-      new MessageEvent('frame', { data: JSON.stringify(env) }),\n-    );\n-  }\n-  emitOpen(): void {\n-    this.dispatchEvent(new Event('open'));\n-  }\n-  close(): void {\n-    this.closed = true;\n-  }\n-}\n+let streams: ReturnType<typeof fetchSseHarness>;\n+beforeEach(() => {\n+  streams = fetchSseHarness();\n+  vi.stubGlobal('fetch', streams.fetch);\n+});\n+afterEach(() => {\n+  document.body.replaceChildren();\n+  vi.unstubAllGlobals();\n+});\n \n const FAKE_SOURCE = {\n   serviceName: 'head',\n@@ -88,30 +74,12 @@ function occurrence(id: string, attrs: Record<string, unknown>): HealthEvent {\n   };\n }\n \n-async function mount(\n-  apiBase: string,\n-  fakeEs: FakeEventSource | null = null,\n-): Promise<HealthLitView> {\n+async function mount(apiBase: string): Promise<HealthLitView> {\n   const el = document.createElement('jf-health-view') as HealthLitView;\n-  if (apiBase) {\n-    el.apiBase = apiBase;\n-  }\n-  // Inject a fake EventSource constructor only when the test wants\n-  // to drive frames manually. Otherwise the real EventSource is\n-  // attempted (and harmlessly fails in happy-dom).\n-  if (fakeEs) {\n-    const orig = (globalThis as { EventSource?: unknown }).EventSource;\n-    (globalThis as { EventSource?: unknown }).EventSource = function (url: string) {\n-      fakeEs.url = String(url);\n-      return fakeEs;\n-    } as unknown;\n-    document.body.appendChild(el);\n-    await el.updateComplete;\n-    (globalThis as { EventSource?: unknown }).EventSource = orig;\n-  } else {\n-    document.body.appendChild(el);\n-    await el.updateComplete;\n-  }\n+  if (apiBase) el.apiBase = apiBase;\n+  document.body.appendChild(el);\n+  await el.updateComplete;\n+  await flushStreamWork();\n   return el;\n }\n \n@@ -124,16 +92,16 @@ describe('HealthLitView render', () => {\n   });\n \n   it('prefixes health SSE with api-base for Tauri asset origins', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://127.0.0.1:33221', fake);\n+    const el = await mount('http://127.0.0.1:33221');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n     expect(fake.url).toBe('http://127.0.0.1:33221/api/health/events/stream');\n     el.remove();\n   });\n \n   it('snapshot frame populates Conditions list and renders one StatusCard per condition', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n-    fake.emitFrame({\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n+    await fake.emitFrame({\n       streamId: 'health-event/v1',\n       frameKind: 'LIFECYCLE',\n       seq: 1,\n@@ -155,10 +123,10 @@ describe('HealthLitView render', () => {\n   });\n \n   it('condition-added / condition-modified / condition-removed deltas keep state in sync', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n \n-    fake.emitFrame({\n+    await fake.emitFrame({\n       streamId: 'h/v1',\n       frameKind: 'UPDATE',\n       seq: 1,\n@@ -172,7 +140,7 @@ describe('HealthLitView render', () => {\n     await el.updateComplete;\n     expect(el.shadowRoot?.querySelectorAll('jf-status-card').length).toBe(1);\n \n-    fake.emitFrame({\n+    await fake.emitFrame({\n       streamId: 'h/v1',\n       frameKind: 'UPDATE',\n       seq: 2,\n@@ -188,7 +156,7 @@ describe('HealthLitView render', () => {\n     expect(cards?.length).toBe(1);\n     expect(cards?.[0]?.getAttribute('subject')).toBe('SubjAModified');\n \n-    fake.emitFrame({\n+    await fake.emitFrame({\n       streamId: 'h/v1',\n       frameKind: 'UPDATE',\n       seq: 3,\n@@ -206,8 +174,8 @@ describe('HealthLitView render', () => {\n   });\n \n   it('blind-monitor UNKNOWN condition renders calm/info with legible wording (tempdoc 600 Design B)', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n     const blind: HealthEvent = {\n       id: 'monitor.unobservable',\n       timestamp: '2026-05-05T12:00:00Z',\n@@ -222,7 +190,7 @@ describe('HealthLitView render', () => {\n         lastTransitionTime: '2026-05-05T12:00:00Z',\n       },\n     };\n-    fake.emitFrame({\n+    await fake.emitFrame({\n       streamId: 'h/v1',\n       frameKind: 'UPDATE',\n       seq: 1,\n@@ -242,10 +210,10 @@ describe('HealthLitView render', () => {\n   });\n \n   it('occurrence-appended frames render under Recent occurrences', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n     for (let i = 0; i < 3; i++) {\n-      fake.emitFrame({\n+      await fake.emitFrame({\n         streamId: 'h/v1',\n         frameKind: 'UPDATE',\n         seq: i + 1,\n@@ -264,9 +232,9 @@ describe('HealthLitView render', () => {\n   });\n \n   it('reset frame clears local state', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n-    fake.emitFrame({\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n+    await fake.emitFrame({\n       streamId: 'h/v1',\n       frameKind: 'LIFECYCLE',\n       seq: 1,\n@@ -281,7 +249,7 @@ describe('HealthLitView render', () => {\n     await el.updateComplete;\n     expect(el.shadowRoot?.querySelectorAll('jf-status-card').length).toBe(1);\n \n-    fake.emitFrame({\n+    await fake.emitFrame({\n       streamId: 'h/v1',\n       frameKind: 'LIFECYCLE',\n       seq: 2,\n@@ -296,14 +264,14 @@ describe('HealthLitView render', () => {\n   });\n \n   it('connection badge debounces the SSE channel (no flicker to a hard down) — 604 Move B', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n     // 604 — the badge does NOT flip to a hard \"down\" the instant the channel isn't open yet: within\n     // the debounce grace it stays \"Connected\" (info), so a fast self-heal never flickers the badge.\n     let dot = el.shadowRoot?.querySelector('jf-status-dot');\n     expect(dot?.getAttribute('tone')).toBe('info');\n \n-    fake.emitOpen();\n+    await fake.open();\n     await el.updateComplete;\n     dot = el.shadowRoot?.querySelector('jf-status-dot');\n     expect(dot?.getAttribute('tone')).toBe('info');\n@@ -311,9 +279,9 @@ describe('HealthLitView render', () => {\n   });\n \n   it('connection badge shows a soft \"paused\" (warning, not error) when SSE is down but the backend is reachable — 604 Move B', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n-    fake.emitOpen();\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n+    await fake.open();\n     await el.updateComplete;\n     // The SSE channel drops and stays down past the debounce window; the /api/status poll still\n     // reports the backend reachable. This test asserts that condition directly rather than relying\n@@ -325,7 +293,7 @@ describe('HealthLitView render', () => {\n     // this test is actually about) without depending on that separate subsystem's startup state.\n     el.backendReachable = true;\n     await el.updateComplete;\n-    fake.dispatchEvent(new Event('error'));\n+    await fake.error();\n     await new Promise((r) => setTimeout(r, 850)); // > DISCONNECT_DEBOUNCE_MS (750)\n     await el.updateComplete;\n     const dot = el.shadowRoot?.querySelector('jf-status-dot');\n@@ -349,9 +317,9 @@ describe('HealthLitView render', () => {\n         message: 'Memory usage above threshold',\n       },\n     };\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n-    fake.emitFrame({\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n+    await fake.emitFrame({\n       streamId: 'h/v1',\n       frameKind: 'LIFECYCLE',\n       seq: 1,\n"
+      "diff": "diff --git a/modules/ui-web/src/shell-v0/views/HealthLitView.test.ts b/modules/ui-web/src/shell-v0/views/HealthLitView.test.ts\nindex 2f66743ef..5ada86cd3 100644\n--- a/modules/ui-web/src/shell-v0/views/HealthLitView.test.ts\n+++ b/modules/ui-web/src/shell-v0/views/HealthLitView.test.ts\n@@ -3,7 +3,7 @@\n /**\n  * Render tests for HealthLitView (slice 3a.2).\n  *\n- * Uses a fake EventSource so the substrate's SSE consumption is\n+ * Uses controlled fetch SSE responses so the substrate's SSE consumption is\n  * exercised end-to-end (frame parsing → reducer → re-render →\n  * StatusCard mount) without a network.\n  *\n@@ -19,45 +19,27 @@\n  *  - reset frame clears the local state.\n  */\n \n-import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';\n-\n-// Incidental requests are outside these render/event scenarios. Keep their\n-// unavailable-backend behavior explicit, without contacting a real server.\n-const originalFetch = globalThis.fetch;\n-beforeEach(() => {\n-  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Test backend unavailable')));\n-});\n-afterEach(() => { globalThis.fetch = originalFetch; });\n+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';\n+import { fetchSseHarness, flushStreamWork } from '../../test/fetchSse.js';\n import './HealthLitView.js';\n // Side-effect: register <jf-status-card> so the dispatched child mounts.\n import '../components/StatusCard.js';\n import type { HealthLitView } from './HealthLitView.js';\n-import type { SseEnvelope } from '../streaming/envelope-types.js';\n import type { HealthEvent } from '../../api/domains/health.js';\n \n-class FakeEventSource extends EventTarget {\n-  url: string;\n-  closed = false;\n-  constructor(url: string) {\n-    super();\n-    this.url = url;\n-    Object.defineProperty(globalThis, '__lastFakeES', {\n-      value: this,\n-      configurable: true,\n-    });\n-  }\n-  emitFrame(env: SseEnvelope): void {\n-    this.dispatchEvent(\n-      new MessageEvent('frame', { data: JSON.stringify(env) }),\n-    );\n-  }\n-  emitOpen(): void {\n-    this.dispatchEvent(new Event('open'));\n-  }\n-  close(): void {\n-    this.closed = true;\n-  }\n-}\n+let streams: ReturnType<typeof fetchSseHarness>;\n+beforeEach(() => {\n+  // Keep main's unavailable-backend behavior for incidental requests; SSE uses\n+  // the authenticated fetch transport with controlled streaming responses.\n+  streams = fetchSseHarness(async () => {\n+    throw new TypeError('Test backend unavailable');\n+  });\n+  vi.stubGlobal('fetch', streams.fetch);\n+});\n+afterEach(() => {\n+  document.body.replaceChildren();\n+  vi.unstubAllGlobals();\n+});\n \n const FAKE_SOURCE = {\n   serviceName: 'head',\n@@ -96,30 +78,12 @@ function occurrence(id: string, attrs: Record<string, unknown>): HealthEvent {\n   };\n }\n \n-async function mount(\n-  apiBase: string,\n-  fakeEs: FakeEventSource | null = null,\n-): Promise<HealthLitView> {\n+async function mount(apiBase: string): Promise<HealthLitView> {\n   const el = document.createElement('jf-health-view') as HealthLitView;\n-  if (apiBase) {\n-    el.apiBase = apiBase;\n-  }\n-  // Inject a fake EventSource constructor only when the test wants\n-  // to drive frames manually. Otherwise the real EventSource is\n-  // attempted (and harmlessly fails in happy-dom).\n-  if (fakeEs) {\n-    const orig = (globalThis as { EventSource?: unknown }).EventSource;\n-    (globalThis as { EventSource?: unknown }).EventSource = function (url: string) {\n-      fakeEs.url = String(url);\n-      return fakeEs;\n-    } as unknown;\n-    document.body.appendChild(el);\n-    await el.updateComplete;\n-    (globalThis as { EventSource?: unknown }).EventSource = orig;\n-  } else {\n-    document.body.appendChild(el);\n-    await el.updateComplete;\n-  }\n+  if (apiBase) el.apiBase = apiBase;\n+  document.body.appendChild(el);\n+  await el.updateComplete;\n+  await flushStreamWork();\n   return el;\n }\n \n@@ -132,16 +96,16 @@ describe('HealthLitView render', () => {\n   });\n \n   it('prefixes health SSE with api-base for Tauri asset origins', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://127.0.0.1:33221', fake);\n+    const el = await mount('http://127.0.0.1:33221');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n     expect(fake.url).toBe('http://127.0.0.1:33221/api/health/events/stream');\n     el.remove();\n   });\n \n   it('snapshot frame populates Conditions list and renders one StatusCard per condition', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n-    fake.emitFrame({\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n+    await fake.emitFrame({\n       streamId: 'health-event/v1',\n       frameKind: 'LIFECYCLE',\n       seq: 1,\n@@ -163,10 +127,10 @@ describe('HealthLitView render', () => {\n   });\n \n   it('condition-added / condition-modified / condition-removed deltas keep state in sync', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n \n-    fake.emitFrame({\n+    await fake.emitFrame({\n       streamId: 'h/v1',\n       frameKind: 'UPDATE',\n       seq: 1,\n@@ -180,7 +144,7 @@ describe('HealthLitView render', () => {\n     await el.updateComplete;\n     expect(el.shadowRoot?.querySelectorAll('jf-status-card').length).toBe(1);\n \n-    fake.emitFrame({\n+    await fake.emitFrame({\n       streamId: 'h/v1',\n       frameKind: 'UPDATE',\n       seq: 2,\n@@ -196,7 +160,7 @@ describe('HealthLitView render', () => {\n     expect(cards?.length).toBe(1);\n     expect(cards?.[0]?.getAttribute('subject')).toBe('SubjAModified');\n \n-    fake.emitFrame({\n+    await fake.emitFrame({\n       streamId: 'h/v1',\n       frameKind: 'UPDATE',\n       seq: 3,\n@@ -214,8 +178,8 @@ describe('HealthLitView render', () => {\n   });\n \n   it('blind-monitor UNKNOWN condition renders calm/info with legible wording (tempdoc 600 Design B)', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n     const blind: HealthEvent = {\n       id: 'monitor.unobservable',\n       timestamp: '2026-05-05T12:00:00Z',\n@@ -230,7 +194,7 @@ describe('HealthLitView render', () => {\n         lastTransitionTime: '2026-05-05T12:00:00Z',\n       },\n     };\n-    fake.emitFrame({\n+    await fake.emitFrame({\n       streamId: 'h/v1',\n       frameKind: 'UPDATE',\n       seq: 1,\n@@ -250,10 +214,10 @@ describe('HealthLitView render', () => {\n   });\n \n   it('occurrence-appended frames render under Recent occurrences', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n     for (let i = 0; i < 3; i++) {\n-      fake.emitFrame({\n+      await fake.emitFrame({\n         streamId: 'h/v1',\n         frameKind: 'UPDATE',\n         seq: i + 1,\n@@ -272,9 +236,9 @@ describe('HealthLitView render', () => {\n   });\n \n   it('reset frame clears local state', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n-    fake.emitFrame({\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n+    await fake.emitFrame({\n       streamId: 'h/v1',\n       frameKind: 'LIFECYCLE',\n       seq: 1,\n@@ -289,7 +253,7 @@ describe('HealthLitView render', () => {\n     await el.updateComplete;\n     expect(el.shadowRoot?.querySelectorAll('jf-status-card').length).toBe(1);\n \n-    fake.emitFrame({\n+    await fake.emitFrame({\n       streamId: 'h/v1',\n       frameKind: 'LIFECYCLE',\n       seq: 2,\n@@ -304,14 +268,14 @@ describe('HealthLitView render', () => {\n   });\n \n   it('connection badge debounces the SSE channel (no flicker to a hard down) — 604 Move B', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n     // 604 — the badge does NOT flip to a hard \"down\" the instant the channel isn't open yet: within\n     // the debounce grace it stays \"Connected\" (info), so a fast self-heal never flickers the badge.\n     let dot = el.shadowRoot?.querySelector('jf-status-dot');\n     expect(dot?.getAttribute('tone')).toBe('info');\n \n-    fake.emitOpen();\n+    await fake.open();\n     await el.updateComplete;\n     dot = el.shadowRoot?.querySelector('jf-status-dot');\n     expect(dot?.getAttribute('tone')).toBe('info');\n@@ -319,9 +283,9 @@ describe('HealthLitView render', () => {\n   });\n \n   it('connection badge shows a soft \"paused\" (warning, not error) when SSE is down but the backend is reachable — 604 Move B', async () => {\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n-    fake.emitOpen();\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n+    await fake.open();\n     await el.updateComplete;\n     // The SSE channel drops and stays down past the debounce window; the /api/status poll still\n     // reports the backend reachable. This test asserts that condition directly rather than relying\n@@ -333,7 +297,7 @@ describe('HealthLitView render', () => {\n     // this test is actually about) without depending on that separate subsystem's startup state.\n     el.backendReachable = true;\n     await el.updateComplete;\n-    fake.dispatchEvent(new Event('error'));\n+    await fake.error();\n     await new Promise((r) => setTimeout(r, 850)); // > DISCONNECT_DEBOUNCE_MS (750)\n     await el.updateComplete;\n     const dot = el.shadowRoot?.querySelector('jf-status-dot');\n@@ -357,9 +321,9 @@ describe('HealthLitView render', () => {\n         message: 'Memory usage above threshold',\n       },\n     };\n-    const fake = new FakeEventSource('test');\n-    const el = await mount('http://test', fake);\n-    fake.emitFrame({\n+    const el = await mount('http://test');\n+    const fake = streams.connections.find((connection) => !connection.closed)!;\n+    await fake.emitFrame({\n       streamId: 'h/v1',\n       frameKind: 'LIFECYCLE',\n       seq: 1,\n"
     },
     {
       "file": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/LocalApiIntegrationTestBase.java",

@@ -165,6 +165,13 @@ public final class WorkerMutationAdmission {
       installed = true;
     }
 
+    /** Stops late callbacks from re-entering an owner whose producers have actually closed. */
+    public void retireCurrentOwner() {
+      requireOpen();
+      if (installed) throw new IllegalStateException("Successor has already been installed");
+      owner = fencedOwner;
+    }
+
     /**
      * Arms the replay certificate before durable pointer publication.
      *

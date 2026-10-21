@@ -42,7 +42,7 @@ To add a **field**:
 5. Verify: `node scripts/lib/tool-invoker.cjs gradle :modules:configuration:test`
 
 ## Add a frontend component
-1. Create in `modules/ui-web/src/components/` or appropriate subdirectory
+1. Create in `modules/ui-web/src/shell-v0/components/` (or `src/shell-v0/views/` for a view)
 2. Follow patterns in neighboring components
 3. Verify: `cd modules/ui-web && npm run typecheck && npm run test:unit:run`
 
@@ -72,7 +72,8 @@ explicitly with `cd modules/ui-web && npm install`, then commit the updated
 - Full unit suite: `node scripts/lib/tool-invoker.cjs gradle test`
 - Frontend unit: `cd modules/ui-web && npm run test:unit:run`
 - Frontend typecheck: `cd modules/ui-web && npm run typecheck`
-- System/integration: `node scripts/lib/tool-invoker.cjs gradle :modules:system-tests:test`
+- Integration: `node scripts/lib/tool-invoker.cjs gradle :modules:system-tests:integrationTest`
+- System (opt-in): `node scripts/lib/tool-invoker.cjs gradle :modules:system-tests:systemTest -PincludeSystemTests=true`
 - Format check: `node scripts/lib/tool-invoker.cjs gradle spotlessCheck`
 - Format fix: `node scripts/lib/tool-invoker.cjs gradle spotlessApply`
 
@@ -161,12 +162,11 @@ The `/api/registry/{operations,resources}` wire is a generated projection of a t
 
 The full worktree mechanics live here.
 
-**Config-file seeding.** `.claude/settings.local.json` and `.mcp.json` are gitignored
-(maintainer-local — they carry a GitHub PAT / a permissive local security posture), **not**
-git-tracked. Whether a new worktree starts with them depends on whether your base checkout had
-them at creation time — don't rely on it. `node scripts/dev/prepare-worktree.cjs` seeds any
-missing one from its committed `.example` file (never overwriting an existing copy), so it is
-always safe to run. `--no-dist` skips the Java dists (FE-only prep). See `MAINTAINING.md`.
+**Config-file seeding.** `.mcp.json` is gitignored and maintainer-local. Do not rely on a new
+worktree already having it. `node scripts/dev/prepare-worktree.cjs` seeds it from the committed
+`.mcp.json.example` when missing and never overwrites an existing copy. It does not seed
+`.claude/settings.local.json`; that file has no committed example. `--no-dist` skips the Java
+dist (FE-only prep). See `MAINTAINING.md`.
 
 **Lifecycle (tempdoc 952).** A worktree is a resource with a registered owner and a durable
 termination obligation. `governance/worktree-lifecycle.v1.json` is the policy (sanctioned root
@@ -175,7 +175,7 @@ command is `node scripts/dev/worktree-lifecycle.cjs`, run from the repository ro
 
 ```powershell
 node scripts/dev/worktree-lifecycle.cjs create <name> [--harness codex] [--prepare]
-node scripts/dev/worktree-lifecycle.cjs register [<path>]            # hooks call this; silent
+node scripts/dev/worktree-lifecycle.cjs register [<path>]            # register an existing worktree; silent
 node scripts/dev/worktree-lifecycle.cjs release <path> [--keep-branch --reason .. --owner .. --review-by YYYY-MM-DD] [--discard-ignored <glob>]
 node scripts/dev/worktree-lifecycle.cjs hold <path|branch> --reason .. --owner .. --review-by YYYY-MM-DD
 node scripts/dev/worktree-lifecycle.cjs status [--lifecycle] [--json]
@@ -184,9 +184,9 @@ node scripts/dev/worktree-lifecycle.cjs reconcile [--execute]         # advisory
 
 Ownership markers live in Git: `git config branch.<name>.justsearch-*` (resource, session,
 harness, created, fork, anchor, released, hold) and the harness's worktree lock as a liveness
-hint. Registration happens on `WorktreeCreate` / `EnterWorktree` through the `worktree-register`
-hook, or by `create`/`register`. A worktree without markers, or outside the sanctioned root, is
-UNMANAGED and never acted on.
+hint. Registration happens through `create`/`register`; the automatic registration hooks were
+retired. Agents entering an existing worktree must register it explicitly. A worktree without
+markers, or outside the sanctioned root, is UNMANAGED and never acted on.
 
 `release` runs the finalization phases, each recorded under `tmp/dev-runner/worktrees/` so a
 crash resumes where it stopped: claim, archive (committed tip to `refs/archive/<resource>/<sha>`;
@@ -194,9 +194,9 @@ tracked, untracked and small ignored working state to `refs/archive/<resource>/s
 through a temporary index; a manifest with blob hashes under `tmp/archive/worktrees/`), verify
 (re-hash), remove (through `remove-worktree.cjs`), retire the branch, done. Ignored files above
 the per-file cap block the release unless named by `--discard-ignored` or matched by a
-declared-disposable glob; archive failure quarantines the resource. The SessionEnd hook
-`worktree-release` releases the session's own worktree: record-only under Claude Code (the
-harness removes after SessionEnd), full `--if-clean` under Codex.
+declared-disposable glob; archive failure quarantines the resource. The automatic SessionEnd
+release hook was retired; agents must invoke `release` explicitly when their worktree is ready
+for finalization.
 
 **Landing receipts.** A branch is retired only on a receipt for its exact head: the merged PR
 whose `headRefOid` equals the head, its squash commit `S`, and
@@ -257,13 +257,14 @@ JUSTSEARCH_SERVER_EXE=F:\JustSearch\modules\ui\native-bin\llama-server\variants\
 
 **Completing an incomplete ORT CUDA native pack (GPU ONNX inference).**
 `OrtCudaHelper.applyOrtNativePackProperty` (tempdoc 772 §J) points ORT at
-`tmp/ort-variant-test/<variant>` only when that dir is COMPLETE — all four DLLs in
-`OrtCudaHelper.ORT_NATIVE_DLL_SET` (`onnxruntime.dll`, `onnxruntime4j_jni.dll`,
-`onnxruntime_providers_shared.dll`, `onnxruntime_providers_cuda.dll`) plus the
+`tmp/ort-variant-test/<variant>` only when that dir is COMPLETE — all four platform-specific libraries from
+`OrtCudaHelper.ortNativeDllSet()` (on Windows: `onnxruntime.dll`, `onnxruntime4j_jni.dll`,
+`onnxruntime_providers_shared.dll`, `onnxruntime_providers_cuda.dll`; Linux names come from the
+native-target contract) plus the
 `ort-native-version.txt` marker. A pre-772 layout carrying only the provider/cuDNN DLLs fails that
 check and ORT silently falls back to CPU, killing GPU inference for every ONNX eval run. To
 complete such a pack, run `node scripts/dev/restage-ort-pack.mjs [<packDir>]` (default packDir
-`tmp/ort-variant-test/cuda-12.4-v1.24.3`): it validates the dir, extracts any missing DLL from the
+`tmp/ort-variant-test/cuda-12.4-v1.24.3`): it validates the dir, extracts any missing native library from the
 gradle-cache `onnxruntime_gpu-<version>.jar` (found under
 `<GRADLE_USER_HOME>/caches/modules-2/files-2.1/com.microsoft.onnxruntime/onnxruntime_gpu/<version>/`,
 version read from `OrtCudaHelper.EXPECTED_ORT_NATIVE_VERSION`), writes the marker, and exits nonzero

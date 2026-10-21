@@ -1,0 +1,59 @@
+--- a/modules/shell/src-tauri/src/linux_process.rs
++++ b/modules/shell/src-tauri/src/linux_process.rs
+@@ -46,14 +46,16 @@
+     Ok((state, ticks))
+ }
+ 
++fn proc_read_error(error: io::Error) -> io::Error {
++    if error.kind() == io::ErrorKind::NotFound && Path::new("/proc/self/stat").is_file() {
++        error
++    } else {
++        io::Error::other(format!("process birth identity unreadable: {error}"))
++    }
++}
++
+ fn birth(pid: u32) -> io::Result<Identity> {
+-    let raw = std::fs::read_to_string(format!("/proc/{pid}/stat")).map_err(|error| {
+-        if error.kind() == io::ErrorKind::NotFound && Path::new("/proc/self/stat").is_file() {
+-            error
+-        } else {
+-            io::Error::other(format!("process birth identity unreadable: {error}"))
+-        }
+-    })?;
++    let raw = std::fs::read_to_string(format!("/proc/{pid}/stat")).map_err(proc_read_error)?;
+     let (state, ticks) = stat(&raw)?;
+     if matches!(state, "Z" | "X" | "x") {
+         return Err(io::Error::new(io::ErrorKind::NotFound, "process ended"));
+@@ -73,18 +75,28 @@
+ }
+ 
+ pub(crate) fn capture(pid: u32) -> io::Result<(Identity, PathBuf)> {
+-    let before = birth(pid)?;
+-    let executable = match std::fs::read_link(format!("/proc/{pid}/exe")) {
++    capture_with(pid, birth, |pid| {
++        std::fs::read_link(format!("/proc/{pid}/exe"))
++    })
++}
++
++fn capture_with(
++    pid: u32,
++    mut read_birth: impl FnMut(u32) -> io::Result<Identity>,
++    mut read_executable: impl FnMut(u32) -> io::Result<PathBuf>,
++) -> io::Result<(Identity, PathBuf)> {
++    let before = read_birth(pid)?;
++    let executable = match read_executable(pid) {
+         Ok(executable) => executable,
+         Err(error) => {
+             // A missing exe link alone is not evidence that the process ended.
+-            birth(pid)?;
++            read_birth(pid)?;
+             return Err(io::Error::other(format!(
+                 "process executable unreadable: {error}"
+             )));
+         }
+     };
+-    let after = birth(pid)?;
++    let after = read_birth(pid)?;
+     if before != after || !executable.is_absolute() {
+         return Err(io::Error::other("process changed during identity read"));
+     }

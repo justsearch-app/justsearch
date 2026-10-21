@@ -12,7 +12,7 @@ probes:
   - adr-0049-engine-port-boundary
   - adr-0049-no-grpc-in-module-builds
   - adr-0049-no-grpc-imports-in-java
-last_reviewed: 2026-09-07
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0049: One Engine JVM, and the process boundaries that survive
@@ -24,6 +24,8 @@ processes) and [ADR-0002](0002-grpc-mmf-hybrid-ipc.md) (historical gRPC + MMF hy
 of the decision this replaces and are marked `superseded`.
 
 Implemented across lane F stage A (tempdoc 936, design `docs/design/lane-f-engine-jvm/design.md`).
+Amended by [ADR-0051](0051-held-process-lifetimes-and-owner-exit-records.md): held process
+lifetimes and owner-recorded exits; chat servers are no longer adopted across Engine restarts.
 
 ## Context
 
@@ -186,3 +188,18 @@ Context above. Live check after item A13: `docs/design/lane-f-engine-jvm/evidenc
 (one JVM, index half READY in 4.7 s, 30 documents ingested and enriched, hybrid search correct; the
 second JVM observed after ingest is the extraction child pool, which is this ADR's surviving
 boundary doing its job).
+
+## Amendment 2026-10-20: current supervision and child lifetime entry points
+
+[ADR-0051](0051-held-process-lifetimes-and-owner-exit-records.md) amends this
+ADR's surviving child boundaries with held lifetimes and owner-recorded exits;
+chat-server adoption across Engine restarts is retired.
+`modules/shell/src-tauri/src/supervisor.rs` holds supervision policy and the
+observation/decision loop; `modules/shell/src-tauri/src/lib.rs` wires it through
+`start_supervision` and `shell_actuator::ShellActuator`. Those symbols supersede the
+2026-09-30 amendment's old numerical ranges.
+`modules/shell/src-tauri/src/containment.rs` binds the Engine to the shell's
+lifetime, while `modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/BoundChildProcess.java`
+and `runtime/containment/LinuxEngineContainment.java` in that module cover
+bound helper launches and Linux Engine containment. The Engine composition
+root remains `modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java`.

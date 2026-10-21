@@ -52,7 +52,7 @@ final class WorkerIngestServiceChunkRegenerationTest extends io.justsearch.adapt
     jobQueue.open();
 
     var layout = new IndexGenerationManager(tempDir.resolve("indexBase")).initializeOrLoad();
-    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(layout.activeGenerationPath()).withExecutorRegistrations(testLuceneExecutors()).open();
+    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(vduCatalog()).atPath(layout.activeGenerationPath()).withExecutorRegistrations(testLuceneExecutors()).open();
 
     IndexingLoop stubLoop = stubIndexingLoop();
     WorkerSignalBus stubBus = new StubWorkerSignalBus();
@@ -108,7 +108,12 @@ final class WorkerIngestServiceChunkRegenerationTest extends io.justsearch.adapt
             .setExtractedContent(content)
             .build();
 
-    UpdateVduResultResponse response = service.updateVduResult(request, CallContext.none());
+    lifecycle.indexingCoordinator().updateDocument(docId,Map.of(SchemaFields.SOURCE_SHA256,"a".repeat(64)));
+    lifecycle.commitOps().commitAndTrack();
+    var base=CallContext.none();var ctx=new CallContext(null,null,null,base.engineContext().withWorkId(java.util.UUID.randomUUID()),base.provenance(),base.childLifetime());
+    String attempt=java.util.UUID.randomUUID().toString();
+    assertTrue(service.markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest.newBuilder().setDocId(docId).setAttemptId(attempt).build(),ctx).getSuccess());
+    UpdateVduResultResponse response = service.updateVduResult(request.toBuilder().setAttemptId(attempt).build(),ctx);
 
     assertNotNull(response);
     assertTrue(response.getSuccess());
@@ -250,5 +255,10 @@ final class WorkerIngestServiceChunkRegenerationTest extends io.justsearch.adapt
 
     @Override
     public void close() {}
+  }  private static FieldCatalogDef vduCatalog() {
+    var fields=new ArrayList<>(FieldCatalogDef.forChunkTestingWithVduRetryCount(0).fields());
+    fields.add(new FieldCatalogDef.FieldDef(SchemaFields.SOURCE_SHA256,"keyword",true,false,List.of(),null,null,false));
+    return new FieldCatalogDef("chunk-vdu-revision",fields);
   }
+
 }

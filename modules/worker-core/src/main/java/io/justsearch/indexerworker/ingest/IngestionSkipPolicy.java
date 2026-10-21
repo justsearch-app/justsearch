@@ -124,7 +124,8 @@ public final class IngestionSkipPolicy {
       if (parent.getFileName() != null
           && isSkippedDirectoryName(parent.getFileName().toString())) return true;
     }
-    return false;
+    return io.justsearch.configuration.excludes.ExclusionPatterns.current()
+        .isExcludedPath(boundary, absolute);
   }
 
   /**

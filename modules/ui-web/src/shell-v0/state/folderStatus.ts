@@ -142,8 +142,8 @@ function count(value: number | null | undefined): number {
  * costume. The displayed percent is correspondingly capped at 99 while work remains.
  */
 interface RootCoverage {
-  /** 0-100, capped at 99 while any document is unsettled. */
-  readonly percent: number;
+  /** Settled coverage, capped at 99 while unsettled; null before any stage settles. */
+  readonly percent: number | null;
   readonly complete: boolean;
 }
 
@@ -188,7 +188,7 @@ function rootCoverage(
   if (total <= 0) return null;
   const complete = settled >= total;
   return {
-    percent: complete ? 100 : Math.min(99, Math.round((settled / total) * 100)),
+    percent: complete ? 100 : settled <= 0 ? null : Math.min(99, Math.round((settled / total) * 100)),
     complete,
   };
 }
@@ -369,7 +369,7 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
       return {
         state: 'enriching',
         glyph: 'pending',
-        metaText: `${collection} · ${fileCountText} · ${ENRICHMENT_CATCHING_UP_CAVEAT} · ${coverage.percent}%${verifiedSuffix}`,
+        metaText: `${collection} · ${fileCountText} · ${ENRICHMENT_CATCHING_UP_CAVEAT}${coverage.percent === null ? '' : ` · ${coverage.percent}%`}${verifiedSuffix}`,
         inFlight,
         failed,
       };

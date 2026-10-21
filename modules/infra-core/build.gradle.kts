@@ -27,7 +27,6 @@ testing {
         implementation(project())
         implementation(platform(libs.junit.bom))
         implementation(libs.junit.jupiter.api)
-        implementation(libs.archunit.junit5)
         runtimeOnly(libs.logback.classic)
         runtimeOnly(libs.junit.jupiter.engine)
         runtimeOnly(libs.junit.platform.launcher)

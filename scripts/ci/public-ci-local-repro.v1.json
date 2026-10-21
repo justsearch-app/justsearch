@@ -1,7 +1,7 @@
 {
   "kind": "justsearch-public-ci-local-repro.v1",
   "version": 1,
-  "note": "Versioned local reproduction inventory for every required public check. local-subset entries are deterministic candidate-side approximations, not substitutes for hosted required checks; hosted-only entries state why no honest local analogue exists.",
+  "note": "Versioned local reproduction inventory for every required public check. local-subset entries are deterministic candidate-side approximations, not substitutes for the full hosted required set on PRs and pushes to main; merge-queue work is governance, build and secrets; hosted-only entries state why no honest local analogue exists.",
   "contexts": [
     {
       "check": "Public claims",
@@ -54,6 +54,8 @@
       "check": "Unit tests (app-ui)",
       "mode": "local-subset",
       "commands": [
+        "npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4",
+        "npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4",
         "node scripts/lib/tool-invoker.cjs gradle :modules:app-agent:test :modules:app-agent-api:test :modules:app-api:test :modules:app-api-tck:test :modules:app-config:test :modules:app-launcher:test :modules:app-observability:test :modules:app-services:test :modules:app-util:test :modules:ui:test -PskipWebBuild=true --console=plain"
       ]
     },

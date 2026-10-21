@@ -14,6 +14,7 @@
  * shape that produced its response.
  */
 
+import { selectIndexingProgress } from '../state/indexingProgress.js';
 import { retrievalFallbackPhrase } from '../aggregate-substrate/strategies/searchTraceExplain.js';
 import { html, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
@@ -83,6 +84,7 @@ import { copyToClipboard } from '../utils/clipboardCopy.js';
 import { whenKnown } from '../state/known.js';
 import {
   readinessNotice,
+  isIndexingObservation,
   reasonFor,
   isReindexCause,
   warrantsSearchDegradationBanner,
@@ -103,6 +105,8 @@ import {
   projectUnifiedThread,
   projectLiveAgentActivity,
   terminalAssistantIds,
+  directionNotAppliedBecause,
+  DIRECTION_QUEUED_NOTE,
   PROMINENCE_SCALE,
   TERMINAL_NODE_WEIGHT,
   type ThreadEvent,
@@ -2570,7 +2574,9 @@ export class UnifiedChatView extends JfElement {
     // not get it (the same verdict's causes are still carried, calmly, by Health). The tier decision
     // lives in the notice authority, beside the wording it gates, not as a local severity test here.
     if (!warrantsSearchDegradationBanner(verdict)) return nothing;
-    const notice = readinessNotice(verdict);
+    const s = this.aiState;
+    const activity = s ? selectIndexingProgress(s.status, s.indexingStatusLive, s.episodeMaxPendingJobs, s.enrichSettleSamples).activity : undefined;
+    const notice = readinessNotice(verdict, activity);
     if (!notice) return nothing;
     // Tempdoc 738 — disclosure decides how much banner. Simple (default) is the one-line pill
     // (headline + remedy, raw causes hidden); Detailed shows the causes. A severe (`error`) verdict
@@ -2591,7 +2597,7 @@ export class UnifiedChatView extends JfElement {
     const causes = dedupDegradationCauses(notice, verdict);
     return html`<jf-system-notice
       tone=${verdictTone(verdict.severity)}
-      live="status"
+      live=${verdict.reasons.some(isIndexingObservation) ? 'off' : 'status'}
       class="degradation-banner"
       data-testid="chat-degradation"
     >
@@ -2638,7 +2644,7 @@ export class UnifiedChatView extends JfElement {
     const count = causes.length;
     return html`<jf-system-notice
       tone=${verdictTone(verdict.severity)}
-      live="status"
+      live=${verdict.reasons.some(isIndexingObservation) ? 'off' : 'status'}
       class="degradation-banner degradation-banner-collapsed"
       data-testid="chat-degradation"
     >
@@ -4154,6 +4160,13 @@ export class UnifiedChatView extends JfElement {
     // consecutive turns ("ok" / "ok") no longer collapse to one.
     const recordedCallIds = new Set<string>();
     const recordedContentCount = new Map<string, number>();
+    // WP6.2 — a direction is durable progress: the record carries it too, under the same directive id.
+    const recordedDirections = new Map<string, number>();
+    recordItems.forEach((it, index) => {
+      if (it.attributes.steer === true && typeof it.attributes.directiveId === 'string') {
+        recordedDirections.set(it.attributes.directiveId, index);
+      }
+    });
     for (const it of recordItems) {
       if (it.kind === 'tool-activity') {
         const cid = typeof it.attributes.callId === 'string' ? it.attributes.callId : it.id;
@@ -4169,6 +4182,30 @@ export class UnifiedChatView extends JfElement {
         const cid = typeof it.attributes.callId === 'string' ? it.attributes.callId : it.id;
         return !recordedCallIds.has(cid);
       }
+      const recorded =
+        typeof it.attributes.directiveId === 'string'
+          ? recordedDirections.get(it.attributes.directiveId)
+          : undefined;
+      if (recorded !== undefined) {
+        // Shown once, at the record's place. A record read before the direction's final outcome
+        // still says queued; the live run already knows what became of it.
+        const record = recordItems[recorded]!;
+        const recordFinal =
+          record.attributes.directiveOutcome !== undefined && record.attributes.directiveOutcome !== 'queued';
+        const liveFinal =
+          it.attributes.directiveOutcome !== undefined && it.attributes.directiveOutcome !== 'queued';
+        if (!recordFinal && liveFinal) {
+          recordItems[recorded] = {
+            ...record,
+            attributes: {
+              ...record.attributes,
+              directiveOutcome: it.attributes.directiveOutcome,
+              directiveReason: it.attributes.directiveReason,
+            },
+          };
+        }
+        return false;
+      }
       if (it.kind === 'user' || it.kind === 'assistant') {
         const k = `${it.kind} ${it.content}`;
         const used = usedContent.get(k) ?? 0;
@@ -4178,7 +4215,7 @@ export class UnifiedChatView extends JfElement {
         }
         return true; // no unused record occurrence remains → keep (e.g. a 2nd identical turn)
       }
-      return true; // progress / handoff / error are ephemeral — never in the record
+      return true; // other progress / handoff / error are ephemeral — never in the record
     });
 
     const ordered = [...recordItems, ...liveOnly].sort(
@@ -5652,6 +5689,7 @@ export class UnifiedChatView extends JfElement {
           ),
           sourceCoverage: readSourceCoverage(it.attributes.claimMatches),
           ...(standalone ? { standaloneQuestion: standalone } : {}),
+          ...(it.attributes.disposition === 'CANCELLED' ? { stopped: true } : {}),
         };
         return this.renderMessage(enriched, idx);
       }
@@ -5685,9 +5723,19 @@ export class UnifiedChatView extends JfElement {
         // Tempdoc 565 §30 — a human STEERING directive (the DIRECTION authority's interject) renders as
         // a distinct human-origin chip, not an ambient agent step, so the user sees their direction land.
         if (it.attributes?.steer === true) {
+          // WP6.2 — an applied direction reads as it always has; one that has not reached the model
+          // (yet, or at all) says so.
+          const outcome = it.attributes.directiveOutcome;
           return html`<div class="steer-directive" data-steer>
             <span class="steer-directive__label">Your direction</span>
             <span class="steer-directive__text">${it.content}</span>
+            ${outcome === 'queued'
+              ? html`<span class="steer-directive__outcome">Queued — ${DIRECTION_QUEUED_NOTE}</span>`
+              : outcome === 'not_applied'
+                ? html`<span class="steer-directive__outcome"
+                    >Not applied — ${directionNotAppliedBecause(it.attributes.directiveReason)}</span
+                  >`
+                : nothing}
           </div>`;
         }
         // Tempdoc 565 §17 — the step's tone/glyph is carried by the <jf-run-node> beside this in the
@@ -5902,6 +5950,8 @@ export class UnifiedChatView extends JfElement {
     const coverageNoteText = m.isExtract
       ? null
       : coverageNote(groundingCoverage(marks, m.content, m.coverage ?? null));
+    // A turn the reader stopped before any text came has no answer to show or to frame.
+    const unanswered = m.stopped === true && m.content.trim() === '';
     return html`
       ${floorDivider}
       <div class="message assistant${inheritedClass}" data-item-id=${m.id ?? nothing} data-msg-idx=${idx}>
@@ -5926,8 +5976,10 @@ export class UnifiedChatView extends JfElement {
         ${/* Search Thread S7 — the transform-shaped "unmissable" warning stays PRE-content (its
             established position abutting the extracted result); every other frame's line is now the
             quiet receipt UNDER the answer. Exactly one of the two ever renders per turn. */ ''}
-        ${frame === 'transform' ? this.renderAnswerFrameLine(frame, degraded, receipt, coverageNoteText) : nothing}
-        ${m.isExtract
+        ${frame === 'transform' && !unanswered ? this.renderAnswerFrameLine(frame, degraded, receipt, coverageNoteText) : nothing}
+        ${unanswered
+          ? nothing
+          : m.isExtract
           ? // Tempdoc 565 §15.B — extract is verbatim text: the ONE renderer in `plain` format.
             html`<jf-markdown-block format="plain" .text=${m.content} frame=${frame}></jf-markdown-block>`
           : (m.claims?.length ?? 0) > 0
@@ -5943,7 +5995,10 @@ export class UnifiedChatView extends JfElement {
               ></jf-markdown-block>`
             : // Tempdoc 565 §15.B — the canonical answer block for every other mode (agent/chat).
               html`<jf-markdown-block .text=${m.content} frame=${frame}></jf-markdown-block>`}
-        ${frame !== 'transform' ? this.renderAnswerFrameLine(frame, degraded, receipt, coverageNoteText) : nothing}
+        ${m.stopped
+          ? html`<div class="turn-stopped" role="note" data-testid="chat-turn-stopped">Stopped by you.</div>`
+          : nothing}
+        ${frame !== 'transform' && !unanswered ? this.renderAnswerFrameLine(frame, degraded, receipt, coverageNoteText) : nothing}
         ${(m.sources?.length ?? 0) > 0 || (m.citations?.length ?? 0) > 0
           ? html`<jf-citations-panel
               .sources=${m.sources ?? []}

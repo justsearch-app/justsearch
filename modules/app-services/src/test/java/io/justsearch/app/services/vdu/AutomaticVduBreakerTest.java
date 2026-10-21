@@ -78,7 +78,7 @@ final class AutomaticVduBreakerTest {
       states.put(id, "PENDING");
       retries.put(id, 0);
     }
-    index = mock(KnowledgeClient.class);
+    index = VduAttemptTestSupport.client();
     when(index.countPendingVdu(any())).thenAnswer(call ->
         (int) states.values().stream().filter("PENDING"::equals).count());
     when(index.queryPendingVduDocIds(any())).thenAnswer(call ->

@@ -1,18 +1,20 @@
 ---
 title: "ADR-0026: Manual-Only CI Triggering"
 type: decision
-status: accepted - narrowed by ADR-0044
-description: "Manual-only workflow policy for the former self-hosted/local-runner model; ADR-0044 now narrows this for the public hosted CI lane."
+status: accepted - narrowed by ADR-0044 and ADR-0052
+description: "Manual-only workflow policy for the former self-hosted/local-runner model; ADR-0044 narrows it for public hosted CI and ADR-0052 schedules CodeQL weekly while keeping manual dispatch."
 date: 2026-04-22
 probes:
   - adr-0026-workflow-triggers-checked
-last_reviewed: 2026-09-05
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0026: Manual-Only CI Triggering
 
 ## Status
-Accepted, narrowed by [ADR-0044](0044-public-hosted-ci-fact-lanes.md).
+Accepted, narrowed by [ADR-0044](0044-public-hosted-ci-fact-lanes.md) and
+[ADR-0052](0052-weekly-codeql-on-hosted-runners.md). CodeQL now runs weekly on Mondays at
+04:17 UTC and remains manually dispatchable; the manual-only security statement below is historical.
 
 ADR-0044 supersedes this ADR for the public repository's standard GitHub-hosted
 `CI` lane: that workflow may run on `pull_request`, `push`, and
@@ -231,3 +233,18 @@ it stays that way, which only a series of runs can answer.
 `ui-proportion-gate` keeps its local-only status and its ADR-0026 citation for
 now: its baseline is pixel geometry, which is far more runner-dependent than
 an axe rule id. That is a separate judgement, not an oversight.
+
+## Amendment 2026-10-20: later exceptions to the all-workflow rule
+
+The 2026-05-08 amendment's requirement that every workflow expose manual
+dispatch is historical. [ADR-0044](0044-public-hosted-ci-fact-lanes.md) permits
+event-driven public hosted checks; `.github/workflows/cla.yml` handles
+`issue_comment`, `pull_request_target` and `merge_group` without
+`workflow_dispatch`.
+
+[ADR-0052](0052-weekly-codeql-on-hosted-runners.md) also narrows item 4 of that
+amendment: `.github/workflows/codeql.yml` declares `schedule: '17 4 * * 1'` as
+well as `workflow_dispatch`, on hosted runners. Self-hosted workstation workflows
+remain manual. Use `scripts/ci/workflow-signal-policy.v1.json` and its trigger
+check for the per-workflow posture rather than reinstating the historical
+repository-wide ban.

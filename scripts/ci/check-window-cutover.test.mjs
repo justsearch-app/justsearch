@@ -1,10 +1,9 @@
 /**
  * Tests for the window-cutover forcing function (scripts/ci/check-window-cutover.mjs).
  *
- * A dated gate is the easy thing to ship inert: it passes on the day it lands and nobody sees the
- * branch that matters until the deadline arrives. These exercise the BITE — the reappearance fail,
- * both sides of the deadline, and each half of "complete" alone failing to close it — plus the
- * degenerate cases (a commented-out registration; a missing CorePlugin) that must not pass silently.
+ * Incomplete promotion stays report-only before, on and after the former deadline. Retirement
+ * and unreadable-registration guards still fail at every date, and neither comments nor a
+ * neighbouring registration can satisfy the audience check.
  *
  * Run: `node scripts/ci/check-window-cutover.test.mjs` (exits non-zero on failure)
  */
@@ -12,6 +11,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import {
   run,
@@ -20,7 +21,6 @@ import {
   RETIRED_WINDOW_DIR,
   CORE_PLUGIN_FILE,
   CUTOVER_MARKER_FILE,
-  DEADLINE,
 } from './check-window-cutover.mjs';
 
 let passed = 0;
@@ -60,6 +60,8 @@ export const CORE_SURFACES = [
 /** A fixture repo: CorePlugin source, plus optional marker file and revived window directory. */
 function makeFixture({ pluginSource = plugin('DEVELOPER'), marker = false, revived = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'window-cutover-gate-'));
+  // Keep CLI repository discovery inside the fixture even when TMPDIR is inside a checkout.
+  fs.mkdirSync(path.join(root, '.git'));
   if (pluginSource !== null) {
     const pluginPath = path.join(root, CORE_PLUGIN_FILE);
     fs.mkdirSync(path.dirname(pluginPath), { recursive: true });
@@ -74,10 +76,8 @@ function makeFixture({ pluginSource = plugin('DEVELOPER'), marker = false, reviv
   return root;
 }
 
-// Derived from DEADLINE so a moved deadline keeps testing its own boundary: the day before WARNS,
-// the deadline day itself FAILS ("on or after").
-const BEFORE = new Date(Date.parse(`${DEADLINE}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
-const AFTER = DEADLINE;
+const DATES = ['2026-11-29', '2026-11-30', '2026-12-01'];
+const checker = fileURLToPath(new URL('./check-window-cutover.mjs', import.meta.url));
 
 // --- audience parsing ------------------------------------------------------
 ok(
@@ -107,55 +107,51 @@ ok(
   ) === 'DEVELOPER',
 );
 
-// --- (a) reappearance ------------------------------------------------------
-{
-  const root = makeFixture({ pluginSource: plugin('USER'), marker: true, revived: true });
-  const { errors } = run(root, BEFORE);
-  ok(
-    'a revived search-v2 directory FAILS even before the deadline, and even when v3 is promoted',
-    errors.length === 1 && errors[0].includes(RETIRED_WINDOW_DIR),
-  );
-}
-
-// --- (b) deadline ----------------------------------------------------------
-{
-  const root = makeFixture();
-  const before = run(root, BEFORE);
-  const after = run(root, AFTER);
-  ok('an incomplete promotion WARNS before the deadline', before.errors.length === 0 && before.warnings.length === 1);
-  ok('the warning names the deadline', before.warnings[0].includes(DEADLINE));
-  ok('the same state FAILS on/after the deadline', after.errors.length === 1 && after.warnings.length === 0);
-  ok('the failure names the owner decision date', after.errors[0].includes('2026-08-19'));
-}
-{
-  const root = makeFixture({ pluginSource: plugin('USER'), marker: true });
-  ok(
-    'a complete promotion passes on both sides of the deadline',
-    run(root, BEFORE).errors.length === 0
-      && run(root, BEFORE).warnings.length === 0
-      && run(root, AFTER).errors.length === 0,
-  );
-}
-{
-  const usrOnly = makeFixture({ pluginSource: plugin('USER'), marker: false });
-  const markerOnly = makeFixture({ pluginSource: plugin('DEVELOPER'), marker: true });
-  ok('USER audience alone does not close the gate', run(usrOnly, AFTER).errors.length === 1);
-  ok('the marker alone does not close the gate', run(markerOnly, AFTER).errors.length === 1);
-  ok(
-    'each single-condition failure names the condition still missing',
-    run(usrOnly, AFTER).errors[0].includes(CUTOVER_MARKER_FILE)
-      && run(markerOnly, AFTER).errors[0].includes('not USER'),
-  );
-}
-
-// --- degenerate ------------------------------------------------------------
-{
-  const root = makeFixture({ pluginSource: null, marker: true });
-  const { errors } = run(root, BEFORE);
-  ok(
-    'a missing CorePlugin FAILS rather than passing silently',
-    errors.length === 1 && errors[0].includes(CORE_PLUGIN_FILE),
-  );
+// --- promotion and hard guards, including the actual CLI at every date ------
+const cases = [
+  { label: 'neither completion condition', options: {}, warnings: 1,
+    detail: ['not USER', CUTOVER_MARKER_FILE, '2026-08-19'] },
+  { label: 'USER audience only', options: { pluginSource: plugin('USER') }, warnings: 1,
+    detail: [CUTOVER_MARKER_FILE] },
+  { label: 'marker only', options: { marker: true }, warnings: 1, detail: ['not USER'] },
+  { label: 'both completion conditions', options: { pluginSource: plugin('USER'), marker: true } },
+  { label: 'restored search-v2 despite complete promotion',
+    options: { pluginSource: plugin('USER'), marker: true, revived: true }, errors: 1,
+    detail: [RETIRED_WINDOW_DIR] },
+  { label: 'missing CorePlugin despite marker', options: { pluginSource: null, marker: true },
+    errors: 1, detail: [CORE_PLUGIN_FILE] },
+  { label: 'missing successor registration despite USER neighbour and marker',
+    options: { pluginSource: plugin('USER').replace('core.search-v3-surface', 'core.other-surface'), marker: true },
+    errors: 1, detail: [CORE_PLUGIN_FILE, 'registration'] },
+  { label: 'unparseable successor audience despite USER neighbour and marker',
+    options: { pluginSource: plugin('DYNAMIC').replace("audience: 'DYNAMIC',", 'audience: getAudience(),'), marker: true },
+    errors: 1, detail: [CORE_PLUGIN_FILE, 'registration'] },
+  { label: 'line-commented successor despite USER neighbour and marker',
+    options: { pluginSource: "// id: 'core.search-v3-surface', audience: 'USER'\n"
+      + plugin('USER').replace('core.search-v3-surface', 'core.other-surface'), marker: true },
+    errors: 1, detail: [CORE_PLUGIN_FILE, 'registration'] },
+  { label: 'block-commented successor despite USER neighbour and marker',
+    options: { pluginSource: "/* id: 'core.search-v3-surface', audience: 'USER' */\n"
+      + plugin('USER').replace('core.search-v3-surface', 'core.other-surface'), marker: true },
+    errors: 1, detail: [CORE_PLUGIN_FILE, 'registration'] },
+];
+for (const scenario of cases) {
+  const root = makeFixture(scenario.options);
+  try {
+    for (const now of DATES) {
+      const label = `${scenario.label} on ${now}`;
+      const result = run(root, now);
+      ok(`${label}: errors`, result.errors.length === (scenario.errors ?? 0));
+      ok(`${label}: warnings`, result.warnings.length === (scenario.warnings ?? 0));
+      ok(`${label}: diagnostic names the relevant condition`,
+        (scenario.detail ?? []).every((part) => [...result.errors, ...result.warnings].join('\n').includes(part)));
+      const cli = spawnSync(process.execPath, [checker, '--now', now], { cwd: root, encoding: 'utf8' });
+      ok(`${label}: CLI exit status`, cli.status === (scenario.errors ? 1 : 0));
+      ok(`${label}: CLI warning visibility`, cli.stderr.includes('check-window-cutover: WARN') === Boolean(scenario.warnings));
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 }
 
 // --- date resolution -------------------------------------------------------

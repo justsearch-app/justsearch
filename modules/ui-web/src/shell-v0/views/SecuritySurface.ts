@@ -20,6 +20,7 @@ import { subscribeAiState, refreshStatusNow, type StatusSnapshot } from '../stat
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { renderAtRestCard, atRestCardStyles } from './security/atRestCard.js';
 import '../components/Button.js';
+import '../components/SystemNotice.js';
 
 export class SecuritySurface extends JfElement {
   static properties = {
@@ -27,6 +28,7 @@ export class SecuritySurface extends JfElement {
     encState: { state: true },
     encRecoveryKey: { state: true },
     encError: { state: true },
+    encWarning: { state: true },
     encBusy: { state: true },
     encAwaitingRecoverySave: { state: true },
     encShowChangePass: { state: true },
@@ -39,6 +41,7 @@ export class SecuritySurface extends JfElement {
   // encRecoveryUnsaved is NOT here — it is localStorage-backed and must survive navigation (Fix 3).
   static transientState = {
     encError: null,
+    encWarning: null,
     encBusy: false,
     encShowChangePass: false,
     encShowImport: false,
@@ -52,6 +55,7 @@ export class SecuritySurface extends JfElement {
   declare encState: string; // unknown | not_configured | locked | unlocked
   declare encRecoveryKey: string | null;
   declare encError: string | null;
+  declare encWarning: string | null;
   declare encBusy: boolean;
   declare encAwaitingRecoverySave: boolean;
   declare encShowChangePass: boolean;
@@ -68,6 +72,7 @@ export class SecuritySurface extends JfElement {
     this.encState = 'unknown';
     this.encRecoveryKey = null;
     this.encError = null;
+    this.encWarning = null;
     this.encBusy = false;
     this.encAwaitingRecoverySave = false;
     this.encShowChangePass = false;
@@ -110,7 +115,9 @@ export class SecuritySurface extends JfElement {
     try {
       const res = await this.doFetch('/api/conversations/encryption');
       if (res.ok) {
-        this.encState = ((await res.json()) as { state?: string }).state ?? 'unknown';
+        const data = (await res.json()) as { state?: string; warning?: string };
+        this.encState = data.state ?? 'unknown';
+        this.encWarning = data.warning ?? null;
       }
     } catch {
       /* leave as unknown */
@@ -134,12 +141,13 @@ export class SecuritySurface extends JfElement {
     this.encBusy = true;
     try {
       const res = await this.encPost('setup', { passphrase });
-      const data = (await res.json()) as { state?: string; recoveryKey?: string; error?: string };
+      const data = (await res.json()) as { state?: string; recoveryKey?: string; error?: string; warning?: string };
       if (!res.ok) {
         this.encError = data.error ?? 'Setup failed.';
         return;
       }
       this.encState = data.state ?? 'unlocked';
+      this.encWarning = data.warning ?? null;
       this.encRecoveryKey = data.recoveryKey ?? null;
       // Tempdoc 629 (#4): enter the REQUIRED recovery-save gate — setup is not "done" in the UI until
       // the user acknowledges they saved the key (Apple-ADP gating). The key can never be re-shown.
@@ -159,12 +167,13 @@ export class SecuritySurface extends JfElement {
     this.encBusy = true;
     try {
       const res = await this.encPost('regenerate-recovery', {});
-      const data = (await res.json()) as { recoveryKey?: string; error?: string };
+      const data = (await res.json()) as { recoveryKey?: string; error?: string; warning?: string };
       if (!res.ok) {
         this.encError = data.error ?? 'Could not regenerate the recovery key.';
         return;
       }
       this.encRecoveryKey = data.recoveryKey ?? null;
+      this.encWarning = data.warning ?? null;
       this.encAwaitingRecoverySave = this.encRecoveryKey != null;
       if (this.encRecoveryKey != null) {
         this.encRecoveryUnsaved = true;
@@ -187,12 +196,13 @@ export class SecuritySurface extends JfElement {
         oldPassphrase: oldPass,
         newPassphrase: newPass,
       });
-      const data = (await res.json()) as { state?: string; error?: string };
+      const data = (await res.json()) as { state?: string; error?: string; warning?: string };
       if (!res.ok) {
         this.encError = data.error ?? 'Could not change the passphrase.';
         return;
       }
       this.encState = data.state ?? 'unlocked';
+      this.encWarning = data.warning ?? null;
       this.encShowChangePass = false;
     } finally {
       this.encBusy = false;
@@ -322,22 +332,30 @@ export class SecuritySurface extends JfElement {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ container, passphrase }),
       });
-      const data = (await res.json()) as { restored?: Record<string, number>; error?: string };
+      const data = (await res.json()) as { restored?: Record<string, number>; skipped?: number; error?: string };
       if (!res.ok) {
         this.encError = data.error ?? 'Could not restore the backup.';
         return;
       }
       const restored = data.restored ?? {};
       const total = Object.values(restored).reduce((a, b) => a + (b || 0), 0);
+      const skipped = data.skipped ?? 0;
       this.encImportSummary =
         total === 0
-          ? 'Nothing new to restore (everything in the backup already exists here).'
+          ? skipped > 0
+            ? 'Nothing new to restore.'
+            : 'Nothing new to restore (everything in the backup already exists here).'
           : 'Restored ' +
             Object.entries(restored)
               .filter(([, v]) => (v || 0) > 0)
               .map(([k, v]) => `${v} ${k}`)
               .join(', ') +
             '.';
+      if (skipped > 0) {
+        this.encImportSummary += skipped === 1
+          ? ' Skipped 1 entry with an invalid id.'
+          : ` Skipped ${skipped} entries with invalid ids.`;
+      }
       this.encShowImport = false;
     } catch {
       this.encError = 'Could not restore the backup.';
@@ -537,6 +555,9 @@ export class SecuritySurface extends JfElement {
       <div class="section">
         <h3>${icon({ name: 'shield', size: 12 })} Chat encryption</h3>
         ${body}
+        ${this.encWarning
+          ? html`<jf-system-notice tone="warning" live="polite">${this.encWarning}</jf-system-notice>`
+          : nothing}
         ${this.encError
           ? html`<p class="help" style="color:var(--text-danger); margin-top:0.5rem">${this.encError}</p>`
           : nothing}

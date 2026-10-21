@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T02:31:50.142Z",
+  "revision": "a3bc6335e5cc29213b9dcacfde8f98315d80fe06",
+  "tree": "017bc893dedffdb2f754560e1812c2b5dc22759d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/tmp/test-intent-vitest-32873-1792463491492.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 9003
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps an honest refusal after context recovers and the composer becomes \"\" (X20)",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:64fd5b5090a476e0349e6c5080f3f7110faeb11d425ab32f90dd2c227558cd11",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps an honest refusal after context recovers and the composer becomes \"\" (X20)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps an honest refusal after context recovers and the composer becomes \"A different draft\" (X20)",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:64fd5b5090a476e0349e6c5080f3f7110faeb11d425ab32f90dd2c227558cd11",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps an honest refusal after context recovers and the composer becomes \"A different draft\" (X20)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends in another conversation while the first question waits for context (X28)",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:64fd5b5090a476e0349e6c5080f3f7110faeb11d425ab32f90dd2c227558cd11",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) sends in another conversation while the first question waits for context (X28)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a3bc6335e",
+    "revision": "a3bc6335e5cc29213b9dcacfde8f98315d80fe06",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/tmp/test-intent-vitest-32873-1792463501978.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7917,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/tmp/test-intent-vitest-32873-1792463501978.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps an honest refusal after context recovers and the composer becomes \"\" (X20)",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps an honest refusal after context recovers and the composer becomes \"\" (X20):  AssertionError: expected 'Question not sent. Your draft is kept…' not to contain 'Your draft is kept'\n    at /home/elias/.cache/agent-method/sessions/agent-session-17dlahpe/tmp/test-intent-before-6U9SE4/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1677:28\n    at file:///h"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps an honest refusal after context recovers and the composer becomes \"A different draft\" (X20)",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps an honest refusal after context recovers and the composer becomes \"A different draft\" (X20):  AssertionError: expected 'Question not sent. Your draft is kept…' not to contain 'Your draft is kept'\n    at /home/elias/.cache/agent-method/sessions/agent-session-17dlahpe/tmp/test-intent-before-6U9SE4/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1677:28\n    at file:///h"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#sends in another conversation while the first question waits for context (X28)",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) sends in another conversation while the first question waits for context (X28):  AssertionError: expected [] to deeply equal [ ObjectContaining{…} ]\n    at /home/elias/.cache/agent-method/sessions/agent-session-17dlahpe/tmp/test-intent-before-6U9SE4/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1728:81\n    at file:///home/elias/dev/justsearch/.claude/w"
+      }
+    ]
+  },
+  "digest": "sha256:a39579ce7dfe54919dd8ae3179b03884f1ac82fbfdfe54dab9f555b8a0faefa4"
+}

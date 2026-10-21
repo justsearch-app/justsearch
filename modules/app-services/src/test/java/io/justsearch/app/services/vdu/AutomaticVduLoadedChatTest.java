@@ -103,7 +103,7 @@ final class AutomaticVduLoadedChatTest {
     service = new OnlineAiServiceImpl(admission, manager);
     var processor = new VduProcessor(service, manager.chatHolds(), service,
         new TempFileManager(directory.resolve("images")), new ImagePreparer(), VduMetricCatalog.noop());
-    KnowledgeClient index = mock(KnowledgeClient.class);
+    KnowledgeClient index = VduAttemptTestSupport.client();
     for (int i = 0; i < 3; i++) documents.add(image("document-" + i + ".png").toString());
     when(index.countPendingVdu(any())).thenAnswer(call -> documents.size() - acknowledged.get());
     when(index.queryPendingVduDocIds(any())).thenAnswer(call -> List.copyOf(documents));

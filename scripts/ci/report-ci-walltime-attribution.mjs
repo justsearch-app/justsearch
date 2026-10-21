@@ -186,7 +186,10 @@ export function buildWalltimeReport({ run = {}, jobs = [], selfJob = null, suite
   };
   const warnings = missing.map((name) => `required job missing or incomplete: ${name}`);
   for (const job of jobReports) {
-    if (UNIT_LANE_JOB.test(job.name) && job.name !== 'Unit tests (app-ui)' && !job.components) {
+    const raw = jobs.find((j) => (j.name || '<job>') === job.name);
+    const skipped = job.conclusion === 'skipped' || (Array.isArray(raw?.steps) && raw.steps.length > 0 && raw.steps.every((step) =>
+      step.conclusion === 'skipped' || /^(Set up job|Complete job)$/.test(step.name)));
+    if (!skipped && UNIT_LANE_JOB.test(job.name) && job.name !== 'Unit tests (app-ui)' && !job.components) {
       warnings.push(`unit attribution missing for ${job.name}`);
     }
   }
@@ -364,7 +367,7 @@ function splitJsonDocuments(text) {
 
 // Merge `gh api .../jobs --paginate` output into a single { jobs: [...] }. Pure +
 // exported so the paging logic is unit-tested while the gh shell-out stays thin,
-// untested I/O (mirrors workflow-signal-health.mjs).
+// untested I/O.
 export function mergePaginatedJobs(text) {
   const jobs = [];
   for (const doc of splitJsonDocuments(String(text || ''))) {

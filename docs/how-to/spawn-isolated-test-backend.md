@@ -102,7 +102,7 @@ For tests that ingest a corpus and then need to know it landed, prefer polling `
 
 Pass `-DisolatedBackend.preserveLogs=true` to keep `backend.log` and the
 `app.log` / `engine.log` plus any crash reports under
-`%TEMP%/isolated-backend-*` after the fixture stops; without the flag,
+the JVM temp directory (`%TEMP%` on Windows, typically `/tmp` on Linux), under `isolated-backend-*` after the fixture stops; without the flag,
 logs are dumped to stderr only on startup failure.
 
 ## Manual smoke test
@@ -121,7 +121,6 @@ and `/api/knowledge/search` endpoints all work normally.
 
 ## References
 
-- Plan: `C:\Users\<user>\.claude\plans\snazzy-soaring-sonnet.md` §"Slice T6.1"
 - Tempdoc 419 (unused user-agent capability discovery)
 - ADR-0028 (related — the resolver works in lite mode): `docs/decisions/0028-scoped-reverse-path-lookup.md`
 - EnvRegistry entry: `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`

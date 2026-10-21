@@ -5,6 +5,238 @@ This audit repair starts at `b79707136`. The earlier acceptance and rejection re
 remain byte-for-byte unchanged under the changeset's acceptance heading. Their digest
 predates this repair; this author appends no review record.
 
+## Main merge: 2026-10-21
+
+Merged origin/main `f6d92d768f86d778ea805012b176c3349705018c` as the sole new
+commit `734f9f25b` (`Merge origin/main into worktree-token-bootstrap`). Changeset,
+assertion inventory, fresh preservation receipts and this section are later,
+uncommitted author edits. Every pre-existing acceptance/audit record remains
+byte-for-byte unchanged. This section supersedes earlier base references below.
+
+Conflict resolutions (one hunk per file):
+
+- ADR-0046: retain this branch's three additional probes. Main's stable status,
+  last-reviewed date and current-entry-point amendment remain; the amendment now
+  names the sixth, owner-only-file control and the authenticated non-public boundary.
+  Source pointers were checked against the merged code: LocalApiServer.java:620,
+  ApiSecurityFilters.java:167 and HeadlessApp.java:505. The same-user residual is
+  the last adversary in the expanded list, rather than the old third item.
+- Headless runtime guide: combine main's actual printed-port variable with this
+  branch's session header in the install-plan-preview command. Keep main's Linux
+  desktop data-folder explanation and all manifest-only credential instructions.
+- route-manifest.snapshot.json and reference-client-openapi.snapshot.json: no manual
+  JSON merge. Both are replaced by `scripts/codegen/gen-api-client.mjs --from-live`
+  from a fresh, installed production Engine; that generator also writes apiRoutes.ts.
+  It records 252 routes and matching digest
+  `sha256:a0deb6b7865b0038433d3714fd26c08c87a69f4bd611fd87a65b9904840e6558`.
+  Comparing method/path sets with main's snapshot (253 routes), the only removed
+  identity is `GET /api/mcp/token`; no main route is lost otherwise.
+
+The live capture starts the installed native launcher with justsearch.prod=true,
+isolated JUSTSEARCH_HOME and JUSTSEARCH_DATA_DIR, mode mcp-lite and a free port.
+It reads the canonical manifest privately, matches its root pid and the unauthenticated
+/api/runtime/live pid/instanceId before supplying the header to the generator.
+Neither snapshot contains the credential or bootstrap route. Both owned Engine PIDs
+were stopped (2610164 and 2622374). The first temporary capture helper used the wrong
+pid location (head.pid) and exited 1; after checking RuntimeManifest's root pid field,
+the corrected helper and generator exited 0. No product fix or weakened check was needed.
+No live credential was printed.
+
+Checks observed:
+
+- `:modules:ui:installDist` and selected `:modules:ui:test` classes plus
+  `:modules:system-tests:integrationTest --tests io.justsearch.systemtests.ProductionRouteTokenWalkTest`
+  under `js-gradle-slot ./gradlew`: exit 0. 66 selected unit cases and one installed
+  production walk passed, none skipped. Classes: ApiSecurityFiltersTest (6),
+  McpOriginValidationTest (38, both modes), LocalApiUiTokenPolicyTest (11),
+  ProductionRouteTokenBoundaryTest (2), RouteManifestControllerTest (3),
+  HeadlessTokenOutputTest (2), HeadlessLauncherProductionModeTest (2),
+  RuntimeManifestCredentialBoundaryTest (2). An additional mistaken OpenApiProjectionTest
+  filter matched no class; no projection execution is claimed from that first call.
+  The actual renderer/exporter/projection classes are selected in the separate
+  snapshot verification command. JAVA_TOOL_OPTIONS is unset; the temporary init
+  script keeps Test java.io.tmpdir and both Engine home variables in this task's
+  sandbox, and JAVA_OPTS sets the Gradle client's temporary directory there too.
+- Snapshot verification under `js-gradle-slot ./gradlew` exited 0 after waiting
+  for its default slot: `:modules:ui:generateReferenceClientOpenApiSnapshot
+  -PreferenceClientOpenApiCheck=true` reported "reference-client OpenAPI snapshot up
+  to date". The same invocation ran the actual OpenApiRendererTest,
+  OpenApiSnapshotExporterTest and SdkOpenApiProjectionTest classes: 17 passed,
+  none failed or skipped. This is the same task and property invoked by the CI
+  check-reference-client-openapi-regen wrapper, run through the required slot helper.
+- `npm run typecheck` in ui-web: exit 0.
+- `node scripts/codegen/gen-api-client.mjs --check`: exit 0, apiRoutes.ts up to date.
+- `node scripts/ci/check-install-api-contract.mjs`: exit 0.
+- `node scripts/ci/pack-mcpb.mjs --sync`: exit 0, no hash change needed.
+  `check-mcpb-consistency.mjs`: exit 0. Packer tests: 28 assertions passed;
+  MCPB consistency self-test: 13 passed; install-contract self-test: 9 passed;
+  API capture-generator self-test: all 13 checks passed.
+- Four web token files (http, authorizedFetch, AuthenticatedCatalogs,
+  AuthenticatedStream), `npx vitest run ... --maxWorkers=4`: 50 passed, exit 0.
+- Discovery and production/dev MCP ingest Node tests: 33 passed, one existing
+  Windows-known-folder test skipped, zero failures, exit 0. TMPDIR is outside the
+  checkout at /home/elias/.cache/justsearch-token-builder/main-20261021, as required
+  for the bridge test environment. Windows execution is not claimed.
+- `npm --prefix packages/runtime-client test`: build and all ten SDK tests passed,
+  exit 0, none skipped.
+- Docs gates passed: frontend-stack claims, model freshness, privacy claims,
+  canonical links, markdownlint canonical docs, docs-validate and adr-coverage.
+  llmstxt --check initially exited 1 for the merged ADR description; the repository
+  generator updated docs/llms.txt and its repeated --check exited 0.
+- `git diff --check origin/main`: exit 0. The pre-merge `--cached --check` against
+  the old first parent reported whitespace in incoming evidence .patch context lines;
+  these files are unchanged from main and were not rewritten.
+
+Fresh preservation evidence is produced by the repository's D4 runner, never edited
+as JSON: token-bootstrap-main-20261021-web.json records eight adapted candidate
+fixtures at 734f9f25b (100 passed), and token-bootstrap-main-20261021-base-preservation.json
+records the same eight original paths, unmodified, in a detached shared clone of
+f6d92d768 (100 passed). Copied node_modules prevent writes through dependency links.
+The current adaptation inventory uses f6d92d768 and embeds those two receipts plus
+the unchanged engine repair receipt. All 229 original web assertion calls survive,
+including 17 transport observation substitutions; none is unmatched. The same three
+pre-existing additional instrumentation assertions (two web, one Java) remain.
+No test or assertion is added, removed or rewritten by this merge.
+
+The gate covers all 19 flagged items, with five isolated new test exemptions and no
+uncovered items. After this metadata/evidence update, `cli.mjs --pr 825` exits 1 solely
+for acceptance-stale; PR #825 still requires its separate audit after acceptance.
+No author record is appended. The advisory reconsider warning is now one third-reviewer
+tie-break among eight audited PRs (12.5%); it does not fail the gate. Earlier warning
+numbers below are historical.
+
+## Base merge: 2026-10-20
+
+Merged `origin/worktree-headless-prod` (`fe3753d37e585f35c61ae5f1488a909739d4b47c`)
+as merge commit `63bcd183c720e6f72954fb91d7bcc235d640ffc8`, with the requested
+message and trailers. Local `origin/main` merge-base is now
+`f003a5c6476776ed2e56d9e0882f8bbaf55fc731`. This section supersedes the old
+base/fixture execution references below; historical security fail-before receipts
+retain their original revisions. Author session remains
+`01a15693-314a-7240-ad93-9b6f8c3969e5`. No new acceptance or audit record is authored.
+
+All three conflict hunks were resolved as follows:
+
+1. ResourceView.render.test.ts, import/fetch-isolation hunk: retain the branch's
+   fetchSseHarness/flushStreamWork path and give its non-SSE fallback main's
+   `TypeError('Test backend unavailable')`. Global fetch is restored after each case.
+   There is no native EventSource stub; the product's authenticated fetch SSE runs.
+2. HealthLitView.test.ts, import/fetch-isolation hunk: retain the same fetch-stream
+   harness and asynchronous frame delivery, adding main's rejecting non-SSE fallback.
+   Global fetch restoration and stream teardown remain after each case.
+3. packaging/mcpb/manifest.json, version/description hunk: version 0.3.1 from this
+   branch; description and long_description (including all egress disclosures) from
+   the incoming base. The remainder matches the incoming base.
+
+The headless runtime guide merged automatically. It retains incoming desktop/headless
+data-root guidance and this branch's owner-only manifest/header authentication,
+six public reads, protected streams, absent bootstrap/stdout token, explicit-port
+environment variable, and authenticated plan-preview example. No conflict hunk occurred
+in that file.
+
+Main added no cases or behavioral assertions in either conflicted test file; its change
+was incidental-fetch isolation. All eight ResourceView and ten HealthLitView cases,
+and their 35 assertion calls, survive. The merge changes no assertion. Relative to the
+new base the existing transport mappings remain: `NoopEventSource.urls` becomes
+`streams.connections.map((connection) => connection.url)` for both ResourceView URL
+assertions; every expected URL is unchanged. HealthLitView's 22 assertions are identical.
+The new-base static audit inventories all eight adapted web fixtures: 229 original
+assertions retained, 17 transport observations remapped, two additional readiness/
+no-connection instrumentation assertions, none lost. Java assertion inventories also
+retain every surviving old assertion (bootstrap removal is documented separately).
+
+Fresh D4 receipts, written by the repository producer without manual JSON edits:
+
+- `token-bootstrap-merged-web.json`: candidate 63bcd183c, eight adapted files,
+  100 cases passed, none failed/skipped; producer exit 0.
+- `token-bootstrap-merged-base-preservation.json`: unmodified original tests from
+  a detached shared clone at fe3753d37, the same eight paths, 100 passed, none
+  failed/skipped; producer exit 0. No candidate test or production overlay.
+- `token-bootstrap-adaptation-audit.json`: regenerated with fe3753d37 as baseline,
+  embeds both receipts plus the unchanged engine repair receipt and full source diffs.
+  This inventory is static evidence, not a D4 producer.
+
+Both D4 web runs used TMPDIR under `tmp/builder/token-base-merge`, the existing
+execution adapter's installed Vitest CLI, and `--maxWorkers=4`. The base dependencies
+were copied (not linked) from installed node_modules; the shared clone is removed
+when done. The producer commands are recorded verbatim in each receipt. Prior security
+fail-before evidence remains applicable: the checked test sources did not change in
+this merge, and both the new base and current parent already include the security fix.
+
+Affected check results observed after resolving the merge:
+
+- Complete union of ui-web test paths touched on either side since 8f49bdc3a:
+  39 files, 909 cases passed, zero failures or skips; `npx vitest run <paths below>
+  --maxWorkers=4` exited 0. Paths with .spec names were also checked; none omitted.
+- `npm run lint` exited 0; `npm run typecheck` exited 0.
+- `js-gradle-slot ./gradlew :modules:ui:test --tests io.justsearch.ui.api.McpOriginValidationTest
+  --tests io.justsearch.ui.HeadlessTokenOutputTest
+  --tests io.justsearch.ui.api.ProductionRouteTokenBoundaryTest
+  :modules:system-tests:integrationTest
+  --tests io.justsearch.systemtests.ProductionRouteTokenWalkTest -PskipWebBuild=true
+  --console=plain --init-script <temporary java-policy.init.gradle>` exited 0:
+  38 Origin cases (19 dev plus 19 production), two output cases, two unit route-boundary
+  cases, one installed production route walk; 43 passed, none skipped. The init script
+  uses the existing adapter's Java policy verbatim, placing java.io.tmpdir, JUSTSEARCH_HOME
+  and JUSTSEARCH_DATA_DIR under the supplied task sandbox. JAVA_TOOL_OPTIONS was unset;
+  JAVA_OPTS places the Gradle client temporary directory there too. No Java source changed,
+  so no formatting edit was needed.
+- The first Gradle invocation exited 1 because its installed-walk filter mistakenly used
+  `io.justsearch.system.ProductionRouteTokenWalkTest`: no tests matched. The corrected
+  package is `io.justsearch.systemtests`; the corrected run above passed.
+
+Only the merge itself was committed. This changeset and subsequent evidence/notes edits
+remain uncommitted. Existing token-bootstrap acceptance and audit records were compared
+byte-for-byte with the pre-merge suffix and are unchanged. The gate is checked both with
+its default local base (`--pr 825`) and the actual PR base (`--base origin/worktree-headless-prod
+--pr 825`). Only independent acceptance on the new digest and its distinct PR #825 audit
+remain. The non-blocking reconsider warning still reports four disagreements among four
+audited PRs (100%); this author supplies no verdict.
+
+Affected Vitest paths (relative to modules/ui-web):
+
+```
+src/__test-setup__/dynamicImportLifetime.test.ts
+src/activity/idleSurfaces.test.ts
+src/api/contract/contractEventsBridge.test.ts
+src/api/http.test.ts
+src/api/registry/AuthenticatedCatalogs.test.ts
+src/shell-v0/aggregate-substrate/components/JfResource.test.ts
+src/shell-v0/api/authorizedFetch.test.ts
+src/shell-v0/chrome/Shell.test.ts
+src/shell-v0/components/ResourceView.history-reconnect.test.ts
+src/shell-v0/components/ResourceView.render.test.ts
+src/shell-v0/components/RetrospectivePanel.test.ts
+src/shell-v0/components/SourcesPane.test.ts
+src/shell-v0/components/advisory/AdvisoryStore.test.ts
+src/shell-v0/controllers/AgentSessionController.test.ts
+src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts
+src/shell-v0/state/searchState.scope.test.ts
+src/shell-v0/state/searchState.test.ts
+src/shell-v0/streaming/AuthenticatedStream.test.ts
+src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts
+src/shell-v0/utils/aiInstallPoll.test.ts
+src/shell-v0/views/BrainSurface.installProgressAggregate.test.ts
+src/shell-v0/views/BrainSurface.pausedInstall.test.ts
+src/shell-v0/views/BrainSurface.repairRemedy.test.ts
+src/shell-v0/views/BrainSurface.skipReason.test.ts
+src/shell-v0/views/BrainSurface.sparkline.test.ts
+src/shell-v0/views/BrainSurface.telemetry-mode.test.ts
+src/shell-v0/views/HealthLitView.test.ts
+src/shell-v0/views/SettingsSurface.chatWidth.test.ts
+src/shell-v0/views/SettingsSurface.contextWindow.test.ts
+src/shell-v0/views/SettingsSurface.highContrast.test.ts
+src/shell-v0/views/SettingsSurface.v15.test.ts
+src/shell-v0/views/UnifiedChatView.extractResult.test.ts
+src/shell-v0/views/UnifiedChatView.test.ts
+src/shell-v0/views/search-v3/SearchV3View.agentRun.test.ts
+src/shell-v0/views/search-v3/Sv3Palette.test.ts
+src/shell-v0/views/search-v3/Sv3Pane.test.ts
+src/shell-v0/views/search-v3/sv3-record.test.ts
+src/shell-v0/views/search-v3/sv3-run.test.ts
+src/shell-v0/views/unifiedThreadProjection.test.ts
+```
+
 ## Audit repair
 
 - McpOriginValidationTest retains all 19 existing candidate cases in dev mode, with

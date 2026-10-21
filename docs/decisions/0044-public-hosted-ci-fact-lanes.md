@@ -7,7 +7,7 @@ date: 2026-06-27
 probes:
   - adr-0044-fact-lane-triggers-checked
   - adr-0044-advisory-fact-lane-bounded
-last_reviewed: 2026-09-05
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0044: Public hosted CI fact lanes
@@ -15,6 +15,10 @@ last_reviewed: 2026-09-05
 ## Status
 
 Accepted. Narrows ADR-0026 for the public repository's standard GitHub-hosted CI lane.
+Amended by [ADR-0052](0052-weekly-codeql-on-hosted-runners.md): CodeQL runs weekly on Mondays
+and remains manually dispatchable. The no-model build and unit lanes now use hosted Linux
+runners; separate Windows-native test lanes run on Windows. The Windows-only build
+description below is historical.
 
 ## Context
 
@@ -38,12 +42,12 @@ failures inside the omnibus job took about 17-18 minutes to become actionable.
 The public repository's standard GitHub-hosted CI lane runs automatically on `pull_request`
 and `push` to `main`, and it may also be dispatched manually with `workflow_dispatch`.
 
-Every workflow that produces a required status check also declares `merge_group`, so the
-check still reports if a GitHub merge queue is ever enabled. A required check that never
-reports on a merge-group ref stalls the queue until it times out, so the trigger is declared
-ahead of the queue rather than after the first stall. It changes nothing until the repository
-is organization-owned and a queue is configured, because no `merge_group` event can be
-delivered before then.
+Every workflow that produces a required status check also declares `merge_group`.
+PRs and pushes to `main` run the full required set. Merge-queue runs check governance,
+build and secrets on the combined tree. Other required jobs report successful skips;
+matrix jobs keep their expanded check names by skipping every step. Runtime, unit and
+Windows tests do not rerun on the combined tree. Measured axe, Integration tests and
+CI wall-clock attribution run only on manual dispatch.
 
 The CI workflow is organized as stable **fact lanes**:
 
@@ -56,7 +60,7 @@ The CI workflow is organized as stable **fact lanes**:
 Each lane name describes the fact it proves. Main branch protection requires the current stable
 check names declared in `scripts/ci/workflow-signal-policy.v1.json`. The same policy file declares
 whether GitHub must require each pull-request branch to be up to date before merging. That setting
-is `false` while the native merge queue is active: the queue creates and tests a merge group
+is `false` while the native merge queue is active: the queue checks a merge group
 against current `main`, so forcing every PR branch through a separate update-and-retest cycle
 would duplicate the queue's integration check and restore the serial re-CI tax.
 
@@ -238,3 +242,14 @@ classic branch protection (`repos/<owner>/<repo>/branches/main/protection`) rath
 after this change lands; `scripts/ci/check-branch-protection.mjs` reports the declared-versus-
 live gap in the interval and is the only guard that can see it, because the default pull-request
 token cannot read branch-protection settings.
+
+## Amendment 2026-10-20: current hosted runner split and CodeQL exception
+
+The original Decision's Windows-hosted build/unit bullet is historical.
+`.github/workflows/ci.yml` runs the no-model `build` job on `ubuntu-latest`;
+`unit-tests` uses its lane matrix (currently Linux), with separate Windows
+native-test lanes. Required-check names and workflow triggers remain declared
+in the workflow-signal policy.
+[ADR-0052](0052-weekly-codeql-on-hosted-runners.md) amends the specialty-workflow
+rule for weekly hosted CodeQL; it also narrows
+[ADR-0026](0026-manual-ci-triggering.md)'s manual-only security statement.

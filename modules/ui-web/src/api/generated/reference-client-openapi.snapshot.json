@@ -1118,6 +1118,29 @@
         ]
       }
     },
+    "/api/chat/conversations/{sessionId}/stop": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "POST /api/chat/conversations/{sessionId}/stop",
+        "tags": [
+          "conversation"
+        ]
+      }
+    },
     "/api/chat/conversations/{sessionId}/title": {
       "delete": {
         "parameters": [
@@ -4317,8 +4340,8 @@
     }
   },
   "x-justsearch-route-source": {
-    "routeCount": 251,
-    "routeDigest": "sha256:a792d41008d82ea1f23f2de94bf69cf65bf081cecc7ba89808b1d8cb9a6d8e30"
+    "routeCount": 252,
+    "routeDigest": "sha256:a0deb6b7865b0038433d3714fd26c08c87a69f4bd611fd87a65b9904840e6558"
   },
   "x-justsearch-surface": {
     "classification": "reference-client-structural-inventory",

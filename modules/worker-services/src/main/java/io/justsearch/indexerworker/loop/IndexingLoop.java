@@ -59,7 +59,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -108,8 +107,8 @@ public class IndexingLoop implements Closeable {
   private final CommitOps commitOps;
   /** The active generation's lexical projection; Green remains the only queue producer. */
   private final AtomicReference<RunningRuntime> activeLexicalSource = new AtomicReference<>();
-  /** Serializes a claimed A/B write with direct deletion of its durable queue row. */
-  private final ReentrantLock fileMutationFence = new ReentrantLock(true);
+  /** Serializes a claimed A/B write with direct deletion of its durable queue row and prunes. */
+  private final FileMutationFence fileMutationFence = new FileMutationFence();
   // Tempdoc 516 Slice 4d (W6): indexingCoordinator / documentFieldOps / indexCountOps are
   // consumed only by the extracted collaborators (writer, extractor, backfillScheduler,
   // embeddingLifecycle). Local ctor params pass them through directly — no IndexingLoop field
@@ -439,6 +438,7 @@ public class IndexingLoop implements Closeable {
             this::chunkSpladeEnabled,
             activeLexicalSource::get,
             fileMutationFence);
+    this.writer.useFileExclusions(ingestionAuthority::excludes);
     // Tempdoc 516 Slice 4a.3 (W5.2): construct the extractor. Holds its own per-batch
     // indexEmptyForBatch cache, the forcedPaths set (shared with the markForced public API),
     // and the running/signalBus pair so it can self-decide when to stop the per-job loop.
@@ -1055,6 +1055,11 @@ public class IndexingLoop implements Closeable {
    * Task t-20261013-ef3c41, round 4: every deletion decision this loop makes (admission, freshness,
    * re-hash, pre-write) asks {@code check} whether the source's root still vouches for absence.
    */
+  /** Bind watched-root policy scope for already queued work. */
+  public void useFileExclusions(java.util.function.BiPredicate<Path, Path> exclusions) {
+    ingestionAuthority.useFileExclusions(exclusions);
+  }
+
   public void useRootCheck(SourcePresence.RootCheck check) {
     ingestionAuthority.useRootCheck(check);
   }
@@ -1079,9 +1084,12 @@ public class IndexingLoop implements Closeable {
 
   /** Direct source deletions hold this through A/B effects and queue removal. */
   public <T> T withFileMutationFence(Supplier<T> mutation) {
-    fileMutationFence.lock();
-    try { return mutation.get(); }
-    finally { fileMutationFence.unlock(); }
+    return fileMutationFence.guard(mutation);
+  }
+
+  /** The fence itself, for a prune that must also judge the files written while it scanned. */
+  public FileMutationFence fileMutationFence() {
+    return fileMutationFence;
   }
 
   /** Called only after the final fence has paused the Green producer. */

@@ -2,11 +2,11 @@
 title: "ADR-0042: Live-registry witness — consumer-presence over the live ContributionRegistry"
 type: decision
 status: accepted
-description: "The live-registry tier of tempdoc 560 §4b/§5: a delivered contribution must carry a consumer, checked over the LIVE ContributionRegistry (not the static snapshot) so runtime-composed contributions are covered — closing the DR-D gap the two static tiers cannot reach. Resolves the four §E.2.1 decisions that gated it with defensible defaults."
+description: "A delivered contribution must carry a consumer, checked by LiveWitnessTest over the live ContributionRegistry, covering runtime-composed MCP and plugin contributions the static snapshot cannot see; core workflow operations are included in the static snapshot."
 date: 2026-06-11
 probes:
   - adr-0042-live-witness-checked
-last_reviewed: 2026-09-05
+last_reviewed: 2026-10-20
 ---
 
 
@@ -17,6 +17,8 @@ last_reviewed: 2026-09-05
 Accepted. Adds the **live-registry tier** of tempdoc 560 §4b/§5 (the witness), and resolves the four
 §E.2.1 decisions that 564's "481 Pass-3" parked, with defensible defaults (recorded below so they are
 auditable and reversible).
+
+Current implementation corrections are recorded in the 2026-10-20 amendment below.
 
 ## Context — consumer-presence already has two static tiers
 
@@ -155,3 +157,16 @@ delivered operation exactly as the build-tier merge does. A forked merge fails i
 
 Unchanged: the Decision itself, the four §E.2.1 resolutions, and every "Future Agents Must Not" item —
 except that "the register guards this" now reads "the enforcing test guards this".
+
+## Amendment 2026-10-20: workflow operations are in the static snapshot
+
+The Context's workflow example describes the former build-tier blind spot.
+`RegistrySnapshotExporter.composedOperations` now installs the base catalogs
+and projects `CoreWorkflowCatalog` through `WorkflowOperationProjection`, using
+`OperationCatalogComposition.installWorkflowOps`. Both snapshot operation
+entries and the static agent witness consume that same composition. Core
+workflow operations are therefore no longer missing from the static snapshot.
+The live tier still covers configured MCP-host tools and plugin contributions
+that the static composition does not include.
+Evidence: `modules/app-services/src/main/java/io/justsearch/app/services/registry/snapshot/RegistrySnapshotExporter.java`
+(`composedOperations`, `buildOperationEntries`, `agentWitnessDeliveredIds`).

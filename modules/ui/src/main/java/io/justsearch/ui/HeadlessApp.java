@@ -43,6 +43,17 @@ import org.slf4j.bridge.SLF4JBridgeHandler;
  * Server, but does not start JavaFX.
  */
 public class HeadlessApp {
+  static {
+    // All Engine tokenizer paths must start without DJL's EC2 telemetry or automatic CUDA
+    // native-library download. Offline mode uses the bundled CPU tokenizer library.
+    // DJL gives environment overrides precedence; preserve explicit system properties too.
+    for (String key : new String[] {"OPT_OUT_TRACKING", "ai.djl.offline"}) {
+      if (SystemAccess.rawSysProp(key) == null) {
+        SystemAccess.setSysProp(key, "true");
+      }
+    }
+  }
+
   private static final Logger log = LoggerFactory.getLogger(HeadlessApp.class);
 
   @FunctionalInterface
@@ -868,9 +879,10 @@ public class HeadlessApp {
     // Policy discovery mirrors its effective flags into the resolver's process sources.
     // A later settings candidate must not mistake that boot publication for an encoder change.
     try {
-      new EnterprisePolicyServiceImpl().snapshot();
-    } catch (Exception ignored) {
-      // best-effort; policy loading itself fails closed where required.
+      java.util.Objects.requireNonNull(new EnterprisePolicyServiceImpl().snapshot());
+    } catch (Exception failure) {
+      log.warn("Boot policy load failed; GPU acceleration disabled", failure);
+      SystemAccess.setSysProp("policy.gpu_acceleration_enabled", "false");
     }
   }
 
@@ -987,6 +999,7 @@ public class HeadlessApp {
 
   private static void maybeMirrorOrtNativePath(ConfigStore configStore) {
     try {
+      if (configStore != null && !configStore.get().ai().gpuAccelerationAllowed()) return;
       Path home = PlatformPaths.resolveDataDir();
       if (home == null) {
         log.debug("ORT native_path mirror: data dir unresolved; skipping");
@@ -2788,6 +2801,7 @@ public class HeadlessApp {
       int gpuLayers = settings.getGpuLayers();
       ConfigStore cs = activeConfigStore != null ? activeConfigStore : ConfigStore.globalOrNull();
       if (cs != null) {
+        if (!cs.get().ai().gpuAccelerationAllowed()) return null;
         gpuLayers = cs.get().ai().gpuLayers();
       }
       if (gpuLayers <= 0) {
