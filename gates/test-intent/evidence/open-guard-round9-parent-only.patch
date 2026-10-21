@@ -1,0 +1,9 @@
+--- a/modules/shell/src-tauri/src/windows_reveal.rs
++++ b/modules/shell/src-tauri/src/windows_reveal.rs
+@@ -24,5 +24,5 @@
+     }
+     let child = unsafe { ILFindLastID(item) };
+     let children = [child.cast_const()];
+-    dispatch(parent.0, children.len() as u32, children.as_ptr())
++    dispatch(parent.0, 0, std::ptr::null())
+ }

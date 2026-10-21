@@ -30,6 +30,7 @@ import { repeat } from 'lit/directives/repeat.js';
 import { icon } from '../components/Icon.js';
 import { openContextMenu, type ContextMenuAction } from '../components/ContextMenu.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
+import { openLocalFile } from '../plugin-api/capabilities/platform.js';
 import { compose } from '../utils/compose.js';
 
 interface WatchedRoot {
@@ -357,7 +358,11 @@ export class BrowseSurface extends JfElement {
   }
 
   private async openFile(path: string): Promise<void> {
-    await this.host_.platform.openExternal(path);
+    try {
+      await openLocalFile(path);
+    } catch {
+      // The platform helper has shown the refusal and Show in folder action.
+    }
   }
 
   private matchesFilter(name: string): boolean {
@@ -470,7 +475,7 @@ export class BrowseSurface extends JfElement {
       });
     }
     else if (result === 'reveal') {
-      void this.host_.platform.revealInExplorer(file.path);
+      void this.host_.platform.revealInExplorer(file.path).catch(() => { /* Already reported. */ });
     }
   }
 
