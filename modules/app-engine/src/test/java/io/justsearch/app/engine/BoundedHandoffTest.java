@@ -73,7 +73,7 @@ final class BoundedHandoffTest {
 
   @Test
   void closeAfterOuterDrainCheckStillFencesTheConsumerCall() throws Exception {
-    var calls = new java.util.concurrent.atomic.AtomicInteger();
+    var calls = new AtomicInteger();
     var flow = new BoundedHandoff<Integer>("retired-entry", value -> calls.incrementAndGet(),
         failure -> fail(failure), task -> {}, BoundedHandoff.Backpressure.FAIL_FAST);
     flow.close();

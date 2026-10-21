@@ -296,7 +296,7 @@ function tabularOneShotStrategy<T extends Record<string, unknown>>(
   };
 }
 
-export function tabularStrategy<T extends Record<string, unknown>>(
+function tabularStrategy<T extends Record<string, unknown>>(
   primaryKey: string,
 ): SubscriptionStrategy<TabularData<T>> {
   if (!primaryKey) {

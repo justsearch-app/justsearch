@@ -7,7 +7,7 @@ author-session: 01a1562b-b2e9-7510-832f-04ea6ad6da28
 
 # Test-intent entries
 
-Author: builder Codex session 01a1562b-b2e9-7510-832f-04ea6ad6da28. Scope is the final branch diff against merge-base f6a14b5a6 with origin/main, not intermediate commit diffs. The user adopted scenarios Q1–Q27 on2026-10-20: “i agree, proceed accordingly”. Every scenario source below is **agent-drafted, owner-adopted**; no brief text is attributed as owner words. Choices are **agent choice** under the separately quoted delegation. Q20 uses its aggregate-queued amendment; Q25–Q27 are included. Q6 retains the agreed whole-call limit: pollPending(16) under10ms p95, including its durable commit. Selection-only timing is additional reporting, not a substitute threshold. Q24 packaged-system verification belongs to the independent verifier, not this test-intent delivery.
+Author: builder Codex session 01a1562b-b2e9-7510-832f-04ea6ad6da28. Scope is the final branch diff against merge-base 2ba7d810e with origin/main, not intermediate commit diffs. The user adopted scenarios Q1–Q27 on2026-10-20: “i agree, proceed accordingly”. Every scenario source below is **agent-drafted, owner-adopted**; no brief text is attributed as owner words. Choices are **agent choice** under the separately quoted delegation. Q20 uses its aggregate-queued amendment; Q25–Q27 are included. Q6 retains the agreed whole-call limit: pollPending(16) under10ms p95, including its durable commit. Selection-only timing is additional reporting, not a substitute threshold. Q24 packaged-system verification belongs to the independent verifier, not this test-intent delivery.
 
 For modified files with both retired oracles and added checks, separate entries name the portions. All full-table and per-file-PENDING state/input changes are Obsolete, not hidden as adaptations. Old→new assertion inventories are attached to those entries; remaining original assertions stay unchanged. The two Adaptation entries identify exactly unchanged assertions and old/new transport encoding. Repaired checks require an assertion fail-before; new instrumentation and preservation checks are explicitly identified and do not pretend a missing old API/table was a defect.
 
@@ -1527,11 +1527,10 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
       "items": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsRetiredDeliveryTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/IndexingJobsSubscriptionFenceTest.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IndexingJobsSubscriberRetirementTest.java",
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/BoundedHandoffTest.java"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IndexingJobsSubscriberRetirementTest.java"
       ],
       "class": "New",
-      "behaviour": "Retired-subscription repair: hold a real PROCESSING handoff after its close check, overflow/resubscribe, advance and finish current claims, then release the old callback; store window, head cursor and state-presence signal stay unchanged. Also fence higher-sequence retired callbacks, old error/completion callbacks, out-of-order active snapshots/deltas/presence and terminal replay, worker-local cursor resets, a late subscribe return after synchronous failure, completed callbacks, worker COW subscriber cancellation/feed closure, and delivery at the closed handoff consumer boundary. Only a new method/import are added to BoundedHandoffTest; all pre-existing inputs, assertions and tags are unchanged.",
+      "behaviour": "Retired-subscription repair: hold a real PROCESSING handoff after its close check, overflow/resubscribe, advance and finish current claims, then release the old callback; store window, head cursor and state-presence signal stay unchanged. Also fence higher-sequence retired callbacks, old error/completion callbacks, out-of-order active snapshots/deltas/presence and terminal replay, worker-local cursor resets, a late subscribe return after synchronous failure, completed callbacks, worker COW subscriber cancellation/feed closure, and delivery at the closed handoff consumer boundary. The related BoundedHandoff delivery-boundary check is recorded separately to refresh only its receipt after a PMD spelling cleanup; all pre-existing inputs, assertions and tags are unchanged.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1576,8 +1575,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsRetiredDeliveryTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/IndexingJobsSubscriptionFenceTest.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IndexingJobsSubscriberRetirementTest.java",
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/BoundedHandoffTest.java#closeAfterOuterDrainCheckStillFencesTheConsumerCall"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IndexingJobsSubscriberRetirementTest.java"
       ],
       "repaired": true
     },
@@ -1795,6 +1793,58 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
       "evidence": "gates/test-intent/evidence/queue-scale-repairs-e890.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/BoundedHandoffTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The closed handoff refuses a delivery that entered before its outer close check. PMD-only cleanup replaces new java.util.concurrent.atomic.AtomicInteger() with new AtomicInteger(), using its existing import. Inputs, fault injection, observations, expected values, tags and conditions are unchanged. Split from entry 28 solely to refresh this file's stale receipt without rerunning unrelated classes.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q15",
+          "quote": "Live, reloaded and reconnected clients converge: concurrent writes during snapshot, more than 256 initial deltas, a reconnect and a browser reload all end with the same rows and no phantom jobs.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q26",
+          "quote": "An overflow of the head's indexing-jobs handoff (a typed cause, not exception-text matching) resubscribes immediately and bounded (no tight loop under sustained overload); real indexing of a 3k-file corpus ends with the head matching jobs.db within 5 s of the last commit. Fails today (up to 30 s stale).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "fence every delivery to the subscription that produced it, so a callback from a retired or closed subscription is dropped even if it passed the close check before; and the head never applies a frame whose sequence is older than its current snapshot (the cursor never moves backward).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Rebase each replacement subscription's local wire sequence at its first snapshot so the head cursor remains monotonic without changing the worker wire protocol.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Skip retired subscribers in captured copy-on-write batches and recheck closure immediately before a handoff invokes its consumer.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/queue-scale-pmd-39515856747.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/BoundedHandoffTest.java#closeAfterOuterDrainCheckStillFencesTheConsumerCall"
       ],
       "repaired": true
     }
