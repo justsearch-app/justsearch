@@ -1,0 +1,88 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T20:12:22.214Z",
+  "revision": "892243645459e5f5a16f8c555e380ca1403f967b",
+  "tree": "0311bdffa75d8a526586417da0bc88339d2b16bf",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.FileMemoryStoreAvailabilityTest.persistenceRollbackAndDeletionSurviveRestart\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2734
+    },
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.HeadAssemblyTest.memoryBackupRoundTripPreservesFieldsAndCollisions\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4447
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.MemoryControllerTest.healthyHttpRoundTripReplacesIdAndSurvivesRestart\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3963
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/FileMemoryStoreAvailabilityTest.java#persistenceRollbackAndDeletionSurviveRestart",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/FileMemoryStoreAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a72f56138f69f544bd97efc2e3ec3219496ce416b8072bdb9ad3a3c8b352eb8c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "persistenceRollbackAndDeletionSurviveRestart(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/HeadAssemblyTest.java#memoryBackupRoundTripPreservesFieldsAndCollisions",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/HeadAssemblyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5c4063405e05d4861fca105ae6cd45cdd07dbcddf16c60d827712461f46ab4bb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "memoryBackupRoundTripPreservesFieldsAndCollisions()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/MemoryControllerTest.java#healthyHttpRoundTripReplacesIdAndSurvivesRestart",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/MemoryControllerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0cdefd9c900c1d96d31553bd20d917d050012b770e96dd1d399c4f990eb1bd8b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "healthyHttpRoundTripReplacesIdAndSurvivesRestart(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:0de468d9decac48d92551e1e8344a618f12079d272ee3f448fe268ac0bb73a8c"
+}

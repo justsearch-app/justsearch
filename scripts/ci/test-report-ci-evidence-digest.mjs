@@ -423,3 +423,22 @@ console.log('test-report-ci-evidence-digest: PASS');
   assert.ok(report.jobs[0].factLane.required, 'removing an empty artifact does not change required status');
   assert.ok(!report.warnings.some((w) => /windows-native-node|undefined-attempt/.test(w)));
 }
+
+// Queue skips have no test artifacts; a job that did work still needs evidence.
+{
+  const skippedJobs = [
+    job('Unit tests (app-ui-ui)', 'skipped', 1, 1),
+    job('Windows-native tests (contracts)', 'skipped', 1, 1),
+    job('Unit tests (search-worker)', 'success', 1, 1, [
+      step('Set up job', 'success', 1, 1), step('Checkout', 'skipped', 1, 1),
+      step('Tests', 'skipped', 1, 1), step('Complete job', 'success', 1, 1),
+    ]),
+  ];
+  const check = (jobs) => buildDigest({ policy, run: { ...greenRun, event: 'merge_group' }, jobsDoc: { jobs } });
+  const report = check(skippedJobs);
+  assert.equal(report.unitAttribution.length, 0);
+  assert.equal(report.partEvidence.length, 0);
+  assert.ok(!report.warnings.some((warning) => /has no .*artifact listed/.test(warning)), report.warnings.join('\n'));
+  const worked = check([job('Unit tests (search-worker)', 'success', 1, 2, [step('Tests', 'success', 1, 2)])]);
+  assert.ok(worked.warnings.some((warning) => /has no .*artifact listed/.test(warning)));
+}

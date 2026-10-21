@@ -1,0 +1,13 @@
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerIngestService.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerIngestService.java
+@@ -99,6 +99,10 @@
+  * <p><b>Rate Limiting:</b> Batch size is capped to prevent queue flooding.
+  */
+ public final class WorkerIngestService {
++  /** Fail-before compatibility only: this revision has no runtime exclusion-policy binding. */
++  public void useExclusionRoots(
++      java.util.function.Supplier<java.util.Collection<java.nio.file.Path>> roots) {}
++
+   private static final Logger log = LoggerFactory.getLogger(WorkerIngestService.class);
+   /** Maximum files allowed in a single batch request. */
+   private static final int MAX_BATCH_SIZE = 10_000;

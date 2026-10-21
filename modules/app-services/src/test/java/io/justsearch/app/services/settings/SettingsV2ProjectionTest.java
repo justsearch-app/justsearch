@@ -59,6 +59,8 @@ class SettingsV2ProjectionTest {
     settings.setIndexBasePath("  ");
 
     var projected = SettingsV2Projection.toSettingsV2(settings, UiSettingsStore.PersistenceMode.READ_WRITE);
+    assertNull(projected.ui().invalidExcludePatterns(),
+        "D3: omit diagnostics when no saved pattern is invalid");
     assertNull(projected.ui().inspectorWidth());
     assertNull(projected.ui().chatEnabled());
     assertNull(projected.llm().serverExecutable());

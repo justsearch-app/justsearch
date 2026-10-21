@@ -144,6 +144,8 @@ public final class KnowledgeServer implements Closeable {
   private volatile String replaySettledGeneration;
   private List<RootBinding> bootRootBindings = List.of();
   private boolean bootRootBindingsBound;
+  private java.util.function.Supplier<java.util.Collection<Path>> exclusionRoots =
+      () -> bootRootBindings.stream().map(RootBinding::path).toList();
   private volatile String rootReconciliationSettledGeneration;
   /**
    * Task t-20261013-ef3c41, round 7 (S8): the roots the committed boot deferred because the folder
@@ -684,6 +686,12 @@ public final class KnowledgeServer implements Closeable {
     }
     bootRootBindings = List.copyOf(Objects.requireNonNull(bindings, "bindings"));
     bootRootBindingsBound = true;
+  }
+
+  /** Current Head-owned membership, including roots whose native watch is unavailable. */
+  public void bindExclusionRoots(java.util.function.Supplier<java.util.Collection<Path>> roots) {
+    if (running) throw new IllegalStateException("Exclusion roots must precede Worker start");
+    exclusionRoots = Objects.requireNonNull(roots, "roots");
   }
 
   /** Binds a retained physical-attempt capsule before start. */
@@ -3376,6 +3384,7 @@ public final class KnowledgeServer implements Closeable {
    * {@link DefaultWorkerAppServices} with non-null indexingLoop / ingestService).
    */
   private void wireAppServicesPostConstruction(WorkerAppServices svc) {
+    svc.ingestService().useExclusionRoots(() -> exclusionRoots.get());
     svc.ingestService().setProjectionSemanticDeferralSupplier(() -> {
       // A FENCED source writer is open for recovery replay only. A writable Lucene runtime
       // does not grant admission to new projections before recorded authority is settled.

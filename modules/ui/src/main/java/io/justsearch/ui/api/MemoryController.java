@@ -3,6 +3,7 @@ package io.justsearch.ui.api;
 
 import io.javalin.http.Context;
 import io.justsearch.agent.api.encryption.KeyLockedException;
+import io.justsearch.agent.api.memory.MemoriesUnavailableException;
 import io.justsearch.agent.api.memory.MemoryRecord;
 import io.justsearch.agent.api.memory.MemoryStore;
 import io.justsearch.app.api.ApiErrorCode;
@@ -59,6 +60,10 @@ public final class MemoryController {
       // two apart instead of rendering the unreadable state as a positive claim.
       payload.put("locked", memoryStore.isLocked());
       ctx.contentType("application/json").result(MAPPER.writeValueAsBytes(payload));
+    } catch (MemoriesUnavailableException e) {
+      ctx.status(503).json(Map.of(
+          "errorCode", ApiErrorCode.MEMORIES_UNAVAILABLE.name(),
+          "error", e.getMessage(), "unavailable", true));
     } catch (Exception e) {
       LOG.error("Failed to list memory", e);
       ctx.status(500).json(Map.of("error", "Failed to read memory"));
@@ -91,6 +96,10 @@ public final class MemoryController {
       ctx.json(Map.of("ok", true, "id", rec.id()));
     } catch (KeyLockedException locked) {
       respondLocked(ctx);
+    } catch (MemoriesUnavailableException e) {
+      ctx.status(503).json(Map.of(
+          "errorCode", ApiErrorCode.MEMORIES_UNAVAILABLE.name(),
+          "error", e.getMessage(), "unavailable", true));
     } catch (Exception e) {
       LOG.error("Failed to record memory", e);
       ctx.status(500).json(Map.of("error", "Failed to record memory"));
@@ -104,6 +113,10 @@ public final class MemoryController {
       ctx.json(Map.of("ok", true));
     } catch (KeyLockedException locked) {
       respondLocked(ctx);
+    } catch (MemoriesUnavailableException e) {
+      ctx.status(503).json(Map.of(
+          "errorCode", ApiErrorCode.MEMORIES_UNAVAILABLE.name(),
+          "error", e.getMessage(), "unavailable", true));
     } catch (Exception e) {
       LOG.error("Failed to forget memory", e);
       ctx.status(500).json(Map.of("error", "Failed to forget memory"));

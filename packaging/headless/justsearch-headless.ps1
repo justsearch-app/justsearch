@@ -34,4 +34,4 @@ $java = Join-Path $here 'runtime\bin\java.exe'
 if (-not (Test-Path $java)) { $java = 'java' }
 
 $cp = "$here\ui-headless.jar;$here\lib\*"
-& $java -cp $cp "-Djustsearch.mode=$Mode" io.justsearch.ui.HeadlessApp
+& $java -cp $cp "-Djustsearch.prod=true" "-Djustsearch.mode=$Mode" io.justsearch.ui.HeadlessApp
