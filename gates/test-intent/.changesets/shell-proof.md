@@ -640,3 +640,14 @@ are recorded separately. A separate session must review these entries and append
   "note": "Same review bound to the stacked PR base origin/worktree-token-bootstrap: Rust and web fail-before receipts reproduced, the commit-transport shim is honestly classified and disclosed, and the AgentSessionController change is an Obsolete drop of the no-binding retry sourced by C5 with no conflicting decision record."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "222cc5ac-ed8c-4129-86aa-d66f6d346876",
+  "verdict": "accept",
+  "digest": "sha256:fc2dc43967d9e672b61b3e2df4f95f61c564ceab3a295122225f183e08220944",
+  "note": "On 5a7973f27 I reran the Rust (13 assertion fail-before, 3 preservation pass, 16/16 after) and web (9 assertion fail-before, 1 preservation pass, 241/241 after) receipts, confirmed the merge kept this PR's 35 paths with http.ts, http.test.ts and lib.rs changes intact, ran the installed production Engine live (released manifest port impostor got zero bytes), and found the commit-transport shim honestly classified as Incidental with its narrower actor boundary disclosed."
+}
+```
