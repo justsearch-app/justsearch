@@ -176,6 +176,22 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
       } catch (RuntimeException unreadable) {
         return "Self-test cleanup unverified: " + message(unreadable);
       }
+      // On POSIX a killed wrapper cannot run its exit trap. End its retained serving handles
+      // before waiting, including when the probe rejected an unauthenticated runtime (K8).
+      if (!io.justsearch.configuration.PlatformPaths.isWindows()
+          && started.stream().anyMatch(io.justsearch.app.api.runtime.child.ProcessTerminator::isRunning)) {
+        try {
+          int ended = control.endRemaining(candidate,
+              StopRequest.of(StopReason.SELF_TEST, StopMode.NOW, REQUESTED_BY));
+          // Preserve S19 for a process that outlived an already-exited candidate. A normal
+          // stop has already cleaned its scope in control. Zero can also mean it just exited;
+          // drain the earlier observations and recheck the retained scope below in that case.
+          if (ended > 0) return "A process the self-test llama-server (pid " + candidate.pid()
+              + ") started is still running after its root exited; ended " + ended + " left running";
+        } catch (IOException | RuntimeException notEnded) {
+          return "Self-test cleanup unverified: " + message(notEnded);
+        }
+      }
       if (!StartedProcesses.awaitExit(List.copyOf(started), STOP_WAIT)) {
         return endLeftRunning(candidate);
       }
@@ -205,9 +221,8 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
 
   /**
    * A process the candidate started outlived it: the self-test fails (S19), and ChildControl ends
-   * what was left in the candidate's own job, recording each as an intended cleanup, so the main
-   * server can load without an Engine restart. Off Windows it cannot be ended and stays the next
-   * chat start's barrier.
+   * what was left in the candidate's own job or retained descendant handles, recording each as an
+   * intended cleanup. Any survivor stays the next chat start's barrier.
    */
   private String endLeftRunning(ChildHandle candidate) {
     String failure = "A process the self-test llama-server (pid " + candidate.pid()

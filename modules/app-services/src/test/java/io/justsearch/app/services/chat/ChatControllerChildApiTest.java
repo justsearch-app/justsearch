@@ -269,12 +269,29 @@ final class ChatControllerChildApiTest {
         server = HttpServer.create(
             new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);
         server.createContext("/health", exchange -> answer(exchange, 200, "{\"status\":\"ok\"}"));
-        server.createContext("/props", exchange -> answer(exchange, 200,
+        var props = server.createContext("/props", exchange -> answer(exchange, 200,
             "{\"model_path\":\"" + model + "\",\"n_ctx\":" + window + "}"));
-        server.createContext("/completion", exchange -> {
+        var completion = server.createContext("/completion", exchange -> {
           exchange.getRequestBody().readAllBytes();
           answer(exchange, 200, "{\"content\":\"ok\",\"stop\":true}");
         });
+        String key = spec.envOverrides().get("LLAMA_API_KEY");
+        if (key != null) {
+          for (var context : List.of(props, completion)) {
+            context.getFilters().add(new com.sun.net.httpserver.Filter() {
+              @Override public String description() { return "llama API authentication"; }
+              @Override public void doFilter(com.sun.net.httpserver.HttpExchange exchange,
+                  Chain chain) throws IOException {
+                if (("Bearer " + key).equals(exchange.getRequestHeaders().getFirst("Authorization"))) {
+                  chain.doFilter(exchange);
+                } else {
+                  exchange.sendResponseHeaders(401, -1);
+                  exchange.close();
+                }
+              }
+            });
+          }
+        }
         server.start();
       }
 

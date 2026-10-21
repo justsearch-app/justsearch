@@ -49,7 +49,7 @@ class OwnedStreamCancellationTest {
     server.start();
     var registry = new io.justsearch.core.execution.TestEngineExecutors();
     var ops = new OnlineModeOps(new InferenceExecutorRegistrations(registry), HttpClient.newHttpClient(),
-        new ObjectMapper(), () -> Mode.ONLINE, () -> server.getAddress().getPort(),
+        new ObjectMapper(), () -> Mode.ONLINE, () -> new LlamaServerEndpoint(server.getAddress().getPort(), null),
         () -> "test-model", () -> "test-model", null);
     try {
       ops.stream(List.of(Map.of("role", "user", "content", "test")), null, 256,
@@ -96,7 +96,7 @@ class OwnedStreamCancellationTest {
       server.start();
       var registry = new io.justsearch.core.execution.TestEngineExecutors();
       var ops = new OnlineModeOps(new InferenceExecutorRegistrations(registry), HttpClient.newHttpClient(),
-          new ObjectMapper(), () -> Mode.ONLINE, () -> server.getAddress().getPort(),
+          new ObjectMapper(), () -> Mode.ONLINE, () -> new LlamaServerEndpoint(server.getAddress().getPort(), null),
           () -> "test-model", () -> "test-model", null,
           new io.justsearch.app.inference.chat.GenerationTracker(owner -> {
             started.incrementAndGet();
@@ -165,7 +165,7 @@ class OwnedStreamCancellationTest {
       });
       server.start();
       var ops = new OnlineModeOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()), HttpClient.newHttpClient(), new ObjectMapper(), () -> Mode.ONLINE,
-          () -> server.getAddress().getPort(), () -> "test-model", () -> "test-model");
+          () -> new LlamaServerEndpoint(server.getAddress().getPort(), null), () -> "test-model", () -> "test-model");
       try {
         ops.stream(List.of(Map.of("role", "user", "content", "first")), null, 32,
             chunk -> firstChunk.countDown(), null, ignored -> {}, null,
@@ -383,7 +383,7 @@ class OwnedStreamCancellationTest {
             HttpClient.newHttpClient(),
             new ObjectMapper(),
             () -> Mode.ONLINE,
-            () -> server.getAddress().getPort(),
+            () -> new LlamaServerEndpoint(server.getAddress().getPort(), null),
             () -> "test-model",
             () -> "test-model");
     var foreground = new WorkProbe();
@@ -429,7 +429,7 @@ class OwnedStreamCancellationTest {
             HttpClient.newHttpClient(),
             new ObjectMapper(),
             () -> Mode.ONLINE,
-            () -> 1,
+            () -> new LlamaServerEndpoint(1, null),
             () -> "test-model",
             () -> "test-model");
     var blockerEntered = new CountDownLatch(1);
@@ -480,7 +480,7 @@ class OwnedStreamCancellationTest {
         var registrations = new InferenceExecutorRegistrations(registry);
         var http = HttpClient.newHttpClient()) {
       var ops = new OnlineModeOps(registrations, http, new ObjectMapper(), () -> Mode.ONLINE,
-          () -> 1, () -> "test-model", () -> "test-model");
+          () -> new LlamaServerEndpoint(1, null), () -> "test-model", () -> "test-model");
       var caller = new Thread(() -> {
         try {
           ops.callOwned(work.handle, () -> {

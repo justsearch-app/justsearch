@@ -2,11 +2,9 @@
 package io.justsearch.app.inference.chat;
 
 import io.justsearch.app.api.runtime.child.ChildHandle;
+import io.justsearch.app.api.runtime.child.ProcessTerminator;
 import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * The processes a llama child started, so a stop can wait for them as well as for the child (I6:
@@ -34,15 +32,13 @@ public final class StartedProcesses {
     boolean interrupted = false;
     try {
       for (ProcessHandle process : processes) {
-        while (process.isAlive()) {
+        while (ProcessTerminator.isRunning(process)) {
           long remaining = deadline - System.nanoTime();
           if (remaining <= 0) return false;
           try {
-            process.onExit().get(remaining, TimeUnit.NANOSECONDS);
+            if (!ProcessTerminator.awaitExit(process, Duration.ofNanos(remaining))) return false;
           } catch (InterruptedException interrupt) {
             interrupted = true;
-          } catch (ExecutionException | TimeoutException recheck) {
-            // re-checked by the loop
           }
         }
       }

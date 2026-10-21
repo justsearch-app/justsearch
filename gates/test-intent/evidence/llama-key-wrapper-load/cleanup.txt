@@ -1,0 +1,4 @@
+Recorded serving-process identities inspected: 4569
+Matching live serving processes: 0
+Matching live wrapper/server command lines: 0
+All owned Gradle/runner calls completed; shared Gradle daemons were not stopped.
