@@ -140,8 +140,9 @@ zero outbound connections. Current network paths are:
   signature and rejects older release sequences. Download/install requires user consent.
 - **AI installation:** user-initiated Install AI, repair and resume can download registry-pinned
   model and runtime assets from GitHub and Hugging Face, with SHA-256 verification. Offline packs
-  are a separate import path. `downloadsEnabled` only gates this installer; its unexpected
-  policy-snapshot errors fail open (see [Enterprise Policy](15-enterprise-policy.md)).
+  are a separate import path. `downloadsEnabled` gates this installer; a configured policy service
+  that throws or returns no snapshot blocks start and repair before acquisition, and the background
+  admission recheck fails closed (see [Enterprise Policy](15-enterprise-policy.md)).
 - **Trace export:** `TracingBootstrap` enables an OTLP/HTTP exporter when
   `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` or `OTEL_EXPORTER_OTLP_ENDPOINT` is set. The endpoint is not
   restricted to loopback. Emitted spans can include file paths; detailed index/search tracing can

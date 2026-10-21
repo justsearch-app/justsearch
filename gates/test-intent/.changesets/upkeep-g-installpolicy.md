@@ -23,22 +23,17 @@ Follow-up 3 also pins fail-closed explicit activation and absent-service compati
         "modules/ui/src/integrationTest/java/io/justsearch/ui/api/AiInstallPolicyIntegrationTest.java"
       ],
       "class": "New",
-      "behaviour": "S1\u2013S10: admission/background download checks fail closed; GPU-off and failed GPU reads produce CPU plans and policy-specific exclusions, suppress automatic CUDA choices and retain installed/resumable CUDA data. HTTP refusals retain 403 DOWNLOADS_DISABLED.",
+      "behaviour": "S1–S10: admission/background download checks fail closed; GPU-off and failed GPU reads produce CPU plans and policy-specific exclusions, suppress automatic CUDA choices and retain installed/resumable CUDA data. HTTP refusals retain 403 DOWNLOADS_DISABLED.",
       "sources": [
         {
           "kind": "owner-words",
-          "location": "docs/explanation/15-enterprise-policy.md:15",
-          "quote": "**downloads disabled** (force offline/import-only)"
+          "location": "task t-20261019-9d870e request",
+          "quote": "nothing on the machine or network is exposed by accident"
         },
         {
           "kind": "owner-words",
           "location": "docs/explanation/15-enterprise-policy.md:17",
           "quote": "**GPU acceleration disabled** (force CPU-only even if GPU packs are present)"
-        },
-        {
-          "kind": "owner-words",
-          "location": "docs/explanation/15-enterprise-policy.md:24",
-          "quote": "fail closed on mismatches (hash/policy/pack allowlist)."
         },
         {
           "kind": "delegated-choice",
@@ -83,18 +78,13 @@ Follow-up 3 also pins fail-closed explicit activation and absent-service compati
       "sources": [
         {
           "kind": "owner-words",
-          "location": "docs/explanation/15-enterprise-policy.md:15",
-          "quote": "**downloads disabled** (force offline/import-only)"
+          "location": "task t-20261019-9d870e request",
+          "quote": "nothing on the machine or network is exposed by accident"
         },
         {
           "kind": "owner-words",
           "location": "docs/explanation/15-enterprise-policy.md:17",
           "quote": "**GPU acceleration disabled** (force CPU-only even if GPU packs are present)"
-        },
-        {
-          "kind": "owner-words",
-          "location": "docs/explanation/15-enterprise-policy.md:24",
-          "quote": "fail closed on mismatches (hash/policy/pack allowlist)."
         },
         {
           "kind": "delegated-choice",
@@ -106,8 +96,8 @@ Follow-up 3 also pins fail-closed explicit activation and absent-service compati
         },
         {
           "kind": "owner-words",
-          "location": "docs/explanation/15-enterprise-policy.md:15",
-          "quote": "force offline/import-only"
+          "location": "docs/explanation/15-enterprise-policy.md:32",
+          "quote": "Offline pack import allowlisting by manifest digest and file SHA-256"
         }
       ],
       "evidence": "gates/test-intent/evidence/upkeep-g-installpolicy-preserved.json",
@@ -133,8 +123,8 @@ Follow-up 3 also pins fail-closed explicit activation and absent-service compati
         },
         {
           "kind": "owner-words",
-          "location": "docs/explanation/15-enterprise-policy.md:24",
-          "quote": "fail closed on mismatches (hash/policy/pack allowlist)."
+          "location": "task t-20261019-9d870e request",
+          "quote": "nothing on the machine or network is exposed by accident"
         },
         {
           "kind": "delegated-choice",
