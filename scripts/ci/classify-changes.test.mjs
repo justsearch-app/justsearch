@@ -12,6 +12,9 @@ test('O1 docs and agent files need no scoped lanes', () => {
 test('the generated legal document selects only its notice-producing lane', () => {
   assert.deepEqual(selected(['docs/reference/legal/ai-runtime-and-model-redistribution.md']), ['license']);
 });
+for (const file of ['scripts/ci/pr-flakes.tsv', 'scripts/ci/pr-flakes.mjs']) {
+  test(`shared PR filter selects every lane: ${file}`, () => all(classifyPaths([file])));
+}
 for (const [path, lanes] of [
   ['docs/reference/legal/ai-runtime-and-model-redistribution.md', ['license']],
   ['scripts/jseval/jseval/ui_a11y_gate.py', ['frontend']],
@@ -83,7 +86,7 @@ for (const path of [
 // Read-only drift check: a literal path/folder in a lane's tests is a conservative
 // consumer edge. Expand folders over tracked files so adding a new reader or file
 // cannot quietly weaken the classifier. Runtime opens are audited separately.
-test('tracked repository paths named by Java, Node and Rust tests select their readers', () => {
+test('tracked repository paths named by Java, Node, Rust and Gradle readers select their readers', () => {
   const tracked = [...new Set(execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }).split('\0').filter(Boolean))];
   const present = new Set(tracked);
   const folders = new Map();
@@ -110,6 +113,11 @@ test('tracked repository paths named by Java, Node and Rust tests select their r
   }
   add('scripts/codegen/gen-notices.mjs', 'license');
   for (const source of tracked) {
+    // Build scripts and shared convention plugins can read test inputs at
+    // configuration time, including only when JUSTSEARCH_PR_CI is enabled.
+    if (source.endsWith('.gradle.kts') || /^build-logic\/.*\.kt$/.test(source)) {
+      for (const [lane, selected] of Object.entries(classifyPaths([source]))) if (selected) add(source, lane);
+    }
     if (/^scripts\/jseval\/jseval\/ui.*\.py$/.test(source)) add(source, 'frontend');
     if (/^modules\/shell\/src-tauri\/.*\.rs$/.test(source)) add(source, 'rust');
     if (/^scripts\/dev\/test-dev-runner-.*\.mjs$/.test(source)) add(source, 'devrunner');
@@ -142,6 +150,14 @@ test('tracked repository paths named by Java, Node and Rust tests select their r
     // Git still lists deleted/moved sources until staged; the destination runs in Public claims.
     let text;
     try { text = readFileSync(source, 'utf8'); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+    if (source.endsWith('.gradle.kts') || source.endsWith('.kt')) {
+      // A direct configuration-time read applies to every job configuring this
+      // script. inputs.file declarations instead belong to their owning tasks.
+      for (const match of text.matchAll(/\brootProject\.file\(\s*["']([^"'\r\n]+)["']\s*\)\s*\.\s*(?:readLines|readText|readBytes|useLines|forEachLine|inputStream|reader|bufferedReader)\(/g)) {
+        checkLiteral(match[1], source, lanes);
+      }
+      continue;
+    }
     // Bound each path expression to a line. Exclude calls nested in the
     // expression rather than scanning arbitrary source prefixes repeatedly.
     const expressions = [...text.matchAll(/\b(?:join|resolve|Path\.of|Paths\.get)\(([^;{}()\r\n]{1,1000})\)/g)];
@@ -197,6 +213,9 @@ test('tracked repository paths named by Java, Node and Rust tests select their r
   const fixtureSource = 'scripts/jseval/jseval/ui_fixtures.py';
   assert.match(readFileSync(fixtureSource, 'utf8'), /configuration\/src\/main\/resources\/ai\/model-registry\.v2\.json/);
   checkLiteral('modules/configuration/src/main/resources/ai/model-registry.v2.json', fixtureSource, ['frontend']);
+  for (const lane of ['ui', 'services', 'search', 'platform', 'lifecycle', 'integration']) {
+    assert.ok(checked.get('scripts/ci/pr-flakes.tsv')?.has(lane), `Gradle rootProject.file read audited for ${lane}`);
+  }
   console.log(`classifier read audit: ${readers.size} readers, ${checked.size} repository inputs, ${gaps.size} gaps`);
   assert.deepEqual([...gaps].sort(), []);
 });

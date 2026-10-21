@@ -5,6 +5,13 @@ import { casesForAdapter, engineRow } from './contract.mjs';
 import { phases as devPhases } from './adapters/dev-runner.mjs';
 import { phases as tauriPhases } from './adapters/tauri.mjs';
 
+test('the engine concurrent reload flake is listed with its Gradle test identifier', () => {
+  const identifier = 'io.justsearch.app.engine.EngineRuntimeReloadTest.concurrentReloadsSerializeAroundPublication';
+  assert.deepEqual(PR_FLAKES.filter(row => row.identifier === identifier), [
+    { runner: 'gradle', source: 'modules/app-engine', identifier },
+  ]);
+});
+
 for (const [adapter, phases] of [['dev-runner', devPhases], ['tauri', tauriPhases]]) {
   test(`${adapter} excludes exactly six listed conformance cases on PRs and runs all on main`, () => {
     const original = process.env.JUSTSEARCH_PR_CI;

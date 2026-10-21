@@ -9,6 +9,8 @@ const contracts = [...java, 'rust', 'frontend'];
 // Unclaimed paths deliberately select everything. Rules overlap: a mixed diff and
 // a file consumed by several lanes both take the union, never first-match wins.
 export const RULES = [
+  // Shared PR filter changes must exercise every lane, including Gradle and Rust conformance.
+  [/^scripts\/ci\/pr-flakes\.(?:mjs|tsv)$/, LANES],
   // Documentation consumed by scoped code is an input, even though ordinary docs are cheap.
   [/^docs\/reference\/legal\/ai-runtime-and-model-redistribution\.md$/, ['license']],
   // The advisory axe sweep consumes Vite, the Python capture/gate and its fixtures,
@@ -47,7 +49,7 @@ export const RULES = [
   [/^modules\/ui\/build\.gradle\.kts$/, ['devrunner', 'windows']],
   [/^modules\/shell\/src-tauri\/src\/(?:bin\/supervisor_conformance|engine_host|lib|shell_actuator)\.rs$/, ['devrunner', 'windows']],
   [/^native\/bound-exec\//, ['devrunner', 'windows']],
-  [/^(?:scripts\/(?:dev|lib|supervisor-conformance|testing)\/|scripts\/agent-analytics\/(?:861-w5-remove-worktree-teardown|936-remove-worktree-cli|952-worktree-lifecycle-cli)\.test\.mjs$|scripts\/jseval\/lane-f\/e-crash-evidence\.mjs$|scripts\/ci\/pr-flakes\.(?:mjs|tsv)$)/, ['devrunner', 'windows']],
+  [/^(?:scripts\/(?:dev|lib|supervisor-conformance|testing)\/|scripts\/agent-analytics\/(?:861-w5-remove-worktree-teardown|936-remove-worktree-cli|952-worktree-lifecycle-cli)\.test\.mjs$|scripts\/jseval\/lane-f\/e-crash-evidence\.mjs$)/, ['devrunner', 'windows']],
   [/^governance\/(?:supervision-contract\.v1\.json$|store-recoverability\.v1\.json$|worktree-lifecycle\.v1\.json$|exit-ledger\.v1\.schema\.json$|fixtures\/exit-ledger\/)/, ['devrunner', 'windows']],
   [/^(?:contracts\/(?:native-targets|platform-paths)\/spec\.v1\.json|modules\/shell\/src-tauri\/tauri\.conf\.json|package(?:-lock)?\.json|dev-runner\.cjs)$/, ['devrunner', 'windows']],
   [/^\.gitignore$/, ['devrunner', 'windows', 'jseval']],

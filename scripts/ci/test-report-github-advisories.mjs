@@ -109,6 +109,28 @@ const multiple = await queryGitHubAdvisories(['pkg-a@1.0.0', 'pkg-b@3.0.0', 'pkg
 assert.deepEqual(multiple[0].affected, [
   { package: 'pkg-a', version: '1.0.0' }, { package: 'pkg-b', version: '4.1.0' },
 ], 'a clean version of the second named package must not inherit the first package match');
+for (const specs of [['pkg-b@1.0.0-next.29'], ['pkg-a@1.0.0', 'pkg-b@1.0.0-next.29']]) {
+  const prerelease = await queryGitHubAdvisories(specs, {
+    fetchImpl: async () => ({ ok: true, json: async () => [{ ...multiPackage,
+      vulnerabilities: [multiPackage.vulnerabilities[0],
+        { package: { ecosystem: 'npm', name: 'pkg-b' }, vulnerable_version_range: '< 1.0.0' }],
+    }] }), retries: 0, timeoutSignalFactory: () => undefined,
+  });
+  assert.ok(prerelease[0].affected.some(entry => entry.package === 'pkg-b' && entry.version === '1.0.0-next.29'),
+    'a vulnerable prerelease must be attributed even beside another matching package');
+}
+for (const [version, range, reason] of [
+  ['not-a-version', '< 1.0.0', 'package version'],
+  ['1.0.0-next.29', 'not a range', 'vulnerable range'],
+]) {
+  await assert.rejects(queryGitHubAdvisories(['pkg-a@1.0.0', `pkg-b@${version}`], {
+    fetchImpl: async () => ({ ok: true, json: async () => [{ ...multiPackage,
+      vulnerabilities: [multiPackage.vulnerabilities[0],
+        { package: { ecosystem: 'npm', name: 'pkg-b' }, vulnerable_version_range: range }],
+    }] }), retries: 0, timeoutSignalFactory: () => undefined,
+  }), new RegExp(`unreadable ${reason} for pkg-b@${version.replaceAll('.', '\\.')}`),
+  'an undecidable second package must fail the report even when the first package matches');
+}
 for (const range of [undefined, '', 'not a range']) {
   await assert.rejects(queryGitHubAdvisories(['pkg-a@1.0.0'], {
     fetchImpl: async () => ({ ok: true, json: async () => [{ ...multiPackage,

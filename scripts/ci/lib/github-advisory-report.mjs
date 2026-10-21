@@ -166,10 +166,15 @@ export async function queryGitHubAdvisories(specs, {
             // uses whitespace for the same intersection.
             const range = typeof entry.vulnerable_version_range === 'string'
               ? entry.vulnerable_version_range.replaceAll(',', ' ') : null;
-            if (!semver.valid(version) || typeof range !== 'string' || !range.trim() || !semver.validRange(range)) {
+            if (!semver.valid(version)) {
+              throw new Error(`GitHub advisory ${advisory.ghsa_id} has unreadable package version for ${spec}`);
+            }
+            if (typeof range !== 'string' || !range.trim() || !semver.validRange(range)) {
               throw new Error(`GitHub advisory ${advisory.ghsa_id} has unreadable vulnerable range for ${spec}`);
             }
-            return semver.satisfies(version, range);
+            // node-semver excludes prereleases by default, even below an upper
+            // bound. Advisory ranges must also cover queried prerelease builds.
+            return semver.satisfies(version, range, { includePrerelease: true });
           });
           return matches ? [{ package: name, version }] : [];
         });
