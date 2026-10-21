@@ -225,6 +225,16 @@ final class ExternalPressureHoldsBackfillTest {
         for (var entry : batch) pending.remove(entry.getKey());
         return new LuceneRuntimeTypes.BatchUpdateResult(batch.size(), 0);
       });
+      when(documentFieldOps.getEnrichmentInputs(anyList())).thenAnswer(inv -> {
+        List<String> ids=inv.getArgument(0);
+        var contents=documentFieldOps.getDocumentContentBatch(ids);
+        var fields=documentFieldOps.getDocumentFieldsBatch(ids,Set.of(SchemaFields.SPLADE_STATUS,SchemaFields.NER_STATUS));
+        Map<String,DocumentFieldOps.EnrichmentInput> result=new HashMap<>();
+        for(String id:ids) result.put(id,new DocumentFieldOps.EnrichmentInput(contents.get(id),fields.getOrDefault(id,Map.of()),null,Map.of()));
+        return result;
+      });
+      when(indexingCoordinator.updateDocumentsBatchIf(anyList(),org.mockito.ArgumentMatchers.anyMap())).thenAnswer(inv ->
+          indexingCoordinator.updateDocumentsBatch(inv.getArgument(0)));
       when(indexCountOps.countByField(anyString(), anyString())).thenReturn(0);
       doAnswer(inv -> {
         ((Runnable) inv.getArgument(0)).run();

@@ -254,8 +254,8 @@ tasks.register<JavaExec>("runSearchDump") {
 }
 
 // Registry snapshot for the consumer-presence governance gate (tempdoc 560 §5/§6). Always-run
-// (no up-to-date caching) so the snapshot the Node gate reads is never stale; mirrors the
-// module-deps gate's tmp/*.json generation step. Run before `node scripts/governance/run.mjs
+// (no up-to-date caching) so the snapshot the Node gate reads is never stale.
+// Run before `node scripts/governance/run.mjs
 // --gate consumer-presence`.
 tasks.register<JavaExec>("exportRegistrySnapshot") {
   group = "verification"

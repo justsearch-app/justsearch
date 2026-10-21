@@ -149,6 +149,18 @@ public final class InstallPlanner {
       Set<String> declined,
       Path modelsDir,
       Path homeDir) {
+    return plan(registry, hardware, intent, declined, modelsDir, homeDir, null);
+  }
+
+  /**
+   * Plans with an already policy-limited profile. The excluded hardware is used only to explain
+   * exclusions that policy caused; null preserves the ordinary hardware explanations.
+   */
+  public static InstallPlan plan(
+      ModelRegistry registry, HardwareProfile hardware, InstallIntent intent, Set<String> declined,
+      Path modelsDir, Path homeDir, HardwareProfile policyExcludedHardware) {
+    DownloadProfile excludedProfile = policyExcludedHardware == null
+        ? DownloadProfile.CPU : policyExcludedHardware.downloadProfile();
     Set<String> declinedIds = declined == null ? Set.of() : declined;
     DownloadProfile profile = hardware.downloadProfile();
     List<InstallPlan.PlannedDownload> downloads = new ArrayList<>();
@@ -219,8 +231,10 @@ public final class InstallPlanner {
             new InstallPlan.SkippedPackage(
                 pkg.id(),
                 SkipCause.HARDWARE,
-                String.format(
-                    "%s requires a CUDA-capable GPU (none detected on this system).", pkg.label())));
+                excludedProfile.usesCuda()
+                    ? "GPU acceleration is disabled by administrator policy"
+                    : String.format(
+                        "%s requires a CUDA-capable GPU (none detected on this system).", pkg.label())));
         continue;
       }
 
@@ -230,13 +244,17 @@ public final class InstallPlanner {
       if (pkg.hasVramRequirement() && !profile.includesGguf()) {
         long minMb = pkg.minVramBytes() / (1024 * 1024);
         String reason;
-        if (hardware.cudaFunctional()) {
-          long haveMb = hardware.vramBytes() / (1024 * 1024);
+        HardwareProfile explanationHardware = policyExcludedHardware == null
+            ? hardware : policyExcludedHardware;
+        if (excludedProfile.includesGguf()) {
+          reason = "GPU acceleration is disabled by administrator policy";
+        } else if (explanationHardware.cudaFunctional()) {
+          long haveMb = explanationHardware.vramBytes() / (1024 * 1024);
           reason =
               String.format(
                   "Insufficient VRAM for %s (%d MB available, %d MB required)",
                   pkg.label(), haveMb, minMb);
-        } else if (hardware.gpuDetected()) {
+        } else if (explanationHardware.gpuDetected()) {
           reason =
               String.format(
                   "%s requires a CUDA-capable GPU. An NVIDIA GPU was detected but the CUDA"

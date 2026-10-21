@@ -8,8 +8,8 @@
  *
  *   (input) → { ruleId, status, reason }
  *
- * Inputs are gate-specific (a module-deps verdict reads `{module, count,
- * pinnedCount, ...}`; an npm-audit verdict reads `{target, severity, baseline,
+ * Inputs are gate-specific (a config-surface verdict reads `{metric, current,
+ * pinned, ...}`; an npm-audit verdict reads `{target, severity, baseline,
  * current, ...}`). The contract is uniform on the output side:
  *
  *   ruleId : string  (kebab-namespaced; the gate's id is the namespace prefix)

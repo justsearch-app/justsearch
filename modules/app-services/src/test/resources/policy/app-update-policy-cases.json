@@ -1,0 +1,506 @@
+[
+  {
+    "name": "absent",
+    "machine": null,
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "v1 defaults",
+    "machine": "{\"schemaVersion\": 1}",
+    "user": "{\"schemaVersion\": 1}",
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "user false",
+    "machine": null,
+    "user": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": false}",
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "machine false user true",
+    "machine": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": false}",
+    "user": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": true}",
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "machine true user false",
+    "machine": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": true}",
+    "user": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": false}",
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "null update flags",
+    "machine": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": null}",
+    "user": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": null}",
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "unknown ignored",
+    "machine": "{\"schemaVersion\": 1, \"future\": {\"x\": []}}",
+    "user": "{\"schemaVersion\": 1, \"future\": false}",
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "AI independent",
+    "machine": "{\"schemaVersion\": 1, \"downloadsEnabled\": false, \"onlineAiEnabled\": false, \"gpuAccelerationEnabled\": false}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "invalid JSON",
+    "machine": "{",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "future machine",
+    "machine": "{\"schemaVersion\": 2}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "missing schema",
+    "machine": "{}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "invalid known boolean",
+    "machine": "{\"schemaVersion\": 1, \"downloadsEnabled\": {}}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "invalid update boolean",
+    "machine": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": \"garbage\"}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "invalid allowlists",
+    "machine": "{\"schemaVersion\": 1, \"allowlists\": []}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "invalid list",
+    "machine": "{\"schemaVersion\": 1, \"allowlists\": {\"packManifestSha256\": {}}}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "invalid list element",
+    "machine": "{\"schemaVersion\": 1, \"allowlists\": {\"modelSha256\": [{}]}}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "invalid date",
+    "machine": "{\"schemaVersion\": 1, \"updatedAt\": []}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "broken user ignored",
+    "machine": null,
+    "user": "{",
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "future user ignored",
+    "machine": null,
+    "user": "{\"schemaVersion\": 2, \"appUpdatesEnabled\": false}",
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "scalar coercion",
+    "machine": "{\"schemaVersion\": 1, \"downloadsEnabled\": \"false\", \"onlineAiEnabled\": 0, \"updatedAt\": 123, \"allowlists\": {\"modelSha256\": [1, true, null]}}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "string update false",
+    "machine": null,
+    "user": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": \"false\"}",
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "string update true",
+    "machine": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": \"TRUE\"}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "numeric false",
+    "machine": null,
+    "user": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": 0}",
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "null string",
+    "machine": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": \"null\"}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "empty boolean",
+    "machine": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": \"\"}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "directory machine",
+    "machine": null,
+    "user": null,
+    "machineKind": "directory",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "dangling machine",
+    "machine": null,
+    "user": null,
+    "machineKind": "dangling",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "unreadable machine",
+    "machine": "{\"schemaVersion\": 1}",
+    "user": null,
+    "machineKind": "unreadable",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "inaccessible attributes",
+    "machine": "{\"schemaVersion\": 1}",
+    "user": null,
+    "machineKind": "inaccessible",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "directory user",
+    "machine": null,
+    "user": null,
+    "machineKind": "file",
+    "userKind": "directory",
+    "allowed": true
+  },
+  {
+    "name": "floating schema coerced",
+    "machine": "{\"schemaVersion\": 1.9}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "string schema coerced",
+    "machine": "{\"schemaVersion\": \" 1 \"}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "boolean schema invalid",
+    "machine": "{\"schemaVersion\": true}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "schema overflow",
+    "machine": "{\"schemaVersion\": 4294967297}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "float boolean invalid",
+    "machine": "{\"schemaVersion\": 1, \"onlineAiEnabled\": 0.0}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "blank allowlists invalid",
+    "machine": "{\"schemaVersion\": 1, \"allowlists\": \"\"}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "blank list invalid",
+    "machine": "{\"schemaVersion\": 1, \"allowlists\": {\"modelSha256\": \"\"}}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "mixed case boolean invalid",
+    "machine": "{\"schemaVersion\": 1, \"downloadsEnabled\": \"tRuE\"}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "uppercase null invalid",
+    "machine": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": \"NULL\"}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "nonascii whitespace invalid",
+    "machine": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": \"\\u00a0true\\u00a0\"}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "false integer update",
+    "machine": "{\"schemaVersion\": 1, \"appUpdatesEnabled\": -1}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "malformed user known field ignored",
+    "machine": null,
+    "user": "{\"schemaVersion\":1,\"appUpdatesEnabled\":false,\"downloadsEnabled\":{}}",
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "invalid duplicate boolean",
+    "machine": "{\"schemaVersion\":1,\"downloadsEnabled\":{},\"downloadsEnabled\":true}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "invalid duplicate schema",
+    "machine": "{\"schemaVersion\":{},\"schemaVersion\":1}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "invalid duplicate allowlist",
+    "machine": "{\"schemaVersion\":1,\"allowlists\":{\"modelSha256\":{},\"modelSha256\":[]}}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "valid duplicate updates",
+    "machine": "{\"schemaVersion\":1,\"appUpdatesEnabled\":false,\"appUpdatesEnabled\":true}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "valid duplicate schema",
+    "machine": "{\"schemaVersion\":2,\"schemaVersion\":1}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "huge integer true",
+    "machine": "{\"schemaVersion\":1,\"appUpdatesEnabled\":123456789012345678901234567890}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "huge numeric string fields",
+    "machine": "{\"schemaVersion\":1,\"updatedAt\":1e999,\"allowlists\":{\"modelSha256\":[123456789012345678901234567890]}}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "negative zero false",
+    "machine": "{\"schemaVersion\":1,\"appUpdatesEnabled\":-0}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "exponent boolean invalid",
+    "machine": "{\"schemaVersion\":1,\"downloadsEnabled\":1e0}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "dangling machine ancestor",
+    "machine": null,
+    "user": null,
+    "machineKind": "dangling-parent",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "UTF-8 BOM v1",
+    "machine": "\ufeff{\"schemaVersion\":1}",
+    "user": null,
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "UTF-8 BOM user false",
+    "machine": null,
+    "user": "\ufeff{\"schemaVersion\":1,\"appUpdatesEnabled\":false}",
+    "machineKind": "file",
+    "userKind": "file",
+    "allowed": false
+  },
+  {
+    "name": "utf16le no BOM",
+    "machine": "{\"schemaVersion\":1,\"downloadsEnabled\":false}",
+    "user": null,
+    "machineKind": "utf16le",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "utf16le BOM",
+    "machine": "\ufeff{\"schemaVersion\":1,\"downloadsEnabled\":false}",
+    "user": null,
+    "machineKind": "utf16le",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "utf16be no BOM",
+    "machine": "{\"schemaVersion\":1,\"downloadsEnabled\":false}",
+    "user": null,
+    "machineKind": "utf16be",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "utf16be BOM",
+    "machine": "\ufeff{\"schemaVersion\":1,\"downloadsEnabled\":false}",
+    "user": null,
+    "machineKind": "utf16be",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "utf32le no BOM",
+    "machine": "{\"schemaVersion\":1,\"downloadsEnabled\":false}",
+    "user": null,
+    "machineKind": "utf32le",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "utf32le BOM",
+    "machine": "\ufeff{\"schemaVersion\":1,\"downloadsEnabled\":false}",
+    "user": null,
+    "machineKind": "utf32le",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "utf32be no BOM",
+    "machine": "{\"schemaVersion\":1,\"downloadsEnabled\":false}",
+    "user": null,
+    "machineKind": "utf32be",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "utf32be BOM",
+    "machine": "\ufeff{\"schemaVersion\":1,\"downloadsEnabled\":false}",
+    "user": null,
+    "machineKind": "utf32be",
+    "userKind": "file",
+    "allowed": true
+  },
+  {
+    "name": "UTF-16 user false",
+    "machine": null,
+    "user": "\ufeff{\"schemaVersion\":1,\"appUpdatesEnabled\":false}",
+    "machineKind": "file",
+    "userKind": "utf16le",
+    "allowed": false
+  }
+]

@@ -1,0 +1,140 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T10:09:20.282Z",
+  "revision": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
+  "tree": "fccf129ea0e7980a42a160ba7fc149e17adfc6b2",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::app_update_shared_policy_fixtures\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8186
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::app_update_env_suppresses_only_automatic_checks\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2085
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::app_update_policy_beats_env_and_reloads_without_changing_state\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1412
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::app_update_shared_policy_fixtures",
+      "file": "modules/shell/src-tauri/src/updater.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:de6b043bb0a2e3106a275635ce3ea61fd0c3f0951340f186f54333060832cded",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::tests::app_update_shared_policy_fixtures",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::app_update_env_suppresses_only_automatic_checks",
+      "file": "modules/shell/src-tauri/src/updater.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:de6b043bb0a2e3106a275635ce3ea61fd0c3f0951340f186f54333060832cded",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::tests::app_update_env_suppresses_only_automatic_checks",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::app_update_policy_beats_env_and_reloads_without_changing_state",
+      "file": "modules/shell/src-tauri/src/updater.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:de6b043bb0a2e3106a275635ce3ea61fd0c3f0951340f186f54333060832cded",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::tests::app_update_policy_beats_env_and_reloads_without_changing_state",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "HEAD",
+    "revision": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
+    "overlays": [
+      "modules/app-services/src/test/resources/policy/app-update-policy-cases.json"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/app-update-rust-before.patch",
+        "contentDigest": "sha256:dd5bd65786350d84c59f9c02e00554645c3355c604680a41000238b3beb141ec"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::app_update_shared_policy_fixtures\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 6579,
+        "output": "\nrunning 1 test\ntest updater::tests::app_update_shared_policy_fixtures ... FAILED\n\nfailures:\n\n---- updater::tests::app_update_shared_policy_fixtures stdout ----\n\nthread 'updater::tests::app_update_shared_policy_fixtures' (1343) panicked at src/updater.rs:2287:13:\nassertion `left == right` failed: \"user false\": Ok(true)\n  left: true\n right: false\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::tests::app_update_shared_policy_fixtures\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 155 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/upkeep-g-updatecheck/tmp/test-intent-before-AmLnDF/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1318:10\n     |\n1318 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1692:4\n     |\n1692 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.55s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/upkeep-g-updatecheck/tmp/base/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::app_update_env_suppresses_only_automatic_checks\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1156,
+        "output": "\nrunning 1 test\ntest updater::tests::app_update_env_suppresses_only_automatic_checks ... FAILED\n\nfailures:\n\n---- updater::tests::app_update_env_suppresses_only_automatic_checks stdout ----\n\nthread 'updater::tests::app_update_env_suppresses_only_automatic_checks' (1651) panicked at src/updater.rs:2303:9:\nassertion `left == right` failed\n  left: Ok(true)\n right: Ok(false)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::tests::app_update_env_suppresses_only_automatic_checks\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 155 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/upkeep-g-updatecheck/tmp/test-intent-before-AmLnDF/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1318:10\n     |\n1318 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1692:4\n     |\n1692 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.12s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/upkeep-g-updatecheck/tmp/base/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::app_update_policy_beats_env_and_reloads_without_changing_state\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1118,
+        "output": "\nrunning 1 test\ntest updater::tests::app_update_policy_beats_env_and_reloads_without_changing_state ... FAILED\n\nfailures:\n\n---- updater::tests::app_update_policy_beats_env_and_reloads_without_changing_state stdout ----\n\nthread 'updater::tests::app_update_policy_beats_env_and_reloads_without_changing_state' (1959) panicked at src/updater.rs:2342:21:\nassertion `left == right` failed: false, true, None: Ok(true)\n  left: true\n right: false\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::tests::app_update_policy_beats_env_and_reloads_without_changing_state\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 155 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/upkeep-g-updatecheck/tmp/test-intent-before-AmLnDF/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:28:20\n   |\n28 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:206:4\n    |\n206 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:946:15\n    |\n946 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1318:10\n     |\n1318 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1692:4\n     |\n1692 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.09s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/upkeep-g-updatecheck/tmp/base/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::app_update_shared_policy_fixtures",
+        "classification": "assertion",
+        "detail": "updater::tests::app_update_shared_policy_fixtures:  ---- updater::tests::app_update_shared_policy_fixtures stdout ----\n\nthread 'updater::tests::app_update_shared_policy_fixtures' (1343) panicked at src/updater.rs:2287:13:\nassertion `left == right` failed: \"user false\": Ok(true)\n  left: true\n right: false\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::tests::app_update_shared_policy_fixtures\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignore"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::app_update_env_suppresses_only_automatic_checks",
+        "classification": "assertion",
+        "detail": "updater::tests::app_update_env_suppresses_only_automatic_checks:  ---- updater::tests::app_update_env_suppresses_only_automatic_checks stdout ----\n\nthread 'updater::tests::app_update_env_suppresses_only_automatic_checks' (1651) panicked at src/updater.rs:2303:9:\nassertion `left == right` failed\n  left: Ok(true)\n right: Ok(false)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::tests::app_update_env_suppresses_only_automatic_checks\n\ntest resul"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::app_update_policy_beats_env_and_reloads_without_changing_state",
+        "classification": "assertion",
+        "detail": "updater::tests::app_update_policy_beats_env_and_reloads_without_changing_state:  ---- updater::tests::app_update_policy_beats_env_and_reloads_without_changing_state stdout ----\n\nthread 'updater::tests::app_update_policy_beats_env_and_reloads_without_changing_state' (1959) panicked at src/updater.rs:2342:21:\nassertion `left == right` failed: false, true, None: Ok(true)\n  left: true\n right: false\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater:"
+      }
+    ]
+  },
+  "digest": "sha256:93feb81f642cff6ae8ca8a4c73166c49f3ddcc5e78e8d40ab3a7c7de1ed07cfb"
+}

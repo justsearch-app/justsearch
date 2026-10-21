@@ -72,6 +72,10 @@ class BulkEncodeUrgencyTest {
   private final CommitOps commitOps = mock(CommitOps.class);
   private final WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
 
+  @org.junit.jupiter.api.BeforeEach void snapshots() {
+    BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator,false,Set.of(SchemaFields.IS_CHUNK));
+  }
+
   private void assertOnlyBackground() {
     assertFalse(urgencies.isEmpty(), "the bulk path must reach the encoder");
     assertEquals(List.of("BACKGROUND"), urgencies.stream().distinct().toList(),
@@ -199,6 +203,7 @@ class BulkEncodeUrgencyTest {
 
   @Test
   void nerBackfillAcquiresBackground() throws Exception {
+    BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator,true,Set.of());
     Encoding encoding = mock(Encoding.class);
     when(encoding.getIds()).thenReturn(new long[] {101, 7, 102});
     when(encoding.getAttentionMask()).thenReturn(new long[] {1, 1, 1});

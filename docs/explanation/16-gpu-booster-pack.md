@@ -39,7 +39,7 @@ This document describes current v3 behavior and is grounded in shipped code path
     - `disallowExternalInferenceServers=true` blocks adopting an already-running external `llama-server` on the configured port.
 - **Current pack import**:
   - Offline pack import supports **models packs** (v2) and **runtime packs** (v3) (install-only; activation is separate).
-  - Windows offline runtime packs install under `<AI_HOME>/native-bin/llama-server/variants/<variantId>/`; explicit activation uses `POST /api/ai/runtime/activate`. Separately, discovery and Windows startup can select an installed CUDA variant automatically (see §5). Linux uses an operator-supplied executable and does not support offline runtime packs.
+  - Windows offline runtime packs install under `<AI_HOME>/native-bin/llama-server/variants/<variantId>/`; explicit activation uses `POST /api/ai/runtime/activate`. Separately, discovery can select an installed CUDA variant; Install AI and Windows startup can also select one automatically when GPU policy permits (see §5). Linux uses an operator-supplied executable and does not support offline runtime packs.
   - Runtime packs may also optionally ship a matching ONNX Runtime native variant under `<AI_HOME>/native-bin/onnxruntime/variants/<variantId>/` (used by the Engine index half for reranker GPU acceleration when available).
 
 Practical note (allowlisting runtime packs):
@@ -58,7 +58,7 @@ Practical note (allowlisting runtime packs):
   `docs/explanation/05-ai-architecture.md`), so the CPU-only binary alone never yields a working
   chat feature.
 - GPU acceleration requires a CUDA-capable runtime plus vendor runtime DLLs (cuBLAS, cuBLASLt, cudart, etc).
-- Install AI can download Windows CUDA llama-server, ORT CUDA/native, cuDNN and CUDA runtime archives from registry-pinned URLs after consent. Each asset has a pinned SHA-256. Allowlisted offline packs provide a separate import path.
+- On supported Windows hardware, Install AI can download registry-pinned CUDA packages when downloads and GPU acceleration are permitted by policy. These include CUDA llama-server, ORT CUDA/native, cuDNN and CUDA runtime archives, acquired after consent with pinned SHA-256 verification. Importing an allowlisted offline GPU pack remains another installation route.
 
 ## 2. Runtime sourcing (upstream pinned prebuilt)
 
@@ -242,8 +242,9 @@ baseline is found, a CUDA variant is a final fallback. This is deterministic, no
 `findFirst()` scan. See [AI Setup + Verification](13-ai-setup-and-verification.md) for the full order.
 
 On Windows, `HeadlessApp.maybeAutoSelectCuda12Variant` can also select `variants/cuda12/` at
-startup when GPU layers are positive, no stored-settings or operator executable source at ordinal 300 or higher wins, and the default
-runtime lacks usable CUDA. Linux keeps the operator-supplied runtime.
+startup when GPU policy permits, GPU layers are positive, no stored-settings or operator executable source at ordinal 300 or higher wins, and the default
+runtime lacks usable CUDA. GPU-off policy or a boot policy-load failure prevents this selection and
+CUDA native-path publication. Linux keeps the operator-supplied runtime.
 
 ### 5.2 Explicit activation
 
@@ -290,7 +291,7 @@ See: `docs/explanation/14-ai-pack-spec.md` and `docs/explanation/15-enterprise-p
 Rules:
 
 - A pack can be **imported** even if hardware is incompatible/unknown (useful for staging); import does not activate it. Startup CUDA selection is a separate path (§5.1).
-- Explicit activation checks that the effective policy allows Online AI and GPU use when a policy snapshot is available. If the policy service is absent, returns null or throws, this check is skipped. There is no separate hardware gate in this path.
+- Explicit activation checks that the effective policy allows Online AI and GPU use. A configured policy service that throws or returns no snapshot denies activation; an absent policy service remains permissive. There is no separate hardware gate in this path.
 - Activation requires the runtime self-test to pass. For GPU offload it requires NVML to be available, a healthy candidate server to complete a tiny chat request, and a measured VRAM increase of at least 64 MiB; missing NVML or an insufficient/unknown increase is inconclusive and does not activate the variant. An explicit zero-GPU-layer configuration tests CPU execution without requiring a VRAM increase.
 
 ### 6.3 Shadow install + self-test

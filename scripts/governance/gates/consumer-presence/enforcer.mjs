@@ -1,8 +1,8 @@
 // consumer-presence gate (tempdoc 560 §5/§6) — the NonEmpty<ConsumerHook> keystone as a build gate.
 //
 // Reads the in-JVM registry snapshot (governance gates have no JVM; the real, merged consumer truth
-// is computed by RegistrySnapshotExporter and handed across as data — the module-deps tmp/*.json
-// pattern) and fails any declaration with zero consumers, unless grandfathered in exemptions.json.
+// is computed by RegistrySnapshotExporter and handed across as a JSON artifact) and fails any
+// declaration with zero consumers, unless grandfathered in exemptions.json.
 // This makes "declare an Operation/Resource/Prompt that nothing consumes" fail the build — the cure
 // for the substrate-without-consumer defect class (C-018) at the prevention-ladder Gate rung.
 
@@ -42,7 +42,7 @@ export async function enforceConsumerPresence(options) {
         `:modules:app-services:test (RegistrySnapshotExporterTest) to generate it.`,
       uri: snapshotRel,
     });
-    return result('pass'); // soft-fail: missing artifact does not block (module-deps pattern)
+    return result('pass'); // soft-fail: missing artifact does not block
   }
 
   let snapshot;

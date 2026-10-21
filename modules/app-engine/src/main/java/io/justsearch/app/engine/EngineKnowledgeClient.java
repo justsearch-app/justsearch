@@ -1019,12 +1019,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   @Override
   public int recoverVduProcessingForRetainedOwner(io.justsearch.app.api.EngineWorkHandle owner) {
-    var request = io.justsearch.ipc.RecoverVduProcessingRequest.newBuilder()
-        .setProcedureOwner(owner.context().workId().orElseThrow().toString()).build();
-    return withOwnedBudget("recoverVduProcessing", deadline(RpcDeadlineCategory.VDU_OPERATION),
+    var request = vduRecoveryRequest(owner.context());
+    int recovered = withOwnedBudget("recoverVduProcessing", deadline(RpcDeadlineCategory.VDU_OPERATION),
         owner.retain(), false,
         budget -> new WorkerIngestCalls(requireService(WorkerAppServices::ingestService),
             budget.context()).recoverVduProcessing(request).getRecoveredCount());
+    vduRecoveryCompleted(owner.context(),request);
+    return recovered;
   }
 
   @Override

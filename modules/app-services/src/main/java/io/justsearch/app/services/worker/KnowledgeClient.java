@@ -1823,6 +1823,28 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return vduOps.updateVduResult(docId, extractedContent, outcome, enrichment, pageCount, engineContext);
     }
 
+    public boolean updateVduResult(String docId, String content,
+            io.justsearch.ipc.VduUpdateOutcome outcome, String enrichment, int pages,
+            String attemptId, EngineContext context) {
+        return vduOps.updateVduResult(docId, content, outcome, enrichment, pages, attemptId, context);
+    }
+
+    public int markVduProcessing(String docId, int maxRetries, String attemptId, EngineContext context) {
+        return vduOps.markVduProcessing(docId, maxRetries, attemptId, context);
+    }
+
+    public boolean releaseVduProcessing(String docId, String attemptId, EngineContext context) {
+        return vduOps.releaseVduProcessing(docId, attemptId, context);
+    }
+
+    protected io.justsearch.ipc.RecoverVduProcessingRequest vduRecoveryRequest(EngineContext context) {
+        return vduOps.recoveryRequest(context);
+    }
+
+    protected void vduRecoveryCompleted(EngineContext context, io.justsearch.ipc.RecoverVduProcessingRequest request) {
+        vduOps.retireRecoveryRequest(request, context);
+    }
+
     public List<String> queryPendingVduDocIds(EngineContext engineContext) {
         return vduOps.queryPendingVduDocIds(engineContext);
     }
