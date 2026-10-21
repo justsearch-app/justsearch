@@ -3,8 +3,6 @@
 /**
  * Was a pinned number in `baseline.txt` RAISED in this PR without a changeset saying so?
  *
- * Mirrors `module-deps/truth-table.mjs:verdictForBaselineShift` — the closest sibling: same
- * `<path> <count> <date>` baseline shape, same per-file dynamic key set, same changeset loader.
  * Added by tempdoc 910: `dead-code` was the only ratchet gate with no baseline-shift rule, so
  * editing the pin upward passed as `rebalance-available` and the ratchet could be relaxed by hand.
  *

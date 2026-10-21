@@ -65,9 +65,9 @@ desktop trust-boundary properties.
 
 Embeddings (current):
 - Generated in the Engine's index half via **ONNX Runtime** (not llama.cpp in-process):
-  - `EmbeddingService` (`modules/indexer-worker/src/main/java/io/justsearch/indexerworker/embed/EmbeddingService.java`)
+  - `EmbeddingService` (`modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingService.java`)
   - ORT session management: `SessionHandle` interface + `NativeSessionHandle` concrete impl, built via `OrtSessionAssembler` (`modules/ort-common/...`)
-- Requires an **ONNX embedding model** (e.g., gte-multilingual-base), discovered via `JUSTSEARCH_MODEL_PATH` or local “AI Home” locations.
+- Requires an **ONNX embedding model** (e.g., gte-multilingual-base), discovered via `JUSTSEARCH_EMBED_ONNX_MODEL_PATH` or local model roots.
 
 ## 2. What gets bundled vs. what is BYO
 
@@ -277,20 +277,18 @@ In production/desktop mode, CORS allows the WebView origins that Tauri uses:
 - `https://tauri.localhost`
 - `http://tauri.localhost`
 
-See: `modules/ui/src/main/java/io/justsearch/ui/api/LocalApiServer.java`
+See: `modules/ui/src/main/java/io/justsearch/ui/api/ApiSecurityFilters.java`
 
 ## 6. BYO AI wiring (how model paths flow today)
 
-### 6.1 Persisted UI settings → sysprops/env
+### 6.1 Persisted UI settings → resolved configuration
 
-On backend startup, `HeadlessApp` reads UI settings and maps them to canonical system properties:
+On backend startup, `HeadlessApp` contributes UI settings to `ResolvedConfig` through
+`ConfigStoreRebuilder.contributeUiSettings` and publishes the result in the shared `ConfigStore`.
+Server and model paths flow through that configuration. `llama.lib.path` remains a direct
+system-property compatibility path for the native loader.
 
-- `justsearch.server.exe` (BYO llama-server path)
-- `justsearch.llm.model_path` (explicit model path override)
-- `justsearch.model.path` (embedding model path; consumed by the Engine index half)
-- `llama.lib.path` (native llama library override)
-
-See: `modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java`
+See: `modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java`.
 
 ### 6.1.1 Simple Mode “Install AI” (v1)
 
@@ -311,13 +309,13 @@ Until lane F stage A item A11 the worker was a child process, and `WorkerSpawner
 - `JUSTSEARCH_MODEL_PATH` (if explicitly set in env), otherwise
 - uses `System.getProperty("justsearch.model.path")` (populated from UI settings) to set `JUSTSEARCH_MODEL_PATH` for the worker process.
 
-That spawner is deleted. In one JVM there is nothing to forward across: the same two lookups happen in place through `EnvRegistry.get()`, against this process's own environment and system properties.
+That spawner and the `JUSTSEARCH_MODEL_PATH` lookup are deleted. The index half reads the shared resolved configuration; use `JUSTSEARCH_EMBED_ONNX_MODEL_PATH` for an explicit ONNX embedding model directory.
 
 ### 6.3 Embedding runtime uses ONNX Runtime
 
 When an ONNX embedding model is present (e.g., gte-multilingual-base), the Engine's index half loads it lazily via ONNX Runtime and generates embeddings. GPU acceleration is used when CUDA is available; otherwise embeddings are generated on CPU.
 
-See: `modules/indexer-worker/src/main/java/io/justsearch/indexerworker/embed/EmbeddingService.java`, `modules/ort-common/`
+See: `modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingService.java`, `modules/ort-common/`
 
 ## 7. Uninstall behavior (what happens today)
 
@@ -386,4 +384,3 @@ The Sandbox is used as a clean, ephemeral environment to validate:
 ### 8.2 Operational caveats
 
 - **Retired Worker configuration snapshot:** The one-Engine runtime no longer reads or writes `runtime/worker-config-snapshot.json`. A file left by an older release is inert; it is not a reason to clear user data or invalidate current Engine configuration. The former stale-path failure (374 G26) belonged to the removed Worker launch path.
-- **`isProd` gate fix:** `resolveWorkerLibDir()` now checks the bundled layout unconditionally (not gated on `isProd`), fixing Worker spawn failures on installed apps where Tauri passes `isProd=false`. (375 G27)

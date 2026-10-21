@@ -458,6 +458,46 @@ final class InteractionThreadControllerTest {
         "a non-list value is dropped, mirroring the claimMatches guard");
   }
 
+  @Test
+  void surfacesTheStandaloneQuestionFromTheRecord() {
+    ConversationStore conversationStore = mock(ConversationStore.class);
+    when(conversationStore.loadHistory("conv-s"))
+        .thenReturn(
+            List.of(
+                Map.of(
+                    "id", "a1",
+                    "role", "assistant",
+                    "content", "the answer",
+                    "ts", "2026-01-01T00:00:01Z",
+                    "standaloneQuestion", "What does the second report say?"),
+                Map.of(
+                    "id", "a2",
+                    "role", "assistant",
+                    "content", "No matching documents found",
+                    "ts", "2026-01-01T00:00:02Z",
+                    "terminalError", true,
+                    "standaloneQuestion", "What does the third report say?"),
+                Map.of(
+                    "id", "a3",
+                    "role", "assistant",
+                    "content", "a turn that was not rewritten",
+                    "ts", "2026-01-01T00:00:03Z")));
+    AgentService agentService = mock(AgentService.class);
+    when(agentService.threadProjection(eq("conv-s"), any()))
+        .thenReturn(ThreadProjection.of(List.of()));
+
+    JsonNode events = invokeGet(newController(conversationStore, agentService), "conv-s").get("events");
+    JsonNode answerNote = events.get(0).get("attributes").get("standaloneQuestion");
+    JsonNode errorNote = events.get(1).get("attributes").get("standaloneQuestion");
+    assertTrue(answerNote != null && errorNote != null, "each rewritten turn carries its note");
+    assertEquals("What does the second report say?", answerNote.asString());
+    assertEquals("ERROR", events.get(1).get("kind").asString());
+    assertEquals("What does the third report say?", errorNote.asString());
+    assertTrue(
+        events.get(2).get("attributes").get("standaloneQuestion") == null,
+        "an unrevised turn carries no key");
+  }
+
   /** A test {@code DataKeyState} with a fixed key whose lock state the test toggles (mirrors
    * FileConversationStoreTest's FakeKey). */
   private static final class FakeDataKeyState implements io.justsearch.agent.api.encryption.DataKeyState {

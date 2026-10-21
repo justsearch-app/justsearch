@@ -105,7 +105,7 @@ final class AutomaticVduBreakerSeamTest {
     var service = new OnlineAiServiceImpl(admission, manager);
     var processor = new VduProcessor(service, manager.chatHolds(), service,
         new TempFileManager(directory.resolve("images")), new ImagePreparer(), VduMetricCatalog.noop());
-    KnowledgeClient index = mock(KnowledgeClient.class);
+    KnowledgeClient index = VduAttemptTestSupport.client();
     for (int i = 0; i < 3; i++) {
       String id = image("document-" + i + ".png").toString();
       documents.add(id);

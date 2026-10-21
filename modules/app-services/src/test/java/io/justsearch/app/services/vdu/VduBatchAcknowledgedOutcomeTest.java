@@ -47,7 +47,7 @@ class VduBatchAcknowledgedOutcomeTest {
   @BeforeEach
   void setUp() {
     processor = mock(VduProcessor.class);
-    client = mock(KnowledgeClient.class);
+    client = VduAttemptTestSupport.client();
     gpu = mock(GpuCapabilitiesService.class);
     context = TestEngineContexts.durableInternal();
     when(processor.hasVisionCapability()).thenReturn(true);

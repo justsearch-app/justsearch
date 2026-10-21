@@ -56,11 +56,28 @@ Local indexing, retrieval, and built-in inference are anchored in the Engine and
 3. **AI downloads and automatic update checks.** Install AI downloads from `github.com` and
    `huggingface.co` with consent; repair and upgrades can download again. On Windows with supported
    NVIDIA hardware it also downloads a CUDA `llama-server` build and selects it automatically unless
-   the user configured an executable. Desktop builds with an embedded release URL check it on launch,
-   after about 30 seconds. CI-built installers embed the repository's configured GitHub release URL,
-   including branch candidates and pre-releases. There is **no off switch yet**. GitHub receives the
-   request IP and time; document content and queries are not sent by this check. Builds without a
-   pinned URL do not contact an update server; debug builds can use a runtime-provided URL.
+   the user configured an executable. Desktop builds with an embedded release URL check it by default
+   about 30 seconds after chrome mount. CI-built installers embed the repository's configured GitHub
+   release URL, including branch candidates and pre-releases. Discovery fetches `release.v1.json`,
+   `release.v1.json.sig` and `latest.json`; installation rechecks `latest.json` and downloads the signed
+   installer only on request. Requests follow GitHub redirects to download/CDN hosts. Those hosts
+   receive the request IP and time; these updater requests send no document content or queries.
+   Set `JUSTSEARCH_AUTO_UPDATE_CHECK=false` before starting a fresh desktop process to suppress only
+   the automatic check; Settings and recovery manual checks remain available. To forbid all new
+   updater requests, set `{"schemaVersion": 1, "appUpdatesEnabled": false}` in `policy.v1.json`: Windows machine policy is
+   `%PROGRAMDATA%\JustSearch\policy.v1.json`, and user policy is in the shell's app-data directory,
+   passed to the Engine as `JUSTSEARCH_HOME`. User policy can only further restrict machine policy.
+   Rust enforces this without the Engine, including qualification autorun and recovery. An invalid,
+   unreadable or nonregular machine policy fails closed; an absent file is permissive. Broken user
+   policy is reported by `/api/policy/effective` and ignored, matching the Engine's existing fallback.
+   Policy is read at the start of each discovery and install, and again before artifact download.
+   A discovery already in flight may complete its descriptor, signature and latest-metadata requests;
+   changes apply to the next operation and the install's artifact download. No in-flight request is
+   cancelled. Disabling checks retains durable upgrade intents, accepted sequences and local Engine
+   reconciliation. The key is optional in schemaVersion 1, independent of AI flags; older releases
+   ignore it. The first enforcing release will be named in its release notes. These controls do not
+   disable AI downloads, trace export or external integrations. Builds without a configured release
+   URL do not contact an update server; debug builds can use a runtime-provided URL.
    See `startAppUpdateMonitor`, `updater.rs::check_release`, and [supply chain](#first-run-and-supply-chain).
 4. **Connected clients and tools.** MCP clients receive retrieved paths and passages. The optional
    MCP host (`JUSTSEARCH_MCP_HOST_CONFIG` / `justsearch.mcp.host.config`) launches user-chosen programs;

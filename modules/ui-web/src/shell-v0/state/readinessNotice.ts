@@ -481,6 +481,12 @@ const CAUSE_ROWS: ReadonlyArray<{
     remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
     severity: 'error',
   },
+  {
+    code: 'index.migration_journal_unavailable',
+    wording: 'An unfinished index migration has lost its job journal. Search is unavailable; the database files have been kept for repair.',
+    remedy: OPEN_HEALTH,
+    severity: 'error',
+  },
   // Tempdoc 915 §C — the Worker gave up rebuilding this index shape by itself after three
   // attempts. Unlike `index.schema_mismatch` (which resolves itself), this one stays until a person
   // acts, and ingestion does not resume meanwhile ⇒ `warn` and a place in REINDEX_CAUSE_CODES.
@@ -608,6 +614,7 @@ const RETRIEVAL_IMPAIRING_CODES: ReadonlySet<string> = new Set([
 
 /** Terminal index failures: no search leg serves, including no keyword fallback. */
 const SEARCH_UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
+  'index.migration_journal_unavailable',
   'index.failed',
   'index.corrupt',
   'index.schema_open_refused',

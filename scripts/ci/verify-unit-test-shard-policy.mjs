@@ -245,7 +245,17 @@ export function validateUnitTestShardPolicy({ policy, workflowText, workflowSign
       const partJob = jobs.find((j) => j.id === part);
       if (!partJob || !runsOnPrAndPush(partJob.if) || partJob['continue-on-error']
           || /^        continue-on-error:/m.test(partJob.text)
-          || partJob.runs.some((run) => run.step?.if && run.step.if !== 'always()')) {
+          || partJob.runs.some((run) => {
+            if (!run.step?.if || run.step.if === 'always()') return false;
+            // Coverage attribution must still run after a failed Gradle execution. Its only
+            // permitted bypass is when that execution never ran (an earlier failure/cancel).
+            const coverage = partJob.runs.find(candidate => candidate.step?.id === 'windows-coverage');
+            return !(part === 'windows-native-contracts'
+              && run.text.startsWith('node scripts/ci/report-unit-test-attribution.mjs ')
+              && run.text.includes('--require-windows-classes')
+              && run.step.if === "always() && (steps.windows-coverage.outcome == 'success' || steps.windows-coverage.outcome == 'failure')"
+              && coverage && !coverage.step.if && coverage.text.includes('-PwindowsOnly=true'));
+          })) {
         issues.push(`${part}: required part is missing, conditional or tolerates job/step failure`);
       }
     }

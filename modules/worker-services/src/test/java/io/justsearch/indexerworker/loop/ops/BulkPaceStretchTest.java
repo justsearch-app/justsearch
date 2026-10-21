@@ -94,7 +94,7 @@ final class BulkPaceStretchTest {
               }
               return out;
             });
-    IndexingCoordinator coordinator = writingCoordinator();
+    IndexingCoordinator coordinator = writingCoordinator(fields);
 
     EmbeddingProvider embedder = mock(EmbeddingProvider.class);
     when(embedder.isAvailable()).thenReturn(true);
@@ -168,7 +168,7 @@ final class BulkPaceStretchTest {
     DocumentFieldOps fields = mock(DocumentFieldOps.class);
     when(fields.queryNonChunkDocIdsByField(anyString(), anyString(), anyInt())).thenReturn(docs);
     when(fields.getDocumentContentBatch(anyList())).thenAnswer(inv -> contents(inv.getArgument(0)));
-    IndexingCoordinator coordinator = writingCoordinator();
+    IndexingCoordinator coordinator = writingCoordinator(fields);
     SpladeEncoder splade = spladeEncoder();
 
     var outcome =
@@ -227,8 +227,9 @@ final class BulkPaceStretchTest {
     return splade;
   }
 
-  private static IndexingCoordinator writingCoordinator() {
+  private static IndexingCoordinator writingCoordinator(DocumentFieldOps fields) {
     IndexingCoordinator coordinator = mock(IndexingCoordinator.class);
+    BackfillSnapshotTestSupport.install(fields,coordinator);
     when(coordinator.updateDocumentsBatch(anyList()))
         .thenAnswer(
             inv ->

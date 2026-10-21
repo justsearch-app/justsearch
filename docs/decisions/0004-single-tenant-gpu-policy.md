@@ -4,10 +4,10 @@ type: decision
 status: superseded
 description: "Historical GPU mutual-exclusion proposal; shipped builds allow ONNX encoders and llama-server to be co-resident."
 date: 2026-02-03
-superseded_by: "GGUF→ONNX embedding migration (tempdocs 268, 286, 327)"
+superseded_by: "0050-gpu-co-residence-by-prevention.md"
 probes:
   - adr-0004-gpu-mutual-exclusion
-last_reviewed: 2026-10-02
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0004: Single-Tenant GPU Policy
@@ -35,6 +35,11 @@ follow-up lane and is outside this merge. The diagnosis file cited in the
 disposition are recorded here from that decision.
 
 ## Status
+
+Superseded by [ADR-0050](0050-gpu-co-residence-by-prevention.md), implemented
+in #759. The 2026-10-02 interim amendment above is historical: fixed GPU
+profiles, bulk-work pacing and external-pressure handling now govern
+co-residence. The original decision and earlier corrections remain below.
 
 Superseded — the GGUF embedding system (in-process llama.cpp via FFM)
 was deleted in March 2026 (~10,000 LOC). Embeddings now use ONNX Runtime

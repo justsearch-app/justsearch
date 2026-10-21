@@ -38,6 +38,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** Read the committed directory before close, with the periodic commit timer stopped. */
 class VduMutationCommitTest extends LuceneExecutorTestBase {
   @TempDir Path tempDir;
+  private static final String ATTEMPT="01b18ddd-e0e3-41b3-bc9f-a991965dbff8";
   private static final String DOC = "vdu-parent";
 
   private WorkerIngestService service(RunningRuntime runtime) {
@@ -46,7 +47,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
   }
 
   private RunningRuntime open() {
-    var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTestingWithVduRetryCount(0))
+    var runtime = IndexSchema.fromCatalog(VduRevisionTestSupport.catalog(0))
         .atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
     runtime.commitOps().stopCommitTimer();
     return runtime;
@@ -55,7 +56,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
   private void seed(RunningRuntime runtime, String status, int retries) {
     runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
         SchemaFields.DOC_ID, DOC, SchemaFields.DOC_UID, "vdu-identity",
-        SchemaFields.CONTENT, "baseline content", SchemaFields.VDU_STATUS, status,
+        SchemaFields.SOURCE_SHA256,"a".repeat(64), SchemaFields.CONTENT, "baseline content", SchemaFields.VDU_STATUS, status,
         SchemaFields.VDU_RETRY_COUNT, String.valueOf(retries))));
     runtime.commitOps().commitAndTrack();
     runtime.commitOps().maybeRefreshBlocking();
@@ -75,10 +76,12 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
       "VDU_UPDATE_OUTCOME_FAILED", "VDU_UPDATE_OUTCOME_REJECTED_SUSPECT_TEXT"})
   void resultAcknowledgementCoversParentAndReplacementChunks(VduUpdateOutcome outcome) throws Exception {
     try (var runtime = open()) {
-      seed(runtime, SchemaFields.VDU_STATUS_PROCESSING, 1);
+      seed(runtime, SchemaFields.VDU_STATUS_PENDING, 0);
+      var service=service(runtime);var ctx=procedureContext();
+      assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT).build(),ctx).getSuccess());
       String content = "Durable extraction with enough words for multiple chunks. ".repeat(400);
-      var result = service(runtime).updateVduResult(UpdateVduResultRequest.newBuilder()
-          .setDocId(DOC).setOutcome(outcome).setExtractedContent(content).build(), CallContext.none());
+      var result = service.updateVduResult(UpdateVduResultRequest.newBuilder()
+          .setDocId(DOC).setAttemptId(ATTEMPT).setOutcome(outcome).setExtractedContent(content).build(), ctx);
       assertTrue(result.getSuccess(), result.getError());
       String expectedStatus = switch (outcome) {
         case VDU_UPDATE_OUTCOME_SUCCESS_TEXT -> SchemaFields.VDU_STATUS_COMPLETED;
@@ -108,7 +111,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
       seed(runtime, SchemaFields.VDU_STATUS_PENDING, 0);
       var service = service(runtime);
       var claim = service.markVduProcessing(MarkVduProcessingRequest.newBuilder()
-          .setDocId(DOC).setMaxRetries(3).build(), CallContext.none());
+          .setDocId(DOC).setAttemptId(ATTEMPT).setMaxRetries(3).build(), procedureContext());
       assertTrue(claim.getSuccess(), claim.getError());
       assertEquals(1, claim.getRetryCount());
       assertEquals(SchemaFields.VDU_STATUS_PROCESSING, committedField(SchemaFields.VDU_STATUS));
@@ -133,7 +136,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
       var service = service(facade);
       var ctx = procedureContext();
       assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder()
-          .setDocId(DOC).setMaxRetries(3).build(), ctx).getSuccess());
+          .setDocId(DOC).setAttemptId(ATTEMPT).setMaxRetries(3).build(), ctx).getSuccess());
       doAnswer(call -> {
         Object selected = call.callRealMethod();
         assertTrue(service.updateVduResult(success(), ctx).getSuccess());
@@ -153,7 +156,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
       var service = service(runtime);
       var ctx = procedureContext();
       assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder()
-          .setDocId(DOC).setMaxRetries(3).build(), ctx).getSuccess());
+          .setDocId(DOC).setAttemptId(ATTEMPT).setMaxRetries(3).build(), ctx).getSuccess());
       assertEquals(1, service.recoverVduProcessing(ownedRecovery(ctx), ctx).getRecoveredCount());
       var result = service.updateVduResult(success(), ctx);
       assertFalse(result.getSuccess(), "a reset retires the abandoned procedure's terminal authority");
@@ -169,7 +172,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
       var abandoned = procedureContext();
       var current = procedureContext();
       assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder()
-          .setDocId(DOC).setMaxRetries(3).build(), current).getSuccess());
+          .setDocId(DOC).setAttemptId(ATTEMPT).setMaxRetries(3).build(), current).getSuccess());
       assertEquals(0, service.recoverVduProcessing(ownedRecovery(abandoned), abandoned).getRecoveredCount());
       assertEquals(SchemaFields.VDU_STATUS_PROCESSING, committedField(SchemaFields.VDU_STATUS));
       assertTrue(service.updateVduResult(success(), current).getSuccess());
@@ -178,7 +181,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
   }
 
   private static UpdateVduResultRequest success() {
-    return UpdateVduResultRequest.newBuilder().setDocId(DOC)
+    return UpdateVduResultRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT)
         .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
         .setExtractedContent("new successful text").build();
   }
@@ -195,6 +198,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
     try { builder.getClass().getMethod("setProcedureOwner", String.class)
         .invoke(builder, ctx.engineContext().workId().orElseThrow().toString()); }
     catch (NoSuchMethodException beforeScopedRecovery) { /* exercise the previous reset */ }
+    builder.addAttemptIds(ATTEMPT);
     return builder.build();
   }
 
@@ -203,7 +207,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
     try (var runtime = open()) {
       seed(runtime, SchemaFields.VDU_STATUS_PENDING, 3);
       var claim = service(runtime).markVduProcessing(MarkVduProcessingRequest.newBuilder()
-          .setDocId(DOC).setMaxRetries(3).build(), CallContext.none());
+          .setDocId(DOC).setAttemptId(ATTEMPT).setMaxRetries(3).build(), procedureContext());
       assertFalse(claim.getSuccess());
       assertEquals("Max retries exceeded", claim.getError());
       assertEquals(SchemaFields.VDU_STATUS_FAILED, committedField(SchemaFields.VDU_STATUS));
@@ -220,27 +224,27 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
     when(runtime.commitOps()).thenReturn(commits);
     when(runtime.documentFieldOps()).thenReturn(fields);
     when(runtime.indexingCoordinator()).thenReturn(indexing);
-    when(indexing.updateDocument(eq(DOC), anyMap())).thenReturn(true);
-    stubRecoveryUpdates(indexing, call -> true);
-    when(fields.queryDocIdsByFieldOrThrow(anyString(), anyString(), anyInt())).thenReturn(List.of(DOC));
-    var failure = new IllegalStateException("controlled commit failure");
-    doThrow(failure).when(commits).commitAndTrack(reason);
-    var service = service(runtime);
-    switch (reason) {
-      case VDU_UPDATE -> assertFalse(service.updateVduResult(UpdateVduResultRequest.newBuilder()
-          .setDocId(DOC).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY).build(),
-          CallContext.none()).getSuccess());
-      case VDU_MARK_PROCESSING -> assertFalse(service.markVduProcessing(MarkVduProcessingRequest.newBuilder()
-          .setDocId(DOC).build(), CallContext.none()).getSuccess());
-      case VDU_RECOVERY -> {
-        var thrown = assertThrows(WorkerServiceException.class, () -> service.recoverVduProcessing(
-            RecoverVduProcessingRequest.getDefaultInstance(), CallContext.none()));
-        assertEquals(WorkerServiceException.Status.INTERNAL, thrown.status());
-        assertSame(failure, thrown.getCause());
-      }
+    Map<String,String> state=new java.util.HashMap<>(Map.of(SchemaFields.SOURCE_SHA256,"a".repeat(64),
+        SchemaFields.CONTENT,"baseline",SchemaFields.DOC_UID,"uid",SchemaFields.VDU_STATUS,"PENDING",SchemaFields.VDU_RETRY_COUNT,"0"));
+    when(fields.getEnrichmentInputs(List.of(DOC))).thenAnswer(call -> Map.of(DOC,new DocumentFieldOps.EnrichmentInput("baseline",Map.copyOf(state),null,Map.of())));
+    when(fields.getDocumentFieldOrThrow(DOC,SchemaFields.VDU_RETRY_COUNT)).thenAnswer(call->state.get(SchemaFields.VDU_RETRY_COUNT));
+    when(indexing.updateDocument(eq(DOC),anyMap())).thenAnswer(call->{ Map<String,Object> updates=call.getArgument(1);updates.forEach((k,v)->state.put(k,v.toString()));return true; });
+    stubRecoveryUpdates(indexing,call->true);
+    when(fields.queryDocIdsByFieldOrThrow(anyString(),anyString(),anyInt())).thenReturn(List.of(DOC));
+    var service=service(runtime);var ctx=procedureContext();
+    if(reason==CommitReason.VDU_UPDATE) assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT).build(),ctx).getSuccess());
+    clearInvocations(commits);
+    var failure=new IllegalStateException("controlled commit failure");doThrow(failure).when(commits).commitAndTrack(reason);
+    switch(reason) {
+      case VDU_UPDATE -> assertFalse(service.updateVduResult(UpdateVduResultRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY).build(),ctx).getSuccess());
+      case VDU_MARK_PROCESSING -> assertFalse(service.markVduProcessing(MarkVduProcessingRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT).build(),ctx).getSuccess());
+      case VDU_RECOVERY -> { var thrown=assertThrows(WorkerServiceException.class,()->service.recoverVduProcessing(RecoverVduProcessingRequest.getDefaultInstance(),CallContext.none()));assertEquals(WorkerServiceException.Status.INTERNAL,thrown.status());assertSame(failure,thrown.getCause()); }
       default -> fail("unexpected test reason");
     }
-    verify(commits, never()).maybeRefreshBlocking();
+    var order=inOrder(commits);
+    if(reason!=CommitReason.VDU_RECOVERY) order.verify(commits).maybeRefreshBlocking();
+    order.verify(commits).commitAndTrack(reason);
+    order.verify(commits,never()).maybeRefreshBlocking();
   }
 
   @Test
@@ -259,7 +263,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
   @ValueSource(booleans = {false, true})
   void failedChunkReplacementStaysRecoverableEvenAfterAnUnrelatedCommit(boolean failInsertion) throws Exception {
     try (var runtime = open()) {
-      seed(runtime, SchemaFields.VDU_STATUS_PROCESSING, 1);
+      seed(runtime, SchemaFields.VDU_STATUS_PENDING, 0);
       var indexing = spy(runtime.indexingCoordinator());
       var failure = new IllegalStateException("controlled chunk replacement failure");
       if (failInsertion) {
@@ -275,10 +279,12 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
       when(facade.indexingCoordinator()).thenReturn(indexing);
       when(facade.documentFieldOps()).thenReturn(runtime.documentFieldOps());
       when(facade.commitOps()).thenReturn(runtime.commitOps());
+      var service=service(facade);var ctx=procedureContext();
+      assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT).build(),ctx).getSuccess());
       String content = "Replacement text long enough to create several chunks. ".repeat(400);
-      var result = service(facade).updateVduResult(UpdateVduResultRequest.newBuilder()
-          .setDocId(DOC).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
-          .setExtractedContent(content).build(), CallContext.none());
+      var result = service.updateVduResult(UpdateVduResultRequest.newBuilder()
+          .setDocId(DOC).setAttemptId(ATTEMPT).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
+          .setExtractedContent(content).build(), ctx);
       assertFalse(result.getSuccess());
       runtime.commitOps().commitAndTrack(CommitReason.TIMER);
       runtime.commitOps().maybeRefreshBlocking();
@@ -335,34 +341,29 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
 
   @Test
   void retryReadFailureCannotResetTheCountAndStartAnotherAttempt() throws Exception {
-    var runtime = mock(RunningRuntime.class);
-    var fields = mock(DocumentFieldOps.class);
-    var indexing = mock(IndexingCoordinator.class);
-    when(runtime.documentFieldOps()).thenReturn(fields);
-    when(runtime.indexingCoordinator()).thenReturn(indexing);
-    when(fields.getDocumentFieldOrThrow(DOC, SchemaFields.VDU_RETRY_COUNT))
-        .thenThrow(new IOException("retry count unreadable"));
-    var result = service(runtime).markVduProcessing(MarkVduProcessingRequest.newBuilder()
-        .setDocId(DOC).setMaxRetries(3).build(), CallContext.none());
-    assertFalse(result.getSuccess());
-    assertEquals("retry count unreadable", result.getError());
-    verifyNoInteractions(indexing);
+    var runtime=mock(RunningRuntime.class);var fields=mock(DocumentFieldOps.class);var indexing=mock(IndexingCoordinator.class);
+    when(runtime.documentFieldOps()).thenReturn(fields);when(runtime.indexingCoordinator()).thenReturn(indexing);
+    when(runtime.commitOps()).thenReturn(mock(CommitOps.class));
+    when(fields.getEnrichmentInputs(List.of(DOC))).thenReturn(Map.of(DOC,new DocumentFieldOps.EnrichmentInput(
+        "baseline",Map.of(SchemaFields.SOURCE_SHA256,"a".repeat(64)),null,Map.of())));
+    when(fields.getDocumentFieldOrThrow(DOC,SchemaFields.VDU_RETRY_COUNT)).thenThrow(new IOException("retry count unreadable"));
+    var result=service(runtime).markVduProcessing(MarkVduProcessingRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT).build(),procedureContext());
+    assertFalse(result.getSuccess());assertEquals("retry count unreadable",result.getError());verifyNoInteractions(indexing);
   }
 
   @Test
   void dropoutReadFailureCannotPublishAnIncorrectTerminalReason() throws Exception {
-    var runtime = mock(RunningRuntime.class);
-    var fields = mock(DocumentFieldOps.class);
-    var indexing = mock(IndexingCoordinator.class);
-    when(runtime.documentFieldOps()).thenReturn(fields);
-    when(runtime.indexingCoordinator()).thenReturn(indexing);
-    when(fields.getDocumentFieldOrThrow(DOC, SchemaFields.EXTRACTION_REASON_CODE))
-        .thenThrow(new IOException("dropout reason unreadable"));
-    var result = service(runtime).updateVduResult(UpdateVduResultRequest.newBuilder()
-        .setDocId(DOC).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY).build(),
-        CallContext.none());
-    assertFalse(result.getSuccess());
-    assertEquals("dropout reason unreadable", result.getError());
-    verifyNoInteractions(indexing);
+    try(var runtime=open()) {
+      seed(runtime,SchemaFields.VDU_STATUS_PENDING,0);
+      var fields=spy(runtime.documentFieldOps());var indexing=spy(runtime.indexingCoordinator());var facade=mock(RunningRuntime.class);
+      when(facade.documentFieldOps()).thenReturn(fields);when(facade.indexingCoordinator()).thenReturn(indexing);when(facade.commitOps()).thenReturn(runtime.commitOps());
+      var service=service(facade);var ctx=procedureContext();
+      assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT).build(),ctx).getSuccess());
+      clearInvocations(indexing);
+      doThrow(new IOException("dropout reason unreadable")).when(fields).getDocumentFieldOrThrow(DOC,SchemaFields.EXTRACTION_REASON_CODE);
+      var result=service.updateVduResult(UpdateVduResultRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT)
+          .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY).build(),ctx);
+      assertFalse(result.getSuccess());assertEquals("dropout reason unreadable",result.getError());verifyNoInteractions(indexing);
+    }
   }
 }

@@ -4,16 +4,16 @@
  * Two layers are tested here:
  *   (1) the shared rule module itself — rule id, direction handling, and the four message shapes
  *       the pin-movement clause can take;
- *   (2) the rule AS THE GATES SEE IT — three real enforcers (`module-deps`, `config-surface`,
- *       `dead-code`) driven through the four cases the rule has to distinguish:
+ *   (2) the rule AS THE GATES SEE IT — two real enforcers (`config-surface`, `dead-code`)
+ *       driven through the four cases the rule has to distinguish:
  *         growth declared + pin advanced to the measured value  → pass
  *         growth declared + pin unchanged                       → FAIL, new rule id
  *         growth declared + pin advanced but below measured     → FAIL, new rule id
  *         no growth declared                                    → untouched (still silent-growth)
  *
- * The three enforcers are picked for SHAPE, not convenience: `module-deps` is a per-row count
- * ratchet over a JSON report, `config-surface` a fixed-metric ratchet whose rows are named metrics,
- * `dead-code` a per-file ratchet whose count is summed out of a knip report. The FLOOR direction
+ * The two enforcers are picked for SHAPE, not convenience: `config-surface` is a fixed-metric
+ * ratchet whose rows are named metrics, `dead-code` a per-file ratchet whose count is summed out
+ * of a knip report. The FLOOR direction
  * (`declared-regression`, where the pin must fall rather than rise) is unit-tested here against
  * `test-efficacy`'s shape and driven through the real `npm-audit` and `test-efficacy` enforcers in
  * `repin-fires-per-gate.test.mjs`.
@@ -35,7 +35,6 @@ import {
   repinRuleDescription,
   repinRuleId,
 } from './declared-growth-repin.mjs';
-import { enforceModuleDeps } from '../gates/module-deps/enforcer.mjs';
 import { enforceConfigSurface } from '../gates/config-surface/enforcer.mjs';
 import { enforceDeadCode } from '../gates/dead-code/enforcer.mjs';
 
@@ -60,9 +59,9 @@ await run('rule id is <prefix>/declared-growth-without-repin and is described', 
     repinRuleId('test-efficacy', REPIN_REGRESSION_RULE_SUFFIX),
     'test-efficacy/declared-regression-without-repin',
   );
-  const desc = repinRuleDescription('module-deps');
-  assert.deepEqual(Object.keys(desc), ['module-deps/declared-growth-without-repin']);
-  assert.match(desc['module-deps/declared-growth-without-repin'], /not advanced to the/);
+  const desc = repinRuleDescription('config-surface');
+  assert.deepEqual(Object.keys(desc), ['config-surface/declared-growth-without-repin']);
+  assert.match(desc['config-surface/declared-growth-without-repin'], /not advanced to the/);
 });
 
 await run('the message names the pin file, the row, the measured value and the remedy', () => {
@@ -83,13 +82,13 @@ await run('the message names the pin file, the row, the measured value and the r
 
 await run('a pin that moved but fell short reads differently from one that never moved', () => {
   const short = repinFinding({
-    rulePrefix: 'module-deps', classification: 'declared-growth', row: 'modules/core', measured: 9,
-    livePin: 7, priorPin: 5, baselineFile: 'gates/module-deps/baseline.txt',
+    rulePrefix: 'config-surface', classification: 'declared-growth', row: 'yaml_keys', measured: 9,
+    livePin: 7, priorPin: 5, baselineFile: 'gates/config-surface/baseline.txt',
   });
   assert.match(short.message, /moved 5 → 7 in this diff but still short of the measured value/);
   const unknown = repinFinding({
-    rulePrefix: 'module-deps', classification: 'declared-growth', row: 'modules/core', measured: 9,
-    livePin: 7, baselineFile: 'gates/module-deps/baseline.txt',
+    rulePrefix: 'config-surface', classification: 'declared-growth', row: 'yaml_keys', measured: 9,
+    livePin: 7, baselineFile: 'gates/config-surface/baseline.txt',
   });
   assert.doesNotMatch(unknown.message, /in this diff/, 'no prior pin ⇒ no claim about movement');
 });
@@ -164,86 +163,6 @@ const CHANGESET = '---\nclassification: declared-growth\ntempdoc: 918\n---\nDecl
 const ids = (r) => r.findings.map((f) => f.ruleId);
 /** Only the ERROR findings decide the verdict; the note-level ones are commentary. */
 const errorIds = (r) => r.findings.filter((f) => f.level === 'error').map((f) => f.ruleId);
-
-// -- module-deps: `<module> <count> <date>` per-row counts read out of a JSON report.
-
-const DEPS_GATE = {
-  id: 'module-deps',
-  baseline: { path: 'gates/module-deps/baseline.txt' },
-  changesetsDir: 'gates/module-deps/.changesets',
-  config: { reportPath: 'tmp/module-deps.json' },
-};
-const MODULE = 'modules/core';
-/** Three production deps, so the measured count is 3. */
-const THREE_DEPS = JSON.stringify({
-  modules: [{ name: MODULE, productionDeps: ['a', 'b', 'c'] }],
-});
-
-async function depsOn(files) {
-  const root = scaffold(files);
-  return enforceModuleDeps({
-    repoRoot: root, gate: DEPS_GATE, baselineRef: 'HEAD', fixtureMode: true, fixtureRoot: root,
-  });
-}
-
-await run('module-deps: growth declared + pin advanced to the measured value → pass', async () => {
-  const r = await depsOn({
-    'tmp/module-deps.json': THREE_DEPS,
-    'gates/module-deps/baseline.txt': `${MODULE} 3 2026-09-03\n`,
-    '_baseline/gates/module-deps/baseline.txt': `${MODULE} 1 2026-09-01\n`,
-    'gates/module-deps/.changesets/918.md': CHANGESET,
-  });
-  assert.equal(r.verdict, 'pass', `expected pass, got ${r.verdict}: ${ids(r).join(', ')}`);
-  assert.ok(!ids(r).includes('module-deps/declared-growth-without-repin'));
-});
-
-await run('module-deps: growth declared + pin unchanged → FAIL with the new rule id', async () => {
-  const r = await depsOn({
-    'tmp/module-deps.json': THREE_DEPS,
-    'gates/module-deps/baseline.txt': `${MODULE} 1 2026-09-01\n`,
-    '_baseline/gates/module-deps/baseline.txt': `${MODULE} 1 2026-09-01\n`,
-    'gates/module-deps/.changesets/918.md': CHANGESET,
-  });
-  assert.equal(r.verdict, 'fail');
-  assert.deepEqual(errorIds(r), ['module-deps/declared-growth-without-repin']);
-  const m = r.findings[0].message;
-  assert.match(m, /Measured 3 cross-module deps/);
-  assert.match(m, /the pin in gates\/module-deps\/baseline\.txt is 1, unchanged in this diff/);
-});
-
-await run('module-deps: growth declared + pin advanced but below measured → FAIL', async () => {
-  const r = await depsOn({
-    'tmp/module-deps.json': THREE_DEPS,
-    'gates/module-deps/baseline.txt': `${MODULE} 2 2026-09-03\n`,
-    '_baseline/gates/module-deps/baseline.txt': `${MODULE} 1 2026-09-01\n`,
-    'gates/module-deps/.changesets/918.md': CHANGESET,
-  });
-  assert.equal(r.verdict, 'fail');
-  assert.deepEqual(errorIds(r), ['module-deps/declared-growth-without-repin']);
-  assert.match(r.findings[0].message, /moved 1 → 2 in this diff but still short/);
-});
-
-await run('module-deps: no growth declared → untouched, still silent-growth', async () => {
-  const r = await depsOn({
-    'tmp/module-deps.json': THREE_DEPS,
-    'gates/module-deps/baseline.txt': `${MODULE} 1 2026-09-01\n`,
-    '_baseline/gates/module-deps/baseline.txt': `${MODULE} 1 2026-09-01\n`,
-  });
-  assert.equal(r.verdict, 'fail');
-  assert.deepEqual(ids(r), ['module-deps/silent-growth'],
-    'without a changeset the pre-existing rule is what must fire, not the new one');
-});
-
-await run('module-deps: a shrink under a declared changeset still rebalances, not fails', async () => {
-  const r = await depsOn({
-    'tmp/module-deps.json': THREE_DEPS,
-    'gates/module-deps/baseline.txt': `${MODULE} 5 2026-09-03\n`,
-    '_baseline/gates/module-deps/baseline.txt': `${MODULE} 5 2026-09-01\n`,
-    'gates/module-deps/.changesets/918.md': CHANGESET,
-  });
-  assert.equal(r.verdict, 'pass');
-  assert.deepEqual(ids(r), ['module-deps/rebalance-available']);
-});
 
 // -- config-surface: the same four cases through a truth-table-driven, fixed-metric gate.
 

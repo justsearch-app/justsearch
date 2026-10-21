@@ -659,6 +659,34 @@ public final class ChatController {
   }
 
   /**
+   * POST /api/chat/conversations/{sessionId}/stop with body {@code {"turnId": "..."}}, the id the
+   * turn was dispatched with. The reader pressed Stop: the Engine cancels that turn and saves it as
+   * stopped. A closed connection never does this; leaving is not stopping. Answers
+   * {@code {stopped, pending}}: {@code stopped} when the running turn was stopped now;
+   * {@code pending} when it has not started yet (the Stop overtook its dispatch) and is stopped when
+   * it starts; neither when nothing changed (its answer was already saved, or it ended for another
+   * reason). The turn's stream ends the same way: an error with {@code errorCode: CANCELLED} for a
+   * stopped turn, {@code done} for one the Stop did not change.
+   */
+  public void handleStopTurn(Context ctx) {
+    String turnId = null;
+    try {
+      Object id = readBody(ctx).get(ConversationEngine.TURN_ID_KEY);
+      if (id instanceof String s) turnId = s;
+    } catch (RuntimeException ignored) {
+      // fall through to the 400 below
+    }
+    if (turnId == null || turnId.isBlank()) {
+      badRequest(ctx, "Missing required field: turnId");
+      return;
+    }
+    ConversationEngine.TurnStop stop = engine.stopTurn(ctx.pathParam("sessionId"), turnId);
+    ctx.json(Map.of(
+        "stopped", stop == ConversationEngine.TurnStop.STOPPED,
+        "pending", stop == ConversationEngine.TurnStop.PENDING));
+  }
+
+  /**
    * Tempdoc 838 — POST /api/chat/conversations/{sessionId}/title with body
    * {@code {"title": "...", "source": "user"|"auto"}}. Names the conversation durably: the title
    * becomes a sealed field of the session's meta.json, so it survives a cleared site-data, a second
