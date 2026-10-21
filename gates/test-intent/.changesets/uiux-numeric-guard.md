@@ -586,3 +586,14 @@ Final command results:
 - `McpAnswerLegibilityTest`: fresh baseline and candidate runs passed.
 - Test-intent: only independent acceptance is missing; the rolling reconsider-rate
   warning is recorded above. The builder has not authored an acceptance record.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp4.5-verifier-dvn67dxr",
+  "verdict": "reject",
+  "digest": "sha256:f8b76f3d681d78b7a5058cb34c8b0f870c159ba6328168132c50049320da968e",
+  "note": "NG1/NG3 and D8/F1 fail for decimals without a leading zero: .5, -.5 and +.5% are treated as 5, 5 and 5%. Both scorers accept the mismatch; real HTTP Ask and Delegate publish verified citations, and both browser windows render the mark. The 41 literal pairs pass, but these extra equivalences were not agreed. See verifier evidence dvn67dxr."
+}
+```
