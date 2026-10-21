@@ -419,3 +419,14 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
   "note": "Entries 1, 2, 4 and 5 and both reproduced fail-befores hold, but entry 3 cites ManagedLlamaAuthenticationTest#aWrapperPassesTheKeyToTheServingProcessAndStopsWithIt, which failed on the candidate (stopping the owned wrapper also ends its serving descendant: false) because on Linux the Engine SIGKILLs the wrapper and never ends descendants, so the assertion races the fixture's 100 ms self-exit poll; that expectation is not an Engine guarantee under K6."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "19daa6e6-0eaf-4328-8500-a30b08317a78",
+  "verdict": "accept",
+  "digest": "sha256:2d63ceca5ce10eeca1b2cecbb50efd3359136a22293a129b8ab940b9ddd7e4ba",
+  "note": "Accept: all five entries' classes, sources and evidence hold on 2466332bf; the three test files main changed (#800 and others) keep this changeset's delta byte-identical and pass; both delegated choices (401 probe before ready; key per launch with 32-byte base64url) and the kept Linux stop design (I6, documented at base) are within scope for what they pin; I reproduced the ignored-key assertion fail-before on 673b54a1b and saw all flagged classes plus the full app-services suite (4005 tests, 0 failed) pass under an orphan-reaping parent; the K8 wrapper/ignored-key gap, which still reproduces on the candidate (unauthenticated /props 200 after rejection), is stated honestly and not claimed by any entry; non-blocking: the changeset prose still says delivery is blocked, names review head 950a3a2ed and does not cite #858, the assertion audit credits the owner with a tooling permission, and both wrapper checks fail where orphaned processes are not reaped."
+}
+```
