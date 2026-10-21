@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T08:07:54.068Z",
+  "revision": "876fec015a8b95ec731856ad04473dba261367c9",
+  "tree": "edf08251dae9a5ba3497d73b487b75bb397a240b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/boot/desktopRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/test-intent-vitest-1528251-1792483669926.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1376
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/desktopRecovery.test.ts",
+      "file": "modules/ui-web/src/boot/desktopRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9f2fb84609eb8f0acfb2929176f31c9b1f0a86c23c437d709c938843bb21162f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "desktop boot recovery subscribes before API discovery and exposes host installation without an API",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery words an escalated Engine exit from the supervisor observation while the API is down",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery removes the recovery surface when the real API is available",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery replaces a running shell with terminal recovery without a successor binding",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery preserves exhaustion that arrives while the application is still mounting",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery keeps an update failure visible and allows checking again",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery restarts through the host and shows a refused restart reason without losing controls",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery shows the spawn obstacle, retained crash evidence, and the count across budget resets",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery keeps the running-but-not-ready explanation visible when the API answers",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery explains a locked data folder without suggesting an automatic retry",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery keeps browser unresolved behavior and never invokes native recovery commands",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c00a0cb24",
+    "revision": "c00a0cb24b4c6000e090d5d09054c1e7e1d24e2f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/boot/desktopRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/test-intent-vitest-1528251-1792483672312.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1614,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/test-intent-vitest-1528251-1792483672312.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/boot/desktopRecovery.test.ts",
+        "classification": "assertion",
+        "detail": "desktop boot recovery replaces a running shell with terminal recovery without a successor binding:  AssertionError: expected '\\n      \\n        JustSearch could no…' to contain 'Restart JustSearch'\n    at /home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/test-intent-before-RV2Bye/modules/ui-web/src/boot/desktopRecovery.test.ts:93:46\n    at processTicksAndRejections (node:int | desktop boot recovery restarts through the host and shows a refused restart reason without losing"
+      }
+    ]
+  },
+  "digest": "sha256:fecc6d72df36dc9043cbd1da1194ecd1f2a48d72bfb7721a051d8d9d8ce9d961"
+}

@@ -17,6 +17,7 @@ mod platform_paths;
 // Lane F stage B item B10: the Engine supervisor (design 7.1). The DECISION half is a pure
 // function over the register the dev-runner also reads; only the actuator lives in this file.
 mod quit;
+mod recovery;
 mod search_shortcut;
 mod session_window;
 mod shell_actuator;
@@ -756,7 +757,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         .join("plugins")
         .join("pipeline-stage-plugins.v1.json");
 
-    let crash_dir = app_data_dir.join("crashes");
+    let crash_options = recovery::jvm_options(&app_data_dir)?;
     let mut cmd = containment::engine_command(&java_bin).map_err(|e| e.to_string())?;
     // Use AOT cache if present (JEP 514 — built at compile time, bundled in aot/).
     let aot_cache = headless_dir.join("aot").join("head.aot");
@@ -811,13 +812,9 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         cmd.arg(format!("-XX:AOTCache={}", aot_cache.to_string_lossy()));
     }
     cmd
-        // JVM crash diagnostics — write to <dataDir>/crashes/
-        .arg(format!(
-            "-XX:ErrorFile={}/hs_err_pid%p.log",
-            crash_dir.to_string_lossy()
-        ))
+        // One argument per JVM option also preserves Windows paths containing spaces.
+        .args(crash_options)
         .arg("-XX:+HeapDumpOnOutOfMemoryError")
-        .arg(format!("-XX:HeapDumpPath={}/", crash_dir.to_string_lossy()))
         // Lane F stage B item B1. Without this an OutOfMemoryError reaches the default
         // uncaught-exception handler and the JVM exits 1 — the same code as a boot failure, so the
         // supervisor cannot tell a memory death from a bad config. With it the JVM exits 3.
@@ -1164,25 +1161,31 @@ pub(crate) fn start_supervision(
     app: &tauri::AppHandle,
     state: Arc<BackendState>,
 ) -> Result<(), String> {
-    let Ok(data_dir) = resolve_app_data_dir(app) else {
-        return Err("supervisor: no app data dir; the Engine will not be supervised".into());
-    };
+    let data_dir = resolve_app_data_dir(app)
+        .map_err(|error| format!("Cannot resolve the Engine data directory: {error}"))?;
     let host = state.host.clone();
     let spawn_app = app.clone();
     let event_app = app.clone();
-    let mut actuator = shell_actuator::ShellActuator::new(
-        host.clone(),
-        data_dir,
-        move || {
-            state.reset_for_restart()?;
-            spawn_headless_backend(&spawn_app, state.clone())?;
-            Ok(state.child_pid().unwrap_or(0))
-        },
-        move |record| {
-            let _ = event_app.emit(EVENT_SUPERVISOR_STATE, record);
-        },
-    );
+    let exhausted_data_dir = data_dir.clone();
+    let actor_host = host.clone();
     host.start_supervisor(move || {
+        let mut actuator = shell_actuator::ShellActuator::new(
+            actor_host,
+            data_dir,
+            move || {
+                state.reset_for_restart()?;
+                spawn_headless_backend(&spawn_app, state.clone())?;
+                Ok(state.child_pid().unwrap_or(0))
+            },
+            move |record| {
+                // Exhaustion now owns an interruptible wait, so retain the terminal helper cleanup
+                // at that transition rather than delaying it until this actor eventually exits.
+                if record.state == "exhausted" && record.retry_at.is_some() {
+                    cleanup_registered_children_for_terminal(&exhausted_data_dir);
+                }
+                let _ = event_app.emit(EVENT_SUPERVISOR_STATE, record);
+            },
+        );
         let policy = supervisor::load_policy();
         let mut sup = supervisor::Supervisor::new(policy);
         let outcome = supervisor::run_supervision(&mut sup, &mut actuator);
@@ -1245,6 +1248,17 @@ fn update_tray_tooltip(state: &BackendState, tooltip: &str) {
     if let Some(tray) = app.tray_by_id(&id) {
         let _ = tray.set_tooltip(Some(tooltip));
     }
+}
+
+#[tauri::command]
+fn restart_engine(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<BackendState>>,
+) -> Result<(), String> {
+    if state.host.request_manual_restart()? {
+        return Ok(());
+    }
+    start_supervision(&app, (*state).clone())
 }
 
 #[tauri::command]
@@ -1905,6 +1919,7 @@ pub fn run() {
         .manage(search_shortcut::SearchShortcut::default())
         .invoke_handler(tauri::generate_handler![
             supervisor_state,
+            restart_engine,
             api_port,
             session_token,
             smoke_run_id,
