@@ -355,13 +355,16 @@
       "status": "READY",
       "implementationSources": [
         "modules/app-services/src/main/java/io/justsearch/app/services/encryption/EncryptionKeystore.java",
-        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/OwnerOnlyDirectory.java",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/WindowsOwnerOnlyDirectory.java"
       ],
       "tests": [
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/DataKeyManagerTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/EncryptionEnvelopeTest.java"
       ],
-      "fixtures": []
+      "fixtures": [],
+      "note": "The encryption folder is owner-only and startup repairs permissions on existing entries, including keystore replicas, skipping links, reparse points and multiply linked files with a warning."
     },
     {
       "id": "user-policy",
@@ -979,7 +982,7 @@
       "id": "runtime-manifest-history",
       "pathVerification": "LITERAL",
       "encryption": "NOT_APPLICABLE",
-      "encryptionNote": "Who is running right now and where: instance id, process ids, loopback ports, the app's own data directory, and reachability/shutdown classification per instance (RuntimeManifestPublisher.java:40). No user content. The per-boot session credential is held only in the owner-only current manifest (POSIX 0600 or Windows owner plus SYSTEM); new instance history strips it. OwnerOnlyFile creates the protected temporary file before RuntimeManifestPublisher writes and replaces the current manifest.",
+      "encryptionNote": "Who is running right now and where: instance id, process ids, loopback ports, the app's own data directory, and reachability/shutdown classification per instance (RuntimeManifestPublisher.java:40). No user content. The per-boot session credential is held only in the owner-only current manifest (POSIX 0600 or Windows owner plus SYSTEM); new instance history strips it. OwnerOnlyFile creates the protected temporary file before RuntimeManifestPublisher writes and replaces the current manifest. The runtime folder is owner-only and startup repairs permissions on existing entries, skipping links, reparse points and multiply linked files with a warning.",
       "owner": "HEAD",
       "root": "DATA_DIR",
       "ownedPaths": [
@@ -1003,7 +1006,9 @@
       "implementationSources": [
         "modules/ui/src/main/java/io/justsearch/ui/runtime/OwnerOnlyFile.java",
         "modules/ui/src/main/java/io/justsearch/ui/runtime/RuntimeManifestPublisher.java",
-        "modules/shell/src-tauri/src/shell_actuator.rs"
+        "modules/shell/src-tauri/src/shell_actuator.rs",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/OwnerOnlyDirectory.java",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/WindowsOwnerOnlyDirectory.java"
       ],
       "tests": [
         "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestCredentialBoundaryTest.java",
@@ -1714,12 +1719,15 @@
         "modules/app-engine/src/main/java/io/justsearch/app/engine/ShutdownRequest.java",
         "modules/shell/src-tauri/src/lib.rs",
         "modules/shell/src-tauri/src/shell_actuator.rs",
-        "scripts/dev/dev-runner.cjs"
+        "scripts/dev/dev-runner.cjs",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/OwnerOnlyDirectory.java",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/WindowsOwnerOnlyDirectory.java"
       ],
       "tests": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestTest.java"
       ],
-      "fixtures": []
+      "fixtures": [],
+      "note": "The runtime folder is owner-only and startup repairs permissions on existing entries, skipping links, reparse points and multiply linked files with a warning."
     },
     {
       "id": "engine-supervisor-state",
@@ -1746,14 +1754,16 @@
       "implementationSources": [
         "scripts/dev/dev-runner.cjs",
         "modules/shell/src-tauri/src/lib.rs",
-        "modules/shell/src-tauri/src/engine_host.rs"
+        "modules/shell/src-tauri/src/engine_host.rs",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/OwnerOnlyDirectory.java",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/WindowsOwnerOnlyDirectory.java"
       ],
       "tests": [
         "scripts/dev/test-dev-runner-supervisor.mjs",
         "scripts/supervisor-conformance/adapters/tauri.mjs"
       ],
       "fixtures": [],
-      "note": "Added at lane F stage B item B8 with one writer and completed at item B10 with the second. design 7.1 declares TWO implementations of one supervisor contract, and this row is where that stops being a claim about behaviour and becomes a claim about bytes: the dev-runner and the Tauri shell write the same field set into the same path, and the harness asserts the shared shape (kind, schemaVersion, state, incarnation, restartCount) from both adapters. Note also what this row does NOT do: it is EPHEMERAL/RESET, which is honest for live state, and the checklist's Q5 weighed moving it outside runtime/ to escape that classification and chose the mirror instead — an upgrade legitimately resets the live state, and the one record that must not be reset is the terminal one. The JSONL mirror is written by the dev-runner only at this stage; the shell's terminal record is the live file plus the updater's own reading of it (item B13), which is the case Q5 was actually about."
+      "note": "Added at lane F stage B item B8 with one writer and completed at item B10 with the second. design 7.1 declares TWO implementations of one supervisor contract, and this row is where that stops being a claim about behaviour and becomes a claim about bytes: the dev-runner and the Tauri shell write the same field set into the same path, and the harness asserts the shared shape (kind, schemaVersion, state, incarnation, restartCount) from both adapters. Note also what this row does NOT do: it is EPHEMERAL/RESET, which is honest for live state, and the checklist's Q5 weighed moving it outside runtime/ to escape that classification and chose the mirror instead — an upgrade legitimately resets the live state, and the one record that must not be reset is the terminal one. The JSONL mirror is written by the dev-runner only at this stage; the shell's terminal record is the live file plus the updater's own reading of it (item B13), which is the case Q5 was actually about. The runtime folder is owner-only and startup repairs permissions on existing entries, skipping links, reparse points and multiply linked files with a warning."
     },
     {
       "id": "engine-exit-ledger-children",
@@ -1780,7 +1790,9 @@
         "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriter.java",
         "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReader.java",
         "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/LedgerRetention.java",
-        "modules/shell/src-tauri/src/exit_ledger.rs"
+        "modules/shell/src-tauri/src/exit_ledger.rs",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/OwnerOnlyDirectory.java",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/WindowsOwnerOnlyDirectory.java"
       ],
       "tests": [
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java",
@@ -1791,7 +1803,7 @@
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java"
       ],
       "fixtures": [],
-      "note": "ADR-0051. The Engine owns child records and is the family's single rotator. Java and Rust readers consume numbered archives, loss receipts and the current file. The reconciliation field remains the frozen compatibility-strategy identifier, including its historical one-generation wording; actual retention now preserves numbered archives within 128 MiB and persists identity/session-scoped EVIDENCE_LOST receipts before eviction. Loss-journal compaction explicitly loses membership detail while preserving known evidence scope; malformed lines are retained and counted, not silently discarded. The source registrations add the retention helper and shared Rust reader without changing the store identity, schema or reconciliation token."
+      "note": "ADR-0051. The Engine owns child records and is the family's single rotator. Java and Rust readers consume numbered archives, loss receipts and the current file. The reconciliation field remains the frozen compatibility-strategy identifier, including its historical one-generation wording; actual retention now preserves numbered archives within 128 MiB and persists identity/session-scoped EVIDENCE_LOST receipts before eviction. Loss-journal compaction explicitly loses membership detail while preserving known evidence scope; malformed lines are retained and counted, not silently discarded. The source registrations add the retention helper and shared Rust reader without changing the store identity, schema or reconciliation token. The runtime folder is owner-only and startup repairs permissions on existing entries, skipping links, reparse points and multiply linked files with a warning."
     },
     {
       "id": "engine-exit-ledger-incarnations",
@@ -1821,7 +1833,9 @@
         "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/LedgerRetention.java",
         "modules/shell/src-tauri/src/exit_ledger.rs",
         "modules/shell/src-tauri/src/shell_actuator.rs",
-        "scripts/dev/lib/exit-ledger.cjs"
+        "scripts/dev/lib/exit-ledger.cjs",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/OwnerOnlyDirectory.java",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/WindowsOwnerOnlyDirectory.java"
       ],
       "tests": [
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/EngineSelfIntentWriterTest.java",
@@ -1832,7 +1846,7 @@
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java"
       ],
       "fixtures": [],
-      "note": "ADR-0051. The Tauri shell or dev-runner supervisor writes engine-start, engine-intent and engine-exit and is the only rotator; the Engine appends self-intent without rotating. The compatibility tuple and reconciliation token remain unchanged. Current retention uses the same 128 MiB numbered-archive and loss-receipt protocol as the children family, including preservation of unreadable loss-journal lines and explicit incomplete scope after lossy compaction. encryption is NOT_APPLICABLE rather than UNSEALED_NO_JVM_CIPHER because the Engine also writes this file."
+      "note": "ADR-0051. The Tauri shell or dev-runner supervisor writes engine-start, engine-intent and engine-exit and is the only rotator; the Engine appends self-intent without rotating. The compatibility tuple and reconciliation token remain unchanged. Current retention uses the same 128 MiB numbered-archive and loss-receipt protocol as the children family, including preservation of unreadable loss-journal lines and explicit incomplete scope after lossy compaction. encryption is NOT_APPLICABLE rather than UNSEALED_NO_JVM_CIPHER because the Engine also writes this file. The runtime folder is owner-only and startup repairs permissions on existing entries, skipping links, reparse points and multiply linked files with a warning."
     },
     {
       "id": "operation-fault-harness-barrier",

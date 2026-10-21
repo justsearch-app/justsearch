@@ -90,7 +90,7 @@ final class WindowsOwnerOnlyDirectory {
           MemorySegment.NULL, MemorySegment.NULL, acl, MemorySegment.NULL);
       if (error != 0) throw new IOException("Cannot set protected entry DACL for " + path + " (Windows error " + error + ")");
     } finally {
-      int closed = (int) Win32.CLOSE.invokeExact(handle);
+      int _ = (int) Win32.CLOSE.invokeExact(handle);
     }
   }
 
