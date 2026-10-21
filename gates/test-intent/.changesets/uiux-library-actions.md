@@ -303,3 +303,14 @@ WP3.4, authored from the agreed scenarios and delegated decisions. No acceptance
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "zeav5urd",
+  "verdict": "accept",
+  "digest": "sha256:63f5cfc5dcf18f45a9f9e56a82ca8546d139c6ec728ca925aa514072da0802ee",
+  "note": "Expectations follow agreed WP3.4, decision 8 and corrected LA1; named checks pass on candidate and assert-fail before (UI rerun used hardlinked dependencies). Test-intent acceptance only; product S34.2 preview and S34.9 dark contrast remain findings."
+}
+```
