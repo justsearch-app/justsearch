@@ -47,7 +47,7 @@ final class WatcherJournalFormatTest {
       try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database);
            Statement sql = connection.createStatement(); ResultSet version = sql.executeQuery("PRAGMA user_version")) {
         assertTrue(version.next());
-        assertTrue(version.getInt(1) > 22,
+        assertTrue(version.getInt(1) > 23,
             "old readers must refuse new DELETE/root-reconciliation formats before any database write");
       }
       var legacy = queue.listSwitchBufferOpsStrict().getFirst();

@@ -265,6 +265,8 @@ class StatusStateFieldsTest {
   static final class Fixture implements AutoCloseable {
     final StatusComponentFixture components = new StatusComponentFixture();
     final Measurements measurements = new Measurements();
+    final java.util.concurrent.atomic.AtomicLong clockMs =
+        new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis());
     final TelemetryHealthState telemetry = new TelemetryHealthState();
     final AtomicReference<String> conversation = new AtomicReference<>("unlocked");
     final StatusLifecycleHandler handler;
@@ -288,10 +290,13 @@ class StatusStateFieldsTest {
           java.nio.file.Path.of(System.getProperty("java.io.tmpdir")), Instant.now(),
           () -> "OK", null, null, () -> gpu, caps.worker(), caps.inference());
       handler.setRrdStoreSupplier(() -> rrd);
+      handler.setClockForTesting(clockMs::get);
       handler.setTelemetryHealthSupplier(() -> telemetry);
       handler.setConversationProtectionSupplier(conversation::get);
       handler.setGpuMemoryReader(new GpuMemoryReader() {
-        @Override public GpuMemorySample sampleNow() { return measurements.memory(Instant.now()); }
+        @Override public GpuMemorySample sampleNow() {
+          return measurements.memory(Instant.ofEpochMilli(clockMs.get()));
+        }
         @Override public void close() {}
       });
       components.attach(handler);
@@ -307,12 +312,12 @@ class StatusStateFieldsTest {
       app.start("127.0.0.1", 0);
     }
 
-    /** Advance every measurement, then let the GPU caches (5 s NVML, 2 s memory) expire. */
-    void measurementsChange() throws InterruptedException {
+    /** Advance measurements and both cache windows (5 s NVML, 2 s memory) together. */
+    void measurementsChange() {
       measurements.tick.incrementAndGet();
       telemetry.recordFlushFailure();
       telemetry.recordGaugeCallbackFailure();
-      Thread.sleep(5_300L);
+      clockMs.addAndGet(5_300L);
       handler.sampleAndBuildStatusSnapshot();
     }
 
@@ -341,6 +346,18 @@ class StatusStateFieldsTest {
         Long.parseLong(r.headers().firstValue("X-JustSearch-Status-Change").orElse("-1")), -1L, r.body());
   }
 
+  private static void assertMeasurements(Fixture f, Read read) {
+    var body = new tools.jackson.databind.ObjectMapper().readTree(read.body());
+    int tick = f.measurements.tick.get();
+    assertEquals(3 * GIB + tick * 7_000_000L, body.at("/gpu/usedVramBytes").asLong(),
+        "the NVML cache published the changed measurement through HTTP");
+    assertEquals(9 * GIB - tick * 9_000_000L,
+        body.at("/operating/gpu/adapterFreeBytes").asLong(),
+        "the memory cache published the changed measurement through HTTP");
+    assertEquals(10 + tick, body.at("/worker/core/indexedDocuments").asLong());
+    assertEquals(100 + tick, body.at("/worker/telemetry/contentLengthAvgChars").asDouble());
+  }
+
   /** Waits for the first GPU samples (unknown to known is a state change), then settles. */
   private Read settle(Fixture f) throws Exception {
     long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
@@ -365,9 +382,12 @@ class StatusStateFieldsTest {
       for (int i = 0; i < 3; i++) {
         f.measurementsChange();
         var ordinary = read(f, "/api/status");
+        assertMeasurements(f, ordinary);
         bodies.add(ordinary.body());
         seen.add(ordinary.change());
-        seen.add(read(f, "/api/status?fresh=true").change());
+        var fresh = read(f, "/api/status?fresh=true");
+        assertMeasurements(f, fresh);
+        seen.add(fresh.change());
       }
       System.out.println("B73-IDLE-MEASUREMENTS settled=" + settled + " seen=" + seen);
       assertFalse(bodies.get(0).equals(bodies.get(1)), "the fixture must change measurements");
@@ -393,6 +413,7 @@ class StatusStateFieldsTest {
       read(f, "/api/status");
       var failed = failingAction(f);
       var canonical = read(f, "/api/status?fresh=true");
+      assertMeasurements(f, canonical);
       System.out.println("B73-FAILED-422 displayedReflected=" + displayed.reflected() + " failedChange="
           + failed.change() + " canonicalChange=" + canonical.change());
       assertEquals(422, failed.code());

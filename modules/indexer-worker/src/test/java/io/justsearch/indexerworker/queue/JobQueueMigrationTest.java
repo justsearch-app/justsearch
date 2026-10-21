@@ -1,6 +1,7 @@
 package io.justsearch.indexerworker.queue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -37,6 +38,83 @@ import org.junit.jupiter.params.provider.ValueSource;
 final class JobQueueMigrationTest {
 
   @TempDir Path tempDir;
+
+  @ParameterizedTest(name = "replayingV23PreservesAdmissionsAndCountsNewWritesOnce({0})")
+  @ValueSource(ints = {20, 22})
+  void replayingV23PreservesAdmissionsAndCountsNewWritesOnce(int version) throws Exception {
+    Path db = tempDir.resolve("replayed-v23.db");
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+    }
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+        var statement = connection.createStatement()) {
+      // The count includes admissions no longer present in the buffer. A rewind must never
+      // reset it, including when V21 rebuilds the buffer and removes its old trigger.
+      statement.execute("UPDATE switch_buffer_admissions SET count = 41 WHERE id = 1");
+      statement.execute("PRAGMA user_version = " + version);
+    }
+    for (int replay = 0; replay < 2; replay++) {
+      try (var queue = new SqliteJobQueue(db)) {
+        assertDoesNotThrow(queue::open,
+            "replaying applied migration structure must preserve the admission counter");
+        assertEquals(41 + replay, queue.switchBufferAdmissions());
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+            var statement = connection.createStatement()) {
+          statement.execute("INSERT INTO switch_buffer "
+              + "(generation, key, op, payload, last_updated, revision, accepted_order) "
+              + "VALUES ('', 'write-" + replay + "', 'DELETE', '{}', 1, 'revision', 1)");
+          statement.execute("DELETE FROM switch_buffer");
+          statement.execute("PRAGMA user_version = 22");
+        }
+        assertEquals(42 + replay, queue.switchBufferAdmissions());
+      }
+    }
+  }
+
+  @ParameterizedTest(name = "releasedVersionUpgradesToV24KeepingAdmissionCount({0})")
+  @ValueSource(ints = {22, 23})
+  void releasedVersionUpgradesToV24KeepingAdmissionCount(int version) throws Exception {
+    Path db = tempDir.resolve("released-v" + version + ".db");
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+    }
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+        var statement = connection.createStatement()) {
+      // Built by hand so the fixture is main's V23 (or a V22 install), not whatever this binary
+      // writes: V23 is the admission counter and its trigger; V24 adds no table layout.
+      statement.execute("DROP TRIGGER IF EXISTS count_switch_buffer_admission");
+      statement.execute("DROP TABLE IF EXISTS switch_buffer_admissions");
+      if (version == 23) {
+        statement.execute("CREATE TABLE switch_buffer_admissions "
+            + "(id INTEGER PRIMARY KEY CHECK(id = 1), count INTEGER NOT NULL CHECK(count >= 0))");
+        statement.execute("INSERT INTO switch_buffer_admissions VALUES (1, 7)");
+        statement.execute("CREATE TRIGGER count_switch_buffer_admission AFTER INSERT ON switch_buffer "
+            + "BEGIN UPDATE switch_buffer_admissions SET count = count + 1 WHERE id = 1; END");
+      }
+      statement.execute("PRAGMA user_version = " + version);
+    }
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+    }
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+        var statement = connection.createStatement()) {
+      try (ResultSet rs = statement.executeQuery("PRAGMA user_version")) {
+        assertTrue(rs.next());
+        assertEquals(24, rs.getInt(1),
+            "a V" + version + " queue must reach V24 so older readers refuse versioned DELETE");
+      }
+      statement.execute("INSERT INTO switch_buffer "
+          + "(generation, key, op, payload, last_updated, revision, accepted_order) "
+          + "VALUES ('', 'after-upgrade', 'DELETE', '{}', 1, 'revision', 1)");
+      try (ResultSet rs = statement.executeQuery(
+          "SELECT count FROM switch_buffer_admissions WHERE id = 1")) {
+        assertTrue(rs.next(), "V23's admission counter must exist after the upgrade");
+        assertEquals(version == 23 ? 8 : 1, rs.getInt(1),
+            "the upgrade keeps main's V23 count and keeps counting admissions");
+      }
+    }
+    assertMatchesFreshSchema(db);
+  }
 
   @Test
   void failedBackupPreservesLiveDatabaseAndCompletedBackup() throws Exception {
@@ -991,7 +1069,7 @@ final class JobQueueMigrationTest {
         assertTrue(rs.next());
         assertEquals(SqliteSchema.TARGET_VERSION, rs.getInt(1));
       }
-      assertEquals(23, SqliteSchema.TARGET_VERSION);
+      assertEquals(24, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {
@@ -1368,6 +1446,8 @@ final class JobQueueMigrationTest {
           + "VALUES ('prefix:/root', 'DELETE_PREFIX', '/root', 42, 'v1')");
       query.execute("INSERT INTO switch_buffer(key, op, payload, last_updated, revision) "
           + "VALUES ('path:/root/file', 'UPSERT', '/root/file', 42, 'v2')");
+      query.execute("DROP TRIGGER IF EXISTS count_switch_buffer_admission");
+      query.execute("DROP TABLE IF EXISTS switch_buffer_admissions");
       query.execute("PRAGMA user_version = 19");
     }
     try (var queue = new SqliteJobQueue(path)) {
@@ -1422,6 +1502,8 @@ final class JobQueueMigrationTest {
       query.execute("ALTER TABLE ingestion_walk_progress DROP COLUMN manifest_sha256");
       query.execute("ALTER TABLE ingestion_walk_progress DROP COLUMN planned_units");
       query.execute("INSERT INTO jobs(path, state, last_updated) VALUES ('/v18/retained.txt', 'PENDING', 123)");
+      query.execute("DROP TRIGGER IF EXISTS count_switch_buffer_admission");
+      query.execute("DROP TABLE IF EXISTS switch_buffer_admissions");
       query.execute("PRAGMA user_version = 18");
     }
   }
@@ -1485,6 +1567,8 @@ final class JobQueueMigrationTest {
       if (hasColumn(statement, "content_hash")) {
         statement.execute("ALTER TABLE jobs DROP COLUMN content_hash");
       }
+      statement.execute("DROP TRIGGER IF EXISTS count_switch_buffer_admission");
+      statement.execute("DROP TABLE IF EXISTS switch_buffer_admissions");
       statement.execute("PRAGMA user_version = 14");
       statement.execute("INSERT INTO jobs(path, state, attempts, last_updated)"
           + " VALUES ('/c2/preserved.txt', 'DONE', 0, 123)");

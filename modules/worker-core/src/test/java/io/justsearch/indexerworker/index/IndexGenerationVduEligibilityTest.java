@@ -1,6 +1,7 @@
 package io.justsearch.indexerworker.index;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -283,7 +284,9 @@ final class IndexGenerationVduEligibilityTest {
             () -> read.get(100, TimeUnit.MILLISECONDS),
             "precondition: the strict read is waiting on the old state file");
 
-        manager.updateMigrationState(IndexGenerationManager.MigrationState.MIGRATING);
+        assertDoesNotThrow(
+            () -> manager.updateMigrationState(IndexGenerationManager.MigrationState.MIGRATING),
+            "the generation owner must publish while the strict reader waits on the old file");
         exclusiveLock.release();
 
         assertTrue(

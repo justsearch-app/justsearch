@@ -76,8 +76,10 @@ JustSearch exposes its retrieval over MCP at `POST /mcp` — **in-process Stream
 is already taken it falls back to a random free port. To pin a port, set the `JUSTSEARCH_API_PORT` environment
 variable before launching; the actual port in use is always written as `head.apiPort` in
 `%APPDATA%\io.justsearch.shell\runtime\manifest.json` on Windows, or
-`~/.local/share/io.justsearch.shell/runtime/manifest.json` on Linux
-(`$XDG_DATA_HOME/io.justsearch.shell/runtime/manifest.json` if set). Details + a 2-minute Claude Desktop walkthrough:
+`~/.local/share/io.justsearch.shell/runtime/manifest.json` on Linux (under
+`$XDG_DATA_HOME/io.justsearch.shell/runtime/manifest.json` if `XDG_DATA_HOME` is set).
+For headless/dev launches with a data directory override, use
+`<JUSTSEARCH_DATA_DIR>/runtime/manifest.json`. Details + a 2-minute Claude Desktop walkthrough:
 [`docs/reference/mcp-production-server.md`](docs/reference/mcp-production-server.md). Connect your agent:
 
 - **Claude Code:** `claude mcp add justsearch --transport http http://127.0.0.1:8080/mcp`

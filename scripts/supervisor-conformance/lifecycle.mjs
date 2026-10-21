@@ -3,7 +3,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { driveCase, watchSupervisor, engineRecords, ledgerMismatch } from './adapters/dev-runner.mjs';
+import { driveCase, watchSupervisor, engineRecords, ledgerMismatch, FIRST_RUNNING_TIMEOUT_MS } from './adapters/dev-runner.mjs';
 import { binaryPath, runBinary } from './adapters/tauri.mjs';
 import { enginePlanFor } from './contract.mjs';
 export async function runLifecycle({ name, testCase, policy, io }) {
@@ -31,13 +31,16 @@ export async function runLifecycle({ name, testCase, policy, io }) {
     if(name==='tauri') fs.writeFileSync(path.join(run.dataDir,'shell-control.json'),JSON.stringify({action,reason}));
     else {
       const state=io.readJsonIfPresent(run.statePath);const dir=path.join(run.stateRoot,'runs',state.runId,'control');fs.mkdirSync(dir,{recursive:true});
+      if(reason==='quit') io.timings?.quitRequested(state,run.workDir);
       fs.writeFileSync(path.join(dir,'stop-request.json'),JSON.stringify({requestId:crypto.randomUUID(),reason,actor:'supervisor-conformance'}));
     }
   }
-  const waitState=(run,predicate)=>watchSupervisor({statePath:run.statePath,predicate,io,seen:run.seen,timeoutMs:25000,faultGatePath:run.faultGatePath});
+  // Only the initial observations include fixture setup; later lifecycle phases keep their budget.
+  const setupTimeoutMs=25000+(name==='dev-runner'?FIRST_RUNNING_TIMEOUT_MS:0);
+  const waitState=(run,predicate,timeoutMs=25000)=>watchSupervisor({statePath:run.statePath,predicate,io,seen:run.seen,timeoutMs,faultGatePath:run.faultGatePath});
   try {
     if(testCase.expect?.killSupervisor) {
-      const first=await start();const state=await waitState(first,s=>s.state==='running');assert(state,'first Engine reaches running');
+      const first=await start();const state=await waitState(first,s=>s.state==='running',setupTimeoutMs);assert(state,'first Engine reaches running');
       let opened = false;
       try { opened = await io.waitFor(()=>engineRecords(io,first.dataDir).some(r=>r.type==='engine-start'),{what:'durable open Engine start'}); } catch {}
       assert(opened,'the supervisor records the open Engine start before it can die');
@@ -46,7 +49,7 @@ export async function runLifecycle({ name, testCase, policy, io }) {
     }
     const run=await start();const probe=testCase.probe;
     if(probe) {
-      const state=await waitState(run,s=>s.state===(probe==='locked'?'exhausted':probe==='cooldown'?'restarting':probe==='start'?'starting':'running'));
+      const state=await waitState(run,s=>s.state===(probe==='locked'?'exhausted':probe==='cooldown'?'restarting':probe==='start'?'starting':'running'),setupTimeoutMs);
       assert(state,`reached trigger phase for ${probe}`);
       if(probe==='locked') {
         const records=engineRecords(io,run.dataDir);const exits=records.filter(r=>r.type==='engine-exit');
@@ -111,6 +114,7 @@ export async function runLifecycle({ name, testCase, policy, io }) {
         if(probe==='forced'||probe==='deadline') {
           assert.equal(exits[0].forced,true);
           assert(exits[0].code===1246953474 || ((name==='dev-runner'||linuxForced)&&exits[0].codeDistinctive===false));
+          io.timings?.measure('quitToStopped', started, policy.quitDeadlineMs+2000);
           assert(Date.now()-started<=policy.quitDeadlineMs+2000,'quit finishes within the contract bound');
         }
         if(probe==='deadline') {
@@ -118,12 +122,12 @@ export async function runLifecycle({ name, testCase, policy, io }) {
           assert(Math.abs(elapsed-(policy.quitDeadlineMs-policy.quitForceMarginMs))<250,`force issued at the contract deadline: ${elapsed}`);
         }
       }
-      if(probe==='stream') { assert(Date.now()-started<=policy.quitDeadlineMs+policy.quitForceMarginMs,'streaming quit deadline');assert(!alive(helper.pid),'extraction ended with Engine'); }
+      if(probe==='stream') { io.timings?.measure('quitToStopped',started,policy.quitDeadlineMs+policy.quitForceMarginMs);assert(Date.now()-started<=policy.quitDeadlineMs+policy.quitForceMarginMs,'streaming quit deadline');assert(!alive(helper.pid),'extraction ended with Engine'); }
       for(const record of records.filter(r=>r.type==='engine-start')) assert(!alive(record.pid),'no Engine survives quit');
       return {problems:[]};
     }
     const reach=testCase.expect?.reach??{state:'running',incarnation:1};
-    const reached=await waitState(run,s=>s.state===reach.state&&s.incarnation===reach.incarnation&&(!previousRunId||engineRecords(io,run.dataDir).some(r=>r.type==='engine-start'&&r.incarnation.session!==previousRunId)));
+    const reached=await waitState(run,s=>s.state===reach.state&&s.incarnation===reach.incarnation&&(!previousRunId||engineRecords(io,run.dataDir).some(r=>r.type==='engine-start'&&r.incarnation.session!==previousRunId)),setupTimeoutMs);
     assert(reached,`reached ${reach.state}/${reach.incarnation}`);
     if(reach.restartCount!==undefined) assert.equal(reached.restartCount,reach.restartCount);
     if(testCase.expect?.seenPhase) assert([...run.seen.values()].some(s=>s.incarnation===testCase.expect.seenPhase.incarnation&&s.phase===testCase.expect.seenPhase.phase),'discovery phase is published');
@@ -142,6 +146,8 @@ export async function runLifecycle({ name, testCase, policy, io }) {
         if(run.child.exitCode===null&&run.child.signalCode===null) { run.child.kill(); await run.exited; }
       }
     }
-    if(process.env.SUPERVISOR_CONFORMANCE_KEEP!=='1')fs.rmSync(workDir,{recursive:true,force:true,maxRetries:5});
+    const remove=()=>fs.rmSync(workDir,{recursive:true,force:true,maxRetries:5});
+    if(io.deferCleanup)io.deferCleanup(workDir,remove);
+    else if(process.env.SUPERVISOR_CONFORMANCE_KEEP!=='1')remove();
   }
 }

@@ -993,6 +993,28 @@ final class RecordedBulkIngestionCoordinatorTest {
   }
 
   @Test
+  void pendingGenerationAuthorityIsAvailableWithoutOpeningTheJobJournal() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("pending-before-journal"))) {
+      assertTrue(harness.coordinator.generationPendingAtBoot());
+    }
+  }
+
+  @Test
+  void onlyExactBuildingReceiptsCanProveThePreviousSourcePointer() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("previous-pointer-receipts"))) {
+      var building = assertInstanceOf(IndexGenerationManager.BootOwnership.Recorded.class,
+          harness.coordinator.bootOwnership(harness.queue));
+      assertTrue(building.previousSourcePointerProven());
+      harness.completeOneCapturedClaim();
+      assertEquals(BulkReindexProgress.Phase.SETTLED, harness.progress().phase());
+      var settled = assertInstanceOf(IndexGenerationManager.BootOwnership.Recorded.class,
+          harness.coordinator.bootOwnership(harness.queue));
+      assertFalse(settled.previousSourcePointerProven(),
+          "settlement precedes promotion, so these receipts cannot prove its pointer");
+    }
+  }
+
+  @Test
   void refusedBulkRetainsDurableIdentityUntilWorkerWitnessesCandidateRetirement()
       throws Exception {
     try (var harness = new BulkHarness(temp.resolve("refusal-retirement-crash-cut"))) {
