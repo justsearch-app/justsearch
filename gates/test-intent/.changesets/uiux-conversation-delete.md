@@ -391,3 +391,14 @@ All checks are durable. Compatibility patch adds signatures only to the before-s
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-bhht7zbd",
+  "verdict": "accept",
+  "digest": "sha256:1ac3729b213b522ca85473c872022d083789fa63e07ee4b53e443df20c4b18c6",
+  "note": "Reviewed before-state tests, agreed scenarios and sources before the diff. All 24 named checks passed without skips on the exact candidate and failed by assertion before, independently replayed to scratch evidence. Test expectations accepted. Product verification fails S52.2: in-flight compaction recreates deleted conversation metadata and its private summary."
+}
+```
