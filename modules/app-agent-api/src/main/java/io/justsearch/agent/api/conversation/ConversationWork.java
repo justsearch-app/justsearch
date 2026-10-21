@@ -45,7 +45,7 @@ public final class ConversationWork {
     Objects.requireNonNull(id, "id");
     if (active.containsKey(id) || !deleting.add(id)) {
       throw new Refused("CONVERSATION_BUSY",
-          "Wait for compaction to finish, or stop any running Ask or agent run, including approval waits, before deleting this conversation.");
+          "Wait for compaction or queued background runs to finish, or stop any running Ask or agent run, including approval waits, before deleting this conversation.");
     }
     return () -> endDelete(id);
   }

@@ -456,8 +456,8 @@ public final class AgentRunStore {
    * count: counting a conversation's turns means projecting its whole event stream per row, per list
    * request, which would defeat the recency bound this method is built around.
    *
-   * <p>Sealed + locked ({@link #readMeta} returns null) lists NOTHING rather than failing — the same
-   * documented degradation the rest of this store's read surface has (629).
+   * <p>While locked, legacy plaintext metadata can still identify a row, without exposing its
+   * preview. Sealed metadata has no readable conversation identity and stays hidden until unlock.
    */
   public synchronized List<Map<String, Object>> listConversations(int limit) {
     if (!isEnabled()) {
@@ -482,7 +482,7 @@ public final class AgentRunStore {
                       .reversed())
               .toList();
       for (Path dir : dirs) {
-        Map<String, Object> meta = readMeta(dir.getFileName().toString());
+        Map<String, Object> meta = readMeta(dir.getFileName().toString(), true);
         if (meta == null || !isAgentRun(meta)) {
           continue;
         }
@@ -878,6 +878,10 @@ public final class AgentRunStore {
   }
 
   private Map<String, Object> readMeta(String sessionId) {
+    return readMeta(sessionId, false);
+  }
+
+  private Map<String, Object> readMeta(String sessionId, boolean identityWhileLocked) {
     if (!isEnabled()) {
       return null;
     }
@@ -885,12 +889,19 @@ public final class AgentRunStore {
     if (!Files.exists(p)) {
       return null;
     }
-    if (cipher.enabled() && cipher.locked()) {
-      return null; // sealed + locked: ledger empty until unlock (documented agent-run limitation, 629)
-    }
+    boolean locked = isLocked();
+    if (locked && !identityWhileLocked) return null;
     try {
-      Map<String, Object> raw =
-          MAPPER.readValue(cipher.open(Files.readString(p, StandardCharsets.UTF_8)), MAP_REF);
+      String stored = Files.readString(p, StandardCharsets.UTF_8);
+      if (locked && cipher.isSealed(stored)) return null;
+      Map<String, Object> raw = MAPPER.readValue(cipher.open(stored), MAP_REF);
+      if (locked) {
+        var identity = new LinkedHashMap<String, Object>();
+        for (String field : List.of("conversationId", "shapeId", "startedAt", "updatedAt")) {
+          if (raw.containsKey(field)) identity.put(field, raw.get(field));
+        }
+        return identity;
+      }
       return SchemaUpcaster.upcast(raw);
     } catch (UnsupportedOperationException e) {
       LOG.error(

@@ -2,12 +2,14 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: wp52-repair-7u245wxo
+author-session: wp52-cd2-88uo_0zj
 ---
 
 # WP5.2 conversation deletion
 
 Gate aliases DS1–DS6 map to agreed S52.1–S52.6, and DN2–DN5 to N52.2–N52.5 (the gate does not accept dotted ids). Quotes are verbatim.
+
+All checks are durable. CD2 adds queued-work ownership, a dispatch-time existence check, and source ownership for resume/fork. Its compatibility patch supplies no-op signatures only on 97439fc54, leaving old writes and deletion unchanged. The same nine checks also fail by assertion on c5204f626 without a compatibility patch (tmp/wp52-cd2/c5204f626-evidence.json). Sealed run-only identity remains unavailable while locked, as CD2 permits.
 
 All checks are durable. The compaction repair extends DC1 to the user-visible compaction request, and makes creation explicit so later updates cannot create missing records. The new before-state patch supplies signatures only, retaining the old implicit creation behavior; its exception type has no implementation. The unchanged evidence producer runs through a shim that uses private shared clones and hard-linked dependencies.
 
@@ -555,6 +557,168 @@ All checks are durable. Compatibility patch adds signatures only to the before-s
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-conversation-delete-repair-preservation.json"
+    },
+    {
+      "items": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/DeferredConversationWorkTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Resume/approval-after-restart and fork retain source ownership until execution ends, stale captured resume snapshots cannot start after source deletion, and legacy plaintext run-only identities stay listed while locked without their preview or deleting bytes; structural activity times are preserved so locking does not move the row out of the merged list window.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS2",
+          "quote": "Deleting while work for that conversation is in flight either is refused with a reason before anything is deleted, or stops or finishes that work first (decision DC1). Work in flight includes:\n  - an Ask streaming in any window or client;\n  - an agent run, in the foreground or background, including one waiting for approval;\n  - a queued history write or a pending history ingest.\n  After a reported success, nothing recreates any part of the conversation, including after a restart.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS3",
+          "quote": "While the encrypted store is locked, the delete is refused with a reason and nothing is deleted (decision DC2). The conversation stays listed.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC1: Refuse live Asks, runs and approval waits. Inside the delete, wait out or cancel the invisible history writer.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC2: Refuse deletion while the encrypted store is locked.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "CD2: An accepted but not yet started background run is work in flight under DC1. Refuse deletion while it is queued: this reuses the existing work lease and preserves already accepted work. Check conversation existence and deletion state again at dispatch. While locked, keep legacy plaintext run-only identities listed without their preview; sealed identities remain hidden until unlock because determining them requires decryption.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-conversation-delete-cd2-java.json",
+      "newChecks": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/DeferredConversationWorkTest.java#resumedApprovalOwnsConversationUntilItFinishes",
+        "modules/app-agent/src/test/java/io/justsearch/agent/DeferredConversationWorkTest.java#forkOwnsSourceConversationUntilItFinishes",
+        "modules/app-agent/src/test/java/io/justsearch/agent/DeferredConversationWorkTest.java#staleResumeSnapshotCannotStartAfterSourceDeletion",
+        "modules/app-agent/src/test/java/io/justsearch/agent/DeferredConversationWorkTest.java#plaintextRunOnlyIdentityStaysListedWhileLocked"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/QueuedConversationDeleteTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Accepted queued and delayed background runs refuse deletion until completion or shutdown; duplicate acceptance releases its extra reservation; dispatch rechecks absent/incompletely deleting conversations; missing conversations are refused before acceptance. The HTTP fixture constructs the real ResourceApiModule, whose separate presence conversation store must share the deletion authority.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS2",
+          "quote": "Deleting while work for that conversation is in flight either is refused with a reason before anything is deleted, or stops or finishes that work first (decision DC1). Work in flight includes:\n  - an Ask streaming in any window or client;\n  - an agent run, in the foreground or background, including one waiting for approval;\n  - a queued history write or a pending history ingest.\n  After a reported success, nothing recreates any part of the conversation, including after a restart.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS3",
+          "quote": "While the encrypted store is locked, the delete is refused with a reason and nothing is deleted (decision DC2). The conversation stays listed.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC1: Refuse live Asks, runs and approval waits. Inside the delete, wait out or cancel the invisible history writer.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC2: Refuse deletion while the encrypted store is locked.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "CD2: An accepted but not yet started background run is work in flight under DC1. Refuse deletion while it is queued: this reuses the existing work lease and preserves already accepted work. Check conversation existence and deletion state again at dispatch. While locked, keep legacy plaintext run-only identities listed without their preview; sealed identities remain hidden until unlock because determining them requires decryption.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-conversation-delete-cd2-java.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/QueuedConversationDeleteTest.java#acceptedQueuedRunRefusesDeleteUntilItFinishes",
+        "modules/ui/src/test/java/io/justsearch/ui/api/QueuedConversationDeleteTest.java#deferredRunRechecksExistenceBeforeEnteringAgent",
+        "modules/ui/src/test/java/io/justsearch/ui/api/QueuedConversationDeleteTest.java#missingConversationIsRefusedBeforeAcceptance",
+        "modules/ui/src/test/java/io/justsearch/ui/api/QueuedConversationDeleteTest.java#delayedDuplicateAndShutdownReleaseEveryReservation",
+        "modules/ui/src/test/java/io/justsearch/ui/api/QueuedConversationDeleteTest.java#deferredRunRefusesAnIncompleteDeletion"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/PresenceRunOperationKeyTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The existing mocked conversation store now explicitly reports the existing conversation metadata used by the operation-key test. All prompts, keys, contexts, statuses, terminal outcomes, deduplication counts, fault injection, selection and assertions are unchanged. CD2 now validates that precondition instead of ignoring it.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS2",
+          "quote": "Deleting while work for that conversation is in flight either is refused with a reason before anything is deleted, or stops or finishes that work first (decision DC1). Work in flight includes:\n  - an Ask streaming in any window or client;\n  - an agent run, in the foreground or background, including one waiting for approval;\n  - a queued history write or a pending history ingest.\n  After a reported success, nothing recreates any part of the conversation, including after a restart.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS3",
+          "quote": "While the encrypted store is locked, the delete is refused with a reason and nothing is deleted (decision DC2). The conversation stays listed.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC1: Refuse live Asks, runs and approval waits. Inside the delete, wait out or cancel the invisible history writer.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC2: Refuse deletion while the encrypted store is locked.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "CD2: An accepted but not yet started background run is work in flight under DC1. Refuse deletion while it is queued: this reuses the existing work lease and preserves already accepted work. Check conversation existence and deletion state again at dispatch. While locked, keep legacy plaintext run-only identities listed without their preview; sealed identities remain hidden until unlock because determining them requires decryption.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-conversation-delete-cd2-preservation.json"
     }
   ]
 }

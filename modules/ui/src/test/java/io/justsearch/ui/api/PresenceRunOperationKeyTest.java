@@ -156,7 +156,10 @@ final class PresenceRunOperationKeyTest {
         return null;
       }).when(agent).runAgent(any(), any(), eq(true), any());
       when(agent.sessionSnapshot("scheduled-test")).thenReturn(Map.of("state", "DONE"));
-      controller = new InteractionThreadController(attempts, mock(ConversationStore.class), agent, registry);
+      var conversations = mock(ConversationStore.class);
+      when(conversations.getSessionMeta("conversation")).thenReturn(Optional.of(
+          new ConversationStore.SessionSummary("conversation", "core.agent-run", 0, 0, 0, "")));
+      controller = new InteractionThreadController(attempts, conversations, agent, registry);
     }
 
     @Override public void close() throws Exception {

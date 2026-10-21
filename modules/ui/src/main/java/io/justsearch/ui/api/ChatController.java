@@ -490,7 +490,7 @@ public final class ChatController {
   /**
    * The run-backed half of {@link #handleListSessions}: conversations that live ONLY in the agent-run
    * record. Empty when {@code shapeId} names a non-agent shape, when the agent capability is
-   * unavailable, and when its store is sealed + locked (which lists nothing rather than failing).
+   * unavailable, and when no conversation identity can be read while its store is locked.
    */
   private List<Map<String, Object>> runBackedRows(
       String shapeId, int limit, List<Map<String, Object>> storeRows) {

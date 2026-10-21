@@ -69,7 +69,7 @@ public final class InteractionThreadController {
     // Tempdoc 561 P-D2: the real background producer — fires an agent run detached from any watcher,
     // stamped background (safe-by-default), surfaced by presenceSince on the user's return.
     this.backgroundRunService =
-        new io.justsearch.agent.BackgroundRunService(attempts, agentService, processExecutors, admission);
+        new io.justsearch.agent.BackgroundRunService(attempts, agentService, processExecutors, admission, conversationStore);
   }
 
   /** Stops the owned background-run scheduler and cancels pending work. */
@@ -236,6 +236,12 @@ public final class InteractionThreadController {
       response.put("state", record.state().name());
       if (record.receipt() != null) response.put("outcomeCode", record.receipt().code());
       ctx.json(response);
+    } catch (io.justsearch.agent.api.conversation.ConversationWork.Refused refused) {
+      ctx.status("CONVERSATION_NOT_FOUND".equals(refused.code()) ? 404 : 409)
+          .json(Map.of("ok", false, "errorCode", refused.code(), "error", refused.getMessage()));
+    } catch (io.justsearch.agent.api.encryption.KeyLockedException locked) {
+      ctx.status(423).json(Map.of("ok", false, "errorCode", "STORE_LOCKED",
+          "error", "Unlock chat history before starting a background run."));
     } catch (io.justsearch.app.api.operations.OperationStoreException failure) {
       var response = io.justsearch.app.api.registry.OperationInvocationResponse.fromStoreFailure(failure);
       int status = switch (response.errorClass()) {
