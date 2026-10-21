@@ -21,6 +21,8 @@ import java.util.function.BiConsumer;
  */
 public final class DataKeyManager implements DataKeyState {
 
+  public record MutationResult(EncryptionKeystore.SaveResult save, String recoveryKey) {}
+
   public enum State {
     NOT_CONFIGURED,
     LOCKED,
@@ -30,6 +32,7 @@ public final class DataKeyManager implements DataKeyState {
   private final EncryptionKeystore keystore;
   private volatile KeystoreRecord record; // null = not configured
   private volatile byte[] dek; // null = locked
+  private EncryptionKeystore.SaveResult lastSave;
 
   /** Tempdoc 629 (LAYER) — fired on every state transition so caching stores reload/clear on
    * lock/unlock (e.g. {@code FileMemoryStore}, which eager-loads once at construction). */
@@ -87,6 +90,11 @@ public final class DataKeyManager implements DataKeyState {
     return record;
   }
 
+  public synchronized String warning() {
+    if (lastSave != null && lastSave.warning() != null) return lastSave.warning();
+    return keystore == null ? null : keystore.recoveryNotice();
+  }
+
   /** Subscribe to state transitions. Listener faults are isolated; the listener runs synchronously. */
   public void addListener(BiConsumer<State, State> listener) {
     listeners.add(Objects.requireNonNull(listener, "listener"));
@@ -108,6 +116,13 @@ public final class DataKeyManager implements DataKeyState {
 
   /** First-time setup: returns the one-time recovery key to display. Leaves the manager UNLOCKED. */
   public synchronized String setup(char[] passphrase) {
+    MutationResult result = setupWithResult(passphrase);
+    result.save().requireSaved();
+    return result.recoveryKey();
+  }
+
+  /** Typed result used by the control interface, including degraded saves that return a key. */
+  public synchronized MutationResult setupWithResult(char[] passphrase) {
     if (keystore == null) {
       throw new IllegalStateException("at-rest encryption is not available (no data dir)");
     }
@@ -116,11 +131,14 @@ public final class DataKeyManager implements DataKeyState {
     }
     State before = state();
     EncryptionEnvelope.SetupResult r = EncryptionEnvelope.setup(passphrase);
-    keystore.save(r.record());
+    lastSave = keystore.save(r.record());
+    if (lastSave.outcome() == EncryptionKeystore.SaveOutcome.FAILED_ROLLED_BACK) {
+      return new MutationResult(lastSave, null);
+    }
     this.record = r.record();
     this.dek = EncryptionEnvelope.unlock(r.record(), passphrase);
     fire(before, state());
-    return r.recoveryKey();
+    return new MutationResult(lastSave, r.recoveryKey());
   }
 
   /** Unlock with the passphrase. @throws WrongPassphraseException on a wrong passphrase. */
@@ -141,13 +159,19 @@ public final class DataKeyManager implements DataKeyState {
 
   /** Re-wrap under a new passphrase (the recovery key is preserved). Leaves the manager UNLOCKED. */
   public synchronized void changePassphrase(char[] oldPass, char[] newPass) {
+    changePassphraseWithResult(oldPass, newPass).requireSaved();
+  }
+
+  public synchronized EncryptionKeystore.SaveResult changePassphraseWithResult(char[] oldPass, char[] newPass) {
     requireConfigured();
     State before = state();
     KeystoreRecord updated = EncryptionEnvelope.changePassphrase(record, oldPass, newPass);
-    keystore.save(updated);
+    lastSave = keystore.save(updated);
+    if (lastSave.outcome() == EncryptionKeystore.SaveOutcome.FAILED_ROLLED_BACK) return lastSave;
     this.record = updated;
     setDek(EncryptionEnvelope.unlock(updated, newPass));
     fire(before, state());
+    return lastSave;
   }
 
   /**
@@ -155,15 +179,24 @@ public final class DataKeyManager implements DataKeyState {
    * once. Requires UNLOCKED (the DEK must be in memory). The passphrase wrap is untouched.
    */
   public synchronized String regenerateRecovery() {
+    MutationResult result = regenerateRecoveryWithResult();
+    result.save().requireSaved();
+    return result.recoveryKey();
+  }
+
+  public synchronized MutationResult regenerateRecoveryWithResult() {
     requireConfigured();
     byte[] d = dek;
     if (d == null) {
       throw new KeyLockedException();
     }
     EncryptionEnvelope.SetupResult r = EncryptionEnvelope.changeRecoveryKey(record, d);
-    keystore.save(r.record());
+    lastSave = keystore.save(r.record());
+    if (lastSave.outcome() == EncryptionKeystore.SaveOutcome.FAILED_ROLLED_BACK) {
+      return new MutationResult(lastSave, null);
+    }
     this.record = r.record();
-    return r.recoveryKey();
+    return new MutationResult(lastSave, r.recoveryKey());
   }
 
   /** Drop + zero the in-memory DEK (returns to LOCKED). No-op if not configured/already locked. */
