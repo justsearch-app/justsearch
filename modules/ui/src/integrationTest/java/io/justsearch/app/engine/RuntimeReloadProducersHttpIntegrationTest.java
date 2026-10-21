@@ -324,7 +324,7 @@ final class RuntimeReloadProducersHttpIntegrationTest {
       assertReloadSuccess(f.post());
       f.awaitCount("reloadobligationgone", 0);
       f.awaitCount("reloadobligationkept", 1);
-      assertEquals(List.of(), f.receipts(), "only the applied root walk retires the obligation");
+      f.awaitReceipts(0, "only the applied root walk retires the obligation");
     }
   }
 
@@ -343,7 +343,7 @@ final class RuntimeReloadProducersHttpIntegrationTest {
       assertReloadSuccess(f.post());
       f.awaitCount("reloadobligationgone", 0);
       f.awaitCount("reloadobligationkept", 1);
-      assertEquals(List.of(), f.receipts(), "only the applied root walk retires the obligation");
+      f.awaitReceipts(0, "only the applied root walk retires the obligation");
     }
   }
 
@@ -428,7 +428,7 @@ final class RuntimeReloadProducersHttpIntegrationTest {
       f.watch(directory.resolve("watched"));
       f.awaitCount("reloadobligationgone", 0);
       f.awaitCount("reloadobligationkept", 1);
-      assertEquals(List.of(), f.receipts());
+      f.awaitReceipts(0, "the applied reconciliation retires its receipt after the search effect");
     }
   }
 
@@ -457,7 +457,7 @@ final class RuntimeReloadProducersHttpIntegrationTest {
     try (var f = new Fixture(true)) {
       f.awaitCount("reloadobligationgone", 0);
       f.awaitCount("reloadobligationkept", 1);
-      assertEquals(List.of(), f.receipts());
+      f.awaitReceipts(0, "the applied reconciliation retires its receipt after the search effect");
     }
   }
 
@@ -467,7 +467,7 @@ final class RuntimeReloadProducersHttpIntegrationTest {
       f.watch(directory.resolve("watched"));
       f.awaitCount("reloadobligationgone", 0);
       f.awaitCount("reloadobligationkept", 1);
-      assertEquals(List.of(), f.receipts());
+      f.awaitReceipts(0, "the applied reconciliation retires its receipt after the search effect");
     }
   }
 
