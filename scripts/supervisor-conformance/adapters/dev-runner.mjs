@@ -68,26 +68,29 @@ function freePort() {
 
 /** Poll `supervisor.v1.json` until `predicate` holds, recording every distinct state seen. */
 export async function watchSupervisor({ statePath, predicate, timeoutMs, io, seen, faultGatePath }) {
+  const end = io.timings?.wait('supervisor state: ' + predicate.toString(), timeoutMs);
   const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const state = io.readJsonIfPresent(statePath);
-    if (state) {
-      const key = `${state.state}:${state.incarnation}:${state.reason ?? ''}${state.phase ? `:${state.phase}` : ''}`;
-      if (!seen.has(key)) seen.set(key, state);
-      // Lifecycle cases may wait for a later incarnation. They still witness the first RUNNING
-      // identity on the way there, so release its fixture fault just as the actuator cases do.
-      if (faultGatePath && state.state === 'running' && state.incarnation === 1
-          && !fs.existsSync(faultGatePath)) {
-        fs.writeFileSync(faultGatePath, JSON.stringify({
-          pid: state.pid, instanceId: state.instanceId, incarnation: state.incarnation,
-        }));
+  try {
+    for (;;) {
+      const state = io.readJsonIfPresent(statePath);
+      if (state) {
+        const key = `${state.state}:${state.incarnation}:${state.reason ?? ''}${state.phase ? `:${state.phase}` : ''}`;
+        if (!seen.has(key)) seen.set(key, state);
+        // Lifecycle cases may wait for a later incarnation. They still witness the first RUNNING
+        // identity on the way there, so release its fixture fault just as the actuator cases do.
+        if (faultGatePath && state.state === 'running' && state.incarnation === 1
+            && !fs.existsSync(faultGatePath)) {
+          fs.writeFileSync(faultGatePath, JSON.stringify({
+            pid: state.pid, instanceId: state.instanceId, incarnation: state.incarnation,
+          }));
+        }
+        if (predicate(state)) return state;
       }
-      if (predicate(state)) return state;
+      if (Date.now() >= deadline) return null;
+      // eslint-disable-next-line no-await-in-loop
+      await io.sleep(25);
     }
-    if (Date.now() >= deadline) return null;
-    // eslint-disable-next-line no-await-in-loop
-    await io.sleep(25);
-  }
+  } finally { end?.(); }
 }
 
 /** Settles with `promise`, or `false` after `ms`; the timer is cleared so it never holds the process open. */
@@ -120,9 +123,11 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
   const firstBootBudgetPath = path.join(workDir, 'first-boot-budget.json');
   const seen = new Map();
 
+  io.timings?.launch(workDir);
   const child = spawn(
     process.execPath,
     [
+      ...(io.timings ? ['--require', path.join(io.repoRoot, 'scripts/supervisor-conformance/timings-preload.cjs')] : []),
       ...preload,
       ...firstBootPreload,
       path.join(io.repoRoot, 'scripts', 'dev', 'dev-runner.cjs'),
@@ -142,6 +147,7 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
         ...io.harnessOverrides,
         JUSTSEARCH_DEV_RUNNER_STATE_ROOT: stateRoot,
         JUSTSEARCH_CONFORMANCE_IDENTITIES: identities,
+        ...(io.timings ? { JUSTSEARCH_CONFORMANCE_TIMINGS: path.join(workDir, 'spawn-timings.jsonl') } : {}),
         JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND: JSON.stringify([process.execPath, ...preload, io.fakeEngine]),
         JUSTSEARCH_DEV_RUNNER_FRONTEND_COMMAND: JSON.stringify([IDLE_FRONTEND[0], ...preload, ...IDLE_FRONTEND.slice(1)]),
         JUSTSEARCH_FAKE_ENGINE_PLAN: planPath,
@@ -220,6 +226,7 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
     }
     if (!ended) throw new Error('fixture runner exit unconfirmed; artifacts retained');
     if (keepWorkDir) return;
+    if (io.deferCleanup) { io.deferCleanup(workDir, () => removeFixtureDirectory(workDir)); return; }
     if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {
       process.stderr.write(`[keep] ${workDir}\n`);
       return;
@@ -227,7 +234,9 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
     removeFixtureDirectory(workDir);
   };
 
-  return { workDir, dataDir, stateRoot, statePath, faultGatePath, firstBootBudgetPath, child, output, exited, seen, cleanup, uiPort, identities };
+  const run = { workDir, dataDir, stateRoot, statePath, faultGatePath, firstBootBudgetPath, child, output, exited, seen, cleanup, uiPort, identities };
+  io.timings?.attach(run);
+  return run;
 }
 
 const RESTART_CASES = new Set([
@@ -687,7 +696,9 @@ async function runLifecycleCase({ testCase, policy, io }) {
       // eslint-disable-next-line no-await-in-loop
       await run.cleanup();
     }
-    if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {
+    if (io.deferCleanup) {
+      io.deferCleanup(workDir, () => removeFixtureDirectory(workDir));
+    } else if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {
       process.stderr.write(`[keep] ${workDir}\n`);
     } else {
       removeFixtureDirectory(workDir);
