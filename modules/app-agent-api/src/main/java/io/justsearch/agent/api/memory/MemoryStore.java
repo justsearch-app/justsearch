@@ -16,7 +16,11 @@ public interface MemoryStore {
   /** Persist a learned item. Idempotent on {@code record.id()} (re-remember replaces). */
   void remember(MemoryRecord record);
 
-  /** The inspectable "what it knows" projection — every learned item, newest first. */
+  /**
+   * The inspectable "what it knows" projection — every learned item, newest first.
+   * @throws MemoriesUnavailableException if an unlocked store could not load completely; mutations
+   *     refuse with the same error until a subsequent access successfully loads the store.
+   */
   List<MemoryRecord> whatItKnows();
 
   /** User control — forget one item by id. No-op if absent. */

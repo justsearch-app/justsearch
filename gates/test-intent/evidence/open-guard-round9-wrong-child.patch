@@ -1,0 +1,11 @@
+--- a/modules/shell/src-tauri/src/windows_reveal.rs
++++ b/modules/shell/src-tauri/src/windows_reveal.rs
+@@ -22,7 +22,7 @@
+     if unsafe { ILRemoveLastID(parent.0) } == 0 {
+         return Err("Could not identify the parent shell item".into());
+     }
+-    let child = unsafe { ILFindLastID(item) };
++    let child = unsafe { ILFindLastID(parent.0) };
+     let children = [child.cast_const()];
+     dispatch(parent.0, children.len() as u32, children.as_ptr())
+ }

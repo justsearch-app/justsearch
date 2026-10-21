@@ -160,6 +160,13 @@ console.log('test-verify-unit-test-shard-policy: PASS');
 `;
   const check = (workflowText) => validate({ policyDoc: p, workflowText });
   assert.equal(check(text).ok, true, check(text).issues.join('\n'));
+  const lightQueue = text.replace('    if: always()\n', "    if: always() && github.event_name != 'merge_group'\n")
+    .replace('  one:\n', "  one:\n    if: github.event_name != 'merge_group'\n")
+    .replace('  two:\n', "  two:\n    if: github.event_name != 'merge_group'\n");
+  assert.equal(check(lightQueue).ok, true, check(lightQueue).issues.join('\n'));
+  for (const condition of ["github.event_name == 'workflow_dispatch'", "github.event_name != 'push'", "github.event_name != 'merge_group' && false"]) {
+    assert.equal(check(lightQueue.replaceAll("github.event_name != 'merge_group'", condition)).ok, false, condition);
+  }
   for (const altered of [
     text.replace('needs: [one, two]', 'needs: [one]'),
     text.replace('    if: always()\n', ''),
@@ -187,6 +194,11 @@ console.log('test-verify-unit-test-shard-policy: PASS');
       assert.equal(check(altered).ok, false, command);
     }
   }
+  for (const altered of [
+    original.replace(" || steps.windows-coverage.outcome == 'failure'", ''),
+    original.replace('id: windows-coverage', 'id: unrelated-step'),
+    original.replace('id: windows-coverage', 'id: windows-coverage\n        if: false'),
+  ]) assert.equal(check(altered).ok, false, 'coverage guard must reference an unconditional Gradle execution and include failures');
   const windowsTask = original.indexOf('      - name: Windows coverage');
   const omitted = original.slice(0, windowsTask) + original.slice(windowsTask).replace(':modules:app-api:test ', '');
   assert.equal(check(omitted).ok, false, 'omitting a Windows module must fail ownership');

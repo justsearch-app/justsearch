@@ -57,6 +57,8 @@ export class MemorySurface extends JfElement {
     // Tempdoc 806 W1 — the last mutation's failure, surfaced instead of discarded. Before this, both
     // mutations awaited the fetch and ignored its status, so a refused write re-rendered as success.
     mutationError: { state: true },
+    loadError: { state: true },
+    loading: { state: true },
   };
 
   declare apiBase: string;
@@ -65,6 +67,10 @@ export class MemorySurface extends JfElement {
   declare busy: boolean;
   declare locked: boolean;
   declare mutationError: string;
+  declare loadError: string;
+  declare loading: boolean;
+
+  private loadVersion = 0;
 
   constructor() {
     super();
@@ -74,6 +80,8 @@ export class MemorySurface extends JfElement {
     this.busy = false;
     this.locked = false;
     this.mutationError = '';
+    this.loadError = '';
+    this.loading = true;
   }
 
   connectedCallback(): void {
@@ -87,23 +95,40 @@ export class MemorySurface extends JfElement {
    *
    *  806 W1: `mutationError` settles the same way — it reports ONE attempt, so it must not outlive the
    *  navigation that ended it (a stale "nothing was saved" beside a list that has since reloaded). */
-  static override transientState = { busy: false, mutationError: '' };
+  static override transientState = { busy: false, mutationError: '', loading: false, loadError: '' };
+
+  protected override settleTransients(): void {
+    ++this.loadVersion;
+    super.settleTransients();
+  }
 
   private base(): string {
     return this.apiBase || '';
   }
 
   private async loadMemories(): Promise<void> {
+    const version = ++this.loadVersion;
+    this.loading = true;
     try {
       const r = await authorizedFetch(`${this.base()}/api/memory`);
-      if (!r.ok) return;
+      if (version !== this.loadVersion) return;
+      if (!r.ok) {
+        this.loadError = 'Memories are unavailable. Try opening Memory again after the stored memories can be read.';
+        return;
+      }
       const j = (await r.json()) as { memories?: MemoryItem[]; locked?: boolean };
+      if (version !== this.loadVersion) return;
       this.memories = Array.isArray(j.memories) ? j.memories : [];
       // Tempdoc 806 W1: the wire distinguishes "cannot read" from "nothing learned" — carry it, so the
       // render can. An older backend omits the field ⇒ `false` (readable), the pre-806 behaviour.
       this.locked = j.locked === true;
+      this.loadError = '';
     } catch {
-      /* offline — keep prior */
+      if (version === this.loadVersion) {
+        this.loadError = 'Memories are unavailable. Could not reach the backend.';
+      }
+    } finally {
+      if (version === this.loadVersion) this.loading = false;
     }
   }
 
@@ -121,7 +146,7 @@ export class MemorySurface extends JfElement {
 
   private async remember(): Promise<void> {
     const content = this.rememberDraft.trim();
-    if (!content || this.busy || this.locked) return;
+    if (!content || this.busy || this.locked || this.loading || this.loadError) return;
     this.busy = true;
     this.mutationError = '';
     try {
@@ -192,7 +217,11 @@ export class MemorySurface extends JfElement {
 
         <section>
           <h2>What it knows</h2>
-          ${this.locked
+          ${this.loading
+            ? html`<p role="status">Loading memories…</p>`
+            : this.loadError
+              ? html`<p role="alert">${this.loadError}</p>`
+              : this.locked
             ? this.renderLocked()
             : this.memories.length === 0
               ? html`<p class="empty">No learned memory yet.</p>`
@@ -220,7 +249,7 @@ export class MemorySurface extends JfElement {
               class="draft"
               .value=${this.rememberDraft}
               aria-label="Teach it a durable fact"
-              ?disabled=${this.locked}
+              ?disabled=${this.locked || this.loading || !!this.loadError}
               placeholder=${this.locked ? LOCKED_INPUT_REASON : 'Teach it a durable fact…'}
               @input=${(e: Event) => (this.rememberDraft = (e.target as HTMLInputElement).value)}
             />
@@ -228,7 +257,9 @@ export class MemorySurface extends JfElement {
               variant="primary"
               label="Remember"
               ?disabled=${this.busy || !this.rememberDraft.trim()}
-              .availability=${this.locked ? unavailableBecause(LOCKED_INPUT_REASON, true) : undefined}
+              .availability=${this.loadError || this.loading
+                ? unavailableBecause(this.loadError || 'Loading memories', true)
+                : this.locked ? unavailableBecause(LOCKED_INPUT_REASON, true) : undefined}
               .onActivate=${() => void this.remember()}
             >
               Remember

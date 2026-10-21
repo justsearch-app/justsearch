@@ -116,6 +116,7 @@ public final class RunStreamController {
           .json(ApiErrorHandler.toResponse(ApiErrorCode.BAD_REQUEST, message(malformed)));
       return;
     }
+    if (StoreIdRequest.rejectBody(ctx, body)) return;
     Optional<ConversationShapeRef> shapeId = shapeIdOf(body);
     if (shapeId.isEmpty()) {
       ctx.status(400)
@@ -304,7 +305,9 @@ public final class RunStreamController {
     if (ctx == null || ctx.body() == null || ctx.body().isEmpty()) {
       return Map.of();
     }
-    return MAPPER.readValue(ctx.body(), Map.class);
+    Map<String, Object> body = MAPPER.readValue(ctx.body(), Map.class);
+    StoreIdRequest.normalizeOptionalIds(body);
+    return body;
   }
 
   private static Map<String, Object> errorBody(String message, ApiErrorCode code) {

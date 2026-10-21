@@ -1177,6 +1177,8 @@ export class Sv3Composer extends JfElement {
    */
   declare modelLabel: string;
   declare draft: string;
+  /** Every input, including IME edits: a delayed send may clear only its original draft. */
+  draftRevision = 0;
   /**
    * Public because the window's Escape ladder has to see it: an open menu is the MOST LOCAL
    * transient in the composer, so the window declines the key the way it declines to an open rename
@@ -1243,6 +1245,7 @@ export class Sv3Composer extends JfElement {
 
   private setDraft(text: string, composing: boolean): void {
     const previous = this.draft;
+    this.draftRevision += 1;
     this.draft = text;
     if (composing) return;
     this.dispatchEvent(

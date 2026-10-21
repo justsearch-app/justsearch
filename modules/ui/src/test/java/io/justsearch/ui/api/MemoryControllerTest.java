@@ -202,6 +202,55 @@ final class MemoryControllerTest {
         "…but the payload says WHY, so no client can render the empty list as 'no learned memory yet'");
   }
 
+  @Test
+  void failedLoadReturnsUnavailableForListRememberAndForget(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+    var locked = new java.util.concurrent.atomic.AtomicBoolean(true);
+    var cipher = new io.justsearch.agent.api.encryption.StoreCipher(new io.justsearch.agent.api.encryption.DataKeyState() {
+      public boolean enabled() { return true; }
+      public boolean locked() { return locked.get(); }
+      public byte[] dek() { return new byte[32]; }
+    });
+    var file = dir.resolve("memory.json");
+    String broken = "[{\"id\":\"old\",\"content\":\"kept\"},{\"content\":\"bad\"}]";
+    java.nio.file.Files.writeString(file, broken);
+    var store = new io.justsearch.agent.FileMemoryStore(dir, cipher);
+    locked.set(false);
+    org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, store::onKeyUnlocked);
+    var controller = new MemoryController(store);
+    for (Response response : List.of(
+        invoke(controller::handleList, null, null),
+        invoke(controller::handleRemember, "{\"content\":\"new\"}", null),
+        invoke(controller::handleForget, null, "old"))) {
+      assertEquals(503, response.status());
+      assertEquals("MEMORIES_UNAVAILABLE", response.body().get("errorCode").asString());
+      assertNull(response.body().get("memories"));
+      assertNull(response.body().get("ok"));
+    }
+    assertEquals(broken, java.nio.file.Files.readString(file));
+    java.nio.file.Files.writeString(file, "[{\"id\":\"old\",\"content\":\"kept\"}]");
+    assertEquals(1, invoke(controller::handleList, null, null).body().get("memories").size());
+  }
+
+  @Test
+  void healthyHttpRoundTripReplacesIdAndSurvivesRestart(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) {
+    var store = new io.justsearch.agent.FileMemoryStore(dir);
+    var controller = new MemoryController(store);
+    String body = "{\"id\":\"same\",\"kind\":\"preference\",\"content\":\"original\",\"actor\":\"chat\",\"sourceConversationId\":\"conv\"}";
+    assertEquals(200, invoke(controller::handleRemember, body, null).status());
+    assertEquals(200, invoke(controller::handleRemember, body.replace("original", "replacement"), null).status());
+    Response list = invoke(controller::handleList, null, null);
+    assertEquals(1, list.body().get("memories").size());
+    JsonNode row = list.body().get("memories").get(0);
+    assertEquals("replacement", row.get("content").asString());
+    assertEquals("preference", row.get("kind").asString());
+    assertEquals("chat", row.get("actor").asString());
+    assertEquals("conv", row.get("sourceConversationId").asString());
+    var reopened = new io.justsearch.agent.FileMemoryStore(dir);
+    assertEquals(store.whatItKnows(), reopened.whatItKnows());
+    assertEquals(200, invoke(controller::handleForget, null, "same").status());
+    assertTrue(new io.justsearch.agent.FileMemoryStore(dir).whatItKnows().isEmpty());
+  }
+
   private static MemoryRecord rec(String id) {
     return new MemoryRecord(id, "fact", "content of " + id, "conv-1", "primary", Instant.EPOCH);
   }

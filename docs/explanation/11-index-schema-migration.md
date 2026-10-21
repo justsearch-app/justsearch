@@ -297,7 +297,7 @@ further action (`HeldBootPersonsRebuildTest`).
 A `state.json` that is present but does not parse still stops the boot earlier, in ownership
 reconciliation, so the Worker does not start at all in that case.
 
-**Recovery is a user-initiated rebuild.** `core.rebuild-index` (`RebuildIndexHandler` →
+**Recovery is a user-initiated rebuild.** `core.rebuild-index` (`RecordedBulkPlan.Profile.RECOVERY_REBUILD` →
 `startMigration(user_requested_rebuild)`) allocates a Green generation beside the read-only Blue, and
 the cutover that completes it calls `promoteBuildingGenerationToActive()`, which clears
 `auto_rebuild_*` — so a successful rebuild both fixes the index and restores the automatic budget.

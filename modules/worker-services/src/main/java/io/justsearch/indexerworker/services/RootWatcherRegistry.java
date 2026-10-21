@@ -32,6 +32,17 @@ import org.slf4j.LoggerFactory;
 public final class RootWatcherRegistry {
   private static final Logger log = LoggerFactory.getLogger(RootWatcherRegistry.class);
 
+  boolean isUserExcluded(Path file) {
+    var patterns = io.justsearch.configuration.excludes.ExclusionPatterns.current();
+    if (patterns.isEmpty()) return false;
+    Path normalized = file.toAbsolutePath().normalize();
+    for (Path root = normalized.getParent(); root != null; root = root.getParent()) {
+      if ((subscriptions.containsKey(root) || awaitingVolume.containsKey(root))
+          && patterns.isExcludedPath(root, normalized)) return true;
+    }
+    return false;
+  }
+
   private final Map<Path, Subscription> subscriptions = new ConcurrentHashMap<>();
   /**
    * Task t-20261013-ef3c41, round 5 (S8): roots whose watch waits for the volume recorded for them
