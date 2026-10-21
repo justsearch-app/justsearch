@@ -138,15 +138,28 @@ public interface SwitchBufferCapableQueue extends JobQueue {
         && matchesAcceptedFileProjection(path, unitRevision, sourceSha256);
   }
 
+  /** What the path's own queue row says about an accepted file admission on a generation. */
+  enum SourceFileWork {
+    /**
+     * The writer of this admission, or of a later one that replaced it, committed exactly the
+     * bytes the generation holds ({@code indexedSourceSha256}).
+     */
+    COMMITTED,
+    /**
+     * The row is pending, claimed, or failed and retrying or terminal: its writer's outcome, not
+     * a new job, decides. It is no effect until that writer commits.
+     */
+    OUTSTANDING,
+    /** No row, or a finished row that wrote nothing the generation holds. */
+    NONE
+  }
+
   /**
-   * True when the generation whose committed source witness is {@code indexedSourceSha256}
-   * holds this admission's effect or a later one, or will: the path's row is pending (its
-   * writer has not run yet), or the writer of this admission or of a later one that replaced
-   * {@code unitRevision} committed exactly the bytes that generation holds. A finished row alone
-   * never proves it: a retired, refused or skipped row wrote nothing.
+   * The path's row judged against the generation whose committed source witness is {@code
+   * indexedSourceSha256}. A finished row alone never proves an effect: a retired, refused or
+   * skipped row wrote nothing.
    */
-  default boolean sourceOwnsFileAdmission(
-      String path, String unitRevision, String indexedSourceSha256) {
+  default SourceFileWork sourceFileWork(String path, String indexedSourceSha256) {
     throw new UnsupportedOperationException("Queue admission ownership evidence is unavailable");
   }
 

@@ -1369,9 +1369,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override
-  public boolean sourceOwnsFileAdmission(
-      String path, String unitRevision, String indexedSourceSha256) {
-    if (path == null || unitRevision == null) return false;
+  public SourceFileWork sourceFileWork(String path, String indexedSourceSha256) {
+    if (path == null) return SourceFileWork.NONE;
     lock.lock();
     try {
       ensureOpen();
@@ -1379,16 +1378,16 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           "SELECT state, content_hash FROM jobs WHERE path = ?")) {
         query.setString(1, path);
         try (ResultSet row = query.executeQuery()) {
-          if (!row.next()) return false;
-          if (STATE_PENDING.equals(row.getString("state"))) return true;
+          if (!row.next()) return SourceFileWork.NONE;
+          if (!STATE_DONE.equals(row.getString("state"))) return SourceFileWork.OUTSTANDING;
           // Only a write records content_hash, and every admission clears it, so a hash here
           // was written by this admission or a later one; a retired, refused or skipped row has
           // none. A later admission's bytes supersede the accepted ones even when they differ
           // from its captured plan, because the file legitimately changed again.
           String committed = row.getString("content_hash");
-          return STATE_DONE.equals(row.getString("state"))
-              && JobQueue.IngestionLedgerTransition.isSha256(committed)
-              && committed.equals(indexedSourceSha256);
+          return JobQueue.IngestionLedgerTransition.isSha256(committed)
+              && committed.equals(indexedSourceSha256)
+              ? SourceFileWork.COMMITTED : SourceFileWork.NONE;
         }
       }
     } catch (SQLException unavailable) {

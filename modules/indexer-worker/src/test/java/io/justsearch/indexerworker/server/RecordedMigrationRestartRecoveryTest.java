@@ -58,18 +58,43 @@ class RecordedMigrationRestartRecoveryTest {
   }
 
   @Test
-  // M8: a FENCED boot's pending root walk does not keep a refused candidate alive
-  void pendingFencedRootWalkDoesNotBlockRollback(@TempDir Path tempDir) throws Exception {
+  // M8: a FENCED boot's pending root walk hands over once A's writer, run now, commits it
+  void pendingFencedRootWalkHandsOverOnceAsWriterCommitsIt(@TempDir Path tempDir)
+      throws Exception {
     Rollback rollback = new Rollback(tempDir);
-    // The FENCED boot re-walked the root: rows are PENDING under a later revision, and the
-    // indexing loop never runs while FENCED, so they cannot settle before cleanup.
+    rollback.recoveryBoot();
+    rollback.fileChangedSinceA();
+    // The FENCED boot re-walked the root: rows are PENDING under a later revision. The refused
+    // walk is sealed, so this boot's producer, which writes A, now runs them.
     when(rollback.queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(40, 40, 0, 5, 0));
-    rollback.supersededByLaterAdmission.set(true);
+    rollback.sourceWork.set("OUTSTANDING");
     when(rollback.queue.matchesAcceptedFileProjection(
         rollback.file.toString(), "accepted-revision", rollback.hash, rollback.hash)).thenReturn(false);
     rollback.reconcile();
+    assertTrue(Mockito.mockingDetails(rollback.producer).getInvocations().stream()
+            .anyMatch(call -> "startIndexingLoop".equals(call.getMethod().getName())),
+        "this boot's writer, which writes A, runs the pending rows");
+    rollback.assertGreenRetained();
+    rollback.sourceWork.set("COMMITTED");
+    rollback.reconcile();
     rollback.assertRolledBackToA();
     verify(rollback.queue, never()).deleteByExactPath(anyString());
+  }
+
+  @Test
+  // preserved: a FENCED boot runs A's writer only once the refused walk can issue no claim
+  void aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen(@TempDir Path tempDir)
+      throws Exception {
+    Rollback rollback = new Rollback(tempDir);
+    rollback.recoveryBoot();
+    rollback.fileChangedSinceA();
+    when(rollback.queue.recordedWalk(OPERATION)).thenReturn(Optional.of(walk(1)));
+    rollback.sourceWork.set("OUTSTANDING");
+    when(rollback.queue.matchesAcceptedFileProjection(
+        rollback.file.toString(), "accepted-revision", rollback.hash, rollback.hash)).thenReturn(false);
+    rollback.reconcile();
+    verify(rollback.producer, never()).startIndexingLoop();
+    rollback.assertGreenRetained();
   }
 
   @Test
@@ -85,6 +110,7 @@ class RecordedMigrationRestartRecoveryTest {
   // preserved: an accepted admission neither on A nor owned by the queue retains Green
   void unprovedAdmissionStillRetainsGreen(@TempDir Path tempDir) throws Exception {
     Rollback rollback = new Rollback(tempDir);
+    rollback.fileChangedSinceA();
     rollback.admission.markReplayUncertain();
     when(rollback.queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(1, 1, 0, 5, 0));
     when(rollback.queue.matchesAcceptedFileProjection(
@@ -136,25 +162,30 @@ class RecordedMigrationRestartRecoveryTest {
 
   // M1+: hand-over to A is judged by A's committed effect, on the real queue
   @Test
-  void aLaterFinishedAdmissionQueuesTheUnappliedUpdateOnA(@TempDir Path tempDir)
-      throws Exception {
+  void aLaterFinishedAdmissionWaitsForTheAJobItQueues(@TempDir Path tempDir) throws Exception {
     // A later admission of the file finished (its row is DONE) but A still holds stale bytes
     // and no work is pending: the row alone never hands over. Cleanup queues an ordinary A job
-    // and hands over by it, so this one restart ends the operation.
+    // and keeps Green and the journal until A's writer commits it.
     try (var handover = new RealQueueHandover(tempDir, "DONE", "stale")) {
       handover.reconcile();
-      handover.assertQueuedOnAThenHandedOver();
+      String queued = handover.assertWaitingOnAJob(true);
+      handover.reconcile();
+      assertEquals(queued, handover.assertWaitingOnAJob(true), "a re-entered attempt queues nothing");
+      handover.aCommits(RealQueueHandover.LATER);
+      handover.reconcile();
+      handover.assertHandedOver();
     }
   }
 
-  // M8 preserved: a pending row will produce the file on A after the restart
+  // M8: a pending later admission is A's work to finish, not yet its effect
   @Test
-  void aPendingLaterAdmissionHandsTheUpdateToA(@TempDir Path tempDir) throws Exception {
+  void aPendingLaterAdmissionHandsOverOnceACommitsIt(@TempDir Path tempDir) throws Exception {
     try (var handover = new RealQueueHandover(tempDir, "PENDING", "stale")) {
       handover.reconcile();
-      assertEquals(0, handover.journalSize());
-      assertTrue(handover.restarted.get());
-      assertEquals("IDLE", handover.manager.readStateBestEffort().migration_state());
+      handover.assertWaitingOnAJob(false);
+      handover.aCommits(RealQueueHandover.LATER);
+      handover.reconcile();
+      handover.assertHandedOver();
     }
   }
 
@@ -163,23 +194,23 @@ class RecordedMigrationRestartRecoveryTest {
   void aLaterAdmissionCommittedOnAHandsTheUpdateToA(@TempDir Path tempDir) throws Exception {
     try (var handover = new RealQueueHandover(tempDir, "DONE", "later")) {
       handover.reconcile();
-      assertEquals(0, handover.journalSize());
-      assertTrue(handover.restarted.get());
-      assertEquals("IDLE", handover.manager.readStateBestEffort().migration_state());
+      handover.assertHandedOver();
     }
   }
 
   // M1+: a later row retired or refused without writing is not A's effect
   @Test
-  void aRetiredLaterAdmissionQueuesTheUnappliedUpdateOnA(@TempDir Path tempDir)
-      throws Exception {
+  void aRetiredLaterAdmissionWaitsForTheAJobItQueues(@TempDir Path tempDir) throws Exception {
     // The refused walk retired the file's later row (DONE, nothing written). Its captured plan
-    // names the bytes A still holds, but the accepted watcher update never reached A. One
-    // restart after the crash reaches IDLE: cleanup queues an ordinary A job and hands over.
+    // names the bytes A still holds, but the accepted watcher update never reached A. Cleanup
+    // queues an ordinary A job and acknowledges only once A's writer committed it.
     String onA = RealQueueHandover.STALE;
     try (var handover = new RealQueueHandover(tempDir, "DONE", onA, null, onA)) {
       handover.reconcile();
-      handover.assertQueuedOnAThenHandedOver();
+      handover.assertWaitingOnAJob(true);
+      handover.aCommits(RealQueueHandover.LATER);
+      handover.reconcile();
+      handover.assertHandedOver();
     }
   }
 
@@ -193,9 +224,7 @@ class RecordedMigrationRestartRecoveryTest {
     try (var handover = new RealQueueHandover(
         tempDir, "DONE", RealQueueHandover.STALE, committed, committed)) {
       handover.reconcile();
-      assertEquals(0, handover.journalSize());
-      assertTrue(handover.restarted.get());
-      assertEquals("IDLE", handover.manager.readStateBestEffort().migration_state());
+      handover.assertHandedOver();
     }
   }
 
@@ -423,6 +452,11 @@ class RecordedMigrationRestartRecoveryTest {
     return layout;
   }
 
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static Object sourceFileWork(Class<?> type, String name) {
+    return Enum.valueOf((Class) type, name);
+  }
+
   private static Object field(Object target, String name) throws Exception {
     var field = target.getClass().getDeclaredField(name);
     field.setAccessible(true);
@@ -444,11 +478,12 @@ class RecordedMigrationRestartRecoveryTest {
     final RunningRuntime source = mock(RunningRuntime.class);
     final RunningRuntime green = mock(RunningRuntime.class);
     final DocumentFieldOps fields = mock(DocumentFieldOps.class);
-    final AtomicBoolean supersededByLaterAdmission = new AtomicBoolean();
+    /** The queue's SourceFileWork answer, by name: earlier versions lack the type. */
+    final java.util.concurrent.atomic.AtomicReference<String> sourceWork =
+        new java.util.concurrent.atomic.AtomicReference<>("NONE");
     final SwitchBufferCapableQueue queue = mock(SwitchBufferCapableQueue.class, invocation ->
-        List.of("queueStillOwnsFileAdmission", "sourceOwnsFileAdmission")
-            .contains(invocation.getMethod().getName())
-            ? supersededByLaterAdmission.get()
+        "sourceFileWork".equals(invocation.getMethod().getName())
+            ? sourceFileWork(invocation.getMethod().getReturnType(), sourceWork.get())
             : Mockito.RETURNS_DEFAULTS.answer(invocation));
     final AtomicBoolean restarted = new AtomicBoolean();
     final AtomicBoolean journalAcked = new AtomicBoolean();
@@ -499,6 +534,20 @@ class RecordedMigrationRestartRecoveryTest {
       setField(server, "ingestLifecycle", green);
       setField(server, "jobQueue", queue);
       setField(server, "migrationRestartAction", (Runnable) () -> restarted.set(true));
+    }
+
+    /**
+     * The file changed after A wrote the accepted bytes, so A holding them proves nothing: only
+     * A's write of the current bytes would.
+     */
+    void fileChangedSinceA() throws Exception {
+      Files.writeString(file, "changed after the accepted admission");
+    }
+
+    /** A FENCED recovery boot: its one producer writes A. */
+    void recoveryBoot() throws Exception {
+      setField(server, "generationBootDisposition", IndexGenerationManager.BootDisposition.FENCED);
+      setField(server, "ingestLifecycle", source);
     }
 
     void freshProducer() throws Exception {
@@ -558,6 +607,8 @@ class RecordedMigrationRestartRecoveryTest {
     final KnowledgeServer server;
     final String key;
     final Path database;
+    final java.util.concurrent.atomic.AtomicReference<String> onA =
+        new java.util.concurrent.atomic.AtomicReference<>();
 
     static final String LATER = "c".repeat(64);
     static final String STALE = "d".repeat(64);
@@ -605,8 +656,9 @@ class RecordedMigrationRestartRecoveryTest {
       var fields = mock(DocumentFieldOps.class);
       when(source.documentFieldOps()).thenReturn(fields);
       when(source.commitOps()).thenReturn(mock(CommitOps.class));
+      this.onA.set(onA);
       when(fields.getDocumentFieldOrThrow(key, SchemaFields.SOURCE_SHA256))
-          .thenReturn(onA);
+          .thenAnswer(ignored -> this.onA.get());
       var owner = new Object();
       var producer = mock(DefaultWorkerAppServices.class);
       when(producer.mutationAdmission()).thenReturn(new WorkerMutationAdmission(owner));
@@ -636,23 +688,49 @@ class RecordedMigrationRestartRecoveryTest {
       return queue.listSwitchBufferOpsStrict().size();
     }
 
-    /** The journal is acknowledged only because an ordinary pending A job now owns the file. */
-    void assertQueuedOnAThenHandedOver() throws Exception {
-      assertEquals(0, journalSize(), "the accepted update is acknowledged");
-      assertTrue(restarted.get(), "cleanup finished in this process");
-      assertEquals("IDLE", manager.readStateBestEffort().migration_state());
+    /** A's writer ran the file's job and committed {@code hash}, which A now holds. */
+    void aCommits(String hash) throws Exception {
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database);
+          var update = connection.prepareStatement(
+              "UPDATE jobs SET state = 'DONE', content_hash = ? WHERE path = ?")) {
+        update.setString(1, hash);
+        update.setString(2, key);
+        assertEquals(1, update.executeUpdate());
+      }
+      onA.set(hash);
+    }
+
+    /**
+     * Green and the journal wait for an A job for the file: a new ordinary one cleanup queued
+     * ({@code queuedByCleanup}), or the file's own later admission. Returns its revision.
+     */
+    String assertWaitingOnAJob(boolean queuedByCleanup) throws Exception {
+      assertEquals(1, journalSize(), "the accepted update waits for A's writer");
+      assertFalse(restarted.get(), "cleanup has not finished");
+      assertEquals("FAILED", manager.readStateBestEffort().migration_state());
+      assertEquals(building, manager.readStateBestEffort().building_generation(), "Green is kept");
       try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database);
           var query = connection.prepareStatement("SELECT state, unit_revision, scan_id, "
               + "planned_source_sha256 FROM jobs WHERE path = ?")) {
         query.setString(1, key);
         try (var row = query.executeQuery()) {
           assertTrue(row.next());
-          assertEquals("PENDING", row.getString("state"), "A's writer runs it after the restart");
-          assertFalse("later-revision".equals(row.getString("unit_revision")), "a new admission");
-          assertNull(row.getString("scan_id"));
-          assertNull(row.getString("planned_source_sha256"), "the writer reads the file's bytes");
+          assertEquals("PENDING", row.getString("state"), "A's writer runs it");
+          assertEquals(!queuedByCleanup, "later-revision".equals(row.getString("unit_revision")),
+              queuedByCleanup ? "a new admission" : "the file's own job is not replaced");
+          if (queuedByCleanup) {
+            assertNull(row.getString("scan_id"));
+            assertNull(row.getString("planned_source_sha256"), "the writer reads the file's bytes");
+          }
+          return row.getString("unit_revision");
         }
       }
+    }
+
+    void assertHandedOver() throws Exception {
+      assertEquals(0, journalSize(), "the accepted update is acknowledged");
+      assertTrue(restarted.get(), "cleanup finished in this process");
+      assertEquals("IDLE", manager.readStateBestEffort().migration_state());
     }
 
     @Override

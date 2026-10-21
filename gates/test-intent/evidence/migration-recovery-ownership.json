@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T03:35:32.932Z",
-  "revision": "c44f281a0f5222e80547d93ef1d22bba9966afc3",
-  "tree": "f31698ad7d27fcb2614ce9ff2703580ae404a3dc",
+  "createdAt": "2026-10-21T06:04:29.413Z",
+  "revision": "a26eaf3e3c1acd65a71652443a75080c080890e0",
+  "tree": "091d9b5aef7c88f4af9508d3c56b948c197dab7f",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,29 +18,29 @@
   },
   "runs": [
     {
-      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.QueueAdmissionOwnershipTest.onlyAPendingRowOrACommittedWriteHandsTheFileToTheSource\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.QueueAdmissionOwnershipTest.onlyACommittedWriteHandsTheFileToTheSource\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1773
+      "durationMs": 1830
     }
   ],
   "checks": [
     {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java#onlyAPendingRowOrACommittedWriteHandsTheFileToTheSource",
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java#onlyACommittedWriteHandsTheFileToTheSource",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5f53487657835c5af635e12dc857b4fbf500382cc677208bf30e0b2144b3234f",
+      "contentDigest": "sha256:5110fa35d6a6707107001d48d9be765abd2d3be5932d364f558eb4d324246fe7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "onlyAPendingRowOrACommittedWriteHandsTheFileToTheSource()",
+          "name": "onlyACommittedWriteHandsTheFileToTheSource()",
           "status": "passed"
         }
       ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:043fed5fecc90dab376e710e35b2f819addf2d5ed8f786340ab5bd208486f76f"
+  "digest": "sha256:67a785b39624a26f06b003758d5b76d7a2a41cfa5d33aab1c840cd02674d2ba5"
 }

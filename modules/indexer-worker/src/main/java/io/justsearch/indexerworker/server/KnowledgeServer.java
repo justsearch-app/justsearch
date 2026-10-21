@@ -2097,12 +2097,38 @@ public final class KnowledgeServer implements Closeable {
     deferredModelInit.whenComplete((ignored, failure) -> {
       var reaper = stuckJobReaper;
       if (closeStarted || reaper == null) return;
+      // A recovery boot has no cutover monitor; its cleanup retries as promptly, within the same
+      // bound counted from here, the point at which cleanup can first run.
+      long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(REFUSAL_SETTLE_BOUND_MS);
       try {
-        reaper.execute(this::reconcileRefusedCandidateSafely);
+        reaper.execute(() -> retryRefusedCandidateCleanup(deadline));
       } catch (java.util.concurrent.RejectedExecutionException closing) {
         if (!closeStarted) log.warn("Refused candidate completion maintenance could not start", closing);
       }
     });
+  }
+
+  /**
+   * As {@link #settleRefusedRecordedCandidate}, without holding the reaper's thread: one attempt,
+   * then the next a second later while the refused candidate awaits cleanup and the bound lasts.
+   * The reaper's own tick keeps retrying after the bound.
+   */
+  private void retryRefusedCandidateCleanup(long deadlineNanos) {
+    boolean settled;
+    try {
+      settled = reconcileRefusedRecordedCandidate();
+    } catch (RuntimeException failure) {
+      log.error("Refused candidate maintenance will retry", failure);
+      settled = false;
+    }
+    var reaper = stuckJobReaper;
+    if (settled || closeStarted || !running || reaper == null
+        || System.nanoTime() >= deadlineNanos || !refusedCandidateAwaitsCleanup()) return;
+    try {
+      reaper.schedule(() -> retryRefusedCandidateCleanup(deadlineNanos), 1, TimeUnit.SECONDS);
+    } catch (java.util.concurrent.RejectedExecutionException closing) {
+      if (!closeStarted) log.warn("Refused candidate cleanup retry could not be scheduled", closing);
+    }
   }
 
   private void reconcileRefusedCandidateSafely() {
@@ -8252,10 +8278,7 @@ public final class KnowledgeServer implements Closeable {
     if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded)) return;
     while (true) {
       if (reconcileRefusedRecordedCandidate() || closeStarted || !running) return;
-      var state = indexGenerationManager == null ? null : indexGenerationManager.readStateBestEffort();
-      if (state == null || !"FAILED".equals(state.migration_state())
-          || state.building_generation() == null
-          || System.nanoTime() >= deadlineNanos) return;
+      if (!refusedCandidateAwaitsCleanup() || System.nanoTime() >= deadlineNanos) return;
       try {
         Thread.sleep(1_000);
       } catch (InterruptedException interrupted) {
@@ -8263,6 +8286,16 @@ public final class KnowledgeServer implements Closeable {
         return;
       }
     }
+  }
+
+  /** A recorded boot whose FAILED pointer still names its candidate. */
+  private boolean refusedCandidateAwaitsCleanup() {
+    if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded)) {
+      return false;
+    }
+    var state = indexGenerationManager == null ? null : indexGenerationManager.readStateBestEffort();
+    return state != null && "FAILED".equals(state.migration_state())
+        && state.building_generation() != null;
   }
 
   /**
@@ -8875,6 +8908,15 @@ public final class KnowledgeServer implements Closeable {
                   .equals(activeIndexPath)) {
             throw new IOException("Refused candidate has no exact writable source generation");
           }
+          // A recovery (FENCED) boot never starts its indexing loop, yet this producer writes
+          // surviving A, and an accepted admission hands over only once A's writer commits it.
+          // Once the refused walk is sealed it issues no candidate claim, so the queue holds
+          // only A's own work, which the boot after cleanup would run anyway: run it now, or
+          // cleanup would wait for A forever. Every attempt below still fences and parks it.
+          if (generationBootDisposition == IndexGenerationManager.BootDisposition.FENCED
+              && ingestLifecycle == source && refusedRecordedWalkSealed(recorded.operationKey())) {
+            producer.startIndexingLoop();
+          }
           // Keep the scoped journal and Green alive until every accepted candidate mutation is
           // certified on surviving A. The same producer fence excludes a later file admission.
           try (var fence = producer.mutationAdmission().beginFinalFence(
@@ -8886,9 +8928,9 @@ public final class KnowledgeServer implements Closeable {
             if (fence == null) {
               throw new IOException("Refused candidate mutation admission is not settled");
             }
-            // Pending rows are path work on the shared queue, not B effects: a FENCED boot
-            // enqueues its root walk but never runs the loop. They stay durable and run on A
-            // after the restart; only a claimed row could still publish a late write.
+            // Pending rows are path work on the shared queue, not B effects. They stay durable
+            // A work, and an accepted admission waits for A's writer to commit it; only a
+            // claimed row could still publish a late write during this attempt.
             // Pause first: the writer returns to its pause point between batches, so a claim it
             // was finishing settles instead of failing this attempt.
             if (!producer.pauseProducerForCutover(10_000)) {
@@ -8950,6 +8992,12 @@ public final class KnowledgeServer implements Closeable {
       migrationRestartAction.run();
     }
     return restart;
+  }
+
+  /** The refused operation's captured walk can issue no further claim. */
+  private boolean refusedRecordedWalkSealed(String operationKey) {
+    return jobQueue.recordedWalk(operationKey).isEmpty()
+        || jobQueue.sealedRecordedWalkReceipt(operationKey).isPresent();
   }
 
   /**

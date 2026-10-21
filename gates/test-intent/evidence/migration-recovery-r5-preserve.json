@@ -1,0 +1,166 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T06:07:09.581Z",
+  "revision": "a26eaf3e3c1acd65a71652443a75080c080890e0",
+  "tree": "d37f698929fabda178dd828fefb430c007392ebc",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RefusedRecoveryRetiredAdmissionTest.aRetiredReadmissionOfAnUnchangedFileIsHandedToA\" --tests \"io.justsearch.indexerworker.server.RefusedRecoveryRetiredAdmissionTest.aRetiredUpdateOfAnUnreadableFileStaysUnproved\" --tests \"io.justsearch.indexerworker.server.RefusedRecoveryRetiredAdmissionTest.anAcceptedUpdateAHoldsSettlesAfterALaterAdmissionFoundItUnchanged\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aLaterAdmissionCommittedOnAHandsTheUpdateToA\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4175
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredReadmissionOfAnUnchangedFileIsHandedToA",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eca170c165e0a486a49fac57ad87eb43abe8b5f865a78c1abac8511ae7f221c5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRetiredReadmissionOfAnUnchangedFileIsHandedToA()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredUpdateOfAnUnreadableFileStaysUnproved",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eca170c165e0a486a49fac57ad87eb43abe8b5f865a78c1abac8511ae7f221c5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRetiredUpdateOfAnUnreadableFileStaysUnproved()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#anAcceptedUpdateAHoldsSettlesAfterALaterAdmissionFoundItUnchanged",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eca170c165e0a486a49fac57ad87eb43abe8b5f865a78c1abac8511ae7f221c5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anAcceptedUpdateAHoldsSettlesAfterALaterAdmissionFoundItUnchanged()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:61bbb850268c414ddcc29274ab4be0d57f4639cca7f5a20d027093c8fb6c27f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterAdmissionCommittedOnAHandsTheUpdateToA",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:61bbb850268c414ddcc29274ab4be0d57f4639cca7f5a20d027093c8fb6c27f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLaterAdmissionCommittedOnAHandsTheUpdateToA(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:61bbb850268c414ddcc29274ab4be0d57f4639cca7f5a20d027093c8fb6c27f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a26eaf3e3",
+    "revision": "a26eaf3e3c1acd65a71652443a75080c080890e0",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RefusedRecoveryRetiredAdmissionTest.aRetiredReadmissionOfAnUnchangedFileIsHandedToA\" --tests \"io.justsearch.indexerworker.server.RefusedRecoveryRetiredAdmissionTest.aRetiredUpdateOfAnUnreadableFileStaysUnproved\" --tests \"io.justsearch.indexerworker.server.RefusedRecoveryRetiredAdmissionTest.anAcceptedUpdateAHoldsSettlesAfterALaterAdmissionFoundItUnchanged\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aLaterAdmissionCommittedOnAHandsTheUpdateToA\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 6209
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredReadmissionOfAnUnchangedFileIsHandedToA",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredUpdateOfAnUnreadableFileStaysUnproved",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#anAcceptedUpdateAHoldsSettlesAfterALaterAdmissionFoundItUnchanged",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterAdmissionCommittedOnAHandsTheUpdateToA",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:501503c14e879ee9b630a3ebb5d43580fad4662ff053612a4282143c614ae8ff"
+}

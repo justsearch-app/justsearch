@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T03:37:44.718Z",
-  "revision": "c44f281a0f5222e80547d93ef1d22bba9966afc3",
-  "tree": "86c73815c5d3acce743a76ffd49c79d32b713ec8",
+  "createdAt": "2026-10-21T06:06:41.739Z",
+  "revision": "a26eaf3e3c1acd65a71652443a75080c080890e0",
+  "tree": "600041ee175774b03396590b9e50019663f8a8ef",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RefusedRecoveryRetiredAdmissionTest.aRetiredUpdateOfAnUnreadableFileStaysUnproved\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2781
+      "durationMs": 2500
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredUpdateOfAnUnreadableFileStaysUnproved",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:af99e0c1027f52b0ba8d19557603baa02bbfac2684c6db6a37cb4addc85cfce9",
+      "contentDigest": "sha256:eca170c165e0a486a49fac57ad87eb43abe8b5f865a78c1abac8511ae7f221c5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -56,7 +56,7 @@
         "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RefusedRecoveryRetiredAdmissionTest.aRetiredUpdateOfAnUnreadableFileStaysUnproved\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 4301
+        "durationMs": 4601
       }
     ],
     "checks": [
@@ -67,5 +67,5 @@
       }
     ]
   },
-  "digest": "sha256:1d8c0c0aef472fc176f70db9a9e11f5e00d996ed03ded52772dd52350d534522"
+  "digest": "sha256:01ccf66630eab222b4ce0b6e51cf344ba46ba663cb605faf9c8351ba6b248f30"
 }

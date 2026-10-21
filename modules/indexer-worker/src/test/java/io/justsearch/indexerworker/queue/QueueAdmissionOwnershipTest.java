@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.queue;
 
+import static io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SourceFileWork.COMMITTED;
+import static io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SourceFileWork.NONE;
+import static io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SourceFileWork.OUTSTANDING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.indexerworker.util.PathNormalizer;
@@ -14,9 +16,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * A refused candidate's accepted file admission is handed to the surviving generation only by
- * that generation's committed effect: a pending row that will produce the file there, or the
- * accepted or a later admission whose writer committed exactly the bytes that generation holds. A row's status alone
- * is not: a retired or refused row wrote nothing.
+ * that generation's committed effect: the accepted or a later admission whose writer committed
+ * exactly the bytes that generation holds. A row's status alone is not: a retired or refused row
+ * wrote nothing, and a pending, claimed or failed row has not written yet.
  */
 final class QueueAdmissionOwnershipTest {
   private static final String LATER = "c".repeat(64);
@@ -25,42 +27,44 @@ final class QueueAdmissionOwnershipTest {
   @TempDir Path tempDir;
 
   @Test
-  void onlyAPendingRowOrACommittedWriteHandsTheFileToTheSource() throws Exception {
+  void onlyACommittedWriteHandsTheFileToTheSource() throws Exception {
     Path db = tempDir.resolve("ownership.db");
     Path file = Files.writeString(tempDir.resolve("owned.txt"), "first").toAbsolutePath();
     String key = PathNormalizer.normalizeKey(file);
     try (var queue = new SqliteJobQueue(db)) {
       queue.open();
-      assertFalse(queue.sourceOwnsFileAdmission(key, "any", LATER), "no row owns nothing");
+      assertEquals(NONE, queue.sourceFileWork(key, LATER), "no row: A needs a job");
       assertTrue(queue.enqueueAndBufferFileForGeneration(
           "green", JobQueue.EnqueueEntry.stat(file), null, null));
       String accepted = SwitchBufferUpsert.decode(
           queue.listSwitchBufferOpsStrictForGeneration("green").getFirst().payload()).unitRevision();
 
-      assertTrue(queue.sourceOwnsFileAdmission(key, accepted, null), "a pending row will run");
+      assertEquals(OUTSTANDING, queue.sourceFileWork(key, null),
+          "a pending row will run, but has written nothing yet");
 
       set(db, key, "DONE", accepted, LATER, LATER);
-      assertTrue(queue.sourceOwnsFileAdmission(key, accepted, LATER),
+      assertEquals(COMMITTED, queue.sourceFileWork(key, LATER),
           "the accepted admission's own write committed the bytes the source holds");
       set(db, key, "DONE", accepted, LATER, null);
-      assertFalse(queue.sourceOwnsFileAdmission(key, accepted, LATER),
+      assertEquals(NONE, queue.sourceFileWork(key, LATER),
           "the accepted admission retired without writing is no effect, even when its plan matches");
       set(db, key, "PROCESSING", "later-revision", LATER, null);
-      assertFalse(queue.sourceOwnsFileAdmission(key, accepted, LATER), "a claim is not an effect");
+      assertEquals(OUTSTANDING, queue.sourceFileWork(key, LATER), "a claim is not an effect");
+      set(db, key, "FAILED", "later-revision", LATER, null);
+      assertEquals(OUTSTANDING, queue.sourceFileWork(key, LATER), "a failure is not an effect");
 
       set(db, key, "DONE", "later-revision", LATER, LATER);
-      assertTrue(queue.sourceOwnsFileAdmission(key, accepted, LATER),
+      assertEquals(COMMITTED, queue.sourceFileWork(key, LATER),
           "the source committed the later admission's bytes");
-      assertFalse(queue.sourceOwnsFileAdmission(key, accepted, STALE),
+      assertEquals(NONE, queue.sourceFileWork(key, STALE),
           "a later finished row with stale source bytes hands nothing over");
-      assertFalse(queue.sourceOwnsFileAdmission(key, accepted, null),
-          "a source without the file holds nothing");
+      assertEquals(NONE, queue.sourceFileWork(key, null), "a source without the file holds nothing");
 
       set(db, key, "DONE", "later-revision", STALE, null);
-      assertFalse(queue.sourceOwnsFileAdmission(key, accepted, STALE),
+      assertEquals(NONE, queue.sourceFileWork(key, STALE),
           "a later row retired without writing is no effect, even when its plan matches the source");
       set(db, key, "DONE", "later-revision", STALE, LATER);
-      assertTrue(queue.sourceOwnsFileAdmission(key, accepted, LATER),
+      assertEquals(COMMITTED, queue.sourceFileWork(key, LATER),
           "the source committed a later captured revision whose bytes changed after its plan");
     }
   }

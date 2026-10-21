@@ -12,6 +12,10 @@ import io.justsearch.adapters.lucene.runtime.CommitReason;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
+import io.justsearch.indexerworker.ingest.IngestionOutcome;
+import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
+import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
+import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
 import io.justsearch.indexerworker.loop.SourceContentHash;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
@@ -34,44 +38,54 @@ import tools.jackson.databind.ObjectMapper;
  * refused walk's pending rows without writing (DONE, SKIPPED_POLICY, RECOVERY_REFUSED). The
  * captured witness of every journal UPSERT names the plan's bytes, which A holds from before the
  * migration; only the file's bytes say whether A is current (task a5fbcb, M1+). An admission A
- * does not hold is handed over through one ordinary pending A job that cleanup queues (round 4).
+ * does not hold gets one ordinary A job that cleanup queues (round 4), and hands over only once
+ * A's writer commits its effect; a pending or failed A job keeps Green and the journal (round 5).
  */
 final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
   private static final String OPERATION = "01994180-0000-7000-8000-000000000197";
   private static final String GREEN = "green";
+  private static final IngestionOutcome SUCCESS = IngestionOutcome.of(
+      IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS", IngestionRetryPolicy.NONE);
 
   @TempDir Path temp;
 
   // M1+: the accepted watcher update was retired unwritten while A holds the original bytes
   @Test
-  void aRetiredWatcherUpdateIsQueuedOnA() throws Exception {
+  void aRetiredWatcherUpdateHandsOverOnceAsJobCommitsIt() throws Exception {
     try (var fixture = new Fixture(temp, "original A source")) {
       fixture.capture();
       fixture.edit("accepted watcher update");
       fixture.admitOnGreen();
       fixture.retire();
-      assertTrue(fixture.drain(), "an ordinary A job now owns the accepted update");
-      assertEquals(0, fixture.journalSize());
+      assertFalse(fixture.drain(), "a queued A job is not A's effect");
+      assertEquals(1, fixture.journalSize(), "the journal waits for A's writer");
       fixture.assertQueuedOnA();
+      fixture.aWriterCommitsTheFile();
+      assertTrue(fixture.drain(), "A committed the accepted update");
+      assertEquals(0, fixture.journalSize());
     }
   }
 
   // M1+: a restart re-admitted the changed file to the journal, then retirement skipped it
   @Test
-  void aRetiredReadmissionOfAChangedFileIsQueuedOnA() throws Exception {
+  void aRetiredReadmissionOfAChangedFileHandsOverOnceAsJobCommitsIt() throws Exception {
     try (var fixture = new Fixture(temp, "original A source")) {
       fixture.capture();
       fixture.edit("accepted watcher update");
       fixture.admitOnGreen();
       fixture.readmitByEnumeration();
       fixture.retire();
-      assertTrue(fixture.drain(), "the re-admission's captured witness is not the file's bytes");
-      assertEquals(0, fixture.journalSize());
+      int accepted = fixture.journalSize();
+      assertFalse(fixture.drain(), "the re-admission's captured witness is not the file's bytes");
+      assertEquals(accepted, fixture.journalSize(), "the journal waits for A's writer");
       fixture.assertQueuedOnA();
+      fixture.aWriterCommitsTheFile();
+      assertTrue(fixture.drain(), "A committed the file's current bytes");
+      assertEquals(0, fixture.journalSize());
     }
   }
 
-  // M1+: a cleanup cut after queuing and re-entered later queues no second job
+  // M1+: a re-entered cleanup, before and after A's commit, queues no second job
   @Test
   void aReenteredCleanupQueuesNoDuplicate() throws Exception {
     try (var fixture = new Fixture(temp, "original A source")) {
@@ -79,30 +93,85 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
       fixture.edit("accepted watcher update");
       fixture.admitOnGreen();
       fixture.retire();
+      assertFalse(fixture.drain());
+      // Read through its own connection: the queued row is durable for a restarted owner.
+      String queued = fixture.assertQueuedOnA();
+      assertFalse(fixture.drain());
+      assertEquals(queued, fixture.assertQueuedOnA(), "the re-entered cleanup queued nothing new");
+      fixture.aWriterCommitsTheFile();
       assertThrows(IllegalStateException.class, () -> fixture.drain(() -> {
         throw new IllegalStateException("cut before the journal acknowledgement");
       }));
       assertEquals(1, fixture.journalSize(), "the cut left the journal unacknowledged");
-      // Read through its own connection: the queued row is durable for a restarted owner.
-      String queued = fixture.assertQueuedOnA();
       assertTrue(fixture.drain());
       assertEquals(0, fixture.journalSize());
-      assertEquals(queued, fixture.assertQueuedOnA(), "the re-entered cleanup queued nothing new");
+      assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(), "no job was re-queued");
     }
   }
 
-  // M1+: the accepted file is gone from disk: A's ordinary removal job owns it
+  // M1+: the accepted file is gone from disk: A's ordinary job removes it, then cleanup settles
   @Test
-  void aRetiredUpdateOfADeletedFileQueuesItsRemovalOnA() throws Exception {
+  void aRetiredUpdateOfADeletedFileHandsOverOnceARemovesIt() throws Exception {
     try (var fixture = new Fixture(temp, "original A source")) {
       fixture.capture();
       fixture.edit("accepted watcher update");
       fixture.admitOnGreen();
       fixture.retire();
       Files.delete(fixture.file);
-      assertTrue(fixture.drain(), "A's removal job owns the accepted update");
-      assertEquals(0, fixture.journalSize());
+      assertFalse(fixture.drain(), "A still holds the file");
+      assertEquals(1, fixture.journalSize());
       fixture.assertQueuedOnA();
+      fixture.aWriterRemovesTheFile();
+      assertTrue(fixture.drain(), "A shows the removal");
+      assertEquals(0, fixture.journalSize());
+    }
+  }
+
+  // M1+ (verifier, round 5): a watcher update of a file unreadable since the crash keeps Green
+  @Test
+  void aPendingUpdateOfAnUnreadableFileKeepsTheJournal() throws Exception {
+    try (var fixture = new Fixture(temp, "original A source")) {
+      fixture.capture();
+      fixture.edit("accepted watcher update");
+      fixture.admitOnGreen();
+      String pending = fixture.assertPending();
+      Files.setPosixFilePermissions(fixture.file, java.util.Set.of());
+      try {
+        assumeFalse(Files.isReadable(fixture.file), "this user can read any file");
+        assertFalse(fixture.drain(), "a pending A job is not A's effect");
+        assertEquals(1, fixture.journalSize(), "the journal is kept");
+        assertEquals(pending, fixture.assertPending(), "the file's own A job stays the only one");
+      } finally {
+        fixture.makeReadable();
+      }
+    }
+  }
+
+  // M1+ (round 5): A's job fails on the unreadable file; only a later committed attempt settles
+  @Test
+  void aFailedAJobKeepsTheJournalUntilALaterAttemptCommits() throws Exception {
+    try (var fixture = new Fixture(temp, "original A source")) {
+      fixture.capture();
+      fixture.edit("accepted watcher update");
+      fixture.admitOnGreen();
+      fixture.retire();
+      assertFalse(fixture.drain());
+      String queued = fixture.assertQueuedOnA();
+      Files.setPosixFilePermissions(fixture.file, java.util.Set.of());
+      try {
+        assumeFalse(Files.isReadable(fixture.file), "this user can read any file");
+        fixture.aWriterFindsTheFileUnreadable();
+        assertFalse(fixture.drain(), "a failed A job is no effect");
+        assertEquals(1, fixture.journalSize(), "the journal is kept");
+      } finally {
+        fixture.makeReadable();
+      }
+      assertFalse(fixture.drain(), "the retry has not run yet");
+      assertEquals(queued, fixture.assertPending(), "the retrying job is not replaced");
+      fixture.retryNow();
+      fixture.aWriterCommitsTheFile();
+      assertTrue(fixture.drain(), "the later attempt committed the accepted update");
+      assertEquals(0, fixture.journalSize());
     }
   }
 
@@ -120,6 +189,23 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
 
   // preserved: a file unreadable at queue time keeps the safe state and queues nothing
   @Test
+  void anAcceptedUpdateAHoldsSettlesAfterALaterAdmissionFoundItUnchanged() throws Exception {
+    // M8: the accepted admission's bytes are on A and on disk. A later admission of the file (a
+    // recovery boot's root walk) moved the row's revision on, and A's writer found the file
+    // unchanged: it wrote nothing because A already held it. A holds the accepted revision.
+    try (var fixture = new Fixture(temp, "original A source")) {
+      fixture.capture();
+      fixture.admitOnGreen();
+      fixture.retire();
+      assertEquals(1, fixture.queue.enqueueEntries(
+          List.of(JobQueue.EnqueueEntry.stat(fixture.file)), "default"));
+      fixture.aWriterFindsTheFileUnchanged();
+      assertTrue(fixture.drain(), "A holds the accepted bytes, which are the file's current bytes");
+      assertEquals(0, fixture.journalSize());
+    }
+  }
+
+  @Test
   void aRetiredUpdateOfAnUnreadableFileStaysUnproved() throws Exception {
     try (var fixture = new Fixture(temp, "original A source")) {
       fixture.capture();
@@ -133,8 +219,7 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
         assertEquals(1, fixture.journalSize(), "the journal is kept");
         assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(), "nothing is queued");
       } finally {
-        Files.setPosixFilePermissions(fixture.file,
-            java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+        fixture.makeReadable();
       }
     }
   }
@@ -200,6 +285,76 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
               System.nanoTime() + TimeUnit.SECONDS.toNanos(1), GREEN), beforeAck);
     }
 
+    /** A's writer claims the file's one job and writes its current bytes to A, uncommitted. */
+    void aWriterCommitsTheFile() throws Exception {
+      var claim = onlyClaim();
+      String bytes = SourceContentHash.sha256(file);
+      source.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, file.toString(), SchemaFields.DOC_UID, "a-current",
+          SchemaFields.PATH, file.toString(), SchemaFields.CONTENT, Files.readString(file),
+          SchemaFields.SOURCE_SHA256, bytes)));
+      queue.markDoneTransitions(
+          List.of(new JobQueue.IngestionLedgerTransition(claim, null, bytes)), SUCCESS);
+    }
+
+    /** A's writer claims the job of the deleted file and removes the file from A. */
+    void aWriterRemovesTheFile() throws Exception {
+      var claim = onlyClaim();
+      source.indexingCoordinator().deleteByIdAndChunks(file.toString());
+      queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claim, null)), SUCCESS);
+    }
+
+    /** A's writer claims the job and finds A already holds the file: it writes nothing. */
+    void aWriterFindsTheFileUnchanged() {
+      var claim = onlyClaim();
+      queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claim, null)),
+          IngestionOutcome.of(IngestionOutcomeClass.SKIPPED_POLICY, IngestionReasonCodes.UNCHANGED,
+              IngestionRetryPolicy.NONE));
+    }
+
+    /** A's writer claims the job and cannot read the file; the row retries later. */
+    void aWriterFindsTheFileUnreadable() {
+      var claim = onlyClaim();
+      assertTrue(queue.markClaimFailed(claim, IngestionOutcome.of(IngestionOutcomeClass.IO_FAILED,
+          IngestionReasonCodes.SOURCE_UNREADABLE, IngestionRetryPolicy.RETRY_UNTIL_AVAILABLE), null));
+    }
+
+    private JobQueue.IndexJob onlyClaim() {
+      var claims = queue.pollPending(10);
+      assertEquals(1, claims.size(), "A's one job for the file is claimable");
+      return claims.getFirst();
+    }
+
+    void retryNow() throws Exception {
+      try (var connection = java.sql.DriverManager.getConnection(
+              "jdbc:sqlite:" + temp.resolve("jobs.db").toAbsolutePath());
+          var update = connection.prepareStatement(
+              "UPDATE jobs SET retry_after = NULL WHERE path = ?")) {
+        update.setString(1, file.toString());
+        assertEquals(1, update.executeUpdate());
+      }
+    }
+
+    void makeReadable() throws Exception {
+      Files.setPosixFilePermissions(file,
+          java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+    }
+
+    /** The file's row is pending; returns its revision. */
+    String assertPending() throws Exception {
+      try (var connection = java.sql.DriverManager.getConnection(
+              "jdbc:sqlite:" + temp.resolve("jobs.db").toAbsolutePath());
+          var query = connection.prepareStatement(
+              "SELECT state, unit_revision FROM jobs WHERE path = ?")) {
+        query.setString(1, file.toString());
+        try (var row = query.executeQuery()) {
+          assertTrue(row.next(), "the file has a queue row");
+          assertEquals("PENDING", row.getString("state"));
+          return row.getString("unit_revision");
+        }
+      }
+    }
+
     /** The file's row is an ordinary pending A job; returns its revision. */
     String assertQueuedOnA() throws Exception {
       try (var connection = java.sql.DriverManager.getConnection(
@@ -209,7 +364,7 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
         query.setString(1, file.toString());
         try (var row = query.executeQuery()) {
           assertTrue(row.next(), "the file has a queue row");
-          assertEquals("PENDING", row.getString("state"), "A's writer runs it after the restart");
+          assertEquals("PENDING", row.getString("state"), "A's writer runs it");
           assertNull(row.getString("scan_id"), "not a member of the refused walk");
           assertNull(row.getObject("walk_seen_epoch"));
           assertNull(row.getString("planned_source_sha256"), "the writer reads the file's bytes");

@@ -1469,7 +1469,9 @@ public final class KnowledgeServerMigrationOps {
           && (!exactRead || awaitQueuedUpserts(context, refusedSourceRecovery));
     }
 
-    if (mutatedLucene && context.ingestLifecycle() != null) {
+    // Refused recovery also judges file admissions by A's writer, whose batches A's reader sees
+    // before they are durable: commit A so the journal is acknowledged only for committed effects.
+    if ((mutatedLucene || refusedSourceRecovery) && context.ingestLifecycle() != null) {
       try {
         // Tempdoc 912 item 2: this used to call the low-level CommitOps.commit(), which skips the
         // per-reason counter, the pendingDocs reset, the commit telemetry and the
@@ -1578,8 +1580,8 @@ public final class KnowledgeServerMigrationOps {
       while (true) {
         JobQueue.JobStateCounts counts = context.jobQueue().jobStateCountsStrict();
         // Refused-candidate recovery runs with its writer paused and proved idle, so pending rows
-        // cannot move here; they stay durable queue work that surviving A's writer runs after
-        // the restart that follows cleanup. Only a claimed row could still publish a late write.
+        // cannot move here; they stay durable queue work that surviving A's writer runs between
+        // attempts. Only a claimed row could still publish a late write.
         if (refusedSourceRecovery) return counts.processingCount() == 0;
         if (counts.processingCount() == 0 && counts.pendingCount() == 0) return true;
         if (System.nanoTime() >= deadline) return false;
@@ -1648,26 +1650,28 @@ public final class KnowledgeServerMigrationOps {
         }
         String indexed = context.ingestLifecycle().documentFieldOps()
             .getDocumentFieldOrThrow(upsert.path(), SchemaFields.SOURCE_SHA256);
-        // A refused candidate hands its admission to A only by A's committed effect: a pending
-        // row that A's writer runs after the restart, or A holding the bytes this admission or
-        // a later one wrote.
-        if (refusedSourceRecovery
-            && queue.sourceOwnsFileAdmission(upsert.path(), upsert.unitRevision(), indexed)) {
-          continue;
+        // A refused candidate hands its admission to A only by A's committed effect: A holds
+        // the bytes this admission or a later one wrote. A pending or failed A job only waits.
+        SwitchBufferCapableQueue.SourceFileWork work = null;
+        if (refusedSourceRecovery) {
+          work = queue.sourceFileWork(upsert.path(), indexed);
+          if (work == SwitchBufferCapableQueue.SourceFileWork.COMMITTED) continue;
         }
         boolean settled = queue.matchesAcceptedFileProjection(
             upsert.path(), upsert.unitRevision(), upsert.sourceSha256(), indexed);
         String onDisk = null;
-        if (settled && refusedSourceRecovery && upsert.sourceSha256().equals(indexed)) {
-          // The exact projection also accepts a row that wrote nothing (retired or refused)
-          // while A holds the witness. A captured witness names the plan's bytes, not the bytes
-          // a later watcher update admitted, so A must hold the file's current bytes as well.
+        if (refusedSourceRecovery && upsert.sourceSha256().equals(indexed)) {
+          // A holds the accepted bytes, whatever the row says: the exact projection also
+          // accepts a row that wrote nothing (retired or refused), and a later admission that
+          // found A unchanged moved the row's revision on without writing. A captured witness
+          // names the plan's bytes, not the bytes a later watcher update admitted, so A must
+          // hold the file's current bytes as well.
           onDisk = currentSource(upsert.path());
           settled = indexed.equals(onDisk);
         }
         if (!settled && refusedSourceRecovery) {
           settled = handUnappliedAdmissionToSource(context, queue, upsert, indexed,
-              onDisk != null ? onDisk : currentSource(upsert.path()));
+              onDisk != null ? onDisk : currentSource(upsert.path()), work);
         }
         if (!settled) {
           context.log().warn("Buffered UPSERT lacks its accepted target projection: {}", upsert.path());
@@ -1696,27 +1700,31 @@ public final class KnowledgeServerMigrationOps {
   }
 
   /**
-   * Refusal cleanup only: an accepted admission A does not hold and no pending row owns. The
-   * Engine may have retired its row unwritten, so nothing would ever bring A to the file. Queue
-   * one ordinary A job for the path (A's removal path when the file is gone) and hand over by the
-   * pending rule; the job counts only as pending work until A's writer runs it after the restart.
-   * A file A already lacks and the disk lacks needs nothing. An unreadable file stays unproved.
+   * Refusal cleanup only: an accepted admission A does not hold. The Engine may have retired its
+   * row unwritten, so nothing would ever bring A to the file: queue one ordinary A job for the
+   * path (A's removal path when the file is gone) unless the path's own A job is outstanding.
+   * Either way the admission settles only once A's writer commits its effect, on a later attempt;
+   * a job that fails keeps the journal. A file A already lacks and the disk lacks needs nothing.
+   * An unreadable file is not queued and stays unproved.
    */
   private static boolean handUnappliedAdmissionToSource(DrainSwitchBufferContext context,
-      SwitchBufferCapableQueue queue, SwitchBufferUpsert upsert, String indexed, String onDisk)
-      throws IOException {
-    if (onDisk == null) return false;
+      SwitchBufferCapableQueue queue, SwitchBufferUpsert upsert, String indexed, String onDisk,
+      SwitchBufferCapableQueue.SourceFileWork work) throws IOException {
     if (SOURCE_GONE.equals(onDisk) && indexed == null
         && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(upsert.path()) == 0) {
       return true; // A already shows the removal.
     }
+    if (onDisk == null || work == SwitchBufferCapableQueue.SourceFileWork.OUTSTANDING) {
+      return false;
+    }
     Path file = Path.of(upsert.path());
     var entry = new JobQueue.EnqueueEntry(file, JobQueue.EnqueueEntry.stat(file).sizeBytes(),
         upsert.provenance(), null, upsert.ingestionRoot());
-    if (queue.enqueueEntries(List.of(entry), upsert.collection()) != 1) return false;
-    context.log().info("Refused candidate queued its unapplied admission on the source: {}",
-        upsert.path());
-    return queue.sourceOwnsFileAdmission(upsert.path(), upsert.unitRevision(), indexed);
+    if (queue.enqueueEntries(List.of(entry), upsert.collection()) == 1) {
+      context.log().info("Refused candidate queued its unapplied admission on the source: {}",
+          upsert.path());
+    }
+    return false;
   }
 
   /** A broad receipt used to supersede a file witness must prove its complete final scope. */

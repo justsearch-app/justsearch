@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T03:36:44.150Z",
-  "revision": "c44f281a0f5222e80547d93ef1d22bba9966afc3",
-  "tree": "66e203a3a228c8f1a1405b5f1134301483e70626",
+  "createdAt": "2026-10-21T06:05:39.670Z",
+  "revision": "a26eaf3e3c1acd65a71652443a75080c080890e0",
+  "tree": "e2280fc2405d5f32b7a78d8127de2df7776e1229",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAProjectionObligationKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.anUnlatchedMigratingCandidateKeepsBuilding\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aPendingLaterAdmissionHandsTheUpdateToA\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aLaterAdmissionCommittedOnAHandsTheUpdateToA\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAProjectionObligationKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.anUnlatchedMigratingCandidateKeepsBuilding\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aLaterAdmissionCommittedOnAHandsTheUpdateToA\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6433
+      "durationMs": 7242
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aCandidateWithAProjectionObligationKeepsWaiting",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d9f6a430afcb03d210c2a230f2de8a27d17d43ac03f41cb857a3b8c51479aaa2",
+      "contentDigest": "sha256:61bbb850268c414ddcc29274ab4be0d57f4639cca7f5a20d027093c8fb6c27f2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#anUnlatchedMigratingCandidateKeepsBuilding",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d9f6a430afcb03d210c2a230f2de8a27d17d43ac03f41cb857a3b8c51479aaa2",
+      "contentDigest": "sha256:61bbb850268c414ddcc29274ab4be0d57f4639cca7f5a20d027093c8fb6c27f2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -56,25 +56,10 @@
       ]
     },
     {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aPendingLaterAdmissionHandsTheUpdateToA",
-      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:d9f6a430afcb03d210c2a230f2de8a27d17d43ac03f41cb857a3b8c51479aaa2",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "aPendingLaterAdmissionHandsTheUpdateToA(Path)",
-          "status": "passed"
-        }
-      ]
-    },
-    {
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterAdmissionCommittedOnAHandsTheUpdateToA",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d9f6a430afcb03d210c2a230f2de8a27d17d43ac03f41cb857a3b8c51479aaa2",
+      "contentDigest": "sha256:61bbb850268c414ddcc29274ab4be0d57f4639cca7f5a20d027093c8fb6c27f2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -93,10 +78,10 @@
     "patches": [],
     "runs": [
       {
-        "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAProjectionObligationKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.anUnlatchedMigratingCandidateKeepsBuilding\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aPendingLaterAdmissionHandsTheUpdateToA\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aLaterAdmissionCommittedOnAHandsTheUpdateToA\" --rerun -PskipWebBuild=true --console=plain",
+        "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aCandidateWithAProjectionObligationKeepsWaiting\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.anUnlatchedMigratingCandidateKeepsBuilding\" --tests \"io.justsearch.indexerworker.server.RecordedMigrationRestartRecoveryTest.aLaterAdmissionCommittedOnAHandsTheUpdateToA\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 9199
+        "durationMs": 8220
       }
     ],
     "checks": [
@@ -111,16 +96,11 @@
         "detail": "the check passes on the before-state, so it does not show a repair"
       },
       {
-        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aPendingLaterAdmissionHandsTheUpdateToA",
-        "classification": "passed",
-        "detail": "the check passes on the before-state, so it does not show a repair"
-      },
-      {
         "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterAdmissionCommittedOnAHandsTheUpdateToA",
         "classification": "passed",
         "detail": "the check passes on the before-state, so it does not show a repair"
       }
     ]
   },
-  "digest": "sha256:349175c93de7ed74fe28f14b50680d23d210e47c0288e10ce2eef4d1ea87eade"
+  "digest": "sha256:0b57659ea7eca0d375869d3805420b9ff9c8b1743020435546fdf6771f4f38a3"
 }

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T03:37:21.010Z",
-  "revision": "c44f281a0f5222e80547d93ef1d22bba9966afc3",
-  "tree": "9fc3c4d0e4bce8111b087dc8a1812f27c6a83f4b",
+  "createdAt": "2026-10-21T06:06:17.163Z",
+  "revision": "a26eaf3e3c1acd65a71652443a75080c080890e0",
+  "tree": "65c304e15e014882677e2174a8ca1397a11fedc0",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RefusedRecoveryRetiredAdmissionTest.aRetiredReadmissionOfAnUnchangedFileIsHandedToA\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2378
+      "durationMs": 2895
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredReadmissionOfAnUnchangedFileIsHandedToA",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:af99e0c1027f52b0ba8d19557603baa02bbfac2684c6db6a37cb4addc85cfce9",
+      "contentDigest": "sha256:eca170c165e0a486a49fac57ad87eb43abe8b5f865a78c1abac8511ae7f221c5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -51,7 +51,7 @@
         "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RefusedRecoveryRetiredAdmissionTest.aRetiredReadmissionOfAnUnchangedFileIsHandedToA\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 4377
+        "durationMs": 4569
       }
     ],
     "checks": [
@@ -62,5 +62,5 @@
       }
     ]
   },
-  "digest": "sha256:b5aa7769544ce37a60cf4085beb0a23c427b2661129db7eb3275683f1deaabf2"
+  "digest": "sha256:132dd0f9eb65d29998283ac53b7e2e0da6932c5bb29c895de074e1648bd1422d"
 }

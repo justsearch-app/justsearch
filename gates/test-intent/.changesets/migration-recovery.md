@@ -14,7 +14,7 @@ the round-1 preservation checks pass on 542eea0d6 and after. The round-2 checks 
 against the rejected candidate 02d503739 (run-evidence.mjs --before 02d503739): the repaired ones
 fail there by assertion, the preserved ones pass there and after. The round-3 repaired checks,
 on the second verifier rejection, are judged against c44f281a0 (run-evidence.mjs --before
-c44f281a0) and fail there by assertion; the round-3 preserved one passes there and after. Round 4 (decision (b): cleanup queues an A job) is judged against the round-3 state, c44f281a0 with its uncommitted main-code diff applied as the before-patch gates/test-intent/evidence/migration-recovery-round3.patch; it changed the expected outcome of three earlier repaired checks, which were renamed and re-run against their own before states. The queue-ownership check
+c44f281a0) and fail there by assertion; the round-3 preserved one passes there and after. Round 4 (decision (b): cleanup queues an A job) is judged against the round-3 state, c44f281a0 with its uncommitted main-code diff applied as the before-patch gates/test-intent/evidence/migration-recovery-round3.patch; it changed the expected outcome of three earlier repaired checks, which were renamed and re-run against their own before states. Round 5 (only A's committed effect hands over; a pending A job means wait) is judged against a26eaf3e3 (run-evidence.mjs --before a26eaf3e3); it changed the expected outcome of seven earlier checks, which were renamed in their entries and re-run against those entries' before states, and moved one preserved check into its repaired entry. The queue-ownership check
 exercises a query this change adds, so it has no before state. Real-Engine evidence is outside
 these files. D4 files are written by run-evidence.mjs. No acceptance is recorded by the
 builder.
@@ -28,7 +28,7 @@ builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "A recorded candidate the Engine refused, in a FAILED pointer, with one accepted file journal UPSERT: with the producer's watcher-uncertainty latch set (as a restart's root re-registration sets it), or with 40 PENDING queue rows from a FENCED boot's root walk whose revision superseded the journal's, refusal cleanup settles the journal on A, acknowledges it, abandons and physically deletes B, and replaces the producer: the pointer is IDLE with A active, no building or previous generation, and only A's directory under indices/ (before: the pointer stays FAILED and B is kept). Cleanup stopped by a harness cut after A's source commit, after the journal acknowledgement, after abandonment or after physical deletion leaves the restart undone; a later cleanup attempt by a fresh producer reaches the same IDLE, A-only state (before: none of the four seams exists). In SWITCHING, the real cutover monitor fails the pointer (FAILED, A still active) within 5 s when the producer's latch is set, or when the embedding model is configured and the candidate is provably empty: walk COMPLETE and captured with 0 planned units, enumeration done, no projection sources, no pending or claimed rows, no journal obligation for B other than removals, and 0 documents (before: it stays SWITCHING).",
+      "behaviour": "A recorded candidate the Engine refused, in a FAILED pointer, with one accepted file journal UPSERT: with the producer's watcher-uncertainty latch set (as a restart's root re-registration sets it), or, with 40 PENDING queue rows from a FENCED boot's root walk whose revision superseded the journal's, once the producer's writer (started by that FENCED boot over A after the refused walk sealed) has committed the file on A, refusal cleanup settles the journal on A, acknowledges it, abandons and physically deletes B, and replaces the producer: the pointer is IDLE with A active, no building or previous generation, and only A's directory under indices/ (before: the pointer stays FAILED and B is kept). Cleanup stopped by a harness cut after A's source commit, after the journal acknowledgement, after abandonment or after physical deletion leaves the restart undone; a later cleanup attempt by a fresh producer reaches the same IDLE, A-only state (before: none of the four seams exists). In SWITCHING, the real cutover monitor fails the pointer (FAILED, A still active) within 5 s when the producer's latch is set, or when the embedding model is configured and the candidate is provably empty: walk COMPLETE and captured with 0 planned units, enumeration done, no projection sources, no pending or claimed rows, no journal obligation for B other than removals, and 0 documents (before: it stays SWITCHING). Round 5 (A's committed effect only) changed this check's expected outcome; it was renamed and re-run against this entry's before state.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -83,7 +83,7 @@ builder.
       "evidence": "gates/test-intent/evidence/migration-recovery-repaired.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#latchedWatcherUncertaintyDoesNotBlockRollback",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#pendingFencedRootWalkDoesNotBlockRollback",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#pendingFencedRootWalkHandsOverOnceAsWriterCommitsIt",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aCutAfterTheSourceCommitResumesToCleanFailure",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aCutAfterTheJournalAcknowledgementResumesToCleanFailure",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aCutAfterAbandonmentResumesToCleanFailure",
@@ -146,7 +146,7 @@ builder.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java"
       ],
       "class": "New",
-      "behaviour": "On the real SQLite queue, a refused candidate's accepted file admission is handed to A only by A's committed effect: a PENDING row of the file, or a finished (DONE) row, of the accepted admission or a later one, whose writer committed a content SHA-256 equal to the SOURCE_SHA256 A holds, even when a later admission's captured plan names other bytes. No row, a PROCESSING later row, a DONE row while A holds other bytes, a DONE row while A lacks the file, and a DONE row that wrote nothing (no committed hash, as retirement or refusal leaves it, for the accepted revision or a later one) while its plan names A's bytes are not handed over. This is a query the change adds, so there is no before state.",
+      "behaviour": "On the real SQLite queue, a refused candidate's accepted file admission is handed to A only by A's committed effect: a finished (DONE) row of the file, of the accepted admission or a later one, whose writer committed a content SHA-256 equal to the SOURCE_SHA256 A holds, even when a later admission's captured plan names other bytes (COMMITTED). A PENDING, PROCESSING or FAILED row is outstanding work, not an effect (OUTSTANDING). No row, a DONE row while A holds other bytes or lacks the file, and a DONE row that wrote nothing (no committed hash, as retirement or refusal leaves it) while its plan names A's bytes hand nothing over (NONE). This is a query the change adds, so there is no before state. Round 5 replaced the boolean query, under which a PENDING row handed over, with this three-way one.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -165,7 +165,7 @@ builder.
       ],
       "evidence": "gates/test-intent/evidence/migration-recovery-ownership.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java#onlyAPendingRowOrACommittedWriteHandsTheFileToTheSource"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java#onlyACommittedWriteHandsTheFileToTheSource"
       ]
     },
     {
@@ -174,7 +174,7 @@ builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Round 2, judged against 02d503739. (1) In SWITCHING with an embedding model, an empty candidate whose only journal obligation is an already-applied DELETE_COLLECTION of mcp-ingest is refused by the real cutover monitor within 5 s, with A still active (before: it stays SWITCHING). (2) On the real SQLite queue, when a later admission of the file is DONE but A still holds other bytes and nothing is pending, refusal cleanup acknowledges the journal UPSERT, requests the restart and reaches IDLE only with an ordinary PENDING A job for the file (new revision, no scan, no planned hash) that refusal cleanup queued (before: the UPSERT is acknowledged while the row stays DONE and nothing will bring the update to A). Decision (b) of round 4 replaced round 2's 'keeps Green'. (3) A latched candidate is refused at the cutover monitor's first pass, without waiting for its queue or enumeration: in SWITCHING with 5,000 queued rows and a claimed row, and in MIGRATING with the enumerator still running and 5,000 queued rows, the pointer is FAILED within 5 s with A active (before: SWITCHING or MIGRATING holds). A latched SWITCHING candidate with 5,000 queued rows and an in-flight mutation lease stays SWITCHING while the lease is held, the runtime swap lock stays acquirable within 1 s throughout, and it is FAILED within 5 s of the lease's release (before: it stays SWITCHING). (4) When the Engine records the refusal only on its sixth query, the monitor's settle loop completes the cleanup within 10 s, IDLE with only A, without the reaper (before: the pointer stays FAILED).",
+      "behaviour": "Round 2, judged against 02d503739. (1) In SWITCHING with an embedding model, an empty candidate whose only journal obligation is an already-applied DELETE_COLLECTION of mcp-ingest is refused by the real cutover monitor within 5 s, with A still active (before: it stays SWITCHING). (2) On the real SQLite queue, when a later admission of the file is DONE but A still holds other bytes and nothing is pending, refusal cleanup queues one ordinary PENDING A job for the file (new revision, no scan, no planned hash; none more on a re-entered attempt) and keeps Green and the journal, then acknowledges the UPSERT, requests the restart and reaches IDLE once A's writer committed it (before: the UPSERT is acknowledged while the row stays DONE and nothing will bring the update to A). Decision (b) of round 4 replaced round 2's 'keeps Green'. (3) A latched candidate is refused at the cutover monitor's first pass, without waiting for its queue or enumeration: in SWITCHING with 5,000 queued rows and a claimed row, and in MIGRATING with the enumerator still running and 5,000 queued rows, the pointer is FAILED within 5 s with A active (before: SWITCHING or MIGRATING holds). A latched SWITCHING candidate with 5,000 queued rows and an in-flight mutation lease stays SWITCHING while the lease is held, the runtime swap lock stays acquirable within 1 s throughout, and it is FAILED within 5 s of the lease's release (before: it stays SWITCHING). (4) When the Engine records the refusal only on its sixth query, the monitor's settle loop completes the cleanup within 10 s, IDLE with only A, without the reaper (before: the pointer stays FAILED). Round 5 (A's committed effect only) changed this check's expected outcome; it was renamed and re-run against this entry's before state.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -201,7 +201,7 @@ builder.
       "evidence": "gates/test-intent/evidence/migration-recovery-r2-repaired.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#anEmptyCandidateWithOnlyACollectionDeleteFailsPromptly",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterFinishedAdmissionQueuesTheUnappliedUpdateOnA",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterFinishedAdmissionWaitsForTheAJobItQueues",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLatchedSwitchingCandidateWithQueuedWorkFailsPromptly",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLatchedMigratingCandidateFailsBeforeItsEnumerationEnds",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#anInFlightMutationDelaysTheRefusalWithoutHoldingTheSwapLock",
@@ -213,7 +213,7 @@ builder.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java"
       ],
       "class": "New",
-      "behaviour": "Round 2 preservation, passing on 02d503739 and after. In SWITCHING with an embedding model, a zero-document candidate with one PROJECTION journal obligation is not refused and stays SWITCHING for 1.5 s. An unlatched MIGRATING candidate whose enumerator still runs stays MIGRATING for 1.5 s. On the real SQLite queue, refusal cleanup hands the journal UPSERT to A and completes (IDLE, journal empty, restart requested) when a later admission of the file is PENDING, or when it is DONE and A holds exactly its bytes.",
+      "behaviour": "Round 2 preservation, passing on 02d503739 and after. In SWITCHING with an embedding model, a zero-document candidate with one PROJECTION journal obligation is not refused and stays SWITCHING for 1.5 s. An unlatched MIGRATING candidate whose enumerator still runs stays MIGRATING for 1.5 s. On the real SQLite queue, refusal cleanup hands the journal UPSERT to A and completes (IDLE, journal empty, restart requested) when a later admission of the file is DONE and A holds exactly its bytes. Round 5 moved the PENDING-later-admission case, which now waits for A's commit, to its own entry.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -234,7 +234,6 @@ builder.
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aCandidateWithAProjectionObligationKeepsWaiting",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#anUnlatchedMigratingCandidateKeepsBuilding",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aPendingLaterAdmissionHandsTheUpdateToA",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterAdmissionCommittedOnAHandsTheUpdateToA"
       ]
     },
@@ -244,7 +243,7 @@ builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Round 3, judged against c44f281a0, on the real SQLite queue. (1) When the file's later row is DONE without a committed content hash (retired or refused without writing) and its captured plan names the bytes A still holds, with nothing pending, refusal cleanup acknowledges the journal UPSERT, requests the restart and reaches IDLE only with an ordinary PENDING A job for the file (new revision, no scan, no planned hash) that refusal cleanup queued (before: the UPSERT is acknowledged while the retired row stays DONE). Decision (b) of round 4 replaced round 3's 'keeps Green'. (2) Refusal cleanup hands the journal UPSERT to A and completes (IDLE, journal empty, restart requested) when the file's later row is DONE with a committed content hash equal to A's SOURCE_SHA256 while its captured plan names other, earlier bytes (before: Green and the UPSERT are kept).",
+      "behaviour": "Round 3, judged against c44f281a0, on the real SQLite queue. (1) When the file's later row is DONE without a committed content hash (retired or refused without writing) and its captured plan names the bytes A still holds, with nothing pending, refusal cleanup queues one ordinary PENDING A job for the file (new revision, no scan, no planned hash), keeps Green and the journal, and acknowledges the UPSERT, requests the restart and reaches IDLE once A's writer committed it (before: the UPSERT is acknowledged while the retired row stays DONE). Decision (b) of round 4 replaced round 3's 'keeps Green'. (2) Refusal cleanup hands the journal UPSERT to A and completes (IDLE, journal empty, restart requested) when the file's later row is DONE with a committed content hash equal to A's SOURCE_SHA256 while its captured plan names other, earlier bytes (before: Green and the UPSERT are kept). Round 5 (A's committed effect only) changed this check's expected outcome; it was renamed and re-run against this entry's before state.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -263,7 +262,7 @@ builder.
       ],
       "evidence": "gates/test-intent/evidence/migration-recovery-r3-repaired.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aRetiredLaterAdmissionQueuesTheUnappliedUpdateOnA",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aRetiredLaterAdmissionWaitsForTheAJobItQueues",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA"
       ]
     },
@@ -273,7 +272,7 @@ builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Round 3, judged against c44f281a0, on the real SQLite queue and a real Lucene A. A captured walk enqueued the file with the bytes A holds; the file then changed and a watcher update was accepted on Green (its journal witness is the captured plan's hash); the Engine retired the refused walk's rows without writing. Refusal cleanup acknowledges the journal UPSERT only with an ordinary PENDING A job for the file that it queued (no scan, no walk epoch, no planned hash), also when a later enumeration re-admitted the changed file before retirement (before: the UPSERT is acknowledged while the retired row stays DONE, so nothing will write the new bytes to A). Round 4's decision (b) replaced round 3's 'keeps the journal'.",
+      "behaviour": "Round 3, judged against c44f281a0, on the real SQLite queue and a real Lucene A. A captured walk enqueued the file with the bytes A holds; the file then changed and a watcher update was accepted on Green (its journal witness is the captured plan's hash); the Engine retired the refused walk's rows without writing. Refusal cleanup queues an ordinary PENDING A job for the file (no scan, no walk epoch, no planned hash), keeps the journal UPSERT while that job is pending, and acknowledges it once A's writer committed the file's bytes, also when a later enumeration re-admitted the changed file before retirement (before: the UPSERT is acknowledged while the retired row stays DONE, so nothing will write the new bytes to A). Round 4's decision (b) replaced round 3's 'keeps the journal'. Round 5 (A's committed effect only) changed this check's expected outcome; it was renamed and re-run against this entry's before state.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -285,8 +284,8 @@ builder.
       ],
       "evidence": "gates/test-intent/evidence/migration-recovery-r3-retired-repaired.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredWatcherUpdateIsQueuedOnA",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredReadmissionOfAChangedFileIsQueuedOnA"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredWatcherUpdateHandsOverOnceAsJobCommitsIt",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredReadmissionOfAChangedFileHandsOverOnceAsJobCommitsIt"
       ]
     },
     {
@@ -316,7 +315,7 @@ builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Round 4, judged against the round-3 state (c44f281a0 plus gates/test-intent/evidence/migration-recovery-round3.patch, its uncommitted main-code diff). With an accepted file journal UPSERT that A does not hold and no pending row (the Engine retired the walk's row unwritten), one refusal cleanup acknowledges the journal, requests the restart and reaches IDLE, leaving one ordinary PENDING A job for the file (a new revision, no scan, no walk epoch, no planned hash) that A's writer runs after that restart; also when a later enumeration re-admitted the changed file. A cleanup cut after queuing and before the journal acknowledgement keeps the journal; re-entered, it acknowledges and leaves the same revision (no second job). A file deleted from disk gets the same ordinary A job, which A's writer turns into the missing-source removal (before, every case: cleanup fails, the journal is kept and Green retained until a later restart).",
+      "behaviour": "Round 4, judged against the round-3 state (c44f281a0 plus gates/test-intent/evidence/migration-recovery-round3.patch, its uncommitted main-code diff), with round 5's stricter rule. With an accepted file journal UPSERT that A does not hold and no pending row (the Engine retired the walk's row unwritten, or a later finished row left A stale), refusal cleanup queues one ordinary PENDING A job for the file (a new revision, no scan, no walk epoch, no planned hash), also when a later enumeration re-admitted the changed file, keeps Green and the journal while it is pending, and acknowledges, requests the restart and reaches IDLE once A's writer committed it. A re-entered cleanup, and one cut before the acknowledgement, queue no second job. A file deleted from disk gets the same ordinary A job; cleanup settles once A's writer removed it (before, every case: cleanup fails, the journal is kept and nothing is queued for A). Round 5 (A's committed effect only) changed this check's expected outcome; it was renamed and re-run against this entry's before state.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -342,12 +341,12 @@ builder.
       ],
       "evidence": "gates/test-intent/evidence/migration-recovery-r4-repaired.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aRetiredLaterAdmissionQueuesTheUnappliedUpdateOnA",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterFinishedAdmissionQueuesTheUnappliedUpdateOnA",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredWatcherUpdateIsQueuedOnA",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredReadmissionOfAChangedFileIsQueuedOnA",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aRetiredLaterAdmissionWaitsForTheAJobItQueues",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterFinishedAdmissionWaitsForTheAJobItQueues",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredWatcherUpdateHandsOverOnceAsJobCommitsIt",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredReadmissionOfAChangedFileHandsOverOnceAsJobCommitsIt",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aReenteredCleanupQueuesNoDuplicate",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredUpdateOfADeletedFileQueuesItsRemovalOnA"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredUpdateOfADeletedFileHandsOverOnceARemovesIt"
       ]
     },
     {
@@ -368,6 +367,91 @@ builder.
       "evidence": "gates/test-intent/evidence/migration-recovery-r4-preserve.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredUpdateOfAnUnreadableFileStaysUnproved"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Round 5, judged against a26eaf3e3. During refusal cleanup a pending A job no longer authorizes acknowledgement; only A's committed effect does. (1) A watcher update accepted on Green whose file is unreadable, with its own A row PENDING: cleanup reports the source unproved and keeps the journal UPSERT (before: acknowledged on the pending row). (2) An A job that cleanup queued and that then fails with IO_FAILED / SOURCE_UNREADABLE keeps the journal, also once the file is readable again while the row waits for its retry; cleanup acknowledges only after a later attempt committed the bytes (before: acknowledged when queued). (3) For a retired watcher update, a retired re-admission of a changed file, a later finished admission that left A stale, a retired later admission, and a pending later admission, cleanup keeps Green and the journal (pointer FAILED, no restart) until A's writer committed the file, then acknowledges, requests the restart and reaches IDLE; a re-entered or cut attempt queues no second job. (4) A retired update of a file deleted from disk keeps the journal until A's writer removed the file. (5) M8: a FENCED recovery boot whose refused walk is sealed starts the producer's writer, which writes A, so its pending rows can commit; cleanup keeps Green while they are outstanding and rolls back to A once committed (before: the writer never starts and the rows' pending state alone handed over).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "during refusal cleanup, hand-over of an accepted update or delete requires A's committed effect: A's index holds that revision, a later revision from a later admission, or the removal. A pending A job, the one cleanup queues or any other, no longer authorizes acknowledgement. It only means \"wait\".",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "An A job that fails (unreadable, I/O error) keeps Green and the journal. Cleanup settles once a later A attempt commits, or once the file is deleted and A's removal commits.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "One restart after a crash must still reach IDLE when A's jobs succeed. Cleanup must therefore re-check while the Engine runs",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "Rule out a deadlock: if A's worker can't process jobs while refusal cleanup is in progress (writer pause, admission held, a monitor), waiting for A's commit would never finish.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/migration-recovery-r5-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aPendingUpdateOfAnUnreadableFileKeepsTheJournal",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aFailedAJobKeepsTheJournalUntilALaterAttemptCommits",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredWatcherUpdateHandsOverOnceAsJobCommitsIt",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredReadmissionOfAChangedFileHandsOverOnceAsJobCommitsIt",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aReenteredCleanupQueuesNoDuplicate",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredUpdateOfADeletedFileHandsOverOnceARemovesIt",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#pendingFencedRootWalkHandsOverOnceAsWriterCommitsIt",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterFinishedAdmissionWaitsForTheAJobItQueues",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aPendingLaterAdmissionHandsOverOnceACommitsIt",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aRetiredLaterAdmissionWaitsForTheAJobItQueues"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 5 preservation, passing on a26eaf3e3 and after. A retired re-admission of an unchanged file whose bytes A already holds is handed to A at once. M8: an accepted update whose bytes A holds, and which are the file's current bytes, is handed to A at once also after a later admission of the file moved the row's revision on and A's writer found the file unchanged (DONE, UNCHANGED, nothing written); an intermediate round-5 state that required the row's exact revision re-queued such a file forever on the real Engine. A retired update of a file made unreadable stays unproved with its journal kept and nothing queued. A FENCED recovery boot whose refused walk is still open (unsealed) does not start the producer's writer and keeps Green. Refusal cleanup hands the journal UPSERT to A and completes (IDLE, journal empty, restart requested) when a later admission's writer committed exactly the bytes A holds, also when that later captured revision's bytes changed after its plan.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "during refusal cleanup, hand-over of an accepted update or delete requires A's committed effect: A's index holds that revision, a later revision from a later admission, or the removal. A pending A job, the one cleanup queues or any other, no longer authorizes acknowledgement. It only means \"wait\".",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "Everything else stays: queue A's missed update idempotently, the 60 s bound, fail-closed (keep Green and the journal) when the bound expires, and nothing deleted on uncertainty.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/migration-recovery-r5-preserve.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredReadmissionOfAnUnchangedFileIsHandedToA",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRetiredUpdateOfAnUnreadableFileStaysUnproved",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#anAcceptedUpdateAHoldsSettlesAfterALaterAdmissionFoundItUnchanged",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aFencedBootKeepsItsWriterStoppedWhileTheRefusedWalkIsOpen",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterAdmissionCommittedOnAHandsTheUpdateToA",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RecordedMigrationRestartRecoveryTest.java#aLaterRevisionCommittedOnAWithChangedBytesHandsTheUpdateToA"
       ]
     }
   ]
