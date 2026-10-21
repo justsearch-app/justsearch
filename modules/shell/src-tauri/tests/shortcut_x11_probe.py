@@ -122,7 +122,8 @@ def run(test, executable):
                     x.XNextEvent(d, event)
                     if c.c_int.from_buffer(event).value == 33 and c.c_ulong.from_buffer(event, 40).value == active:
                         count += 1
-                        (root / "activations").write_text(str(count))
+                        (root / "activations.tmp").write_text(str(count))
+                        os.replace(root / "activations.tmp", root / "activations")
                 time.sleep(0.005)
             return child.returncode
         finally:
