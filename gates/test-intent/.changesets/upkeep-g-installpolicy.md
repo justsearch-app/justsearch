@@ -208,3 +208,14 @@ Follow-up 3 also pins fail-closed explicit activation and absent-service compati
   "note": "Delta 225fc3a43: owner-words verbatim at base; 2 repaired activation checks fail on d0500402b by assertion (no ISE thrown), pass on candidate; absent-service check passes on both; shard-policy change stricter only; delegation quote not checked against task record (verifier may not read it)"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "bdb9d530-cc39-4c3f-a139-a4d29c7a5bc1",
+  "verdict": "accept",
+  "digest": "sha256:fc1d9ca0b9564bfc8ac6f3ec144358bd2d93d193e16c89e6b3fba463d5baad3c",
+  "note": "Sources re-reviewed at 8e472cf37: task-request quote verbatim per brief and supports fail-closed downloads/activation; 15-enterprise-policy.md:17 and :32 verbatim at base, file unchanged in PR, :32 supports preserved offline import; no stronger owner source conflicts; delegation quote not checked against task record (verifier may not read it)"
+}
+```
