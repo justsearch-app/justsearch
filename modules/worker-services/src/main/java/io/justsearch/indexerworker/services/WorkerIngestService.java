@@ -749,7 +749,8 @@ public final class WorkerIngestService {
    */
   public void reconcileReloadedWatcherRootsFrom(WorkerIngestService retiring) {
     RootWatcherRegistry ownRegistry = rootWatcherRegistry;
-    setRootWatcherRegistry(retiring.rootWatcherRegistry);
+    // A failed earlier attempt may already have handed the roots on; borrow their current owner.
+    setRootWatcherRegistry(retiring.rootWatcherRegistry.current());
     try {
       reconcilePendingWatcherRoots();
     } finally {
@@ -777,15 +778,19 @@ public final class WorkerIngestService {
       }
       var subscription = rootWatcherRegistry.subscription(root);
       if (subscription == null) continue; // Startup waits for the declared root's registration.
+      // An unavailable or replaced root keeps its receipt for its return; it never fails the
+      // caller (a reload, a start or another root's watch), and nothing is applied to it.
       try (var ignoredEvent = rootWatcherRegistry.enterEvent(subscription)) {
         if (ignoredEvent == null) continue;
         if (!debt.rootIdentity().equals(subscription.rootIdentity().toString())) {
-          throw WorkerServiceException.unavailable("Watcher reconciliation root incarnation changed");
+          log.warn("Watcher reconciliation for {} waits: its root is another folder now", root);
+          continue;
         }
         SyncDirectoryResponse result = syncDirectory(SyncDirectoryRequest.newBuilder()
             .setRootPath(root.toString()).setForce(false).build(), CallContext.none());
         if (!result.getError().isBlank() || result.getSkipped()
             || result.getDeleteDetectionUnverified()) {
+          subscription.rootIdentity().requireCurrent(root);
           throw WorkerServiceException.unavailable("Watcher reconciliation is incomplete");
         }
         subscription.rootIdentity().requireCurrent(root);
@@ -796,8 +801,22 @@ public final class WorkerIngestService {
           throw WorkerServiceException.unavailable("Watcher reconciliation receipt changed");
         }
       } catch (IOException unavailable) {
-        throw WorkerServiceException.unavailable("Watcher reconciliation root is unavailable");
+        log.warn("Watcher reconciliation for {} waits for its root: {}", root,
+            unavailable.getMessage());
       }
+    }
+  }
+
+  /**
+   * A closing reload's successor takes over every root this service watched or held for its
+   * volume, so the reload leaves the watch list as it was; removed roots stay removed.
+   */
+  public void handWatchedRootsTo(WorkerIngestService successor) {
+    try (var ignoredMutation = successor.mutationLease()) {
+      rootWatcherRegistry.handOverTo(successor.rootWatcherRegistry, (registry, root, collection) ->
+          successor.rootOnAnotherVolume(root.toString()) != null
+              ? registry.watchWhenVolumeReturns(root, collection)
+              : registry.watch(root.toString(), collection));
     }
   }
 

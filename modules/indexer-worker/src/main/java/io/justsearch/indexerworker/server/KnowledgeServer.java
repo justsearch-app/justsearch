@@ -3518,6 +3518,7 @@ public final class KnowledgeServer implements Closeable {
       this.appServices = null; // The incumbent has actually closed; callers see unavailability.
       if (reloadRootAuthority != null) {
         newServices.ingestService().reconcileReloadedWatcherRootsFrom(reloadRootAuthority);
+        reloadRootAuthority.handWatchedRootsTo(newServices.ingestService());
       }
       newServices.startIndexingLoop();
       publishServingView(newServices);

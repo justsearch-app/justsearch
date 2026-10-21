@@ -361,6 +361,40 @@ final class RuntimeReloadProducersHttpIntegrationTest {
   }
 
   @Test
+  void receiptForAnUnavailableRootWaitsWithoutFailingTheReload() throws Exception {
+    try (var f = new Fixture()) {
+      var files = f.unwatchedFilesWithReceipt();
+      Path away = files.root().resolveSibling(files.root().getFileName() + "-away");
+      Files.move(files.root(), away);
+      assertReloadSuccess(f.post());
+      assertEquals(1, f.receipts().size(), "the unavailable root's receipt must stay pending");
+      assertEquals(1, f.count("reloadobligationgone"), "nothing is applied to an unavailable root");
+      Files.move(away, files.root());
+      assertReloadSuccess(f.post());
+      assertEquals(List.of(), f.receipts());
+      assertEquals(0, f.count("reloadobligationgone"));
+      assertEquals(1, f.count("reloadobligationkept"));
+    }
+  }
+
+  @Test
+  void failedNativeReloadAndRetryKeepTheRootWatched() throws Exception {
+    try (var f = new Fixture()) {
+      var files = f.watchedFiles();
+      f.useReload(() -> { throw new IllegalStateException("injected failed opener"); });
+      var refused = f.post();
+      assertEquals(500, refused.statusCode(), refused.body());
+      f.useNormalReload();
+      assertReloadSuccess(f.post());
+      Files.delete(files.gone());
+      Files.writeString(files.root().resolve("added.txt"), "reloadobligationadded after retry");
+      f.awaitCount("reloadobligationgone", 0);
+      f.awaitCount("reloadobligationadded", 1);
+      f.awaitCount("reloadobligationkept", 1);
+    }
+  }
+
+  @Test
   @Timeout(180)
   void watcherObligationSurvivesProcessDeathAfterFailedHandoff() throws Exception {
     assertEquals(71, crashChild("failed-handoff"), "the selected crash cut must execute");

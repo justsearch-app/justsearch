@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -57,6 +58,18 @@ public final class RootWatcherRegistry {
   private final Map<Path, Long> removedAt = new ConcurrentHashMap<>();
   private long removals;
   private final WorkerMethvinWatcher watcher;
+  /**
+   * Set once a reload's replacement registry took over this one's roots. Watch changes that still
+   * reach this retired registry go to the successor, so none is lost and no removal is undone.
+   */
+  private RootWatcherRegistry successor;
+  private long handoverMark;
+
+  /** How a successor re-registers one handed-over root (a volume check may hold it instead). */
+  @FunctionalInterface
+  interface Rewatch {
+    WatchResult watch(RootWatcherRegistry registry, Path root, String collection);
+  }
 
   public RootWatcherRegistry() {
     this(null);
@@ -67,6 +80,7 @@ public final class RootWatcherRegistry {
   }
 
   synchronized WatchResult watch(String rootPath, String collection) {
+    if (successor != null) return successor.watch(rootPath, collection);
     Path normalized;
     try {
       normalized = Path.of(rootPath).toAbsolutePath().normalize();
@@ -137,6 +151,7 @@ public final class RootWatcherRegistry {
    * retired. {@link #resumeAwaitingVolume} registers it once a walk or sync finds the volume back.
    */
   synchronized WatchResult watchWhenVolumeReturns(Path root, String collection) {
+    if (successor != null) return successor.watchWhenVolumeReturns(root, collection);
     Path normalized = root.toAbsolutePath().normalize();
     Subscription prior = subscriptions.remove(normalized);
     if (prior != null) {
@@ -162,6 +177,7 @@ public final class RootWatcherRegistry {
    * is back at its path. Returns whether a watch was registered.
    */
   synchronized boolean resumeAwaitingVolume(Path root) {
+    if (successor != null) return successor.resumeAwaitingVolume(root);
     Path normalized = root.toAbsolutePath().normalize();
     String collection = awaitingVolume.get(normalized);
     if (collection == null) {
@@ -175,6 +191,7 @@ public final class RootWatcherRegistry {
   }
 
   synchronized boolean unwatch(String rootPath) {
+    if (successor != null) return successor.unwatch(rootPath);
     Path normalized;
     try {
       normalized = Path.of(rootPath).toAbsolutePath().normalize();
@@ -221,7 +238,44 @@ public final class RootWatcherRegistry {
     if (removedSince(root, mark)) {
       return new WatchResult(false, "ROOT_REMOVED: " + root + " was removed");
     }
+    if (successor != null) {
+      // Any removal since the handover counts: a removed root is never re-watched from here.
+      return successor.watchUnlessRemovedSince(root, collection, handoverMark);
+    }
     return watch(root.toString(), collection);
+  }
+
+  /** The registry that currently owns this one's roots: itself, or its latest successor. */
+  synchronized RootWatcherRegistry current() {
+    return successor == null ? this : successor.current();
+  }
+
+  /**
+   * Re-registers every watched root, and every root held for its volume, in {@code next}, with its
+   * collection, then retires this registry in its favour. A root removed before the handover is
+   * not here and is never revived; one removed after it is removed from {@code next}. A root whose
+   * watch cannot be registered now is held in {@code next} until its volume is back, not dropped.
+   */
+  synchronized void handOverTo(RootWatcherRegistry next, Rewatch rewatch) {
+    if (successor != null) {
+      successor.handOverTo(next, rewatch);
+      return;
+    }
+    if (next == this) throw new IllegalArgumentException("A registry cannot succeed itself");
+    for (Subscription watched : List.copyOf(subscriptions.values())) {
+      if (!rewatch.watch(next, watched.root(), watched.collection()).watching()
+          && !next.awaitsVolume(watched.root())) {
+        next.holdUntilVolumeReturns(watched.root(), watched.collection());
+      }
+    }
+    awaitingVolume.forEach(next::holdUntilVolumeReturns);
+    handoverMark = next.removalMark();
+    successor = next;
+  }
+
+  private synchronized void holdUntilVolumeReturns(Path root, String collection) {
+    if (subscriptions.containsKey(root)) return;
+    awaitingVolume.putIfAbsent(root, collection == null ? "" : collection);
   }
 
   @SuppressWarnings("unused") // RootWatcherRegistryTest only; frozen in UnreferencedCodeTest's store.
