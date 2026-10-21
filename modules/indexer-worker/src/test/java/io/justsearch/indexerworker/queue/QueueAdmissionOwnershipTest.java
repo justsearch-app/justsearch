@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.queue;
 
 import static io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SourceFileWork.COMMITTED;
+import static io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SourceFileWork.FAILED;
 import static io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SourceFileWork.NONE;
 import static io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SourceFileWork.OUTSTANDING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -18,7 +19,8 @@ import org.junit.jupiter.api.io.TempDir;
  * A refused candidate's accepted file admission is handed to the surviving generation only by
  * that generation's committed effect: the accepted or a later admission whose writer committed
  * exactly the bytes that generation holds. A row's status alone is not: a retired or refused row
- * wrote nothing, and a pending, claimed or failed row has not written yet.
+ * wrote nothing, a pending or claimed row has not written yet, and a failed row (terminal, or
+ * waiting out a back-off) is no effect and has nothing in flight.
  */
 final class QueueAdmissionOwnershipTest {
   private static final String LATER = "c".repeat(64);
@@ -51,7 +53,17 @@ final class QueueAdmissionOwnershipTest {
       set(db, key, "PROCESSING", "later-revision", LATER, null);
       assertEquals(OUTSTANDING, queue.sourceFileWork(key, LATER), "a claim is not an effect");
       set(db, key, "FAILED", "later-revision", LATER, null);
-      assertEquals(OUTSTANDING, queue.sourceFileWork(key, LATER), "a failure is not an effect");
+      assertEquals(FAILED, queue.sourceFileWork(key, LATER),
+          "a terminal failure is no effect, and nothing is in flight");
+      set(db, key, "RETRY_EXHAUSTED", "later-revision", LATER, null);
+      assertEquals(FAILED, queue.sourceFileWork(key, LATER), "an exhausted retry is a failure");
+      set(db, key, "PENDING", "later-revision", LATER, null);
+      retryAfter(db, key, System.currentTimeMillis() + 600_000L);
+      assertEquals(FAILED, queue.sourceFileWork(key, LATER),
+          "a retry waiting out its back-off is the failure of the state it ran on");
+      retryAfter(db, key, System.currentTimeMillis() - 1_000L);
+      assertEquals(OUTSTANDING, queue.sourceFileWork(key, LATER), "a retry that is due will run");
+      retryAfter(db, key, null);
 
       set(db, key, "DONE", "later-revision", LATER, LATER);
       assertEquals(COMMITTED, queue.sourceFileWork(key, LATER),
@@ -66,6 +78,16 @@ final class QueueAdmissionOwnershipTest {
       set(db, key, "DONE", "later-revision", STALE, LATER);
       assertEquals(COMMITTED, queue.sourceFileWork(key, LATER),
           "the source committed a later captured revision whose bytes changed after its plan");
+    }
+  }
+
+  private static void retryAfter(Path db, String key, Long at) throws Exception {
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+        var statement = connection.prepareStatement(
+            "UPDATE jobs SET retry_after = ? WHERE path = ?")) {
+      statement.setObject(1, at);
+      statement.setString(2, key);
+      assertEquals(1, statement.executeUpdate());
     }
   }
 

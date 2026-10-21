@@ -1700,11 +1700,16 @@ public final class KnowledgeServerMigrationOps {
    * this file state ended by A's normal policy (excluded, too large). Unreadable bytes settle
    * nothing. A path that is no longer a regular file (gone, a folder, a link) settles once A no
    * longer holds it: A's normal policy retires such a source's text, and its retirement reaches
-   * A while a candidate exists. A pending or failed A job only waits.
+   * A while a candidate exists. A path counts as gone only when its absence is confirmed: the
+   * folder that answers for it (its root, or an explicit file's own folder) is present, listable
+   * and the same folder on the same volume. A missing, unreadable or replaced folder proves
+   * nothing, so nothing settles. A pending or claimed A job only waits.
    *
    * <p>Otherwise the Engine may have retired the admission's row unwritten, so nothing would ever
    * bring A to the path: queue one ordinary A job for it, once per file state. A path that
-   * changes, or a restart, may admit it again; the same state is never admitted twice.
+   * changes, or a restart, may admit it again; the same state is never admitted twice. A failed
+   * row (terminal, or retrying after a back-off) is the outcome for the state its writer ran on,
+   * so it never holds back the admission of a state this cleanup has not admitted.
    */
   private static boolean sourceHoldsAdmission(DrainSwitchBufferContext context,
       SwitchBufferCapableQueue queue, SwitchBufferUpsert upsert, String indexed) throws IOException {
@@ -1713,6 +1718,7 @@ public final class KnowledgeServerMigrationOps {
     try {
       attributes = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
     } catch (NoSuchFileException absent) {
+      if (!confirmedAbsent(context, upsert)) return false; // Not found proves nothing yet.
       attributes = null;
     } catch (IOException | RuntimeException unknown) {
       return false; // What the path is now is unknown, so is A's effect for it.
@@ -1751,6 +1757,18 @@ public final class KnowledgeServerMigrationOps {
           upsert.path());
     }
     return false;
+  }
+
+  /**
+   * Whether {@code upsert}'s path is confirmed absent, by the live Worker's root authority: the
+   * same answer that authorises any deletion. Without that authority nothing is confirmed.
+   */
+  private static boolean confirmedAbsent(DrainSwitchBufferContext context,
+      SwitchBufferUpsert upsert) {
+    if (context.publisher() == null) return false;
+    return io.justsearch.indexerworker.loop.SourcePresence.classify(Path.of(upsert.path()),
+        upsert.ingestionRoot(), context.publisher().rootCheck())
+        == io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT;
   }
 
   /** A broad receipt used to supersede a file witness must prove its complete final scope. */

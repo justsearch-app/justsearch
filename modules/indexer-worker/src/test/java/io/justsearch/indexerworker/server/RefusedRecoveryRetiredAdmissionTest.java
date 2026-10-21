@@ -18,10 +18,12 @@ import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
 import io.justsearch.indexerworker.loop.SourceContentHash;
+import io.justsearch.indexerworker.loop.SourcePresence;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps;
+import io.justsearch.indexerworker.services.WorkerIngestService;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import java.nio.file.Files;
@@ -164,12 +166,18 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
         fixture.aWriterFindsTheFileUnreadable();
         assertFalse(fixture.drain(), "a failed A job is no effect");
         assertEquals(1, fixture.journalSize(), "the journal is kept");
+        // Round 8: the back-off is the failure of the state it ran on; the unreadable state gets
+        // its own one admission at once, not after the back-off.
+        assertNotEquals(queued, fixture.assertQueuedOnA(), "the unreadable state's admission");
+        fixture.aWriterFindsTheFileUnreadable();
+        assertFalse(fixture.drain(), "its failure is no effect, and it is not admitted again");
+        assertEquals(0, fixture.queue.jobStateCountsStrict().pendingReadyCount(),
+            "only the back-off remains");
       } finally {
         fixture.makeReadable();
       }
-      assertFalse(fixture.drain(), "the retry has not run yet");
-      assertEquals(queued, fixture.assertPending(), "the retrying job is not replaced");
-      fixture.retryNow();
+      assertFalse(fixture.drain(), "the readable state is admitted at once");
+      fixture.assertQueuedOnA();
       fixture.aWriterCommitsTheFile();
       assertTrue(fixture.drain(), "the later attempt committed the accepted update");
       assertEquals(0, fixture.journalSize());
@@ -433,14 +441,91 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
     }
   }
 
+  // P1 (round 8): "not found" under an unavailable folder is uncertainty, never a delete. The
+  // accepted new file stays owed to A, with nothing queued, until its folder returns.
+  @Test
+  void anAcceptedNewFileUnderAnUnavailableFolderIsKeptUntilItReturns() throws Exception {
+    try (var fixture = new Fixture(temp, "accepted new file", "volume")) {
+      fixture.forgetOnA();
+      fixture.capture();
+      fixture.admitOnGreen();
+      fixture.retire();
+      Path folder = fixture.file.getParent();
+      Path away = temp.resolve("volume-away");
+      Files.move(folder, away);
+      try {
+        assertFalse(fixture.drain(), "not found under an unavailable folder proves nothing");
+        assertFalse(fixture.drain(), "it stays unproved");
+        assertEquals(1, fixture.journalSize(), "the accepted file stays owed to A");
+        assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(),
+            "nothing is admitted on uncertainty");
+      } finally {
+        Files.move(away, folder);
+      }
+      assertFalse(fixture.drain(), "the returned file gets its admission on A");
+      fixture.assertQueuedOnA();
+      fixture.aWriterCommitsTheFile();
+      assertTrue(fixture.drain(), "A holds the accepted bytes");
+      assertEquals(0, fixture.journalSize());
+    }
+  }
+
+  // P2 (round 8): a failure belongs to the file state it was for. A's job failed terminally on
+  // the accepted bytes; the file is then deleted, and that new state gets its own admission.
+  @Test
+  void aTerminalFailureOnEarlierBytesDoesNotHoldBackTheDeletedState() throws Exception {
+    try (var fixture = new Fixture(temp, "original A source")) {
+      fixture.capture();
+      fixture.edit("accepted watcher update");
+      fixture.admitOnGreen();
+      fixture.retire();
+      assertFalse(fixture.drain());
+      fixture.assertQueuedOnA();
+      fixture.aWriterFailsTheFile(IngestionOutcomeClass.PARSER_FAILED,
+          IngestionReasonCodes.PARSER_FAILED);
+      assertFalse(fixture.drain(), "a failure is no effect");
+      assertEquals(0, fixture.queue.jobStateCountsStrict().pendingCount(),
+          "the failed state is not admitted again");
+      Files.delete(fixture.file);
+      assertFalse(fixture.drain(), "A still serves the deleted file's text");
+      fixture.assertQueuedOnA();
+      fixture.aWriterRemovesTheFile();
+      assertTrue(fixture.drain(), "A shows the removal");
+      assertEquals(0, fixture.journalSize());
+    }
+  }
+
   private final class Fixture implements AutoCloseable {
     final Path file;
     final String original;
     SqliteJobQueue queue;
     final RunningRuntime source;
 
+    /**
+     * The live Worker's root authority, as the Engine's cleanup is given: a folder vouches while
+     * it is a present, listable directory.
+     */
+    final WorkerIngestService publisher = org.mockito.Mockito.mock(WorkerIngestService.class);
+
     Fixture(Path dir, String content) throws Exception {
-      file = Files.writeString(dir.resolve("watched.txt"), content).toAbsolutePath();
+      this(dir, content, "");
+    }
+
+    /** The watched file in {@code folder} beneath {@code dir}, so its folder can go away. */
+    Fixture(Path dir, String content, String folder) throws Exception {
+      Files.createDirectories(dir.resolve(folder));
+      file = Files.writeString(dir.resolve(folder).resolve("watched.txt"), content).toAbsolutePath();
+      org.mockito.Mockito.when(publisher.rootCheck()).thenReturn(new SourcePresence.RootCheck() {
+        @Override
+        public boolean vouches(Path vouching) {
+          return Files.isDirectory(vouching) && Files.isReadable(vouching);
+        }
+
+        @Override
+        public boolean admits(Path vouching) {
+          return vouches(vouching);
+        }
+      });
       original = SourceContentHash.sha256(file);
       queue = new SqliteJobQueue(dir.resolve("jobs.db"));
       queue.open();
@@ -451,6 +536,13 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
           SchemaFields.DOC_ID, file.toString(), SchemaFields.DOC_UID, "a-original",
           SchemaFields.PATH, file.toString(), SchemaFields.CONTENT, content,
           SchemaFields.SOURCE_SHA256, original)));
+      source.commitOps().commitAndTrack(CommitReason.DRAIN);
+      source.commitOps().maybeRefreshBlocking();
+    }
+
+    /** A never held the file: it was accepted new during the migration. */
+    void forgetOnA() throws Exception {
+      source.indexingCoordinator().deleteByIdAndChunks(file.toString());
       source.commitOps().commitAndTrack(CommitReason.DRAIN);
       source.commitOps().maybeRefreshBlocking();
     }
@@ -504,7 +596,8 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
           new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
               queue, source, null, IndexingPacing.unthrottled(), temp, temp, new ObjectMapper(),
               () -> false, () -> true, LoggerFactory.getLogger(getClass()),
-              System.nanoTime() + TimeUnit.SECONDS.toNanos(1), GREEN), beforeAck);
+              System.nanoTime() + TimeUnit.SECONDS.toNanos(1), GREEN).withPublisher(publisher),
+          beforeAck);
     }
 
     /** A's writer claims the file's one job and writes its current bytes to A, uncommitted. */
@@ -561,16 +654,6 @@ final class RefusedRecoveryRetiredAdmissionTest extends LuceneExecutorTestBase {
       var claims = queue.pollPending(10);
       assertEquals(1, claims.size(), "A's one job for the file is claimable");
       return claims.getFirst();
-    }
-
-    void retryNow() throws Exception {
-      try (var connection = java.sql.DriverManager.getConnection(
-              "jdbc:sqlite:" + temp.resolve("jobs.db").toAbsolutePath());
-          var update = connection.prepareStatement(
-              "UPDATE jobs SET retry_after = NULL WHERE path = ?")) {
-        update.setString(1, file.toString());
-        assertEquals(1, update.executeUpdate());
-      }
     }
 
     void makeReadable() throws Exception {

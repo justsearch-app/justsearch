@@ -1423,8 +1423,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     try {
       ensureOpen();
       try (PreparedStatement query = connection.prepareStatement(
-          "SELECT state, content_hash, last_outcome_class, last_reason_code, last_retry_policy"
-              + " FROM jobs WHERE path = ?")) {
+          "SELECT state, content_hash, last_outcome_class, last_reason_code, last_retry_policy,"
+              + " retry_after FROM jobs WHERE path = ?")) {
         query.setString(1, path);
         try (ResultSet row = query.executeQuery()) {
           if (!row.next()) return SourceFileWork.NONE;
@@ -1432,6 +1432,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           if (endedByPolicy(state, row.getString("last_outcome_class"),
               row.getString("last_reason_code"), row.getString("last_retry_policy"))) {
             return SourceFileWork.POLICY;
+          }
+          if (STATE_FAILED.equals(state) || STATE_RETRY_EXHAUSTED.equals(state)) {
+            return SourceFileWork.FAILED;
+          }
+          if (STATE_PENDING.equals(state)) {
+            long retryAfter = row.getLong("retry_after");
+            return !row.wasNull() && retryAfter > System.currentTimeMillis()
+                ? SourceFileWork.FAILED : SourceFileWork.OUTSTANDING;
           }
           if (!STATE_DONE.equals(state)) return SourceFileWork.OUTSTANDING;
           // Only a write records content_hash, and every admission clears it, so a hash here

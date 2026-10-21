@@ -146,7 +146,7 @@ builder.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java"
       ],
       "class": "New",
-      "behaviour": "On the real SQLite queue, a refused candidate's accepted file admission is handed to A only by A's committed effect: a finished (DONE) row of the file, of the accepted admission or a later one, whose writer committed a content SHA-256 equal to the SOURCE_SHA256 A holds, even when a later admission's captured plan names other bytes (COMMITTED). A PENDING, PROCESSING or FAILED row is outstanding work, not an effect (OUTSTANDING). No row, a DONE row while A holds other bytes or lacks the file, and a DONE row that wrote nothing (no committed hash, as retirement or refusal leaves it) while its plan names A's bytes hand nothing over (NONE). This is a query the change adds, so there is no before state. Round 5 replaced the boolean query, under which a PENDING row handed over, with this three-way one.",
+      "behaviour": "On the real SQLite queue, a refused candidate's accepted file admission is handed to A only by A's committed effect: a finished (DONE) row of the file, of the accepted admission or a later one, whose writer committed a content SHA-256 equal to the SOURCE_SHA256 A holds, even when a later admission's captured plan names other bytes (COMMITTED). A PROCESSING row, and a PENDING row that is a fresh admission or a retry that is due, is outstanding work, not an effect (OUTSTANDING). Round 8: a FAILED or RETRY_EXHAUSTED row, and a PENDING row waiting out a back-off, is a failure for the state its writer ran on: no effect, nothing in flight (FAILED). No row, a DONE row while A holds other bytes or lacks the file, and a DONE row that wrote nothing (no committed hash, as retirement or refusal leaves it) while its plan names A's bytes hand nothing over (NONE). This is a query the change adds, so there is no before state. Round 5 replaced the boolean query, under which a PENDING row handed over, with this three-way one.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -356,7 +356,7 @@ builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Round 5, judged against a26eaf3e3. During refusal cleanup a pending A job no longer authorizes acknowledgement; only A's committed effect does. (1) A watcher update accepted on Green whose file is unreadable, with its own A row PENDING: cleanup reports the source unproved and keeps the journal UPSERT (before: acknowledged on the pending row). (2) An A job that cleanup queued and that then fails with IO_FAILED / SOURCE_UNREADABLE keeps the journal, also once the file is readable again while the row waits for its retry; cleanup acknowledges only after a later attempt committed the bytes (before: acknowledged when queued). (3) For a retired watcher update, a retired re-admission of a changed file, a later finished admission that left A stale, a retired later admission, and a pending later admission, cleanup keeps Green and the journal (pointer FAILED, no restart) until A's writer committed the file, then acknowledges, requests the restart and reaches IDLE; a re-entered or cut attempt queues no second job. (4) A retired update of a file deleted from disk keeps the journal until A's writer removed the file. (5) M8: a FENCED recovery boot whose refused walk is sealed starts the producer's writer, which writes A, so its pending rows can commit; cleanup keeps Green while they are outstanding and rolls back to A once committed (before: the writer never starts and the rows' pending state alone handed over).",
+      "behaviour": "Round 5, judged against a26eaf3e3. During refusal cleanup a pending A job no longer authorizes acknowledgement; only A's committed effect does. (1) A watcher update accepted on Green whose file is unreadable, with its own A row PENDING: cleanup reports the source unproved and keeps the journal UPSERT (before: acknowledged on the pending row). (2) An A job that cleanup queued and that then fails with IO_FAILED / SOURCE_UNREADABLE keeps the journal, also once the file is readable again; cleanup acknowledges only after a later attempt committed the bytes (round 8: each file state, unreadable then readable again, gets its own one admission at once instead of waiting out the back-off) (before: acknowledged when queued). (3) For a retired watcher update, a retired re-admission of a changed file, a later finished admission that left A stale, a retired later admission, and a pending later admission, cleanup keeps Green and the journal (pointer FAILED, no restart) until A's writer committed the file, then acknowledges, requests the restart and reaches IDLE; a re-entered or cut attempt queues no second job. (4) A retired update of a file deleted from disk keeps the journal until A's writer removed the file. (5) M8: a FENCED recovery boot whose refused walk is sealed starts the producer's writer, which writes A, so its pending rows can commit; cleanup keeps Green while they are outstanding and rolls back to A once committed (before: the writer never starts and the rows' pending state alone handed over).",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -576,6 +576,41 @@ builder.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecordedIngestionTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java#refusalRetiresOnlySettledAcceptedUpsertAfterSourceProjectionIsProved",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/SwitchBufferStrictReplayTest.java#capturedReplayRefreshesBeforeCertifyingPlannedH1AndIndexedH2"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 8, failing on 95654a5af and passing after. A path counts as deleted only when its absence is confirmed by the Worker's root authority: an accepted new file A never held, whose folder is unavailable, keeps Green and the journal with nothing queued, and once the folder returns it gets its one admission and settles when A holds its bytes. A failure belongs to the file state it was for: after A's job failed terminally (PARSER_FAILED) on the accepted bytes, deleting the file gets its own admission, A's writer removes the text, and cleanup settles.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M10",
+          "quote": "A path counts as deleted only when its absence is confirmed: the watched root is present, readable and on its recorded volume, and the path is missing under it. If the root (or the volume) is missing, unreadable or replaced, that's uncertainty: fail-closed, Green and the journal kept, as M10 says.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "A retired or refused row never stops a later admission. When the path exists again, the normal paths index it.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "A failure outcome belongs to the file state it was for. A new state (changed bytes, a different kind, deleted) gets its own one admission, whatever the older failure was.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/migration-recovery-r8-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#anAcceptedNewFileUnderAnUnavailableFolderIsKeptUntilItReturns",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aTerminalFailureOnEarlierBytesDoesNotHoldBackTheDeletedState"
       ]
     }
   ]

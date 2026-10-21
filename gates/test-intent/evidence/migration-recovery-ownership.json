@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T13:18:01.624Z",
-  "revision": "18a242439e636df73dd3effdba8bed170a7c4936",
-  "tree": "41abf002140abf2e783da58de7f33a12d56315b3",
+  "createdAt": "2026-10-21T15:20:27.045Z",
+  "revision": "95654a5af80f39815801598127fe3c779b2966a5",
+  "tree": "c8caa3fd1e441d753c555d82e3f9a385dd65a8c7",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.QueueAdmissionOwnershipTest.onlyACommittedWriteHandsTheFileToTheSource\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3064
+      "durationMs": 1972
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java#onlyACommittedWriteHandsTheFileToTheSource",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:5110fa35d6a6707107001d48d9be765abd2d3be5932d364f558eb4d324246fe7",
+      "contentDigest": "sha256:fd0346381389eefef80ac1701cbb59b1ed54fa0fb0954cecec1e092bf10db16f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:2bc0252e79fbb1910efe4366f7f37990557cb5603187a09009810e8790ba4cbf"
+  "digest": "sha256:d0eda69d09b1cdf8ddff6a2796dec6deabc5925350fb8d4f227f73702c11a9bf"
 }

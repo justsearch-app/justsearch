@@ -146,10 +146,15 @@ public interface SwitchBufferCapableQueue extends JobQueue {
      */
     COMMITTED,
     /**
-     * The row is pending, claimed, or failed and retrying or terminal: its writer's outcome, not
-     * a new job, decides. It is no effect until that writer commits.
+     * The row is pending (a fresh admission, or a retry that is due) or claimed: its writer will
+     * judge the file as it is when it runs. It is no effect until that writer commits.
      */
     OUTSTANDING,
+    /**
+     * The row's writer failed, terminally or with a retry waiting out a back-off. That outcome is
+     * for the file state the writer ran on and is no effect; nothing is in flight.
+     */
+    FAILED,
     /**
      * The row's last writer ended it by the generation's normal policy for a source that is not
      * indexable as it was then: not a regular file, excluded, or too large. That handling is the
