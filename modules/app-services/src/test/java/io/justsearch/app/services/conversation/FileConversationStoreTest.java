@@ -600,6 +600,24 @@ final class FileConversationStoreTest {
   }
 
   @Test
+  void excludingTheFloorMessageKeepsTheFloor(@TempDir Path tmp) {
+    var store = new FileConversationStore(tmp);
+    store.appendMessage("s", "core.free-chat", userMsg("q1"));
+    store.appendMessage("s", "core.free-chat", assistantMsg("a1"));
+    store.appendMessage("s", "core.free-chat", userMsg("q2"));
+    store.appendMessage("s", "core.free-chat", assistantMsg("a2"));
+    List<Map<String, Object>> full = store.loadHistory("s");
+    String floorId = (String) full.get(2).get("id"); // q2
+
+    store.setContextFloor("s", floorId);
+    store.excludeMessage("s", floorId, true);
+
+    // The floor still starts the prompt at q2; q2 itself is excluded, so a2 is all that is left.
+    List<Map<String, Object>> eff = store.loadEffectiveContext("s");
+    assertEquals(List.of("a2"), eff.stream().map(m -> m.get("content")).toList());
+  }
+
+  @Test
   @DisplayName("Tempdoc 610: loadEffectiveContext fails safe to full history for an unknown floor id")
   void contextFloorUnknownIdFailsSafe(@TempDir Path tmp) {
     var store = new FileConversationStore(tmp);

@@ -1768,6 +1768,7 @@ export class BrainSurface extends JfElement {
     const aiVerdict = this.deriveAiEngineVerdict();
     const aiState = aiVerdict.kind;
     const activationRequired = this.installStatus?.phase === 'activation_required';
+    const indexingActivity = this.indexingProgress().activity;
     const downloadsDisabled = this.policy?.downloadsEnabled === false;
     const onlineDisabled = this.policy?.onlineAiEnabled === false;
     const repairRemedy = deriveRepairRemedy(this.installStatus);
@@ -1859,10 +1860,10 @@ export class BrainSurface extends JfElement {
       // resolve on its own the way the second one does.
       indexing: {
         dot: 'indexing',
-        label: aiEngineHeadline(aiVerdict),
-        sub: aiVerdict.awaitingChatEnable
-          ? "Ready — click Resume Chat AI below to start."
-          : 'Indexing embeddings…',
+        label: indexingActivity.summary,
+        sub: [indexingActivity.summary, indexingActivity.detail,
+          aiVerdict.awaitingChatEnable ? 'Click Resume Chat AI below to start chat.' : null,
+        ].filter(Boolean).join(' — '),
       },
       connecting: { dot: 'starting', label: 'Connecting…', sub: 'Checking AI status…' },
     };
@@ -2373,7 +2374,8 @@ export class BrainSurface extends JfElement {
         ),
       ),
     ];
-    const canonicalWordings = reindexCauses.map((code) => reasonFor(code).wording);
+    const activity = this.indexingProgress().activity;
+    const canonicalWordings = reindexCauses.map((code) => reasonFor(code, activity).wording);
     return html`
       <div class="section" style="border-color: var(--accent-warning-45); background: var(--accent-warning-08)">
         <div style="display: flex; gap: 0.625rem; align-items: flex-start">
@@ -2387,7 +2389,7 @@ export class BrainSurface extends JfElement {
                     </div>`,
                 )
               : html`<div style="font-weight: 600; color: var(--text-warning)">
-                  Rebuild the index to restore full search.
+                  ${activity.confirmed ? '' : `${activity.summary} — last observed: `}Rebuild the index to restore full search.
                 </div>`}
             ${embeddingBlocked
               ? html`
@@ -2449,18 +2451,21 @@ export class BrainSurface extends JfElement {
    * and the card persists until the WHOLE blend settles, so a per-stage 100% can no longer read as
    * done. The per-stage breakdown stays available in the Tasks card's disclosure (§20's two layers).
    */
+  private indexingProgress() {
+    return selectIndexingProgress(
+      this.systemStatus,
+      this._unifiedAiState?.indexingStatusLive ?? false,
+      this._unifiedAiState?.episodeMaxPendingJobs ?? 0,
+      this._unifiedAiState?.enrichSettleSamples ?? [],
+    );
+  }
+
   private renderEnrichmentProgress(): TemplateResult | typeof nothing {
     const emb = this.systemStatus?.embedding;
     // The compat callout above owns the BLOCKED_* states (it carries the reindex remedy); a second
     // card about the same condition would be two voices on one fact.
     if (emb?.compatState?.startsWith('BLOCKED')) return nothing;
-    const live = !this._unifiedAiState || this._unifiedAiState.snapshotLive;
-    const progress = selectIndexingProgress(
-      this.systemStatus,
-      live,
-      this._unifiedAiState?.episodeMaxPendingJobs ?? 0,
-      this._unifiedAiState?.enrichSettleSamples ?? [],
-    );
+    const progress = this.indexingProgress();
     // Only the enrichment phase is this card's subject: `indexing` is the Tasks card's countdown,
     // `blocked` is the install CTA's business (nothing is progressing, so a progress bar would be a
     // fabrication), and `ready`/`unknown` have no progress to report.
@@ -2471,9 +2476,10 @@ export class BrainSurface extends JfElement {
     const pct = progress.enrichingPercent;
     // Tempdoc 807 A.3 — these are fields off the RETAINED snapshot. With the backend gone they kept
     // animating a confident "Building semantic search 2.0% · 5,084 pending" (round 13, R13-F2): the
-    // numbers were right, the present tense was not. Not live ⟹ stop asserting progress — no spinner,
-    // no live-work colouring, every figure explicitly labelled as the last observation.
-    if (!live) {
+    // numbers were right, the present tense was not. An unconfirmed observation (expired or
+    // explicitly stale) stops asserting progress: no spinner, no live-work colouring, and every
+    // figure explicitly labelled as the last observation.
+    if (!progress.activity.confirmed) {
       return html`
         <div class="section" data-testid="brain-enrichment-progress">
           <div style="display: flex; gap: 0.625rem; align-items: flex-start">
@@ -2483,7 +2489,7 @@ export class BrainSurface extends JfElement {
                 Semantic search build — last known
               </div>
               <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 0.25rem">
-                ${reasonFor('binding.unreachable').wording} — these figures are the last observed
+                ${progress.activity.summary}${this._unifiedAiState?.snapshotLive ? '' : ` — ${reasonFor('binding.unreachable').wording}`} — these figures are the last observed
                 values, not live progress.
               </div>
             </div>
@@ -2510,18 +2516,19 @@ export class BrainSurface extends JfElement {
       <div
         class="section"
         data-testid="brain-enrichment-progress"
-        style="border-color: var(--accent-warning-30); background: var(--accent-warning-08)"
+        style=${progress.activity.enrichmentDeferred ? '' : 'border-color: var(--accent-warning-30); background: var(--accent-warning-08)'}
       >
         <div style="display: flex; gap: 0.625rem; align-items: flex-start">
           ${icon({ name: 'zap', size: 18 })}
           <div style="flex: 1">
-            <div style="font-weight: 600; color: var(--text-warning)">
-              ${ENRICHMENT_IN_PROGRESS_LABEL}
+            <div style=${`font-weight: 600; color: var(${progress.activity.enrichmentDeferred ? '--text-secondary' : '--text-warning'})`}>
+              ${progress.activity.enrichmentDeferred ? progress.activity.summary : ENRICHMENT_IN_PROGRESS_LABEL}
             </div>
             <!-- The subtitle names the SCOPE of the number above it. Before this it promised chunk
                  embeddings while the figure measured document vectors — one stage's number under
                  another stage's sentence. -->
             <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 0.25rem">
+              ${progress.activity.detail ?? ''}
               ${ENRICHMENT_SCOPE_NOTE}: semantic vectors, passage vectors, keyword expansion and
               entity recognition.
             </div>
@@ -2530,14 +2537,14 @@ export class BrainSurface extends JfElement {
             ? nothing
             : html`<div style="font-weight: 600; font-variant-numeric: tabular-nums">${pct}%</div>`}
         </div>
-        ${pct === null
+        ${pct === null || progress.activity.enrichmentDeferred
           ? nothing
           : html`<div class="progress" style="margin-top: 0.625rem">
               <div class="progress-bar" style="width: ${pct}%; background: var(--accent-warning)"></div>
             </div>`}
         <div style="font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: 0.5rem; display: flex; align-items: center; gap: 0.375rem">
-          ${icon({ name: 'loader-2', size: 12, spin: true })}
-          ${NUM.format(pending)} pending across all stages
+          ${progress.activity.enrichmentDeferred ? nothing : icon({ name: 'loader-2', size: 12, spin: true })}
+          ${NUM.format(pending)} ${progress.activity.enrichmentDeferred ? 'waiting' : 'pending'} across all stages
         </div>
       </div>
     `;
@@ -3172,6 +3179,7 @@ export class BrainSurface extends JfElement {
   // ---------- Render: runtime / variants / inference / LLM settings ----------
 
   private renderRuntimeSection(): TemplateResult {
+    const progress = this.indexingProgress();
     const variants = this.runtimeStatus?.variants ?? [];
     const activeId = this.runtimeStatus?.activation?.activeVariantId ?? null;
     const actState = this.runtimeStatus?.activation?.state ?? 'idle';
@@ -3323,13 +3331,10 @@ export class BrainSurface extends JfElement {
             >
               Reload
             </jf-button>
-            ${this.inference?.embeddingQueueSize !== undefined
+            ${this.systemStatus
               ? html`<span style="font-size: var(--font-size-xs); color: var(--text-secondary); align-self: center">
-                  embed queue: ${NUM.format(this.inference.embeddingQueueSize)}
-                  ${this.inference.vduQueueSize !== undefined
-                    ? html` · VDU queue: ${NUM.format(this.inference.vduQueueSize)}`
-                    : nothing}
-                  ${live ? nothing : html` (last observed)`}
+                  ${progress.activity.confirmed ? nothing : `${progress.activity.summary} — ${progress.phase === 'unknown' ? '' : 'last observed '}`}embed queue: ${progress.phase === 'unknown' ? '—' : NUM.format(progress.embeddingPending)}
+                  · VDU queue: ${progress.phase === 'unknown' ? '—' : NUM.format(progress.vduPending)}
                 </span>`
               : nothing}
           </div>

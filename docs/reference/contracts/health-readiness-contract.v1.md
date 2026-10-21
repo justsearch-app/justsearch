@@ -2,7 +2,7 @@
 title: Health Readiness Contract
 type: contract
 status: stable
-updated: 2026-09-27
+updated: 2026-10-20
 description: Schema-2 Engine component observations plus diagnostic readiness dimensions and composites.
 ---
 
@@ -77,6 +77,52 @@ only `state`, `reason_code`, and `state_since`. The camel-case
 `readiness.engineComponents.*.stateSince` and snake-case
 `components.*.state_since` values identify the same state epoch; consumers must
 not treat them as two clocks or two authorities.
+
+## Automatic indexing holds
+
+`operating.indexing.state` keeps its existing `IDLE`, `RUNNING`, `SLOWED` and
+`PAUSED` vocabulary. With automatic reasons, `PAUSED` describes an enrichment or
+GPU bulk hold; it does not mean that text indexing stopped. Consumers describe
+the reason by the work it holds, rather than displaying the state name alone:
+
+- `energy_saver` defers idle enrichment on both CPU and GPU. Text indexing
+  continues, and sparse enrichment interleaved between files may continue: that
+  path does not check energy saver. An empty file queue with enrichment waiting
+  is deferred idle enrichment, not Ready.
+- `game_mode` and `gpu_busy_external` defer GPU-bound idle enrichment cycles,
+  including mixed CPU/GPU cycles, and **all** sparse enrichment interleaved
+  between files, including CPU sparse work. CPU-only idle enrichment cycles may
+  continue. Placement is not reported in public status, so consumers state these
+  scopes without claiming that a particular idle cycle is on CPU or GPU.
+- `chat_generating` names shared time with chat, not an automatic stop. Only a
+  present reason supports that explanation.
+
+Reasons can be present with `IDLE`; neither that state nor an empty file queue
+proves enrichment is complete. These explanations do not change scheduling.
+
+### Compatibility
+
+Optional field additions are patch changes (ADR-0039, evolution rules), and
+`docs/reference/contributing/common-workflows.md`, "Add a field to a record",
+requires generated boundary validation and preserves the manual compatibility
+baselines for ordinary additions. There is no lockstep-only exception for status
+consumers. Older generated status validators are strict: adding
+`worker.enrichment.backfillGpuBound` would reject the entire observation. WP3.3
+therefore retains the existing public status shape and reports the scheduling
+scopes above using existing reasons. GPU profiles and the previous backfill mode
+are not evidence of the current aggregate idle-cycle placement. Consumers must
+not loosen their local validator to hide drift (ADR-0039).
+
+The UI's shared indexing-progress projection supplies activity wording to the
+status deck, task list, Health (including Now), Library rows and indexing overlay.
+Missing or stale worker observations, including `operating.freshness.staleSources`
+containing `indexing`, are unconfirmed. A fresh observation replaces the explanation;
+cleared reasons do not linger. Folder failures and verification caveats retain
+their own scope. Progress stays below 100% while applicable work remains, including
+stages without denominators; no percentage is shown before evidence of a drain.
+The status deck owns the indexing live announcement and changes its text only
+when the activity description changes, so repeated polls and numeric progress
+updates do not repeat the announcement.
 
 ## Engine Component States
 

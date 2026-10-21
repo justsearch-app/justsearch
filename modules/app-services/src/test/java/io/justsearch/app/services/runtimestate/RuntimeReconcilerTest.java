@@ -61,6 +61,7 @@ final class RuntimeReconcilerTest {
   private static EnterprisePolicyService policyOnlineEnabled(boolean enabled) {
     EffectivePolicy p =
         new EffectivePolicy(
+            true,
             true, enabled, true, false, List.of(), List.of(), "test", false, null, null, false);
     return () -> p;
   }

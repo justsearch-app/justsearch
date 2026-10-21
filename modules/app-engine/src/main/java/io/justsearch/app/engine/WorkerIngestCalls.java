@@ -142,6 +142,11 @@ final class WorkerIngestCalls implements IngestServiceCalls {
   }
 
   @Override
+  public boolean releaseVduProcessing(String docId, String attemptId) {
+    return service.releaseVduProcessing(docId, attemptId, ctx);
+  }
+
+  @Override
   public io.justsearch.ipc.RecoverVduProcessingResponse recoverVduProcessing(io.justsearch.ipc.RecoverVduProcessingRequest request) {
     return service.recoverVduProcessing(request, ctx);
   }

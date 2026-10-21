@@ -895,14 +895,17 @@ public final class RuntimeActivationService
    */
   @Override
   public void enforceActivationPolicy() {
+    if (policyService == null) {
+      return;
+    }
     EffectivePolicy effective;
     try {
-      effective = policyService != null ? policyService.snapshot() : null;
+      effective = policyService.snapshot();
     } catch (Exception ignored) {
       effective = null;
     }
     if (effective == null) {
-      return;
+      throw new IllegalStateException("GPU acceleration is disabled by administrator policy.");
     }
     // v3 enforcement: block activation when Online AI or GPU acceleration is disabled by policy.
     if (!effective.onlineAiEnabled()) {

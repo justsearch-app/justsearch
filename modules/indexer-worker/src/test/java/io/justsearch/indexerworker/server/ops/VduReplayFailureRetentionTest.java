@@ -26,7 +26,6 @@ import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
-import io.justsearch.indexerworker.services.LanguageUtils;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.indexing.chunking.ChunkSplitter;
@@ -74,8 +73,8 @@ final class VduReplayFailureRetentionTest {
   }
 
   @Test
-  @DisplayName("a missing parent retains the same VDU update across queue reopen")
-  void missingParentRetainsSamePayloadAcrossQueueReopen() throws Exception {
+  @DisplayName("an unverifiable missing-parent result is retired across queue reopen")
+  void unverifiableMissingParentResultRetiresAcrossQueueReopen() throws Exception {
     Path dbPath = tempDir.resolve("missing-parent.db");
     String payload = vduUpdatePayload(DOC_ID, CONTENT);
     persist(dbPath, payload);
@@ -87,22 +86,15 @@ final class VduReplayFailureRetentionTest {
 
     try (SqliteJobQueue queue = openQueue(dbPath)) {
       drain(queue, runtime);
-      assertBuffered(queue, payload);
-      verify(indexingCoordinator).updateDocument(DOC_ID, chunkDeclaration());
-      verify(indexingCoordinator).updateDocument(DOC_ID, terminalParentUpdate());
-      verify(indexingCoordinator, never())
-          .updateDocument(eq(DOC_ID), argThat(updates ->
-              !updates.equals(chunkDeclaration()) && !updates.equals(terminalParentUpdate())));
+      assertEquals(0,queue.switchBufferDepth());
+      verifyNoMoreInteractions(indexingCoordinator);
     }
-
-    try (SqliteJobQueue queue = openQueue(dbPath)) {
-      assertBuffered(queue, payload);
-    }
+    try(SqliteJobQueue queue=openQueue(dbPath)) { assertEquals(0,queue.switchBufferDepth()); }
   }
 
   @Test
-  @DisplayName("chunk deletion failure retains the VDU update and prevents terminal parent write")
-  void chunkDeletionFailureRetainsPayloadAndPreventsTerminalParentWrite() throws Exception {
+  @DisplayName("an unverifiable legacy result is retired before chunk deletion")
+  void unverifiableResultNeverReachesChunkDeletion() throws Exception {
     assertTrue(ChunkSplitter.splitWithMetadata(CONTENT).size() > 1);
     Path dbPath = tempDir.resolve("delete-failure.db");
     String payload = vduUpdatePayload(DOC_ID, CONTENT);
@@ -118,16 +110,16 @@ final class VduReplayFailureRetentionTest {
 
     try (SqliteJobQueue queue = openQueue(dbPath)) {
       drain(queue, runtime);
-      assertBuffered(queue, payload);
-      verify(indexingCoordinator).deleteChunksForParentDocId(DOC_ID);
-      verify(indexingCoordinator, never()).indexSingle(any(IndexDocument.class));
-      verify(indexingCoordinator, never()).updateDocument(anyString(), anyMap());
+      assertEquals(0,queue.switchBufferDepth());
+      verify(indexingCoordinator,never()).deleteChunksForParentDocId(DOC_ID);
+      verify(indexingCoordinator,never()).indexSingle(any(IndexDocument.class));
+      verify(indexingCoordinator,never()).updateDocument(anyString(),anyMap());
     }
   }
 
   @Test
-  @DisplayName("a later chunk insertion failure retains the VDU update and prevents terminal parent write")
-  void laterChunkInsertionFailureRetainsPayloadAndPreventsTerminalParentWrite() throws Exception {
+  @DisplayName("an unverifiable legacy result is retired before chunk insertion")
+  void unverifiableResultNeverReachesChunkInsertion() throws Exception {
     assertTrue(ChunkSplitter.splitWithMetadata(CONTENT).size() > 1);
     Path dbPath = tempDir.resolve("insert-failure.db");
     String payload = vduUpdatePayload(DOC_ID, CONTENT);
@@ -146,13 +138,7 @@ final class VduReplayFailureRetentionTest {
 
     try (SqliteJobQueue queue = openQueue(dbPath)) {
       drain(queue, runtime);
-      assertBuffered(queue, payload);
-      verify(indexingCoordinator).deleteChunksForParentDocId(DOC_ID);
-      verify(indexingCoordinator, times(2)).indexSingle(any(IndexDocument.class));
-      // The declaration is recoverable metadata, never a terminal VDU/content update.
-      verify(indexingCoordinator).updateDocument(DOC_ID, chunkDeclaration());
-      verify(indexingCoordinator, never())
-          .updateDocument(anyString(), argThat(updates -> !updates.equals(chunkDeclaration())));
+      assertEquals(0,queue.switchBufferDepth());
       verifyNoMoreInteractions(indexingCoordinator);
     }
   }
@@ -221,25 +207,6 @@ final class VduReplayFailureRetentionTest {
       assertTrue(commitSawBufferedOperation.get(), "commit must observe the durable replay row");
       assertEquals(0, queue.switchBufferDepth());
     }
-  }
-
-  private Map<String, Object> chunkDeclaration() {
-    return Map.of(
-        SchemaFields.CHUNK_TOTAL, 18,
-        SchemaFields.CHUNK_PARENT_CONTENT_SHA256, CONTENT_SHA256);
-  }
-
-  private Map<String, Object> terminalParentUpdate() {
-    String preview = CONTENT.strip().substring(0, ChunkSplitter.CONTENT_PREVIEW_MAX_CHARS);
-    return Map.of(
-        SchemaFields.VDU_PROCESSED, "true",
-        SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_COMPLETED,
-        SchemaFields.CONTENT, CONTENT,
-        SchemaFields.CONTENT_SHA256, CONTENT_SHA256,
-        SchemaFields.CONTENT_PREVIEW, preview,
-        SchemaFields.LANGUAGE, LanguageUtils.resolveLanguage(preview),
-        SchemaFields.EXTRACTION_METHOD, SchemaFields.EXTRACTION_METHOD_VDU,
-        SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
   }
 
   private RunningRuntime mockRuntime(

@@ -14,6 +14,7 @@ import java.util.List;
  * this type, so the DTO must be reachable from {@code app-services}.
  */
 public record EffectivePolicy(
+    boolean appUpdatesEnabled,
     boolean downloadsEnabled,
     boolean onlineAiEnabled,
     boolean gpuAccelerationEnabled,

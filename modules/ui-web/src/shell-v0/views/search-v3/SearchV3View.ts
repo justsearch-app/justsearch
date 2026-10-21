@@ -117,6 +117,7 @@ import {
   restoreSessionTitle,
   sessionById,
   setSessionContextUsage,
+  dropTurn,
   setTurnEvidence,
   setTurnReasoning,
   setTurnRewrite,
@@ -128,6 +129,7 @@ import {
   SV3_SESSIONS_EMPTY,
   type Sv3RunGate,
   type Sv3Session,
+  type Sv3SessionHistory,
   type Sv3SessionList,
 } from './sv3-sessions.js';
 // The effective-context set (tempdoc 610, ported by 852 S2) — the pure half. The WRITES are the five
@@ -139,7 +141,10 @@ import {
   sv3ContextMenuItems,
   sv3ExcludedMessageIds,
   sv3ExcludedTurnCount,
+  sv3FloorUnseen,
+  sv3FollowUpContext,
   sv3TurnContextFor,
+  sv3UnseenExcludedIds,
   type Sv3ContextAction,
   type Sv3ContextActionId,
   type Sv3ContextMenuRequest,
@@ -176,6 +181,7 @@ import {
   SV3_EFFORT_DEFAULT,
   isSv3Effort,
   sv3Ask,
+  sv3StopAsk,
   type Sv3Effort,
 } from './sv3-ask.js';
 // The app-wide CONVERSATION authority (tempdoc 510 Design D; inventory A1). A v3 session IS a
@@ -194,6 +200,7 @@ import {
   loadConversations,
   restoreActiveConversation,
   resumeConversation,
+  type ResumedConversation,
   setActiveConversation,
   setContextFloor,
   setConversationApiBase,
@@ -274,7 +281,7 @@ import {
   type Sv3RunTurnState,
   type Sv3RunView,
 } from './sv3-run.js';
-import { type Sv3CitationOpen, type Sv3RunDecision } from './Sv3Main.js';
+import { type Sv3CitationOpen, type Sv3RunDecision, type Sv3StopState } from './Sv3Main.js';
 import {
   sameCitationHeader,
   type CitationHeader,
@@ -307,9 +314,11 @@ import { emitEphemeralToast } from '../../components/advisory/ephemeralToast.js'
 import { projectSv3Degradation, type Sv3Degradation } from './sv3-degradation.js';
 import {
   BRANCH_FAILED,
+  BRANCH_RERUN_BUSY,
   CONTEXT_COMPACT_FAILED,
   CONTEXT_EXCLUDE_FAILED,
   CONTEXT_FLOOR_FAILED,
+  CONTEXT_INCLUDE_ALL_FAILED,
   CONTEXT_INCLUDE_FAILED,
   CONTEXT_RESTORE_FAILED,
   CONTEXT_SUMMARY_FAILED,
@@ -394,6 +403,19 @@ const openControlMenuInPath = (event: KeyboardEvent): boolean =>
     // through to the window would take the composer back to hero with it.
     return el.effortMenuOpen === true || el.tierMenuOpen === true;
   });
+
+/** What a `/history` read says about the conversation's context and lineage, as the window keeps it. */
+const sv3HistoryOf = (history: ResumedConversation): Sv3SessionHistory => ({
+  parentSessionId: history.parentSessionId,
+  branchPointMessageId: history.branchPointMessageId,
+  parentFirstUserMessage: history.parentFirstUserMessage,
+  contextFloor: history.contextFloor,
+  contextFloorSummary: history.contextFloorSummary,
+  excludedMessageIds: history.excludedMessageIds,
+  excludedSourceIds: history.excludedSourceIds,
+  messageIds: history.messages.flatMap((m) => (typeof m.id === 'string' ? [m.id] : [])),
+  locked: history.locked,
+});
 
 export class SearchV3View extends JfElement {
   static styles = [
@@ -657,6 +679,7 @@ export class SearchV3View extends JfElement {
     sessions: { state: true },
     aiSnapshot: { state: true },
     streaming: { state: true },
+    askStopping: { state: true },
     sidebarWidthPx: { state: true },
     sidebarCollapsed: { type: Boolean, reflect: true, attribute: 'sidebar-collapsed' },
     resizing: { type: Boolean, reflect: true },
@@ -701,6 +724,8 @@ export class SearchV3View extends JfElement {
   declare aiSnapshot: AiState | null;
   /** A response is in flight. Window-level, not session-level: the composer's slot is one slot. */
   declare streaming: boolean;
+  /** Where the reader's Stop on the streaming answer stands, until the Engine ends the turn. */
+  declare askStopping: Sv3StopState | null;
   /**
    * The sidebar's chosen width (tempdoc 822 Phase F5). Kept EXPANDED-only: collapsing renders the
    * icon rail without touching this number, which is what makes "expand restores the width I chose"
@@ -811,11 +836,16 @@ export class SearchV3View extends JfElement {
   private convListUnsubscribe: (() => void) | null = null;
   /** The in-flight record fetch, so a claim that supersedes another cannot land out of order. */
   private recordAbort: AbortController | null = null;
-  /**
-   * The `/history` companion load's generation token (852 S3, closing S2's F5) — the record half's
-   * {@link recordAbort} discipline applied to the other half of the same open.
-   */
-  private historyAbort: AbortController | null = null;
+  /** Reads are ordered within each conversation without cancelling another conversation's read. */
+  private historyReads = new Map<string, AbortController>();
+  /** A write includes its response AND saved-history refresh; later controls queue behind it. */
+  private contextWrites = new Map<string, Promise<void>>();
+  private contextNotices = new Map<string, string>();
+  /** A refused send outlives context recovery: the reader may have typed a different draft. */
+  private refusedQuestions = new Map<string, string>();
+  private contextRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private contextRetryDelay = 1000;
+  private contextAskPending = new Set<string>();
   /**
    * One-shot, mirroring the shipped window's `reattachChecked` (`views/UnifiedChatView.ts:3496`): a
    * cold load asks the shared controller to reattach to a live run ONCE. Re-asking on every render
@@ -831,6 +861,8 @@ export class SearchV3View extends JfElement {
   private draftSeedPending = false;
   /** The in-flight ask's abort handle; null exactly when no response is streaming. */
   private askAbort: AbortController | null = null;
+  /** The reader's Stop for that ask: the Engine is asked to end the turn, and its stream says how. */
+  private askStop: (() => void) | null = null;
   /**
    * What this window remembers about the delegated run it dispatched — including the explicit turn
    * ref that is its `activeTurnId`. Not reactive state: it is mutated in place by the controller's
@@ -902,6 +934,7 @@ export class SearchV3View extends JfElement {
     this.sessions = SV3_SESSIONS_EMPTY;
     this.aiSnapshot = null;
     this.streaming = false;
+    this.askStopping = null;
     this.sidebarWidthPx = SV3_SIDEBAR_DEFAULT_PX;
     this.sidebarCollapsed = false;
     this.resizing = false;
@@ -946,8 +979,10 @@ export class SearchV3View extends JfElement {
     this.observeWindowBox();
     setSearchApiBase(this.apiBase || '');
     this.aiUnsubscribe = subscribeAiState((snapshot) => {
+      const reconnected = this.aiSnapshot?.connection.reachable === false && snapshot.connection.reachable;
       this.aiSnapshot = snapshot;
       this.applyLockState(snapshot);
+      if (reconnected) this.retryContextOnReconnect();
     });
     // Inventory E3 — the app-wide Simple/Detailed authority. Nothing is COPIED into this element:
     // every render site reads `isAdvancedMode()` live, so the subscription's only job is to ask for
@@ -1006,6 +1041,8 @@ export class SearchV3View extends JfElement {
     // every other entry path below, not a second focus mechanism — its refusal set (renaming,
     // palette open, already typing elsewhere) applies here exactly as it does on mount.
     window.addEventListener('jf-focus-composer', this.onFocusComposerEvent);
+    window.addEventListener('online', this.retryContextOnReconnect);
+    this.retryContextOnReconnect();
     // Tempdoc 864 Layer 1(a) — ARRIVING AT THIS WINDOW PUTS THE READER IN THE COMPOSER. Activation is
     // an entry path like the other two ({@link onSessionSelect}, {@link onSessionNew}), and it is the
     // one that covers both a fresh hero and the restored record `restoreLastViewed` just claimed:
@@ -1069,8 +1106,12 @@ export class SearchV3View extends JfElement {
     this.convListUnsubscribe = null;
     this.recordAbort?.abort();
     this.recordAbort = null;
-    this.historyAbort?.abort();
-    this.historyAbort = null;
+    for (const [id, read] of this.historyReads) {
+      this.markContextUnconfirmed(id);
+      read.abort();
+    }
+    this.historyReads.clear();
+    this.clearContextRetry();
     this.aiUnsubscribe?.();
     this.aiUnsubscribe = null;
     this.uiModeUnsubscribe?.();
@@ -1098,6 +1139,7 @@ export class SearchV3View extends JfElement {
     this.removeEventListener('keydown', this.onHostKeydown, true);
     this.removeEventListener('focusout', this.onHostFocusOut);
     window.removeEventListener('jf-focus-composer', this.onFocusComposerEvent);
+    window.removeEventListener('online', this.retryContextOnReconnect);
     // Tempdoc 864 PR E — LAST, so a re-parent is recorded however the teardown above went. See
     // {@link movedRatherThanEntered}.
     this.markPossibleMove();
@@ -1393,65 +1435,81 @@ export class SearchV3View extends JfElement {
   }
 
   /**
-   * The `/history` COMPANION load (tempdoc 852 §2.3c). The shipped window reads both records at
-   * adjacent lines (`views/UnifiedChatView.ts:2048-2049`); this one read only the thread, so a
-   * conversation's branch lineage, its effective-context floor and its two exclusion ledgers were
-   * never on the wire it listened to. Nothing renders them yet — S2/S3 do — but a window that cannot
-   * ask for them cannot grow an affordance that needs them.
-   *
-   * On CLAIM, not per turn: these are properties of a conversation, and re-asking at every terminal
-   * would spend a round trip per answer to re-read facts that a turn does not change.
-   *
-   * `claim: false`, and the pointer is never touched here. `resumeConversation` claims the app-wide
-   * active conversation as a side effect of a successful read, which is right for the shipped
-   * window's open path and wrong for a companion load: a slow read landing after the reader moved on
-   * — to another v3 conversation, to New session, or into the OTHER window, which claims the same
-   * shared pointer — would re-point the product at the conversation they walked away from. Reading
-   * without claiming removes the race rather than compensating for it afterwards; this window
-   * already claims at open ({@link claimConversation}).
-   *
-   * TWO GUARDS, because there are two ways an answer can be stale (852 S3, closing S2's F5).
-   *
-   *  - **Session** — the reader moved on, and these fields belong to a conversation that is no longer
-   *    the one on screen. That guard shipped with S1.
-   *  - **ORDER** — two reloads of the SAME conversation can land out of order, and the older answer
-   *    would then stand. S2 recorded this as F5 and named the fix: the record half's generation
-   *    token. Branch and edit multiply the reload rate (every act is a write followed by a reload,
-   *    and an edit is two acts in a row), so the same discipline applies here: each load supersedes
-   *    the one before it, and a superseded load's answer is DROPPED however late it arrives.
-   *
-   * HONEST LIMIT on the order guard: `resumeConversation` accepts no signal, so the superseded
-   * REQUEST is not cancelled — only its answer is discarded. That is what F5 named (ordering), and
-   * the request that is still in flight costs a round trip and changes nothing.
-   *
-   * HONEST LIMIT: `resumeConversation` reports a failed read as an empty resume by contract, so a
-   * conversation whose history could not be read is recorded as one with no floor and no parent
-   * rather than as one that was not told. The record half has {@link recordNotice} for that; this
-   * half would need the shared store to distinguish the two, which is not S1's to change.
-   *
-   * OBLIGATION ON S2/S3: every one of these fields is mutable by an affordance those slices ship —
-   * setting or clearing a floor, compacting, excluding a message or a source. Each must re-run this
-   * load after the write lands, or the window renders a floor the backend no longer holds.
+   * Read saved context without claiming the shared pointer. A later read of this conversation
+   * supersedes an earlier one. Writes may refresh their own session after navigation; ordinary
+   * opens only apply to the active session. Failed reads never invent a floor or exclusions.
    */
-  private async refreshHistory(conversationId: string): Promise<void> {
-    this.historyAbort?.abort();
+  private async refreshHistory(conversationId: string, forWrite = false): Promise<boolean> {
+    if (!this.isConnected || (!forWrite && this.sessions.activeId !== conversationId)) return false;
+    this.historyReads.get(conversationId)?.abort();
     const abort = new AbortController();
-    this.historyAbort = abort;
+    this.historyReads.set(conversationId, abort);
     const history = await resumeConversation(conversationId, SV3_ASK_SHAPE_ID, { claim: false });
-    if (abort.signal.aborted) return;
-    if (this.historyAbort === abort) this.historyAbort = null;
-    if (this.sessions.activeId !== conversationId) return;
-    this.sessions = applySv3History(this.sessions, conversationId, {
-      parentSessionId: history.parentSessionId,
-      branchPointMessageId: history.branchPointMessageId,
-      parentFirstUserMessage: history.parentFirstUserMessage,
-      contextFloor: history.contextFloor,
-      contextFloorSummary: history.contextFloorSummary,
-      excludedMessageIds: history.excludedMessageIds,
-      excludedSourceIds: history.excludedSourceIds,
-      locked: history.locked,
-    });
+    if (abort.signal.aborted) return false;
+    this.historyReads.delete(conversationId);
+    const landed = (forWrite || this.sessions.activeId === conversationId)
+      && history.failed !== true && history.locked !== true;
+    if (landed) {
+      this.sessions = applySv3History(this.sessions, conversationId, sv3HistoryOf(history));
+      // A read during a pending write cannot confirm that write's eventual result.
+      if (!this.contextWrites.has(conversationId)) this.confirmContext(conversationId);
+    } else {
+      this.markContextUnconfirmed(conversationId);
+    }
+    this.scheduleContextRetry();
+    return landed;
   }
+
+  private markContextUnconfirmed(sessionId: string): void {
+    this.contextNotices.set(sessionId, 'Saved context could not be confirmed. Retrying…');
+    this.requestUpdate();
+  }
+
+  private contextNotice(sessionId: string): string {
+    const context = this.contextNotices.get(sessionId)
+      ?? (this.contextWrites.has(sessionId) ? 'Saving context… Later changes will follow in order.' : '');
+    const question = this.refusedQuestions.get(sessionId);
+    // Keep the exact submitted text selectable even after a retry confirms context. Never replace
+    // newer input to recover it; the reader can copy these words back when ready to try again.
+    return [context, question === undefined ? ''
+      : `Question not sent. Unsent question (copy to reuse): “${question}”`]
+      .filter(Boolean).join(' ');
+  }
+
+  private confirmContext(sessionId: string): void {
+    this.contextNotices.delete(sessionId);
+    this.contextRetryDelay = 1000;
+    this.clearContextRetry();
+    this.requestUpdate();
+    this.scheduleContextRetry();
+  }
+
+  private clearContextRetry(): void {
+    if (this.contextRetryTimer !== null) clearTimeout(this.contextRetryTimer);
+    this.contextRetryTimer = null;
+  }
+
+  /** Only the shown conversation needs background retries; opening another reads it afresh. */
+  private scheduleContextRetry(): void {
+    const id = this.sessions.activeId;
+    if (this.contextRetryTimer !== null || !this.isConnected || id === null
+      || !this.contextNotices.has(id) || this.contextWrites.has(id)) return;
+    this.contextRetryTimer = setTimeout(() => {
+      this.contextRetryTimer = null;
+      this.contextRetryDelay = Math.min(this.contextRetryDelay * 2, 30000);
+      if (this.sessions.activeId === id && !this.contextWrites.has(id)) void this.refreshHistory(id);
+      else this.scheduleContextRetry();
+    }, this.contextRetryDelay);
+  }
+
+  private retryContextOnReconnect = (): void => {
+    this.clearContextRetry();
+    this.contextRetryDelay = 1000;
+    const id = this.sessions.activeId;
+    if (id !== null && this.contextNotices.has(id) && !this.contextWrites.has(id)) {
+      void this.refreshHistory(id);
+    }
+  };
 
   /* ── The effective context (tempdoc 610, ported by 852 S2) ────────────────────────────────── */
 
@@ -1535,49 +1593,47 @@ export class SearchV3View extends JfElement {
     void this.runContextAction(detail);
   }
 
-  /**
-   * The five acts of tempdoc 610, and the two reads beside them. Each write goes through the SHARED
-   * store function that owns its endpoint (this window mints no request), and — the obligation 852
-   * S1 recorded when it loaded `/history` without rendering it — **every write is followed by a
-   * re-load of that record**. The backend is the authority on the floor and the exclusions; a
-   * window that patched its own copy instead would keep rendering a floor a failed or partial write
-   * never established, and would drift from the other client the moment there is one.
-   */
-  private async runContextAction(detail: Sv3ContextAction): Promise<void> {
+  /** Keep controls usable: capture their targets now, then send each act in selection order. */
+  private runContextAction(detail: Sv3ContextAction): Promise<void> {
     const session = this.activeSession;
-    if (session === null) return;
-    const sessionId = session.id;
+    if (session === null) return Promise.resolve();
     if (detail.action === 'inspect') {
       this.openContextInspector();
-      return;
+      return Promise.resolve();
     }
-    const contexts = this.turnContexts();
-    const turn = detail.turnId === undefined ? null : sv3TurnContextFor(contexts, detail.turnId);
+    const turn = detail.turnId === undefined ? null : sv3TurnContextFor(this.turnContexts(), detail.turnId);
+    const previous = this.contextWrites.get(session.id) ?? Promise.resolve();
+    const pending = previous.then(() => this.writeContext(session.id, detail, turn)).finally(() => {
+      if (this.contextWrites.get(session.id) === pending) this.contextWrites.delete(session.id);
+      this.requestUpdate();
+      this.scheduleContextRetry();
+    });
+    this.contextWrites.set(session.id, pending);
+    this.clearContextRetry();
+    this.requestUpdate();
+    return pending;
+  }
+
+  private async writeContext(
+    sessionId: string,
+    detail: Sv3ContextAction,
+    turn: Sv3TurnContext | null,
+  ): Promise<void> {
     switch (detail.action) {
       case 'floor': {
         const messageId = turn?.floorMessageId ?? null;
         if (messageId === null) return;
-        await this.settleContextWrite(
-          sessionId,
-          await setContextFloor(sessionId, messageId),
-          CONTEXT_FLOOR_FAILED,
-        );
+        await this.settleContextWrite(sessionId, await setContextFloor(sessionId, messageId), CONTEXT_FLOOR_FAILED);
         return;
       }
       case 'restore':
-        await this.settleContextWrite(
-          sessionId,
-          await clearContextFloor(sessionId),
-          CONTEXT_RESTORE_FAILED,
-        );
+        await this.settleContextWrite(sessionId, await clearContextFloor(sessionId), CONTEXT_RESTORE_FAILED);
         return;
       case 'compact': {
         const messageId = turn?.floorMessageId ?? null;
-        if (messageId === null || this.compacting) return;
+        if (messageId === null) return;
         this.compacting = true;
         try {
-          // The summary comes back on the response, and is then re-read from `/history` like every
-          // other field: one place decides what the floor currently says.
           const summary = await compactContext(sessionId, messageId);
           await this.settleContextWrite(sessionId, summary !== null, CONTEXT_COMPACT_FAILED);
         } finally {
@@ -1587,32 +1643,32 @@ export class SearchV3View extends JfElement {
       }
       case 'summary':
         if (detail.text === undefined) return;
-        await this.settleContextWrite(
-          sessionId,
-          await editContextFloorSummary(sessionId, detail.text),
-          CONTEXT_SUMMARY_FAILED,
-        );
+        await this.settleContextWrite(sessionId, await editContextFloorSummary(sessionId, detail.text), CONTEXT_SUMMARY_FAILED);
         return;
       case 'exclude':
       case 'include': {
         const ids = turn?.messageIds ?? [];
         if (ids.length === 0) return;
         const excluded = detail.action === 'exclude';
-        // Both of a turn's messages, because the reader hid a TURN: leaving the question in the
-        // prompt while dropping the answer would send the model a question it never answered.
-        const ok = await this.excludeInTurn(sessionId, ids, excluded);
-        await this.settleContextWrite(
-          sessionId,
-          ok,
-          excluded ? CONTEXT_EXCLUDE_FAILED : CONTEXT_INCLUDE_FAILED,
-        );
+        const landed = await this.excludeInTurn(sessionId, ids, excluded);
+        await this.settleContextWrite(sessionId, landed.length === ids.length,
+          excluded ? CONTEXT_EXCLUDE_FAILED : CONTEXT_INCLUDE_FAILED);
         return;
       }
       case 'include-all': {
-        const ids = sv3ExcludedMessageIds(contexts);
+        // Derive the WHOLE saved ledger when this queued action runs, including prior exclusions.
+        // If the previous refresh failed we must read it first, rather than omit unknown ids.
+        if (this.contextNotices.has(sessionId)) {
+          if (!await this.refreshHistory(sessionId, true)) {
+            emitEphemeralToast({ message: CONTEXT_INCLUDE_ALL_FAILED, severity: 'warning' });
+            return;
+          }
+          this.confirmContext(sessionId);
+        }
+        const ids = sv3ExcludedMessageIds(sessionById(this.sessions, sessionId)?.history ?? null);
         if (ids.length === 0) return;
-        const ok = await this.excludeInTurn(sessionId, ids, false);
-        await this.settleContextWrite(sessionId, ok, CONTEXT_INCLUDE_FAILED);
+        const landed = await this.excludeInTurn(sessionId, ids, false);
+        await this.settleContextWrite(sessionId, landed.length === ids.length, CONTEXT_INCLUDE_ALL_FAILED);
         return;
       }
       default:
@@ -1635,34 +1691,42 @@ export class SearchV3View extends JfElement {
    * removes the race rather than detecting it afterwards, and it is what the shipped window already
    * does (`views/UnifiedChatView.ts:1767-1776`, a sequential `for`-await).
    *
-   * Returns whether EVERY toggle landed; the caller reloads `/history` either way.
+   * Returns the successful ids to report partial refusal; only a saved-history read confirms state.
    */
   private async excludeInTurn(
     sessionId: string,
     ids: readonly string[],
     excluded: boolean,
-  ): Promise<boolean> {
-    let ok = true;
+  ): Promise<readonly string[]> {
+    const landed: string[] = [];
     for (const id of ids) {
-      if (!(await setMessageExcluded(sessionId, id, excluded))) ok = false;
+      if (await setMessageExcluded(sessionId, id, excluded)) landed.push(id);
     }
-    return ok;
+    return landed;
   }
 
-  /**
-   * The tail every context write shares: RELOAD, then report a refusal. The reload runs whether or
-   * not the write landed — a partially-applied bulk exclusion is exactly the case where the window's
-   * own idea of the ledger is least trustworthy — and the toast names the act, because the remedies
-   * differ (a refused floor is the store; a compaction that returned nothing is usually the model).
-   */
-  private async settleContextWrite(
-    sessionId: string,
-    ok: boolean,
-    failure: string,
-  ): Promise<void> {
-    await this.refreshHistory(sessionId);
-    if (ok) return;
-    emitEphemeralToast({ message: failure, severity: 'warning' });
+  /** A write's response alone cannot confirm saved context, including a lost or partial response. */
+  private async settleContextWrite(sessionId: string, ok: boolean, failure: string): Promise<void> {
+    if (await this.refreshHistory(sessionId, true)) {
+      this.confirmContext(sessionId);
+    } else {
+      this.markContextUnconfirmed(sessionId);
+    }
+    if (!ok) emitEphemeralToast({ message: failure, severity: 'warning' });
+  }
+
+  /** Wait for queued actions, then confirm uncertainty before a question can consume this state. */
+  private async confirmContextForAsk(sessionId: string): Promise<boolean> {
+    while (this.contextWrites.has(sessionId)) await this.contextWrites.get(sessionId);
+    if (!this.contextNotices.has(sessionId) && !this.historyReads.has(sessionId)
+      && sessionById(this.sessions, sessionId)?.history != null) return true;
+    const read = await this.refreshHistory(sessionId);
+    // A control used during that read must also settle before this question is sent.
+    if (this.contextWrites.has(sessionId)) return this.confirmContextForAsk(sessionId);
+    if (read) return true;
+    this.markContextUnconfirmed(sessionId);
+    this.scheduleContextRetry();
+    return false;
   }
 
   /* ── Branch, edit / retry and the version pager (852 S3) ──────────────────────────────────── */
@@ -1698,6 +1762,11 @@ export class SearchV3View extends JfElement {
    * The ids come from {@link projectSv3TurnLineage} and nowhere else, so an act can never be pointed
    * at a message `?fromMsgId=` would reject — and a turn that names none renders no affordance to
    * press in the first place.
+   *
+   * A turn re-runs in ITS OWN tier (WP1.2 S2.5): an agent turn's Retry/Edit runs the agent again, an
+   * ask turn's asks again, whatever tier the composer happens to show — the reader is repeating that
+   * turn, not composing a new one. When the agent cannot run, the act is refused BEFORE anything is
+   * forked and says why (S2.6): there is no falling back to an ask, and the editor keeps the text.
    */
   private async runBranchAction(detail: Sv3BranchAction): Promise<void> {
     const session = this.activeSession;
@@ -1705,18 +1774,25 @@ export class SearchV3View extends JfElement {
     const lineage = sv3LineageFor(this.turnLineage(), detail.turnId);
     if (lineage === null) return;
     const turn = session.turns.find((t) => t.id === detail.turnId) ?? null;
+    const tier: Sv3ComposerTier = turn?.kind === 'agent' ? 'delegate' : 'ask';
     switch (detail.action) {
       case 'branch':
         if (lineage.branchFromId === null) return;
-        await this.branchInto(session.id, lineage.branchFromId, null);
+        // A branch re-sends nothing; it continues the conversation in the tier of the turn it forked
+        // after, so the next send from a Delegate turn's branch is a delegation.
+        if ((await this.branchInto(session.id, lineage.branchFromId, null, tier)) && tier === 'delegate') {
+          this.tier = 'delegate';
+        }
         return;
       case 'retry': {
         const question = turn?.question ?? '';
         if (lineage.forkKey === null || question === '') return;
+        if (!this.canRerun(tier)) return;
         await this.branchInto(
-          session.id,
+          lineage.forkFromId,
           lineage.forkKey,
           question,
+          tier,
           this.search.scopeOfTurn(detail.turnId),
         );
         return;
@@ -1724,10 +1800,12 @@ export class SearchV3View extends JfElement {
       case 'edit': {
         const text = (detail.text ?? '').trim();
         if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
+        if (!this.canRerun(tier)) return;
         await this.branchInto(
-          session.id,
+          lineage.forkFromId,
           lineage.forkKey,
           text,
+          tier,
           this.search.scopeOfTurn(detail.turnId),
         );
         return;
@@ -1735,6 +1813,26 @@ export class SearchV3View extends JfElement {
       default:
         return;
     }
+  }
+
+  /**
+   * Whether a re-run in `tier` can start now, saying why not when it cannot (S2.6). Only the
+   * delegate tier is checked here: an ask re-run keeps the path it has always had. The agent needs
+   * the model (its own availability gate — not the ask tier's, which also wants indexed documents)
+   * and no other run in flight on the one shared controller.
+   */
+  private canRerun(tier: Sv3ComposerTier): boolean {
+    if (tier !== 'delegate') return true;
+    const unavailable = this.delegateUnavailableReason;
+    if (unavailable !== '') {
+      emitEphemeralToast({ message: unavailable, severity: 'warning' });
+      return false;
+    }
+    if (this.agentController()?.runInFlight === true) {
+      emitEphemeralToast({ message: BRANCH_RERUN_BUSY, severity: 'warning' });
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -1753,20 +1851,36 @@ export class SearchV3View extends JfElement {
     sessionId: string,
     fromMsgId: string,
     resend: string | null,
+    tier: Sv3ComposerTier,
     scope: Sv3AskScope | null = null,
-  ): Promise<void> {
+  ): Promise<boolean> {
     // The preview is the conversation's OPENING question, the same thing the shipped window sends
     // (`:1485`): it is what makes the new session surface as a recent one with a name.
     const preview = this.activeSession?.turns.find((t) => t.question !== '')?.question ?? '';
     const branched = await branchConversation(sessionId, fromMsgId, preview);
     if (branched === null) {
       emitEphemeralToast({ message: BRANCH_FAILED, severity: 'warning' });
-      return;
+      return false;
     }
     await this.openBranch(branched);
-    // A re-send keeps the files its turn was limited to (WP1.1 S1.7) — or, for a turn this window
-    // did not limit, asks all files, which is what its Retry/Edit said it would do.
-    if (resend !== null) await this.runAsk(resend, scope);
+    if (resend === null) return true;
+    // The same ORDER for both tiers: the branch is claimed first, so the re-run lands in it.
+    // An ask re-send keeps the files its turn was limited to (WP1.1 S1.7) — or, for a turn this
+    // window did not limit, asks all files, which is what its Retry/Edit said it would do.
+    if (tier === 'delegate') {
+      // The agent can stop being able to run while the fork is in flight (S2.6). The fork stands —
+      // it is the new version — and the text waits in its composer, in Delegate, saying why; it is
+      // never run as an Ask and never dropped.
+      if (!this.canRerun(tier)) {
+        this.tier = 'delegate';
+        this.writeDraft(resend);
+        return true;
+      }
+      this.delegate(resend);
+    } else {
+      await this.runAsk(resend, scope);
+    }
+    return true;
   }
 
   /**
@@ -2683,6 +2797,17 @@ export class SearchV3View extends JfElement {
     return availability.kind === 'unavailable' ? availability.reason : '';
   }
 
+  /** Resolve saved context before opening a turn. Null refuses; [] means confirmed empty context. */
+  private async followUpContext(
+    sessionId: string,
+  ): Promise<ReturnType<typeof sv3FollowUpContext> | null> {
+    if (!await this.confirmContextForAsk(sessionId)
+      || !this.isConnected || this.sessions.activeId !== sessionId) return null;
+    const session = sessionById(this.sessions, sessionId);
+    if (session?.history == null) return null;
+    return sv3FollowUpContext(session.turns, projectSv3TurnContexts(session.turns, session.history), session.history);
+  }
+
   /**
    * The ONE path a question takes. There is no second entry: the composer refuses an unavailable or
    * busy send before it leaves, so this method is not a second gate re-deciding the same question —
@@ -2691,6 +2816,26 @@ export class SearchV3View extends JfElement {
   private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null): Promise<void> {
     const question = rawQuestion.trim();
     if (question === '') return;
+    const composer = this.composer;
+    const draftRevision = composer?.draftRevision;
+    const sessionId = this.sessions.activeId;
+    if (sessionId !== null && this.contextAskPending.has(sessionId)) return;
+    let context: ReturnType<typeof sv3FollowUpContext> = [];
+    if (sessionId !== null) {
+      this.contextAskPending.add(sessionId);
+      try {
+        const resolved = await this.followUpContext(sessionId);
+        if (resolved === null || !this.isConnected || this.sessions.activeId !== sessionId) {
+          this.refusedQuestions.set(sessionId, question);
+          this.requestUpdate();
+          return;
+        }
+        context = resolved;
+        this.refusedQuestions.delete(sessionId);
+      } finally {
+        this.contextAskPending.delete(sessionId);
+      }
+    }
     this.leaveResultsBySending();
     this.sessions = submitInSession(this.sessions, question, Date.now(), 'ask', createConversationId());
     const ref = latestTurnRef(this.sessions);
@@ -2699,11 +2844,35 @@ export class SearchV3View extends JfElement {
     // store keeps no scope with a turn, so after a reload the turn is honestly an unscoped one.
     if (scope !== null) this.search.recordTurnScope(ref.turnId, scope);
     this.claimConversation(ref.sessionId);
-    this.composer?.clearDraft();
+    // The submitted question is fixed; input typed while confirmation waited belongs to the reader.
+    if (this.composer === composer && composer?.draftRevision === draftRevision) composer?.clearDraft();
     void this.setComposerState('docked');
 
     const abort = new AbortController();
+    // Stop is explicit: the Engine is told to end THIS turn, and the stream is KEPT until the Engine
+    // ends it. Only the Engine knows whether the Stop landed before the answer was saved, so only its
+    // terminal says "stopped" (an error with CANCELLED, saved as stopped) or "finished" (`done`), and
+    // every word it sent before the Stop landed, which it saves, reaches the turn. A question still
+    // waiting to be sent (for the conversation's settings, or for Engine capacity) is sent all the
+    // same, and the Engine records it as stopped. Only a window that unmounts or starts afresh lets
+    // the stream go (`abortAsk`): the Engine finishes and saves the turn, as it does for a closed tab.
+    // The id the Stop names is this dispatch's own, never the turn's place in the list, which another
+    // window or a reload can hand out again: the Engine ignores a Stop for a turn that finished.
+    const dispatchId = crypto.randomUUID();
+    let stopAsked = false;
+    const stop = (): void => {
+      if (stopAsked) return;
+      stopAsked = true;
+      this.askStopping = { turnId: ref.turnId, state: 'stopping' };
+      void sv3StopAsk(this.apiBase, ref.sessionId, dispatchId).then((taken) => {
+        if (taken || this.askAbort !== abort) return;
+        // Refused or unanswered: the answer goes on, and Stop can be pressed again.
+        stopAsked = false;
+        this.askStopping = { turnId: ref.turnId, state: 'failed' };
+      });
+    };
     this.askAbort = abort;
+    this.askStop = stop;
     this.streaming = true;
     // The controller is per-ASK, not per-turn: it accumulates and times one stream's thinking, and
     // the blocks it finalizes are written onto the turn below. Resetting here is what stops the
@@ -2711,41 +2880,49 @@ export class SearchV3View extends JfElement {
     this.askReasoning.reset();
     this.askReasoningTurnId = ref.turnId;
     // The app-wide activity indicator, raised for the duration and settled at the terminal below
-    // (inventory G11). Cancelling through the SAME abort handle Stop uses, so there is one way to
-    // stop this stream however the reader reaches it.
+    // (inventory G11). Cancelling through the SAME stop the Stop control uses, so there is one way
+    // to stop this turn however the reader reaches it.
     setAiActivity({
       state: 'streaming',
       shapeId: SV3_ASK_SHAPE_ID,
       startedAtMs: Date.now(),
       canCancel: true,
-      cancel: () => abort.abort(),
+      cancel: stop,
     });
     // Every terminal below settles the SAME ref the dispatch opened, so a reader who claims another
     // session mid-stream still gets the answer written where it was asked.
     const settle = (
-      status: 'complete' | 'halted' | 'refused' | 'failed',
+      status: 'complete' | 'halted' | 'refused' | 'failed' | 'left',
       detail = '',
     ): void => {
-      // The thinking is closed out and RECORDED on the turn at every terminal, including a halt: what
-      // the model thought before the reader stopped it was really produced, and dropping it would
-      // lose evidence the window actually received (inventory C9).
-      this.askReasoning.finalize();
-      this.sessions = setTurnReasoning(this.sessions, ref, [...this.askReasoning.reasoningBlocks]);
-      this.sessions = settleTurn(
-        this.sessions,
-        ref,
-        status,
-        Date.now(),
-        detail,
-        // The model AS OF THIS TERMINAL (inventory C1). Recorded rather than read at render, so a
-        // transcript re-read after a model swap still names the one that wrote each answer.
-        this.currentModelLabel,
-      );
+      if (status === 'left') {
+        // Not stopped and not finished here: the Engine goes on and saves the turn, and the record
+        // shows what it saved the next time this conversation is read.
+        this.sessions = dropTurn(this.sessions, ref);
+      } else {
+        // The thinking is closed out and RECORDED on the turn at every terminal, including a halt:
+        // what the model thought before the reader stopped it was really produced, and dropping it
+        // would lose evidence the window actually received (inventory C9).
+        this.askReasoning.finalize();
+        this.sessions = setTurnReasoning(this.sessions, ref, [...this.askReasoning.reasoningBlocks]);
+        this.sessions = settleTurn(
+          this.sessions,
+          ref,
+          status,
+          Date.now(),
+          detail,
+          // The model AS OF THIS TERMINAL (inventory C1). Recorded rather than read at render, so a
+          // transcript re-read after a model swap still names the one that wrote each answer.
+          this.currentModelLabel,
+        );
+      }
       // Only THIS dispatch's terminal may clear the window's busy state: a later ask has already
       // installed its own controller, and clearing it here would strand a live stream with a Send
       // control in the slot.
       if (this.askAbort === abort) {
         this.askAbort = null;
+        this.askStop = null;
+        this.askStopping = null;
         this.streaming = false;
         this.askReasoningTurnId = null;
         this.settleAiActivity();
@@ -2763,6 +2940,8 @@ export class SearchV3View extends JfElement {
         // The chosen files' PATHS (what the backend's `docIds` filter matches), or none at all —
         // never an empty list standing in for a choice, which would mean the whole index.
         ...(scope !== null ? { docIds: scope.paths } : {}),
+        context,
+        turnId: dispatchId,
         signal: abort.signal,
       },
       {
@@ -2801,7 +2980,14 @@ export class SearchV3View extends JfElement {
           // The SERVER just said the store is locked, which is newer than any poll (inventory E4/E5).
           this.noteRefusedWhileLocked();
         },
-        onHalted: () => settle('halted'),
+        onHalted: () => {
+          settle('halted');
+          // Saved as stopped: the record gives the turn its store ids (so it can be retried,
+          // edited or branched) and the list its conversation, as after a finished answer.
+          void loadConversations();
+          void this.refreshRecord(ref.sessionId);
+        },
+        onLeft: () => settle('left'),
         onFailed: (message) => settle('failed', message),
       },
     );
@@ -2833,7 +3019,10 @@ export class SearchV3View extends JfElement {
     if (tier === 'search' && this.search.showing) this.search.type(this.currentDraft());
   }
 
-  /** Halting is always the reader's; the turn settles `halted` through the sink's own terminal. */
+  /**
+   * Lets the stream go without telling the Engine (leaving is not stopping); the turn leaves the
+   * transcript through the sink's own `onLeft`, and the record later shows what the Engine saved.
+   */
   private abortAsk(): void {
     this.askAbort?.abort();
   }
@@ -3661,7 +3850,7 @@ export class SearchV3View extends JfElement {
    */
   private onComposerStop(): void {
     if (this.streaming) {
-      this.abortAsk();
+      this.askStop?.();
       return;
     }
     this.haltRun();
@@ -3835,15 +4024,20 @@ export class SearchV3View extends JfElement {
           .turnLineage=${this.turnLineage()}
           .floorSummary=${session?.history?.contextFloorSummary ?? null}
           ?streaming=${this.streaming}
+          .stopping=${this.askStopping}
           data-testid="sv3-main"
         ></jf-sv3-main>
         <!-- 859 §B — ONE positioned wrapper for the whole dock, so its height is one observable
              box and the transcript scrolls beneath it rather than being cut off above it. -->
         <div class="dock" data-testid="sv3-dock">
         <jf-sv3-context-bar
+          .notice=${session === null ? '' : this.contextNotice(session.id)}
           .usage=${session?.contextUsage ?? null}
           .contextWindow=${this.aiSnapshot?.runtime.contextWindow ?? null}
           hidden-turns=${sv3ExcludedTurnCount(contexts)}
+          unseen-hidden=${sv3UnseenExcludedIds(contexts, session?.history ?? null).length}
+          ?floor-unseen=${session !== null && sv3FloorUnseen(session.turns, session.history)}
+          .floorSummary=${session?.history?.contextFloorSummary ?? null}
           data-testid="sv3-context-bar-host"
         ></jf-sv3-context-bar>
         <jf-sv3-composer

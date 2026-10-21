@@ -17,6 +17,8 @@ public final class BootstrapLeaseFixtures {
     var lease = mock(KnowledgeServerBootstrap.ClientLease.class);
     when(bootstrap.client()).thenReturn(client);
     when(bootstrap.captureClient()).thenReturn(lease);
+    when(bootstrap.tryCaptureClient()).thenAnswer(ignored ->
+        java.util.Optional.of(bootstrap.captureClient()));
     when(bootstrap.acquireClientLease()).thenReturn(lease);
     when(lease.client()).thenReturn(client);
     when(lease.withClient(any())).thenAnswer(invocation ->

@@ -1,0 +1,11 @@
+--- a/modules/shell/src-tauri/src/factory_reset.rs
++++ b/modules/shell/src-tauri/src/factory_reset.rs
+@@ -4,2 +4,8 @@
+ use std::path::Path;
++
++// Before the repair, retry_factory_reset only checked the displayed phase and restarted.
++// Test callers already hold that incomplete phase; Retry did no filesystem work.
++pub(crate) fn retry(_dir: &Path) -> Result<(), String> {
++    Ok(())
++}
+ 

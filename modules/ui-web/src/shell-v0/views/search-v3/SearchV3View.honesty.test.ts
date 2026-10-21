@@ -772,6 +772,10 @@ describe('a stream failure is worded by the shared mapping, and an abort is not 
     const composer = await region(el, 'jf-sv3-composer');
     (q(composer, 'sv3-composer-stop') as HTMLButtonElement | null)?.click();
     await settle(el);
+    // The Engine ends the turn it was told to stop with CANCELLED, its own word for a Stop.
+    stream.emit('error', { error: 'Stopped by the user', errorCode: 'CANCELLED' });
+    stream.end();
+    await settle(el);
 
     const turn = el.sessions.sessions[0]?.turns[0];
     expect(turn?.status).toBe('halted');

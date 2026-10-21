@@ -1177,6 +1177,8 @@ export class Sv3Composer extends JfElement {
    */
   declare modelLabel: string;
   declare draft: string;
+  /** Every input, including IME edits: a delayed send may clear only its original draft. */
+  draftRevision = 0;
   /**
    * Public because the window's Escape ladder has to see it: an open menu is the MOST LOCAL
    * transient in the composer, so the window declines the key the way it declines to an open rename
@@ -1243,6 +1245,7 @@ export class Sv3Composer extends JfElement {
 
   private setDraft(text: string, composing: boolean): void {
     const previous = this.draft;
+    this.draftRevision += 1;
     this.draft = text;
     if (composing) return;
     this.dispatchEvent(
@@ -1406,13 +1409,15 @@ export class Sv3Composer extends JfElement {
     // The ONE banner slot, shared. The affordance-scoped reason yields whenever the degradation
     // banner already words its code, so the same fact never stands in the slot twice.
     const reason = sv3ComposerReason(this.degradation, activeReason);
+    // Like the degradation banner, this is a reachable description of the refusal. The shell's
+    // always-mounted status deck announces observed health/indexing changes once for all surfaces.
     return html`
       <div class="band" data-testid="sv3-composer-band">
         ${this.state === 'hero' ? this.landing() : nothing}
         ${this.degradationBanner()}
         ${reason === ''
           ? nothing
-          : html`<p class="notice" id="sv3-composer-notice" role="status" data-testid="sv3-composer-notice">
+          : html`<p class="notice" id="sv3-composer-notice" data-testid="sv3-composer-notice">
               ${reason}
             </p>`}
         ${this.scopeNote()}

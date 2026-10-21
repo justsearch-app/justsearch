@@ -152,11 +152,11 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 | [0001](0001-three-process-architecture.md) | Use three separate OS processes | Superseded by [0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) | 2026-02-03 |
 | [0002](0002-grpc-mmf-hybrid-ipc.md) | Use gRPC + MMF hybrid for IPC | Superseded by [0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) | 2026-02-03 |
 | [0003](0003-direct-lucene-no-elasticsearch.md) | Use Lucene directly without search platform | Accepted | 2026-02-03 |
-| [0004](0004-single-tenant-gpu-policy.md) | Historical single-tenant GPU policy; shipped builds allow encoder/LLM co-residence | Superseded (amended 2026-10-02) | 2026-02-03 |
+| [0004](0004-single-tenant-gpu-policy.md) | Historical single-tenant GPU policy; shipped builds allow encoder/LLM co-residence | Superseded by [0050](0050-gpu-co-residence-by-prevention.md) | 2026-02-03 |
 | [0005](0005-manual-ffm-bindings.md) | Manual FFM bindings for llama.cpp | Accepted | 2026-02-03 |
-| [0006](0006-two-pronged-citation-strategy.md) | Two-pronged citation strategy | Accepted | 2026-02-07 |
+| [0006](0006-two-pronged-citation-strategy.md) | Two-pronged citation strategy | Accepted (amended 2026-10-20: verifier-backed rendering) | 2026-02-07 |
 | [0007](0007-entity-faceting-over-knowledge-graph.md) | Entity faceting over full knowledge graph | Accepted | 2026-01-22 |
-| [0008](0008-settings-ephemeral-defaults-safe.md) | Settings are ephemeral, defaults are safe | Accepted | 2026-02-10 |
+| [0008](0008-settings-ephemeral-defaults-safe.md) | Settings are ephemeral, defaults are safe | Historical decision; schema-v5 migration shipped, owner review open (amended 2026-10-20) | 2026-02-10 |
 | [0009](0009-custom-dag-engine-ci-orchestration.md) | Custom DAG engine for CI orchestration | Accepted | 2026-02-23 |
 | [0010](0010-local-first-workflow-quality-observability.md) | Local-first workflow quality observability | Superseded (tempdoc 638) | 2026-03-07 |
 | [0011](0011-distributed-readiness-spi.md) | Distributed Readiness — Remote Shard SPI | Rejected - never built (retired 2026-09-02) | 2026-03-16 |
@@ -174,7 +174,7 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 | [0023](0023-api-responses-declare-runtime-context.md) | API responses declare their runtime context | Accepted | 2026-03-30 |
 | [0024](0024-app-packaging-nsis-per-user-download.md) | App packaging: NSIS, per-user install, download-on-demand | Accepted | 2026-04-06 |
 | [0025](0025-core-dto-dual-type-layering.md) | Core DTO dual-type layering (in-process ports vs REST) | Accepted | 2026-04-06 |
-| [0026](0026-manual-ci-triggering.md) | Manual-Only CI Triggering | Accepted (narrowed by ADR-0044) | 2026-04-22 |
+| [0026](0026-manual-ci-triggering.md) | Manual-Only CI Triggering | Accepted (narrowed by [0044](0044-public-hosted-ci-fact-lanes.md) and [0052](0052-weekly-codeql-on-hosted-runners.md)) | 2026-04-22 |
 | [0027](0027-metric-catalog-as-telemetry-contract.md) | MetricCatalog as the Telemetry Contract | Accepted | 2026-04-25 |
 | [0028](0028-scoped-reverse-path-lookup.md) | Scoped Reverse Path-Hash Lookup | Accepted (amended 2026-09-03) | 2026-04-26 |
 | [0029](0029-telemetry-events-bridge-vs-direct-emit.md) | TelemetryEvents Bridge vs Direct-Emit Façade | Accepted | 2026-04-27 |
@@ -183,24 +183,24 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 | [0032](0032-fe-lit-web-components.md) | Frontend rendering — Lit web components | Accepted | 2026-06-09 |
 | [0033](0033-fe-framework-not-product.md) | Frontend as a framework, not a product | Accepted | 2026-06-09 |
 | [0034](0034-fe-backend-owned-truth.md) | Backend-owned truth — frontend renders, never owns | Accepted | 2026-06-09 |
-| [0035](0035-fe-plugin-boundary.md) | Plugin boundary — truth vs presentation | Accepted | 2026-06-09 |
+| [0035](0035-fe-plugin-boundary.md) | Plugin boundary — truth vs presentation | Accepted intent; frontend Resource overlay gap (amended 2026-10-20) | 2026-06-09 |
 | [0036](0036-fe-resource-category.md) | Resource Category axis | Accepted | 2026-06-09 |
 | [0037](0037-universal-sse-envelope.md) | Universal SSE envelope | Accepted | 2026-06-09 |
 | [0038](0038-wire-contract-source-of-truth.md) | Wire contract as a first-class artifact | Accepted (mechanism superseded by tempdoc 564) | 2026-06-09 |
 | [0039](0039-contract-substrate.md) | Contract substrate — every published contract is first-class | Accepted (format superseded by tempdoc 564) | 2026-06-09 |
 | [0040](0040-wire-contract-format.md) | Wire contract format — protobuf + protovalidate | Superseded by tempdoc 564 | 2026-06-09 |
-| [0041](0041-catalog-category-format.md) | Catalog Category format — protobuf enums + metadata | Accepted (format superseded in part by tempdoc 564) | 2026-06-09 |
+| [0041](0041-catalog-category-format.md) | Catalog Category format — protobuf enums + metadata | Superseded by tempdoc 564; see [0039](0039-contract-substrate.md) | 2026-06-09 |
 | [0042](0042-runtime-witness-consumer-presence.md) | Live-registry witness — consumer-presence over the live ContributionRegistry | Accepted | 2026-06-11 |
 | [0043](0043-multilingual-by-construction-no-per-language-levers.md) | Multilingual by construction — no per-language levers | Accepted | 2026-06-15 |
-| [0044](0044-public-hosted-ci-fact-lanes.md) | Public hosted CI fact lanes | Accepted, amended 2026-09-04 | 2026-06-27 |
+| [0044](0044-public-hosted-ci-fact-lanes.md) | Public hosted CI fact lanes | Accepted, amended by [0052](0052-weekly-codeql-on-hosted-runners.md); runner split clarified 2026-10-20 | 2026-06-27 |
 | [0045](0045-public-main-history-publication.md) | Public main history publication (validated agent enqueue, commit-safe PR body, managed review comment) | Accepted, amended 2026-09-05 | 2026-06-28 |
 | [0046](0046-local-api-trust-boundary.md) | Local API trust boundary | Accepted | 2026-09-02 |
-| [0047](0047-context-window-is-a-derived-resource.md) | Context window is a derived resource | Accepted | 2026-09-02 |
+| [0047](0047-context-window-is-a-derived-resource.md) | Context window is a derived resource | Accepted, amended by [0050](0050-gpu-co-residence-by-prevention.md) | 2026-09-02 |
 | [0048](0048-extraction-isolation-and-indexing-pacing.md) | Extraction isolation and indexing pacing | Accepted (amended 2026-09-09: explicit urgency and work lifetime; amended 2026-10-05 by [0050](0050-gpu-co-residence-by-prevention.md): chat generation and external GPU pressure) | 2026-09-02 |
-| [0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) | One Engine JVM, and the process boundaries that survive | Accepted | 2026-09-07 |
+| [0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) | One Engine JVM, and the process boundaries that survive | Accepted, amended by [0051](0051-held-process-lifetimes-and-owner-exit-records.md) | 2026-09-07 |
 | [0050](0050-gpu-co-residence-by-prevention.md) | GPU co-residence by prevention, measured profiles and explicit degradation | Accepted (amends 0004, 0047, 0048) | 2026-10-05 |
 | [0051](0051-held-process-lifetimes-and-owner-exit-records.md) | Held process lifetimes and owner-recorded exits | Accepted (amends 0049) | 2026-10-05 |
-| [0052](0052-weekly-codeql-on-hosted-runners.md) | Weekly CodeQL on hosted runners | Accepted (amends 0044) | 2026-10-19 |
+| [0052](0052-weekly-codeql-on-hosted-runners.md) | Weekly CodeQL on hosted runners | Accepted (amends [0044](0044-public-hosted-ci-fact-lanes.md) and [0026](0026-manual-ci-triggering.md)) | 2026-10-19 |
 
 > ADRs 0031–0041 were graduated on 2026-06-09 from the retired `421` frontend-rewrite kernel
 > draft's `50-decisions/` set (authored ~2026-05; the rewrite shipped per tempdoc 563). The

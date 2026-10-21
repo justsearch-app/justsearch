@@ -128,6 +128,9 @@ public final class LifecycleSnapshotTap {
         new MappingKey(ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "index.schema_open_refused"),
         new ConditionMapping("index.start-error", "worker", Severity.ERROR));
     MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "index.migration_journal_unavailable"),
+        new ConditionMapping("index.start-error", "worker", Severity.ERROR));
+    MAPPING_TABLE.put(
         new MappingKey(
             ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "component.recovery_exhausted"),
         new ConditionMapping("index.start-error", "worker", Severity.ERROR));
@@ -166,6 +169,9 @@ public final class LifecycleSnapshotTap {
         new ConditionMapping("index.unavailable", "worker", Severity.ERROR));
     MAPPING_TABLE.put(
         new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_READY", "index.schema_open_refused"),
+        new ConditionMapping("index.unavailable", "worker", Severity.ERROR));
+    MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_READY", "index.migration_journal_unavailable"),
         new ConditionMapping("index.unavailable", "worker", Severity.ERROR));
     // Slice 447-followup §X.11.5 Phase 7: 442 §B.9 row 548 ships end-to-end via the
     // parameterless `core.rebuild-index` wrapper Operation. Static defaultArgsJson

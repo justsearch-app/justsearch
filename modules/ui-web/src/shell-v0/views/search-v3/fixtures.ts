@@ -123,6 +123,13 @@ export const TURN_EMPTY_ANSWER = '(empty response)';
 
 /** The reader's Stop. Said as the reader's own act, never as a failure the window suffered. */
 export const TURN_HALTED = 'Stopped by you.';
+/**
+ * Between the reader's Stop and the Engine's answer to it. Only the Engine's own end of the turn
+ * says whether it stopped (and was saved as stopped) or had already finished.
+ */
+export const TURN_STOPPING = 'Stopping…';
+/** The Stop never reached the Engine (refused, or no answer), so the answer goes on. */
+export const TURN_STOP_FAILED = 'Could not stop this answer — it goes on. Press Stop to try again.';
 
 export const TURN_FAILED = 'The answer failed.';
 
@@ -337,11 +344,23 @@ export const CONTEXT_SUMMARY_CANCEL = 'Cancel';
 export const CONTEXT_METER_LABEL = 'Context';
 export const CONTEXT_METER_BAR_LABEL = 'Context window used';
 export const CONTEXT_INCLUDE_ALL = 'Include all';
-export const CONTEXT_INCLUDE_ALL_LABEL = 'Include every hidden turn back into the context';
+export const CONTEXT_INCLUDE_ALL_LABEL = 'Include every hidden message back into the context';
 
 /** "N turns hidden from context" — a count the reader can act on, so it says which number it is. */
 export const contextHiddenLabel = (turns: number): string =>
   `${turns} turn${turns === 1 ? '' : 's'} hidden from context`;
+
+/**
+ * Hidden messages no turn on screen names (S2.7) — counted as MESSAGES, because there is no turn to
+ * count them by, and a turn count that silently left them out would read as "nothing else is hidden".
+ */
+export const contextUnseenLabel = (messages: number): string =>
+  `${messages} hidden message${messages === 1 ? '' : 's'} not shown here`;
+
+/** The floor sits on a message this window does not draw as a turn, so no divider can carry it (S2.8). */
+export const CONTEXT_FLOOR_UNSEEN = 'Context starts at a message not shown here';
+export const CONTEXT_FLOOR_UNSEEN_SUMMARIZED =
+  'Context starts at a message not shown here — earlier turns are summarized for the assistant';
 
 /** The occupancy readout, and what pressing it opens. */
 export const contextMeterLabel = (pct: number, occupancy: number, window: number): string =>
@@ -373,6 +392,8 @@ export const CONTEXT_COMPACT_FAILED = 'The turns above this one could not be sum
 export const CONTEXT_SUMMARY_FAILED = 'The summary could not be saved';
 export const CONTEXT_EXCLUDE_FAILED = 'That turn could not be hidden from the context';
 export const CONTEXT_INCLUDE_FAILED = 'That turn could not be put back into the context';
+export const CONTEXT_INCLUDE_ALL_FAILED =
+  'Some hidden messages could not be put back into the context';
 
 /* ── Branch, edit / retry and the version pager (slice 513 + 610 Phase A/B, ported by 852 S3) ───
  *
@@ -414,6 +435,9 @@ export const versionPagerCount = (index: number, total: number): string => `${in
  * because the act they pressed was about to replace what is on screen.
  */
 export const BRANCH_FAILED = 'That thread could not be branched — this conversation is unchanged';
+/** A Delegate turn's Retry/Edit, refused because the one shared agent controller is running (S2.6). */
+export const BRANCH_RERUN_BUSY =
+  'Another run is still going — stop it or let it finish, then run this again';
 
 /** Delete's two new words: the cascade prompt, and the refusal when the store declined. */
 export const DELETE_FAILED = 'That conversation could not be deleted';

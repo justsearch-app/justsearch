@@ -9,7 +9,7 @@ probes:
   - adr-0046-no-wildcard-bind
   - adr-0046-token-fails-closed
   - adr-0046-token-refusal-asserted
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0046: Local API trust boundary
@@ -23,6 +23,8 @@ what did not exist was a decision record naming *what they collectively defend a
 they deliberately do not*. Root `CLAUDE.md` hard invariant #2 said "Local API binds to 127.0.0.1
 only" — true, but a description of one control rather than of the posture. This ADR is the posture;
 the invariant line now points here.
+
+Current implementation corrections are recorded in the 2026-10-20 amendment below.
 
 ## Context
 
@@ -155,3 +157,16 @@ variant) inherits a silent downgrade.
 - [ADR-0030](0030-policy-on-operations-vs-mcp-hints.md) — what the MCP surface is allowed to
   express; this ADR governs who may reach it.
 - Root `CLAUDE.md` hard invariant #2 — the always-loaded one-line projection of this decision.
+
+## Amendment 2026-10-20: current security-control entry points
+
+The five controls remain; the numerical source references above are historical.
+Current entry points are `LocalApiServer`'s explicit
+`app.start("127.0.0.1", bindPort)` and `ApiSecurityFilters.install`, which installs
+Host validation, MCP Origin validation, CORS and session-token enforcement.
+`ApiSecurityFilters.requiresSessionToken` owns the route predicate and
+`HeadlessApp` calls `LocalApiServer.generateSessionToken` for production startup.
+Evidence: `modules/ui/src/main/java/io/justsearch/ui/api/LocalApiServer.java:623`,
+`modules/ui/src/main/java/io/justsearch/ui/api/ApiSecurityFilters.java:171`, and
+`modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java:494`.
+These locations update the pointers, not the trust boundary.

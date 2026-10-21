@@ -27,6 +27,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 final class VduCancellationRetryTest extends LuceneExecutorTestBase {
   @TempDir Path directory;
+  private static final String ATTEMPT = "e494d0eb-b1c9-4561-9551-f1546d87c18e";
   private static final String DOC = "cancelled-picture";
 
   @Test void shutdownReturnsTheUnusedRetryAndAllowsTheNextPass() throws Exception {
@@ -59,7 +60,7 @@ final class VduCancellationRetryTest extends LuceneExecutorTestBase {
       var service = service(runtime);
       var ctx = context();
       assertTrue(service.markVduProcessing(claim(), ctx).getSuccess());
-      assertTrue(service.updateVduResult(UpdateVduResultRequest.newBuilder().setDocId(DOC)
+      assertTrue(service.updateVduResult(UpdateVduResultRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT)
           .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
           .setExtractedContent("completed picture text").build(), ctx).getSuccess());
       assertEquals(0, service.recoverVduProcessing(owned(ctx), ctx).getRecoveredCount());
@@ -81,12 +82,12 @@ final class VduCancellationRetryTest extends LuceneExecutorTestBase {
   }
 
   private RunningRuntime open(int retries) {
-    var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTestingWithVduRetryCount(0))
+    var runtime = IndexSchema.fromCatalog(VduRevisionTestSupport.catalog(0))
         .atPath(directory).withExecutorRegistrations(testLuceneExecutors()).open();
     runtime.commitOps().stopCommitTimer();
     runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
         SchemaFields.DOC_ID, DOC, SchemaFields.DOC_UID, "cancelled-picture-identity",
-        SchemaFields.CONTENT, "original text", SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING,
+        SchemaFields.SOURCE_SHA256, "a".repeat(64), SchemaFields.CONTENT, "original text", SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING,
         SchemaFields.VDU_RETRY_COUNT, String.valueOf(retries))));
     runtime.commitOps().commitAndTrack(CommitReason.TIMER);
     runtime.commitOps().maybeRefreshBlocking();
@@ -99,7 +100,7 @@ final class VduCancellationRetryTest extends LuceneExecutorTestBase {
   }
 
   private static MarkVduProcessingRequest claim() {
-    return MarkVduProcessingRequest.newBuilder().setDocId(DOC).setMaxRetries(3).build();
+    return MarkVduProcessingRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT).setMaxRetries(3).build();
   }
 
   private static CallContext context() {
@@ -110,7 +111,7 @@ final class VduCancellationRetryTest extends LuceneExecutorTestBase {
 
   private static RecoverVduProcessingRequest owned(CallContext ctx) {
     return RecoverVduProcessingRequest.newBuilder()
-        .setProcedureOwner(ctx.engineContext().workId().orElseThrow().toString()).build();
+        .setProcedureOwner(ctx.engineContext().workId().orElseThrow().toString()).addAttemptIds(ATTEMPT).build();
   }
 
   private String committed(String field) throws Exception {

@@ -10,17 +10,17 @@
 <g id="clust1" class="cluster">
 <title>cluster_ingestion</title>
 <path fill="none" stroke="#4f86a3" stroke-width="1.2" d="M20,-428C20,-428 636,-428 636,-428 642,-428 648,-434 648,-440 648,-440 648,-1252.72 648,-1252.72 648,-1258.72 642,-1264.72 636,-1264.72 636,-1264.72 20,-1264.72 20,-1264.72 14,-1264.72 8,-1258.72 8,-1252.72 8,-1252.72 8,-440 8,-440 8,-434 14,-428 20,-428"/>
-<text text-anchor="middle" x="328" y="-1251.12" font-family="Helvetica,sans-Serif" font-size="12.00">Ingestion Time (Body / Worker)</text>
+<text text-anchor="middle" x="328" y="-1251.12" font-family="Helvetica,sans-Serif" font-size="12.00">Ingestion Time — Engine Index Half</text>
 </g>
 <g id="clust2" class="cluster">
 <title>cluster_head</title>
 <path fill="none" stroke="#5f9f5f" stroke-width="1.2" d="M684,-218C684,-218 1040,-218 1040,-218 1046,-218 1052,-224 1052,-230 1052,-230 1052,-1169.36 1052,-1169.36 1052,-1175.36 1046,-1181.36 1040,-1181.36 1040,-1181.36 684,-1181.36 684,-1181.36 678,-1181.36 672,-1175.36 672,-1169.36 672,-1169.36 672,-230 672,-230 672,-224 678,-218 684,-218"/>
-<text text-anchor="middle" x="862" y="-1167.76" font-family="Helvetica,sans-Serif" font-size="12.00">Query Time — Head (Main Process)</text>
+<text text-anchor="middle" x="862" y="-1167.76" font-family="Helvetica,sans-Serif" font-size="12.00">Query Time — Engine Application Half</text>
 </g>
 <g id="clust3" class="cluster">
 <title>cluster_worker</title>
 <path fill="none" stroke="#b07f3a" stroke-width="1.2" d="M1072,-8C1072,-8 1693,-8 1693,-8 1699,-8 1705,-14 1705,-20 1705,-20 1705,-1068.36 1705,-1068.36 1705,-1074.36 1699,-1080.36 1693,-1080.36 1693,-1080.36 1072,-1080.36 1072,-1080.36 1066,-1080.36 1060,-1074.36 1060,-1068.36 1060,-1068.36 1060,-20 1060,-20 1060,-14 1066,-8 1072,-8"/>
-<text text-anchor="middle" x="1382.5" y="-1066.76" font-family="Helvetica,sans-Serif" font-size="12.00">Query Time — Worker (Body Process)</text>
+<text text-anchor="middle" x="1382.5" y="-1066.76" font-family="Helvetica,sans-Serif" font-size="12.00">Query Time — Engine Index Half</text>
 </g>
 <!-- ANCH_ING -->
 <!-- ANCH_HEAD -->
@@ -56,12 +56,12 @@
 <polyline fill="none" stroke="#888888" points="1975,-962 1969,-962 "/>
 <text text-anchor="middle" x="1844" y="-956" font-family="Helvetica,sans-Serif" font-size="10.00">Legend / Constraints</text>
 <text text-anchor="middle" x="1844" y="-945" font-family="Helvetica,sans-Serif" font-size="10.00">• Retrieval legs: BM25 | Dense KNN | SPLADE</text>
-<text text-anchor="middle" x="1844" y="-934" font-family="Helvetica,sans-Serif" font-size="10.00">• Fusion: RRF default; CC alternative</text>
+<text text-anchor="middle" x="1844" y="-934" font-family="Helvetica,sans-Serif" font-size="10.00">• Fusion: CC default; RRF alternative</text>
 <text text-anchor="middle" x="1844" y="-923" font-family="Helvetica,sans-Serif" font-size="10.00">• Reranking: LambdaMART → Cross-Encoder (cascade)</text>
 <text text-anchor="middle" x="1844" y="-912" font-family="Helvetica,sans-Serif" font-size="10.00">• Pipeline control:</text>
 <text text-anchor="middle" x="1844" y="-901" font-family="Helvetica,sans-Serif" font-size="10.00">  - PipelineConfig flags (not mode enum)</text>
 <text text-anchor="middle" x="1844" y="-890" font-family="Helvetica,sans-Serif" font-size="10.00">  - Expansion: gated by expansionEnabled flag</text>
-<text text-anchor="middle" x="1844" y="-879" font-family="Helvetica,sans-Serif" font-size="10.00">  - Stemming fallback then fuzzy (not both)</text>
+<text text-anchor="middle" x="1844" y="-879" font-family="Helvetica,sans-Serif" font-size="10.00">  - Fuzzy correction on zero hits</text>
 </g>
 <!-- ANCH_WORK&#45;&gt;LEGEND -->
 <!-- B -->
@@ -81,7 +81,7 @@
 <title>C</title>
 <path fill="#ffffff" stroke="#444444" d="M628,-938C628,-938 408,-938 408,-938 402,-938 396,-932 396,-926 396,-926 396,-914 396,-914 396,-908 402,-902 408,-902 408,-902 628,-902 628,-902 634,-902 640,-908 640,-914 640,-914 640,-926 640,-926 640,-932 634,-938 628,-938"/>
 <text text-anchor="middle" x="518" y="-923.2" font-family="Helvetica,sans-Serif" font-size="11.00">Text Analysis (ICU Tokenizer)</text>
-<text text-anchor="middle" x="518" y="-911.2" font-family="Helvetica,sans-Serif" font-size="11.00">ICUTokenizer → NFC → lower → synonyms</text>
+<text text-anchor="middle" x="518" y="-911.2" font-family="Helvetica,sans-Serif" font-size="11.00">ICUTokenizer → NFC → lowercase</text>
 </g>
 <!-- B&#45;&gt;C -->
 <g id="edge4" class="edge">
@@ -120,9 +120,9 @@
 <g id="node9" class="node">
 <title>F</title>
 <path fill="#ffffff" stroke="#444444" d="M206.5,-698C206.5,-698 27.5,-698 27.5,-698 21.5,-698 15.5,-692 15.5,-686 15.5,-686 15.5,-666 15.5,-666 15.5,-660 21.5,-654 27.5,-654 27.5,-654 206.5,-654 206.5,-654 212.5,-654 218.5,-660 218.5,-666 218.5,-666 218.5,-686 218.5,-686 218.5,-692 212.5,-698 206.5,-698"/>
-<text text-anchor="middle" x="117" y="-685.2" font-family="Helvetica,sans-Serif" font-size="11.00">Dense Embedding (nomic&#45;embed)</text>
-<text text-anchor="middle" x="117" y="-673.2" font-family="Helvetica,sans-Serif" font-size="11.00">nomic&#45;embed&#45;text&#45;v1.5; 768&#45;d</text>
-<text text-anchor="middle" x="117" y="-661.2" font-family="Helvetica,sans-Serif" font-size="11.00">Q8_0 GGUF (llama.cpp)</text>
+<text text-anchor="middle" x="117" y="-685.2" font-family="Helvetica,sans-Serif" font-size="11.00">Dense Embedding (ONNX)</text>
+<text text-anchor="middle" x="117" y="-673.2" font-family="Helvetica,sans-Serif" font-size="11.00">gte-multilingual-base; 768-d</text>
+<text text-anchor="middle" x="117" y="-661.2" font-family="Helvetica,sans-Serif" font-size="11.00">FP32 CPU / FP16 CUDA (ORT)</text>
 </g>
 <!-- D&#45;&gt;F -->
 <g id="edge7" class="edge">
@@ -135,8 +135,8 @@
 <title>G</title>
 <path fill="#ffffff" stroke="#444444" d="M415,-698C415,-698 271,-698 271,-698 265,-698 259,-692 259,-686 259,-686 259,-666 259,-666 259,-660 265,-654 271,-654 271,-654 415,-654 415,-654 421,-654 427,-660 427,-666 427,-666 427,-686 427,-686 427,-692 421,-698 415,-698"/>
 <text text-anchor="middle" x="343" y="-685.2" font-family="Helvetica,sans-Serif" font-size="11.00">SPLADE Encoding</text>
-<text text-anchor="middle" x="343" y="-673.2" font-family="Helvetica,sans-Serif" font-size="11.00">SPLADE&#45;v3 (BERT&#45;base)</text>
-<text text-anchor="middle" x="343" y="-661.2" font-family="Helvetica,sans-Serif" font-size="11.00">256 tokens; sparse weights</text>
+<text text-anchor="middle" x="343" y="-673.2" font-family="Helvetica,sans-Serif" font-size="11.00">Multilingual sparse encoder</text>
+<text text-anchor="middle" x="343" y="-661.2" font-family="Helvetica,sans-Serif" font-size="11.00">512-token default; sparse weights</text>
 </g>
 <!-- D&#45;&gt;G -->
 <g id="edge8" class="edge">
@@ -277,7 +277,7 @@
 <g id="node20" class="node">
 <title>Q12</title>
 <path fill="#ffffff" stroke="#444444" d="M828,-585C828,-585 752,-585 752,-585 746,-585 740,-579 740,-573 740,-573 740,-561 740,-561 740,-555 746,-549 752,-549 752,-549 828,-549 828,-549 834,-549 840,-555 840,-561 840,-561 840,-573 840,-573 840,-579 834,-585 828,-585"/>
-<text text-anchor="middle" x="790" y="-564.2" font-family="Helvetica,sans-Serif" font-size="11.00">Worker Results</text>
+<text text-anchor="middle" x="790" y="-564.2" font-family="Helvetica,sans-Serif" font-size="11.00">Index Results</text>
 </g>
 <!-- Q5&#45;&gt;Q12 -->
 <g id="edge21" class="edge">
@@ -304,7 +304,7 @@
 <title>Q14</title>
 <path fill="#ffffff" stroke="#444444" d="M855,-371C855,-371 725,-371 725,-371 719,-371 713,-365 713,-359 713,-359 713,-339 713,-339 713,-333 719,-327 725,-327 725,-327 855,-327 855,-327 861,-327 867,-333 867,-339 867,-339 867,-359 867,-359 867,-365 861,-371 855,-371"/>
 <text text-anchor="middle" x="790" y="-358.2" font-family="Helvetica,sans-Serif" font-size="11.00">Cross&#45;Encoder Reranking</text>
-<text text-anchor="middle" x="790" y="-346.2" font-family="Helvetica,sans-Serif" font-size="11.00">MiniLM&#45;L6&#45;v2 (ONNX)</text>
+<text text-anchor="middle" x="790" y="-346.2" font-family="Helvetica,sans-Serif" font-size="11.00">gte multilingual (ONNX)</text>
 <text text-anchor="middle" x="790" y="-334.2" font-family="Helvetica,sans-Serif" font-size="11.00">deadline&#45;budgeted skip</text>
 </g>
 <!-- Q13&#45;&gt;Q14 -->
@@ -412,7 +412,7 @@
 <path fill="#ffffff" stroke="#444444" d="M1467.5,-371C1467.5,-371 1276.5,-371 1276.5,-371 1270.5,-371 1264.5,-365 1264.5,-359 1264.5,-359 1264.5,-339 1264.5,-339 1264.5,-333 1270.5,-327 1276.5,-327 1276.5,-327 1467.5,-327 1467.5,-327 1473.5,-327 1479.5,-333 1479.5,-339 1479.5,-339 1479.5,-359 1479.5,-359 1479.5,-365 1473.5,-371 1467.5,-371"/>
 <text text-anchor="middle" x="1372" y="-358.2" font-family="Helvetica,sans-Serif" font-size="11.00">RRF / CC Fusion</text>
 <text text-anchor="middle" x="1372" y="-346.2" font-family="Helvetica,sans-Serif" font-size="11.00">RRF: K=60; vecWeight=0.75</text>
-<text text-anchor="middle" x="1372" y="-334.2" font-family="Helvetica,sans-Serif" font-size="11.00">CC: min&#45;max normalized alternative</text>
+<text text-anchor="middle" x="1372" y="-334.2" font-family="Helvetica,sans-Serif" font-size="11.00">CC: min-max normalized default</text>
 </g>
 <!-- W5&#45;&gt;W8 -->
 <g id="edge32" class="edge">

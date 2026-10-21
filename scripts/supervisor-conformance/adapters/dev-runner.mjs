@@ -42,6 +42,13 @@ const JS_ENGINE_STOP = 0x4A530002;
 /** An idle stand-in for the Vite dev server: the supervisor is not the frontend's supervisor. */
 const IDLE_FRONTEND = [process.execPath, '-e', 'setInterval(() => {}, 60000)'];
 
+// Fixture startup includes the Windows PowerShell job host, C# compilation and identity capture.
+// Hosted job 118612815529 spent the old 10s before discovering an otherwise healthy fake Engine.
+// Allow that setup here only; explicit start-timeout cases and the restart policy stay bounded.
+const FIXTURE_START_TIMEOUT_MS = 60_000;
+// Discovery and HTTP readiness have separate budgets; include runner setup before both begin.
+export const FIRST_RUNNING_TIMEOUT_MS = 2 * FIXTURE_START_TIMEOUT_MS + 20_000;
+
 export async function available({ io }) {
   const devRunner = path.join(io.repoRoot, 'scripts', 'dev', 'dev-runner.cjs');
   if (!fs.existsSync(devRunner)) return { ok: false, reason: `not found: ${devRunner}` };
@@ -68,26 +75,29 @@ function freePort() {
 
 /** Poll `supervisor.v1.json` until `predicate` holds, recording every distinct state seen. */
 export async function watchSupervisor({ statePath, predicate, timeoutMs, io, seen, faultGatePath }) {
+  const end = io.timings?.wait('supervisor state: ' + predicate.toString(), timeoutMs);
   const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const state = io.readJsonIfPresent(statePath);
-    if (state) {
-      const key = `${state.state}:${state.incarnation}:${state.reason ?? ''}${state.phase ? `:${state.phase}` : ''}`;
-      if (!seen.has(key)) seen.set(key, state);
-      // Lifecycle cases may wait for a later incarnation. They still witness the first RUNNING
-      // identity on the way there, so release its fixture fault just as the actuator cases do.
-      if (faultGatePath && state.state === 'running' && state.incarnation === 1
-          && !fs.existsSync(faultGatePath)) {
-        fs.writeFileSync(faultGatePath, JSON.stringify({
-          pid: state.pid, instanceId: state.instanceId, incarnation: state.incarnation,
-        }));
+  try {
+    for (;;) {
+      const state = io.readJsonIfPresent(statePath);
+      if (state) {
+        const key = `${state.state}:${state.incarnation}:${state.reason ?? ''}${state.phase ? `:${state.phase}` : ''}`;
+        if (!seen.has(key)) seen.set(key, state);
+        // Lifecycle cases may wait for a later incarnation. They still witness the first RUNNING
+        // identity on the way there, so release its fixture fault just as the actuator cases do.
+        if (faultGatePath && state.state === 'running' && state.incarnation === 1
+            && !fs.existsSync(faultGatePath)) {
+          fs.writeFileSync(faultGatePath, JSON.stringify({
+            pid: state.pid, instanceId: state.instanceId, incarnation: state.incarnation,
+          }));
+        }
+        if (predicate(state)) return state;
       }
-      if (predicate(state)) return state;
+      if (Date.now() >= deadline) return null;
+      // eslint-disable-next-line no-await-in-loop
+      await io.sleep(25);
     }
-    if (Date.now() >= deadline) return null;
-    // eslint-disable-next-line no-await-in-loop
-    await io.sleep(25);
-  }
+  } finally { end?.(); }
 }
 
 /** Settles with `promise`, or `false` after `ms`; the timer is cleared so it never holds the process open. */
@@ -120,9 +130,11 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
   const firstBootBudgetPath = path.join(workDir, 'first-boot-budget.json');
   const seen = new Map();
 
+  io.timings?.launch(workDir);
   const child = spawn(
     process.execPath,
     [
+      ...(io.timings ? ['--require', path.join(io.repoRoot, 'scripts/supervisor-conformance/timings-preload.cjs')] : []),
       ...preload,
       ...firstBootPreload,
       path.join(io.repoRoot, 'scripts', 'dev', 'dev-runner.cjs'),
@@ -142,6 +154,7 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
         ...io.harnessOverrides,
         JUSTSEARCH_DEV_RUNNER_STATE_ROOT: stateRoot,
         JUSTSEARCH_CONFORMANCE_IDENTITIES: identities,
+        ...(io.timings ? { JUSTSEARCH_CONFORMANCE_TIMINGS: path.join(workDir, 'spawn-timings.jsonl') } : {}),
         JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND: JSON.stringify([process.execPath, ...preload, io.fakeEngine]),
         JUSTSEARCH_DEV_RUNNER_FRONTEND_COMMAND: JSON.stringify([IDLE_FRONTEND[0], ...preload, ...IDLE_FRONTEND.slice(1)]),
         JUSTSEARCH_FAKE_ENGINE_PLAN: planPath,
@@ -149,10 +162,9 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
         JUSTSEARCH_SUPERVISOR_HARNESS_REQUEST_REASON: testCase.request?.reason ?? '',
         JUSTSEARCH_CONFORMANCE_FIRST_BOOT_TIMEOUT_MS: String(testCase.startTimeoutMs ?? ''),
         JUSTSEARCH_CONFORMANCE_FIRST_BOOT_BUDGET_PATH: firstBootBudgetPath,
-        // Keep the first incarnation's start bounded: the default is 15 s locally and 300 s in CI,
-        // and a case that hangs for either is a case nobody will run.
-        JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: '10000',
-        JUSTSEARCH_DEV_RUNNER_BACKEND_READY_TIMEOUT_MS: '10000',
+        // Bound fixture setup independently of the product's local and CI defaults.
+        JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: String(FIXTURE_START_TIMEOUT_MS),
+        JUSTSEARCH_DEV_RUNNER_BACKEND_READY_TIMEOUT_MS: String(FIXTURE_START_TIMEOUT_MS),
         CI: '',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -220,6 +232,7 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
     }
     if (!ended) throw new Error('fixture runner exit unconfirmed; artifacts retained');
     if (keepWorkDir) return;
+    if (io.deferCleanup) { io.deferCleanup(workDir, () => removeFixtureDirectory(workDir)); return; }
     if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {
       process.stderr.write(`[keep] ${workDir}\n`);
       return;
@@ -227,7 +240,9 @@ export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir
     removeFixtureDirectory(workDir);
   };
 
-  return { workDir, dataDir, stateRoot, statePath, faultGatePath, firstBootBudgetPath, child, output, exited, seen, cleanup, uiPort, identities };
+  const run = { workDir, dataDir, stateRoot, statePath, faultGatePath, firstBootBudgetPath, child, output, exited, seen, cleanup, uiPort, identities };
+  io.timings?.attach(run);
+  return run;
 }
 
 const RESTART_CASES = new Set([
@@ -257,7 +272,7 @@ export async function runCase({ testCase, policy, io }) {
     const running = await watchSupervisor({
       statePath: run.statePath,
       predicate: (s) => s.state === 'running' && s.incarnation === 1,
-      timeoutMs: 20_000,
+      timeoutMs: FIRST_RUNNING_TIMEOUT_MS,
       io,
       seen: run.seen,
     });
@@ -616,12 +631,12 @@ async function runLifecycleCase({ testCase, policy, io }) {
   const runs = [];
   try {
     if (expect.killSupervisor) {
-      // The supervisor is killed outright (TerminateProcess, no handler runs); its Engine dies with
-      // the runner's job and nobody records the exit.
+      // Kill outright: TerminateProcess on Windows, SIGKILL elsewhere so no shutdown handler runs.
+      // Its Engine dies with the runner's job and nobody records the exit.
       const first = await driveCase({ testCase, policy, io, workDir, keepWorkDir: true });
       runs.push(first);
       const up = await watchSupervisor({ statePath: first.statePath, predicate: (s) => s.state === 'running',
-        timeoutMs: 20_000, io, seen: first.seen, faultGatePath: first.faultGatePath });
+        timeoutMs: FIRST_RUNNING_TIMEOUT_MS, io, seen: first.seen, faultGatePath: first.faultGatePath });
       if (!up) {
         problems.push(`the first supervisor never reached running. stderr: ${first.output.stderr.slice(-1200)}`);
         return { problems };
@@ -632,7 +647,7 @@ async function runLifecycleCase({ testCase, policy, io }) {
         .some((r) => r.type === 'engine-start' && r.incarnation?.session === previousRunId), { timeoutMs: 10_000,
         what: 'the first run\'s engine-start' }).catch(() => false);
       if (!opened) problems.push('the first run never wrote its engine-start');
-      first.child.kill();
+      first.child.kill(process.platform === 'win32' ? undefined : 'SIGKILL');
       await Promise.race([first.exited, io.sleep(5000)]);
       const enginePid = up.pid;
       await io.waitFor(() => { try { process.kill(enginePid, 0); return false; } catch { return true; } },
@@ -647,7 +662,8 @@ async function runLifecycleCase({ testCase, policy, io }) {
       statePath: run.statePath,
       predicate: (s) => s.state === reach.state && s.incarnation === reach.incarnation
         && (!previousRunId || s.runId !== previousRunId),
-      timeoutMs: 40_000,
+      // Include fixture setup before the lifecycle case's existing recovery observation budget.
+      timeoutMs: FIRST_RUNNING_TIMEOUT_MS + 40_000,
       io,
       seen: run.seen,
       faultGatePath: run.faultGatePath,
@@ -687,7 +703,9 @@ async function runLifecycleCase({ testCase, policy, io }) {
       // eslint-disable-next-line no-await-in-loop
       await run.cleanup();
     }
-    if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {
+    if (io.deferCleanup) {
+      io.deferCleanup(workDir, () => removeFixtureDirectory(workDir));
+    } else if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {
       process.stderr.write(`[keep] ${workDir}\n`);
     } else {
       removeFixtureDirectory(workDir);

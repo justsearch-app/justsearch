@@ -183,6 +183,12 @@ final class PreOpenSchemaMismatchBootTest {
   void interruptedBackupWithAbsentActiveReconcilesAndStartsSourceRebuild(@TempDir Path tempDir)
       throws Exception {
     WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    // An interrupted recovery retains its journal. Its absence is a durability refusal,
+    // covered by MigrationJournalDurabilityBootTest, rather than healthy backup recovery.
+    try (var queue = new io.justsearch.indexerworker.queue.SqliteJobQueue(
+        layout.dataDir().resolve("jobs.db"))) {
+      queue.open();
+    }
     WorkerBootFixture.seed(layout.activePath(), null, 3);
     Path backup = recoveryBackup(layout, "20000101-000000");
     java.nio.file.Files.move(layout.activePath(), backup);

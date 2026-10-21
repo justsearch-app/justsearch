@@ -1,8 +1,8 @@
 {
   "$schema": "https://ssot.justsearch/v1/schemas/route-manifest.json",
-  "count": 252,
+  "count": 253,
   "namespace": "meta-routes",
-  "routeDigest": "sha256:e682cfe90289651d2cb9e2d1f96b278f1fd83de8938bdecc5e009ea06ed23176",
+  "routeDigest": "sha256:8c31286499d38c5404dab1995d4a60ab86d0f2a87c504ae9212787b5e4419f47",
   "routes": [
     {
       "method": "GET",
@@ -798,6 +798,20 @@
     {
       "method": "POST",
       "path": "/api/chat/conversations/{sessionId}/sources/exclude",
+      "cohort": "conversation",
+      "owningModule": null,
+      "requiredCapabilities": [],
+      "responseSchema": null,
+      "stability": null,
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": null,
+      "responseSchemas": null,
+      "lifecycle": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat/conversations/{sessionId}/stop",
       "cohort": "conversation",
       "owningModule": null,
       "requiredCapabilities": [],

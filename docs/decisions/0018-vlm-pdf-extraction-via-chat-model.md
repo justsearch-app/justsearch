@@ -6,7 +6,7 @@ description: "Reuse the chat model's vision path, without a Docling sidecar, for
 date: 2026-03-23
 probes:
   - adr-0018-layout-flag-absent
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0018: VLM PDF Extraction via Chat Model
@@ -141,3 +141,19 @@ The Negative bullet *"only flagged pages"* still holds, but the flagging populat
 this ADR assumed (images as well as PDFs, and dropout/enrichment demands as well as low quality
 scores) — so the GPU-contention consequence is correspondingly larger. The tier-2 budget, not a
 feature flag, is what bounds it.
+
+## Amendment 2026-10-20: GPU and VDU pacing after co-residence shipped
+
+The GPU-contention consequence above predates
+[ADR-0048](0048-extraction-isolation-and-indexing-pacing.md) and
+[ADR-0050](0050-gpu-co-residence-by-prevention.md). In addition to
+`VduPacingPolicy`, `VduProcessor.asVduBulkWork` marks vision and chat passes
+with `DemandScope.bulk(BulkWorkKind.VDU)`. `OnlineAiServiceImpl` classifies
+these as bulk VDU demand, so VDU's own generation is not counted as chat
+answering. The original default-off, PDF-only decision remains historical;
+the 2026-09-02 amendment describes the current default-on PDF/image routing.
+Evidence: `modules/app-services/src/main/java/io/justsearch/app/services/vdu/VduProcessor.java`
+(`asVduBulkWork`, vision-completion calls),
+`modules/app-inference/src/main/java/io/justsearch/app/inference/OnlineAiServiceImpl.java`
+(`declaredLeaseKind`), and
+`modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/VisualRoutingDecision.java`.

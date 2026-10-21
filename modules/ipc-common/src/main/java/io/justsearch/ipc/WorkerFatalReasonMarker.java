@@ -34,6 +34,7 @@ public final class WorkerFatalReasonMarker {
    * it the refusal reaches the Head as a bare non-zero exit, indistinguishable from a crash.
    */
   public static final String INDEX_SCHEMA_MISMATCH = "index_schema_mismatch";
+  public static final String MIGRATION_JOURNAL_UNAVAILABLE = "migration_journal_unavailable";
 
   private static final String FILE = "worker-fatal-reason";
 
