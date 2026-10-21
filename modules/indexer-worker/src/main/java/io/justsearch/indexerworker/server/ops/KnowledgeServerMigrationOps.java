@@ -78,6 +78,12 @@ public final class KnowledgeServerMigrationOps {
     default boolean resumeAcceptedGapBuild() throws IOException, InterruptedException { return false; }
 
     default void transition(String point) throws IOException, InterruptedException {}
+
+    /**
+     * Writes FAILED, before any queue or enumeration wait, for a candidate that can never
+     * certify. Returns true when it did; its obligations stay for the refusal cleanup.
+     */
+    default boolean refuseUncertifiable() { return false; }
   }
 
   public record CutoverContext(
@@ -245,6 +251,14 @@ public final class KnowledgeServerMigrationOps {
             Thread.sleep(1_000);
           }
           continue;
+        }
+
+        // A candidate that can never certify gains nothing from waiting for its enumeration or
+        // queue: that wait grows with the corpus. Refuse it now; pending rows stay durable work.
+        if ((ms == IndexGenerationManager.MigrationState.MIGRATING
+                || ms == IndexGenerationManager.MigrationState.SWITCHING)
+            && context.liveCutover().refuseUncertifiable()) {
+          return;
         }
 
         if (!context.migrationEnumeratorDoneSupplier().getAsBoolean()) {
@@ -1632,14 +1646,14 @@ public final class KnowledgeServerMigrationOps {
               .countByIdAndChunksStrict(upsert.path()) != 0) return false;
           continue;
         }
-        if (refusedSourceRecovery
-            && queue.queueStillOwnsFileAdmission(upsert.path(), upsert.unitRevision())) {
-          // A pending row, or a later admission of the same path, owns this file on the queue
-          // that surviving A's writer drains after cleanup. A restart replays it on A.
-          continue;
-        }
         String indexed = context.ingestLifecycle().documentFieldOps()
             .getDocumentFieldOrThrow(upsert.path(), SchemaFields.SOURCE_SHA256);
+        if (refusedSourceRecovery
+            && queue.sourceOwnsFileAdmission(upsert.path(), upsert.unitRevision(), indexed)) {
+          // Judged by A's committed effect: A already holds a later admission's exact bytes, or
+          // a pending row will produce the file on A when its writer runs after the restart.
+          continue;
+        }
         boolean settled = queue.matchesAcceptedFileProjection(
             upsert.path(), upsert.unitRevision(), upsert.sourceSha256(), indexed);
         if (!settled) {

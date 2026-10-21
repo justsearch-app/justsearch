@@ -348,6 +348,9 @@ public final class KnowledgeServer implements Closeable {
   // Generated from the register (tempdoc 575 §17 Face A) — single source, cannot drift.
   private static final long STALE_PROCESSING_MS = LivenessWindows.REAPER_STALE_MS; // 5 min liveness window
   private static final long REAP_INTERVAL_MS = 2 * 60_000L; // check every 2 min (poll cadence, not a window)
+  /** How long a refused recorded candidate's cleanup retries each second after readiness. */
+  private static final long REFUSAL_SETTLE_BOUND_MS = 60_000L;
+  private static final long EARLY_REFUSAL_FENCE_WAIT_MS = 100L;
   private java.util.concurrent.ScheduledExecutorService stuckJobReaper;
   private java.util.concurrent.ScheduledFuture<?> stuckJobReapTask;
   /** How often a root the committed boot deferred is checked for its recorded volume (round 7). */
@@ -8164,6 +8167,10 @@ public final class KnowledgeServer implements Closeable {
     }
     final int cutoverMaxFailedJobs = recordedCandidate == null ? migrationCutoverMaxFailedJobs
         : recordedCandidate.configuration().index().migrationCutoverMaxFailedJobs();
+    // Refusal cleanup of this monitor's candidate retries promptly until this bound, counted
+    // from the monitor's start at readiness; the stuck-job reaper keeps retrying after it.
+    final long settleDeadline = System.nanoTime()
+        + TimeUnit.MILLISECONDS.toNanos(REFUSAL_SETTLE_BOUND_MS);
     migrationCutoverThread =
         new Thread(
             () -> {
@@ -8216,11 +8223,16 @@ public final class KnowledgeServer implements Closeable {
                            @Override public void transition(String point) throws IOException, InterruptedException {
                              migrationTransition(point);
                            }
+
+                           @Override public boolean refuseUncertifiable() {
+                             return refuseUncertifiableRecordedCandidate(false,
+                                 EARLY_REFUSAL_FENCE_WAIT_MS);
+                           }
                          }));
               } finally {
                 try {
                   observeFailedRecordedCandidate();
-                  reconcileRefusedRecordedCandidate();
+                  settleRefusedRecordedCandidate(settleDeadline);
                 } catch (RuntimeException failure) {
                   log.error("Refused candidate cutover cleanup will retry", failure);
                 }
@@ -8229,6 +8241,28 @@ public final class KnowledgeServer implements Closeable {
             "migration-cutover");
     migrationCutoverThread.setDaemon(true);
     migrationCutoverThread.start();
+  }
+
+  /**
+   * Retries the refused-candidate cleanup once a second until it restores A or the bound passes.
+   * A FAILED pointer becomes a refusal only after the Engine records it, and a claimed row
+   * settles only at the writer's next batch boundary; neither should wait for the reaper.
+   */
+  private void settleRefusedRecordedCandidate(long deadlineNanos) {
+    if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded)) return;
+    while (true) {
+      if (reconcileRefusedRecordedCandidate() || closeStarted || !running) return;
+      var state = indexGenerationManager == null ? null : indexGenerationManager.readStateBestEffort();
+      if (state == null || !"FAILED".equals(state.migration_state())
+          || state.building_generation() == null
+          || System.nanoTime() >= deadlineNanos) return;
+      try {
+        Thread.sleep(1_000);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        return;
+      }
+    }
   }
 
   /**
@@ -8806,21 +8840,21 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /** The application has durably refused B while A is still the pointer. Retire Green first. */
-  private void reconcileRefusedRecordedCandidate() {
+  private boolean reconcileRefusedRecordedCandidate() {
     if (!recordedCandidatePrecommitRefused() || closeStarted || encoderRecoveryReservation != null
         || recoveryStartContext != null
-        && recoveryStartContext.recoveryAttempt()) return;
+        && recoveryStartContext.recoveryAttempt()) return false;
     CompletableFuture<Void> composition = deferredModelInit;
-    if (composition != null && !composition.isDone()) return;
+    if (composition != null && !composition.isDone()) return false;
     boolean restart = false;
     runtimeSwapLock.lock();
     try {
       if (closeStarted || encoderRecoveryReservation != null
           || recoveryStartContext != null && recoveryStartContext.recoveryAttempt()
           || !(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
-          || !(appServices instanceof DefaultWorkerAppServices producer)) return;
+          || !(appServices instanceof DefaultWorkerAppServices producer)) return false;
       IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
-      if (state == null || !recorded.sourceGeneration().equals(state.active_generation())) return;
+      if (state == null || !recorded.sourceGeneration().equals(state.active_generation())) return false;
       if (state.building_generation() == null) {
         // A process restart loses the volatile cleanup flag. The refused operation key still
         // identifies its exact retired B, including the pointer-before-mark crash cut.
@@ -8835,7 +8869,7 @@ public final class KnowledgeServer implements Closeable {
       } else {
         try {
           if (!IndexGenerationManager.recordedGenerationId(recorded.operationKey())
-              .equals(state.building_generation())) return;
+              .equals(state.building_generation())) return false;
           if (!(searchLifecycle instanceof RunningRuntime source)
               || !indexGenerationManager.resolveGenerationPathStrict(state.active_generation())
                   .equals(activeIndexPath)) {
@@ -8855,11 +8889,15 @@ public final class KnowledgeServer implements Closeable {
             // Pending rows are path work on the shared queue, not B effects: a FENCED boot
             // enqueues its root walk but never runs the loop. They stay durable and run on A
             // after the restart; only a claimed row could still publish a late write.
-            var counts = jobQueue.jobStateCountsStrict();
-            if (counts.processingCount() != 0 || !producer.pauseProducerForCutover(10_000)) {
+            // Pause first: the writer returns to its pause point between batches, so a claim it
+            // was finishing settles instead of failing this attempt.
+            if (!producer.pauseProducerForCutover(10_000)) {
               throw new IOException("Refused candidate writer has not settled");
             }
             try {
+              if (jobQueue.jobStateCountsStrict().processingCount() != 0) {
+                throw new IOException("Refused candidate writer has not settled");
+              }
               producer.commitActiveLexicalProjectionForCutover();
               if (!KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
                   new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
@@ -8881,7 +8919,7 @@ public final class KnowledgeServer implements Closeable {
                 candidateModels.close();
                 candidateModels = null;
               }
-              if (recordedCandidateInPlace) return; // A recompose failed; retain exact owners.
+              if (recordedCandidateInPlace) return false; // A recompose failed; retain exact owners.
               if (ingestLifecycle != null && ingestLifecycle != searchLifecycle) ingestLifecycle.close();
               indexGenerationManager.abandonBuildingGeneration("recorded candidate refused");
               migrationTransition("migration-refusal-after-abandonment");
@@ -8911,6 +8949,7 @@ public final class KnowledgeServer implements Closeable {
       notifyRecordedServicesPublished();
       migrationRestartAction.run();
     }
+    return restart;
   }
 
   /**
@@ -8922,14 +8961,21 @@ public final class KnowledgeServer implements Closeable {
    * the ordinary refused-candidate cleanup restores A.
    */
   private boolean finalizeOrRefuseRecordedCandidateBeforeCutover() {
-    if (refuseUncertifiableRecordedCandidate(false)) return false;
+    if (refuseUncertifiableRecordedCandidate(false, 10_000)) return false;
     if (finalizeEmbeddingRebuildBeforeCutover()) return true;
-    refuseUncertifiableRecordedCandidate(true);
+    refuseUncertifiableRecordedCandidate(true, 10_000);
     return false;
   }
 
-  /** Writes FAILED under the promotion lock order when the SWITCHING candidate cannot certify. */
-  private boolean refuseUncertifiableRecordedCandidate(boolean refuseProvablyEmpty) {
+  /**
+   * Writes FAILED under the promotion lock order when the recorded candidate cannot certify: a
+   * latched producer in MIGRATING or SWITCHING, an empty candidate only in SWITCHING. The fence
+   * waits at most {@code fenceWaitMs} for in-flight mutations while the swap lock is held; the
+   * cutover loop's early check passes a short wait and simply retries on its next pass, so a
+   * long root walk never stalls the Engine's calls behind the swap lock.
+   */
+  private boolean refuseUncertifiableRecordedCandidate(boolean refuseProvablyEmpty,
+      long fenceWaitMs) {
     if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
         || !(appServices instanceof DefaultWorkerAppServices observed)) {
       return false;
@@ -8951,11 +8997,15 @@ public final class KnowledgeServer implements Closeable {
           || (recoveryStartContext != null && recoveryStartContext.recoveryAttempt())
           || !(appServices instanceof DefaultWorkerAppServices producer)) return false;
       try (var fence = producer.mutationAdmission().beginFinalFence(
-          producer.mutationOwnerToken(), 10_000)) {
+          producer.mutationOwnerToken(), fenceWaitMs)) {
         if (fence == null) return false;
         var state = indexGenerationManager.readStateBestEffort();
         String candidate = IndexGenerationManager.recordedGenerationId(recorded.operationKey());
-        if (state == null || !"SWITCHING".equals(state.migration_state())
+        // The latch refuses from MIGRATING too (it never clears in this process); emptiness is
+        // judged only in SWITCHING, after finalization tried to earn the stamp.
+        String phase = state == null ? null : state.migration_state();
+        if (!("SWITCHING".equals(phase) || (!refuseProvablyEmpty && "MIGRATING".equals(phase)))
+            || Boolean.TRUE.equals(state.migration_paused())
             || !recorded.sourceGeneration().equals(state.active_generation())
             || !candidate.equals(state.building_generation())) return false;
         String reason;
@@ -8983,9 +9033,11 @@ public final class KnowledgeServer implements Closeable {
 
   /**
    * Provably empty: the captured walk closed complete with no planned unit, no recorded claim
-   * was issued, no queue row is pending or claimed, no projection source seeds the candidate, no
-   * accepted journal obligation is waiting for B, and B holds no document. Anything unreadable
-   * or still moving is not empty.
+   * was issued, no queue row is pending or claimed, no projection source seeds the candidate,
+   * every accepted journal obligation for B is a removal (which leaves an empty B empty; the
+   * refusal cleanup still settles it on A before acknowledging it), and B holds no document.
+   * An UPSERT, projection, VDU result or root sync could add content, so it is never empty.
+   * Anything unreadable or still moving is not empty.
    */
   private boolean recordedCandidateProvablyEmpty(
       IndexGenerationManager.BootOwnership.Recorded recorded, String candidate) throws IOException {
@@ -9002,10 +9054,15 @@ public final class KnowledgeServer implements Closeable {
     var counts = jobQueue.jobStateCountsStrict();
     if (counts.pendingCount() != 0 || counts.processingCount() != 0
         || !(jobQueue instanceof SwitchBufferCapableQueue journal)
-        || !journal.listSwitchBufferOpsStrictForGeneration(candidate).isEmpty()) return false;
+        || !journal.listSwitchBufferOpsStrictForGeneration(candidate).stream()
+            .allMatch(op -> REMOVAL_JOURNAL_OPS.contains(op.op()))) return false;
     green.commitOps().maybeRefreshBlocking();
     return green.indexCountOps().docCountOrThrow() == 0L;
   }
+
+  /** Journal kinds that only remove rows: replayed on a zero-document B they change nothing. */
+  private static final Set<String> REMOVAL_JOURNAL_OPS =
+      Set.of("DELETE", "DELETE_PREFIX", "DELETE_COLLECTION", "PRUNE_PREFIX");
 
   /** State transition and producer admission use one lock order: runtime, mutation, generation. */
   private void enterSwitchingWithMutationAdmission(IndexGenerationManager.State observed)

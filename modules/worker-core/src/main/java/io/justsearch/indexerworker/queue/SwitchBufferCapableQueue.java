@@ -139,11 +139,13 @@ public interface SwitchBufferCapableQueue extends JobQueue {
   }
 
   /**
-   * True when the durable queue row for {@code path} still owns this admission: the row is
-   * pending, or a later admission of the same path replaced its revision. A writer that drains
-   * the queue later then applies the path to whatever generation it serves.
+   * True when the generation whose committed source witness is {@code indexedSourceSha256}
+   * holds this admission's effect or a later one, or will: the path's row is pending (its
+   * writer has not run yet), or a later admission replaced {@code unitRevision} and finished
+   * with exactly the bytes that generation committed. A finished row alone never proves it.
    */
-  default boolean queueStillOwnsFileAdmission(String path, String unitRevision) {
+  default boolean sourceOwnsFileAdmission(
+      String path, String unitRevision, String indexedSourceSha256) {
     throw new UnsupportedOperationException("Queue admission ownership evidence is unavailable");
   }
 

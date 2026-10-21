@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-20T23:13:52.104Z",
-  "revision": "542eea0d6c626bd481cb89b50e1178e9f50c2a73",
-  "tree": "7de3ab57862ebdefe08ec1e21233d12983874649",
+  "createdAt": "2026-10-21T01:25:32.252Z",
+  "revision": "02d503739e40821ad5ca6c19abd3ee57d934390c",
+  "tree": "061000b97a2c0c7a88124a08288c5f0aa8b44e98",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,29 +18,29 @@
   },
   "runs": [
     {
-      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.QueueAdmissionOwnershipTest.queueOwnsAPendingOrSupersededAdmissionButNotASettledOne\" --rerun -PskipWebBuild=true --console=plain",
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.QueueAdmissionOwnershipTest.onlyAPendingRowOrACommittedLaterAdmissionHandsTheFileToTheSource\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2260
+      "durationMs": 2423
     }
   ],
   "checks": [
     {
-      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java#queueOwnsAPendingOrSupersededAdmissionButNotASettledOne",
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java#onlyAPendingRowOrACommittedLaterAdmissionHandsTheFileToTheSource",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueAdmissionOwnershipTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f2d6f2cc153d70d6d84d875282d97547bea43ac2a2468d5ea2a9a5ef6fa696f6",
+      "contentDigest": "sha256:b17b085ea8de423084b9d20e4e6e6fd0f53c0615e0fdb3f9d8dc6b6fa1abae92",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "queueOwnsAPendingOrSupersededAdmissionButNotASettledOne()",
+          "name": "onlyAPendingRowOrACommittedLaterAdmissionHandsTheFileToTheSource()",
           "status": "passed"
         }
       ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:bea4d9c563d1b80b8f45d2d6e73d0f0e492f4d2bbf80888a4895d1dd6e20dcdb"
+  "digest": "sha256:bb838a65cbd1b62a0cf599650242160322496e6dc849b81717de35ad4960710f"
 }

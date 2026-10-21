@@ -1369,19 +1369,26 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override
-  public boolean queueStillOwnsFileAdmission(String path, String unitRevision) {
+  public boolean sourceOwnsFileAdmission(
+      String path, String unitRevision, String indexedSourceSha256) {
     if (path == null || unitRevision == null) return false;
     lock.lock();
     try {
       ensureOpen();
       try (PreparedStatement query = connection.prepareStatement(
-          "SELECT state, unit_revision FROM jobs WHERE path = ?")) {
+          "SELECT state, unit_revision, planned_source_sha256, content_hash FROM jobs WHERE path = ?")) {
         query.setString(1, path);
         try (ResultSet row = query.executeQuery()) {
           if (!row.next()) return false;
+          if (STATE_PENDING.equals(row.getString("state"))) return true;
           String revision = row.getString("unit_revision");
-          return STATE_PENDING.equals(row.getString("state"))
-              || (revision != null && !unitRevision.equals(revision));
+          String planned = row.getString("planned_source_sha256");
+          String committed = row.getString("content_hash");
+          return STATE_DONE.equals(row.getString("state"))
+              && revision != null && !unitRevision.equals(revision)
+              && JobQueue.IngestionLedgerTransition.isSha256(indexedSourceSha256)
+              && indexedSourceSha256.equals(planned)
+              && (committed == null || indexedSourceSha256.equals(committed));
         }
       }
     } catch (SQLException unavailable) {

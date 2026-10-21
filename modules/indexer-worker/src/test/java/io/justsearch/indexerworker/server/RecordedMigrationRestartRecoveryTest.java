@@ -134,6 +134,42 @@ class RecordedMigrationRestartRecoveryTest {
     rollback.assertRolledBackToA();
   }
 
+  // M1+: hand-over to A is judged by A's committed effect, on the real queue
+  @Test
+  void aLaterFinishedAdmissionDoesNotHandAnUnappliedUpdateToA(@TempDir Path tempDir)
+      throws Exception {
+    // A later admission of the file finished (its row is DONE) but A still holds stale bytes
+    // and no work is pending: nothing will ever bring the accepted update to A.
+    try (var handover = new RealQueueHandover(tempDir, "DONE", "stale")) {
+      handover.reconcile();
+      assertEquals(1, handover.journalSize(), "the unapplied update stays in the journal");
+      assertFalse(handover.restarted.get(), "Green is retained");
+      assertEquals(handover.building, handover.manager.readStateBestEffort().building_generation());
+    }
+  }
+
+  // M8 preserved: a pending row will produce the file on A after the restart
+  @Test
+  void aPendingLaterAdmissionHandsTheUpdateToA(@TempDir Path tempDir) throws Exception {
+    try (var handover = new RealQueueHandover(tempDir, "PENDING", "stale")) {
+      handover.reconcile();
+      assertEquals(0, handover.journalSize());
+      assertTrue(handover.restarted.get());
+      assertEquals("IDLE", handover.manager.readStateBestEffort().migration_state());
+    }
+  }
+
+  // preserved: A already committed the later admission's exact bytes
+  @Test
+  void aLaterAdmissionCommittedOnAHandsTheUpdateToA(@TempDir Path tempDir) throws Exception {
+    try (var handover = new RealQueueHandover(tempDir, "DONE", "later")) {
+      handover.reconcile();
+      assertEquals(0, handover.journalSize());
+      assertTrue(handover.restarted.get());
+      assertEquals("IDLE", handover.manager.readStateBestEffort().migration_state());
+    }
+  }
+
   // ---------------------------------------------------------------- SWITCHING refusal
 
   @Test
@@ -217,8 +253,124 @@ class RecordedMigrationRestartRecoveryTest {
     switching.stop();
   }
 
+  // M5: a removal already reconciled on an empty candidate leaves it provably empty
   @Test
+  void anEmptyCandidateWithOnlyACollectionDeleteFailsPromptly(@TempDir Path tempDir)
+      throws Exception {
+    Switching switching = new Switching(tempDir, "current-model");
+    when(switching.queue.listSwitchBufferOpsStrictForGeneration(switching.building)).thenReturn(
+        List.of(new SwitchBufferCapableQueue.SwitchBufferOp(switching.building,
+            "collection:mcp-ingest", "DELETE_COLLECTION", "mcp-ingest", 1, "v1")));
+    switching.start();
+    assertEquals("FAILED", switching.awaitStateOtherThanSwitching(5_000));
+    assertEquals(switching.active, switching.state().active_generation(), "A stays active");
+    switching.stop();
+  }
+
+  @Test
+  void aCandidateWithAProjectionObligationKeepsWaiting(@TempDir Path tempDir) throws Exception {
+    Switching switching = new Switching(tempDir, "current-model");
+    when(switching.queue.listSwitchBufferOpsStrictForGeneration(switching.building)).thenReturn(
+        List.of(new SwitchBufferCapableQueue.SwitchBufferOp(switching.building,
+            "projection:x", "PROJECTION", "{}", 1, "v1")));
+    switching.start();
+    assertNull(switching.awaitStateOtherThanSwitching(1_500), "SWITCHING must keep waiting");
+    switching.stop();
+  }
+
+  // Bound: a latched candidate is refused without waiting for its queue or enumeration
+  @Test
+  void aLatchedSwitchingCandidateWithQueuedWorkFailsPromptly(@TempDir Path tempDir)
+      throws Exception {
+    Switching switching = new Switching(tempDir, null);
+    switching.admission.markReplayUncertain();
+    when(switching.queue.queueDepth()).thenReturn(5_000L);
+    when(switching.queue.jobStateCounts())
+        .thenReturn(new JobQueue.JobStateCounts(5_000, 5_000, 1, 0, 0));
+    switching.start();
+    assertEquals("FAILED", switching.awaitStateOtherThanSwitching(5_000));
+    switching.stop();
+  }
+
+  @Test
+  void aLatchedMigratingCandidateFailsBeforeItsEnumerationEnds(@TempDir Path tempDir)
+      throws Exception {
+    Switching switching = new Switching(tempDir, null);
+    switching.manager.updateMigrationState(IndexGenerationManager.MigrationState.MIGRATING);
+    setField(switching.server, "migrationEnumeratorDone", false);
+    when(switching.queue.queueDepth()).thenReturn(5_000L);
+    switching.admission.markReplayUncertain();
+    switching.start();
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while (System.nanoTime() < deadline
+        && "MIGRATING".equals(switching.state().migration_state())) Thread.sleep(25);
+    assertEquals("FAILED", switching.state().migration_state());
+    assertEquals(switching.active, switching.state().active_generation(), "A stays active");
+    switching.stop();
+  }
+
+  // Bound: an in-flight mutation (a root walk) delays the early refusal without holding the
+  // swap lock, so the Engine's own calls keep answering; the refusal follows once it ends
+  @Test
+  void anInFlightMutationDelaysTheRefusalWithoutHoldingTheSwapLock(@TempDir Path tempDir)
+      throws Exception {
+    Switching switching = new Switching(tempDir, null);
+    switching.admission.markReplayUncertain();
+    when(switching.queue.queueDepth()).thenReturn(5_000L); // the walk's rows are still queued
+    when(switching.queue.jobStateCounts())
+        .thenReturn(new JobQueue.JobStateCounts(5_000, 5_000, 1, 0, 0));
+    var swapLock = (java.util.concurrent.locks.ReentrantLock) field(switching.server,
+        "runtimeSwapLock");
+    var walk = switching.admission.enter(
+        ((DefaultWorkerAppServices) switching.server.appServices).mutationOwnerToken());
+    try {
+      switching.start();
+      long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+      while (System.nanoTime() < end) {
+        assertTrue(swapLock.tryLock(1, TimeUnit.SECONDS), "the swap lock stays available");
+        swapLock.unlock();
+        Thread.sleep(50);
+      }
+      assertEquals("SWITCHING", switching.state().migration_state());
+    } finally {
+      walk.close();
+    }
+    assertEquals("FAILED", switching.awaitStateOtherThanSwitching(5_000));
+    switching.stop();
+  }
+
+  // preserved: an unlatched migration keeps building while its enumeration runs
+  @Test
+  void anUnlatchedMigratingCandidateKeepsBuilding(@TempDir Path tempDir) throws Exception {
+    Switching switching = new Switching(tempDir, null);
+    switching.manager.updateMigrationState(IndexGenerationManager.MigrationState.MIGRATING);
+    setField(switching.server, "migrationEnumeratorDone", false);
+    switching.start();
+    Thread.sleep(1_500);
+    assertEquals("MIGRATING", switching.state().migration_state());
+    switching.stop();
+  }
+
+  // Bound: cleanup retries promptly while the Engine has not yet recorded the refusal
+  @Test
+  void cleanupRetriesUntilTheEngineRecordsTheRefusal(@TempDir Path tempDir) throws Exception {
+    Rollback rollback = new Rollback(tempDir);
+    var calls = new java.util.concurrent.atomic.AtomicInteger();
+    when(rollback.lifecycle.recordedPrecommitRefused(OPERATION))
+        .thenAnswer(ignored -> calls.incrementAndGet() > 5);
+    setField(rollback.server, "running", true);
+    var start = KnowledgeServer.class.getDeclaredMethod("startMigrationCutoverMonitorBestEffort");
+    start.setAccessible(true);
+    start.invoke(rollback.server);
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (System.nanoTime() < deadline && !rollback.restarted.get()) Thread.sleep(50);
+    rollback.assertRolledBackToA();
+    setField(rollback.server, "running", false);
+    assertTrue(rollback.server.awaitMigrationCutoverExitForTests(10, TimeUnit.SECONDS));
+  }
+
   // M7: a keyword-only empty candidate is not refused as empty
+  @Test
   void keywordOnlyEmptyCandidateIsNotRefused(@TempDir Path tempDir) throws Exception {
     Switching switching = new Switching(tempDir, null);
     switching.start();
@@ -242,6 +394,12 @@ class RecordedMigrationRestartRecoveryTest {
     return layout;
   }
 
+  private static Object field(Object target, String name) throws Exception {
+    var field = target.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
+  }
+
   private static void setField(Object target, String name, Object value) throws Exception {
     var field = KnowledgeServer.class.getDeclaredField(name);
     field.setAccessible(true);
@@ -259,7 +417,8 @@ class RecordedMigrationRestartRecoveryTest {
     final DocumentFieldOps fields = mock(DocumentFieldOps.class);
     final AtomicBoolean supersededByLaterAdmission = new AtomicBoolean();
     final SwitchBufferCapableQueue queue = mock(SwitchBufferCapableQueue.class, invocation ->
-        "queueStillOwnsFileAdmission".equals(invocation.getMethod().getName())
+        List.of("queueStillOwnsFileAdmission", "sourceOwnsFileAdmission")
+            .contains(invocation.getMethod().getName())
             ? supersededByLaterAdmission.get()
             : Mockito.RETURNS_DEFAULTS.answer(invocation));
     final AtomicBoolean restarted = new AtomicBoolean();
@@ -354,6 +513,89 @@ class RecordedMigrationRestartRecoveryTest {
       verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
       assertEquals(building, manager.readStateBestEffort().building_generation());
       assertFalse(restarted.get());
+    }
+  }
+
+  /**
+   * A refused candidate whose one journal UPSERT was replaced on the real queue by a later
+   * admission of the same file, in {@code laterState}; A's committed source witness is either
+   * the accepted admission's predecessor ("stale") or the later admission's bytes ("later").
+   */
+  private static final class RealQueueHandover implements AutoCloseable {
+    final IndexGenerationManager manager;
+    final io.justsearch.indexerworker.queue.SqliteJobQueue queue;
+    final AtomicBoolean restarted = new AtomicBoolean();
+    final String building;
+    final KnowledgeServer server;
+
+    RealQueueHandover(Path tempDir, String laterState, String sourceHolds) throws Exception {
+      var layout = preparedLayout(tempDir);
+      var lifecycle = mock(RecordedIngestionLifecycle.class);
+      server = new KnowledgeServer(new TestEngineExecutors(),
+          WorkerBootFixture.workerConfig(layout.dataDir()), null,
+          io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle);
+      manager = Mockito.spy(layout.genManager());
+      String active = manager.readStateBestEffort().active_generation();
+      building = manager.startRecordedMigration(OPERATION, "recorded-test", "a".repeat(64),
+          active, List.of()).building_generation();
+      manager.updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+      when(lifecycle.recordedPrecommitRefused(OPERATION)).thenReturn(true);
+      Path file = Files.writeString(tempDir.resolve("handed.txt"), "accepted").toAbsolutePath();
+      queue = new io.justsearch.indexerworker.queue.SqliteJobQueue(tempDir.resolve("handover.db"));
+      queue.open();
+      assertTrue(queue.enqueueAndBufferFileForGeneration(
+          building, JobQueue.EnqueueEntry.stat(file), null, null));
+      String key = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
+      String later = "c".repeat(64);
+      try (var connection = java.sql.DriverManager.getConnection(
+              "jdbc:sqlite:" + tempDir.resolve("handover.db").toAbsolutePath());
+          var update = connection.prepareStatement("UPDATE jobs SET state = ?, unit_revision = ?, "
+              + "planned_source_sha256 = ?, content_hash = ? WHERE path = ?")) {
+        update.setString(1, laterState);
+        update.setString(2, "later-revision");
+        update.setString(3, later);
+        update.setString(4, "DONE".equals(laterState) ? later : null);
+        update.setString(5, key);
+        assertEquals(1, update.executeUpdate());
+      }
+      var source = mock(RunningRuntime.class);
+      var fields = mock(DocumentFieldOps.class);
+      when(source.documentFieldOps()).thenReturn(fields);
+      when(source.commitOps()).thenReturn(mock(CommitOps.class));
+      when(fields.getDocumentFieldOrThrow(key, SchemaFields.SOURCE_SHA256))
+          .thenReturn("later".equals(sourceHolds) ? later : "d".repeat(64));
+      var owner = new Object();
+      var producer = mock(DefaultWorkerAppServices.class);
+      when(producer.mutationAdmission()).thenReturn(new WorkerMutationAdmission(owner));
+      when(producer.mutationOwnerToken()).thenReturn(owner);
+      when(producer.pauseProducerForCutover(10_000)).thenReturn(true);
+      var closed = new AtomicBoolean();
+      Mockito.doAnswer(invocation -> { closed.set(true); return null; }).when(producer).close();
+      when(producer.producerClosed()).thenAnswer(ignored -> closed.get());
+      server.appServices = producer;
+      setField(server, "generationBootOwnership", new IndexGenerationManager.BootOwnership.Recorded(
+          OPERATION, active, "recorded-test", "a".repeat(64), true));
+      setField(server, "indexGenerationManager", manager);
+      setField(server, "activeIndexPath", layout.activePath());
+      setField(server, "searchLifecycle", source);
+      setField(server, "ingestLifecycle", mock(RunningRuntime.class));
+      setField(server, "jobQueue", queue);
+      setField(server, "migrationRestartAction", (Runnable) () -> restarted.set(true));
+    }
+
+    void reconcile() throws Exception {
+      var reconcile = KnowledgeServer.class.getDeclaredMethod("reconcileRefusedRecordedCandidate");
+      reconcile.setAccessible(true);
+      reconcile.invoke(server);
+    }
+
+    int journalSize() {
+      return queue.listSwitchBufferOpsStrict().size();
+    }
+
+    @Override
+    public void close() throws Exception {
+      queue.close();
     }
   }
 
