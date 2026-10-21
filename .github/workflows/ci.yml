@@ -229,6 +229,14 @@ jobs:
       - name: Release asset compatibility tests
         run: node --test scripts/release/app-release-assets.test.mjs
 
+      - name: Test module dependencies, logging, prerequisites and ORT native assets
+        run: >-
+          node --test
+          scripts/architecture/module-deps.test.mjs
+          scripts/ci/check-slf4j-bare-message-logging.test.mjs
+          scripts/verify-prerequisites.test.mjs
+          scripts/release/check-ort-native-asset.test.mjs
+
       - name: Release metadata projection tests
         run: |
           node --test scripts/release/release-changelog.test.mjs

@@ -31,7 +31,7 @@ const GENERATED_BEGIN_MARKER = '<!-- GENERATED:MODULE_DEPS:BEGIN -->';
 const GENERATED_END_MARKER = '<!-- GENERATED:MODULE_DEPS:END -->';
 
 // Configuration types that indicate production dependencies
-const PRODUCTION_CONFIGS = new Set(['api', 'implementation', 'runtimeOnly']);
+const PRODUCTION_CONFIGS = new Set(['api', 'implementation', 'runtimeOnly', 'compileOnly', 'compileOnlyApi']);
 // Configuration types that indicate test-only dependencies
 const TEST_CONFIGS = new Set(['testImplementation', 'testRuntimeOnly', 'integrationTestImplementation']);
 
@@ -41,7 +41,7 @@ const STALE_THRESHOLD_MONTHS = 6;
 // Includes: entry points, deferred enhancements, and JNI/native modules
 const ENTRY_POINT_MODULES = new Set([
   'app-launcher',      // CLI entry point
-  'ui',                // Head process entry
+  'ui',                // Engine application entry
   // Lane F stage A item A13: no longer a process entry point (the Worker main and its
   // distribution are gone), but still a leaf library nobody depends on — the Engine dist pulls it
   // in from :modules:ui, so zero dependents remains expected, not suspicious.
@@ -265,35 +265,63 @@ function parseSettingsGradle(settingsPath) {
 /**
  * Parse a build.gradle.kts file and extract project dependencies with their configuration type.
  * @param {string} buildFilePath - Path to build.gradle.kts
- * @returns {{ production: Set<string>, test: Set<string> }} Sets of dependency module names
+ * @returns {{ production: Set<string>, test: Set<string>, compileOnly: Set<string> }} Sets of dependency module names
  */
 function parseBuildGradleDeps(buildFilePath) {
   const text = fs.readFileSync(buildFilePath, 'utf8');
   const production = new Set();
   const test = new Set();
 
-  // Enhanced regex to capture configuration type
-  // Matches: api(project(":modules:xyz")), implementation(project(...)), testImplementation(project(...))
-  const re = /(api|implementation|runtimeOnly|testImplementation|testRuntimeOnly|integrationTestImplementation)\s*\(\s*project\s*\(\s*["'](:modules:[^"']+)["']\s*\)\s*\)/g;
-
-  for (const m of text.matchAll(re)) {
-    const configType = m[1];
-    const projectPath = m[2];
-    const depName = gradlePathToModuleName(projectPath);
-    if (!depName) continue;
-
-    if (PRODUCTION_CONFIGS.has(configType)) {
-      production.add(depName);
-    } else if (TEST_CONFIGS.has(configType)) {
-      test.add(depName);
+  const compileOnly = new Set();
+  // Tokenize strings and comments separately: braces in either must not change block scope.
+  // Kotlin block comments may nest. Keep offsets so the declaration regex uses the original text.
+  const tokens = [];
+  const tokenRe = /\/\/[^\n]*|\/\*|"""[\s\S]*?"""|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[A-Za-z_$][\w$]*|[{}]|[^\s]/gy;
+  let offset = 0;
+  while (offset < text.length) {
+    if (/\s/.test(text[offset])) { offset += 1; continue; }
+    tokenRe.lastIndex = offset;
+    const match = tokenRe.exec(text);
+    if (!match) break;
+    offset = tokenRe.lastIndex;
+    if (match[0] === '/*') {
+      let depth = 1;
+      while (offset < text.length && depth > 0) {
+        if (text.startsWith('/*', offset)) { depth += 1; offset += 2; }
+        else if (text.startsWith('*/', offset)) { depth -= 1; offset += 2; }
+        else offset += 1;
+      }
+      continue;
     }
+    if (!match[0].startsWith('//')) tokens.push({ value: match[0], index: match.index });
   }
 
-  return { production, test };
+  const blocks = [];
+  const declaration = /^(api|implementation|runtimeOnly|compileOnly|compileOnlyApi|testImplementation|testRuntimeOnly|integrationTestImplementation)\s*\(\s*project\s*\(\s*["'](:modules:[^"']+)["']\s*\)\s*\)/;
+  for (let i = 0; i < tokens.length; i += 1) {
+    const { value, index } = tokens[i];
+    if (value === '{') {
+      blocks.push(tokens[i - 1]?.value === 'dependencies' && blocks.length === 0 ? 'main-dependencies' : tokens[i - 1]?.value);
+    } else if (value === '}') {
+      blocks.pop();
+    } else if (PRODUCTION_CONFIGS.has(value) || TEST_CONFIGS.has(value)) {
+      const m = text.slice(index).match(declaration);
+      // An interpolated path is not a literal module; document the audit loop separately.
+      if (!m || m[2].includes('$')) continue;
+      const depName = gradlePathToModuleName(m[2]);
+      if (PRODUCTION_CONFIGS.has(value) && blocks.includes('main-dependencies')) {
+        production.add(depName);
+        if (value.startsWith('compileOnly')) compileOnly.add(depName);
+      } else if (TEST_CONFIGS.has(value) || (blocks.includes('testing') && blocks.includes('dependencies'))) {
+        test.add(depName);
+      }
+    }
+  }
+  return { production, test, compileOnly };
 }
 
 /**
- * Calculate fan-in (number of outgoing edges) for each module.
+ * Calculate fan-out (number of outgoing edges) for each module.
  * @param {Array<{from: string, to: string}>} edges
  * @returns {Array<{module: string, count: number}>} Sorted by count descending
  */
@@ -468,7 +496,7 @@ function generateTempdocFormat(graph, settingsModules, fanIn, { includeFooter = 
 
   lines.push('**With dependencies**');
   for (const m of withDeps.sort((a, b) => a.name.localeCompare(b.name))) {
-    const deps = m.productionDeps.map(d => bt + ':modules:' + d + bt).join(', ');
+    const deps = m.productionDeps.map(d => bt + ':modules:' + d + bt + (m.compileOnlyDeps.includes(d) ? ' (compile-only)' : '')).join(', ');
     lines.push('- ' + bt + ':modules:' + m.name + bt + ' -> ' + deps);
   }
   lines.push('');
@@ -482,7 +510,10 @@ function generateTempdocFormat(graph, settingsModules, fanIn, { includeFooter = 
     lines.push('');
     for (const m of withTestDeps.sort((a, b) => a.name.localeCompare(b.name))) {
       const deps = m.testDeps.map(d => bt + ':modules:' + d + bt).join(', ');
-      lines.push('- ' + bt + ':modules:' + m.name + bt + ' uses ' + bt + 'testImplementation' + bt + ' on ' + deps);
+      lines.push('- ' + bt + ':modules:' + m.name + bt + ' has test dependencies on ' + deps);
+    }
+    if (graph.modules.some(m => m.name === 'dead-code-audit')) {
+      lines.push('- ' + bt + ':modules:dead-code-audit' + bt + ' uses ' + bt + 'testImplementation' + bt + ' on every module in its ' + bt + 'auditedModules' + bt + ' list (most production modules).');
     }
     lines.push('');
   }
@@ -496,7 +527,7 @@ function generateTempdocFormat(graph, settingsModules, fanIn, { includeFooter = 
   // A4: Notable build/packaging facts
   lines.push('### A4. Notable build/packaging facts');
   lines.push('');
-  lines.push('**Heaviest "internal fan-in" (direct module deps, production)**');
+  lines.push('**Heaviest "internal fan-out" (direct module deps, production)**');
   lines.push('');
   lines.push('| Module | Direct deps | Notes |');
   lines.push('|--------|-------------|-------|');
@@ -507,7 +538,7 @@ function generateTempdocFormat(graph, settingsModules, fanIn, { includeFooter = 
     if (module === 'app-services') notes = 'Orchestration + glue across large portions of the stack';
     else if (module === 'app-launcher') notes = 'CLI/distribution wiring; pulls in most runtime modules';
     else if (module === 'indexer-worker') notes = 'Knowledge-server runtime hosted in the Engine, includes AI bridge + Lucene';
-    else if (module === 'ui') notes = 'Head REST API + orchestration bridge';
+    else if (module === 'ui') notes = 'REST/MCP API of the Engine’s application half + orchestration bridge';
 lines.push('| ' + bt + module + bt + ' | ' + count + ' | ' + notes + ' |');
   }
   lines.push('');
@@ -549,6 +580,7 @@ async function main() {
   // Enhanced: track production vs test dependencies separately
   const moduleProductionDeps = new Map(); // module -> Set<dep>
   const moduleTestDeps = new Map(); // module -> Set<dep>
+  const moduleCompileOnlyDeps = new Map(); // module -> Set<dep>
   const moduleDeps = new Map(); // module -> Set<dep> (all deps, for backward compat)
 
   for (const bf of buildFiles) {
@@ -563,7 +595,8 @@ async function main() {
     if (!moduleTestDeps.has(moduleName)) moduleTestDeps.set(moduleName, new Set());
 
     // Parse with configuration type awareness
-    const { production, test } = parseBuildGradleDeps(bf);
+    const { production, test, compileOnly } = parseBuildGradleDeps(bf);
+    moduleCompileOnlyDeps.set(moduleName, compileOnly);
 
     for (const dep of production) {
       if (dep === moduleName) continue;
@@ -599,7 +632,7 @@ async function main() {
     }
   }
 
-  // Calculate fan-in based on production deps only
+  // Calculate fan-out based on production deps only
   const fanIn = calculateFanIn(productionEdges);
 
   // Calculate staleness if requested
@@ -616,6 +649,7 @@ async function main() {
       name,
       build_file: `modules/${name}/build.gradle.kts`,
       deps: [...(moduleDeps.get(name) || [])].sort(), // All deps (backward compat)
+      compileOnlyDeps: [...(moduleCompileOnlyDeps.get(name) || [])].sort(),
       productionDeps: [...(moduleProductionDeps.get(name) || [])].sort(),
       testDeps: [...(moduleTestDeps.get(name) || [])].sort(),
     })),
