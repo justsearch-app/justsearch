@@ -59,3 +59,14 @@ Builder evidence (logs in this checkout's `tmp/xvfb-loop/`):
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-verifier-xvfb-0ca21a4b9",
+  "verdict": "accept",
+  "digest": "sha256:1248b113c85ad30623593a724ed5a9b434f290a5660d487d755e1c2ef657a3fc",
+  "note": "Incidental fits: 7 new checks fail on 56e27e059 (100 starts, no Mesa var) and pass on 0ca21a4b9; real Xvfb start+connect+cleanup ok both ways; abort not reproducible here"
+}
+```
