@@ -614,3 +614,14 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
   "note": "Accept: entries 1-7 are correctly classed with in-scope sources and no conflicting stronger source; on 4ee0dea2e the four changed modules' suites pass except one esbuild-environment UI failure, all new checks fail by assertion for the reason under test on 4f4e20514 and the nine cleanup checks on 0109762bc, and live Linux runs of the installed Engine confirm K1, K3, K4, K6, K8 and the zombie barrier, with the K8 message reaching the Engine log while the settings route returns only the generic preparation refusal."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "2117f94d-89cf-4377-a766-30a493c7c6fe",
+  "verdict": "accept",
+  "digest": "sha256:a5934c63cf789418e2fc364832b291580b71e9d42dee4b594d2b137dd55c109d",
+  "note": "Accept on 4c9f672f6: the main merge left this changeset's own lines byte-identical, its only change to a flagged test (OpenAiCompatControllerTest, #825) adds the Engine session token outside the endpoint-adaptation hunks and weakens no claim, no chat, child-control or llama product path changed, and the seven flagged UI tests plus ManagedLlamaAuthenticationTest, ManagedLlamaAdoptionTest and RuntimeActivationAuthenticationTest (108 tests, none skipped) pass, including the proxy check that the managed key is never forwarded to callers."
+}
+```
