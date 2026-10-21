@@ -703,3 +703,25 @@ like acceptance, must come from another session. No author approval is supplied.
   "note": "Audit at 86244f7c7 (base 50eafae23): no flagged item, entry or evidence changed since 7df82d2ef and main changed no flagged test; reran Java and web fail-before/preservation at the new base (assertion failures for the reason under test, all McpOriginValidation dev cases and original tests pass on both); non-blocking: header prose names old bases and the HeadlessLauncherProductionModeTest entry now covers a file this PR no longer changes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "a4c2b5eb-530f-4cc3-841f-9a6cb207900c",
+  "verdict": "accept",
+  "digest": "sha256:883010a3fde180e23e2c4d7bb98e66eaff3cf52951f8575e0e0a2215b31437b8",
+  "note": "All 15 entries hold on digest 883010a3: classes match the before-state tests and the owner-adopted T1-T19, delegated choices stay in scope with base ADR-0046 superseded by T1/T19, and reruns confirmed assertion fail-before plus candidate passes for the Java token/Origin and web GET-token checks, with dev-mode Origin cases unchanged and the merged production router walked."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "3dfdf9fc-0b44-4632-8027-02109cc4faaa",
+  "verdict": "accept",
+  "digest": "sha256:883010a3fde180e23e2c4d7bb98e66eaff3cf52951f8575e0e0a2215b31437b8",
+  "note": "All 15 entries hold on the merged candidate: classes match, sources predate the PR, delegated choices are in scope, Java and web fail-befores rerun as assertion failures, adaptations keep every old assertion and dev-mode precondition, and the walk covers the merge's new stop route."
+}
+```
