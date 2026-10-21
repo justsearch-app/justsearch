@@ -613,17 +613,9 @@ public final class FileConversationStore implements ConversationStore {
     List<Map<String, Object>> full = loadHistory(sessionId);
     Map<String, Object> meta = readMeta(sessionId);
     if (meta == null) return full;
-    // Tempdoc 610 §E.3 — per-message exclusion is applied to the WHOLE history first (before the
-    // floor trim): an excluded message is dropped from the prompt regardless of where the floor sits.
-    Object excludedRaw = meta.get("excludedMessageIds");
-    if (excludedRaw instanceof List<?> exList && !exList.isEmpty()) {
-      java.util.Set<Object> excluded = new java.util.HashSet<>(exList);
-      List<Map<String, Object>> kept = new ArrayList<>(full.size());
-      for (Map<String, Object> m : full) {
-        if (!excluded.contains(m.get("id"))) kept.add(m);
-      }
-      full = kept;
-    }
+    // Tempdoc 610 §E.3 — the floor is located in the FULL history, before exclusion: excluding the
+    // floor message itself must not move the floor (if the trim looked for it among the kept messages
+    // it would miss, fail safe to the whole history, and bring back everything the floor hid).
     Object floor = meta.get("contextFloor");
     Object summary = meta.get("contextFloorSummary");
     List<Map<String, Object>> trimmed = new ArrayList<>(full);
@@ -636,6 +628,12 @@ public final class FileConversationStore implements ConversationStore {
         }
       }
       if (idx >= 0) trimmed = new ArrayList<>(full.subList(idx, full.size()));
+    }
+    // Per-message exclusion then drops an excluded message wherever it sits at or after the floor.
+    Object excludedRaw = meta.get("excludedMessageIds");
+    if (excludedRaw instanceof List<?> exList && !exList.isEmpty()) {
+      java.util.Set<Object> excluded = new java.util.HashSet<>(exList);
+      trimmed.removeIf(m -> excluded.contains(m.get("id")));
     }
     if (summary instanceof String s && !s.isBlank()) {
       Map<String, Object> summaryMsg = new LinkedHashMap<>();

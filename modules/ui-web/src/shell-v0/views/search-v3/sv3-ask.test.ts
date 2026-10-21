@@ -115,6 +115,7 @@ async function askWith(payload: Record<string, unknown>, meta?: Record<string, u
       onDone: () => {},
       onRefused: () => {},
       onHalted: () => {},
+      onLeft: () => {},
       onFailed: (message) => {
         throw new Error(`the ask failed: ${message}`);
       },
@@ -182,6 +183,7 @@ describe('the search v3 ask path reads the producer off the payload (847 §1.5)'
         onDone: () => {},
         onRefused: () => {},
         onHalted: () => {},
+        onLeft: () => {},
         onFailed: (message) => {
           throw new Error(`the ask failed: ${message}`);
         },
