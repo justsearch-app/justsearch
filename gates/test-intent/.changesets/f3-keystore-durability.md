@@ -409,3 +409,14 @@ New round-3 checks use 94c9bb8ec as their before-state. No verifier evidence was
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-verifier-f3-31b6bc98d",
+  "verdict": "accept",
+  "digest": "sha256:5ecedd6903ec6415a942e04131e628b60a8fe6f2fd4f7695ce134bb722bde1cf",
+  "note": "Round 4 on 31b6bc98d: own cases incl. legacy-ro/T3b/T4 unchanged pass, startup checks fail on c697a4684 and pass here, real Engine starts with read-only encryption folder, full suite green except known out-of-scope long-path test"
+}
+```
