@@ -441,3 +441,14 @@ The existing rejection and acceptance records below are preserved byte-for-byte.
   "note": "The new Adaptation entry for RuntimeDirectoryPermissionsTest cites as owner-words a quote ('Make the smallest change that keeps the mock's scope...') that is not among the owner's words in this task; otherwise the _ rename keeps the mock's scope and assertions, windowsRepairIncludesExistingFilesAndSkipsEveryReparsePoint fails by assertion on eae9993ac and passes on d9252652e, linkedRuntime preservation passes on both, and PMD/tests pass."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "ef124d7c-fa8f-49cb-81f5-078edab203ef",
+  "verdict": "accept",
+  "digest": "sha256:a79b78b897b03ea9fd40fcb1023d3015babbf7282339c150ebe544afb359a2ba",
+  "note": "All 33 sources match the agreed P1-P9 quotes or cite delegated choices under 'resume with remaining work autonomously' that weaken no scenario, the PMD rename entry is now a delegated choice and keeps the mock's scope, and my rerun of windowsRepairIncludesExistingFilesAndSkipsEveryReparsePoint fails by its DACL assertion on eae9993ac and passes on f06e792e2 while linkedRuntime preservation passes on both, matching the v5 receipts."
+}
+```
