@@ -25,9 +25,7 @@ These are not product concepts. They are framework shapes used to project
 backend-owned capability into any frontend surface.
 
 For the convergence rationale (what was tried, what failed, why these three),
-see `../../../../decisions/0031-fe-three-primitives.md`. For full source evidence, see
-`archive/source-tempdocs/421-data-plane.md`, `429-slice-1-2-admin-action-registry.md`,
-and `435-operation-substrate-doc-alignment.md`.
+see `../../../../decisions/0031-fe-three-primitives.md`.
 
 ## Operation
 

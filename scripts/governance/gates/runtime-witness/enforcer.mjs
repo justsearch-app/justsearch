@@ -53,7 +53,7 @@ export async function enforceRuntimeWitness(options) {
         `:modules:app-services:test (RegistrySnapshotExporterTest) to generate it.`,
       uri: snapshotRel,
     });
-    return result('pass'); // soft-fail: missing artifact does not block (module-deps pattern)
+    return result('pass'); // soft-fail: missing artifact does not block
   }
 
   let snapshot;

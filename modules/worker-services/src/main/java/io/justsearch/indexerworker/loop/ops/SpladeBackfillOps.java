@@ -94,8 +94,8 @@ public final class SpladeBackfillOps {
 
       // Phase 1: collect parent content or reconstructed chunk slices in one batch.
       long t1 = System.nanoTime();
-      Map<String, String> contentByDocId =
-          context.documentFieldOps().getDocumentContentBatch(pendingIds);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds);
+      Map<String, String> contentByDocId = batch.contents();
       List<String> batchDocIds = new ArrayList<>(pendingIds.size());
       List<String> batchContents = new ArrayList<>(pendingIds.size());
       for (String docId : pendingIds) {
@@ -110,12 +110,7 @@ public final class SpladeBackfillOps {
             // EmbeddingBackfillOps' handling of the identical condition.
             context.log().warn("SPLADE backfill: content missing or blank for {}", docId);
             markedFailed +=
-                handleSpladeFailure(
-                    context.documentFieldOps(),
-                    context.indexingCoordinator(),
-                    docId,
-                    "Content missing or blank",
-                    context.log());
+                batch.failure(docId, SchemaFields.SPLADE_RETRY_COUNT, SpladeBackfillOps::computeSpladeFailureUpdate);
             failed++;
             continue;
           }
@@ -125,7 +120,7 @@ public final class SpladeBackfillOps {
         } catch (Exception e) {
           context.log().error("SPLADE content fetch failed for {}: {}", docId, e.getMessage());
           markedFailed +=
-              handleSpladeFailure(context.documentFieldOps(), context.indexingCoordinator(), docId, e.getMessage(), context.log());
+              batch.failure(docId, SchemaFields.SPLADE_RETRY_COUNT, SpladeBackfillOps::computeSpladeFailureUpdate);
           failed++;
         }
       }
@@ -190,12 +185,10 @@ public final class SpladeBackfillOps {
             updates.put(SchemaFields.SPLADE, sparseVec);
             updates.put(SchemaFields.SPLADE_STATUS, spladeStatusFor(sparseVec));
             updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
-            context.indexingCoordinator().updateDocument(batchDocIds.get(i), updates);
-            processed++;
+            if (batch.update(batchDocIds.get(i), updates)) processed++;
           } catch (Exception e2) {
             markedFailed +=
-                handleSpladeFailure(
-                    context.documentFieldOps(), context.indexingCoordinator(), batchDocIds.get(i), e2.getMessage(), context.log());
+                batch.failure(batchDocIds.get(i), SchemaFields.SPLADE_RETRY_COUNT, SpladeBackfillOps::computeSpladeFailureUpdate);
             failed++;
           }
           pacer.afterUnit(1);
@@ -231,7 +224,7 @@ public final class SpladeBackfillOps {
         updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
         batchUpdates.add(Map.entry(batchDocIds.get(i), updates));
       }
-      var batchResult = context.indexingCoordinator().updateDocumentsBatch(batchUpdates);
+      var batchResult = batch.updateBatch(batchUpdates);
       processed += batchResult.updatedCount();
       long writeMs = (System.nanoTime() - t3) / 1_000_000;
 
@@ -294,39 +287,7 @@ public final class SpladeBackfillOps {
     }
   }
 
-  static int handleSpladeFailure(
-      DocumentFieldOps documentFieldOps, IndexingCoordinator indexingCoordinator, String docId, String reason, Logger log) {
-    try {
-      String retryCountStr =
-          documentFieldOps.getDocumentField(docId, SchemaFields.SPLADE_RETRY_COUNT);
-      int currentRetryCount = parseRetryCountOrZero(retryCountStr);
-      Map<String, Object> updates = computeSpladeFailureUpdate(currentRetryCount);
-      int retryCount = currentRetryCount + 1;
 
-      if (updates.containsKey(SchemaFields.SPLADE_STATUS)) {
-        log.warn(
-            "SPLADE permanently FAILED for {} after {} retries: {}",
-            docId,
-            retryCount,
-            reason);
-        indexingCoordinator.updateDocument(docId, updates);
-        return 1;
-      } else {
-        log.debug(
-            "SPLADE retry {}/{} for {}: {}",
-            retryCount,
-            SchemaFields.SPLADE_MAX_RETRIES,
-            docId,
-            reason);
-        indexingCoordinator.updateDocument(docId, updates);
-        return 0;
-      }
-
-    } catch (Exception e) {
-      log.error("Failed to update SPLADE retry count for {}", docId, e);
-      return 0;
-    }
-  }
 
   /**
    * The terminal SPLADE status a successful encode earns: {@code COMPLETED} when the weights will
@@ -354,7 +315,7 @@ public final class SpladeBackfillOps {
 
   /**
    * Pure computation of the retry-count/status update for a SPLADE failure — no I/O. Shared by
-   * {@link #handleSpladeFailure} (immediate single-doc write) and the combined enrichment path
+   * snapshot-bound individual publication and the combined enrichment path
    * (merges the result into its own single batched write), so the two stay in escalation-parity
    * by construction (tempdoc 700).
    *
@@ -372,14 +333,5 @@ public final class SpladeBackfillOps {
     return updates;
   }
 
-  private static int parseRetryCountOrZero(String retryCountStr) {
-    if (retryCountStr == null || retryCountStr.isBlank()) {
-      return 0;
-    }
-    try {
-      return Integer.parseInt(retryCountStr);
-    } catch (NumberFormatException ignored) {
-      return 0;
-    }
-  }
+
 }

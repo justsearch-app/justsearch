@@ -1,0 +1,227 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T22:26:37.760Z",
+  "revision": "917d7d60bdef568ab2173d045d6485ac00d99cb0",
+  "tree": "91789eeb5204d82bbb42c3aa12e2bb81ace1e0bb",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/tmp/test-intent-vitest-274657-1792448779217.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 9558
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer floor and next Ask when an older Restore response arrives and its refresh fails",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the newer floor and next Ask when an older Restore response arrives and its refresh fails",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps a newer saved snapshot when a delayed Restore response arrives and its refresh fails",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps a newer saved snapshot when a delayed Restore response arrives and its refresh fails",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the last saved snapshot when a newer floor write also cannot refresh before an older Restore response",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the last saved snapshot when a newer floor write also cannot refresh before an older Restore response",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer exclusions and next Ask when an older 'exclude' response arrives and its refresh fails",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the newer exclusions and next Ask when an older 'exclude' response arrives and its refresh fails",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer exclusions and next Ask when an older 'include' response arrives and its refresh fails",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the newer exclusions and next Ask when an older 'include' response arrives and its refresh fails",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer exclusions and next Ask when an older 'include-all' response arrives and its refresh fails",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the newer exclusions and next Ask when an older 'include-all' response arrives and its refresh fails",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#preserves the newer saved context after a delayed 'floor' response and failed refresh",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) preserves the newer saved context after a delayed 'floor' response and failed refresh",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#preserves the newer saved context after a delayed 'compact' response and failed refresh",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) preserves the newer saved context after a delayed 'compact' response and failed refresh",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#preserves the newer saved context after a delayed 'summary' response and failed refresh",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6a97bedfa20006afb71fe05fa34a7babf3b19e03e1f4a8de294b30297790d8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) preserves the newer saved context after a delayed 'summary' response and failed refresh",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "917d7d60b",
+    "revision": "917d7d60bdef568ab2173d045d6485ac00d99cb0",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/tmp/test-intent-vitest-274657-1792448790492.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7031,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/tmp/test-intent-vitest-274657-1792448790492.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer floor and next Ask when an older Restore response arrives and its refresh fails",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the newer floor and next Ask when an older Restore response arrives and its refresh fails:  AssertionError: expected { floor: undefined, …(2) } to deeply equal { …(3) }\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-9z4Ni8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1572:59\n    at file:///home/elias/dev/justsearch/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps a newer saved snapshot when a delayed Restore response arrives and its refresh fails",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps a newer saved snapshot when a delayed Restore response arrives and its refresh fails:  AssertionError: expected undefined to be '11111111-2222-4333-8444-555555555553' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-9z4Ni8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1602:60\n    at file:///h"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the last saved snapshot when a newer floor write also cannot refresh before an older Restore response",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the last saved snapshot when a newer floor write also cannot refresh before an older Restore response:  AssertionError: expected undefined to be '11111111-2222-4333-8444-555555555550' // Object.is equality\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-9z4Ni8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1629:60\n    at file:///h"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer exclusions and next Ask when an older 'exclude' response arrives and its refresh fails",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the newer exclusions and next Ask when an older 'exclude' response arrives and its refresh fails:  AssertionError: expected { excluded: [ …(2) ], …(2) } to deeply equal { excluded: [], hidden: false, …(1) }\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-9z4Ni8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1674:43\n    at fil"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer exclusions and next Ask when an older 'include' response arrives and its refresh fails",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the newer exclusions and next Ask when an older 'include' response arrives and its refresh fails:  AssertionError: expected { excluded: [], hidden: false, …(1) } to deeply equal { excluded: [ …(2) ], …(2) }\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-9z4Ni8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1674:43\n    at fil"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the newer exclusions and next Ask when an older 'include-all' response arrives and its refresh fails",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the newer exclusions and next Ask when an older 'include-all' response arrives and its refresh fails:  AssertionError: expected { excluded: [], hidden: false, …(1) } to deeply equal { excluded: [ …(2) ], …(2) }\n    at /home/elias/.cache/agent-method/sessions/agent-session-8oyauz6z/tmp/test-intent-before-9z4Ni8/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1674:43\n    at fil"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#preserves the newer saved context after a delayed 'floor' response and failed refresh",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#preserves the newer saved context after a delayed 'compact' response and failed refresh",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#preserves the newer saved context after a delayed 'summary' response and failed refresh",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:be4844125828a046206585600db7b10d101ae84599e26ec4be7129a20383f8b1"
+}

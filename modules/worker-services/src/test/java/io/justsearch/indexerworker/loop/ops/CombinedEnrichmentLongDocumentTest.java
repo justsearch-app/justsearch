@@ -113,6 +113,7 @@ class CombinedEnrichmentLongDocumentTest {
 
   @BeforeEach
   void wireFakeIndex() throws Exception {
+    BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator);
     lenient().when(embeddingProvider.isAvailable()).thenReturn(true);
     lenient().when(nerService.isAvailable()).thenReturn(true);
     lenient().when(indexingCoordinator.bulkDeleteEpoch()).thenReturn(0L);

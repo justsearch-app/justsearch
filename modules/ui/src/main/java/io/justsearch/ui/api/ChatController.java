@@ -14,6 +14,7 @@ import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.services.conversation.AgentRunShape;
 import io.justsearch.app.services.conversation.ConversationEngine;
+import io.justsearch.configuration.persistence.StoreIds;
 import io.justsearch.telemetry.Telemetry;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -231,7 +232,9 @@ public final class ChatController {
    */
   public io.javalin.http.Handler dynamicHandler(String route) {
     return ctx -> {
-      Object rawShapeId = readBody(ctx).get("shapeId");
+      Map<String, Object> body = readBody(ctx);
+      if (StoreIdRequest.rejectBody(ctx, body)) return;
+      Object rawShapeId = body.get("shapeId");
       if (rawShapeId == null || rawShapeId.toString().isBlank()) {
         sseWriter.initSseHeaders(ctx, route);
         sseError(ctx, "Missing required field: shapeId", ApiErrorCode.INVALID_REQUEST);
@@ -293,6 +296,7 @@ public final class ChatController {
       sseError(ctx, message(malformed), ApiErrorCode.BAD_REQUEST);
       return;
     }
+    if (StoreIdRequest.rejectBody(ctx, parsedBody)) return;
     if (engine.wouldDiscardWhileLocked(shapeId, parsedBody)) {
       LOG.info("Refusing dispatch of shape {}: conversation store is locked", shapeId.value());
       Map<String, Object> locked =
@@ -490,7 +494,7 @@ public final class ChatController {
     List<Map<String, Object>> rows = new ArrayList<>();
     for (Map<String, Object> run : agent.conversationSummaries(limit)) {
       Object conversationId = run.get("conversationId");
-      if (!(conversationId instanceof String id) || id.isBlank() || hasStoreSession(id, inThisWindow)) {
+      if (!(conversationId instanceof String id) || !StoreIds.isValid(id) || hasStoreSession(id, inThisWindow)) {
         continue;
       }
       Map<String, Object> m = new LinkedHashMap<>();
@@ -561,6 +565,7 @@ public final class ChatController {
    */
   public void handleLoadHistory(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     List<Map<String, Object>> messages = conversationStore.loadHistory(sessionId);
     // Slice 513 + 515 FIX-7 — include parent pointers in the response so the
     // FE can mark inherited messages with a branch indicator. Direct
@@ -574,11 +579,13 @@ public final class ChatController {
         response.put("parentSessionId", s.parentSessionId());
         // Slice 515 FIX-8 — surface the parent's first-message preview so the
         // FE branch indicator can name the parent without a second roundtrip.
-        conversationStore.getSessionMeta(s.parentSessionId()).ifPresent(parent -> {
-          if (parent.firstUserMessage() != null && !parent.firstUserMessage().isEmpty()) {
-            response.put("parentFirstUserMessage", parent.firstUserMessage());
-          }
-        });
+        if (StoreIds.isValid(s.parentSessionId())) {
+          conversationStore.getSessionMeta(s.parentSessionId()).ifPresent(parent -> {
+            if (parent.firstUserMessage() != null && !parent.firstUserMessage().isEmpty()) {
+              response.put("parentFirstUserMessage", parent.firstUserMessage());
+            }
+          });
+        }
       }
       if (s.branchPointMessageId() != null) {
         response.put("branchPointMessageId", s.branchPointMessageId());
@@ -619,6 +626,7 @@ public final class ChatController {
    */
   public void handleSetContextFloor(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     String floorMessageId = null;
     try {
       @SuppressWarnings("unchecked")
@@ -645,8 +653,37 @@ public final class ChatController {
    */
   public void handleClearContextFloor(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     conversationStore.setContextFloor(sessionId, null);
     ctx.json(Map.of("ok", true));
+  }
+
+  /**
+   * POST /api/chat/conversations/{sessionId}/stop with body {@code {"turnId": "..."}}, the id the
+   * turn was dispatched with. The reader pressed Stop: the Engine cancels that turn and saves it as
+   * stopped. A closed connection never does this; leaving is not stopping. Answers
+   * {@code {stopped, pending}}: {@code stopped} when the running turn was stopped now;
+   * {@code pending} when it has not started yet (the Stop overtook its dispatch) and is stopped when
+   * it starts; neither when nothing changed (its answer was already saved, or it ended for another
+   * reason). The turn's stream ends the same way: an error with {@code errorCode: CANCELLED} for a
+   * stopped turn, {@code done} for one the Stop did not change.
+   */
+  public void handleStopTurn(Context ctx) {
+    String turnId = null;
+    try {
+      Object id = readBody(ctx).get(ConversationEngine.TURN_ID_KEY);
+      if (id instanceof String s) turnId = s;
+    } catch (RuntimeException ignored) {
+      // fall through to the 400 below
+    }
+    if (turnId == null || turnId.isBlank()) {
+      badRequest(ctx, "Missing required field: turnId");
+      return;
+    }
+    ConversationEngine.TurnStop stop = engine.stopTurn(ctx.pathParam("sessionId"), turnId);
+    ctx.json(Map.of(
+        "stopped", stop == ConversationEngine.TurnStop.STOPPED,
+        "pending", stop == ConversationEngine.TurnStop.PENDING));
   }
 
   /**
@@ -669,6 +706,7 @@ public final class ChatController {
    */
   public void handleSetTitle(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     String title = null;
     String source = ConversationStore.TITLE_SOURCE_USER;
     String precondition = ctx.header("If-None-Match");
@@ -754,6 +792,7 @@ public final class ChatController {
    */
   public void handleAutoTitle(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     Optional<ConversationStore.SessionSummary> meta = conversationStore.getSessionMeta(sessionId);
     if (meta.isEmpty()) {
       noSuchConversation(ctx, sessionId);
@@ -865,7 +904,9 @@ public final class ChatController {
    * conversation that has none, or of one that does not exist, is a no-op success.
    */
   public void handleClearTitle(Context ctx) {
-    conversationStore.setTitle(ctx.pathParam("sessionId"), null, null);
+    String sessionId = ctx.pathParam("sessionId");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
+    conversationStore.setTitle(sessionId, null, null);
     ctx.json(Map.of("ok", true));
   }
 
@@ -885,6 +926,7 @@ public final class ChatController {
    */
   public void handleCompact(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     String floorMessageId = null;
     try {
       @SuppressWarnings("unchecked")
@@ -957,6 +999,7 @@ public final class ChatController {
    */
   public void handleEditContextFloorSummary(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     String summaryText = null;
     try {
       @SuppressWarnings("unchecked")
@@ -995,6 +1038,7 @@ public final class ChatController {
    */
   public void handleToggleMessageExcluded(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     String messageId = ctx.pathParam("messageId");
     boolean excluded = true;
     try {
@@ -1018,6 +1062,7 @@ public final class ChatController {
    */
   public void handleToggleSourceExcluded(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     String sourceId = "";
     boolean excluded = true;
     try {
@@ -1055,6 +1100,7 @@ public final class ChatController {
    */
   public void handleDeleteConversation(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
+    if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
     try {
       conversationStore.deleteSession(sessionId);
       AgentService agent = agentService.get();
@@ -1081,6 +1127,7 @@ public final class ChatController {
    */
   public void handleBranchConversation(Context ctx) {
     String parentSessionId = ctx.pathParam("sessionId");
+    if (StoreIdRequest.rejectUnsafe(ctx, parentSessionId)) return;
     String fromMsgId = ctx.queryParam("fromMsgId");
     if (fromMsgId == null || fromMsgId.isBlank()) {
       Map<String, Object> err = new LinkedHashMap<>();

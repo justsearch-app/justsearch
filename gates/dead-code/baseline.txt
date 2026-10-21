@@ -1,5 +1,4 @@
 # dead-code ratchet — tempdoc 530 §2.9. <path> <count> <date>
-package.json 5 2026-07-16
 scripts/capture-evidence-bundle.mjs 1 2026-07-16
 src/api/domains/agent.ts 16 2026-07-16
 src/api/domains/browse.ts 4 2026-09-02
@@ -143,7 +142,7 @@ src/shell-v0/state/inspectorState.ts 2 2026-07-16
 src/shell-v0/state/messageClasses.ts 1 2026-07-16
 src/shell-v0/state/messageRouting.ts 1 2026-07-16
 src/shell-v0/state/pinnedSearchState.ts 1 2026-07-16
-src/shell-v0/state/runtimeConformance.ts 2 2026-07-16
+src/shell-v0/state/runtimeConformance.ts 1 2026-10-20
 src/shell-v0/state/searchFiltersState.ts 2 2026-07-16
 src/shell-v0/state/searchState.ts 4 2026-07-16
 src/shell-v0/state/shellContextState.ts 2 2026-09-02

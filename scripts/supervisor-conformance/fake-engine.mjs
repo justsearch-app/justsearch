@@ -66,6 +66,8 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 
+const entryEpochMs = Date.now();
+process.stdout.write(`[fake-engine] ${new Date(entryEpochMs).toISOString()} entryEpochMs=${entryEpochMs} pid=${process.pid} incarnationRef=${process.env.JUSTSEARCH_ENGINE_INCARNATION ?? ''}\n`);
 const require = createRequire(import.meta.url);
 const ledgerLib = require('../dev/lib/exit-ledger.cjs');
 const { readLinuxProcess } = require('../dev/lib/process-identity.cjs');
@@ -194,7 +196,7 @@ function log(message) {
 }
 
 log(
-  `incarnation=${behaviour.incarnation} mode=${behaviour.mode} exitCode=${behaviour.exitCode} `
+  `entryEpochMs=${entryEpochMs} pid=${process.pid} incarnationRef=${process.env.JUSTSEARCH_ENGINE_INCARNATION ?? ''} incarnation=${behaviour.incarnation} mode=${behaviour.mode} exitCode=${behaviour.exitCode} `
     + `pid=${process.pid} dataDir=${dataDir}`,
 );
 

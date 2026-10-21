@@ -10,7 +10,7 @@
  * `branchAndResend`). This module ports that ARITHMETIC, and nothing else: which message id each of
  * the three acts names, and which conversations are the versions of one turn.
  *
- * THREE LAWS, the first two inherited from 852 S1/S2 and the third from the reference:
+ * FOUR LAWS, the first two inherited from 852 S1/S2, the third from the reference, the fourth from 863:
  *
  * 1. **Ids come from {@link sv3TurnMessageIds} and nowhere else.** A turn reports a message id only
  *    when the CONVERSATION STORE minted it, so `?fromMsgId=` can never be handed an agent-run-plane
@@ -21,10 +21,11 @@
  *    different ids on the same turn and confusing them is silent: an edit forked from the turn's own
  *    answer would inherit the very exchange the reader was replacing, and the transcript would look
  *    entirely plausible. {@link Sv3TurnLineage} carries both, named for what they do.
- * 4. **An AGENT turn offers none of the three** (tempdoc 863 §4.A.5 A-8), gated on the turn's KIND.
- *    All three re-dispatch through the ask tier, so on a delegate turn they are a silent tier
- *    conversion. Until 863 this was withheld for free by law 1 — a delegate turn named no store
- *    message — which made the refusal depend on an accident that 863 removed.
+ * 4. **A turn re-runs in its own tier.** 863 §4.A.5 A-8 withheld all three acts on an AGENT turn,
+ *    because they re-dispatched through the ask tier (a silent tier conversion). WP1.2 S2.5 replaces
+ *    the withholding with the right dispatch: the window re-runs an agent turn's Retry/Edit through
+ *    the delegate path and leaves a Branch in Delegate, so this module now gates an agent turn
+ *    exactly as an ask turn — by laws 1–3, and by ownership.
  */
 import type { Conversation } from '../../state/conversationListStore.js';
 import { siblingSessionsAt } from '../../state/conversationListStore.js';
@@ -88,6 +89,13 @@ export interface Sv3TurnLineage {
    * and this turn came from the parent), or a previous turn whose answer is not a store message.
    */
   readonly forkKey: string | null;
+  /**
+   * The conversation Edit and Retry fork at {@link forkKey}: this one, except at a BRANCH's first own
+   * turn. There the key is the point the branch was itself forked at, so the fork is taken from the
+   * PARENT — the re-run is one more version of the same turn, a sibling of this branch. Forking this
+   * conversation instead would nest a branch inside it, and the versions would split across pagers.
+   */
+  readonly forkFromId: string;
   /** This turn's question can be rewritten and re-sent: it names a store message and has a fork key. */
   readonly canEdit: boolean;
   /** The versions of this turn, or `null` when this turn is not a divergence point with more than one. */
@@ -136,30 +144,25 @@ export function projectSv3TurnLineage(
   conversations: readonly Conversation[],
 ): readonly Sv3TurnLineage[] {
   const firstOwn = sv3FirstOwnTurnIndex(turns, history);
+  const parent = history?.parentSessionId ?? '';
+  const point = history?.branchPointMessageId ?? '';
   return turns.map((turn, index) => {
     const own = index >= firstOwn;
     const { userMsgId, assistantMsgId } = sv3TurnMessageIds(turn);
     const forkKey = own ? forkKeyAt(turns, index, firstOwn, history) : null;
-    // LAW 4 (tempdoc 863 §4.A.5 A-8) — an AGENT turn offers none of the three acts, gated on the
-    // turn's KIND rather than on the accident that its ids were not store ids. Before 863 a delegate
-    // turn named no store message, so law 1 withheld them for free; now that the engine records the
-    // delegate turn its ids ARE store ids, and law 1 would hand all three back. That would be wrong
-    // for a reason law 1 never expressed: all three re-dispatch through the ASK tier
-    // (`branchAndResend`, and Branch-to-new-thread's follow-up), so offering them on an agent turn is
-    // a SILENT TIER CONVERSION — the reader asks the delegate again and gets an ask. Re-dispatching
-    // an agent turn to the agent tier is the better answer and is 863 §8's open question, not a
-    // silent inclusion here.
-    //
-    // Note the deliberate asymmetry: `forkKeyAt` still reads the previous turn's OWN assistant id, so
-    // the ordinary ask turn that FOLLOWS a delegate turn now gets a real fork key and legitimately
-    // gains Edit (863 §4.A.5 A-8.2). Withholding on an agent turn is about what re-dispatching THAT
-    // turn would do, not about the messages around it.
-    const agentTurn = turn.kind === 'agent';
+    // LAW 4, REVISED (WP1.2 S2.5, answering 863 §8's open question). 863 §4.A.5 A-8 withheld all
+    // three acts on an AGENT turn because they re-dispatched through the ASK tier — offering them was a
+    // silent tier conversion. They no longer do: the window re-runs an agent turn's Retry/Edit through
+    // the DELEGATE path (`SearchV3View.runBranchAction`), whatever the composer's tier, and Branch
+    // leaves the composer in Delegate. So an agent turn now gets the same acts an ask turn does, under
+    // the same laws 1–3: a run-plane-only turn still names no store message and offers nothing, and an
+    // inherited turn is still the parent's.
     return {
       turnId: turn.id,
-      branchFromId: own && !agentTurn ? assistantMsgId : null,
+      branchFromId: own ? assistantMsgId : null,
       forkKey,
-      canEdit: own && !agentTurn && userMsgId !== null && forkKey !== null,
+      forkFromId: index === firstOwn && parent !== '' && point !== '' ? parent : sessionId,
+      canEdit: own && userMsgId !== null && forkKey !== null,
       versions: versionsAt(turns, index, firstOwn, history, sessionId, conversations),
     };
   });

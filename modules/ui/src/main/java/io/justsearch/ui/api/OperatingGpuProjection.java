@@ -52,7 +52,7 @@ final class OperatingGpuProjection {
 
   private final GpuMemoryReader reader;
   private final Supplier<Set<Long>> ourPids;
-  private final Clock clock;
+  private final Supplier<Instant> now;
 
   /** Set once the first sample is cached; read without the lock so a pass never waits for it. */
   private volatile boolean sampled;
@@ -61,9 +61,14 @@ final class OperatingGpuProjection {
   private Instant cachedAt;
 
   OperatingGpuProjection(GpuMemoryReader reader, Supplier<Set<Long>> ourPids, Clock clock) {
+    this(reader, ourPids, clock::instant);
+  }
+
+  OperatingGpuProjection(GpuMemoryReader reader, Supplier<Set<Long>> ourPids,
+      Supplier<Instant> now) {
     this.reader = Objects.requireNonNull(reader, "reader");
     this.ourPids = Objects.requireNonNull(ourPids, "ourPids");
-    this.clock = Objects.requireNonNull(clock, "clock");
+    this.now = Objects.requireNonNull(now, "now");
   }
 
   /** The Engine process and every process it launched, as the OS reports them now. */
@@ -80,7 +85,7 @@ final class OperatingGpuProjection {
     synchronized (this) {
       if (!sampled) {
         cached = read();
-        cachedAt = clock.instant();
+        cachedAt = now.get();
       }
     }
     sampled = true;
@@ -90,7 +95,7 @@ final class OperatingGpuProjection {
   OperatingGpuView view(long staleAfterMs) {
     if (!sampled) return OperatingGpuView.unknown();
     synchronized (this) {
-      Instant now = clock.instant();
+      Instant now = this.now.get();
       if (!now.isBefore(cachedAt.plus(CACHE_WINDOW))) {
         cached = read();
         cachedAt = now;
