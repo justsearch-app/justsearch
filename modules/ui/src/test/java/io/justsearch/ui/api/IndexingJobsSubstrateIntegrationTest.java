@@ -161,7 +161,7 @@ final class IndexingJobsSubstrateIntegrationTest {
     stubService.queueSnapshot(
         7L,
         List.of(
-            stubView("hash-a", "PENDING", 0, 1000L),
+            stubView("hash-a", "FAILED", 0, 1000L),
             stubView("hash-b", "PROCESSING", 1, 2000L)));
     bridge.start().get(2, TimeUnit.SECONDS);
 

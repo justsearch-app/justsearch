@@ -28,6 +28,8 @@ import io.justsearch.app.api.runtime.child.DefaultChildControl;
 import io.justsearch.app.api.runtime.child.ExitClass;
 import io.justsearch.app.api.runtime.child.ExitOutcome;
 import io.justsearch.app.api.runtime.child.StopRequest;
+import io.justsearch.app.api.runtime.child.StopReason;
+import io.justsearch.app.api.runtime.child.StopMode;
 import io.justsearch.app.inference.telemetry.InferenceTelemetryEvents;
 import java.io.IOException;
 import java.util.Objects;
@@ -133,8 +135,8 @@ final class LlamaServerOps {
       "Managed llama-server exited, descendants unverified; retry cleanup";
   /** Retries a survivor's stop; ChildControl keeps the survivor's first intent and reason. */
   private static final StopRequest SURVIVOR_RETRY = StopRequest.of(
-      io.justsearch.app.api.runtime.child.StopReason.ROLLBACK,
-      io.justsearch.app.api.runtime.child.StopMode.NOW, "chat-controller");
+      StopReason.ROLLBACK,
+      StopMode.NOW, "chat-controller");
   private static final Duration STARTUP_HEALTH_PROBE_TIMEOUT = Duration.ofSeconds(2);
   private static final Duration HEALTH_PROBE_TIMEOUT = Duration.ofSeconds(1);
   private static final Duration PROPS_PROBE_TIMEOUT = Duration.ofSeconds(2);
@@ -340,7 +342,10 @@ final class LlamaServerOps {
    * port of this managed launch, or the external endpoint's port. It is kept here rather than in
    * {@link StartResult} so a same-configuration relaunch on a new port keeps its start identity.
    */
-  private record ActiveServer(StartResult start, ChildHandle child, int port) {}
+  private record ActiveServer(
+      StartResult start, ChildHandle child, LlamaServerEndpoint endpoint) {
+    int port() { return endpoint.port(); }
+  }
 
   // ==================== Constructor ====================
 
@@ -990,14 +995,15 @@ final class LlamaServerOps {
 
   /**
    * I6: what the exited server started (a wrapper's server, a crash reporter in its job) ends
-   * before the next launch. ChildControl ends the server's own job, recording each member as an
-   * intended cleanup with {@code request}'s reason, so a crash-recovery restart does not wait on
-   * it. Where nothing can be ended (off Windows) the processes are awaited, and ChildControl
-   * refuses the next chat start beside any still running.
+   * before the next launch. ChildControl ends the server's own job on Windows, or its retained
+   * descendant handles elsewhere, recording each member as an intended cleanup with {@code
+   * request}'s reason. Any survivor still refuses the next chat start. Linux zombies have exited
+   * and do not hold the barrier, even when their parent never reaps them.
    */
   private void endLeftRunning(
       ChildHandle exited, List<ProcessHandle> started, StopRequest request) {
-    if (started.stream().noneMatch(ProcessHandle::isAlive)) return;
+    if (started.stream().noneMatch(
+        io.justsearch.app.api.runtime.child.ProcessTerminator::isRunning)) return;
     try {
       int ended = childControl.endRemaining(exited, request);
       LOG.info("Ended {} process(es) llama-server PID {} left running ({})", ended, exited.pid(),
@@ -1268,6 +1274,7 @@ final class LlamaServerOps {
               ModeTransitionException.Reason.PROCESS_EXITED,
               "Managed llama-server exited during startup health verification");
         }
+        verifyManagedAuthentication(expected);
         LOG.info("Server healthy");
         // The build accepted --reasoning-budget: it started and serves with the flag present.
         if (reasoningBudgetRequested) {
@@ -1295,6 +1302,26 @@ final class LlamaServerOps {
     throw new ModeTransitionException(
         ModeTransitionException.Reason.HEALTH_CHECK_TIMEOUT,
         "Server health check timeout after " + HEALTH_CHECK_TIMEOUT_MS + "ms");
+  }
+
+  private void verifyManagedAuthentication(ActiveServer expected) throws ModeTransitionException {
+    if (expected.child() == null) return; // Explicit external endpoints keep their own policy.
+    try {
+      LlamaServerAuthentication.requireEnforcement(httpClient, expected.port(), PROPS_PROBE_TIMEOUT);
+    } catch (IOException | InterruptedException rejected) {
+      LOG.error("Managed llama-server authentication failed: {}", rejected.getMessage());
+      var failure = new ModeTransitionException(ModeTransitionException.Reason.ONLINE_START_FAILED,
+          "Managed llama-server authentication failed: " + rejected.getMessage(), rejected);
+      if (isActive(expected)) {
+        try {
+          stopLlamaServer(StopRequest.of(StopReason.ROLLBACK, StopMode.NOW, "chat-controller"));
+        } catch (RuntimeException cleanup) {
+          failure.addSuppressed(cleanup);
+        }
+      }
+      if (rejected instanceof InterruptedException) Thread.currentThread().interrupt();
+      throw failure;
+    }
   }
 
   /**
@@ -1759,11 +1786,16 @@ final class LlamaServerOps {
     // image).
     Path serverExeDir = context.inference().serverExecutable().getParent();
     Path logFile = prepareServerLog(resolveLlamaServerLogFile(context));
+    byte[] secret = new byte[32];
+    new java.security.SecureRandom().nextBytes(secret);
+    String apiKey = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(secret);
+    Map<String, String> environment = new java.util.HashMap<>(launchEnvironment());
+    environment.put("LLAMA_API_KEY", apiKey);
     ChildSpec spec = new ChildSpec(
         ChildKind.LLAMA_SERVER,
         command,
         serverExeDir != null && Files.isDirectory(serverExeDir) ? serverExeDir : null,
-        launchEnvironment(),
+        environment,
         new ChildSpec.Stdio.AppendToLog(logFile),
         gpuLayersOf(command) > 0,
         java.util.OptionalLong.empty(),
@@ -1772,7 +1804,7 @@ final class LlamaServerOps {
         "llama-server",
         runtimeDllPath(serverExeDir, context));
     LOG.debug("Starting server with command: {}", String.join(" ", command));
-    startManagedChild(spec, logFile, result, port);
+    startManagedChild(spec, logFile, result, new LlamaServerEndpoint(port, apiKey));
   }
 
   /** The {@code -ngl} value of a launch command; 0 when absent or unreadable. */
@@ -1907,8 +1939,9 @@ final class LlamaServerOps {
    * server whose stop did not confirm its exit stays held, as one that survived a stop does: the
    * next stop retries it and fails while it lives, and no start launches beside it.
    */
-  private void startManagedChild(ChildSpec spec, Path logFile, StartResult result, int port)
+  private void startManagedChild(ChildSpec spec, Path logFile, StartResult result, LlamaServerEndpoint endpoint)
       throws IOException {
+    int port = endpoint.port();
     retrySurvivor();
     InferenceConfig cfg = result.context().inference();
     ChildControl.ManifestEntry entry = new ChildControl.ManifestEntry(
@@ -1927,7 +1960,7 @@ final class LlamaServerOps {
     child = started;
     LOG.info("llama-server logs: {}", logFile);
     LOG.info("llama-server started, PID: {}, port: {}", started.pid(), port);
-    installActive(result, started, port);
+    installActive(result, started, endpoint);
   }
 
   private void armRuntimeMonitoring(ActiveServer owner)
@@ -2016,13 +2049,17 @@ final class LlamaServerOps {
 
   private HealthProbe probeHealth(ActiveServer expected, Duration timeout) {
     if (!isActive(expected)) return staleHealthProbe();
-    HealthProbe probe = probeHealth(expected.port(), timeout);
+    HealthProbe probe = probeHealth(expected.endpoint(), timeout);
     return isActive(expected) ? probe : staleHealthProbe();
   }
 
   private HealthProbe probeHealth(int port, Duration timeout) {
+    return probeHealth(new LlamaServerEndpoint(port, null), timeout);
+  }
+
+  private HealthProbe probeHealth(LlamaServerEndpoint endpoint, Duration timeout) {
     try {
-      HttpRequest request = buildGetRequest(port, PATH_HEALTH, timeout);
+      HttpRequest request = buildGetRequest(endpoint, PATH_HEALTH, timeout);
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
       boolean ok = response.statusCode() == 200;
@@ -2040,13 +2077,17 @@ final class LlamaServerOps {
 
   private PropsProbe probeServerProps(ActiveServer expected, Duration timeout) {
     if (!isActive(expected)) return stalePropsProbe();
-    PropsProbe probe = probeServerProps(expected.port(), timeout);
+    PropsProbe probe = probeServerProps(expected.endpoint(), timeout);
     return isActive(expected) ? probe : stalePropsProbe();
   }
 
   private PropsProbe probeServerProps(int port, Duration timeout) {
+    return probeServerProps(new LlamaServerEndpoint(port, null), timeout);
+  }
+
+  private PropsProbe probeServerProps(LlamaServerEndpoint endpoint, Duration timeout) {
     try {
-      HttpRequest request = buildGetRequest(port, PATH_PROPS, timeout);
+      HttpRequest request = buildGetRequest(endpoint, PATH_PROPS, timeout);
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
       if (response.statusCode() != 200) {
@@ -2337,14 +2378,18 @@ final class LlamaServerOps {
     return owner != null && owner.start() == expected && ownedPhysicalServerAlive(owner);
   }
 
-  /** Where the active server listens: this launch's fresh port, or the external endpoint's. */
-  OptionalInt activePort() {
+  Optional<LlamaServerEndpoint> activeEndpoint() {
     ActiveServer owner = activeServer;
-    return owner == null ? OptionalInt.empty() : OptionalInt.of(owner.port());
+    return owner == null ? Optional.empty() : Optional.of(owner.endpoint());
   }
 
   private ActiveServer installActive(StartResult start, ChildHandle launched, int port) {
-    ActiveServer owner = new ActiveServer(start, launched, port);
+    return installActive(start, launched, new LlamaServerEndpoint(port, null));
+  }
+
+  private ActiveServer installActive(
+      StartResult start, ChildHandle launched, LlamaServerEndpoint endpoint) {
+    ActiveServer owner = new ActiveServer(start, launched, endpoint);
     synchronized (ownershipMonitor) {
       activeServer = owner;
       failureSignalledOwner = null;

@@ -5,6 +5,7 @@ import java.io.Closeable;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -25,19 +26,47 @@ import java.util.function.Consumer;
  */
 public interface IndexingJobChangeFeed {
 
-  /** Per-row delta event. Discriminated union — switches must be exhaustive. */
+  /** Maximum number of recent FAILED / RETRY_EXHAUSTED rows in the view. */
+  int FAILURE_WINDOW_SIZE = 200;
+
+  /** Committed row change or window replacement. Discriminated union — switches must be exhaustive. */
   sealed interface Delta {
+    /** All-queue state presence, or null when the commit did not change it. */
+    Set<String> presentStates();
+
     /** New row inserted into the queue. Carries the full row state. */
-    record Insert(JobRow row) implements Delta {}
+    record Insert(JobRow row, Set<String> presentStates) implements Delta {
+      public Insert(JobRow row) { this(row, null); }
+      public Insert { if (presentStates != null) presentStates = Set.copyOf(presentStates); }
+    }
 
     /** Existing row mutated. Carries the post-commit row state. */
-    record Update(JobRow row) implements Delta {}
+    record Update(JobRow row, Set<String> presentStates) implements Delta {
+      public Update(JobRow row) { this(row, null); }
+      public Update { if (presentStates != null) presentStates = Set.copyOf(presentStates); }
+    }
 
     /**
      * Row removed from the queue. Only the primary key (pathHash) is carried
      * since the row no longer exists.
      */
-    record Delete(String pathHash) implements Delta {}
+    record Delete(String pathHash, Set<String> presentStates) implements Delta {
+      public Delete(String pathHash) { this(pathHash, null); }
+      public Delete { if (presentStates != null) presentStates = Set.copyOf(presentStates); }
+    }
+
+    /**
+     * Replace the window after a deletion whose identity was not retained, or when a vacancy
+     * reveals older failures. Emitted at most once per commit, after its row deltas. The bounded
+     * post-commit snapshot travels with the marker so delivery never queries a newer transaction.
+     */
+    record Resync(List<JobRow> items, Set<String> presentStates) implements Delta {
+      public Resync(List<JobRow> items) { this(items, null); }
+      public Resync {
+        items = List.copyOf(items);
+        if (presentStates != null) presentStates = Set.copyOf(presentStates);
+      }
+    }
   }
 
   /**
@@ -77,10 +106,18 @@ public interface IndexingJobChangeFeed {
    * counter at the time of snapshot; live deltas have {@code seq > snapshotSeq}.
    */
   record SnapshotAndSubscription(
-      long snapshotSeq, List<JobRow> items, Subscription subscription) {}
+      long snapshotSeq, List<JobRow> items, Set<String> presentStates, Subscription subscription) {
+    public SnapshotAndSubscription(long snapshotSeq, List<JobRow> items, Subscription subscription) {
+      this(snapshotSeq, items, null, subscription);
+    }
+    public SnapshotAndSubscription {
+      if (presentStates != null) presentStates = Set.copyOf(presentStates);
+    }
+  }
 
   /**
-   * Atomically captures a snapshot of the current jobs collection AND adds
+   * Atomically captures a window (all PROCESSING rows and the newest 200 FAILED /
+   * RETRY_EXHAUSTED rows) AND adds
    * {@code subscriber} to the live-delta broadcast list. Implementations must
    * guarantee that no delta with {@code seq <= snapshotSeq} is delivered to
    * the subscriber, and that no commit-time mutation is dropped.

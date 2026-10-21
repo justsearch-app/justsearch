@@ -150,7 +150,7 @@ public final class StreamingFakeLlamaServer {
       exchange.getResponseBody().write(body);
       exchange.close();
     });
-    server.createContext("/props", exchange -> {
+    var props = server.createContext("/props", exchange -> {
       byte[] body = ("{\"model_path\":\"" + model + "\",\"n_ctx\":" + window + "}")
           .getBytes(StandardCharsets.UTF_8);
       exchange.getResponseHeaders().add("Content-Type", "application/json");
@@ -158,7 +158,7 @@ public final class StreamingFakeLlamaServer {
       exchange.getResponseBody().write(body);
       exchange.close();
     });
-    server.createContext("/v1/chat/completions", exchange -> {
+    var chat = server.createContext("/v1/chat/completions", exchange -> {
       try (exchange) {
         exchange.getRequestBody().readAllBytes();
         exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
@@ -179,6 +179,23 @@ public final class StreamingFakeLlamaServer {
         Thread.currentThread().interrupt();
       }
     });
+    String key = System.getenv("LLAMA_API_KEY");
+    if (key != null) {
+      for (var context : List.of(props, chat)) {
+        context.getFilters().add(new com.sun.net.httpserver.Filter() {
+          @Override public String description() { return "llama API authentication"; }
+          @Override public void doFilter(com.sun.net.httpserver.HttpExchange exchange,
+              Chain chain) throws IOException {
+            if (("Bearer " + key).equals(exchange.getRequestHeaders().getFirst("Authorization"))) {
+              chain.doFilter(exchange);
+            } else {
+              exchange.sendResponseHeaders(401, -1);
+              exchange.close();
+            }
+          }
+        });
+      }
+    }
     server.start();
     long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2);
     while (launcher != null && launcher.isAlive() && System.nanoTime() < deadline) {

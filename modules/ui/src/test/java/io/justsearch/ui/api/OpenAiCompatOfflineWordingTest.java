@@ -34,7 +34,7 @@ final class OpenAiCompatOfflineWordingTest {
     List<Integer> statuses = new ArrayList<>();
     List<Object> bodies = new ArrayList<>();
 
-    new OpenAiCompatController(upstream, () -> STALE_PORT, null)
+    new OpenAiCompatController(upstream, () -> new io.justsearch.app.inference.LlamaServerEndpoint(STALE_PORT, null), null)
         .handleChatCompletions(context(statuses, bodies));
 
     assertEquals(List.of(503), statuses);

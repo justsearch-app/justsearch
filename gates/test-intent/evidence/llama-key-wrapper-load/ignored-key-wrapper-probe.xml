@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.justsearch.app.inference.IgnoredKeyWrapperProbeTest" tests="1" skipped="0" failures="1" errors="0" timestamp="2026-10-21T05:50:42.387Z" hostname="elias-systemproductname" time="14.794">
+  <properties/>
+  <testcase name="rejectedUnprotectedWrapperMustLeaveNoServingDescendant()" classname="io.justsearch.app.inference.IgnoredKeyWrapperProbeTest" time="14.785">
+    <failure message="org.opentest4j.AssertionFailedError: K8 rejection must not leave an unauthenticated serving descendant ==&gt; expected: not equal but was: &lt;200&gt;" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: K8 rejection must not leave an unauthenticated serving descendant ==&gt; expected: not equal but was: &lt;200&gt;
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertNotEquals.failEqual(AssertNotEquals.java:277)
+	at org.junit.jupiter.api.AssertNotEquals.assertNotEquals(AssertNotEquals.java:94)
+	at org.junit.jupiter.api.Assertions.assertNotEquals(Assertions.java:2023)
+	at io.justsearch.app.inference.IgnoredKeyWrapperProbeTest.rejectedUnprotectedWrapperMustLeaveNoServingDescendant(IgnoredKeyWrapperProbeTest.java:40)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <system-out><![CDATA[IGNORED_KEY_WRAPPER rejected=true online=false servingPid=322532 unauthenticatedProps=200
+]]></system-out>
+  <system-err><![CDATA[Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (/home/elias/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy-agent/1.17.7/fbf3d6d649ed37fc9e9c59480a05be0a26e3c2da/byte-buddy-agent-1.17.7.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
+</testsuite>

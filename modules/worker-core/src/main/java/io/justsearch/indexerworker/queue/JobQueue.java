@@ -617,6 +617,12 @@ public interface JobQueue extends Closeable {
    */
   List<IndexJob> pollPending(int limit);
 
+  /** The preceding poll stopped on its scan budget; retry promptly before entering idle work. */
+  default boolean pollPendingBudgetExhausted() { return false; }
+
+  /** Time-sensitive readiness probe; implementations may use indexed existence reads. */
+  default boolean hasPendingIngestWork() { return jobStateCounts().pendingReadyCount() > 0; }
+
   /**
    * Marks a job as successfully completed.
    *

@@ -3702,6 +3702,52 @@ public final class WorkerIngestService {
   // ==================== Slice 445 — Job-queue TABULAR Resource ====================
 
   /**
+   * Accept live terminal outcomes before any recoverable view handoff. No history, row snapshot,
+   * pending-snapshot queue or SSE observer is involved. The empty initial frame acknowledges
+   * registration; committed deltas remain serialized with it and cancellation fences delivery.
+   */
+  public void subscribeIndexingJobOutcomes(
+      java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame> sink, CallContext ctx) {
+    IndexingJobChangeFeed feed = jobQueue.indexingJobChangeFeed().orElseThrow(() ->
+        WorkerServiceException.unimplemented("Job queue does not support change-feed"));
+    Object emitLock = new Object();
+    var closed = new java.util.concurrent.atomic.AtomicBoolean();
+    var subscription = new java.util.concurrent.atomic.AtomicReference<IndexingJobChangeFeed.Subscription>();
+    var sequence = new java.util.concurrent.atomic.AtomicLong();
+    Runnable close = () -> {
+      closed.set(true);
+      var current = subscription.getAndSet(null);
+      if (current != null) current.close();
+    };
+    ctx.onCancel(close);
+    // Nothing can invoke this new consumer before registration, so acquiring the queue owner
+    // lock here cannot invert locks with a pre-existing delivery to this subscription.
+    synchronized (emitLock) {
+      if (closed.get() || ctx.cancelled()) return;
+      var registered = feed.subscribe(delta -> {
+        IndexingJobChangeFeed.JobRow row = switch (delta) {
+          case IndexingJobChangeFeed.Delta.Insert insert -> insert.row();
+          case IndexingJobChangeFeed.Delta.Update update -> update.row();
+          default -> null; // Resync is view state, never a replay of terminal activity.
+        };
+        if (row == null || !(row.state().equals("DONE") || row.state().equals("FAILED")
+            || row.state().equals("RETRY_EXHAUSTED"))) return;
+        synchronized (emitLock) {
+          if (closed.get() || ctx.cancelled()) return;
+          sink.accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(sequence.incrementAndGet())
+              .setDelta(io.justsearch.ipc.IndexingJobsDelta.newBuilder().setUpdate(toJobView(row))).build());
+        }
+      });
+      subscription.set(registered);
+      if (closed.get() || ctx.cancelled()) { close.run(); return; }
+      try {
+        sink.accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(sequence.incrementAndGet())
+            .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.getDefaultInstance()).build());
+      } catch (RuntimeException | Error failure) { close.run(); throw failure; }
+    }
+  }
+
+  /**
    * Streams the indexing-jobs collection: one snapshot frame followed by
    * per-row delta frames as the SqliteJobQueue mutates. Backs the
    * {@code core.indexing-jobs} TABULAR Resource (Category × SSE_STREAM ×
@@ -3757,7 +3803,25 @@ public final class WorkerIngestService {
           if (ctx.cancelled() || closeRequested.get()) return;
           io.justsearch.ipc.IndexingJobsDelta.Builder deltaBuilder =
               io.justsearch.ipc.IndexingJobsDelta.newBuilder();
+          if (delta instanceof IndexingJobChangeFeed.Delta.Resync resync) {
+            var replacement = io.justsearch.ipc.IndexingJobsSnapshot.newBuilder();
+            for (var row : resync.items()) replacement.addItems(toJobView(row));
+            synchronized (emitLock) {
+              try {
+                sink.accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder()
+                    .setSnapshot(replacement.build()).setSeq(frameSeq.incrementAndGet())
+                    .setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.newBuilder()
+                        .addAllStates(resync.presentStates() == null ? Set.of() : resync.presentStates()))
+                    .build());
+              } catch (RuntimeException e) {
+                log.warn("subscribeIndexingJobs: resync delivery failed; closing subscription", e);
+                closeSubscription.run();
+              }
+            }
+            return;
+          }
           switch (delta) {
+            case IndexingJobChangeFeed.Delta.Resync ignored -> throw new IllegalStateException("Resync already handled");
             case IndexingJobChangeFeed.Delta.Insert ins ->
                 deltaBuilder.setInsert(toJobView(ins.row()));
             case IndexingJobChangeFeed.Delta.Update upd ->
@@ -3767,11 +3831,13 @@ public final class WorkerIngestService {
           }
           synchronized (emitLock) {
             try {
-              sink.accept(
-                  io.justsearch.ipc.IndexingJobsFrame.newBuilder()
-                      .setDelta(deltaBuilder.build())
-                      .setSeq(frameSeq.incrementAndGet())
-                      .build());
+              var frame = io.justsearch.ipc.IndexingJobsFrame.newBuilder()
+                  .setDelta(deltaBuilder.build()).setSeq(frameSeq.incrementAndGet());
+              if (delta.presentStates() != null) {
+                frame.setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.newBuilder()
+                    .addAllStates(delta.presentStates()));
+              }
+              sink.accept(frame.build());
             } catch (RuntimeException e) {
               log.warn("subscribeIndexingJobs: delta delivery failed; closing subscription", e);
               closeSubscription.run();
@@ -3823,6 +3889,8 @@ public final class WorkerIngestService {
         sink.accept(
             io.justsearch.ipc.IndexingJobsFrame.newBuilder()
                 .setSnapshot(snapBuilder.build())
+                .setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.newBuilder()
+                    .addAllStates(snap.presentStates() == null ? Set.of() : snap.presentStates()))
                 .setSeq(frameSeq.incrementAndGet())
                 .build());
         // Reentrant sink writes also join this queue, behind already buffered deltas.
