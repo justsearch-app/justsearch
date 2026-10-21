@@ -92,6 +92,11 @@ const AI_STATE_READY = {
   // `projectAvailability` now gates on this first (a dead backend leaves `capabilities.chat` true off
   // the retained snapshot), so a fixture that omits it would describe a disconnected backend.
   snapshotLive: true,
+  // Readiness cases are confirmed index observations, not runtime-mode guesses.
+  indexingStatusLive: true,
+  status: { worker: { core: { indexState: 'IDLE', indexHealthy: true, pendingJobs: 0 } } },
+  episodeMaxPendingJobs: 0,
+  enrichSettleSamples: [],
 };
 vi.mock('../state/aiStateStore.js', () => ({
   startAiStateStore: vi.fn(),

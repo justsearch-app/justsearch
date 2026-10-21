@@ -1409,13 +1409,15 @@ export class Sv3Composer extends JfElement {
     // The ONE banner slot, shared. The affordance-scoped reason yields whenever the degradation
     // banner already words its code, so the same fact never stands in the slot twice.
     const reason = sv3ComposerReason(this.degradation, activeReason);
+    // Like the degradation banner, this is a reachable description of the refusal. The shell's
+    // always-mounted status deck announces observed health/indexing changes once for all surfaces.
     return html`
       <div class="band" data-testid="sv3-composer-band">
         ${this.state === 'hero' ? this.landing() : nothing}
         ${this.degradationBanner()}
         ${reason === ''
           ? nothing
-          : html`<p class="notice" id="sv3-composer-notice" role="status" data-testid="sv3-composer-notice">
+          : html`<p class="notice" id="sv3-composer-notice" data-testid="sv3-composer-notice">
               ${reason}
             </p>`}
         ${this.scopeNote()}

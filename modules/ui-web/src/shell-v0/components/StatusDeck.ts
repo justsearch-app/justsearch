@@ -32,7 +32,7 @@ import {
 // Tempdoc 814 §D5 / §B.7 — the chip's yield rule reads the SAME banner-presence authority the chat
 // surface's banner does, and the SAME activeSurface Shell already publishes on every navigation.
 // No new signal, no state fork.
-import { readinessNotice, warrantsSearchDegradationBanner } from '../state/readinessNotice.js';
+import { isIndexingObservation, readinessNotice, warrantsSearchDegradationBanner } from '../state/readinessNotice.js';
 import { getShellContext, subscribeShellContext } from '../state/shellContextState.js';
 import { presentVerdict, type VerdictKind } from '../state/verdict.js';
 import { presentAiEngineVerdict, type AiEngineKind } from '../state/aiVerdict.js';
@@ -56,7 +56,7 @@ import { projectFact } from '../display/facts.js';
 import { formatBytes, formatCount } from '../display/format.js';
 import './Control.js';
 import { subscribeTasks, listRunningTasks, type Task } from '../substrates/tasks/index.js';
-import { selectIndexingProgress } from '../state/indexingProgress.js';
+import { selectIndexingProgress, indexingTaskStatus } from '../state/indexingProgress.js';
 import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
 import type { ComponentState } from '../../api/generated/schema-types/status-response.js';
 
@@ -477,8 +477,18 @@ export class StatusDeck extends JfElement {
    */
   private inferenceChipReadout(): { label: string; tone: NoticeTone } {
     const s = this.aiState;
-    if (s && this.yieldsDegradationToBanner()) return statusWithoutVerdictFlavor(s);
-    return { label: s?.statusLabel ?? 'offline', tone: this.inferencePillTone() };
+    const readout = s && this.yieldsDegradationToBanner()
+      ? statusWithoutVerdictFlavor(s)
+      : { label: s?.statusLabel ?? 'offline', tone: this.inferencePillTone() };
+    // Runtime mode says who owns the GPU, not whether its enrichment cycle is running.
+    const indexingMode = s?.aiEngine.kind === 'indexing' && readout.label === 'Indexing';
+    const indexingTransition = s?.verdict.kind === 'transitioning' && s.verdict.reasons.some(isIndexingObservation);
+    if (s && (indexingMode || indexingTransition)) {
+      const { activity } = selectIndexingProgress(s.status, s.indexingStatusLive, s.episodeMaxPendingJobs, s.enrichSettleSamples);
+      if (!activity.confirmed) return { label: activity.summary, tone: 'neutral' };
+      if (indexingMode) return { label: activity.summary, tone: readout.tone };
+    }
+    return readout;
   }
 
   /**
@@ -520,7 +530,7 @@ export class StatusDeck extends JfElement {
     // showing one would claim progress that cannot happen.
     const progress = selectIndexingProgress(
       this.status,
-      this.aiState?.snapshotLive ?? false,
+      this.aiState?.indexingStatusLive ?? false,
       this.aiState?.episodeMaxPendingJobs ?? 0,
       this.aiState?.enrichSettleSamples ?? [],
     );
@@ -555,10 +565,11 @@ export class StatusDeck extends JfElement {
         if (running.length === 0) return nothing;
         const target = running.find((t) => t.originSurfaceId)?.originSurfaceId;
         const count = running.length;
-        const text = count === 1 ? running[0]!.label : `${count} running`;
+        const lastKnown = running.some(task => indexingTaskStatus(task, progress.activity) !== task.status);
+        const text = (count === 1 ? running[0]!.label : `${count} running`) + (lastKnown ? ' — indexing last observed' : '');
         if (!target) {
           return html`<span class="group" role="img" aria-label="${name}: ${text}">
-            <span aria-hidden="true">⟳</span><span class="val">${count}</span>
+            <span aria-hidden="true">⟳</span><span class="val">${count}${lastKnown ? ' · indexing last observed' : ''}</span>
           </span>`;
         }
         return html`<jf-control
@@ -566,7 +577,7 @@ export class StatusDeck extends JfElement {
           label="${name}: ${text}. Return to it."
           .onActivate=${() => requestSurfaceNavigation(target)}
         >
-          <span aria-hidden="true">⟳</span><span class="val">${count}</span>
+          <span aria-hidden="true">⟳</span><span class="val">${count}${lastKnown ? ' · indexing last observed' : ''}</span>
         </jf-control>`;
       }
       case 'core.conn': {
@@ -620,6 +631,7 @@ export class StatusDeck extends JfElement {
         return html`<jf-control
           class="status-pill group"
           label="${name}: ${mode}. ${actionLabel}"
+          title=${this.aiState?.aiEngine.kind === 'indexing' ? progress.activity.detail ?? nothing : nothing}
           .onActivate=${() =>
             needsBrain ? requestSurfaceNavigation('core.brain-surface') : this.openHealth()}
         >
@@ -627,21 +639,14 @@ export class StatusDeck extends JfElement {
         </jf-control>`;
       }
       case 'core.queue': {
-        if (queue <= 0 && embed <= 0) return nothing;
-        // 630: the global, main-surface home for energy-pause legibility. When the OS energy saver
-        // is deferring deferrable backfill, a queue that sits still should read as "paused to save
-        // energy", not stalled/broken — the calm twin of the Health card's "Paused — saving energy".
-        // (Not routed through the degradation banner: that mechanism is degradation-only, and search
-        // still works. "Catching up…" already shows here via the verdict pill.)
-        const energyPaused = this.status?.power?.energyReduced === true && queue > 0;
-        if (energyPaused) {
-          return html`<span
-            class="group"
-            role="img"
-            aria-label="${name}: ${NUM.format(queue)} job(s) queued — paused to save energy"
-          >
-            ${icon({ name: 'moon', size: 11 })}
-            <span class="val">queue: ${NUM.format(queue)} · paused</span>
+        if (queue <= 0 && embed <= 0 && progress.activity.confirmed) return nothing;
+        const activity = progress.activity;
+        if (!activity.confirmed || activity.detail) {
+          const description = [activity.summary, activity.detail].filter(Boolean).join(' — ');
+          const label = activity.confirmed ? `queue: ${NUM.format(queue)} · ${description}` : description;
+          return html`<span class="group" role="img" aria-label=${label} title=${label}>
+            ${icon({ name: 'zap', size: 11 })}
+            <span class="val">${label}</span>
           </span>`;
         }
         // 813 §4 — during the enrichment window the honest second number is the COVERAGE fraction,
@@ -706,9 +711,23 @@ export class StatusDeck extends JfElement {
     // Tempdoc 663 Design pass 3 — the AI-engine sibling announcer, same pattern, living in this
     // ALWAYS-MOUNTED surface (not BrainSurface's own render) so a transition still announces even if
     // the user has navigated away from the AI Brain page.
-    const aiEngineAnnounce = this.aiState ? presentAiEngineVerdict(this.aiState.aiEngine).announce : null;
+    // The shared indexing announcer below already owns indexing activity and its holds.
+    const aiEngineAnnounce = this.aiState && this.aiState.aiEngine.kind !== 'indexing'
+      ? presentAiEngineVerdict(this.aiState.aiEngine).announce : null;
+    const progress = selectIndexingProgress(
+      this.status, this.aiState?.indexingStatusLive ?? false,
+      this.aiState?.episodeMaxPendingJobs ?? 0, this.aiState?.enrichSettleSamples ?? [],
+    );
+    const indexingTransition = this.aiState?.verdict.kind === 'transitioning' &&
+      this.aiState.verdict.reasons.some(isIndexingObservation);
+    // Migration and holds are one indexing subject, including when its observation expires.
+    const indexingAnnounce = [indexingTransition && progress.activity.confirmed
+      ? announce?.text ?? progress.activity.summary : progress.activity.summary,
+    progress.activity.detail].filter(Boolean).join(' — ');
     return html`
-      ${announce
+      <jf-system-notice class="visually-hidden" live="status" data-testid="indexing-announcer"
+        >${indexingAnnounce}</jf-system-notice>
+      ${announce && !indexingTransition
         ? html`<jf-system-notice
             class="visually-hidden"
             live=${announce.politeness}

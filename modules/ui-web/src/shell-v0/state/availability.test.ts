@@ -19,7 +19,7 @@ import {
 import type { AiState } from './aiStateStore.js';
 import { known, UNKNOWN } from './known.js';
 
-/** Minimal AiState carrying only the fields projectAvailability reads. */
+/** Confirmed observations for the capability cases; runtime mode alone is not work evidence. */
 function aiState(opts: {
   phase?: AiState['phase'];
   chat?: boolean;
@@ -51,6 +51,11 @@ function aiState(opts: {
   return {
     phase: opts.phase ?? 'connected',
     snapshotLive: opts.snapshotLive ?? true,
+    indexingStatusLive: opts.snapshotLive ?? true,
+    status: { worker: { core: { indexState: 'IDLE', indexHealthy: true,
+      pendingJobs: opts.pendingJobs ?? (opts.mode === 'indexing' ? 1 : 0) } } },
+    episodeMaxPendingJobs: 0,
+    enrichSettleSamples: [],
     capabilities: { chat: opts.chat ?? true, rag: false, extract: false, embedding: false },
     runtime: { mode: opts.mode ?? 'online' },
     verdict,
@@ -129,7 +134,7 @@ describe('projectAvailability (tempdoc 596)', () => {
     });
   });
 
-  it('zero docs WHILE indexing (runtime.mode) → transient forward-looking reason (§16.4 availableWhen)', () => {
+  it('zero docs WHILE indexing (confirmed status) → transient forward-looking reason (§16.4 availableWhen)', () => {
     const a = projectAvailability('documents', aiState({ chat: true, docs: 0, mode: 'indexing' }));
     expect(a.kind).toBe('unavailable');
     expect(isUnavailable(a) && a.transient).toBe(true);

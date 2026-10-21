@@ -1,0 +1,247 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T01:59:36.724Z",
+  "revision": "8dbeb755730762c155c9422302bf0b9f419020ab",
+  "tree": "872d2c4a7fd167471a6e755af822d4bc659bc411",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/indexingMissedSurfaces.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-vitest-1802715-1792547971194.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2215
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 encoder and passage readiness observations are qualified on both Search paths",
+      "file": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6e0a6b719dd0be86488a464e15061afeeeeb6e7c55c39ee888f9a70ed1cf467f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 S33.6 encoder and passage readiness observations are qualified on both Search paths",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 Browse empty roots never infer a current rebuild from unconfirmed migration",
+      "file": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6e0a6b719dd0be86488a464e15061afeeeeb6e7c55c39ee888f9a70ed1cf467f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 S33.6 Browse empty roots never infer a current rebuild from unconfirmed migration",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 migration mode pills qualify retained rebuilding while preserving fresh migration",
+      "file": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6e0a6b719dd0be86488a464e15061afeeeeb6e7c55c39ee888f9a70ed1cf467f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 S33.6 migration mode pills qualify retained rebuilding while preserving fresh migration",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 declared liveness readouts qualify retained migration and its accessible name",
+      "file": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6e0a6b719dd0be86488a464e15061afeeeeb6e7c55c39ee888f9a70ed1cf467f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 S33.6 declared liveness readouts qualify retained migration and its accessible name",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.1 S33.4 overlay activity animation stops during deferred work and uncertainty, then resumes",
+      "file": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6e0a6b719dd0be86488a464e15061afeeeeb6e7c55c39ee888f9a70ed1cf467f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 independent inventory regressions S33.1 S33.4 overlay activity animation stops during deferred work and uncertainty, then resumes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.6 Search and deck announce an indexing transition once, with silent numeric and identical polls",
+      "file": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6e0a6b719dd0be86488a464e15061afeeeeb6e7c55c39ee888f9a70ed1cf467f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 independent inventory regressions S33.6 Search and deck announce an indexing transition once, with silent numeric and identical polls",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims",
+      "file": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6e0a6b719dd0be86488a464e15061afeeeeb6e7c55c39ee888f9a70ed1cf467f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 Brain runtime queues use worker counts and confirmation even with fresh inference contact",
+      "file": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6e0a6b719dd0be86488a464e15061afeeeeb6e7c55c39ee888f9a70ed1cf467f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 Brain runtime queues use worker counts and confirmation even with fresh inference contact",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 Health fallback queue dot cannot animate an unconfirmed observation",
+      "file": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6e0a6b719dd0be86488a464e15061afeeeeb6e7c55c39ee888f9a70ed1cf467f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 Health fallback queue dot cannot animate an unconfirmed observation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts#595 §15.1 (E1): a visually-hidden aria-live announcer mirrors the verdict, politely",
+      "file": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9adf0867284d6c3dd2b4ad43c763383f15ea71822d1e377eb8a52807a105bf6c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "StatusDeck (slice 461) 595 §15.1 (E1): a visually-hidden aria-live announcer mirrors the verdict, politely",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "8dbeb7557",
+    "revision": "8dbeb755730762c155c9422302bf0b9f419020ab",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/indexingMissedSurfaces.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-vitest-1802715-1792547974413.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2100,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-vitest-1802715-1792547974413.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 encoder and passage readiness observations are qualified on both Search paths",
+        "classification": "assertion",
+        "detail": "WP3.3 independent inventory regressions S33.4 S33.6 encoder and passage readiness observations are qualified on both Search paths:  AssertionError: age: encoders.health.embedding_not_ready: notice: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-before-UjMkfP/modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts:85:71"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 Browse empty roots never infer a current rebuild from unconfirmed migration",
+        "classification": "assertion",
+        "detail": "WP3.3 independent inventory regressions S33.4 S33.6 Browse empty roots never infer a current rebuild from unconfirmed migration:  AssertionError: age: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-before-UjMkfP/modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts:95:45\n    at file:///home/elias/dev/justsearch/.claude/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 migration mode pills qualify retained rebuilding while preserving fresh migration",
+        "classification": "assertion",
+        "detail": "WP3.3 independent inventory regressions S33.4 S33.6 migration mode pills qualify retained rebuilding while preserving fresh migration:  AssertionError: age: expected 'Rebuilding…' to be 'Indexing status unconfirmed' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-before-UjMkfP/modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts:103:84\n    at file:///"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 declared liveness readouts qualify retained migration and its accessible name",
+        "classification": "assertion",
+        "detail": "WP3.3 independent inventory regressions S33.4 S33.6 declared liveness readouts qualify retained migration and its accessible name:  AssertionError: age: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-before-UjMkfP/modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts:111:63\n    at file:///home/elias/dev/justsearch/.claude"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.1 S33.4 overlay activity animation stops during deferred work and uncertainty, then resumes",
+        "classification": "assertion",
+        "detail": "WP3.3 independent inventory regressions S33.1 S33.4 overlay activity animation stops during deferred work and uncertainty, then resumes:  AssertionError: energy: 0 files: expected true to be false // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-before-UjMkfP/modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts:133:69\n    at file:///home/elias/dev/justse"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.6 Search and deck announce an indexing transition once, with silent numeric and identical polls",
+        "classification": "assertion",
+        "detail": "WP3.3 independent inventory regressions S33.6 Search and deck announce an indexing transition once, with silent numeric and identical polls:  AssertionError: indexing stale, expanded=false: expected 2 to be 1 // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-before-UjMkfP/modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts:156:66\n    at file:///home/elias/de"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims",
+        "classification": "assertion",
+        "detail": "WP3.3 independent inventory regressions S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-before-UjMkfP/modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts:180:111\n    at file:///home/elias/dev/justsearch/.claude/wor"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 Brain runtime queues use worker counts and confirmation even with fresh inference contact",
+        "classification": "assertion",
+        "detail": "WP3.3 independent inventory regressions S33.4 Brain runtime queues use worker counts and confirmation even with fresh inference contact:  AssertionError: energy: expected '\\n      \\n        \\n    \\n   Runtime\\…' to contain 'embed queue: 80'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-before-UjMkfP/modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts:185:42\n    at file://"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 Health fallback queue dot cannot animate an unconfirmed observation",
+        "classification": "assertion",
+        "detail": "WP3.3 independent inventory regressions S33.4 Health fallback queue dot cannot animate an unconfirmed observation:  AssertionError: age: expected true to be false // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-before-UjMkfP/modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts:197:81\n    at file:///home/elias/dev/justsearch/.claude"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts#595 §15.1 (E1): a visually-hidden aria-live announcer mirrors the verdict, politely",
+        "classification": "assertion",
+        "detail": "StatusDeck (slice 461) 595 §15.1 (E1): a visually-hidden aria-live announcer mirrors the verdict, politely:  AssertionError: expected 'Indexing' to be 'Rebuilding…' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-before-UjMkfP/modules/ui-web/src/shell-v0/components/StatusDeck.test.ts:365:36\n    at runNextTicks (node:internal/process/task_que"
+      }
+    ]
+  },
+  "digest": "sha256:8cdf6f8fe3d76204a0c04fb32029667ed1b691cea6e00f1b81bea6c59bdeb042"
+}

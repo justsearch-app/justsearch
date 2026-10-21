@@ -1,0 +1,118 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T19:12:07.720Z",
+  "revision": "8dbeb755730762c155c9422302bf0b9f419020ab",
+  "tree": "d8d95753a629d551dd17a292d430ec3493dc644c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/test-intent-vitest-3262968-1792523526586.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1133
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:38c47f8e6cf5c5173ef0b9531b2166d3573b800c622b3f302ae7faa5ff0db44f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "BrainSurface — enrichment progress card (807) S33.4 a fresh timestamp with 'worker RPC stale' is unconfirmed, then recovers",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress card (807) S33.4 a fresh timestamp with 'indexing lane stale' is unconfirmed, then recovers",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress card (807) S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress card (807) stops presenting as live progress when the snapshot is not live",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress card (807) stops ANIMATING when the snapshot is not live (the spinner is the present-tense claim)",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress card (807) ANTI-REGRESSION: a healthy verdict still renders the live progress card unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress SCOPE (round-15 scope mismatch) THE defect: the card does not disappear when its old single signal hits 100%",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress SCOPE (round-15 scope mismatch) shows the AGGREGATE percent, the one the other surfaces show — not the embedding stage",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress SCOPE (round-15 scope mismatch) declares its SCOPE, and no longer promises a quantity it is not measuring",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress SCOPE (round-15 scope mismatch) withdraws once the WHOLE blend settles, not once one stage does",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress SCOPE (round-15 scope mismatch) renders no progress bar when semantic enrichment cannot run at all (round-15 F1)",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — capability counts (807) \"4/4 active\" stops claiming active when the snapshot is not live",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — capability counts (807) ANTI-REGRESSION: a healthy verdict still says \"4/4 active\"",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — the status card sentence (807 Part A) THE round-13 photograph: with the backend gone, the card no longer reads \"Online / Chat and summaries ready.\"",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — the status card sentence (807 Part A) the card offers no action whose precondition is a live backend (807 A.3)",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — the status card sentence (807 Part A) ANTI-REGRESSION: a live observation still renders the green \"Online / Chat and summaries ready.\"",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — Runtime card (807) labels the readout as last-known and blocks its controls with a reason when not live",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — Runtime card (807) P2: an offline click on a runtime control neither queues nor fires when the backend returns",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — Runtime card (807) ANTI-REGRESSION: a healthy verdict leaves the Runtime readout and its controls alone",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:af79b8c523e45d447d5a0b988ad4cb48b6b09199603233ccdeed6dcba45f2371"
+}
