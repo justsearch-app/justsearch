@@ -3638,6 +3638,14 @@ public final class KnowledgeServer implements Closeable {
         pendingDeferredUpgrade = null;
         // Only a no-throw gate opens after B is publicly selected; no jobs were claimed before it.
         candidate.activatePreparedIndexingLoop();
+        // A root watched while only the reader served (an automatic restore at start) gets its
+        // pending watcher receipts applied now that a writer serves it. A failure keeps them
+        // pending for the next watch, start or reload; it must not undo the published upgrade.
+        try {
+          candidate.ingestService().reconcilePendingWatcherRoots();
+        } catch (RuntimeException pending) {
+          log.warn("Pending watcher receipts wait after the writer upgrade: {}", pending.getMessage());
+        }
       } catch (RuntimeException | Error failure) {
         try { closePendingAppServices(); }
         catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }

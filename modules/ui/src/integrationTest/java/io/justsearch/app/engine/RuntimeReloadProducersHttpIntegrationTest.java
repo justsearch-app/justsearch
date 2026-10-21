@@ -423,6 +423,19 @@ final class RuntimeReloadProducersHttpIntegrationTest {
     assertWaitingDeleteRecovered();
   }
 
+  @Test
+  @Timeout(240)
+  void automaticRootRestoreAppliesTheWaitingDeleteWithoutAWatchCall() throws Exception {
+    assertEquals(71, crashChild("persisted.close"), "the selected crash cut must execute");
+    // The restart restores the persisted root by itself (no watch call): the pending receipt
+    // must be applied within awaitCount's bound, not left to a later periodic sync.
+    try (var f = new Fixture(true)) {
+      f.awaitCount("reloadobligationgone", 0);
+      f.awaitCount("reloadobligationkept", 1);
+      assertEquals(List.of(), f.receipts());
+    }
+  }
+
   /** After the restart and its watch call, the waiting DELETE has its effect; the sibling stays. */
   private void assertWaitingDeleteRecovered() throws Exception {
     try (var f = new Fixture()) {
@@ -468,7 +481,8 @@ final class RuntimeReloadProducersHttpIntegrationTest {
       try {
         var test = new RuntimeReloadProducersHttpIntegrationTest();
         test.directory = Path.of(args[1]);
-        var f = test.new Fixture();
+        boolean persisted = args[0].startsWith("persisted.");
+        var f = test.new Fixture(persisted);
         if ("failed-handoff".equals(args[0])) {
           var files = f.watchedFiles();
           var gate = (java.util.concurrent.locks.ReentrantReadWriteLock)
@@ -486,8 +500,8 @@ final class RuntimeReloadProducersHttpIntegrationTest {
         }
         // A successful native reload with a settled DELETE waiting on its fence, parked at the exit
         // of the named DefaultWorkerAppServices lifecycle method, where this process then dies.
-        var files = f.watchedFiles();
-        String cut = args[0];
+        var files = persisted ? f.persistedFiles() : f.watchedFiles();
+        String cut = args[0].substring(args[0].indexOf('.') + 1);
         new net.bytebuddy.agent.builder.AgentBuilder.Default()
             .with(net.bytebuddy.agent.builder.AgentBuilder.RedefinitionStrategy.RETRANSFORMATION)
             .type(net.bytebuddy.matcher.ElementMatchers.named(DefaultWorkerAppServices.class.getName()))
@@ -547,7 +561,13 @@ final class RuntimeReloadProducersHttpIntegrationTest {
     final Javalin http;
     final HttpClient transport = HttpClient.newHttpClient();
 
-    Fixture() throws Exception {
+    Fixture() throws Exception { this(false); }
+
+    /**
+     * {@code production}: root membership persists in the data folder and the bootstrap's automatic
+     * root producers run, so a restart restores and re-watches persisted roots by itself.
+     */
+    Fixture(boolean production) throws Exception {
       var builder = ResolvedConfig.builder();
       builder.putDefault(EnvRegistry.DATA_DIR.configKey(), directory.resolve("data").toString());
       builder.putDefault(EnvRegistry.INDEX_BASE_PATH.configKey(), directory.resolve("index").toString());
@@ -568,11 +588,12 @@ final class RuntimeReloadProducersHttpIntegrationTest {
                 encoders, configuration);
             built.set(result);
             return result;
-          }, 5_000, 100, ignored -> {}, () -> {}, OperationAuthority.inMemory());
+          }, 5_000, 100, ignored -> {}, () -> {}, production
+              ? OperationAuthority.load(directory.resolve("data")) : OperationAuthority.inMemory());
       var config = new KnowledgeServerConfig(false, directory.resolve("data"), directory, directory,
           5_000L, 5_000L, 1, 5_000L, 1_000L, 300_000L, 100, 5_000L, 0);
       bootstrap = new KnowledgeServerBootstrap(root.executors(), config, null, root.components(),
-          root.indexComponent(), root, false, root.publicationLock());
+          root.indexComponent(), root, production, root.publicationLock());
       bootstrap.startInitial(ignored -> {});
       server = built.get();
       assertTrue(server.awaitIndexRecoveryModels(10_000));
@@ -644,6 +665,18 @@ final class RuntimeReloadProducersHttpIntegrationTest {
     }
 
     WatchedFiles watchedFiles() throws Exception { return files(true); }
+
+    /** Both files indexed under a root the person added, so its membership persists. */
+    WatchedFiles persistedFiles() throws Exception {
+      Path root = Files.createDirectories(directory.resolve("watched"));
+      var files = new WatchedFiles(root,
+          Files.writeString(root.resolve("gone.txt"), "reloadobligationgone distinct content"),
+          Files.writeString(root.resolve("kept.txt"), "reloadobligationkept distinct content"));
+      client.addWatchedRoot("default", root, CONTEXT);
+      awaitCount("reloadobligationgone", 1);
+      awaitCount("reloadobligationkept", 1);
+      return files;
+    }
 
     /** A durable receipt as a failed or interrupted earlier reload leaves it for a watched root. */
     WatchedFiles unwatchedFilesWithReceipt() throws Exception {
