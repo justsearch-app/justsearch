@@ -32,7 +32,12 @@ candidate failures; the new port preserves restart-without-retry and known-crede
 Save results distinguish SAVED, FAILED_ROLLED_BACK and SAVED_WITHOUT_REPLICA. Round 3
 retains the old replica until the primary and then replica are published. Clean rollback preserves
 both old copies; only failed rollback invalidates stale wraps. Startup treats a valid primary as
-authoritative and durably repairs missing, invalid or different replicas. Temporary writes already
+authoritative and attempts durable repair of missing, invalid or different replicas.
+Round 4 makes replica repair best effort: read or repair failure logs a warning, exposes it through
+the existing Security & Privacy notice, and preserves loading/unlocking from the valid primary.
+A replica read failure performs no writes. The next start or successful save retries and clears
+the warning. These new checks use c697a4684. The HTTP save-outcome checks remain explicitly
+bound to 36d97a92f, where their failures are assertions; they are not claimed against 94c9bb8ec. Temporary writes already
 use unique names; refused abandoned-file cleanup warns and retries on subsequent saves.
 Existing SystemNotice rendering displays restoration and degraded-save warnings.
 New round-3 checks use 94c9bb8ec as their before-state. No verifier evidence was read this round.
@@ -356,6 +361,45 @@ New round-3 checks use 94c9bb8ec as their before-state. No verifier evidence was
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreReplicaRepairTest.java#startupRepairsReplicaFromAuthoritativePrimary",
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreReplicaRepairTest.java#lockedAbandonedTempWarnsAndRetriesWithoutBlockingSaves",
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreReplicaRepairTest.java#killBetweenPublicationsRepairsCurrentWrapsOnRestart"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/KeystoreStartupAvailabilityHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A real POSIX read-only encryption folder without a replica, a blocked replica path, an injected replica read error, and an injected read-only filesystem repair failure all preserve valid-primary loading in the exact key-manager constructor used by HeadAssembly. Real HTTP status exposes the warning and unlock decrypts the original key. Replica read errors call no writer and preserve both files. Each case retries on restart and successful save, retaining the key and clearing the warning. Read-only POSIX cases are skipped where the filesystem lacks POSIX permissions; blocked-path and read-error cases remain cross-platform.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "A valid primary always loads, whatever state the replica is in or whether it can be written.",
+          "location": "task t-20261021-f3 user turn 6"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "If the repair fails, log it and show the existing \"saved without replica\" style warning in Security & Privacy.",
+          "location": "task t-20261021-f3 user turn 6"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Retry the repair on the next start and on the next successful save.",
+          "location": "task t-20261021-f3 user turn 6"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "A replica read error must not be treated as \"missing\" in a way that triggers a restore or overwrites anything. With a valid primary, only a rewrite of the replica is allowed.",
+          "location": "task t-20261021-f3 user turn 6"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Plus one check at the Engine's assembly level, or the nearest real caller, that a replica failure doesn't stop the Engine from starting.",
+          "location": "task t-20261021-f3 user turn 6"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f3-startup-availability-repaired.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/KeystoreStartupAvailabilityHttpTest.java#validPrimaryLoadsAndWarnsThenRetries"
       ],
       "repaired": true
     }

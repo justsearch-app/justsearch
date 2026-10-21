@@ -51,6 +51,7 @@ public final class EncryptionKeystore {
   private final Path file;
   private final Path replica;
   private boolean restoredFromReplica;
+  private boolean replicaUnavailable;
 
   public EncryptionKeystore(Path dataDir) {
     this.file = Objects.requireNonNull(dataDir, "dataDir").resolve("encryption").resolve("keystore.json");
@@ -66,21 +67,30 @@ public final class EncryptionKeystore {
       byte[] primary = readIfPresent(file);
       if (primary != null && primary.length != 0) {
         KeystoreRecord authoritative = decode(primary);
-        byte[] backup = readIfPresent(replica);
-        boolean matches = false;
-        if (backup != null) {
-          try {
-            matches = authoritative.equals(decode(backup));
-          } catch (IllegalStateException invalidReplica) {
-            // A valid primary owns the current credentials, including when the replica is
-            // corrupt or uses a different schema. Never replace the primary with that copy.
+        try {
+          byte[] backup = readIfPresent(replica);
+          boolean matches = false;
+          if (backup != null) {
+            try {
+              matches = authoritative.equals(decode(backup));
+            } catch (IllegalStateException invalidReplica) {
+              // A valid primary owns the current credentials, even when the replica is invalid.
+            }
           }
-        }
-        if (!matches) {
-          AtomicFileWrites.replaceStrict(replica, primary);
+          if (!matches) {
+            AtomicFileWrites.replaceStrict(replica, primary);
+            LoggerFactory.getLogger(EncryptionKeystore.class)
+                .warn("Repaired encryption keystore recovery replica from authoritative primary: {}", replica);
+          }
+        } catch (IOException | RuntimeException replicaFailure) {
+          // A read failure is not absence: do not restore or rewrite either copy in that case.
+          // A failed repair must not prevent the Engine from using the validated primary.
+          replicaUnavailable = true;
           LoggerFactory.getLogger(EncryptionKeystore.class)
-              .warn("Repaired encryption keystore recovery replica from authoritative primary: {}", replica);
+              .warn("Could not read or repair encryption keystore recovery replica; using valid primary", replicaFailure);
+          return Optional.of(authoritative);
         }
+        replicaUnavailable = false;
         return Optional.of(authoritative);
       }
       byte[] backup = readIfPresent(replica);
@@ -102,6 +112,10 @@ public final class EncryptionKeystore {
   }
 
   public String recoveryNotice() {
+    if (replicaUnavailable) {
+      return "Your encryption key is available, but its recovery replica could not be read or repaired. "
+          + "Keep your recovery key safe. Repair will be retried on the next start or successful encryption change.";
+    }
     return restoredFromReplica ? "Your encryption key was restored from its recovery replica." : null;
   }
 
@@ -183,6 +197,7 @@ public final class EncryptionKeystore {
         return new SaveResult(SaveOutcome.FAILED_ROLLED_BACK, replicaFailure);
       }
       restoredFromReplica = false;
+      replicaUnavailable = false;
       return new SaveResult(SaveOutcome.SAVED, null);
     } catch (IOException e) {
       return new SaveResult(SaveOutcome.FAILED_ROLLED_BACK, e);
