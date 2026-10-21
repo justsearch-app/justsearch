@@ -20,8 +20,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -39,23 +41,33 @@ class KeystoreBackupDurabilityHttpTest {
   }
 
   @Test
+  @Timeout(90)
   void failedRotationAndRetryKeepHttpExportsDecryptable() throws Exception {
+    // Windows passes take 26-27 s against the 30 s default, with a timeout in the second
+    // round trip's import. Allow roughly three times the slowest observed pass for headroom.
+    System.out.println("Rotation/retry: setting up source keystore");
     var keys = new DataKeyManager(new EncryptionKeystore(dir));
     String recovery = keys.setup("old".toCharArray());
     Path replica = dir.resolve("encryption/keystore.replica.json");
     Files.deleteIfExists(replica);
     Files.createDirectories(replica);
     Files.writeString(replica.resolve("blocker"), "keep");
+    System.out.println("Rotation/retry: forcing failed rotation");
     assertThrows(UncheckedIOException.class,
         () -> keys.changePassphrase("old".toCharArray(), "new".toCharArray()));
+    System.out.println("Rotation/retry: round trip after failed rotation");
     roundTrip(keys, "old", recovery);
     Files.delete(replica.resolve("blocker"));
     Files.delete(replica);
+    System.out.println("Rotation/retry: retrying rotation");
     keys.changePassphrase("old".toCharArray(), "new".toCharArray());
+    System.out.println("Rotation/retry: round trip after successful retry");
     roundTrip(keys, "new", recovery);
   }
 
   private void roundTrip(DataKeyManager keys, String passphrase, String recovery) throws Exception {
+    long started = System.nanoTime();
+    System.out.println("Backup round trip: preparing target keystore");
     List<Map<String, Object>> entries = List.of(Map.of("sessionId", "saved", "message", "keep me"));
     var imported = new ArrayList<Map<String, Object>>();
     var sourceHead = mock(HeadAssembly.class);
@@ -63,6 +75,8 @@ class KeystoreBackupDurabilityHttpTest {
         dir.resolve("source"), () -> entries, ignored -> 0)));
     var targetKeys = new DataKeyManager(new EncryptionKeystore(Files.createTempDirectory(dir, "import-")));
     targetKeys.setup("target".toCharArray());
+    System.out.println("Backup round trip: target keystore ready after "
+        + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) + " ms");
     var targetHead = mock(HeadAssembly.class);
     when(targetHead.authoredStores()).thenReturn(List.of(new StoreDescriptor(StoreCatalog.CONVERSATIONS,
         dir.resolve("target"), List::of, restored -> { imported.addAll(restored); return restored.size(); })));
@@ -86,7 +100,10 @@ class KeystoreBackupDurabilityHttpTest {
         assertEquals(entries, imported);
       }
     } finally {
+      System.out.println("Backup round trip: stopping HTTP server");
       app.stop();
+      System.out.println("Backup round trip: completed cleanup; elapsed="
+          + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) + " ms");
     }
   }
 
@@ -94,8 +111,16 @@ class KeystoreBackupDurabilityHttpTest {
     var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + app.port() + path))
         .header("Content-Type", "application/json")
         .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body))).build();
-    var response = client.send(request, HttpResponse.BodyHandlers.ofString());
-    assertEquals(200, response.statusCode(), response.body());
-    return JSON.readTree(response.body());
+    long started = System.nanoTime();
+    String operation = "POST " + path + " " + body.keySet();
+    System.out.println(operation + ": sending");
+    try {
+      var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+      assertEquals(200, response.statusCode(), response.body());
+      return JSON.readTree(response.body());
+    } finally {
+      System.out.println(operation + ": elapsed="
+          + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) + " ms");
+    }
   }
 }
