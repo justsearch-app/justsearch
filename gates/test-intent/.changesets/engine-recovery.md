@@ -935,3 +935,14 @@ Temporary baseline/data folders are removed; raw logs and downloaded artifacts r
   "note": "All fifteen entries are warranted; fresh host/updater checks pass and updater fails by the intended baseline assertion; merge and register review found no conflict."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15f2d-b4c4-75e3-9808-613ad38bf88f",
+  "verdict": "accept",
+  "digest": "sha256:d1bc535f92be5a0562914c2c2827f0d9f597a23ef9eaa311b911a289531376b9",
+  "note": "All fifteen entries are warranted; independent before/after checks, unchanged race bounds, cleanup probes and both conformance adapters support the harness correction, with actual Windows execution unverified."
+}
+```
