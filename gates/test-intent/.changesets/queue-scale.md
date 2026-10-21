@@ -2112,3 +2112,14 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
   "note": "All 37 test-intent entries preserve or explicitly supersede agreed intent with matching receipts and independent reruns; two baseline-existing startup and recovery defects are reported separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15dc0-0479-76b3-98a0-a7d39a8e5848",
+  "verdict": "accept",
+  "digest": "sha256:539d5bbde121d6adeb22101514fa3136c5f9528c2df07a39695188682b358a71",
+  "note": "All 40 entries preserve or explicitly supersede Q1–Q27 intent with valid receipts, independent repair reruns and successful Linux V13, main-V23 and unshipped-V23 migration, refusal and crash-reopen probes; the startup-readiness finding is reported separately."
+}
+```
