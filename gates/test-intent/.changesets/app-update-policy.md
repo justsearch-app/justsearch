@@ -139,3 +139,14 @@ contain no policy parsing, environment suppression or fail-closed repair.
   "note": "Sources and classes verified; digest-bound execution evidence matches; product verdict is separate."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "o62doh87",
+  "verdict": "accept",
+  "digest": "sha256:fa5858deafd577e3f89243af0b5885e4294fa6ddc916437653295043b87478d1",
+  "note": "Revised owner-words source quotes the task request verbatim and supports the fail-closed entry; other sources and classes hold."
+}
+```
