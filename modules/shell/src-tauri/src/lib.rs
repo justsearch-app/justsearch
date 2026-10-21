@@ -20,6 +20,7 @@ mod search_shortcut;
 mod session_window;
 mod shell_actuator;
 mod supervisor;
+mod tls;
 mod updater;
 
 use binding::{read_manifest_if_present, Binding, ManifestFields};
@@ -1919,6 +1920,7 @@ async fn read_plugin_source(path: String) -> Result<String, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    tls::initialize();
     // First, before any window or Engine exists: at Windows shutdown and logoff the shell is ended
     // before other applications, so its incarnation job closes and takes the Engine and its helpers
     // with it (Spec F §0.1 SHELL_SHUTDOWN_LEVEL).
