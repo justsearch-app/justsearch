@@ -223,7 +223,7 @@ final class RuntimeReloadHttpIntegrationTest {
       publish.invoke(server, services());
       var creation = KnowledgeServer.class.getDeclaredMethod("newAppServices");
       creation.setAccessible(true);
-      doAnswer(ignored -> services()).when(server);
+      var unused = doAnswer(ignored -> services()).when(server);
       creation.invoke(server);
       client = new EngineKnowledgeClient(executors, server::appServices,
           new ForegroundLoadGate(new ForegroundLoad()), 5_000, 100, IpcTelemetry.noop(),

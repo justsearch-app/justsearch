@@ -479,7 +479,7 @@ final class EngineRuntimeReloadTest {
       publish(services());
       var creation = KnowledgeServer.class.getDeclaredMethod("newAppServices");
       creation.setAccessible(true);
-      doAnswer(ignored -> services()).when(server);
+      var unused = doAnswer(ignored -> services()).when(server);
       creation.invoke(server);
       client = new EngineKnowledgeClient(registry, server::appServices,
           new ForegroundLoadGate(new ForegroundLoad()), deadline, 100, IpcTelemetry.noop(),
