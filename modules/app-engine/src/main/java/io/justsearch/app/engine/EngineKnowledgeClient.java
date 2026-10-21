@@ -72,6 +72,10 @@ import org.slf4j.LoggerFactory;
  */
 public final class EngineKnowledgeClient extends KnowledgeClient {
 
+  private io.justsearch.core.scheduling.IndexingHold indexingHold;
+  void bindIndexingHold(io.justsearch.core.scheduling.IndexingHold hold) { indexingHold = hold; }
+  @Override public io.justsearch.core.scheduling.IndexingHold indexingHold() { return indexingHold; }
+
   private static final Logger log = LoggerFactory.getLogger(EngineKnowledgeClient.class);
 
   /**

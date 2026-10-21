@@ -65,6 +65,8 @@ final class CoreOperationCatalogTest {
             "core.apply-excludes",
             "core.switch-inference-mode",
             "core.set-chat-enabled",
+            "core.indexing-pause",
+            "core.indexing-resume",
             "core.trigger-offline-processing",
             "core.activate-runtime-variant",
             "core.deactivate-runtime-variant",

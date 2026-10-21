@@ -43,8 +43,8 @@ public final class ResetSettingsHandler implements OperationHandler {
   public OperationApprovalPreview approvalPreview(OperationPreparation prepared) {
     var intent = SettingsResetPreparation.validate(prepared);
     return new OperationApprovalPreview(intent.recovery()
-        ? "Reset unavailable settings history to defaults and restart the Engine. Preserved corruption evidence remains."
-        : "Reset user-facing settings to defaults while preserving administrator paths and window settings.");
+        ? "Reset unavailable settings history to defaults, clear exclusions and indexing pause, and restart the Engine. Preserved corruption evidence remains."
+        : "Reset user-facing settings to defaults, including clearing exclusions and indexing pause, while preserving administrator paths and window settings.");
   }
 
   @Override

@@ -9,6 +9,8 @@ import java.util.Locale;
  * sorted by it, and its first entry is the primary reason. Lower snake case on the wire.
  */
 public enum IndexingReason {
+  USER_PAUSED,
+  SETTINGS_RECOVERY,
   GAME_MODE,
   GPU_BUSY_EXTERNAL,
   ENERGY_SAVER,

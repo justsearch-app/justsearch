@@ -502,6 +502,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     this.knowledgeServerLifecycleSupplier = supplier;
     // Spec E step E1: the operating indexing block reads the same Engine's bulk-work gate.
     operatingStateAssembler.setBulkWork(() -> value("bulk-gate", null));
+    operatingStateAssembler.setIndexingHold(() -> value("indexing-hold", null));
   }
 
   /**
@@ -670,6 +671,12 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       var supplier = knowledgeServerLifecycleSupplier;
       var server = supplier == null ? null : supplier.get();
       return server == null ? null : server.bulkWork().snapshot();
+    }, period));
+    pending.add(refresh("indexing-hold", () -> {
+      var supplier = knowledgeServerLifecycleSupplier;
+      var server = supplier == null ? null : supplier.get();
+      var scheduling = server == null ? null : server.gpuScheduling();
+      return scheduling == null ? null : scheduling.indexingHold().snapshot();
     }, period));
     pending.add(refresh("vdu", () -> vduCapabilitySnapshotSupplier == null ? null : vduCapabilitySnapshotSupplier.get(), period));
     pending.add(refresh("vdu-processing", () -> vduProcessingSupplier != null && Boolean.TRUE.equals(vduProcessingSupplier.get()), period));
@@ -906,7 +913,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     OperatingStateView operating = value("operating", (OperatingStateView) null);
     operating = StatusSnapshotCache.ageOperating(operating, clockMs.getAsLong(),
         stale("operating") || stale("inference") || stale("registry"),
-        stale("operating") || workerRpcStale || stale("bulk-gate") || stale("power"),
+        stale("operating") || workerRpcStale || stale("bulk-gate") || stale("indexing-hold") || stale("power"),
         stale("operating") || stale("gpu-memory") || stale("device-plan"), observation("gpu-memory").staleAfterMs());
     operating = StatusSnapshotCache.projectOperating(operating, lifecycleSnapshot, inference);
     if (operating != null) {

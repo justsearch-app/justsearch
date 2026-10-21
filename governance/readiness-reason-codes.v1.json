@@ -60,6 +60,18 @@
       "why": "Spec E step E1: the reasonCode of the operating status block's indexing projection (operating.indexing), set by OperatingStateAssembler when indexing is PAUSED for energy saver. It never enters the readiness envelope or wordCauses; the operating surface words it from its reasons."
     },
     {
+      "code": "indexing.pausing_user",
+      "why": "WP3.6: operating.indexing reports the user hold while admitted processors finish and publish. It never enters readiness; controls and wording are WP3.7."
+    },
+    {
+      "code": "indexing.paused_user",
+      "why": "WP3.6: operating.indexing reports the acknowledged user hold, including an empty queue. It never enters readiness; controls and wording are WP3.7."
+    },
+    {
+      "code": "indexing.paused_settings_recovery_check_exclusions",
+      "why": "WP3.6 decision 7: settings recovery holds processing because exclusions may have been lost. It never enters readiness; operating.indexing and MCP status report this reason."
+    },
+    {
       "code": "indexing.slowed_chat_generating",
       "why": "Spec E step E2: the reasonCode of the operating status block's indexing projection (operating.indexing), set by OperatingStateAssembler when indexing is SLOWED to the duty floor while chat is answering. It never enters the readiness envelope or wordCauses; the operating surface words it from its reasons."
     },

@@ -155,7 +155,6 @@ interface UISettings {
   highContrast?: boolean;
   defaultAction?: 'open' | 'reveal' | 'preview';
   vimMode?: boolean;
-  pauseIndexingDuringAi?: boolean;
 }
 
 /**

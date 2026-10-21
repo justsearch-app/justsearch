@@ -1,0 +1,117 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T18:04:12.732Z",
+  "revision": "1016257d2f200a6fd39bc1b4e88d20595e66223f",
+  "tree": "00212e4e957246cc4d70d9323002cff24a362e3d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/api/contract.test.ts\" \"src/api/generated/schema-types/settings-v2.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/e9cx5hlb/tmp/test-intent-vitest-1235409-1792605850803.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1927
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/api/contract.test.ts",
+      "file": "modules/ui-web/src/api/contract.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:03b3df4d5ea07bb7162dcb5bebfd8cf7d27f1829d23bbb27e24af1c88a6320f9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Cross-language contract: StatusResponse vs generated statusResponseSchema Java-serialized StatusResponse passes Zod validation",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: StatusResponse vs generated statusResponseSchema fixture contains expected top-level fields",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: StatusResponse vs generated statusResponseSchema readiness envelope has expected structure",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: SettingsV2 round-trip Java-serialized SettingsV2 passes generated Zod validation",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: SettingsV2 round-trip fixture contains all expected settings fields",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: KnowledgeSearchResponse → generated knowledgeSearchResponseSchema Java-serialized search response passes generated Zod validation, then maps",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: KnowledgeSearchResponse → generated knowledgeSearchResponseSchema mapped response preserves hit data",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: KnowledgeSearchResponse → generated knowledgeSearchResponseSchema mapped response preserves metadata fields (364 T1-C)",
+          "status": "passed"
+        },
+        {
+          "name": "Cross-language contract: KnowledgeSearchResponse → generated knowledgeSearchResponseSchema raw fixture has expected wire format fields",
+          "status": "passed"
+        },
+        {
+          "name": "380: Mapper propagation — no silent field drops all fields map entries from rich fixture hit propagate to mapped SearchHit",
+          "status": "passed"
+        },
+        {
+          "name": "380: Mapper propagation — no silent field drops sparse hit (missing optional fields) maps without crashing",
+          "status": "passed"
+        },
+        {
+          "name": "380: Mapper propagation — no silent field drops top-level result properties propagate when present",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/generated/schema-types/settings-v2.test.ts",
+      "file": "modules/ui-web/src/api/generated/schema-types/settings-v2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:cef2433d77090bc1a47e6b2e353e4d8901e133d4c587149a183dcfbd019d40e6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generated settingsV2Schema (683 faithfulness) validates the real captured settings wire fixture with no contract drift",
+          "status": "passed"
+        },
+        {
+          "name": "generated settingsV2Schema (683 faithfulness) accepts a receipt-only replay without inventing a current settings document",
+          "status": "passed"
+        },
+        {
+          "name": "generated settingsV2Schema (683 faithfulness) rejects a witness with a nonnumeric revision",
+          "status": "passed"
+        },
+        {
+          "name": "generated settingsV2Schema (683 faithfulness) requires both members of a nonnull witness while allowing an explicit initial pair",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2fc3e813052402a3d995a5e616196fb0f8bb95c145ae657adf4df4be2d96ec3b"
+}
