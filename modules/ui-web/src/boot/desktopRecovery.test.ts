@@ -130,6 +130,25 @@ describe('desktop boot recovery', () => {
     expect(recovery.shadowRoot?.textContent).toContain('You have the latest version');
   });
 
+  it.each(['Check for updates', 'Install update'])('shows administrator refusal for %s with the Engine down', async (label) => {
+    const refusal = 'App updates are disabled by administrator policy (appUpdatesEnabled=false).';
+    const root = document.getElementById('root')!;
+    await resolveBootWithRecovery(root);
+    const recovery = root.querySelector('jf-engine-recovery') as EngineRecovery;
+    await recovery.updateComplete;
+    const button = [...recovery.shadowRoot!.querySelectorAll('jf-button')]
+      .find((candidate) => candidate.textContent?.trim() === label) as HTMLElement & { onActivate: () => Promise<void> };
+    expect(button).toBeDefined();
+    mocks.invoke.mockImplementation(async (command) => {
+      if (command === 'app_update_status') return { state: 'available', currentVersion: '1.0', availableVersion: '1.1' };
+      throw refusal;
+    });
+    await button.onActivate();
+    await recovery.updateComplete;
+    expect(recovery.shadowRoot?.querySelector('[role="alert"]')?.textContent).toContain(refusal);
+    expect(mocks.endpoint).toHaveBeenCalledOnce();
+  });
+
   it('keeps browser unresolved behavior and never invokes native recovery commands', async () => {
     mocks.native.mockReturnValue(false);
     const root = document.getElementById('root')!;

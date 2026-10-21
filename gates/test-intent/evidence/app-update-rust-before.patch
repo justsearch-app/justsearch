@@ -1,0 +1,14 @@
+--- a/modules/shell/src-tauri/src/updater.rs
++++ b/modules/shell/src-tauri/src/updater.rs
+@@ -1062,6 +1062,11 @@
+     }
+ }
+ 
++// Compatibility only: before the off switch all updater operations were allowed.
++fn authorize_app_update_at(
++    _machine: Option<&Path>, _user: &Path, _automatic: bool, _preference: Option<&str>,
++) -> Result<bool, String> { Ok(true) }
++
+ async fn check_release(app: &AppHandle) -> Result<Option<ReleaseDescriptor>, String> {
+     let descriptor_url = descriptor_url()?;
+     ensure_https(&descriptor_url)?;

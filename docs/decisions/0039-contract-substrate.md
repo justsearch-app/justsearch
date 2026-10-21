@@ -6,7 +6,7 @@ description: "One authority per contract Category, projected per target; only wi
 date: 2026-06-09
 probes:
   - adr-0039-one-contract-category
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-20
 ---
 
 
@@ -21,7 +21,11 @@ last_reviewed: 2026-09-02
 
 ## Status
 
-Accepted **in principle** (single authority per contract; projection-not-fork) — but the **proto-format realization is superseded by tempdoc 564**, which chose record-as-IDL for the wire Category and demoted proto to a derived view. The substrate framing stands; its V1 format does not.
+Accepted **in principle** (single authority per contract; projection-not-fork) — but the
+**proto-format realization for frontend types is superseded by tempdoc 564**, which
+chose record-as-IDL. Proto still feeds Java generation and `buf breaking`; it is
+not the frontend type authority. See the 2026-10-20 amendment and the superseded
+catalog proposal in [ADR-0041](0041-catalog-category-format.md).
 
 ## Decision
 
@@ -503,3 +507,28 @@ Probe `adr-0039-one-contract-category` pins the count at 1, so the addition fail
 `adr-coverage` gate: the Category cannot be accepted until this ADR has been re-examined and
 the generalization either re-established with evidence or re-narrowed. That is the intended
 order — decide first, register second.
+
+## Amendment 2026-10-20: record authority and the surviving proto path
+
+The original Decision's language-neutral source under `contracts/<category>/`
+and inherited ban on "implicit Java-as-SoT with codegen on top" are historical
+format choices. They do not prohibit the shipped record-as-IDL pipeline. Java
+wire records drive JSON Schema, from which
+`scripts/codegen/gen-wire-schema-types.mjs` projects frontend TypeScript and Zod.
+`governance/contract-surfaces.v1.json` registers those projections and consumers;
+the contract-projection gate guards their coherence. The retained commitment is
+one declared authority per contract with projections, not one source language.
+
+`contracts/registry.v1.json` still registers only `wire`, with `format: protobuf`.
+That registry has not been converted to the frontend projection register.
+`modules/api-contract-projection-java/build.gradle.kts` compiles
+`contracts/wire` with protoc, and root `build.gradle.kts` keeps `wireGenerate`
+for that Java path and buf for breaking checks. This does **not** establish that
+the `.proto` files themselves are generated from Java records.
+
+The 2026-09-02 amendment's language-neutral-spec framing and "partly superseded"
+description of ADR-0041 are therefore qualified here: no catalog Category is
+registered, and [ADR-0041](0041-catalog-category-format.md) is superseded as a
+catalog-format proposal. Its `contracts/catalog/severity/` spike is outside the
+Java projection's source set. Adding a catalog still requires a new decision;
+the one-Category reopening trigger above remains in force.

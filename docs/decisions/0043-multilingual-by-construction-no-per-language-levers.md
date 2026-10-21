@@ -2,11 +2,11 @@
 title: "ADR-0043: Multilingual by construction — no per-language levers"
 type: decision
 status: accepted
-description: "The search engine is multilingual by construction via one multilingual model stack; no per-language analysis artifact (stemmer/analyzer field/stopwords/spelling dict/curated synonyms) may be authored or maintained. Language may be read as a signal to a uniform policy, but never forked into per-language components."
+description: "Retrieval analysis uses one multilingual model stack and locale-invariant analysis, with no per-language stemmers, analyzer fields, spelling dictionaries or curated synonyms. English word lists remain in NER cleanup; the 2026-10-20 amendment records this limit of the broader engine claim."
 date: 2026-06-15
 probes:
   - adr-0043-no-per-language-levers
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0043: Multilingual by construction — no per-language levers
@@ -15,6 +15,8 @@ last_reviewed: 2026-09-02
 
 Accepted. Spun out of tempdoc 581. Partially supersedes ADR-0013 (the per-language
 synonym placeholder is retired; ADR-0013's analyzer-fingerprinting algorithm remains in force).
+
+Current implementation corrections are recorded in the 2026-10-20 amendment below.
 
 ## Context
 
@@ -106,3 +108,16 @@ uniform mechanism rather than an O(languages) program.
   the bad state unrepresentable (rung 1).
 - **Document-only (prose) enforcement.** Rejected as insufficient: prose at ~70% adherence is
   exactly what let Q-004 keep resurfacing; the schema enum + CI gate raise it to ~100%.
+
+## Amendment 2026-10-20: limits of the no-language-artifact claim
+
+The locale-invariant retrieval-analysis decision and its SSOT guard remain.
+It is not evidence that all entity processing is free of authored English
+heuristics: `BioTagDecoder.HEADER_STOPWORDS` contains English header words, and
+`EntityNormalizer.LEADING_ARTICLES` contains `the`, `a` and `an` alongside
+honorific lists. These are active NER/disambiguation cleanup heuristics in
+`modules/worker-core/src/main/java/io/justsearch/indexerworker/ner/BioTagDecoder.java`
+and `modules/worker-core/src/main/java/io/justsearch/indexerworker/disambiguation/EntityNormalizer.java`.
+This records a limit of the broad "engine" wording, not a new exemption for
+per-language analyzers, spelling dictionaries or synonym lists. Changing those
+entity heuristics or deciding their policy scope is separate work.
