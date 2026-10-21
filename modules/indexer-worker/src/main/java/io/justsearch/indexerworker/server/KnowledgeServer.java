@@ -3543,14 +3543,18 @@ public final class KnowledgeServer implements Closeable {
       runtimeReloadSource = null;
     }
     pendingAppServices = successor;
+    boolean handedOff = false;
     try {
       wireAppServicesPostConstruction(successor);
       if (initialEncoderSet != null) retainProducerModels(successor, initialEncoderSet);
       if (successor.ownsNativeProducer()) {
         successor.prepareIndexingLoop();
+        handedOff = true;
         source.installNativeWatcherHandoffTo(successor);
         mutations.install(successor.mutationOwnerToken());
         source.close();
+        // The same durable root obligations the closing path discharges, before B is published.
+        successor.ingestService().reconcilePendingWatcherRoots();
         publishServingView(successor);
         successor.activatePreparedIndexingLoop();
         mutations.certifySuccessor();
@@ -3561,6 +3565,8 @@ public final class KnowledgeServer implements Closeable {
       }
       pendingAppServices = null;
     } catch (Exception | Error failure) {
+      try { if (handedOff) source.withdrawNativeWatcherHandoff(mutations); }
+      catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
       try { closePendingAppServices(); }
       catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
       if (failure instanceof Error fatal) throw fatal;

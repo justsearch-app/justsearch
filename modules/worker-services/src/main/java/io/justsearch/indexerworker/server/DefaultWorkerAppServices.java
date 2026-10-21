@@ -1166,6 +1166,12 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     watcherCallbacks.target = successor.preparedWatcherTarget;
   }
 
+  /** A failed handoff routes the retained watcher back to this drained owner, inside the fence. */
+  public void withdrawNativeWatcherHandoff(WorkerMutationAdmission.FinalFence fence) {
+    watcherCallbacks.target = preparedWatcherTarget;
+    fence.restorePriorOwner();
+  }
+
   public WorkerMutationAdmission mutationAdmission() { return mutationAdmission; }
 
   /** Retains the exact native model set until this producer's actual exit or ownership transfer. */
@@ -1700,7 +1706,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     producerOwnership.close(workerWatcher, indexingLoop);
   }
 
-  /** Stops native work and retains the watcher behind its mutation fence until replacement. */
+  /**
+   * Stops native work and retains the watcher behind its mutation fence until replacement. If the
+   * replacement fails, the fence closes on this owner: callbacks waiting on it reach this drained
+   * service, which records each watcher delete as a durable root obligation.
+   */
   public WorkerMutationAdmission.FinalFence closeForRuntimeReload()
       throws IOException, InterruptedException, java.util.concurrent.TimeoutException {
     var fence = mutationAdmission.beginFinalFence(mutationOwnerToken, 5_000);
@@ -1709,7 +1719,6 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     }
     try {
       closeNativeLoopRetainingModels();
-      fence.retireCurrentOwner();
       return fence;
     } catch (IOException | RuntimeException | Error failure) {
       fence.close();
