@@ -1,0 +1,72 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T13:19:29.826Z",
+  "revision": "2a64b161f9d2ac5a9aa1c269bedf72bd083c2ecb",
+  "tree": "7eb4e00c1f46ca45ae60daa39a2bbf02ff231db1",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::download_failures_and_rejections_return_to_actionable_error\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14957
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::download_failures_and_rejections_return_to_actionable_error",
+      "file": "modules/shell/src-tauri/src/updater.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:8406a0011b1d52edde77bed3718313f60d1462bb6c57ea86336a084ede09957a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::tests::download_failures_and_rejections_return_to_actionable_error",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "738e6a443c9d6ce82383e9c938c264a3a20fb506",
+    "revision": "738e6a443c9d6ce82383e9c938c264a3a20fb506",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/fixtures/engine-recovery-updater-before.patch",
+        "contentDigest": "sha256:4ab0e9568f05e441c60fac251319c476d1a0156be6cb6dd6f1bcfc9686bd9f9c"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::download_failures_and_rejections_return_to_actionable_error\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 11277,
+        "output": "\nrunning 1 test\ntest updater::tests::download_failures_and_rejections_return_to_actionable_error ... FAILED\n\nfailures:\n\n---- updater::tests::download_failures_and_rejections_return_to_actionable_error stdout ----\n\nthread 'updater::tests::download_failures_and_rejections_return_to_actionable_error' (3716045) panicked at src/updater.rs:3596:13:\nassertion `left == right` failed: transport left recovery actions disabled\n  left: \"downloading\"\n right: \"error\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::tests::download_failures_and_rejections_return_to_actionable_error\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 215 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-39601040562/test-intent-before-8qHgl1/modules/shell/src-tauri)\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:216:4\n    |\n216 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n    --> src/lib.rs:1026:15\n     |\n1026 | pub(crate) fn restart_headless_backend(\n     |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1632:10\n     |\n1632 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:2006:4\n     |\n2006 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 11 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.22s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/modules/shell/src-tauri/target/debug/deps/shell_lib-4b545b7ad422528c)\nerror: test failed, to rerun pass `--lib`\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::download_failures_and_rejections_return_to_actionable_error",
+        "classification": "assertion",
+        "detail": "updater::tests::download_failures_and_rejections_return_to_actionable_error:  ---- updater::tests::download_failures_and_rejections_return_to_actionable_error stdout ----\n\nthread 'updater::tests::download_failures_and_rejections_return_to_actionable_error' (3716045) panicked at src/updater.rs:3596:13:\nassertion `left == right` failed: transport left recovery actions disabled\n  left: \"downloading\"\n right: \"error\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfail"
+      }
+    ]
+  },
+  "digest": "sha256:75f711c76def67222fc594953b45eb24cfbe95109cee0f7dac751e045edfee61"
+}

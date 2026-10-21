@@ -60,7 +60,7 @@ beforeEach(() => {
   globalThis.fetch = fetchSpy as unknown as typeof fetch;
   mocks.isTauriRuntime.mockReturnValue(true);
   mocks.invoke.mockReset();
-  mocks.invoke.mockResolvedValue('tok-1');
+  mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:43210', token: 'tok-1' });
   vi.resetModules(); // http.ts caches the resolved token in module state.
 });
 
@@ -73,29 +73,29 @@ describe('fetchLiveRuns (834 §5.1)', () => {
   it('sends the session token on this GET, and narrows by shape at the server', async () => {
     answers([run('r1')]);
     const { fetchLiveRuns, AGENT_SHAPE_ID: shape } = await liveRuns();
-    await fetchLiveRuns('http://test', shape);
+    await fetchLiveRuns('http://127.0.0.1:43210', shape);
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('http://test/api/chat/runs/live?shapeId=core.agent-run');
+    expect(url).toBe('http://127.0.0.1:43210/api/chat/runs/live?shapeId=core.agent-run');
     expect((init.headers as Record<string, string>)[SESSION_HEADER]).toBe('tok-1');
   });
 
   it('never sends a conversationId filter — the caller guard is asymmetric, an equality filter is not', async () => {
     answers([run('r1')]);
     const { discoverLiveAgentRun } = await liveRuns();
-    await discoverLiveAgentRun('http://test', 'conv-1');
+    await discoverLiveAgentRun('http://127.0.0.1:43210', 'conv-1');
     expect(fetchSpy.mock.calls[0]![0] as string).not.toContain('conversationId');
   });
 
   it('degrades to no live runs on a non-2xx', async () => {
     fetchSpy.mockResolvedValue(new Response('nope', { status: 401 }));
     const { fetchLiveRuns } = await liveRuns();
-    expect(await fetchLiveRuns('http://test')).toEqual([]);
+    expect(await fetchLiveRuns('http://127.0.0.1:43210')).toEqual([]);
   });
 
   it('degrades to no live runs when the fetch throws', async () => {
     fetchSpy.mockRejectedValue(new Error('offline'));
     const { fetchLiveRuns } = await liveRuns();
-    expect(await fetchLiveRuns('http://test')).toEqual([]);
+    expect(await fetchLiveRuns('http://127.0.0.1:43210')).toEqual([]);
   });
 
   it('degrades to no live runs when the body fails the generated validator', async () => {
@@ -103,7 +103,7 @@ describe('fetchLiveRuns (834 §5.1)', () => {
     // path that then addresses a run stream by id.
     answers([{ runId: 'r1', unexpectedField: true }]);
     const { fetchLiveRuns } = await liveRuns();
-    expect(await fetchLiveRuns('http://test')).toEqual([]);
+    expect(await fetchLiveRuns('http://127.0.0.1:43210')).toEqual([]);
   });
 });
 
@@ -111,42 +111,42 @@ describe('discoverLiveAgentRun (834 §15.3)', () => {
   it('takes the first row — the enumeration is already newest-first, so no re-sort is needed', async () => {
     answers([run('newest', { startedAtEpochMs: 9 }), run('older', { startedAtEpochMs: 2 })]);
     const { discoverLiveAgentRun } = await liveRuns();
-    expect(await discoverLiveAgentRun('http://test')).toBe('newest');
+    expect(await discoverLiveAgentRun('http://127.0.0.1:43210')).toBe('newest');
   });
 
   it('refuses a run of another shape even if the server returned one', async () => {
     answers([run('wf', { shapeId: 'core.workflow-run' })]);
     const { discoverLiveAgentRun } = await liveRuns();
-    expect(await discoverLiveAgentRun('http://test')).toBeNull();
+    expect(await discoverLiveAgentRun('http://127.0.0.1:43210')).toBeNull();
   });
 
   it('a caller with NO conversation adopts the newest agent run — the cross-tab case', async () => {
     answers([run('r1', { conversationId: 'conv-somebody-else' })]);
     const { discoverLiveAgentRun } = await liveRuns();
-    expect(await discoverLiveAgentRun('http://test', null)).toBe('r1');
+    expect(await discoverLiveAgentRun('http://127.0.0.1:43210', null)).toBe('r1');
   });
 
   it('a caller pinned to a conversation refuses a run belonging to a DIFFERENT one', async () => {
     answers([run('r1', { conversationId: 'conv-A' })]);
     const { discoverLiveAgentRun } = await liveRuns();
-    expect(await discoverLiveAgentRun('http://test', 'conv-B')).toBeNull();
+    expect(await discoverLiveAgentRun('http://127.0.0.1:43210', 'conv-B')).toBeNull();
   });
 
   it('a pinned caller still adopts a run that carries no conversation of its own', async () => {
     answers([run('r1', { conversationId: null })]);
     const { discoverLiveAgentRun } = await liveRuns();
-    expect(await discoverLiveAgentRun('http://test', 'conv-B')).toBe('r1');
+    expect(await discoverLiveAgentRun('http://127.0.0.1:43210', 'conv-B')).toBe('r1');
   });
 
   it('skips a mismatched row and takes the next adoptable one', async () => {
     answers([run('not-mine', { conversationId: 'conv-A' }), run('mine', { conversationId: 'conv-B' })]);
     const { discoverLiveAgentRun } = await liveRuns();
-    expect(await discoverLiveAgentRun('http://test', 'conv-B')).toBe('mine');
+    expect(await discoverLiveAgentRun('http://127.0.0.1:43210', 'conv-B')).toBe('mine');
   });
 
   it('answers null on an empty enumeration', async () => {
     answers([]);
     const { discoverLiveAgentRun } = await liveRuns();
-    expect(await discoverLiveAgentRun('http://test')).toBeNull();
+    expect(await discoverLiveAgentRun('http://127.0.0.1:43210')).toBeNull();
   });
 });

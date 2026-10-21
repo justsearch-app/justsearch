@@ -205,12 +205,16 @@ public class InferenceLifecycleManager
    * Managed launches never bind the configured port (ADR-0051 decision 2).
    */
   public int servingPort() {
+    return servingEndpoint().port();
+  }
+
+  /** Current launch address and private credential for in-Engine HTTP callers only. */
+  public LlamaServerEndpoint servingEndpoint() {
     LlamaServerOps server = serverOps;
-    if (server != null) {
-      java.util.OptionalInt active = server.activePort();
-      if (active.isPresent()) return active.getAsInt();
-    }
-    return configuredInference().serverPort();
+    return server == null
+        ? new LlamaServerEndpoint(configuredInference().serverPort(), null)
+        : server.activeEndpoint().orElseGet(
+            () -> new LlamaServerEndpoint(configuredInference().serverPort(), null));
   }
 
   private InferenceConfig servingInference() {
@@ -471,7 +475,7 @@ public class InferenceLifecycleManager
               createdHttpClient,
               createdObjectMapper,
               runner::currentMode,
-              this::servingPort,
+              this::servingEndpoint,
               () -> generation.admit(GenerationTracker.Kind.AUX, null));
       openedOnline =
           new OnlineModeOps(
@@ -479,7 +483,7 @@ public class InferenceLifecycleManager
               createdHttpClient,
               createdObjectMapper,
               runner::currentMode,
-              this::servingPort,
+              this::servingEndpoint,
               () -> runner.view().lastKnownModelId(),
               () -> servingInference().modelPath().getFileName().toString(),
               this.events,

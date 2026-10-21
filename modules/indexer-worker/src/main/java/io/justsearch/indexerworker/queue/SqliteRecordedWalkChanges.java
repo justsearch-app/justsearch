@@ -23,6 +23,7 @@ final class SqliteRecordedWalkChanges implements AutoCloseable {
   private final List<Listener> listeners = new CopyOnWriteArrayList<>();
   private final SQLiteUpdateListener capture;
   private volatile boolean closed;
+  private long changeVersion;
 
   private static final class Listener implements JobQueue.WalkSubscription {
     private final Consumer<String> consumer;
@@ -35,10 +36,15 @@ final class SqliteRecordedWalkChanges implements AutoCloseable {
     this.connection = connection;
     sqlite = connection.unwrap(SQLiteConnection.class);
     capture = (type, database, table, rowId) -> {
-      if (!closed && "ingestion_walk_progress".equals(table) && type != SQLiteUpdateListener.Type.DELETE) pending.add(rowId);
+      if (!closed && "ingestion_walk_progress".equals(table)) {
+        changeVersion++;
+        if (type != SQLiteUpdateListener.Type.DELETE) pending.add(rowId);
+      }
     };
     sqlite.addUpdateListener(capture);
   }
+
+  long changeVersion() { return changeVersion; }
 
   JobQueue.WalkSubscription subscribe(Consumer<String> consumer) {
     if (closed) throw new IllegalStateException("Recorded walk notifications are closed");

@@ -29,6 +29,7 @@ const { readLinuxProcess, linuxIdentity, signalLinuxProcess } = require('./proce
 const { terminateWithCodeSync } = require('./recorded-termination.cjs');
 
 const ledgerLib = require('./exit-ledger.cjs');
+const { prepareCrashFolder } = require('./engine-recovery.cjs');
 const { engineRow } = require('./engine-supervisor.cjs');
 
 const TERMINATE_SCRIPT = path.join(__dirname, 'terminate-process.ps1');
@@ -330,6 +331,7 @@ function openEngineStarts(records) {
  */
 function createEngineActuator({
   dataDir,
+  heapDumpDir = path.join(dataDir, 'crashes'),
   runId,
   policy,
   spawnChild,
@@ -438,6 +440,7 @@ function createEngineActuator({
      * it only stores the observation and wakes the loop. `pollExit` is its one consumer.
      */
     spawnEngine({ n, cause, apiPort, startupTimeoutMs }) {
+      prepareCrashFolder(heapDumpDir);
       try { fs.unlinkSync(path.join(dataDir, "runtime", "shutdown-request.v1.json")); } catch (err) { if (err.code !== "ENOENT") log(`stale shutdown request cleanup failed: ${err.message}`); }
       const env = { [INCARNATION_ENV]: `${runId}/${n}` };
       const child = spawnChild(n, apiPort, env, { startupTimeoutMs });

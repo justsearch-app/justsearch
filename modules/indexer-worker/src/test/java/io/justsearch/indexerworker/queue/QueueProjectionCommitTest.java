@@ -73,8 +73,9 @@ final class QueueProjectionCommitTest {
       assertTrue(observed.stream().allMatch(delta -> delta instanceof IndexingJobChangeFeed.Delta.Update u
           && u.row().state().equals("DONE")));
       var snapshot = queue.changeStream().subscribeWithSnapshot(delta -> observed.add(delta));
-      assertEquals(499L, snapshot.items().stream().filter(row -> row.state().equals("DONE")).count());
-      assertEquals(2L, snapshot.items().stream().filter(row -> row.state().equals("PENDING")).count());
+      assertTrue(snapshot.items().isEmpty(), "DONE and PENDING are outside the window");
+      assertEquals(499, queue.jobStateCountsStrict().doneCount(), "committed chunk survives outside the view");
+      assertEquals(2, queue.jobStateCountsStrict().pendingCount(), "rolled-back chunk remains pending");
       snapshot.subscription().close();
       execute(db, "DROP TRIGGER refuse_last");
       queue.markDoneBatch(paths.subList(499, 501));
@@ -91,11 +92,14 @@ final class QueueProjectionCommitTest {
       List<String> second = new ArrayList<>();
       queue.changeStream().subscribe(delta -> {
         first.add(kind(delta));
+        if (delta instanceof IndexingJobChangeFeed.Delta.Resync resync) {
+          assertTrue(resync.items().isEmpty(), "the later delete commit clears the view");
+        }
         if (once.compareAndSet(false, true)) queue.clearAll();
       });
       queue.changeStream().subscribe(delta -> second.add(kind(delta)));
       queue.enqueue(List.of(temp.resolve("a.txt"), temp.resolve("b.txt")));
-      assertEquals(List.of("insert", "insert", "delete", "delete"), first);
+      assertEquals(List.of("insert", "insert", "resync"), first);
       assertEquals(first, second, "subscriber-triggered deletion cannot overtake the insert batch");
     }
   }
@@ -117,12 +121,13 @@ final class QueueProjectionCommitTest {
         }
       });
       queue.enqueue(List.of(temp.resolve("a.txt")));
-      assertEquals(2, snapshot.get().items().size());
+      assertTrue(snapshot.get().items().isEmpty(), "both committed PENDING writes are outside the window");
       assertEquals(2, snapshot.get().snapshotSeq());
       assertTrue(observed.isEmpty(), "snapshot already includes both committed writes");
       queue.clearAll();
-      assertEquals(2, observed.size());
-      assertTrue(observed.stream().allMatch(delta -> delta instanceof IndexingJobChangeFeed.Delta.Delete));
+      assertEquals(1, observed.size(), "unknown identities coalesce into one marker");
+      assertTrue(observed.getFirst() instanceof IndexingJobChangeFeed.Delta.Resync resync
+          && resync.items().isEmpty());
       snapshot.get().subscription().close();
     }
   }
@@ -133,7 +138,8 @@ final class QueueProjectionCommitTest {
       queue.open();
       AtomicReference<JobQueue.IndexJob> claimed = new AtomicReference<>();
       queue.changeStream().subscribe(delta -> {
-        if (delta instanceof IndexingJobChangeFeed.Delta.Insert) {
+        if (delta instanceof IndexingJobChangeFeed.Delta.Insert
+            || delta instanceof IndexingJobChangeFeed.Delta.Update update && update.row().state().equals("PENDING")) {
           claimed.set(queue.pollPending(1).getFirst());
         }
       });
@@ -184,10 +190,11 @@ final class QueueProjectionCommitTest {
         assertThrows(TimeoutException.class, () -> reader.get(200, TimeUnit.MILLISECONDS));
         release.countDown();
         var snapshot = reader.get(5, TimeUnit.SECONDS);
-        assertEquals(1, snapshot.items().size());
+        assertTrue(snapshot.items().isEmpty(), "the committed PENDING row is outside the window");
         assertEquals(1, snapshot.snapshotSeq());
         snapshot.subscription().close();
         assertEquals(1, writer.get(5, TimeUnit.SECONDS));
+        assertEquals(1, queue.jobStateCountsStrict().pendingCount());
       } finally {
         release.countDown();
       }
@@ -195,7 +202,12 @@ final class QueueProjectionCommitTest {
   }
 
   private static String kind(IndexingJobChangeFeed.Delta delta) {
-    return delta instanceof IndexingJobChangeFeed.Delta.Insert ? "insert" : "delete";
+    return switch (delta) {
+      case IndexingJobChangeFeed.Delta.Insert ignored -> "insert";
+      case IndexingJobChangeFeed.Delta.Update ignored -> "update";
+      case IndexingJobChangeFeed.Delta.Delete ignored -> "delete";
+      case IndexingJobChangeFeed.Delta.Resync ignored -> "resync";
+    };
   }
 
   private static IngestionOutcome success() {

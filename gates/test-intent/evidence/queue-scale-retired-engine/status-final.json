@@ -1,0 +1,614 @@
+{
+  "http": 200,
+  "body": {
+    "schema_version": 2,
+    "observed_at": "2026-10-20T11:50:42.838215433Z",
+    "lifecycle": {
+      "state": "LIFECYCLE_STATE_READY",
+      "reason_code": null,
+      "message": null
+    },
+    "components": {
+      "api": {
+        "state": "READY",
+        "reason_code": null,
+        "state_since": "2026-10-20T11:49:33.478503792Z"
+      },
+      "index": {
+        "state": "READY",
+        "reason_code": null,
+        "state_since": "2026-10-20T11:49:35.756370776Z"
+      },
+      "encoders": {
+        "state": "ABSENT",
+        "reason_code": null,
+        "state_since": "2026-10-20T11:49:35.518707780Z"
+      },
+      "generative": {
+        "state": "ABSENT",
+        "reason_code": "inference.deactivated",
+        "state_since": "2026-10-20T11:49:32.012073772Z"
+      }
+    },
+    "status": "ok",
+    "service": "JustSearch Local API",
+    "indexBasePath": "/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/retired-delivery/probe/tmp/engine-fenced-candidate/data/index/default",
+    "uptimeMs": 69976,
+    "memoryUsedBytes": 82816400,
+    "memoryTotalBytes": 166723584,
+    "memoryMaxBytes": 1073741824,
+    "diskPressure": "OK",
+    "worker": {
+      "core": {
+        "indexHealthy": true,
+        "indexedDocuments": 3005,
+        "pendingJobs": 0,
+        "indexState": "IDLE",
+        "indexSizeBytes": 1810585,
+        "pendingVduCount": 0,
+        "writerQueueDepth": 0,
+        "writerPendingDocs": 0,
+        "commitCount": 13,
+        "refreshLagMs": 79,
+        "recentJobQueueDepth": [],
+        "recentDocsPerSec": [],
+        "pendingBytes": 0,
+        "pendingUnknownSizeJobs": 0,
+        "searchableDocuments": 3005,
+        "indexMaxDoc": 3010,
+        "indexNumDocs": 3010,
+        "indexedDocumentsUnknown": false,
+        "vduAvailable": false
+      },
+      "failure": {
+        "failedJobs": 0,
+        "lastFailedPath": "",
+        "lastFailedErrorMessage": "",
+        "lastFailedAtMs": 0,
+        "nextRetryAtMs": 0,
+        "searchesZeroResultCount": 0,
+        "failedByFileKind": {}
+      },
+      "migration": {
+        "activeGenerationId": "g-20261020-114933",
+        "migrationState": "IDLE",
+        "buildingGenerationId": "",
+        "previousGenerationId": "",
+        "servingSearchGenerationId": "g-20261020-114933",
+        "servingIngestGenerationId": "g-20261020-114933",
+        "activeIndexedDocuments": 3005,
+        "buildingIndexedDocuments": 0,
+        "switchBufferDepth": 0,
+        "pendingJobsCount": 0,
+        "processingJobsCount": 0,
+        "pendingReadyJobsCount": 0,
+        "pendingBackoffJobsCount": 0,
+        "migrationSwitchingAgeMs": 0,
+        "migrationSwitchingMaxDurationMs": 1800000,
+        "migrationPaused": false,
+        "migrationPauseReason": "",
+        "migrationPausedAtMs": 0,
+        "migrationSource": "",
+        "migrationEnumerator": {
+          "running": false,
+          "done": false,
+          "rootsTotal": 0,
+          "rootsDone": 0,
+          "filesSeen": 0,
+          "filesEnqueued": 0,
+          "startedAtMs": 0,
+          "finishedAtMs": 0,
+          "lastPath": ""
+        }
+      },
+      "compatibility": {
+        "embeddingCompatState": "UNAVAILABLE",
+        "embeddingCompatReason": "NO_EMBEDDING_MODEL",
+        "embeddingFingerprintCurrent": "",
+        "embeddingFingerprintStored": "",
+        "indexSchemaFpCurrent": "86366d71bb6eecdf125401766b7039426d1294fd49eaf83542add2aef13de64b",
+        "indexSchemaFpStored": "86366d71bb6eecdf125401766b7039426d1294fd49eaf83542add2aef13de64b",
+        "indexSchemaCompatState": "COMPATIBLE",
+        "reindexRequired": false,
+        "reindexRequiredReason": ""
+      },
+      "queueDb": {
+        "queueDbHealthy": true,
+        "queueDbLastBackupAtMs": 0,
+        "queueDbLastQuickCheckAtMs": 1792496973034,
+        "queueDbLastQuickCheckOk": true,
+        "queueDbLastErrorAtMs": 0
+      },
+      "enrichment": {
+        "chunk": {
+          "chunkDocCount": 5,
+          "chunkEmbeddingCompletedCount": 0,
+          "chunkEmbeddingPendingCount": 5,
+          "chunkEmbeddingFailedCount": 0,
+          "chunkVectorCoveragePercent": 0.0,
+          "chunkVectorsReady": false,
+          "chunkSpladeEnabled": false,
+          "chunkSpladeCompletedCount": 0,
+          "chunkSpladePendingCount": 0,
+          "chunkSpladeCoveragePercent": 0.0
+        },
+        "embeddingDocCount": 3005,
+        "embeddingCompletedCount": 0,
+        "embeddingPendingCount": 3005,
+        "embeddingFailedCount": 0,
+        "embeddingCoveragePercent": 0.0,
+        "spladeDocCount": 3005,
+        "spladeCompletedCount": 0,
+        "spladePendingCount": 3005,
+        "spladeFailedCount": 0,
+        "spladeCoveragePercent": 0.0,
+        "pendingNerCount": 3005,
+        "completedNerCount": 0,
+        "failedNerCount": 0,
+        "completeness": [
+          {
+            "stageId": "embed",
+            "tier": "ARTIFACT",
+            "expected": 3005,
+            "present": 0,
+            "missing": 3005,
+            "failed": 0
+          },
+          {
+            "stageId": "chunk_embed",
+            "tier": "ARTIFACT",
+            "expected": 5,
+            "present": 0,
+            "missing": 5,
+            "failed": 0
+          },
+          {
+            "stageId": "splade",
+            "tier": "STATUS",
+            "expected": 3005,
+            "present": 0,
+            "missing": 3005,
+            "failed": 0
+          },
+          {
+            "stageId": "ner",
+            "tier": "STATUS",
+            "expected": 3005,
+            "present": 0,
+            "missing": 3005,
+            "failed": 0
+          }
+        ],
+        "chunkMinChars": 2000,
+        "vectorReadyPercent": 95.0,
+        "enrichmentCompleted": {},
+        "batchTiming": {
+          "batchCount": {},
+          "totalMs": {}
+        },
+        "encoderProfiles": {},
+        "embeddingEnabled": false,
+        "spladeEnabled": false,
+        "nerEnabled": false,
+        "backfillMode": "idle",
+        "embeddedAndSparseCount": 0,
+        "embeddingAvailable": false,
+        "spladeAvailable": false,
+        "nerAvailable": false
+      },
+      "gpu": {
+        "rerankerOrtCuda": {
+          "configured": false,
+          "attempted": false,
+          "available": false,
+          "variantId": "",
+          "nativePath": "",
+          "failureReason": "",
+          "missingDlls": []
+        },
+        "spladeOrtCuda": {
+          "configured": false,
+          "attempted": false,
+          "available": false,
+          "variantId": "",
+          "nativePath": "",
+          "failureReason": "",
+          "missingDlls": []
+        },
+        "embedOrtCuda": {
+          "configured": false,
+          "attempted": false,
+          "available": false,
+          "variantId": "",
+          "nativePath": "",
+          "failureReason": "",
+          "missingDlls": []
+        },
+        "embedBackend": "",
+        "embedGpuLayers": 0,
+        "spladeModelPath": "",
+        "rerankerModelPath": "",
+        "nerModelPath": "",
+        "nerGpuEnabled": false,
+        "nerOrtCuda": {
+          "configured": false,
+          "attempted": false,
+          "available": false,
+          "variantId": "",
+          "nativePath": "",
+          "failureReason": "",
+          "missingDlls": []
+        },
+        "citationOrtCuda": {
+          "configured": false,
+          "attempted": false,
+          "available": false,
+          "variantId": "",
+          "nativePath": "",
+          "failureReason": "",
+          "missingDlls": []
+        },
+        "bgeM3OrtCuda": {
+          "configured": false,
+          "attempted": false,
+          "available": false,
+          "variantId": "",
+          "nativePath": "",
+          "failureReason": "",
+          "missingDlls": []
+        }
+      },
+      "vectorFormat": {
+        "vectorFormatConfig": "float32",
+        "vectorFormatStored": "float32",
+        "vectorFormatActual": "FLOAT32",
+        "vectorSegmentsFloat32": 9,
+        "vectorSegmentsQuantized": 0
+      },
+      "telemetry": {
+        "contentLengthAvgChars": 420.0,
+        "contentLengthMinChars": 407,
+        "contentLengthMaxChars": 4336,
+        "throughputDocsPerSec": 0.0,
+        "throughputWindowState": "UNKNOWN"
+      },
+      "searchConfig": {
+        "chunkAwareEnabled": true,
+        "ccWeightSparse": 0.6,
+        "ccWeightDense": 0.2,
+        "ccWeightSplade": 0.2,
+        "branchCcWeightWhole": 0.5,
+        "branchCcWeightChunk": 0.5,
+        "branchChunkMinWeightMultiplier": 0.25,
+        "titleBoost": 3.0,
+        "entityBoost": 0.0,
+        "queryClassificationEnabled": true
+      },
+      "visualExtraction": {
+        "ocrEnabled": true,
+        "ocrEngineAvailable": true,
+        "ocrEngine": "tesseract [PATH] /usr/bin/tesseract",
+        "visualTextNeededCount": 0,
+        "visualEnrichmentNeededCount": 0,
+        "vduProcessing": false
+      }
+    },
+    "indexAvailable": true,
+    "knowledgeServerStartError": "",
+    "power": {
+      "energyReduced": false,
+      "source": "UNKNOWN"
+    },
+    "catchingUp": false,
+    "inference": {
+      "phase": "OFFLINE",
+      "usingExternal": false,
+      "counters": {
+        "softRestarts": 0,
+        "hardRestarts": 0,
+        "transitionsTotal": 0
+      },
+      "chatEnabledSpec": false,
+      "engineState": "Down",
+      "engineReason": "engine-down",
+      "procedure": "",
+      "leaseHolder": "NONE"
+    },
+    "readiness": {
+      "schemaVersion": 2,
+      "observedAt": "2026-10-20T11:50:42.838215433Z",
+      "engineComponents": {
+        "index": {
+          "state": "READY",
+          "stateSince": "2026-10-20T11:49:35.756370776Z",
+          "appliedVersion": "fed8b82f20a6a26631a926eba38e7ac0b7cbe4487cb2186f4d54fabbc7d6f5e4",
+          "desiredVersion": "fed8b82f20a6a26631a926eba38e7ac0b7cbe4487cb2186f4d54fabbc7d6f5e4",
+          "deadlineMs": 60000,
+          "recoveryAttempts": 0
+        },
+        "api": {
+          "state": "READY",
+          "stateSince": "2026-10-20T11:49:33.478503792Z",
+          "appliedVersion": "a47ef1a2660a03a4ff5a353610bafe2b5f28245e078e1f132d2cb33b6898697f",
+          "desiredVersion": "a47ef1a2660a03a4ff5a353610bafe2b5f28245e078e1f132d2cb33b6898697f",
+          "deadlineMs": 0,
+          "recoveryAttempts": 0,
+          "evidence": "boundPort=60197"
+        },
+        "encoders": {
+          "state": "ABSENT",
+          "stateSince": "2026-10-20T11:49:35.518707780Z",
+          "appliedVersion": "c14ea50e328da2941ca231ce9da55ccd130ff4f754b0c8e60101a62dc7ac03ca",
+          "desiredVersion": "c14ea50e328da2941ca231ce9da55ccd130ff4f754b0c8e60101a62dc7ac03ca",
+          "deadlineMs": 120000,
+          "recoveryAttempts": 0,
+          "evidence": "no_encoder_roles_requested"
+        },
+        "generative": {
+          "state": "ABSENT",
+          "reasonCode": "inference.deactivated",
+          "stateSince": "2026-10-20T11:49:32.012073772Z",
+          "appliedVersion": "0d770dedde0ab34e40de0dab0c8e16e0861b01f9e288fae9c703af8b356761be",
+          "desiredVersion": "0d770dedde0ab34e40de0dab0c8e16e0861b01f9e288fae9c703af8b356761be",
+          "deadlineMs": 180000,
+          "recoveryAttempts": 0,
+          "evidence": "generative intent is disabled"
+        }
+      },
+      "components": {
+        "workerControlPlane": {
+          "state": "READY",
+          "source": "lifecycle_snapshot",
+          "observedAt": "2026-10-20T11:50:42.838215433Z",
+          "stale": false,
+          "stalenessMs": 0
+        },
+        "visualDocumentUnderstanding": {
+          "state": "READY",
+          "source": "head_vdu_status",
+          "observedAt": "2026-10-20T11:50:39.767353304Z",
+          "stale": false,
+          "stalenessMs": 0
+        },
+        "chunkEmbedding": {
+          "state": "DEGRADED",
+          "reasonCode": "chunk_embedding.not_ready",
+          "source": "worker_status",
+          "observedAt": "2026-10-20T11:50:39.767468298Z",
+          "stale": false,
+          "stalenessMs": 0
+        },
+        "embedding": {
+          "state": "NOT_READY",
+          "reasonCode": "encoders.health.embedding_not_ready",
+          "source": "worker_health_check",
+          "observedAt": "2026-10-20T11:50:39.767122872Z",
+          "stale": false,
+          "stalenessMs": 0
+        },
+        "ai": {
+          "state": "NOT_CONFIGURED",
+          "reasonCode": "inference.deactivated",
+          "source": "lifecycle_inference",
+          "observedAt": "2026-10-20T11:50:42.838215433Z",
+          "stale": false,
+          "stalenessMs": 0
+        },
+        "visualTextExtraction": {
+          "state": "READY",
+          "source": "worker_status",
+          "observedAt": "2026-10-20T11:50:39.767216968Z",
+          "stale": false,
+          "stalenessMs": 0
+        },
+        "indexServing": {
+          "state": "DEGRADED",
+          "reasonCode": "index.dense_unavailable",
+          "source": "worker_status",
+          "observedAt": "2026-10-20T11:50:42.838215433Z",
+          "stale": false,
+          "stalenessMs": 0
+        },
+        "lambdamartModel": {
+          "state": "READY",
+          "reasonCode": "lambdamart.not_configured",
+          "source": "head_gpl_status",
+          "observedAt": "2026-10-20T11:50:39.767214847Z",
+          "stale": false,
+          "stalenessMs": 0
+        },
+        "gpu": {
+          "state": "READY",
+          "source": "gpu_saturation_monitor",
+          "observedAt": "2026-10-20T11:50:39.767549975Z",
+          "stale": false,
+          "stalenessMs": 0
+        },
+        "telemetry": {
+          "state": "READY",
+          "source": "telemetry_health",
+          "observedAt": "2026-10-20T11:50:39.767926984Z",
+          "stale": false,
+          "stalenessMs": 0
+        }
+      },
+      "composites": {
+        "retrieval": {
+          "state": "DEGRADED",
+          "reasonCodes": [
+            "index.dense_unavailable",
+            "chunk_embedding.not_ready",
+            "lambdamart.not_configured"
+          ],
+          "stale": false,
+          "maxStalenessMs": 0
+        },
+        "aiFeatures": {
+          "state": "NOT_READY",
+          "reasonCodes": [
+            "inference.deactivated",
+            "encoders.health.embedding_not_ready"
+          ],
+          "stale": false,
+          "maxStalenessMs": 0
+        },
+        "telemetry": {
+          "state": "READY",
+          "reasonCodes": [],
+          "stale": false,
+          "maxStalenessMs": 0
+        }
+      }
+    },
+    "aiReady": false,
+    "embeddingReady": false,
+    "embedding": {
+      "observedAtMs": 1792497042838,
+      "compatState": "UNAVAILABLE",
+      "compatReason": "NO_EMBEDDING_MODEL",
+      "fingerprintCurrent": "",
+      "fingerprintStored": "",
+      "ready": false,
+      "docCount": 3005,
+      "completedCount": 0,
+      "pendingCount": 3005,
+      "failedCount": 0,
+      "coveragePercent": 0.0
+    },
+    "schema": {
+      "observedAtMs": 1792497042838,
+      "fpCurrent": "86366d71bb6eecdf125401766b7039426d1294fd49eaf83542add2aef13de64b",
+      "fpStored": "86366d71bb6eecdf125401766b7039426d1294fd49eaf83542add2aef13de64b",
+      "compatState": "COMPATIBLE",
+      "reindexRequired": false,
+      "reindexRequiredReason": ""
+    },
+    "chunkCoverage": {
+      "observedAtMs": 1792497042838,
+      "docCount": 5,
+      "completedCount": 0,
+      "pendingCount": 5,
+      "failedCount": 0,
+      "coveragePercent": 0.0,
+      "ready": false
+    },
+    "queueHealth": {
+      "observedAtMs": 1792497042838,
+      "healthy": true,
+      "lastBackupAtMs": 0,
+      "lastQuickCheckAtMs": 1792496973034,
+      "lastQuickCheckOk": true,
+      "lastErrorAtMs": 0
+    },
+    "migration": {
+      "observedAtMs": 1792497042838,
+      "state": "IDLE",
+      "buildingGenerationId": "",
+      "previousGenerationId": "",
+      "paused": false,
+      "pauseReason": "",
+      "switchingAgeMs": 0,
+      "switchingMaxDurationMs": 1800000,
+      "enumerator": {
+        "running": false,
+        "done": false,
+        "rootsTotal": 0,
+        "rootsDone": 0,
+        "filesSeen": 0,
+        "filesEnqueued": 0,
+        "startedAtMs": 0,
+        "finishedAtMs": 0,
+        "lastPath": ""
+      },
+      "migrationSource": ""
+    },
+    "gpu": {
+      "available": true,
+      "gpuUtilizationPercent": 2,
+      "memoryUtilizationPercent": 14,
+      "totalVramBytes": 12878610432,
+      "usedVramBytes": 1890910208,
+      "freeVramBytes": 10987700224,
+      "driverVersion": "580.178.04",
+      "deviceCount": 1,
+      "recentUtilizationPercent": [],
+      "recentMemoryUtilizationPercent": [],
+      "cudaFunctional": false,
+      "source": "nvml",
+      "confidence": "HIGH"
+    },
+    "atRestProtection": {
+      "diskEncryption": "UNKNOWN",
+      "source": "none",
+      "confidence": "UNKNOWN",
+      "qualityKnown": false,
+      "probedAtMs": 1792496972977
+    },
+    "conversationProtection": {
+      "state": "not_configured"
+    },
+    "modelDistribution": {},
+    "agentSessions": {
+      "activeCount": 0
+    },
+    "telemetryHealth": {
+      "flushFailureCount": 0,
+      "gaugeCallbackFailureCount": 0
+    },
+    "meta": {
+      "workerRpcAtMs": 1792497039713,
+      "workerRpcStale": false
+    },
+    "operating": {
+      "schemaVersion": 1,
+      "seq": 13,
+      "assembledAt": "2026-10-20T11:50:42.838215433Z",
+      "chat": {
+        "state": "OFF",
+        "reason": null,
+        "detail": null,
+        "reasonCode": "inference.deactivated",
+        "since": "2026-10-20T11:49:32.012073772Z",
+        "managed": true,
+        "generating": null,
+        "inFlight": null,
+        "queued": null,
+        "blockedBy": null,
+        "load": null,
+        "reloadAllowed": null,
+        "nextReloadNotBefore": null,
+        "sampledAt": "2026-10-20T11:50:42.838215433Z"
+      },
+      "indexing": {
+        "state": "IDLE",
+        "reasons": [],
+        "reasonCode": null,
+        "since": "2026-10-20T11:50:37.774555314Z",
+        "affects": [],
+        "pendingJobs": 0,
+        "agingReleaseAt": null,
+        "sampledAt": "2026-10-20T11:50:39.713Z"
+      },
+      "gpu": {
+        "profile": "NO_GPU",
+        "profileSource": "MEASURED",
+        "adapter": null,
+        "adapterTotalBytes": null,
+        "adapterFreeBytes": null,
+        "ourDedicatedBytes": null,
+        "ourSharedBytes": null,
+        "externalUsedBytes": null,
+        "spillSuspected": null,
+        "source": "NONE",
+        "sampledAt": null,
+        "ageMs": null,
+        "stale": false
+      },
+      "degradations": [],
+      "freshness": {
+        "staleAfterMs": 30000,
+        "staleSources": []
+      }
+    }
+  }
+}

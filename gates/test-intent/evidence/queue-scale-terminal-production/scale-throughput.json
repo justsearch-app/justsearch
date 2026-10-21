@@ -1,0 +1,856 @@
+[
+  {
+    "elapsed": 4.078569085977506,
+    "httpStatusMs": 2.455499954521656,
+    "counts": {
+      "PENDING": 700016,
+      "DONE": 200000,
+      "FAILED": 1000,
+      "PROCESSING": 0,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 0,
+    "indexedDocuments": 9168,
+    "reportedPending": 700016
+  },
+  {
+    "elapsed": 9.112110497022513,
+    "httpStatusMs": 2.7190980035811663,
+    "counts": {
+      "PENDING": 699936,
+      "DONE": 200000,
+      "FAILED": 1000,
+      "PROCESSING": 80,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 0,
+    "indexedDocuments": 9168,
+    "reportedPending": 700016
+  },
+  {
+    "elapsed": 14.145292136003263,
+    "httpStatusMs": 1.9380929879844189,
+    "counts": {
+      "PENDING": 699824,
+      "DONE": 200000,
+      "FAILED": 1000,
+      "PROCESSING": 192,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 0,
+    "indexedDocuments": 9168,
+    "reportedPending": 699824
+  },
+  {
+    "elapsed": 19.186824754986446,
+    "httpStatusMs": 4.797764995601028,
+    "counts": {
+      "PENDING": 699712,
+      "DONE": 200224,
+      "FAILED": 1000,
+      "PROCESSING": 80,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 224,
+    "indexedDocuments": 9168,
+    "reportedPending": 699744
+  },
+  {
+    "elapsed": 24.220327841001563,
+    "httpStatusMs": 2.2562789963558316,
+    "counts": {
+      "PENDING": 699616,
+      "DONE": 200224,
+      "FAILED": 1000,
+      "PROCESSING": 176,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 224,
+    "indexedDocuments": 9168,
+    "reportedPending": 699616
+  },
+  {
+    "elapsed": 29.24968374299351,
+    "httpStatusMs": 1.779265992809087,
+    "counts": {
+      "PENDING": 699488,
+      "DONE": 200464,
+      "FAILED": 1000,
+      "PROCESSING": 64,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 464,
+    "indexedDocuments": 9168,
+    "reportedPending": 699520
+  },
+  {
+    "elapsed": 34.28887746698456,
+    "httpStatusMs": 1.8066149787046015,
+    "counts": {
+      "PENDING": 699456,
+      "DONE": 200464,
+      "FAILED": 1000,
+      "PROCESSING": 96,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 464,
+    "indexedDocuments": 9168,
+    "reportedPending": 699456
+  },
+  {
+    "elapsed": 39.3173548639752,
+    "httpStatusMs": 1.7903530388139188,
+    "counts": {
+      "PENDING": 699456,
+      "DONE": 200464,
+      "FAILED": 1000,
+      "PROCESSING": 96,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 464,
+    "indexedDocuments": 9168,
+    "reportedPending": 699456
+  },
+  {
+    "elapsed": 44.348415785992984,
+    "httpStatusMs": 2.2500960039906204,
+    "counts": {
+      "PENDING": 699456,
+      "DONE": 200464,
+      "FAILED": 1000,
+      "PROCESSING": 96,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 464,
+    "indexedDocuments": 9168,
+    "reportedPending": 699456
+  },
+  {
+    "elapsed": 49.382176615006756,
+    "httpStatusMs": 2.3670029477216303,
+    "counts": {
+      "PENDING": 699456,
+      "DONE": 200464,
+      "FAILED": 1000,
+      "PROCESSING": 96,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 464,
+    "indexedDocuments": 9168,
+    "reportedPending": 699456
+  },
+  {
+    "elapsed": 54.413721059972886,
+    "httpStatusMs": 1.8053389503620565,
+    "counts": {
+      "PENDING": 699456,
+      "DONE": 200464,
+      "FAILED": 1000,
+      "PROCESSING": 96,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 464,
+    "indexedDocuments": 9168,
+    "reportedPending": 699456
+  },
+  {
+    "elapsed": 59.457108111993875,
+    "httpStatusMs": 2.831459976732731,
+    "counts": {
+      "PENDING": 699456,
+      "DONE": 200464,
+      "FAILED": 1000,
+      "PROCESSING": 96,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 464,
+    "indexedDocuments": 9168,
+    "reportedPending": 699456
+  },
+  {
+    "elapsed": 64.49504084797809,
+    "httpStatusMs": 1.6543809906579554,
+    "counts": {
+      "PENDING": 699456,
+      "DONE": 200464,
+      "FAILED": 1000,
+      "PROCESSING": 96,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 464,
+    "indexedDocuments": 9168,
+    "reportedPending": 699456
+  },
+  {
+    "elapsed": 69.52549504599301,
+    "httpStatusMs": 2.1106640342622995,
+    "counts": {
+      "PENDING": 699456,
+      "DONE": 200464,
+      "FAILED": 1000,
+      "PROCESSING": 96,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 464,
+    "indexedDocuments": 9168,
+    "reportedPending": 699456
+  },
+  {
+    "elapsed": 74.56062075099908,
+    "httpStatusMs": 1.7306929803453386,
+    "counts": {
+      "PENDING": 699440,
+      "DONE": 200464,
+      "FAILED": 1000,
+      "PROCESSING": 112,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 464,
+    "indexedDocuments": 9168,
+    "reportedPending": 699456
+  },
+  {
+    "elapsed": 79.58982060401468,
+    "httpStatusMs": 2.0548959728330374,
+    "counts": {
+      "PENDING": 699328,
+      "DONE": 200576,
+      "FAILED": 1000,
+      "PROCESSING": 112,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 576,
+    "indexedDocuments": 9168,
+    "reportedPending": 699344
+  },
+  {
+    "elapsed": 84.61970203899546,
+    "httpStatusMs": 1.8560680327937007,
+    "counts": {
+      "PENDING": 699136,
+      "DONE": 200576,
+      "FAILED": 1000,
+      "PROCESSING": 304,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 576,
+    "indexedDocuments": 9168,
+    "reportedPending": 699168
+  },
+  {
+    "elapsed": 89.64926850801567,
+    "httpStatusMs": 1.7447189893573523,
+    "counts": {
+      "PENDING": 698976,
+      "DONE": 200912,
+      "FAILED": 1000,
+      "PROCESSING": 128,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 912,
+    "indexedDocuments": 9168,
+    "reportedPending": 698992
+  },
+  {
+    "elapsed": 94.68148667301284,
+    "httpStatusMs": 1.6303840093314648,
+    "counts": {
+      "PENDING": 698864,
+      "DONE": 200912,
+      "FAILED": 1000,
+      "PROCESSING": 240,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 912,
+    "indexedDocuments": 9168,
+    "reportedPending": 698896
+  },
+  {
+    "elapsed": 99.71563459100435,
+    "httpStatusMs": 3.0855530058033764,
+    "counts": {
+      "PENDING": 698720,
+      "DONE": 201184,
+      "FAILED": 1000,
+      "PROCESSING": 112,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 1184,
+    "indexedDocuments": 9168,
+    "reportedPending": 698736
+  },
+  {
+    "elapsed": 104.75114486098755,
+    "httpStatusMs": 2.126082021277398,
+    "counts": {
+      "PENDING": 698608,
+      "DONE": 201184,
+      "FAILED": 1000,
+      "PROCESSING": 224,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 1184,
+    "indexedDocuments": 9168,
+    "reportedPending": 698640
+  },
+  {
+    "elapsed": 109.7800050629885,
+    "httpStatusMs": 1.8610599800013006,
+    "counts": {
+      "PENDING": 698496,
+      "DONE": 201424,
+      "FAILED": 1000,
+      "PROCESSING": 96,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 1424,
+    "indexedDocuments": 9168,
+    "reportedPending": 698496
+  },
+  {
+    "elapsed": 114.81115373398643,
+    "httpStatusMs": 2.4801819818094373,
+    "counts": {
+      "PENDING": 698352,
+      "DONE": 201424,
+      "FAILED": 1000,
+      "PROCESSING": 240,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 1424,
+    "indexedDocuments": 9168,
+    "reportedPending": 698416
+  },
+  {
+    "elapsed": 119.84456647699699,
+    "httpStatusMs": 2.3625660105608404,
+    "counts": {
+      "PENDING": 698192,
+      "DONE": 201728,
+      "FAILED": 1000,
+      "PROCESSING": 96,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 1728,
+    "indexedDocuments": 9168,
+    "reportedPending": 698192
+  },
+  {
+    "elapsed": 124.87544808798702,
+    "httpStatusMs": 1.6176279750652611,
+    "counts": {
+      "PENDING": 698064,
+      "DONE": 201728,
+      "FAILED": 1000,
+      "PROCESSING": 224,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 1728,
+    "indexedDocuments": 9168,
+    "reportedPending": 698096
+  },
+  {
+    "elapsed": 129.90894081501756,
+    "httpStatusMs": 3.0819200328551233,
+    "counts": {
+      "PENDING": 697904,
+      "DONE": 202016,
+      "FAILED": 1000,
+      "PROCESSING": 96,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 2016,
+    "indexedDocuments": 9168,
+    "reportedPending": 697920
+  },
+  {
+    "elapsed": 134.93791664997116,
+    "httpStatusMs": 1.7584669985808432,
+    "counts": {
+      "PENDING": 697744,
+      "DONE": 202016,
+      "FAILED": 1000,
+      "PROCESSING": 256,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 2016,
+    "indexedDocuments": 9168,
+    "reportedPending": 697808
+  },
+  {
+    "elapsed": 139.96612697298406,
+    "httpStatusMs": 1.3302320148795843,
+    "counts": {
+      "PENDING": 697568,
+      "DONE": 202336,
+      "FAILED": 1000,
+      "PROCESSING": 112,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 2336,
+    "indexedDocuments": 9168,
+    "reportedPending": 697568
+  },
+  {
+    "elapsed": 145.00081386900274,
+    "httpStatusMs": 2.0466679707169533,
+    "counts": {
+      "PENDING": 697424,
+      "DONE": 202336,
+      "FAILED": 1000,
+      "PROCESSING": 256,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 2336,
+    "indexedDocuments": 9168,
+    "reportedPending": 697472
+  },
+  {
+    "elapsed": 150.04002601501998,
+    "httpStatusMs": 5.5002570152282715,
+    "counts": {
+      "PENDING": 697248,
+      "DONE": 202672,
+      "FAILED": 1000,
+      "PROCESSING": 96,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 2672,
+    "indexedDocuments": 9168,
+    "reportedPending": 697264
+  },
+  {
+    "elapsed": 155.08215251599904,
+    "httpStatusMs": 5.254347983282059,
+    "counts": {
+      "PENDING": 697136,
+      "DONE": 202672,
+      "FAILED": 1000,
+      "PROCESSING": 208,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 2672,
+    "indexedDocuments": 9168,
+    "reportedPending": 697184
+  },
+  {
+    "elapsed": 160.1105887820013,
+    "httpStatusMs": 1.5135410358197987,
+    "counts": {
+      "PENDING": 697024,
+      "DONE": 202896,
+      "FAILED": 1000,
+      "PROCESSING": 96,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 2896,
+    "indexedDocuments": 9168,
+    "reportedPending": 697040
+  },
+  {
+    "elapsed": 165.1396367190173,
+    "httpStatusMs": 1.5954209957271814,
+    "counts": {
+      "PENDING": 696896,
+      "DONE": 202896,
+      "FAILED": 1000,
+      "PROCESSING": 224,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 2896,
+    "indexedDocuments": 9168,
+    "reportedPending": 696928
+  },
+  {
+    "elapsed": 170.1692440629704,
+    "httpStatusMs": 1.5273210010491312,
+    "counts": {
+      "PENDING": 696704,
+      "DONE": 203200,
+      "FAILED": 1000,
+      "PROCESSING": 112,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 3200,
+    "indexedDocuments": 9168,
+    "reportedPending": 696720
+  },
+  {
+    "elapsed": 175.2030632760143,
+    "httpStatusMs": 2.0856340415775776,
+    "counts": {
+      "PENDING": 696512,
+      "DONE": 203200,
+      "FAILED": 1000,
+      "PROCESSING": 304,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 3200,
+    "indexedDocuments": 9168,
+    "reportedPending": 696592
+  },
+  {
+    "elapsed": 180.24525170197012,
+    "httpStatusMs": 2.9891339945606887,
+    "counts": {
+      "PENDING": 696320,
+      "DONE": 203584,
+      "FAILED": 1000,
+      "PROCESSING": 112,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 3584,
+    "indexedDocuments": 9168,
+    "reportedPending": 696352
+  },
+  {
+    "elapsed": 185.27947974699782,
+    "httpStatusMs": 1.7630289657972753,
+    "counts": {
+      "PENDING": 696160,
+      "DONE": 203584,
+      "FAILED": 1000,
+      "PROCESSING": 272,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 3584,
+    "indexedDocuments": 9168,
+    "reportedPending": 696224
+  },
+  {
+    "elapsed": 190.3077730149962,
+    "httpStatusMs": 1.6103259986266494,
+    "counts": {
+      "PENDING": 695952,
+      "DONE": 203952,
+      "FAILED": 1000,
+      "PROCESSING": 112,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 3952,
+    "indexedDocuments": 9168,
+    "reportedPending": 695968
+  },
+  {
+    "elapsed": 195.3491671400261,
+    "httpStatusMs": 3.5236169933341444,
+    "counts": {
+      "PENDING": 695840,
+      "DONE": 203952,
+      "FAILED": 1000,
+      "PROCESSING": 224,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 3952,
+    "indexedDocuments": 9168,
+    "reportedPending": 695872
+  },
+  {
+    "elapsed": 200.37752347899368,
+    "httpStatusMs": 1.3151699677109718,
+    "counts": {
+      "PENDING": 695696,
+      "DONE": 204208,
+      "FAILED": 1000,
+      "PROCESSING": 112,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 4208,
+    "indexedDocuments": 9168,
+    "reportedPending": 695744
+  },
+  {
+    "elapsed": 205.40896862797672,
+    "httpStatusMs": 2.7550700469873846,
+    "counts": {
+      "PENDING": 695568,
+      "DONE": 204208,
+      "FAILED": 1000,
+      "PROCESSING": 240,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 4208,
+    "indexedDocuments": 9168,
+    "reportedPending": 695632
+  },
+  {
+    "elapsed": 210.4381680280203,
+    "httpStatusMs": 1.7367959953844547,
+    "counts": {
+      "PENDING": 695360,
+      "DONE": 204560,
+      "FAILED": 1000,
+      "PROCESSING": 96,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 4560,
+    "indexedDocuments": 9168,
+    "reportedPending": 695376
+  },
+  {
+    "elapsed": 215.46632830798626,
+    "httpStatusMs": 1.4160579885356128,
+    "counts": {
+      "PENDING": 695216,
+      "DONE": 204560,
+      "FAILED": 1000,
+      "PROCESSING": 240,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 4560,
+    "indexedDocuments": 9168,
+    "reportedPending": 695280
+  },
+  {
+    "elapsed": 220.51121377502568,
+    "httpStatusMs": 4.77015197975561,
+    "counts": {
+      "PENDING": 695104,
+      "DONE": 204832,
+      "FAILED": 1000,
+      "PROCESSING": 80,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 4832,
+    "indexedDocuments": 9168,
+    "reportedPending": 695120
+  },
+  {
+    "elapsed": 225.54043226101203,
+    "httpStatusMs": 1.5598710160702467,
+    "counts": {
+      "PENDING": 694976,
+      "DONE": 204832,
+      "FAILED": 1000,
+      "PROCESSING": 208,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 4832,
+    "indexedDocuments": 9168,
+    "reportedPending": 695040
+  },
+  {
+    "elapsed": 230.5710944510065,
+    "httpStatusMs": 2.6214600075036287,
+    "counts": {
+      "PENDING": 694832,
+      "DONE": 205104,
+      "FAILED": 1000,
+      "PROCESSING": 80,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 5104,
+    "indexedDocuments": 9168,
+    "reportedPending": 694864
+  },
+  {
+    "elapsed": 235.60199272597674,
+    "httpStatusMs": 1.7705120262689888,
+    "counts": {
+      "PENDING": 694704,
+      "DONE": 205104,
+      "FAILED": 1000,
+      "PROCESSING": 208,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 5104,
+    "indexedDocuments": 9168,
+    "reportedPending": 694752
+  },
+  {
+    "elapsed": 240.65255754900863,
+    "httpStatusMs": 6.694165989756584,
+    "counts": {
+      "PENDING": 694528,
+      "DONE": 205424,
+      "FAILED": 1000,
+      "PROCESSING": 64,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 5424,
+    "indexedDocuments": 9168,
+    "reportedPending": 694544
+  },
+  {
+    "elapsed": 245.70829427900026,
+    "httpStatusMs": 2.0261500030755997,
+    "counts": {
+      "PENDING": 694400,
+      "DONE": 205424,
+      "FAILED": 1000,
+      "PROCESSING": 192,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 5424,
+    "indexedDocuments": 9168,
+    "reportedPending": 694464
+  },
+  {
+    "elapsed": 250.73926270002266,
+    "httpStatusMs": 1.5007780166342854,
+    "counts": {
+      "PENDING": 694304,
+      "DONE": 205680,
+      "FAILED": 1000,
+      "PROCESSING": 32,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 5680,
+    "indexedDocuments": 9168,
+    "reportedPending": 694320
+  },
+  {
+    "elapsed": 255.7805757939932,
+    "httpStatusMs": 1.4748050016351044,
+    "counts": {
+      "PENDING": 694176,
+      "DONE": 205680,
+      "FAILED": 1000,
+      "PROCESSING": 160,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 5680,
+    "indexedDocuments": 9168,
+    "reportedPending": 694176
+  },
+  {
+    "elapsed": 260.80875531502534,
+    "httpStatusMs": 1.313141023274511,
+    "counts": {
+      "PENDING": 694000,
+      "DONE": 205968,
+      "FAILED": 1000,
+      "PROCESSING": 48,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 5968,
+    "indexedDocuments": 9168,
+    "reportedPending": 694032
+  },
+  {
+    "elapsed": 265.83765880402643,
+    "httpStatusMs": 1.2383550056256354,
+    "counts": {
+      "PENDING": 693872,
+      "DONE": 205968,
+      "FAILED": 1000,
+      "PROCESSING": 176,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 5968,
+    "indexedDocuments": 9168,
+    "reportedPending": 693888
+  },
+  {
+    "elapsed": 270.86629203899065,
+    "httpStatusMs": 1.6688969917595387,
+    "counts": {
+      "PENDING": 693648,
+      "DONE": 206320,
+      "FAILED": 1000,
+      "PROCESSING": 48,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 6320,
+    "indexedDocuments": 9168,
+    "reportedPending": 693664
+  },
+  {
+    "elapsed": 275.8992813259829,
+    "httpStatusMs": 3.1955490121617913,
+    "counts": {
+      "PENDING": 693504,
+      "DONE": 206320,
+      "FAILED": 1000,
+      "PROCESSING": 192,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 6320,
+    "indexedDocuments": 9168,
+    "reportedPending": 693504
+  },
+  {
+    "elapsed": 280.96188832097687,
+    "httpStatusMs": 3.502303035929799,
+    "counts": {
+      "PENDING": 693312,
+      "DONE": 206656,
+      "FAILED": 1000,
+      "PROCESSING": 48,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 6656,
+    "indexedDocuments": 9168,
+    "reportedPending": 693344
+  },
+  {
+    "elapsed": 286.02098017797107,
+    "httpStatusMs": 2.4859620025381446,
+    "counts": {
+      "PENDING": 693216,
+      "DONE": 206656,
+      "FAILED": 1000,
+      "PROCESSING": 144,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 6656,
+    "indexedDocuments": 9168,
+    "reportedPending": 693216
+  },
+  {
+    "elapsed": 291.084818902018,
+    "httpStatusMs": 4.250559024512768,
+    "counts": {
+      "PENDING": 693104,
+      "DONE": 206880,
+      "FAILED": 1000,
+      "PROCESSING": 32,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 6880,
+    "indexedDocuments": 9168,
+    "reportedPending": 693136
+  },
+  {
+    "elapsed": 296.12363104202086,
+    "httpStatusMs": 2.078456978779286,
+    "counts": {
+      "PENDING": 693008,
+      "DONE": 206880,
+      "FAILED": 1000,
+      "PROCESSING": 128,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 6880,
+    "indexedDocuments": 9168,
+    "reportedPending": 693008
+  },
+  {
+    "elapsed": 301.15465248399414,
+    "httpStatusMs": 1.6212610062211752,
+    "counts": {
+      "PENDING": 692864,
+      "DONE": 207120,
+      "FAILED": 1000,
+      "PROCESSING": 32,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 7120,
+    "indexedDocuments": 9168,
+    "reportedPending": 692928
+  },
+  {
+    "elapsed": 306.1855078099761,
+    "httpStatusMs": 1.750237017404288,
+    "counts": {
+      "PENDING": 692736,
+      "DONE": 207120,
+      "FAILED": 1000,
+      "PROCESSING": 160,
+      "RETRY_EXHAUSTED": 98984
+    },
+    "realSuccessDocs": 7120,
+    "indexedDocuments": 9168,
+    "reportedPending": 692736
+  }
+]

@@ -18,6 +18,7 @@
  * fall back to schema-blind rendering when null.
  */
 
+import { getSessionOrigin, resolveSessionTokenFromTauri } from '../http.js';
 import { authorizedFetch } from '../../shell-v0/api/authorizedFetch.js';
 import type { JsonSchema } from '@jsonforms/core';
 
@@ -66,7 +67,12 @@ export async function fetchSchema(
     try {
       // External schema documents do not receive the Engine credential.
       const fetcher = fetchImpl ?? (url.startsWith('/api/schemas/') ? authorizedFetch : fetch);
-      const response = await fetcher(url);
+      let target = url;
+      if (!fetchImpl && url.startsWith('/api/schemas/')) {
+        await resolveSessionTokenFromTauri();
+        target = (getSessionOrigin() ?? '') + url;
+      }
+      const response = await fetcher(target);
       if (!response.ok) {
         return null;
       }

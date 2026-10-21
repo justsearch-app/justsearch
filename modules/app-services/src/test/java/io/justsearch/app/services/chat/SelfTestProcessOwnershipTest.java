@@ -2,7 +2,6 @@
 package io.justsearch.app.services.chat;
 
 import static io.justsearch.app.services.chat.ManagedChatSeam.await;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -54,22 +53,17 @@ final class SelfTestProcessOwnershipTest {
   }
 
   /**
-   * The self-test still fails when its server outlives the wrapper. On Windows that survivor, in
-   * the candidate's own job, is then ended and recorded as an intended cleanup; elsewhere it cannot
-   * be ended and keeps running (the named limit).
+   * An unexpectedly exited wrapper still fails the self-test (S19). Its captured serving
+   * descendant must now be ended and recorded on POSIX too (K5/#858).
    */
   @Test
-  void exitedSelfTestWrapperWithLiveDescendantCannotPass() throws Exception {
+  void exitedSelfTestWrapperIsCleanedBeforeResultReturns() throws Exception {
     try (var fixture = new Candidate(directory); var control = recordingControl()) {
       SelfTestRun result = new ChildSelfTestLauncher(control).run(fixture.spec(control, true));
       assertFalse(result.exercised(), "a live descendant must make cleanup fail");
       assertTrue(result.failure().contains("still running"), result.failure());
-      if (WINDOWS) {
-        assertFalse(fixture.descendantAlive(), "the survivor in the candidate's job is ended");
-        assertSurvivorRecorded(fixture);
-      } else {
-        assertTrue(fixture.descendantAlive(), "the serving descendant outlived its wrapper");
-      }
+      assertFalse(fixture.descendantAlive(), "the retained serving descendant is ended");
+      assertSurvivorRecorded(fixture);
     }
   }
 
@@ -93,11 +87,10 @@ final class SelfTestProcessOwnershipTest {
 
   /**
    * After a self-test whose server survived the forced wrapper stop, the main server loads without
-   * an Engine restart on Windows, the survivor ended and recorded. Elsewhere the main start is
-   * refused beside the survivor until it exits.
+   * an Engine restart, with the serving descendant ended and its cleanup recorded on both paths.
    */
   @Test
-  void selfTestDescendantSurvivalBlocksMainReload() throws Exception {
+  void selfTestDescendantsEndBeforeMainReload() throws Exception {
     try (var fixture = new Candidate(directory);
         var control = recordingControl();
         var seam = new ManagedChatSeam(directory, 0, control);
@@ -113,31 +106,19 @@ final class SelfTestProcessOwnershipTest {
           reconciler.start();
           reconciler.requestBootConvergence();
           assertTrue(reconciler.awaitQuiescent(30_000));
-          assertFalse(session.run(fixture.spec(control, false)).exercised(),
-              "the descendant survives the forced wrapper stop");
+          var result = session.run(fixture.spec(control, false));
           if (WINDOWS) {
+            assertFalse(result.exercised(), "the descendant survives the forced wrapper stop");
             assertFalse(fixture.descendantAlive(), "the survivor in the candidate's job is ended");
             assertSurvivorRecorded(fixture);
           } else {
-            assertTrue(fixture.descendantAlive());
+            assertTrue(result.exercised(), result.failure());
+            assertFalse(fixture.descendantAlive(), "the captured serving descendant is ended");
+            assertSurvivorRecorded(fixture);
           }
         }
         reconciler.specChanged();
-        if (WINDOWS) {
-          await(manager::isOnline, "main chat load after the self-test, without an Engine restart");
-          assertEquals(1, seam.models().size());
-          return;
-        }
-        assertTrue(reconciler.awaitQuiescent(30_000));
-        assertEquals(List.of(), seam.models(),
-            "closing the self-test session must not spawn main beside its surviving descendant");
-        assertFalse(manager.isOnline());
-        assertTrue(manager.view().toString().contains("descendant"),
-            "chat status must explain the refusal: " + manager.view());
-        fixture.endDescendant();
-        assertDoesNotThrow(() -> { manager.switchToOnlineMode(); },
-            "an explicit retry can launch once the recorded descendant exits");
-        await(manager::isOnline, "chat reload after descendant exit");
+        await(manager::isOnline, "main chat load after the self-test, without an Engine restart");
         assertEquals(1, seam.models().size());
       }
     }
@@ -207,7 +188,10 @@ final class SelfTestProcessOwnershipTest {
     }
 
     boolean descendantAlive() throws Exception {
-      return owned("server").map(ProcessHandle::isAlive).orElse(false);
+      return owned("server").filter(ProcessHandle::isAlive)
+          .filter(process -> !io.justsearch.configuration.PlatformPaths.isLinux()
+              || io.justsearch.app.api.runtime.child.LinuxProcessIdentity.observe(process.pid()).presence()
+                  != ProcessTerminator.IdentityPresence.GONE).isPresent();
     }
 
     private Optional<ProcessHandle> owned(String role) throws Exception {
@@ -232,7 +216,13 @@ final class SelfTestProcessOwnershipTest {
       // No PID-only or parent-tree kills: only producer-recorded identities are awaited.
       for (String role : List.of("wrapper", "server")) {
         var process = owned(role);
-        if (process.isPresent()) process.get().onExit().get(10, java.util.concurrent.TimeUnit.SECONDS);
+        if (process.isPresent()) {
+          if (WINDOWS) process.get().onExit().get(10, java.util.concurrent.TimeUnit.SECONDS);
+          else await(() -> !process.get().isAlive()
+              || (io.justsearch.configuration.PlatformPaths.isLinux()
+                  && io.justsearch.app.api.runtime.child.LinuxProcessIdentity.observe(process.get().pid())
+                      .presence() == ProcessTerminator.IdentityPresence.GONE), "owned fixture exit");
+        }
       }
     }
   }

@@ -6,6 +6,7 @@ mod windows_reveal;
 mod containment;
 // Reader/writer enabler; lifecycle callers land in Spec F step 6.
 mod engine_host;
+mod engine_conn;
 mod engine_probe;
 #[allow(dead_code)]
 mod exit_ledger;
@@ -16,6 +17,7 @@ mod platform_paths;
 // Lane F stage B item B10: the Engine supervisor (design 7.1). The DECISION half is a pure
 // function over the register the dev-runner also reads; only the actuator lives in this file.
 mod quit;
+mod recovery;
 mod search_shortcut;
 mod session_window;
 mod shell_actuator;
@@ -27,8 +29,7 @@ use binding::{read_manifest_if_present, Binding, ManifestFields};
 use engine_host::{EngineHost, PreparedCommand};
 
 use std::fs::OpenOptions;
-use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{Ipv4Addr, SocketAddr, TcpStream};
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -205,49 +206,6 @@ impl Drop for BackendState {
         let ticket = self.quit.begin(quit::QuitCause::Drop);
         let _ = self.quit.wait(ticket);
     }
-}
-
-/// Tempdoc 805 G.1: ask Head to run its own ordered shutdown (`POST /api/lifecycle/shutdown`).
-/// Returns true iff Head acknowledged with 2xx; every other outcome falls through to force-kill.
-///
-/// Hand-rolled loopback HTTP rather than the `reqwest` client the updater uses: this runs on the
-/// synchronous quit path (including `Drop`, and `RunEvent::Exit` while the tokio runtime is
-/// winding down), where an async client has no runtime to block on.
-fn request_head_shutdown(port: u16, token: &str) -> bool {
-    if token.contains(['\r', '\n']) {
-        return false; // a token carrying CRLF would splice headers — never send it
-    }
-    let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
-    let Ok(mut stream) = TcpStream::connect_timeout(&address, Duration::from_secs(2)) else {
-        return false;
-    };
-    let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
-    let request = format!(
-        "POST /api/lifecycle/shutdown HTTP/1.1\r\n\
-         Host: 127.0.0.1:{port}\r\n\
-         X-JustSearch-Session: {token}\r\n\
-         Content-Type: application/json\r\n\
-         Content-Length: 2\r\n\
-         Connection: close\r\n\r\n{{}}"
-    );
-    if stream.write_all(request.as_bytes()).is_err() {
-        return false;
-    }
-    let _ = stream.flush();
-    let mut response = Vec::new();
-    let mut chunk = [0u8; 256];
-    while response.len() < 64 {
-        match stream.read(&mut chunk) {
-            Ok(0) | Err(_) => break,
-            Ok(n) => response.extend_from_slice(&chunk[..n]),
-        }
-    }
-    let status_line = String::from_utf8_lossy(&response);
-    let Some(code) = status_line.split_whitespace().nth(1) else {
-        return false;
-    };
-    code.starts_with('2')
 }
 
 /// Recursively copy a directory tree from src to dest.
@@ -799,7 +757,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         .join("plugins")
         .join("pipeline-stage-plugins.v1.json");
 
-    let crash_dir = app_data_dir.join("crashes");
+    let crash_options = recovery::jvm_options(&app_data_dir)?;
     let mut cmd = containment::engine_command(&java_bin).map_err(|e| e.to_string())?;
     // Use AOT cache if present (JEP 514 — built at compile time, bundled in aot/).
     let aot_cache = headless_dir.join("aot").join("head.aot");
@@ -854,13 +812,9 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         cmd.arg(format!("-XX:AOTCache={}", aot_cache.to_string_lossy()));
     }
     cmd
-        // JVM crash diagnostics — write to <dataDir>/crashes/
-        .arg(format!(
-            "-XX:ErrorFile={}/hs_err_pid%p.log",
-            crash_dir.to_string_lossy()
-        ))
+        // One argument per JVM option also preserves Windows paths containing spaces.
+        .args(crash_options)
         .arg("-XX:+HeapDumpOnOutOfMemoryError")
-        .arg(format!("-XX:HeapDumpPath={}/", crash_dir.to_string_lossy()))
         // Lane F stage B item B1. Without this an OutOfMemoryError reaches the default
         // uncaught-exception handler and the JVM exits 1 — the same code as a boot failure, so the
         // supervisor cannot tell a memory death from a bad config. With it the JVM exits 3.
@@ -1207,25 +1161,31 @@ pub(crate) fn start_supervision(
     app: &tauri::AppHandle,
     state: Arc<BackendState>,
 ) -> Result<(), String> {
-    let Ok(data_dir) = resolve_app_data_dir(app) else {
-        return Err("supervisor: no app data dir; the Engine will not be supervised".into());
-    };
+    let data_dir = resolve_app_data_dir(app)
+        .map_err(|error| format!("Cannot resolve the Engine data directory: {error}"))?;
     let host = state.host.clone();
     let spawn_app = app.clone();
     let event_app = app.clone();
-    let mut actuator = shell_actuator::ShellActuator::new(
-        host.clone(),
-        data_dir,
-        move || {
-            state.reset_for_restart()?;
-            spawn_headless_backend(&spawn_app, state.clone())?;
-            Ok(state.child_pid().unwrap_or(0))
-        },
-        move |record| {
-            let _ = event_app.emit(EVENT_SUPERVISOR_STATE, record);
-        },
-    );
+    let exhausted_data_dir = data_dir.clone();
+    let actor_host = host.clone();
     host.start_supervisor(move || {
+        let mut actuator = shell_actuator::ShellActuator::new(
+            actor_host,
+            data_dir,
+            move || {
+                state.reset_for_restart()?;
+                spawn_headless_backend(&spawn_app, state.clone())?;
+                Ok(state.child_pid().unwrap_or(0))
+            },
+            move |record| {
+                // Exhaustion now owns an interruptible wait, so retain the terminal helper cleanup
+                // at that transition rather than delaying it until this actor eventually exits.
+                if record.state == "exhausted" && record.retry_at.is_some() {
+                    cleanup_registered_children_for_terminal(&exhausted_data_dir);
+                }
+                let _ = event_app.emit(EVENT_SUPERVISOR_STATE, record);
+            },
+        );
         let policy = supervisor::load_policy();
         let mut sup = supervisor::Supervisor::new(policy);
         let outcome = supervisor::run_supervision(&mut sup, &mut actuator);
@@ -1291,6 +1251,17 @@ fn update_tray_tooltip(state: &BackendState, tooltip: &str) {
 }
 
 #[tauri::command]
+fn restart_engine(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<BackendState>>,
+) -> Result<(), String> {
+    if state.host.request_manual_restart()? {
+        return Ok(());
+    }
+    start_supervision(&app, (*state).clone())
+}
+
+#[tauri::command]
 fn supervisor_state(state: tauri::State<'_, Arc<BackendState>>) -> Option<supervisor::StateRecord> {
     state.host.latest_record()
 }
@@ -1311,25 +1282,36 @@ async fn api_port(state: tauri::State<'_, Arc<BackendState>>) -> Result<Option<u
     Ok(state.get_port())
 }
 
-/// Returns the session token for non-GET request authentication (prod mode only).
-/// This is delivered to the UI so it can include the token in API requests.
-/// Returns None if the token has not been set (dev mode or not yet started).
+/// A token is issued only with the exact origin of its incarnation.
+#[derive(serde::Serialize)]
+struct SessionCredential {
+    origin: String,
+    token: String,
+}
+
+fn session_credential(state: &BackendState) -> Option<SessionCredential> {
+    let binding = state.binding_snapshot();
+    Some(SessionCredential {
+        origin: format!("http://127.0.0.1:{}", binding.port?),
+        token: binding.token?,
+    })
+}
+
 #[tauri::command]
 async fn session_token(
     state: tauri::State<'_, Arc<BackendState>>,
-) -> Result<Option<String>, String> {
-    if let Some(token) = state.get_session_token() {
-        return Ok(Some(token));
-    }
-    if state.has_spawn_error() {
-        return Ok(None);
-    }
-
-    // Wait (bounded) for backend to reveal its token on stdout.
-    // Use a shorter timeout than port since token may not be present in dev mode.
-    let notified = state.session_token_ready.notified();
-    let _ = tokio::time::timeout(std::time::Duration::from_secs(10), notified).await;
-    Ok(state.get_session_token())
+) -> Result<Option<SessionCredential>, String> {
+    // Register before inspecting the snapshot, including a token that arrived before its port.
+    let wait = async {
+        loop {
+            let port = state.port_ready.notified();
+            let token = state.session_token_ready.notified();
+            if let Some(credential) = session_credential(&state) { return Some(credential); }
+            if state.has_spawn_error() { return None; }
+            tokio::select! { _ = port => {}, _ = token => {} }
+        }
+    };
+    Ok(tokio::time::timeout(Duration::from_secs(10), wait).await.unwrap_or(None))
 }
 
 #[tauri::command]
@@ -1937,6 +1919,7 @@ pub fn run() {
         .manage(search_shortcut::SearchShortcut::default())
         .invoke_handler(tauri::generate_handler![
             supervisor_state,
+            restart_engine,
             api_port,
             session_token,
             smoke_run_id,
@@ -2737,6 +2720,12 @@ mod tests {
     }
 }
 
+#[cfg(all(test, target_os = "linux"))]
+#[path = "engine_conn_test_support.rs"]
+mod engine_conn_test_support;
+
+#[cfg(all(test, target_os = "linux"))]
+mod session_credential_tests;
 #[cfg(test)]
 mod open_guard_tests {
     use super::*;

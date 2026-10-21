@@ -3846,6 +3846,7 @@ dependencies = [
  "base64 0.22.1",
  "dunce",
  "gtk",
+ "libc",
  "open",
  "reqwest",
  "ring",

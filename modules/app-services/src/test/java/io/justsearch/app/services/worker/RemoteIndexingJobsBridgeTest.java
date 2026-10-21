@@ -59,7 +59,7 @@ final class RemoteIndexingJobsBridgeTest {
     stub.queueSnapshot(
         7L,
         List.of(
-            view("hash-a", "PENDING", 0, 1000L, ""),
+            view("hash-a", "FAILED", 0, 1000L, ""),
             view("hash-b", "PROCESSING", 1, 2000L, "")));
 
     var deliveries = new CopyOnWriteArrayList<RemoteIndexingJobsBridge.Delta>();
@@ -166,11 +166,11 @@ final class RemoteIndexingJobsBridgeTest {
   }
 
   @Test
-  @DisplayName("§B.2: deltas keep latestSnapshot live — a drained job reflects DONE, not frozen PENDING")
+  @DisplayName("completed rows leave the window and still reach live listeners")
   void latestSnapshotReflectsDeltasNotFrozenSubscribeTime() throws Exception {
-    // Subscribe-time snapshot: one PENDING job (mirrors the live §B.2 setup).
-    stub.queueSnapshot(1L, List.of(view("hash-job", "PENDING", 0, 1L, "")));
-    // Worker drains it: PENDING → DONE (an UPDATE delta).
+    // A running job is initially visible in the bounded window.
+    stub.queueSnapshot(1L, List.of(view("hash-job", "PROCESSING", 0, 1L, "")));
+    // Completion removes it from the window but remains a terminal live delta.
     stub.queueDelta(
         2L,
         IndexingJobsDelta.newBuilder().setUpdate(view("hash-job", "DONE", 0, 2L, "")).build());
@@ -180,24 +180,17 @@ final class RemoteIndexingJobsBridgeTest {
     bridge.start().get(2, TimeUnit.SECONDS);
     awaitDeliveries(deliveries, 2); // snapshot + update
 
-    // The cached snapshot a NEW subscriber would receive (IndexingJobsStreamController
-    // serves bridge.latestSnapshot()) MUST reflect the CURRENT state (DONE), not the
-    // frozen subscribe-time PENDING. Pre-fix this asserted "PENDING" (the §B.2 bug:
-    // phantom pending rows the live queueDepth reported as 0).
-    var snap = bridge.latestSnapshot();
-    assertEquals(1, snap.size());
-    assertEquals("hash-job", snap.get(0).pathHash());
-    assertEquals(
-        "DONE",
-        snap.get(0).state(),
-        "latestSnapshot must reflect the UPDATE delta (DONE), not the frozen PENDING");
+    assertTrue(bridge.latestSnapshot().isEmpty());
+    var completion = (RemoteIndexingJobsBridge.Delta.Update) deliveries.get(1);
+    assertEquals("DONE", completion.row().state());
+    assertEquals("hash-job", completion.row().pathHash());
     assertEquals(2L, bridge.latestSnapshotSeq(), "snapshot seq advances with applied deltas");
   }
 
   @Test
   @DisplayName("§B.2: a deleted job is removed from latestSnapshot")
   void deleteDeltaRemovesFromLatestSnapshot() throws Exception {
-    stub.queueSnapshot(1L, List.of(view("hash-gone", "PENDING", 0, 1L, "")));
+    stub.queueSnapshot(1L, List.of(view("hash-gone", "PROCESSING", 0, 1L, "")));
     stub.queueDelta(2L, IndexingJobsDelta.newBuilder().setDeletePathHash("hash-gone").build());
 
     var deliveries = new CopyOnWriteArrayList<RemoteIndexingJobsBridge.Delta>();
@@ -213,23 +206,66 @@ final class RemoteIndexingJobsBridgeTest {
   @Test
   @DisplayName("§B.2 fix-pass: latestSnapshotPair() returns a coherent (seq, items) pair")
   void latestSnapshotPairIsCoherent() throws Exception {
-    stub.queueSnapshot(5L, List.of(view("h", "PENDING", 0, 1L, "")));
+    stub.queueSnapshot(5L, List.of(view("h", "PROCESSING", 0, 1L, "")));
     stub.queueDelta(
-        6L, IndexingJobsDelta.newBuilder().setUpdate(view("h", "DONE", 0, 2L, "")).build());
+        6L, IndexingJobsDelta.newBuilder().setUpdate(view("h", "FAILED", 0, 2L, "")).build());
     var deliveries = new CopyOnWriteArrayList<RemoteIndexingJobsBridge.Delta>();
     bridge.subscribe(deliveries::add);
     bridge.start().get(2, TimeUnit.SECONDS);
     awaitDeliveries(deliveries, 2);
 
-    // The (seq, items) pair moves together: after the seq-6 DONE delta the pair is (6, [DONE]) —
-    // never items@5 with seq@6 or vice versa (the torn-read the single AtomicReference prevents).
+    // The synchronized copy captures both the updated cursor and its eligible row.
     var pair = bridge.latestSnapshotPair();
     assertEquals(6L, pair.seq());
     assertEquals(1, pair.items().size());
-    assertEquals("DONE", pair.items().get(0).state());
-    // The convenience accessors derive from the same atomic record (no separate field to tear).
+    assertEquals("FAILED", pair.items().get(0).state());
+    // Convenience accessors agree when there are no intervening writes.
     assertEquals(pair.seq(), bridge.latestSnapshotSeq());
     assertEquals(pair.items(), bridge.latestSnapshot());
+  }
+
+  @Test void statePresenceOutsideWindowInvalidatesButHeartbeatCountsAndReconnectDoNot() throws Exception {
+    stub.queueSnapshot(1L, List.of());
+    bridge.start().get(2, TimeUnit.SECONDS);
+    long before = statusCounter();
+    var outside = IndexingJobsDelta.newBuilder().setInsert(view("outside", "PENDING", 0, 1, ""));
+    stub.active.accept(IndexingJobsFrame.newBuilder().setSeq(2).setDelta(outside)
+        .setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.newBuilder().addStates("PENDING")).build());
+    assertEquals(before + 1, statusCounter());
+    stub.queueDelta(3, IndexingJobsDelta.newBuilder().setInsert(view("second", "PENDING", 0, 2, "")).build());
+    stub.queueDelta(4, IndexingJobsDelta.newBuilder().setUpdate(view("outside", "PENDING", 0, 3, "")).build());
+    stub.active.accept(IndexingJobsFrame.newBuilder().setSeq(5).setSnapshot(IndexingJobsSnapshot.getDefaultInstance())
+        .setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.newBuilder().addStates("PENDING")).build());
+    assertEquals(before + 1, statusCounter(), "counts, heartbeat and identical reconnect preserve the signal");
+    stub.active.accept(IndexingJobsFrame.newBuilder().setSeq(6).setSnapshot(IndexingJobsSnapshot.getDefaultInstance())
+        .setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.getDefaultInstance()).build());
+    assertEquals(before + 2, statusCounter(), "removing the last outside-window row invalidates status");
+    assertTrue(bridge.latestSnapshot().isEmpty(), "state publication does not add rows to the window");
+  }
+
+  @Test void sustainedChurnAndReconnectConvergeToBoundedWindowWithoutPhantoms() throws Exception {
+    stub.queueSnapshot(1, List.of(view("running", "PROCESSING", 0, 1, "")));
+    bridge.start().get(2, TimeUnit.SECONDS);
+    for (int i = 0; i < 600; i++) {
+      stub.queueDelta(i + 2, IndexingJobsDelta.newBuilder()
+          .setUpdate(view("failure-" + i, i % 2 == 0 ? "FAILED" : "RETRY_EXHAUSTED", 1, i + 2, "bad")).build());
+    }
+    assertEquals(201, bridge.latestSnapshot().size());
+    assertTrue(bridge.latestSnapshot().stream().anyMatch(v -> v.pathHash().equals("running")));
+    assertTrue(bridge.latestSnapshot().stream().noneMatch(v -> v.pathHash().equals("failure-399")));
+    stub.queueDelta(602, IndexingJobsDelta.newBuilder().setUpdate(view("running", "DONE", 0, 602, "")).build());
+    stub.queueDelta(603, IndexingJobsDelta.newBuilder().setUpdate(view("failure-599", "PENDING", 0, 603, "")).build());
+    var before = bridge.latestSnapshotPair();
+    var protoRows = before.items().stream().map(v -> view(v.pathHash(), v.state(), v.attempts(), v.lastUpdatedMs(), v.errorMessage())).toList();
+    stub.queueSnapshot(604, protoRows);
+    assertEquals(before.items(), bridge.latestSnapshot());
+    var freshSource = new StubIndexingJobsSource(); freshSource.queueSnapshot(604, protoRows);
+    var fresh = new RemoteIndexingJobsBridge(processExecutors, () -> freshSource);
+    try {
+      fresh.start().get(2, TimeUnit.SECONDS);
+      assertEquals(bridge.latestSnapshotPair(), fresh.latestSnapshotPair(), "reload and reconnect converge");
+      assertTrue(fresh.latestSnapshot().stream().noneMatch(v -> v.state().equals("PENDING") || v.state().equals("DONE")));
+    } finally { fresh.stop(); }
   }
 
   // ---- helpers ----
@@ -296,7 +332,10 @@ final class RemoteIndexingJobsBridgeTest {
 
     synchronized void queueSnapshot(long seq, List<io.justsearch.ipc.IndexingJobView> items) {
       var snap = IndexingJobsSnapshot.newBuilder().addAllItems(items).build();
-      var frame = IndexingJobsFrame.newBuilder().setSnapshot(snap).setSeq(seq).build();
+      var frame = IndexingJobsFrame.newBuilder().setSnapshot(snap).setSeq(seq)
+          .setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.newBuilder()
+              .addAllStates(items.stream().map(io.justsearch.ipc.IndexingJobView::getState).distinct().toList()))
+          .build();
       if (active != null) {
         deliver(frame);
       } else {
@@ -338,8 +377,10 @@ final class RemoteIndexingJobsBridgeTest {
     bridge.latestSnapshot(); bridge.latestSnapshotPair();
     stub.queueSnapshot(2L, List.of(pending));
     assertEquals(before + 1, statusCounter(), "same snapshot at a new cursor must not invalidate");
-    stub.queueDelta(3L, IndexingJobsDelta.newBuilder()
-        .setUpdate(view("counter", "PROCESSING", 1, 2000L, "")).build());
+    stub.active.accept(IndexingJobsFrame.newBuilder().setSeq(3L)
+        .setDelta(IndexingJobsDelta.newBuilder().setUpdate(view("counter", "PROCESSING", 1, 2000L, "")))
+        .setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.newBuilder().addStates("PROCESSING"))
+        .build());
     assertEquals(before + 2, statusCounter());
   }
 }

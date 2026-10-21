@@ -23,7 +23,7 @@ const {
   __test: { parseJavaMajor },
 } = require('../dev/lib/resolve-jdk.cjs');
 
-export const TOOL_FLOORS = Object.freeze({ node: 20, java: 24, pythonMajor: 3, pythonMinor: 13 });
+export const TOOL_FLOORS = Object.freeze({ node: 24, java: 24, pythonMajor: 3, pythonMinor: 13 });
 
 export const NPM_LOCK_ROOTS = Object.freeze([
   '.',

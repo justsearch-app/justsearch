@@ -1,0 +1,6 @@
+{
+  "sameDatabase": true,
+  "realFiles": 12000,
+  "changedContent": true,
+  "reason": "Repeat the production probe with Details expanded after its asynchronous appearance; no database copy or regeneration."
+}

@@ -31,6 +31,9 @@
  * operator-trace surfaces use the sibling DiagnosticChannel primitive.)
  */
 
+import { subscribeAiState } from '../state/aiStateStore.js';
+import { indexingQueueCounts } from '../state/indexingQueueCounts.js';
+import { formatCount } from '../display/format.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import type { JsonSchema } from '@jsonforms/core';
@@ -126,6 +129,8 @@ export class ResourceView extends JfElement {
     schema: { state: true },
     connectionState: { state: true },
     error: { state: true },
+    queueCounts: { state: true },
+    queueCountsLive: { state: true },
   } as const;
 
   declare resourceId: string;
@@ -136,6 +141,9 @@ export class ResourceView extends JfElement {
   declare connectionState: ConnectionState;
   declare error: string | null;
 
+  private declare queueCountsLive: boolean;
+  private declare queueCounts: ReturnType<typeof indexingQueueCounts>;
+  private stopQueueStatus: (() => void) | null = null;
   private resource: Resource | null = null;
   private strategy: SubscriptionStrategy<unknown> | null = null;
   private streamUnsubscribe: (() => void) | null = null;
@@ -151,6 +159,8 @@ export class ResourceView extends JfElement {
 
   constructor() {
     super();
+    this.queueCounts = null;
+    this.queueCountsLive = false;
     this.resourceId = '';
     this.apiBase = '';
     this.paneId = '';
@@ -235,6 +245,12 @@ export class ResourceView extends JfElement {
       return;
     }
     this.resource = resource;
+    if (resource.id === 'core.indexing-jobs') {
+      this.stopQueueStatus = subscribeAiState((s) => {
+        this.queueCounts = indexingQueueCounts(s.status);
+        this.queueCountsLive = s.snapshotLive;
+      });
+    }
 
     // Bespoke specialty short-circuit (slice 3a.1.9 §A.8 #2): if the
     // dispatched renderer for this Resource is a bespoke specialty that
@@ -327,6 +343,10 @@ export class ResourceView extends JfElement {
   }
 
   private unbind(): void {
+    this.stopQueueStatus?.();
+    this.stopQueueStatus = null;
+    this.queueCounts = null;
+    this.queueCountsLive = false;
     if (this.catalogChangeUnsubscribe) {
       this.catalogChangeUnsubscribe();
       this.catalogChangeUnsubscribe = null;
@@ -409,6 +429,14 @@ export class ResourceView extends JfElement {
           ${this.connectionState}
         </span>
       </div>
+      ${this.resourceId === 'core.indexing-jobs' ? html`
+        <p data-testid="indexing-window-notice">
+          Live window: active files and up to 200 recent failures. Queue totals include files outside this view.
+        </p>
+        <p data-testid="indexing-queue-totals">${this.queueCounts
+          ? `${this.queueCountsLive ? "" : "Last reported: "}${formatCount(this.queueCounts.queued)} queued · ${formatCount(this.queueCounts.processing)} processing · ${formatCount(this.queueCounts.failed)} failed`
+          : 'Queue totals unavailable'}</p>
+      ` : nothing}
       <div class="body">${this.renderRenderer()}</div>
     `;
   }

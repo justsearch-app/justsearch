@@ -59,11 +59,17 @@ public final class EncryptionKeystore {
   }
 
   public boolean exists() {
-    return Files.exists(file);
+    try {
+      prepareDirectory();
+      return Files.exists(file);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Cannot prepare encryption directory", e);
+    }
   }
 
   public Optional<KeystoreRecord> load() {
     try {
+      prepareDirectory();
       byte[] primary = readIfPresent(file);
       if (primary != null && primary.length != 0) {
         KeystoreRecord authoritative = decode(primary);
@@ -168,9 +174,15 @@ public final class EncryptionKeystore {
     return new CorruptDurableStoreException("encryption-keystore", message, cause);
   }
 
+  private void prepareDirectory() throws IOException {
+    Files.createDirectories(file.toAbsolutePath().getParent().getParent());
+    io.justsearch.configuration.persistence.OwnerOnlyDirectory.ensureOwnerOnlyDirectory(file.getParent());
+  }
+
   public SaveResult save(KeystoreRecord record) {
     validate(record);
     try {
+      prepareDirectory();
       byte[] bytes = MAPPER.writeValueAsBytes(record);
       byte[] previous = readIfPresent(file);
       removeAbandonedTemps();
