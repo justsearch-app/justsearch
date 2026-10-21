@@ -39,6 +39,8 @@ mod engine_probe;
 #[path = "../supervisor.rs"]
 #[allow(dead_code)]
 mod supervisor;
+#[path = "../tls.rs"]
+mod tls;
 // Spec F §2.1: the fake engine starts inside its incarnation job exactly as the real Engine does,
 // so the containment cases exercise the production spawn with no Tauri link.
 #[path = "../containment.rs"]
@@ -109,6 +111,7 @@ fn arg(name: &str) -> Option<String> {
         .and_then(|i| args.get(i + 1).cloned())
 }
 fn main() {
+    tls::initialize();
     #[cfg(target_os = "linux")]
     linux_process::set_bundle_dir(
         &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ui/build/install/ui"),
