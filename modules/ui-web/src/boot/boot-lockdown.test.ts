@@ -32,7 +32,7 @@ const normalSurfaceCatalog = surfaceCatalogSchema.parse({
 
 declare global {
   interface Window {
-    bootHarness: { phase: string; failStatus: boolean; api: boolean; calls: string[];
+    bootHarness: { phase: string; failStatus: boolean; api: boolean; supervisorState: string; calls: string[];
       emit: (event: string, payload: unknown) => void };
   }
 }
@@ -58,19 +58,19 @@ afterAll(async () => {
   if (output) await rm(output, { recursive: true, force: true });
 });
 
-async function open(phase = 'idle', failStatus = false, api = false, desktop = true, query = ''): Promise<Page> {
+async function open(phase = 'idle', failStatus = false, api = false, desktop = true, query = '', supervisorState = 'exhausted'): Promise<Page> {
   const page = await browser.newPage();
   const observed: string[] = [];
   errors.set(page, observed);
   page.on('pageerror', (error) => observed.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') observed.push(message.text()); });
   await page.route('https://fonts.**/*', (route) => route.abort());
-  await page.addInitScript(({ phase, failStatus, api, desktop }) => {
+  await page.addInitScript(({ phase, failStatus, api, desktop, supervisorState }) => {
     // Native IPC is the boundary double; boot, Lit, lockdown and recovery code are real.
     const callbacks = new Map<number, (event: unknown) => void>();
     const listeners = new Map<string, number>();
     let next = 0;
-    const harness = window.bootHarness = { phase, failStatus, api, calls: [] as string[],
+    const harness = window.bootHarness = { phase, failStatus, api, supervisorState, calls: [] as string[],
       emit: (event: string, payload: unknown) => callbacks.get(listeners.get(event)!)?.({ payload }) };
     if (!desktop) return;
     Object.assign(window, {
@@ -85,7 +85,7 @@ async function open(phase = 'idle', failStatus = false, api = false, desktop = t
           if (command === 'acknowledge_factory_reset') { sessionStorage.setItem('continued', '1'); return; }
           if (command === 'plugin:event|listen') { listeners.set(args.event, args.handler); return args.handler; }
           if (command === 'supervisor_state') return { schemaVersion: 1, kind: 'engine-supervisor-state.v1',
-            supervisor: 'tauri', state: harness.api ? 'running' : 'exhausted', incarnation: 1, restartCount: 3, maxRestartAttempts: 3 };
+            supervisor: 'tauri', state: harness.api ? 'running' : harness.supervisorState, incarnation: 1, restartCount: 3, maxRestartAttempts: 3 };
           if (command === 'app_update_status') return { state: 'up_to_date', currentVersion: '1.0' };
           if (command === 'complete_factory_reset_storage') { sessionStorage.setItem('continued', '1'); return; }
           if (command === 'api_port') return harness.api ? Number(location.port) : null;
@@ -95,7 +95,8 @@ async function open(phase = 'idle', failStatus = false, api = false, desktop = t
       },
     });
     if (sessionStorage.getItem('continued')) { harness.phase = 'idle'; harness.failStatus = false; }
-  }, { phase, failStatus, api, desktop });
+    if (sessionStorage.getItem('engine-ready')) harness.api = true;
+  }, { phase, failStatus, api, desktop, supervisorState });
   // Hold the reset module until real lockdown completes. This reproduces warm-cache
   // ordering deterministically, without mocking SES or changing the production entry.
   await page.route('**/factoryReset-*.js', async (route) => {
@@ -137,8 +138,8 @@ it('RS4 reset Continue and Try again reload into a mounted app under real lockdo
   } finally { await failed.close(); }
 }, 30_000);
 
-it('RN3 Engine recovery Retry and both desktop event reloads mount under real lockdown', async () => {
-  const page = await open();
+it('RN3 nonterminal Engine recovery Retry and both desktop event reloads mount under real lockdown', async () => {
+  const page = await open('idle', false, false, true, '', 'starting');
   try {
     await mounted(page, 'jf-engine-recovery');
     await Promise.all([page.waitForEvent('framenavigated'), page.getByText('Try connecting again', { exact: true }).click()]);
@@ -150,6 +151,30 @@ it('RN3 Engine recovery Retry and both desktop event reloads mount under real lo
           incarnation: 2, restartCount: 0, maxRestartAttempts: 3 }), event)]);
       await mounted(page, 'jf-engine-recovery');
     }
+  } finally { await page.close(); }
+}, 30_000);
+
+it('E3 terminal Engine recovery restarts through native IPC and reconnects under real lockdown', async () => {
+  const page = await open();
+  try {
+    await mounted(page, 'jf-engine-recovery');
+    const restart = page.getByRole('button', { name: 'Restart JustSearch', exact: true });
+    await expect.poll(() => restart.count(), { timeout: 2000 }).toBe(1);
+    const navigations: string[] = [];
+    page.on('framenavigated', (frame) => navigations.push(frame.url()));
+    await restart.click();
+    await expect.poll(async () => ({ calls: await page.evaluate(() => window.bootHarness.calls.filter((c) => c === 'restart_engine').length),
+      navigations })).toEqual({ calls: 1, navigations: [] });
+    expect(navigations).toEqual([]);
+    await mounted(page, 'jf-engine-recovery');
+    await Promise.all([page.waitForEvent('framenavigated'), page.evaluate(() => {
+      window.bootHarness.api = true;
+      sessionStorage.setItem('engine-ready', '1');
+      window.bootHarness.emit('justsearch://supervisor-state',
+        { schemaVersion: 1, kind: 'engine-supervisor-state.v1', supervisor: 'tauri', state: 'running',
+          incarnation: 2, restartCount: 0, maxRestartAttempts: 3 });
+    })]);
+    await mounted(page, 'jf-shell');
   } finally { await page.close(); }
 }, 30_000);
 

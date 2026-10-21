@@ -1,0 +1,144 @@
+Recovery revalidation after #821/#851
+Candidate: 79b120f72341764b1629a55af29ac5b6135ae9a1
+Baseline origin/main: 4f4e20514ff82dd9d698661ef09dc646ee643311
+
+Source changes: only the Tauri IPC mock now forwards argument payloads; existing assertions are unchanged.
+No production Rust change, no commit, no Gradle invocation.
+
+Build: cargo build --manifest-path modules/shell/src-tauri/Cargo.toml --locked -> passed.
+
+Candidate full Rust suite
+cargo test --manifest-path modules/shell/src-tauri/Cargo.toml --locked
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 220 filtered out; finished in 0.00s
+test result: ok. 221 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.06s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 141 filtered out; finished in 0.00s
+test result: FAILED. 135 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.63s
+
+Main full Rust suite, with installed helper fixture
+cargo test --manifest-path modules/shell/src-tauri/Cargo.toml --locked
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 212 filtered out; finished in 0.00s
+test result: ok. 213 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.08s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 133 filtered out; finished in 0.00s
+test result: FAILED. 127 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.57s
+
+Candidate, excluding exactly the seven user-excluded failures
+cargo test --manifest-path modules/shell/src-tauri/Cargo.toml --locked -- <seven exact --skip names below>
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 220 filtered out; finished in 0.00s
+test result: ok. 221 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.22s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 141 filtered out; finished in 0.00s
+test result: ok. 135 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 12.02s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+Seven baseline failures, unchanged (full normalized panic bodies below). Only libtest thread PIDs are normalized.
+updater_probe::handoff_tests::dead_stop_witness_refuses_mixed_receipts_and_wrong_attempt
+Candidate and main: identical
+thread 'updater_probe::handoff_tests::dead_stop_witness_refuses_mixed_receipts_and_wrong_attempt' (PID) panicked at src/bin/../updater_handoff_tests.rs:436:54:
+called `Result::unwrap()` on an `Err` value: "registered-child reconciliation is outside this probe; Engine replacement remains held; update recovery is required"
+
+updater_probe::handoff_tests::handoff_failures_keep_hold_explicit_and_never_invent_a_dead_engine_fallback
+Candidate and main: identical
+thread 'updater_probe::handoff_tests::handoff_failures_keep_hold_explicit_and_never_invent_a_dead_engine_fallback' (PID) panicked at src/bin/../updater_handoff_tests.rs:414:9:
+assertion `left == right` failed
+  left: 0
+ right: 1
+
+updater_probe::handoff_tests::held_crash_before_commit_still_launches_installer
+Candidate and main: identical
+thread 'updater_probe::handoff_tests::held_crash_before_commit_still_launches_installer' (PID) panicked at src/bin/../updater_handoff_tests.rs:289:5:
+assertion `left == right` failed: held crash before commit must proceed to install: Err("registered-child reconciliation is outside this probe; Engine replacement remains held; update recovery is required")
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+updater_probe::handoff_tests::launch_failure_resumes_one_child_and_one_supervisor_on_each_stop_path
+Candidate and main: identical
+thread 'updater_probe::handoff_tests::launch_failure_resumes_one_child_and_one_supervisor_on_each_stop_path' (PID) panicked at src/bin/../updater_handoff_tests.rs:371:9:
+assertion failed: fixture.run(&UpdateCoordinator::default()).await.unwrap_err().contains("supervision was resumed")
+
+updater_probe::handoff_tests::p5_original::p5_u2_nonempty_job_never_launches_the_installer
+Candidate and main: identical
+thread 'updater_probe::handoff_tests::p5_original::p5_u2_nonempty_job_never_launches_the_installer' (PID) panicked at src/bin/../updater_p5_oracle.rs:15:9:
+registered-child reconciliation is outside this probe; Engine replacement remains held; update recovery is required
+
+updater_probe::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer
+Candidate and main: identical
+thread 'updater_probe::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer' (PID) panicked at src/bin/../updater_handoff_tests.rs:477:9:
+registered-child reconciliation is outside this probe; Engine replacement remains held; update recovery is required
+
+updater_probe::handoff_tests::unbound_owned_engine_is_reaped_before_launch_and_witness_survives_reconciliation
+Candidate and main: identical
+thread 'updater_probe::handoff_tests::unbound_owned_engine_is_reaped_before_launch_and_witness_survives_reconciliation' (PID) panicked at src/bin/../updater_handoff_tests.rs:324:54:
+called `Result::unwrap()` on an `Err` value: "registered-child reconciliation is outside this probe; Engine replacement remains held; update recovery is required"
+
+Baseline fixture preparation:
+The fresh shared clone initially had no ignored installed bound-exec. That attempt produced ENOENT fixture failures and is not product evidence.
+Copied this unchanged producer artifact into the same relative baseline path: modules/ui/build/install/ui/native/linux-x86_64/justsearch-bound-exec
+SHA-256: ccacd18fe4710ee11b4b1a099a94a3db60d736ff902eb52f9c0dbaa7b66e1f30
+native/bound-exec and linux_process.rs are byte-identical between candidate and main. The full comparison above was rerun with that fixture.
+
+Initial merged Vitest: 11 files, 64 passed / 1 failed. Existing crash-folder reveal assertion expected the path argument; the mock discarded it.
+The only mock change adds ...args: unknown[] and forwards mocks.invoke(command, ...args). No assertion or production call was changed.
+Final related Vitest: 16 files, 127 tests passed, none skipped.
+
+node scripts/supervisor-conformance/run.mjs --self-test -> supervisor-conformance: 35/35 checks passed
+node scripts/supervisor-conformance/run.mjs --adapter dev-runner -> supervisor-conformance: 50/50 checks passed
+node scripts/supervisor-conformance/run.mjs --adapter tauri -> supervisor-conformance: 60/60 checks passed
+
+Native shortcut and reset-startup checks from the full library suite:
+test tests::m2_incomplete_reset_never_initializes_shortcuts_and_cancel_preserves_saved_choice ... ok
+test factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage ... ok
+test search_shortcut::tests::sc8_x11_off_releases_all_lock_variants_to_another_client ... ok
+test search_shortcut::tests::sc1_sc9_x11_summon_requests_activation_from_never_shown_and_hidden ... ok
+test factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data ... ok
+test tests::m3_completed_reset_removes_shortcut_choice_before_initialization ... ok
+
+Temporary cross-feature probe (scaffolding only, in the disposable shared candidate clone):
+Runs real recovery::jvm_options, factory_reset::{run_pending,request,storage_cleared} and the production after_factory_reset gate against a temporary profile with spaces. No Engine/JVM starts.
+Proves normal restart preparation retains fatal/heap artifacts; an explicit reset deletes them and shortcut preference; blocked storage cleanup never recreates the crash directory; completed reset permits an empty fresh crash directory; models and native-bin/llama-server survive.
+The first probe used an arbitrary native-bin/keep sentinel, which main correctly deletes. Corrected fixture uses the documented native-bin/llama-server runtime location; all preservation assertions remain.
+cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact factory_reset::recovery_merge_probe::recovery_evidence_and_explicit_reset_keep_their_separate_lifetimes -> 1 passed; 0 failed.
+
+Reproducible scaffolding appended to factory_reset.rs in that clone:
+// Temporary cross-feature probe; not part of the submitted test suite.
+#[cfg(test)]
+mod recovery_merge_probe {
+    use super::*;
+    #[test]
+    fn recovery_evidence_and_explicit_reset_keep_their_separate_lifetimes() {
+        let root = tempfile::Builder::new().prefix("recovery reset path ").tempdir().unwrap();
+        let dir = root.path();
+        crate::recovery::jvm_options(dir).unwrap();
+        let fatal = dir.join("crashes/hs_err_pid-first.log");
+        let heap = dir.join("crashes/heap-first.hprof");
+        fs::write(&fatal, "#  Internal Error (fixture.cpp:1)\n").unwrap();
+        fs::write(&heap, b"first crash evidence").unwrap();
+        for keep in ["models", "native-bin/llama-server"] {
+            fs::create_dir_all(dir.join(keep)).unwrap();
+            fs::write(dir.join(keep).join("keep"), b"retained").unwrap();
+        }
+        fs::write(dir.join("search-shortcut.v1.json"), br#"{"version":1,"enabled":false}"#).unwrap();
+        let idle = run_pending(dir, || panic!("normal recovery must not perform reset cleanup"));
+        crate::after_factory_reset(&idle, || { crate::recovery::jvm_options(dir).unwrap(); });
+        assert!(fatal.is_file() && heap.is_file());
+        request(dir).unwrap();
+        let awaiting = run_pending(dir, || Ok(()));
+        assert_eq!(awaiting.phase, Phase::AwaitingStorage);
+        crate::after_factory_reset(&awaiting, || panic!("blocked reset must not recreate crash directories or start supervision"));
+        assert!(!dir.join("crashes").exists());
+        assert!(!dir.join("search-shortcut.v1.json").exists());
+        storage_cleared(dir).unwrap();
+        let complete = run_pending(dir, || panic!("a completed reset must not repeat deletion"));
+        assert_eq!(complete.phase, Phase::Complete);
+        crate::after_factory_reset(&complete, || { crate::recovery::jvm_options(dir).unwrap(); });
+        assert!(dir.join("crashes").is_dir());
+        assert!(!fatal.exists() && !heap.exists());
+        for keep in ["models", "native-bin/llama-server"] {
+            assert_eq!(fs::read(dir.join(keep).join("keep")).unwrap(), b"retained");
+        }
+    }
+}
+
+Official evidence for changeset entries 10/12: engine-recovery-merge-821-851.json, written by the unmodified run-evidence.mjs; candidate passed, current-main fail-before classifications are assertions.

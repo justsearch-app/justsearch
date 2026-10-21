@@ -1,0 +1,431 @@
+Supplemental CI-follow-up transcript; Node script checks are outside D4 product scope.
+Candidate HEAD: a2ab1d99cf71e1be63abec9b6884c53f42b13517 plus uncommitted classification and harness fix.
+Every abbreviated --adapter command below uses node scripts/supervisor-conformance/run.mjs.
+4b42fcdc5aadd5c9746e711979afab768972d3e7b2d14145a5782be5f3f8441f  governance/store-recoverability.v1.json
+0c646bc17c72a2d9f0b892b899a6a79addf79b5763d6b8240d0a5ca32c95fae9  governance/store-corruption-policies.v1.json
+8c790d1bda63898f43e3ab5b3da2c86e88508facdb7b4c4476860aeefcafb2d5  scripts/supervisor-conformance/recovery-scenario.mjs
+2e71688f0d034b082da992ec3c9297e040011df1fcfcc8fa4e98e3787253af22  scripts/supervisor-conformance/recovery-startup-budget.test.mjs
+
+$ Merge base: node scripts/ci/check-store-recoverability.mjs
+store-recoverability gate OK - 6 catalog stores and 55 durable state authorities are registered (floor 35), across 28 corruption policies in use + 0 awaiting a row.
+
+$ Candidate: node scripts/ci/check-store-recoverability.mjs
+store-recoverability gate OK - 6 catalog stores and 56 durable state authorities are registered (floor 35), across 29 corruption policies in use + 0 awaiting a row.
+
+$ Pre-fix a2ab1d99c: node --test scripts/supervisor-conformance/recovery-startup-budget.test.mjs
+✖ recovery-delayed-retry: a slow third root publication reaches recovery instead of failing spawn (2144.295206ms)
+✖ recovery-manual-restart-and-update-hold: a slow third root publication reaches recovery instead of failing spawn (2191.628378ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4390.009946
+
+✖ failing tests:
+
+test at scripts/supervisor-conformance/recovery-startup-budget.test.mjs:13:3
+✖ recovery-delayed-retry: a slow third root publication reaches recovery instead of failing spawn (2144.295206ms)
+  AssertionError [ERR_ASSERTION]: supervisor-conformance: NARROWED to `recovery-delayed-retry` — 49 case(s) not run.
+  FAIL  adapter:dev-runner :: recovery-delayed-retry
+          AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 3
+  
+      at runRecoveryCase (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/recovery-scenario.mjs:114:12)
+      at async runAdapter (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/run.mjs:511:23)
+      at async main (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/run.mjs:532:5)
+      at async file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/run.mjs:542:1
+  [dev-runner] warn: compact chat model not found at /home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/models/compact/Qwen3.5-4B-Q4_K_M.gguf — run: node scripts/dev/fetch-compact-model.mjs
+  [dev-runner] Launching dist: repoRoot=/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before gitHead=a2ab1d99c headDistStamp=?
+  [dev-runner] supervisor-conformance harness: engine command replaced by /usr/bin/node
+  [dev-runner] Engine incarnation 1 exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 1/3 ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-delayed-retry-I2BHcc/state/runs/cb56f394-a83f-4799-90b6-71670b5b9b34/incarnations/1/logs/engine.log
+  [dev-runner] Engine incarnation 2 exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 2/3 ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-delayed-retry-I2BHcc/state/runs/cb56f394-a83f-4799-90b6-71670b5b9b34/incarnations/2/logs/engine.log
+  [dev-runner] ENGINE_RESTART_EXHAUSTED — restart_failed:controlled root publication exceeded startup budget. Supervisor state: tmp/supervisor-conformance/dev-runner-recovery-delayed-retry-I2BHcc/data/runtime/supervisor.v1.json
+  
+  
+  supervisor-conformance: 0/1 checks passed
+  failed: recovery-delayed-retry
+  
+  
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/recovery-startup-budget.test.mjs:48:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/supervisor-conformance/recovery-startup-budget.test.mjs:13:3
+✖ recovery-manual-restart-and-update-hold: a slow third root publication reaches recovery instead of failing spawn (2191.628378ms)
+  AssertionError [ERR_ASSERTION]: supervisor-conformance: NARROWED to `recovery-manual-restart-and-update-hold` — 49 case(s) not run.
+  FAIL  adapter:dev-runner :: recovery-manual-restart-and-update-hold
+          AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 3
+  
+      at runRecoveryCase (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/recovery-scenario.mjs:114:12)
+      at async runAdapter (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/run.mjs:511:23)
+      at async main (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/run.mjs:532:5)
+      at async file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/run.mjs:542:1
+  [dev-runner] warn: compact chat model not found at /home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/models/compact/Qwen3.5-4B-Q4_K_M.gguf — run: node scripts/dev/fetch-compact-model.mjs
+  [dev-runner] Launching dist: repoRoot=/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before gitHead=a2ab1d99c headDistStamp=?
+  [dev-runner] supervisor-conformance harness: engine command replaced by /usr/bin/node
+  [dev-runner] Engine incarnation 1 exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 1/3 ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-manual-restart-and-update-hold-Zvx87H/state/runs/0d92f5a9-c2f0-4cf5-91ea-0123bd1cdc79/incarnations/1/logs/engine.log
+  [dev-runner] Engine incarnation 2 exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 2/3 ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-manual-restart-and-update-hold-Zvx87H/state/runs/0d92f5a9-c2f0-4cf5-91ea-0123bd1cdc79/incarnations/2/logs/engine.log
+  [dev-runner] ENGINE_RESTART_EXHAUSTED — restart_failed:controlled root publication exceeded startup budget. Supervisor state: tmp/supervisor-conformance/dev-runner-recovery-manual-restart-and-update-hold-Zvx87H/data/runtime/supervisor.v1.json
+  
+  
+  supervisor-conformance: 0/1 checks passed
+  failed: recovery-manual-restart-and-update-hold
+  
+  
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/recovery-startup-budget.test.mjs:48:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+$ Pre-fix plus PR #842: same Node regression
+✖ recovery-delayed-retry: a slow third root publication reaches recovery instead of failing spawn (2163.598474ms)
+✖ recovery-manual-restart-and-update-hold: a slow third root publication reaches recovery instead of failing spawn (2227.582518ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4453.07268
+
+✖ failing tests:
+
+test at scripts/supervisor-conformance/recovery-startup-budget.test.mjs:13:3
+✖ recovery-delayed-retry: a slow third root publication reaches recovery instead of failing spawn (2163.598474ms)
+  AssertionError [ERR_ASSERTION]: supervisor-conformance: NARROWED to `recovery-delayed-retry` — 49 case(s) not run.
+  FAIL  adapter:dev-runner :: recovery-delayed-retry
+          AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 3
+  
+      at runRecoveryCase (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/recovery-scenario.mjs:114:12)
+      at async runAdapter (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/run.mjs:511:23)
+      at async main (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/run.mjs:532:5)
+      at async file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/run.mjs:542:1
+  [dev-runner] warn: compact chat model not found at /home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/models/compact/Qwen3.5-4B-Q4_K_M.gguf — run: node scripts/dev/fetch-compact-model.mjs
+  [dev-runner] Launching dist: repoRoot=/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before gitHead=a2ab1d99c headDistStamp=?
+  [dev-runner] supervisor-conformance harness: engine command replaced by /usr/bin/node
+  [dev-runner] Engine incarnation 1 exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 1/3 ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-delayed-retry-qUznwX/state/runs/09f21e8c-217f-4885-ab31-5faa24b01ce2/incarnations/1/logs/engine.log
+  [dev-runner] Engine incarnation 2 exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 2/3 ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-delayed-retry-qUznwX/state/runs/09f21e8c-217f-4885-ab31-5faa24b01ce2/incarnations/2/logs/engine.log
+  [dev-runner] ENGINE_RESTART_EXHAUSTED — restart_failed:controlled root publication exceeded startup budget. Supervisor state: tmp/supervisor-conformance/dev-runner-recovery-delayed-retry-qUznwX/data/runtime/supervisor.v1.json
+  
+  
+  supervisor-conformance: 0/1 checks passed
+  failed: recovery-delayed-retry
+  
+  
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/recovery-startup-budget.test.mjs:48:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/supervisor-conformance/recovery-startup-budget.test.mjs:13:3
+✖ recovery-manual-restart-and-update-hold: a slow third root publication reaches recovery instead of failing spawn (2227.582518ms)
+  AssertionError [ERR_ASSERTION]: supervisor-conformance: NARROWED to `recovery-manual-restart-and-update-hold` — 49 case(s) not run.
+  FAIL  adapter:dev-runner :: recovery-manual-restart-and-update-hold
+          AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 3
+  
+      at runRecoveryCase (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/recovery-scenario.mjs:114:12)
+      at async runAdapter (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/run.mjs:511:23)
+      at async main (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/run.mjs:532:5)
+      at async file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/run.mjs:542:1
+  [dev-runner] warn: compact chat model not found at /home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/models/compact/Qwen3.5-4B-Q4_K_M.gguf — run: node scripts/dev/fetch-compact-model.mjs
+  [dev-runner] Launching dist: repoRoot=/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before gitHead=a2ab1d99c headDistStamp=?
+  [dev-runner] supervisor-conformance harness: engine command replaced by /usr/bin/node
+  [dev-runner] Engine incarnation 1 exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 1/3 ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-manual-restart-and-update-hold-LgAcGR/state/runs/2962f108-cdb5-4af5-9af0-d9ec3ec06e9d/incarnations/1/logs/engine.log
+  [dev-runner] Engine incarnation 2 exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 2/3 ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-manual-restart-and-update-hold-LgAcGR/state/runs/2962f108-cdb5-4af5-9af0-d9ec3ec06e9d/incarnations/2/logs/engine.log
+  [dev-runner] ENGINE_RESTART_EXHAUSTED — restart_failed:controlled root publication exceeded startup budget. Supervisor state: tmp/supervisor-conformance/dev-runner-recovery-manual-restart-and-update-hold-LgAcGR/data/runtime/supervisor.v1.json
+  
+  
+  supervisor-conformance: 0/1 checks passed
+  failed: recovery-manual-restart-and-update-hold
+  
+  
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/before/scripts/supervisor-conformance/recovery-startup-budget.test.mjs:48:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+$ Candidate: node --test scripts/supervisor-conformance/recovery-startup-budget.test.mjs
+✔ recovery-delayed-retry: a slow third root publication reaches recovery instead of failing spawn (4610.14365ms)
+✔ recovery-manual-restart-and-update-hold: a slow third root publication reaches recovery instead of failing spawn (6402.327537ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11050.241436
+
+$ Merge base with test-only recovery case overlays: --adapter dev-runner --case recovery-delayed-retry
+supervisor-conformance: NARROWED to `recovery-delayed-retry` — 40 case(s) not run.
+FAIL  adapter:dev-runner :: recovery-delayed-retry
+        AssertionError [ERR_ASSERTION]: exhaustion publishes the delayed retry
+    at runRecoveryCase (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/merge-base/scripts/supervisor-conformance/recovery-scenario.mjs:115:12)
+    at async runAdapter (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/merge-base/scripts/supervisor-conformance/run.mjs:511:23)
+    at async main (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/merge-base/scripts/supervisor-conformance/run.mjs:532:5)
+    at async file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/merge-base/scripts/supervisor-conformance/run.mjs:542:1
+[dev-runner] warn: compact chat model not found at /home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/merge-base/models/compact/Qwen3.5-4B-Q4_K_M.gguf — run: node scripts/dev/fetch-compact-model.mjs
+[dev-runner] Launching dist: repoRoot=/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/merge-base gitHead=2ba7d810e headDistStamp=?
+[dev-runner] supervisor-conformance harness: engine command replaced by /usr/bin/node
+[dev-runner] Engine incarnation 1 exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 1/3 ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-delayed-retry-jJwyrr/state/runs/71bd7a93-cf2d-4447-894b-08110ecd431c/incarnations/1/logs/engine.log
+[dev-runner] Engine incarnation 2 exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 2/3 ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-delayed-retry-jJwyrr/state/runs/71bd7a93-cf2d-4447-894b-08110ecd431c/incarnations/2/logs/engine.log
+[dev-runner] Engine incarnation 3 exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 3/3 ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-delayed-retry-jJwyrr/state/runs/71bd7a93-cf2d-4447-894b-08110ecd431c/incarnations/3/logs/engine.log
+[dev-runner] Engine incarnation 4 exited 1 (fatal_or_uncaught, TRANSIENT); decision=exhausted ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-delayed-retry-jJwyrr/state/runs/71bd7a93-cf2d-4447-894b-08110ecd431c/incarnations/4/logs/engine.log
+[dev-runner] ENGINE_RESTART_EXHAUSTED — fatal_or_uncaught. Supervisor state: tmp/supervisor-conformance/dev-runner-recovery-delayed-retry-jJwyrr/data/runtime/supervisor.v1.json
+
+
+supervisor-conformance: 0/1 checks passed
+failed: recovery-delayed-retry
+
+$ Merge base with test-only recovery case overlays: --adapter dev-runner --case recovery-manual-restart-and-update-hold
+supervisor-conformance: NARROWED to `recovery-manual-restart-and-update-hold` — 40 case(s) not run.
+FAIL  adapter:dev-runner :: recovery-manual-restart-and-update-hold
+        AssertionError [ERR_ASSERTION]: exhaustion publishes the delayed retry
+    at runRecoveryCase (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/merge-base/scripts/supervisor-conformance/recovery-scenario.mjs:115:12)
+    at async runAdapter (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/merge-base/scripts/supervisor-conformance/run.mjs:511:23)
+    at async main (file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/merge-base/scripts/supervisor-conformance/run.mjs:532:5)
+    at async file:///home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/merge-base/scripts/supervisor-conformance/run.mjs:542:1
+e/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/merge-base/models/compact/Qwen3.5-4B-Q4_K_M.gguf — run: node scripts/dev/fetch-compact-model.mjs
+[dev-runner] Launching dist: repoRoot=/home/elias/dev/justsearch/.claude/worktrees/engine-recovery/tmp/builder/ci-followup/merge-base gitHead=2ba7d810e headDistStamp=?
+[dev-runner] supervisor-conformance harness: engine command replaced by /usr/bin/node
+[dev-runner] Engine incarnation 1 exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 1/3 ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-manual-restart-and-update-hold-QPhjXJ/state/runs/66b047dc-810f-4da7-acaf-e67d9ea9b915/incarnations/1/logs/engine.log
+[dev-runner] Engine incarnation 2 exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 2/3 ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-manual-restart-and-update-hold-QPhjXJ/state/runs/66b047dc-810f-4da7-acaf-e67d9ea9b915/incarnations/2/logs/engine.log
+[dev-runner] Engine incarnation 3 exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 3/3 ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-manual-restart-and-update-hold-QPhjXJ/state/runs/66b047dc-810f-4da7-acaf-e67d9ea9b915/incarnations/3/logs/engine.log
+[dev-runner] Engine incarnation 4 exited 1 (fatal_or_uncaught, TRANSIENT); decision=exhausted ledger=UNEXPECTED engineLog=tmp/supervisor-conformance/dev-runner-recovery-manual-restart-and-update-hold-QPhjXJ/state/runs/66b047dc-810f-4da7-acaf-e67d9ea9b915/incarnations/4/logs/engine.log
+[dev-runner] ENGINE_RESTART_EXHAUSTED — fatal_or_uncaught. Supervisor state: tmp/supervisor-conformance/dev-runner-recovery-manual-restart-and-update-hold-QPhjXJ/data/runtime/supervisor.v1.json
+
+
+supervisor-conformance: 0/1 checks passed
+failed: recovery-manual-restart-and-update-hold
+
+$ Merge base: --adapter dev-runner --case quit-deadline-is-the-contract-value
+supervisor-conformance: NARROWED to `quit-deadline-is-the-contract-value` — 40 case(s) not run.
+PASS  adapter:dev-runner :: quit-deadline-is-the-contract-value
+
+supervisor-conformance: 1/1 checks passed
+
+$ Unmodified branch: --adapter dev-runner --case recovery-delayed-retry
+supervisor-conformance: NARROWED to `recovery-delayed-retry` — 49 case(s) not run.
+PASS  adapter:dev-runner :: recovery-delayed-retry
+
+supervisor-conformance: 1/1 checks passed
+
+$ Unmodified branch: --adapter dev-runner --case recovery-manual-restart-and-update-hold
+supervisor-conformance: NARROWED to `recovery-manual-restart-and-update-hold` — 49 case(s) not run.
+PASS  adapter:dev-runner :: recovery-manual-restart-and-update-hold
+
+supervisor-conformance: 1/1 checks passed
+
+$ Unmodified branch: --adapter dev-runner --case quit-deadline-is-the-contract-value
+supervisor-conformance: NARROWED to `quit-deadline-is-the-contract-value` — 49 case(s) not run.
+PASS  adapter:dev-runner :: quit-deadline-is-the-contract-value
+
+supervisor-conformance: 1/1 checks passed
+
+$ Candidate: --adapter dev-runner --case recovery-delayed-retry
+supervisor-conformance: NARROWED to `recovery-delayed-retry` — 49 case(s) not run.
+PASS  adapter:dev-runner :: recovery-delayed-retry
+
+supervisor-conformance: 1/1 checks passed
+
+$ Candidate: --adapter dev-runner --case recovery-manual-restart-and-update-hold
+supervisor-conformance: NARROWED to `recovery-manual-restart-and-update-hold` — 49 case(s) not run.
+PASS  adapter:dev-runner :: recovery-manual-restart-and-update-hold
+
+supervisor-conformance: 1/1 checks passed
+
+$ Candidate: --adapter dev-runner --case quit-deadline-is-the-contract-value
+supervisor-conformance: NARROWED to `quit-deadline-is-the-contract-value` — 49 case(s) not run.
+PASS  adapter:dev-runner :: quit-deadline-is-the-contract-value
+
+supervisor-conformance: 1/1 checks passed
+
+$ Candidate: node scripts/supervisor-conformance/run.mjs --adapter dev-runner
+PASS  adapter:dev-runner :: recovery-never-healthy-delayed-retry
+PASS  adapter:dev-runner :: recovery-manual-retry-races-deadline-and-quit
+PASS  adapter:dev-runner :: recovery-first-spawn-failure-reason
+PASS  adapter:dev-runner :: recovery-replacement-spawn-failure-reason
+PASS  adapter:dev-runner :: recovery-status-failure-and-resume
+PASS  adapter:dev-runner :: recovery-delayed-retry
+PASS  adapter:dev-runner :: recovery-manual-restart-and-update-hold
+PASS  adapter:dev-runner :: recovery-quit-during-delayed-retry
+PASS  adapter:dev-runner :: recovery-update-hold-blocks-delayed-retry
+PASS  adapter:dev-runner :: recovery-index-never-ready
+PASS  adapter:dev-runner :: recovery-long-loop-remains-visible
+PASS  adapter:dev-runner :: escalated-restart
+PASS  adapter:dev-runner :: fileless-clean-local-restart-is-not-counted
+PASS  adapter:dev-runner :: local-handoff-bounds-responsive-close-with-churn
+PASS  adapter:dev-runner :: completed-local-handoff-still-bounds-native-exit
+PASS  adapter:dev-runner :: local-handoff-fatal-exit-remains-counted
+PASS  adapter:dev-runner :: stale-local-handoff-cannot-arm-close
+PASS  adapter:dev-runner :: clean-exit-0-stops
+PASS  adapter:dev-runner :: crash-1-restarts-under-budget
+PASS  adapter:dev-runner :: oom-3-restarts-under-budget
+PASS  adapter:dev-runner :: non-transient-2-exhausts-at-once
+PASS  adapter:dev-runner :: requested-restart-is-not-counted
+PASS  adapter:dev-runner :: requested-restart-completion-failure-is-counted
+PASS  adapter:dev-runner :: requested-upgrade-stops
+PASS  adapter:dev-runner :: hang-soft-recovered-through-the-request-file
+PASS  adapter:dev-runner :: hang-hard-recovered-by-forced-kill
+PASS  adapter:dev-runner :: budget-exhausted-after-max-attempts
+PASS  adapter:dev-runner :: live-503-and-continuous-essential-stability
+PASS  adapter:dev-runner :: start-deadline-stops-a-partial-boot
+PASS  adapter:dev-runner :: start-death-before-manifest-is-one-exit-path
+PASS  adapter:dev-runner :: start-death-after-manifest-before-http
+PASS  adapter:dev-runner :: readiness-death-uses-the-death-path
+PASS  adapter:dev-runner :: port-phase-exit-keeps-requested-reason
+PASS  adapter:dev-runner :: start-deadline-stops-and-records
+PASS  adapter:dev-runner :: hang-forced-kill-is-distinctive
+PASS  adapter:dev-runner :: owner-died-recorded-after-supervisor-kill
+PASS  adapter:dev-runner :: engine-self-restart-is-requested
+PASS  adapter:dev-runner :: hang-close-the-engine-runs-is-the-supervisors-timeout
+PASS  adapter:dev-runner :: a-crash-during-the-requested-close-stays-unexpected
+PASS  adapter:dev-runner :: quit-cooperative-records-requested-quit
+PASS  adapter:dev-runner :: one-exit-record-per-incarnation
+PASS  adapter:dev-runner :: quit-past-deadline-is-forced-and-distinct
+PASS  adapter:dev-runner :: quit-crash-stays-unexpected
+PASS  adapter:dev-runner :: quit-during-cooldown-spawns-nothing
+PASS  adapter:dev-runner :: quit-during-start
+PASS  adapter:dev-runner :: quit-deadline-is-the-contract-value
+PASS  adapter:dev-runner :: stale-request-file-is-not-honoured
+PASS  adapter:dev-runner :: data-dir-locked-after-own-predecessor-waits-once
+PASS  adapter:dev-runner :: suspend-gap-is-not-a-hang
+PASS  adapter:dev-runner :: misses-after-resume-grace-still-hang
+
+supervisor-conformance: 50/50 checks passed
+
+$ Candidate: --adapter tauri --case recovery-delayed-retry
+supervisor-conformance: NARROWED to `recovery-delayed-retry` — 59 case(s) not run.
+PASS  adapter:tauri :: recovery-delayed-retry
+
+supervisor-conformance: 1/1 checks passed
+
+$ Candidate: --adapter tauri --case recovery-manual-restart-and-update-hold
+supervisor-conformance: NARROWED to `recovery-manual-restart-and-update-hold` — 59 case(s) not run.
+PASS  adapter:tauri :: recovery-manual-restart-and-update-hold
+
+supervisor-conformance: 1/1 checks passed
+
+$ Candidate: node scripts/supervisor-conformance/run.mjs --self-test
+PASS  manifest handoff :: requires admitted identity and known shutdown state/reason
+PASS  contract :: the register exit table agrees with EngineExit.java
+PASS  contract :: every declared case is well-formed and the live fault modes are driven
+PASS  decision :: escalated-restart
+PASS  decision :: fileless-clean-local-restart-is-not-counted
+PASS  decision :: clean-exit-0-stops
+PASS  decision :: crash-1-restarts-under-budget
+PASS  decision :: oom-3-restarts-under-budget
+PASS  decision :: non-transient-2-exhausts-at-once
+PASS  decision :: requested-restart-is-not-counted
+PASS  decision :: requested-restart-completion-failure-is-counted
+PASS  decision :: requested-upgrade-stops
+PASS  decision :: hang-soft-recovered-through-the-request-file
+PASS  decision :: hang-hard-recovered-by-forced-kill
+PASS  decision :: budget-exhausted-after-max-attempts
+PASS  decision :: unknown-exit-code-fails-open-to-transient
+PASS  decision :: cooldown-ramps-linearly
+PASS  decision :: cooldown-ceiling-binds-when-budget-raised
+PASS  decision :: ready-starts-the-stability-window
+PASS  decision :: stability-elapsed-resets-the-budget
+PASS  decision :: hang-misses-below-the-threshold-do-nothing
+PASS  decision :: hang-detection-is-suspended-while-starting
+PASS  decision :: hang-detection-is-suspended-while-stopping
+PASS  decision :: start-deadline-stops-a-partial-boot
+PASS  decision :: the register declares decision cases at all
+PASS  policy :: per-run overrides are inert without the harness flag
+PASS  fake-engine :: mode clean-exit exits 0
+PASS  fake-engine :: mode crash exits 1
+PASS  fake-engine :: mode oom exits 3
+PASS  fake-engine :: mode boot-fail exits 2
+PASS  fake-engine :: honour publishes a real manifest and answers health
+PASS  fake-engine :: honour exits 0 on a shutdown request
+PASS  fake-engine :: hang-soft stops answering and honours the request file
+PASS  fake-engine :: hang-hard stops answering and ignores the request file
+PASS  fake-engine :: slow-start withholds the manifest past a short start deadline
+
+supervisor-conformance: 35/35 checks passed
+
+$ Official execution-evidence runner: six Rust checks
+modules/shell/src-tauri/src/recovery.rs#recovery::tests::fresh_crash_folder_with_spaces_keeps_artifacts_across_boots: passed
+modules/shell/src-tauri/src/recovery.rs#recovery::tests::unavailable_crash_folder_reports_the_real_obstacle: passed
+modules/shell/src-tauri/src/recovery.rs#recovery::tests::fatal_summary_is_bounded_and_redacts_windows_paths_with_spaces: passed
+modules/shell/src-tauri/src/recovery.rs#recovery::tests::the_daily_count_survives_budget_reset_and_shell_relaunch: passed
+modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::manual_restart_after_finished_exhaustion_reaches_ready_with_a_new_generation: passed
+modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::manual_restart_refuses_quit_and_update_holds_without_admitting_a_child: passed
+evidence written: gates/test-intent/evidence/engine-recovery-rust.json
+
+$ Official runner --check scripts/supervisor-conformance/recovery-startup-budget.test.mjs: exit 2, intentionally unsupported Node scope
+run-evidence: scripts/supervisor-conformance/recovery-startup-budget.test.mjs: no runner for this path (JVM test source set, ui-web test file, or shell crate .rs)
+
+Windows hosted job 118947729530: relevant original log lines
+2026-10-21T00:51:08.9278890Z FAIL  adapter:dev-runner :: recovery-delayed-retry
+2026-10-21T00:51:08.9292474Z [dev-runner] ENGINE_RESTART_EXHAUSTED — restart_failed:the Engine job host (pid 4936) did not publish its root within the 599.9854ms startup budget. Supervisor state: tmp/supervisor-conformance/dev-runner-recovery-delayed-retry-Bv2nr4/data/runtime/supervisor.v1.json
+2026-10-21T00:51:14.2448922Z FAIL  adapter:dev-runner :: recovery-manual-restart-and-update-hold
+2026-10-21T00:51:14.2462584Z [dev-runner] incarnation 3 did not come up: Backend did not emit JUSTSEARCH_API_PORT=<port> within 1s (requested=0).
+2026-10-21T00:51:14.2481772Z [dev-runner] ENGINE_RESTART_EXHAUSTED — restart_failed:the Engine job host (pid 8960) did not publish its root within the 599.9847ms startup budget. Supervisor state: tmp/supervisor-conformance/dev-runner-recovery-manual-restart-and-update-hold-cog9wc/data/runtime/supervisor.v1.json
+2026-10-21T00:54:27.0468983Z FAIL  adapter:dev-runner :: quit-deadline-is-the-contract-value
+2026-10-21T00:54:27.0469699Z         adapter threw: AssertionError [ERR_ASSERTION]: quit finishes within the contract bound

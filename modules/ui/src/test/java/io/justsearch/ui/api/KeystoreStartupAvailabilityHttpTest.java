@@ -13,8 +13,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.Set;
 import org.junit.jupiter.api.Tag;
@@ -62,12 +64,19 @@ class KeystoreStartupAvailabilityHttpTest {
             PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE));
         assertFalse(Files.isWritable(primary().getParent()), "the folder must really be read-only");
       }
+      var deniedModeRepair = mock(PosixFileAttributeView.class);
+      doThrow(new AccessDeniedException(primary().getParent().toString()))
+          .when(deniedModeRepair).setPermissions(anySet());
       try (var writes = mockStatic(AtomicFileWrites.class, invocation -> {
             if (problem.equals("read-only-filesystem") && invocation.getMethod().getName().equals("replaceStrict")
                 && replica().equals(invocation.getArgument(0))) throw new java.nio.file.ReadOnlyFileSystemException();
             return invocation.callRealMethod();
           });
           var _ = mockStatic(Files.class, invocation -> {
+            // Preserve the real read-only write failure even when startup attempts privacy repair.
+            if (problem.equals("read-only") && invocation.getMethod().getName().equals("getFileAttributeView")
+                && primary().getParent().equals(invocation.getArgument(0))
+                && PosixFileAttributeView.class.equals(invocation.getArgument(1))) return deniedModeRepair;
             if (problem.equals("read-error") && invocation.getMethod().getName().equals("readAllBytes")
                 && replica().equals(invocation.getArgument(0))) throw new IOException("injected replica read error");
             return invocation.callRealMethod();

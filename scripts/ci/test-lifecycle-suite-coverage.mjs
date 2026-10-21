@@ -64,20 +64,18 @@ test('both installed Engine tiers always collect and upload additional child log
   }
 });
 
-test('CI does full required work outside the queue and advisory work only on dispatch', () => {
+test('CI does full required work and advisory axe outside the queue; other advisory work stays on dispatch', () => {
   const jobs = load(workflow).jobs;
   const skipQueue = "github.event_name != 'merge_group'";
   for (const id of ['jseval-suite', 'license-and-notices', 'app-ui-ui', 'app-ui-services',
-    'windows-native-node', 'windows-native-contracts', 'lifecycle-integration-tests']) {
+    'windows-native-node', 'windows-native-contracts', 'lifecycle-integration-tests', 'measured-axe']) {
     assert.equal(jobs[id].if, skipQueue, id);
   }
   for (const id of ['app-ui', 'windows-native-tests']) {
     assert.equal(jobs[id].if, `always() && ${skipQueue}`, id);
   }
   for (const id of ['public-claims', 'build', 'secret-scan']) assert.equal(jobs[id].if, undefined, id);
-  for (const id of ['measured-axe', 'integration-tests']) {
-    assert.equal(jobs[id].if, "github.event_name == 'workflow_dispatch'", id);
-  }
+  assert.equal(jobs['integration-tests'].if, "github.event_name == 'workflow_dispatch'");
   assert.equal(jobs['ci-walltime'].if, "always() && github.event_name == 'workflow_dispatch'");
   assert.ok(jobs['ci-walltime'].needs.includes('integration-tests'));
   const originalConditions = {

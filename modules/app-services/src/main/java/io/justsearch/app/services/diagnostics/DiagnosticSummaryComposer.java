@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -30,7 +31,7 @@ final class DiagnosticSummaryComposer {
 
   private static final long MAX_CRASH_REPORT_BYTES = 64L * 1024L;
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final Set<String> CRASH_PROCESSES = Set.of("head", "worker");
+  private static final Set<String> CRASH_PROCESSES = Set.of("head", "worker", "engine");
   private static final Set<String> GPU_VENDORS = Set.of("NVIDIA", "AMD", "INTEL", "APPLE");
   private static final Set<String> GPU_CAPABILITY_TIERS =
       Set.of("CUDA_FUNCTIONAL", "CUDA_AVAILABLE", "GPU_AVAILABLE");
@@ -38,6 +39,10 @@ final class DiagnosticSummaryComposer {
   private static final Pattern GPU_MODEL = Pattern.compile("[\\p{L}\\p{N} ._+()\\-]+");
   private static final Pattern EXCEPTION_TYPE =
       Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*");
+  // VMError::report uses an OS signal/exception name, Internal Error, or Out of Memory Error.
+  // POSIX signal names also include SIG<number> and SIGRTMIN+<offset>.
+  private static final Pattern JVM_FATAL_HEADER = Pattern.compile(
+      "#  (SIG[A-Z0-9_]+(?:\\+[0-9]+)?|EXCEPTION_[A-Z0-9_]+|Internal Error|Out of Memory Error) \\(.*");
 
   record PlatformMetadata(String family, String version, String architecture, String jvmVersion) {}
 
@@ -117,7 +122,11 @@ final class DiagnosticSummaryComposer {
       return null;
     }
     CrashMetadata latest = null;
-    try (DirectoryStream<Path> reports = Files.newDirectoryStream(crashDir, "crash-*.json")) {
+    try (DirectoryStream<Path> reports = Files.newDirectoryStream(crashDir, path -> {
+      String name = path.getFileName().toString();
+      return (name.startsWith("crash-") && name.endsWith(".json"))
+          || (name.startsWith("hs_err_pid") && name.endsWith(".log"));
+    })) {
       for (Path report : reports) {
         CrashMetadata candidate = readCrash(report);
         if (candidate != null && isLater(candidate, latest)) {
@@ -132,10 +141,23 @@ final class DiagnosticSummaryComposer {
 
   private static CrashMetadata readCrash(Path report) {
     try {
-      if (!Files.isRegularFile(report)) {
+      if (!Files.isRegularFile(report, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
         return null;
       }
       try (InputStream input = Files.newInputStream(report)) {
+        if (report.getFileName().toString().startsWith("hs_err_pid")) {
+          String header = new String(input.readNBytes((int) MAX_CRASH_REPORT_BYTES), StandardCharsets.UTF_8);
+          String type = header.lines().limit(64).map(String::trim)
+              .map(JVM_FATAL_HEADER::matcher).filter(Matcher::matches)
+              // Keep the public exception-type identifier allowlist; never copy locations/messages.
+              .map(match -> switch (match.group(1)) {
+                case "Internal Error" -> "InternalError";
+                case "Out of Memory Error" -> "OutOfMemoryError";
+                default -> match.group(1).replace('+', '_');
+              })
+              .findFirst().orElse(null);
+          return type == null ? null : new CrashMetadata(Files.getLastModifiedTime(report).toInstant(), "engine", type);
+        }
         return readCrash(input);
       }
     } catch (IOException | RuntimeException ignored) {

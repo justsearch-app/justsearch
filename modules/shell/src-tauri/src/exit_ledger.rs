@@ -413,7 +413,9 @@ fn retain_and_rename(
         let mut added = Vec::new();
         for row in &rows {
             if row["pid"].as_u64().is_none()
-                || (row["creationFileTime"].as_str().is_none() && row["processIdentity"]["kind"] != "linux-proc-v1") {
+                || (row["creationFileTime"].as_str().is_none()
+                    && row["processIdentity"]["kind"] != "linux-proc-v1")
+            {
                 continue;
             }
             let mut loss = json!({"schemaVersion":1,"type":"ledger-gap","seq":row["seq"],"at":row["at"],
@@ -492,6 +494,193 @@ fn retain_and_rename(
         size -= bytes;
     }
     Ok(())
+}
+
+/// Create with private permissions, then repair existing directories without following links.
+/// Links warn once and remain writable without permission repair; non-directories are refused.
+pub(crate) fn ensure_owner_only_directory(path: &Path) -> io::Result<()> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => {
+            if is_directory_link(&metadata) {
+                warn_owner_only_directory(path, "skipping repair on a link or reparse point");
+                return Ok(());
+            }
+            if !metadata.is_dir() {
+                warn_owner_only_directory(path, "refusing non-directory runtime path");
+                return Err(io::Error::other("refusing non-directory runtime path"));
+            }
+        }
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            create_directory_without_repair(path)?;
+            return ensure_owner_only_directory(path);
+        }
+        Err(e) => return Err(e),
+    }
+    #[cfg(unix)]
+    let result = {
+        use std::os::unix::ffi::OsStrExt;
+        let directory = std::ffi::CString::new(path.as_os_str().as_bytes())
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "directory contains NUL"))?;
+        // The mutation itself must not follow a link swapped in after symlink_metadata.
+        let changed = unsafe {
+            libc::fchmodat(
+                libc::AT_FDCWD,
+                directory.as_ptr(),
+                0o700,
+                libc::AT_SYMLINK_NOFOLLOW,
+            )
+        };
+        if changed == 0 {
+            Ok(())
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    };
+    #[cfg(windows)]
+    let result = private_windows_directory(path, false);
+    if let Err(error) = result {
+        warn_owner_only_directory(path, &error.to_string());
+    }
+    Ok(())
+}
+
+fn is_directory_link(metadata: &fs::Metadata) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        if metadata.file_attributes() & 0x400 != 0 {
+            return true;
+        }
+    }
+    metadata.file_type().is_symlink()
+}
+
+// Used below a linked runtime too: existing entries must keep their permissions.
+fn create_directory_without_repair(path: &Path) -> io::Result<()> {
+    match fs::metadata(path) {
+        Ok(metadata) if metadata.is_dir() => return Ok(()),
+        Ok(_) => return Err(io::Error::other("runtime path is not a directory")),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
+    }
+    #[cfg(unix)]
+    let creation = {
+        use std::os::unix::fs::DirBuilderExt;
+        fs::DirBuilder::new().mode(0o700).create(path)
+    };
+    #[cfg(windows)]
+    let creation = private_windows_directory(path, true);
+    match creation {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+            if fs::metadata(path)?.is_dir() {
+                Ok(())
+            } else {
+                Err(io::Error::other("runtime path is not a directory"))
+            }
+        }
+        Err(e) => {
+            fs::create_dir(path)?;
+            warn_owner_only_directory(path, &e.to_string());
+            Ok(())
+        }
+    }
+}
+
+fn warn_owner_only_directory(path: &Path, error: &str) {
+    static WARNED: std::sync::OnceLock<std::sync::Mutex<std::collections::HashSet<PathBuf>>> =
+        std::sync::OnceLock::new();
+    if WARNED
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap()
+        .insert(path.to_path_buf())
+    {
+        eprintln!(
+            "Could not protect owner-only directory {}: {error}",
+            path.display()
+        );
+    }
+}
+
+#[cfg(any(windows, test))]
+const OWNER_ONLY_DIRECTORY_SDDL: &str = "D:P(A;OICI;FA;;;OW)(A;OICI;FA;;;SY)";
+
+// DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION.
+#[cfg(any(windows, test))]
+const OWNER_ONLY_DIRECTORY_SECURITY_INFORMATION: u32 = 0x00000004 | 0x80000000;
+
+#[cfg(windows)]
+fn private_windows_directory(path: &Path, create: bool) -> io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::{
+        Foundation::LocalFree,
+        Security::{
+            Authorization::ConvertStringSecurityDescriptorToSecurityDescriptorW, SetFileSecurityW,
+            SECURITY_ATTRIBUTES,
+        },
+        Storage::FileSystem::CreateDirectoryW,
+    };
+    let path: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    // OW is the object's owner; protect the DACL against later changes to the data parent's ACL.
+    let sddl: Vec<u16> = OWNER_ONLY_DIRECTORY_SDDL
+        .encode_utf16()
+        .chain(Some(0))
+        .collect();
+    unsafe {
+        let mut descriptor = std::ptr::null_mut();
+        if ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            sddl.as_ptr(),
+            1,
+            &mut descriptor,
+            std::ptr::null_mut(),
+        ) == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        let attributes = SECURITY_ATTRIBUTES {
+            nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+            lpSecurityDescriptor: descriptor,
+            bInheritHandle: 0,
+        };
+        let ok = if create {
+            CreateDirectoryW(path.as_ptr(), &attributes)
+        } else {
+            SetFileSecurityW(
+                path.as_ptr(),
+                OWNER_ONLY_DIRECTORY_SECURITY_INFORMATION,
+                descriptor,
+            )
+        };
+        let result = if ok == 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(())
+        };
+        LocalFree(descriptor);
+        result
+    }
+}
+
+fn ensure_ledger_directory(dir: &Path) -> io::Result<()> {
+    if let Some(parent) = dir.parent() {
+        if dir.file_name().is_some_and(|name| name == "exit-ledger")
+            && parent.file_name().is_some_and(|name| name == "runtime")
+        {
+            if let Some(data) = parent.parent() {
+                fs::create_dir_all(data)?;
+            }
+            let linked =
+                fs::symlink_metadata(parent).is_ok_and(|metadata| is_directory_link(&metadata));
+            ensure_owner_only_directory(parent)?;
+            if linked {
+                return create_directory_without_repair(dir);
+            }
+        } else {
+            fs::create_dir_all(parent)?;
+        }
+    }
+    ensure_owner_only_directory(dir)
 }
 
 pub(crate) fn read_ledger(dir: &Path, family: Family) -> io::Result<LedgerRead> {
@@ -585,6 +774,8 @@ impl LedgerWriter {
         {
             return Err("invalid writer identity".into());
         }
+        // Opening a writer must remain nonfatal; failed writes become ledger gaps.
+        let _ = ensure_ledger_directory(&dir);
         let writer = json!({"role":writer["role"],"pid":writer["pid"],
             "startedAt":normalized_timestamp(&writer["startedAt"])});
         Ok(Self {
@@ -635,7 +826,7 @@ impl LedgerWriter {
         }
     }
     fn write_line(&self, bytes: &[u8]) -> io::Result<()> {
-        fs::create_dir_all(&self.dir)?;
+        ensure_ledger_directory(&self.dir)?;
         let (current, _) = self.family.paths(&self.dir);
         // Rust std's Windows open defaults include FILE_SHARE_DELETE; the whole record is one
         // append-mode write, followed by sync_data before the caller takes its action.
@@ -660,6 +851,10 @@ impl LedgerWriter {
         self.start_session_at(now_ms());
     }
     fn start_session_at(&mut self, at: i64) {
+        if ensure_ledger_directory(&self.dir).is_err() {
+            self.healthy = false;
+            return;
+        }
         if self.torn() && self.write_line(b"\n").is_err() {
             self.healthy = false;
         }
@@ -741,6 +936,39 @@ impl LedgerWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn windows_directory_descriptor_is_protected_and_only_owner_and_system_inherit_full_control() {
+        // Compatible harness: inspect the production declarations, keeping the exact literal
+        // policy oracle, without requiring new production symbols in the before-state crate.
+        let source = include_str!("exit_ledger.rs");
+        let production = source.split("\n#[cfg(test)]\nmod tests").next().unwrap();
+        let sddl = production
+            .split("const OWNER_ONLY_DIRECTORY_SDDL: &str = \"")
+            .nth(1)
+            .unwrap()
+            .split('"')
+            .next()
+            .unwrap();
+        let parts: Vec<_> = sddl.split('(').collect();
+        assert_eq!(
+            parts[0], "D:P",
+            "disable parent DACL inheritance at creation"
+        );
+        assert_eq!(parts.len(), 3, "exactly two explicit access entries");
+        assert_eq!(&parts[1..], &["A;OICI;FA;;;OW)", "A;OICI;FA;;;SY)"]);
+        let flags = production
+            .split("const OWNER_ONLY_DIRECTORY_SECURITY_INFORMATION: u32 = ")
+            .nth(1)
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap();
+        let flags = flags
+            .split('|')
+            .map(|part| u32::from_str_radix(part.trim().trim_start_matches("0x"), 16).unwrap())
+            .fold(0, |left, right| left | right);
+        assert_eq!(flags, 0x80000004);
+    }
     fn fixtures() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../governance/fixtures/exit-ledger")
     }
@@ -756,6 +984,147 @@ mod tests {
     fn fields(v: Value) -> Map<String, Value> {
         v.as_object().unwrap().clone()
     }
+    #[cfg(unix)]
+    #[test]
+    fn shell_first_ledger_and_recreation_are_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let data = tempfile::tempdir().unwrap();
+        fs::set_permissions(data.path(), fs::Permissions::from_mode(0o775)).unwrap();
+        let parent_mode = fs::metadata(data.path()).unwrap().permissions().mode() & 0o777;
+        let engine_data = data.path().join("new-data");
+        let dir = ledger_directory(&engine_data);
+        let mut ledger = writer(&dir, true);
+        ledger.write_line(b"{}\n").unwrap();
+        assert_eq!(
+            fs::metadata(engine_data.join("runtime"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+        assert_eq!(
+            fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        fs::set_permissions(
+            engine_data.join("runtime"),
+            fs::Permissions::from_mode(0o775),
+        )
+        .unwrap();
+        ledger.start_session();
+        assert_eq!(
+            fs::metadata(engine_data.join("runtime"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+        fs::remove_dir_all(engine_data.join("runtime")).unwrap();
+        ledger.write_line(b"{}\n").unwrap();
+        assert_eq!(
+            fs::metadata(engine_data.join("runtime"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+        assert_eq!(
+            fs::metadata(data.path()).unwrap().permissions().mode() & 0o777,
+            parent_mode
+        );
+    }
+
+    #[cfg(unix)]
+    fn linked_runtime_fixture() -> (tempfile::TempDir, tempfile::TempDir) {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let data = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        for path in [data.path(), outside.path()] {
+            fs::set_permissions(path, fs::Permissions::from_mode(0o775)).unwrap();
+        }
+        let ledger = outside.path().join("exit-ledger");
+        fs::create_dir(&ledger).unwrap();
+        fs::set_permissions(&ledger, fs::Permissions::from_mode(0o775)).unwrap();
+        symlink(outside.path(), data.path().join("runtime")).unwrap();
+        (data, outside)
+    }
+
+    #[cfg(unix)]
+    fn exercise_linked_writers(data: &Path) {
+        let runtime = data.join("runtime");
+        let ledger = writer(&ledger_directory(data), true);
+        assert!(ledger.write_line(b"{}\n").is_ok());
+        let record: crate::supervisor::StateRecord = serde_json::from_value(json!({
+            "schemaVersion": 1, "kind": "engine-supervisor-state.v1", "supervisor": "tauri",
+            "state": "RUNNING", "incarnation": 1, "restartCount": 0, "maxRestartAttempts": 1,
+            "policyProfile": "product", "updatedAt": "2026-10-20T00:00:00Z"
+        }))
+        .unwrap();
+        crate::engine_host::EngineHost::default().publish_state(
+            Some(&runtime.join("supervisor.v1.json")),
+            &record,
+            |_| {},
+        );
+        assert!(runtime.join("supervisor.v1.json").is_file());
+        assert!(
+            crate::shell_actuator::write_atomic(&runtime.join("shutdown-request.json"), "{}")
+                .is_ok()
+        );
+        assert!(runtime.join("shutdown-request.json").is_file());
+    }
+
+    #[cfg(unix)]
+    fn assert_link_permissions(data: &Path, outside: &Path) {
+        use std::os::unix::fs::PermissionsExt;
+        for path in [data, outside, &outside.join("exit-ledger")] {
+            assert_eq!(
+                fs::metadata(path).unwrap().permissions().mode() & 0o777,
+                0o775
+            );
+        }
+        assert!(fs::symlink_metadata(data.join("runtime"))
+            .unwrap()
+            .file_type()
+            .is_symlink());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn shell_linked_runtime_keeps_all_writers_working() {
+        let (data, outside) = linked_runtime_fixture();
+        exercise_linked_writers(data.path());
+        assert_link_permissions(data.path(), outside.path());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn shell_linked_runtime_warns_once_without_repairing_through_link() {
+        const CHILD_ROOT: &str = "JUSTSEARCH_PRIVATE_FOLDERS_WARNING_CHILD";
+        if let Some(data) = std::env::var_os(CHILD_ROOT) {
+            exercise_linked_writers(Path::new(&data));
+            return;
+        }
+        let (data, outside) = linked_runtime_fixture();
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "exit_ledger::tests::shell_linked_runtime_warns_once_without_repairing_through_link", "--nocapture"])
+            .env(CHILD_ROOT, data.path()).output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&output.stderr)
+                .matches("skipping repair on a link or reparse point")
+                .count(),
+            1
+        );
+        assert_link_permissions(data.path(), outside.path());
+    }
+
     #[test]
     fn t15_every_shared_fixture_has_the_java_and_node_summary() {
         for dir in fs::read_dir(fixtures().join("cases")).unwrap() {

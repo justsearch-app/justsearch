@@ -46,8 +46,9 @@ Every workflow that produces a required status check also declares `merge_group`
 PRs and pushes to `main` run the full required set. Merge-queue runs check governance,
 build and secrets on the combined tree. Other required jobs report successful skips;
 matrix jobs keep their expanded check names by skipping every step. Runtime, unit and
-Windows tests do not rerun on the combined tree. Measured axe, Integration tests and
-CI wall-clock attribution run only on manual dispatch.
+Windows tests do not rerun on the combined tree. Advisory Measured axe runs on PRs,
+pushes to main and manual dispatch, gathering stability evidence before promotion to
+required. Integration tests and CI wall-clock attribution run only on manual dispatch.
 
 The CI workflow is organized as stable **fact lanes**:
 

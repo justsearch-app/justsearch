@@ -1,0 +1,114 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T13:07:07.232Z",
+  "revision": "75853ca8448ecb5a2cbf08ca56fd32e60f52b192",
+  "tree": "6d4e055940e167966e4dd1c3953415784a1c635e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::windows_directory_descriptor_is_protected_and_only_owner_and_system_inherit_full_control\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2119
+    },
+    {
+      "command": "./gradlew :modules:configuration:test --tests \"io.justsearch.configuration.persistence.OwnerOnlyDirectoryTest\" --tests \"io.justsearch.configuration.persistence.WindowsOwnerOnlyDirectoryTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1597
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/OwnerOnlyDirectoryTest.java",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/OwnerOnlyDirectoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8f42377c5e91be9acfe132c3493912bfb44bc8fce3149186166453eadf1a8857",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "linkWarnsOnceAndContinuesWithoutCallingPermissionSetterOrChangingTarget()",
+          "status": "passed"
+        },
+        {
+          "name": "permissionFailureWarnsOnceAndPreservesContents()",
+          "status": "passed"
+        },
+        {
+          "name": "freshAndRestoredDirectoryArePrivateWithoutChangingParentOrOldContents()",
+          "status": "passed"
+        },
+        {
+          "name": "repairsNestedFilesAndDirectoriesButNeverLinkTargets()",
+          "status": "passed"
+        },
+        {
+          "name": "unsupportedPermissionsWarnAndContinue()",
+          "status": "passed"
+        },
+        {
+          "name": "deniedChildRepairsWarnOnceForTheFolderAndPreserveEveryFile()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::windows_directory_descriptor_is_protected_and_only_owner_and_system_inherit_full_control",
+      "file": "modules/shell/src-tauri/src/exit_ledger.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:a37ab48723e7fd7e98e09fe61bcf50512d8f58860db466cea94e49229a0b68a5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit_ledger::tests::windows_directory_descriptor_is_protected_and_only_owner_and_system_inherit_full_control",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/WindowsOwnerOnlyDirectoryTest.java",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/WindowsOwnerOnlyDirectoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7f794af8055a0392dc66ed7f68261789773ef47fa9d60e68a9865ee0e0fb264c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "openedHandleRejectsHardLinkedFilesAndReparsePointsButAllowsRealDirectories()",
+          "status": "passed"
+        },
+        {
+          "name": "creationDescriptorIsProtectedAndGrantsOnlyOwnerAndSystemInheritableFullControl()",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableNativePermissionsWarnOnceAndPreserveContents(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "repairSetsDaclAndProtectsItWithoutChangingOwnerGroupOrSacl()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:4a7584f0c7788cd014c98f2002f32b8dc2f2454847afac3226ce42aaca3e16fe"
+}

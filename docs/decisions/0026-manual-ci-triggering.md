@@ -207,8 +207,8 @@ as §22.2 follow-up 5.
 
 **Decision.** `.github/workflows/ci.yml` gains a `measured-axe` job
 (`Measured axe (advisory)`, `ubuntu-latest`) running `jseval ui-a11y-gate` on
-`pull_request`, `push` to `main`, `merge_group` and `workflow_dispatch` — the
-triggers ADR-0044 already grants that workflow. This adds no trigger and
+`pull_request`, `push` to `main` and `workflow_dispatch`, excluding `merge_group` —
+events ADR-0044 already grants that workflow. This adds no trigger and
 touches no self-hosted runner, so the manual-only policy for self-hosted and
 specialty workflows is unchanged.
 
