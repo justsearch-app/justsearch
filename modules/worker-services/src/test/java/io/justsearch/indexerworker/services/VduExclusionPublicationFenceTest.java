@@ -9,6 +9,9 @@ import io.justsearch.adapters.lucene.runtime.*;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
+import io.justsearch.indexerworker.loop.IndexingLoop;
+import io.justsearch.indexerworker.coordination.WorkerSignalBus;
+import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.ipc.*;
@@ -24,15 +27,15 @@ import org.junit.jupiter.api.io.TempDir;
 final class VduExclusionPublicationFenceTest extends LuceneExecutorTestBase {
   @TempDir Path directory;
 
-  @ParameterizedTest(name="policySaveWaitsForVduPublicationAfterItsExclusionCheck({0})") @ValueSource(booleans={false,true})
-  void policySaveWaitsForVduPublicationAfterItsExclusionCheck(boolean exhaustedClaim) throws Exception {
+  @ParameterizedTest(name="explicitApplyFollowsInFlightVduPublication({0})") @ValueSource(booleans={false,true})
+  void explicitApplyFollowsInFlightVduPublication(boolean exhaustedClaim) throws Exception {
     var previous = ConfigStore.globalOrNull();
     var installed = new ConfigStore(config("[\"unrelated.txt\"]"));
     ConfigStore.setGlobal(installed);
     var checked = new CountDownLatch(1);
     var publish = new CountDownLatch(1);
-    var saving = new CountDownLatch(1);
-    var executor = Executors.newFixedThreadPool(2);
+    var applying = new CountDownLatch(1);
+    var executor = Executors.newFixedThreadPool(3);
     try (var runtime = IndexSchema.fromCatalog(VduRevisionTestSupport.catalog(4))
         .atPath(directory.resolve("index")).withExecutorRegistrations(testLuceneExecutors()).open()) {
       runtime.commitOps().stopCommitTimer();
@@ -45,7 +48,17 @@ final class VduExclusionPublicationFenceTest extends LuceneExecutorTestBase {
       var fields = spy(runtime.documentFieldOps());
       var view = spy(runtime);
       doReturn(fields).when(view).documentFieldOps();
-      var service = new WorkerIngestService(null,null,null,IndexingPacing.unthrottled(),null,null,view,view,null,0L);
+      var fence = new java.util.concurrent.locks.ReentrantLock(true);
+      var loop = mock(IndexingLoop.class);
+      when(loop.withFileMutationFence(any())).thenAnswer(call -> {
+        java.util.function.Supplier<?> mutation = call.getArgument(0);
+        fence.lock();
+        try { return mutation.get(); } finally { fence.unlock(); }
+      });
+      var service = new WorkerIngestService(mock(JobQueue.class),loop,mock(WorkerSignalBus.class),
+          IndexingPacing.unthrottled(),null,null,view,view,null,0L);
+      Object owner = new Object();
+      service.setMutationAdmission(new WorkerMutationAdmission(owner),owner);
       service.useExclusionRoots(() -> List.of(directory));
       var base = CallContext.none();
       var context = new CallContext(null,null,null,base.engineContext().withWorkId(UUID.randomUUID()),base.provenance(),base.childLifetime());
@@ -54,7 +67,7 @@ final class VduExclusionPublicationFenceTest extends LuceneExecutorTestBase {
       doAnswer(call -> {
         Object result = call.callRealMethod();
         checked.countDown();
-        assertTrue(publish.await(10, TimeUnit.SECONDS));
+        assertTrue(publish.await(20, TimeUnit.SECONDS));
         return result;
       }).when(fields).excludedProcessingIds(List.of(id));
       var result = executor.submit(() -> {
@@ -67,19 +80,24 @@ final class VduExclusionPublicationFenceTest extends LuceneExecutorTestBase {
             .setExtractedContent("new VDU text ".repeat(600)).setVduEnrichment("vdu marker").build(),context).getSuccess();
       });
       assertTrue(checked.await(10, TimeUnit.SECONDS), "pause immediately after the live exclusion check");
-      var save = executor.submit(() -> { saving.countDown(); installed.update(config("[\"private.png\"]")); });
-      assertTrue(saving.await(10, TimeUnit.SECONDS));
+      var save = executor.submit(() -> installed.update(config("[\"private.png\"]")));
+      Future<Boolean> apply;
       try {
-        assertThrows(TimeoutException.class, () -> save.get(250, TimeUnit.MILLISECONDS),
-            "a later save must not complete between the exclusion check and publication");
+        assertDoesNotThrow(() -> save.get(2,TimeUnit.SECONDS),
+            "the save publishes its snapshot without waiting for the VDU file fence");
+        apply = executor.submit(() -> {
+          applying.countDown();
+          return service.deleteById(DeleteByIdRequest.newBuilder().setDocId(id).build(),CallContext.none()).getSuccess();
+        });
+        assertTrue(applying.await(2,TimeUnit.SECONDS));
+        assertFalse(apply.isDone(),"explicit Apply waits behind the in-flight VDU publication");
       } finally { publish.countDown(); }
       assertEquals(!exhaustedClaim,result.get(10, TimeUnit.SECONDS));
-      save.get(10,TimeUnit.SECONDS);
-      assertEquals(exhaustedClaim ? "FAILED" : "COMPLETED",runtime.documentFieldOps().getDocumentField(id,SchemaFields.VDU_STATUS));
-      if (!exhaustedClaim) assertEquals("vdu marker",runtime.documentFieldOps().getDocumentField(id,SchemaFields.VDU_ENRICHMENT));
-      else assertTrue(runtime.documentFieldOps().getDocumentField(id,SchemaFields.VDU_ENRICHMENT).contains("Max retries"));
-      assertEquals(Set.of(id),runtime.documentFieldOps().excludedProcessingIds(List.of(id)),
-          "the later save now routes the document through normal exclusion handling");
+      assertTrue(apply.get(10,TimeUnit.SECONDS));
+      runtime.commitOps().maybeRefreshBlocking();
+      assertNull(runtime.documentFieldOps().getDocumentContent(id),
+          "explicit Apply runs after publication and removes its text and enrichment");
+      assertTrue(runtime.documentFieldOps().queryDocIdsByField(SchemaFields.PARENT_DOC_ID,id,100).isEmpty());
     } finally {
       publish.countDown();
       executor.shutdownNow();
