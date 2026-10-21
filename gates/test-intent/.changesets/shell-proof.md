@@ -17,10 +17,22 @@ below are labelled agent-drafted, owner-adopted; none is relabelled owner-words.
 and test-harness choices use delegated-choice, quoting the delegation and labelling the choice
 agent choice. The orchestrator's brief is not cited as the owner's words.
 
-Before-state for this changeset: the exact token-branch tip
-`7df82d2ef0944cef399db3daf0f8765442e487d4` (`origin/worktree-token-bootstrap`), not 4975ceedf
-and not the parent of the merge. Candidate: `51f6ba6e1` plus these uncommitted test-diagnostic and
-changeset/evidence edits. No production source or test-intent gate implementation is changed here.
+Before-state for the refreshed receipts: `origin/main` at
+`947be754dc59485c01e34c53fe62f78a8bdc7d55`, including the squashed token PR #825.
+Candidate: merge commit `9be9fdbf7` plus these uncommitted changeset/evidence edits.
+The merge preserves main's token-only files exactly and layers only shell-proof changes above it.
+Both prior acceptance records below remain verbatim; neither accepts this refreshed digest.
+During validation the shared origin/main ref advanced to 4f5954535 (#857). These receipts remain
+pinned to the main revision actually merged; a further merge requires a decision under the
+request's prohibition on commits after the merge. No second merge or later commit was made.
+
+Merge validation: the generator captured 252 routes and matching OpenAPI from the freshly installed
+production Engine, byte-identical to main; that Engine exited 0 after ordered shutdown. Conformance
+passed self-test 35/35, dev-runner 39/39 and Tauri 49/49. Related Vitest passed 241/241. The Rust
+library passed 227 tests (one ignored); the binary run passed 139 and failed eight (one ignored).
+Seven updater failures reproduce on current main (127 passed, seven failed); the additional
+unchanged identity fixture hit ETXTBSY at spawn and passed its focused rerun. No check was weakened.
+These full-suite observations are separate from the selected machine-readable execution receipts.
 
 Evidence was written by `scripts/governance/gates/test-intent/run-evidence.mjs`. The existing
 `token-bootstrap-execution-adapter.cjs` supplies shared before clones and --maxWorkers=4; it does
@@ -30,7 +42,7 @@ are retained and digest-bound. They expose legacy behaviour to new test signatur
 fixtures; they do not implement process proof, origin binding, redirect rejection or retry guards.
 
 The evidence scopes are intentional:
-- original: untouched original tests at the exact token tip, all passing;
+- original: untouched original tests at the current main before-state, all passing;
 - adapted: seven candidate preservation files pass after and with before input re-encoding;
 - native: 16 selected checks pass after; 13 fail before by assertion and three preservation checks
   pass before. The evidence runner exits 1 for this mixed receipt because preserved checks pass
@@ -108,7 +120,7 @@ are recorded separately. A separate session must review these entries and append
         "purpose": "Supply an owned Engine child and an independently owned listener, so sender checks can falsify process ownership instead of trusting a health response.",
         "callersAndStateOwners": "Fixture owns its EngineHost and TempDir and reaps only its recorded Child. Sleeper never owns the impostor socket. The Python server owns its socket and checks a token tied to its actual PID; its response reports that PID. The parent impostor would return plausible instance/health/token-rejection JSON if the caller writes.",
         "indirectBehaviours": "Listener accept/read and process lifetime are real OS boundaries. Three-second fixture startup/accept deadlines and a two-second read timeout fail or close the fixture; they are not product timeouts. Rejected connections disclose zero application bytes. The before-only patch loads these test modules and adapts signatures, without adding ownership proof to an old sender.",
-        "evidence": "All native after checks in shell-proof-native.json pass. Its before receipt is exactly 7df82d2ef0944cef399db3daf0f8765442e487d4: 13 assertion failures and three preservation passes. The patch attached here is fully recorded by the producer with its content digest.",
+        "evidence": "All native after checks in shell-proof-native.json pass. Its before receipt is exactly 947be754dc59485c01e34c53fe62f78a8bdc7d55: 13 assertion failures and three preservation passes. The patch attached here is fully recorded by the producer with its content digest.",
         "unresolvedRisks": "The fixtures do not simulate system-wide /proc denial or a failing Windows API. Timeout and unavailable expected-owner evidence are narrower checks; the existing force-kill path is exercised by the actor rejection test."
       },
       "sources": [
@@ -237,7 +249,7 @@ are recorded separately. A separate session must review these entries and append
         "modules/shell/src-tauri/src/shell_connection_tests.rs"
       ],
       "class": "New",
-      "behaviour": "C1/C4: shutdown to an impostor writes no bytes, falls back to the owned request file, and the recorded child can still be force-killed and reaped. A commit cannot reach its send hook or be marked sent before proof, even when the listener would acknowledge. C2: every later connection, including after replacing the child and binding, is checked afresh. A successful real health probe is not authority for the later send connection after port takeover. All four named checks fail by assertion at the token tip and pass after. Explicit is_err and hook-called assertions replace unwrap/panic-only diagnostics; the forbidden send hook remains forbidden.",
+      "behaviour": "C1/C4: shutdown to an impostor writes no bytes, falls back to the owned request file, and the recorded child can still be force-killed and reaped. A commit cannot reach its send hook or be marked sent before proof, even when the listener would acknowledge. C2: every later connection, including after replacing the child and binding, is checked afresh. A successful real health probe is not authority for the later send connection after port takeover. All four named checks fail by assertion at the main before-state and pass after. Explicit is_err and hook-called assertions replace unwrap/panic-only diagnostics; the forbidden send hook remains forbidden.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -380,9 +392,9 @@ are recorded separately. A separate session must review these entries and append
       "class": "Incidental",
       "assessment": {
         "purpose": "Keep the distinction between no attempted commit write and ambiguous delivery after an attempted write. This is not classified as Adaptation: the actor function is no longer the observation boundary.",
-        "callersAndStateOwners": "At the token tip, these two original functions call shell_actuator::post_before_send(port, token, ...). At the candidate, a test-local function with that name shadows the actor function and calls engine_conn::connect_proven with the fixture process PID, then engine_conn::post_connected. The test owns the listener, not a host-owned Engine child. No current-host snapshot or actor PID admission is exercised by this shim.",
+        "callersAndStateOwners": "At the main before-state, these two original functions call shell_actuator::post_before_send(port, token, ...). At the candidate, a test-local function with that name shadows the actor function and calls engine_conn::connect_proven with the fixture process PID, then engine_conn::post_connected. The test owns the listener, not a host-owned Engine child. No current-host snapshot or actor PID admission is exercised by this shim.",
         "indirectBehaviours": "The old assertions remain: failed connect must not call before_send; a false before_send leaves sent=false and zero bytes; a written request followed by a missing receipt is an error with sent=true. Inputs, loopback fault listeners and read timeouts remain. Coverage is narrower at the actor boundary even though these transport assertions survive. Actor ownership is independently covered by the actual actor/sender checks in shell_connection_tests.rs and updater_connection_tests.rs, not by pretending the shim checks the actor.",
-        "evidence": "shell-proof-original.json runs the untouched two test functions against the actual original actor at 7df82d2ef0944cef399db3daf0f8765442e487d4 and records both passing. shell-proof-native.json records the changed shim passing after and under legacy writer scaffolding before; its real actor checks separately fail before by assertion and pass after. The two receipts are distinct: passing the shared writer is not called proof that the actor path was preserved.",
+        "evidence": "shell-proof-original.json runs the untouched two test functions against the actual original actor at 947be754dc59485c01e34c53fe62f78a8bdc7d55 and records both passing. shell-proof-native.json records the changed shim passing after and under legacy writer scaffolding before; its real actor checks separately fail before by assertion and pass after. The two receipts are distinct: passing the shared writer is not called proof that the actor path was preserved.",
         "unresolvedRisks": "The retained transport tests alone cannot catch bypassing EngineHost::connect_engine in the actor. That gap is explicit and is covered by the separate actor regressions. Windows live execution is not claimed."
       },
       "sources": [
@@ -468,7 +480,7 @@ are recorded separately. A separate session must review these entries and append
         "purpose": "Preserve one operation key and the initially captured conversation across an allowed token retry, and use a fresh key for a later action.",
         "callersAndStateOwners": "runBackgroundTask is the caller; AgentSessionController owns conversation capture and the operation key, while http.ts owns the credential cache. The changed case now explicitly establishes a Tauri binding, invalidates that cache, recreates the controller at the issued origin and uses a test invoke mock.",
         "indirectBehaviours": "This changes preconditions from an implicit browser/no-binding retry to an explicit permitted desktop retry, so it is not an Adaptation of the whole oracle. The old two-identical-bodies, one-key, original-conversation, new-action/new-key, timer-count and no-toast assertions remain exactly in place. RestoreAllMocks tears down the runtime spy. C5 separately removes the old unconditional stale-token retry to a nonmatching/no-issued origin.",
-        "evidence": "shell-proof-original.json runs the original file at the token tip: all its original cases pass. shell-proof-adapted.json runs the candidate file after and with only input-decoding compatibility before: all cases pass in both states. This includes the changed retry case and the unaffected controller cases, so the new top-level mock is not accepted just by shape.",
+        "evidence": "shell-proof-original.json runs the original file at the main before-state: all its original cases pass. shell-proof-adapted.json runs the candidate file after and with only input-decoding compatibility before: all cases pass in both states. This includes the changed retry case and the unaffected controller cases, so the new top-level mock is not accepted just by shape.",
         "unresolvedRisks": "The old no-binding browser retry is deliberately not claimed as preserved: it conflicts with the agreed C5 retry restriction. Cross-origin refusal has separate fail-before evidence in shell-proof-web.json. No unrelated controller assertion or skip is changed."
       },
       "sources": [
@@ -569,10 +581,10 @@ are recorded separately. A separate session must review these entries and append
       ],
       "class": "Incidental",
       "assessment": {
-        "purpose": "Make the new wire-format fixtures executable against the token tip without transplanting the shell-proof authorization repair.",
+        "purpose": "Make the new wire-format fixtures executable against the main before-state without transplanting the shell-proof authorization repair.",
         "callersAndStateOwners": "This is before-only execution instrumentation, not a production change in the candidate: the old session-token resolver can unwrap the candidate object input, but still ignores origin and retains its original sending, redirects and retry behaviour.",
         "indirectBehaviours": "The producer applies this patch before overlaying the candidate check files. All seven preservation files pass on both states. Both security files fail before by assertion and pass after; thus the projection cannot supply the missing protection. No assertions, expected values or reports are synthesized by the patch.",
-        "evidence": "shell-proof-adapted.json and shell-proof-web.json record the exact token-tip revision and this patch content digest. shell-proof-original.json additionally records the untouched string-format tests on the real token tip. This entry binds the patch bytes to acceptance.",
+        "evidence": "shell-proof-adapted.json and shell-proof-web.json record the exact main revision and this patch content digest. shell-proof-original.json additionally records the untouched string-format tests on the real main before-state. This entry binds the patch bytes to acceptance.",
         "unresolvedRisks": "The decoded-before run alone is not the untouched-original run; both are provided and kept separate. There is no changed before-state authorization condition."
       },
       "sources": [

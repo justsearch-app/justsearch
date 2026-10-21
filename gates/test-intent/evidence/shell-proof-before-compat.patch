@@ -1,7 +1,7 @@
 --- a/modules/shell/src-tauri/src/lib.rs
 +++ b/modules/shell/src-tauri/src/lib.rs
-@@ -2144,3 +2144,18 @@
-         assert!(res.is_err());
+@@ -3787,3 +3787,18 @@
+         }
      }
  }
 +
@@ -42,7 +42,7 @@
 +}
 --- a/modules/shell/src-tauri/src/updater.rs
 +++ b/modules/shell/src-tauri/src/updater.rs
-@@ -2983,3 +2983,7 @@
+@@ -3457,3 +3457,7 @@
  #[cfg(test)]
  #[path = "updater_actor_hold_witness_tests.rs"]
  mod actor_hold_witness_tests;

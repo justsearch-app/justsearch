@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-20T12:47:47.658Z",
-  "revision": "7df82d2ef0944cef399db3daf0f8765442e487d4",
-  "tree": "10b51a685a8dfe3beb32622b576643a331159319",
+  "createdAt": "2026-10-21T12:02:35.849Z",
+  "revision": "947be754dc59485c01e34c53fe62f78a8bdc7d55",
+  "tree": "5ffb80433461529f393991350a7c3563d22bf1ba",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::connect_failure_and_observed_exit_send_no_commit_bytes\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5292
+      "durationMs": 18598
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::request_written_then_missing_receipt_is_ambiguous_delivery\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1342
+      "durationMs": 18787
     },
     {
-      "command": "npx vitest run \"src/api/backendRestart.test.ts\" \"src/api/http.test.ts\" \"src/api/registry/AuthenticatedCatalogs.test.ts\" \"src/shell-v0/api/authorizedFetch.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/controllers/liveRuns.test.ts\" \"src/shell-v0/streaming/AuthenticatedStream.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/justsearch-shell-proof-builder/test-intent-vitest-2311109-1792500463147.json\"",
+      "command": "npx vitest run \"src/api/backendRestart.test.ts\" \"src/api/http.test.ts\" \"src/api/registry/AuthenticatedCatalogs.test.ts\" \"src/shell-v0/api/authorizedFetch.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/controllers/liveRuns.test.ts\" \"src/shell-v0/streaming/AuthenticatedStream.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/shell-proof/tmp/builder/test-intent-vitest-2056980-1792584151565.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4507
+      "durationMs": 4282
     }
   ],
   "checks": [
@@ -1070,5 +1070,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:4dc2a98f5ad404ea1056158180cda11495202a1f815a7e524e7d9c102bd568bf"
+  "digest": "sha256:1d0f8dda325f0fc6187b506648bbdb00d28b923e930ad2445466be2ab8d7ee0e"
 }
