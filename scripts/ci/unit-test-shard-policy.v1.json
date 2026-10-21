@@ -195,6 +195,12 @@
           "name": "io.justsearch.configuration.persistence.AtomicFileWritesTest"
         },
         {
+          "name": "io.justsearch.app.services.ai.install.AiInstallServiceCudaPolicyTest"
+        },
+        {
+          "name": "io.justsearch.ui.HeadlessAppCudaPolicyTest"
+        },
+        {
           "name": "io.justsearch.configuration.persistence.ContendedFileReadsTest",
           "allowedSkips": [
             {
