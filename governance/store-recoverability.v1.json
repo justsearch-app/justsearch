@@ -1289,6 +1289,38 @@
       "fixtures": []
     },
     {
+      "id": "engine-jvm-crash-artifacts",
+      "pathVerification": "LITERAL",
+      "encryption": "UNSEALED_DERIVED_OS_DISK_ENCRYPTION",
+      "encryptionNote": "Raw JVM fatal logs can contain executable/user paths, arguments and native frames; HPROF heap dumps can contain document text, prompts, credentials and other process memory. The JVM writes plaintext outside StoreCipher, relying on OS disk encryption. Diagnostics exports include bounded redacted fatal-log text, never heap dumps.",
+      "owner": "SHELL",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        "crashes/hs_err_pid*.log",
+        "crashes/*.hprof"
+      ],
+      "recoverability": "DERIVED",
+      "upgradeHandling": "PRESERVE_EXTERNAL",
+      "format": "JVM vendor fatal-error text and binary HPROF dumps, with a fresh boot UUID in each name",
+      "currentVersion": 0,
+      "readableLegacyVersions": [],
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "BEST_EFFORT",
+      "corruptionPolicy": "PRESERVE_DIAGNOSTICS_AND_PRUNE_BY_RETENTION",
+      "corruptionNote": "Fatal logs are never rewritten or pruned: unreadable files and unusable headers are skipped by latest_crash, leaving their bytes intact. Heap dumps are not parsed or repaired: spawn preparation keeps the oldest and newest regular .hprof files by modification time and deletes only intermediate dumps. Directory, metadata and pruning failures report a spawn-preparation obstacle.",
+      "reconciliation": "The desktop shell owns directory preparation, JVM output-path selection and heap retention; the Engine JVM writes the artifact bytes. Recreate a missing crashes directory before spawning, choose fresh UUID names, and preserve prior fatal logs and the first/latest dumps across relaunches. Lost or corrupt historical artifacts cannot be reconstructed; their loss affects diagnostics only, never indexed or queued data. Later failures produce new independent artifacts. Preserve the JVM-owned formats across upgrades; no schema migration or replay consumes them.",
+      "status": "READY",
+      "implementationSources": [
+        "modules/shell/src-tauri/src/recovery.rs",
+        "modules/shell/src-tauri/src/lib.rs"
+      ],
+      "tests": [
+        "modules/shell/src-tauri/src/recovery.rs",
+        "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/JvmCrashEvidenceTest.java"
+      ],
+      "fixtures": []
+    },
+    {
       "id": "telemetry-and-crash-artifacts",
       "pathVerification": "LITERAL",
       "encryption": "UNSEALED_DERIVED_OS_DISK_ENCRYPTION",

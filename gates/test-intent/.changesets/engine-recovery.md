@@ -9,7 +9,7 @@ author-session: 01a1563a-7f02-7081-9d04-646e3ac0b504
 
 Owner adopted the E1–E21 scenarios on 2026-10-20. Entries below quote the relevant
 scenarios verbatim. Engine-side queue scenarios E8–E15 belong to a later assignment.
-Coverage is against the merge-base with origin/main, c00a0cb24. There are eight flagged items;
+Coverage is against the merge-base with origin/main, 2ba7d810e. There are seven flagged items;
 separate entries distinguish new assertions from unchanged test formatting in the same item.
 No acceptance record is written by the builder. Governance tooling is unchanged by this correction;
 no Java check source changed, so its existing execution evidence remains valid. No Gradle run was
@@ -39,6 +39,55 @@ never-ready initial generation and delayed fifth spawn. Earlier Java/UI and repa
 fail-before evidence remains tied to the unchanged check-file content digests. The temporary shared
 before/known-good clones live under TMPDIR and are removed after the checks. Compatibility patches
 are evidence-only fixtures, never production patches or substituted passing implementations.
+
+## CI follow-up after merging main (2026-10-21)
+
+Public-claims job 118947729682 correctly found the new production write site recovery.rs
+unclassified. The register now gives its JVM crash artifacts their own SHELL-owned derived
+identity: the shell prepares the directory, selects output names and retains heaps; the JVM
+writes the plaintext fatal logs/HPROF bytes. Existing fatal logs are preserved even if unreadable;
+heap retention keeps the oldest/newest files without parsing them. Missing historical evidence
+cannot be reconstructed, and future crashes produce independent UUID-named artifacts. This differs
+from the existing rotating telemetry/JSON authority, so its corruption vocabulary states preservation
+and retention rather than falsely claiming every damaged diagnostic is rotated away. The register
+gate passes with 56 authorities; the merge base passes with 55 and the unmodified branch failed
+specifically for recovery.rs. Product storage behavior is unchanged by this classification.
+
+Windows job 118947729530's recovery-delayed-retry reached RUNNING and had two TRANSIENT exits,
+then its third Windows job root missed the 599.9854 ms startup budget. In the manual/update-hold
+case, the third incarnation first suffered the same short discovery allowance, was closed as a
+hang, and the following job root missed its 599.9847 ms allowance. These are not exhaustion after
+four real crash exits, so those cases correctly reject the missing retry deadline. The initial
+CLI admission policy cannot explain them: first readiness has already occurred, and the default
+shared supervisor's delayed retry has no prior-health condition.
+
+The branch's own recovery driver overrode START_DEADLINE_MS to 600 for every replacement.
+Removing that override restores the common conformance harness's 4000 ms startup policy; neither
+restart allowance, quit deadline, fault timing nor existing assertion changes. The new out-of-scope
+Node regression recovery-startup-budget.test.mjs inserts a controlled 900 ms root-publication delay
+at the real third-spawn actuator boundary and runs both existing real-process recovery cases.
+Both assertions fail on the shared a2ab1d99c before clone and pass after. Applying PR #842
+(da6cb8180) in that disposable before clone still fails both: its 60-second fixture allowance is
+capped by min(policy.startDeadlineMs, initialPortMs), leaving this 600 ms override in force.
+
+On Linux, both ordinary recovery cases pass before and after this harness fix. The merge base
+predates these new recovery cases; with only their test scaffolding overlaid, both reach four
+TRANSIENT exits and fail the new retry-deadline assertion because main has no delayed recovery.
+No product implementation or policy was overlaid. quit-deadline-is-the-contract-value passes on
+both merge-base 2ba7d810e and the candidate; lifecycle.mjs is byte-identical between them. Its
+Windows failure is the separate post-quit elapsed-time assertion (which includes exit-record work),
+also reported on unrelated PR #841. The RUNNING quit deadline/force-margin calculation is unchanged.
+PR #842 only extends pre-trigger startup observation and does not change that post-quit assertion.
+Windows cannot be executed here; no Windows pass or fix of that shared failure is claimed.
+
+Execution transcript: gates/test-intent/evidence/engine-recovery-ci-followup.txt. All Engines use
+throwaway data/home folders and the drivers stop their own children; shared clones are removed.
+The official execution-evidence runner refreshed all six existing Rust checks. Invoking it for
+the new Node script exits 2 (no runner for scripts/); these scripts are explicitly outside product
+test-intent scope, so the Node checks have a supplemental transcript, not fabricated D4 JSON.
+Existing Java/UI and fail-before evidence stays valid for unchanged check-file digests. No Gradle
+or Java change is needed. Acceptance records below are preserved and require a new independent
+acceptance on the changed digest.
 
 ```json
 {

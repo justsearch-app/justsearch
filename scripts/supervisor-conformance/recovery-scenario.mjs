@@ -11,7 +11,6 @@ export async function runRecoveryCase({ name, testCase, io }) {
   if (testCase.id === 'recovery-never-healthy-delayed-retry') return runNeverHealthyCase({ name, testCase, io });
   const env = { ...io.harnessOverrides,
     JUSTSEARCH_SUPERVISOR_EXHAUSTED_RETRY_DELAY_MS: testCase.id.includes('manual') && !testCase.id.includes('race') ? '5000' : '1000',
-    JUSTSEARCH_SUPERVISOR_START_DEADLINE_MS: '600',
     JUSTSEARCH_SUPERVISOR_HARNESS_FAIL_SPAWN_AT: String(testCase.failSpawnAt ?? 0) };
   const workDir = io.makeWorkDir(`${name}-${testCase.id}`);
   const dataDir = path.join(workDir, 'data');
