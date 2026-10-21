@@ -7,8 +7,8 @@ author-session: 01a15751-d591-7723-a5d5-9aa16695d081
 
 # Llama key test intent
 
-Covers every flagged item against merge-base `50eafae23a304df420f87ee9b287cfd3da0a945d`.
-Current review parent: `0109762bc16244364dacdff4752a95521d8d9275` (candidate includes the uncommitted cleanup repair).
+Covers every flagged item against merge-base `4f4e20514ff82dd9d698661ef09dc646ee643311`.
+Current review parent: `2b775d981` (merge of origin/main; candidate includes the collection snapshot repair).
 The owner adopted K1–K9 on 2026-10-20: "i agree, proceed accordingly".
 The three isolated new test classes are exempt; their checks are referenced where they establish
 new shared-fixture expectations. Existing review records are retained below.
@@ -23,7 +23,7 @@ are `[1] false`, `[2] true`, or numeric values and do not include method names. 
 execute every case without changing test display names or the evidence runner. Both activation
 methods (success/rotation and ignored-key rejection), in both session modes, therefore run in
 each activation evidence file. The auth repair is checked against f003a5c64, the readiness-guard repair against its
-historical parent 673b54a1b, and descendant cleanup against current review parent 0109762bc.
+historical parent 673b54a1b, and descendant cleanup against its historical review parent 0109762bc.
 These targeted before-states are distinct from the current merge-base named above.
 
 ## Execution results
@@ -55,13 +55,49 @@ candidate, with one executed passing check in each artifact and no skips. Both u
 adapted fixture; its four original assertions are unchanged, as recorded in the assertion audit.
 No assertion fail-before is claimed for that adaptation.
 
-Final validation ran `spotlessApply :modules:app-api:test :modules:app-inference:test
+Historical pre-merge validation ran `spotlessApply :modules:app-api:test :modules:app-inference:test
 :modules:app-services:test --continue -PskipWebBuild=true` in one Gradle invocation: 5,008 passed,
 17 pre-existing skips, zero failures/errors (460 / 560 / 4,005 total cases respectively).
 The additional #759 ownership selection passed 71 cases without skips. Every Gradle invocation
 used `js-gradle-slot` with its default wait and `JAVA_TOOL_OPTIONS` unset. The final
 `build -x test -PskipWebBuild=true` exited 0. Full raw reports and command logs are retained under
 `/home/elias/.cache/justsearch-llama-key-builder/linux-cleanup/`.
+
+## Main integration and Windows CI follow-up
+
+Merged origin/main into this branch in `2b775d981` without rebasing. The current
+base and review parent above describe that merge; older references in execution
+evidence remain the historical before-states they actually tested.
+
+The [CI follow-up report](../evidence/llama-key-ci-followup.md) records the first
+Windows assertion, child-log timestamps, unchanged index-recovery call path,
+and recent main/other-branch comparisons. Recovery attempt 2 was refused by
+`EngineRoot.closeIndex` with "Live Engine work retains the index owner", rather
+than producing the exact root-lock evidence the harness requires. No chat was
+launched; the changed chat descendant cleanup does not execute on this path.
+The named check passed on main 037c651e1 and 4f4e20514, another recovery branch,
+and the previous key-branch run. No matching failure was found on the recent
+main runs inspected; a local Windows rerun remains unavailable.
+
+The descendant-cleanup evidence was regenerated on the merged candidate:
+nine checks passed without skips, and the same nine failed by assertion on
+historical parent 0109762bc. The runner exited 0 and removed its before-worktree.
+
+The cleanup warning is repaired by iterating a snapshot of the concurrent map's
+entries while preserving conditional removal and ledger notes. No test source,
+fixture, assertion, selection, or acceptance record changed in this follow-up.
+The post-merge four-module batch executed 7,142 cases: 7,123 passed, one
+failed, 18 skipped. App-api (463), app-inference (560), and app-services (4,050)
+had no failures. The full UI suite did report one unchanged timing assertion failure: status
+latency 652 ms exceeded the existing 500 ms limit in
+`VerifierStatusIsolationTest#repeatedFreshDuringHangDoesNotPileUpSamplerThreads`.
+That fixture mocks inference and starts no child. The failed result is retained
+in the follow-up report and is not replaced by an isolated retry or a weakened
+assertion.
+The scoped app-api/inference/services/UI build with `-x test -PskipWebBuild=true`
+and app-api `spotlessCheck` exited 0; app-api `spotlessApply` also completed.
+The build's UI integration task passed. These passes do not erase the unit-suite
+latency failure above.
 
 ## Wrapper cleanup and #858
 
@@ -78,8 +114,8 @@ exit of a recorded survivor is noted when the admission barrier next observes it
 This closes [#858](https://github.com/justsearch-app/justsearch/issues/858)'s implementation scope in PR #838 and supersedes the earlier delegated choice
 against Linux descendant termination. It changes no Windows job cleanup. The durable main and
 self-test wrapper probes exercise the previously exposed unauthenticated /props boundary. The
-new sealed `llama-key-descendant-cleanup.json` evidence compares these expectations with review
-parent 0109762bc. Existing acceptance records below are preserved; the updated digest requires
+new sealed `llama-key-descendant-cleanup.json` evidence compares these expectations with
+historical review parent 0109762bc. Existing acceptance records below are preserved; the updated digest requires
 independent acceptance.
 
 ## Owner-adopted scenarios

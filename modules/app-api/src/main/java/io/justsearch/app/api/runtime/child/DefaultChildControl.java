@@ -412,7 +412,7 @@ public final class DefaultChildControl implements ChildControl {
     }
     // A member recorded as not ended stays counted after its job was closed, until its own exit.
     members = new ArrayList<>(members);
-    for (var entry : held.notEndedMembers.entrySet()) {
+    for (var entry : List.copyOf(held.notEndedMembers.entrySet())) {
       ProcessHandle leftover = entry.getValue();
       if (!ProcessTerminator.isRunning(leftover)) {
         if (held.notEndedMembers.remove(entry.getKey(), leftover)) {

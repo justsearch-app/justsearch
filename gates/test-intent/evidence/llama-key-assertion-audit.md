@@ -1,6 +1,6 @@
 # Llama key assertion audit
 
-Historical source comparison: auth baseline `f003a5c6476776ed2e56d9e0882f8bbaf55fc731` with initial ignored-key repair `dc1bcaa07a18351991fdd24c991ffb4963a3ca56`. Current review parent is `0109762bc16244364dacdff4752a95521d8d9275`; subsequent wrapper and #858 cleanup oracle changes are documented in the changeset.
+Historical source comparison: auth baseline `f003a5c6476776ed2e56d9e0882f8bbaf55fc731` with initial ignored-key repair `dc1bcaa07a18351991fdd24c991ffb4963a3ca56`. The wrapper/#858 repair used review parent `0109762bc16244364dacdff4752a95521d8d9275`; the current review parent is merge `2b775d981` over main `4f4e20514ff82dd9d698661ef09dc646ee643311`. Subsequent wrapper and #858 cleanup oracle changes are documented in the changeset.
 
 This is a source comparison, not D4 execution evidence. Java assertion invocations were tokenized with strings retained and comments/whitespace ignored. Nested assertions are counted individually; mocks and fixture handlers are reviewed in the changeset. No test or production file was edited for this audit.
 
@@ -118,3 +118,13 @@ assertTrue(result.failure().contains("still running"), result.failure());
 ```
 
 The member still exits after the post-stop snapshot and exposes a still-running late member. Only its exit trigger moves from an `onExit` subscription to the first liveness observation, so kernel polling and future waiting see the same exit facts. The original assertions still reject a self-test that skips the final membership read. The unchanged official producer records a passing preservation check on both parent production (with this fixture overlaid) and candidate production in `llama-key-drain-adaptation-before.json` and `llama-key-drain-adaptation.json`; no fail-before is claimed for this adaptation.
+
+## Main integration audit (2026-10-21)
+
+The merge of origin/main resolved both touched Java files automatically. Against
+merged main, `VduRequestActivityTest.java` has exactly one changed line: the
+proxy supplier wraps the existing upstream port in `LlamaServerEndpoint(port,
+null)`. No assertion in that file differs from main. The table above remains a
+historical comparison with the original auth baseline, rather than a claim
+that later main assertions were authored on this branch. The warning repair
+changes only the production concurrent-map iteration; it changes no test file.
