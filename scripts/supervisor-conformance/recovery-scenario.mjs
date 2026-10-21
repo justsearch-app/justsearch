@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { driveCase } from './adapters/dev-runner.mjs';
+import { driveCase, FIRST_RUNNING_TIMEOUT_MS } from './adapters/dev-runner.mjs';
+import { removeFixtureDirectory } from './fixture-cleanup.mjs';
 import { binaryPath, runBinary } from './adapters/tauri.mjs';
 
 export async function runRecoveryCase({ name, testCase, io }) {
@@ -28,7 +29,7 @@ export async function runRecoveryCase({ name, testCase, io }) {
   }
   const localIo = { ...io, harnessOverrides: env };
   let run;
-  if (name === 'dev-runner') run = await driveCase({ testCase, io: localIo, workDir });
+  if (name === 'dev-runner') run = await driveCase({ testCase, io: localIo, workDir, keepWorkDir: true });
   else {
     const planPath = io.writeEnginePlan(workDir, testCase.enginePlan);
     const faultGatePath = path.join(workDir, 'first-incarnation-running.json');
@@ -45,7 +46,7 @@ export async function runRecoveryCase({ name, testCase, io }) {
   }
   let nonce = 0;
   const current = () => io.readJsonIfPresent(run.statePath);
-  const waitState = predicate => io.waitFor(() => { const state = current(); return state && predicate(state) ? state : null; }, { timeoutMs: 15000, what: testCase.id });
+  const waitState = (predicate, timeoutMs = 15000) => io.waitFor(() => { const state = current(); return state && predicate(state) ? state : null; }, { timeoutMs, what: testCase.id });
   const command = async action => {
     const request = { nonce: ++nonce, action };
     const target = path.join(run.dataDir, 'shell-control.json');
@@ -62,7 +63,10 @@ export async function runRecoveryCase({ name, testCase, io }) {
       assert.ok(!failed.retryAt);
       return { problems: [] };
     }
-    const first = await waitState(state => state.state === 'running');
+    // Windows job-host setup precedes the first Engine. Share the adapter's existing first-boot
+    // allowance; subsequent recovery waits and the restart/quit race retain their shorter bounds.
+    const first = await waitState(state => state.state === 'running',
+      name === 'dev-runner' ? FIRST_RUNNING_TIMEOUT_MS : 15000);
     if (testCase.id === 'recovery-newest-fatal-report') {
       assert.equal(first.crashFile?.name, 'hs_err_pid-newest.log', 'published recovery data must choose the newest fatal report, including native OOM');
       assert.equal(first.crashFile.exception, 'Out of Memory Error [path]');
@@ -184,7 +188,10 @@ export async function runRecoveryCase({ name, testCase, io }) {
   } catch (error) { return { problems: [`${error.stack}\n${run.output.stderr.slice(-1800)}`] }; }
   finally {
     await run.cleanup();
-    fs.rmSync(workDir, { recursive: true, force: true });
+    // The outer runner writes timing records/output before it applies these deferred removals.
+    const remove = () => removeFixtureDirectory(workDir);
+    if (io.deferCleanup) io.deferCleanup(workDir, remove);
+    else remove();
   }
 }
 
@@ -259,6 +266,9 @@ async function runNeverHealthyCase({ name, testCase, io }) {
     return { problems: [`${error.stack}\n${run.output.stderr.slice(-1800)}`] };
   } finally {
     await run.cleanup();
-    fs.rmSync(workDir, { recursive: true, force: true });
+    // The outer runner writes timing records/output before it applies these deferred removals.
+    const remove = () => removeFixtureDirectory(workDir);
+    if (io.deferCleanup) io.deferCleanup(workDir, remove);
+    else remove();
   }
 }

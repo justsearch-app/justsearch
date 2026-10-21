@@ -777,6 +777,42 @@ Details and actual commands are in `gates/test-intent/evidence/engine-recovery-u
 Older evidence artifacts and every acceptance/rejection record are preserved. All changes after
 the existing merge commit remain uncommitted; product code and tests are unchanged.
 
+## Windows E5 first-boot observation and evidence teardown (2026-10-21)
+
+Both attempts of CI run 39620243172 fail at recovery-scenario.mjs:65, the first RUNNING
+observation, before releasing the fixture fault gate or sending any restart/quit command.
+The adapter already permits 60s initial port + 60s readiness + 20s setup, but the recovery
+helper waited only 15s. This is harness setup timing, not an observed E5 supervisor race.
+Only that first dev-runner wait now shares FIRST_RUNNING_TIMEOUT_MS (140s); every later
+15s observation, 5s control reply, the 100ms race offset, and every E5 assertion remain.
+The production supervisors, restart budgets, replacement-start and quit bounds are unchanged.
+
+The existing two startup-budget script checks remain unchanged. Two added checks pin this
+repair at the real actuator boundary: a 16s first-spawn delay (within the adapter's existing
+60s limit) must still complete E5, and normal-speed recovery must retain its timing witness.
+Both fail by assertion on 5b89d03f0; all four startup checks pass after. The slow pass's first
+RUNNING wait is 16.164s. Shared recovery teardown now uses the outer runner's existing deferred
+cleanup so it can write timing/output first, retaining failed hosted artifacts as designed.
+Fixture identity-aware process cleanup still completes before any directory removal.
+
+These are script checks outside the product gate's scope, so their actual transcripts are
+recorded in `gates/test-intent/evidence/engine-recovery-windows-first-boot.txt`; no unsupported
+Node checks or hand-written D4 execution records are substituted into the official runner.
+Existing product-check source digests and all prior evidence files remain unchanged. E5's
+owner-adopted scenario and unchanged assertions remain the intent source for the interleaving;
+E17 keeps the shared supervisor semantics, which this harness-only correction does not alter.
+The evidence notes include both Windows log/artifact identifiers, the missing recovery records,
+the separate first-attempt quit and lock-case timings, and the explicit Windows execution limit.
+Every existing acceptance/rejection record is preserved; no acceptance or commit is written.
+
+The requested Linux race repetition completed 50/50, with 50 complete timing witnesses and no
+warnings. Full conformance then passed: self-test 35/35, dev-runner 51/51, Tauri 61/61.
+The two new script checks plus the two existing startup checks pass 4/4; related timing/cleanup
+unit tests pass 15 with three existing Windows-only skips. No Rust is changed or built; the
+Tauri adapter uses the existing target binary. Actual Windows execution remains unverified.
+Temporary baseline/data folders are removed; raw logs and downloaded artifacts remain under
+`tmp/builder/windows-recovery-race/`. All subsequent changes remain uncommitted.
+
 ## Acceptance records
 
 ```json
