@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T11:01:49.630Z",
+  "revision": "85ce8dd77859b1b94e660c2ceb8b922ac8ed50bf",
+  "tree": "235661947113920bf4912e77959e86a487a3a6e9",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.RootWatcherRegistryTest.handoverKeepsWatchedRootsAndNeverRevivesAnUnwatchedOne\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4683
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootWatcherRegistryTest.java#handoverKeepsWatchedRootsAndNeverRevivesAnUnwatchedOne",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootWatcherRegistryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9e6cd3f7f70d14c2a62067362448cc24bdaf85d7c71a97f96a7f71d168754ef7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "handoverKeepsWatchedRootsAndNeverRevivesAnUnwatchedOne()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:e32cd60b1a4e0e6c6d555089585880448da879ae0b96b749ba1bae1cad4d6706"
+}

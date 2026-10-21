@@ -196,7 +196,8 @@ final class MigrationEnumerationCompletenessTest {
 
       String normalized = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
       assertTrue(queue.putSwitchBufferForGeneration(
-          "g-building", "path:" + normalized, "DELETE", normalized));
+          "g-building", "path:" + normalized, "DELETE", new io.justsearch.indexerworker.queue.SwitchBufferDelete(
+              normalized, io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.EXPLICIT, null).encode()));
       queue.deleteByExactPath(normalized);
       assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context),
           "a foreground delete supersedes the baseline enumeration for coverage");
