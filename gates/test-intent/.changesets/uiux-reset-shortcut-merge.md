@@ -95,3 +95,14 @@ evidence remains valid. No acceptance record is authored by the builder.
   "note": "M2/M3 expectations follow supplied agreed RS4 recovery-only and SC8 preference scenarios. The exact candidate and bbc028999 execute both combination checks; private-Xvfb real shells preserve reset gating and preference deletion/default-on through automatic process restart. Existing lib.rs tests retain their oracles under formatting. RN3 is a valid normal-start catalog input adaptation: compared against the real candidate Engine response and authoritative schema, with every assertion and 8-second/60-second deadline unchanged; named RN3 failed all three before runs and passed all three candidate runs under two loaded CPUs. This accepts test intent, not a claim that all live scenarios pass; the separate report identifies an inherited cancellation defect."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "da5t9n4v-verifier-3",
+  "verdict": "accept",
+  "digest": "sha256:93f662004f87bc8595822185bc69a0fac8c8b5f8b69b7ff38f7f42775b461545",
+  "note": "Accept test intent on the refreshed digest. M2/M3 expectations remain derived from agreed RS4 and SC8. Both combination checks executed and passed on e4480da72 and 6617bfacd. Independent private-Xvfb shells show recovery-only activation with no shortcut file access, preference deletion on completion/default-on after automatic restart, and preservation of the off choice after Cancel. The lib.rs test adaptation preserves existing oracles. RN3 normal-start catalog is unchanged from e4480da72, schema-valid, and consistent with the real Engine catalog captured in this session; the 14 lockdown tests and 7147 default frontend tests pass on both. Main updater policy changes are retained, with only shared atomic-write visibility differing from main. No test oracle was weakened."
+}
+```

@@ -1240,3 +1240,14 @@ delegation, scope and verbatim orchestrator choice. Acceptance records are untou
   "note": "RA7 entries (two Rust, one frontend) are New/repaired, quote RA7 verbatim from the agreed area-5 text, and each expectation follows from it (newer_version reason for requested and cancelled newer files, neutral message, no deletion claims, no Retry, working Cancel). Re-ran run-evidence for uiux-reset-ra7.json with --before 5737dd426: same check digests, all three executed and passed, all three fail-before are assertion failures for the reason under test (missing reason, old 'requested this reset' text, 'Reset incomplete' heading). The four refresh files pass the gate's evidence checks; repaired checks fail before by assertion, preservation checks pass before. Verifier's own checks: newer files in every phase including unknown, missing and non-string phases carry the reason and cancel to idle; a version-1 file cannot forge the reason; the ordinary incomplete screen markup is byte-identical before and after. Non-blocking: the candidate's RA7 Rust test covers only requested and idle phases; the RA6 entry's behaviour sentence still says 'requested the reset', qualified by its RA7 note."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "da5t9n4v-verifier-3",
+  "verdict": "accept",
+  "digest": "sha256:17379d9b863e63d393fc791fa45749035a4cb0c097ac0ced7975b17002edced4",
+  "note": "Accept test intent. All 67 source references across the reset and merge changesets match the supplied agreed scenario/choice text. RA5-RA7 now use delegated-choice, agent choice labels and bounded design-delegation scope, rather than owner-adopted provenance. The new displayed-phase permission checks and protected Retry expectations follow RS4 and RA6/RA7; the before adapter faithfully exposes the previous restart-only Retry filesystem behavior without writes. All five new Rust checks executed and passed on 6617bfacd. Independent real-shell comparisons reproduce e4480da72 rejection of Cancel for requested/cancelled disk markers and missing Retry write/read errors; the candidate passes all 18 phase cases plus activation gating, including native restart, preserved shortcut-off choice and no deletion after Cancel. A SIGKILL about 1.4 ms after the new idle receipt survives restart. Existing expectations are retained; the prepared full Rust and frontend suites pass. This record accepts the test expectations and evidence, not untested Windows or power-loss behavior."
+}
+```
