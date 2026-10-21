@@ -42,6 +42,7 @@ export interface SettingsV2 {
     hasSeenTrustLoopNudge?: boolean | null;
     highContrast?: boolean | null;
     inspectorWidth?: number | null;
+    invalidExcludePatterns?: string[] | null;
     mode?: string | null;
     pauseIndexingDuringAi?: boolean | null;
     theme?: string | null;
@@ -84,6 +85,7 @@ export const settingsV2Schema = z.strictObject({
     "hasSeenTrustLoopNudge": z.boolean().nullable().optional(),
     "highContrast": z.boolean().nullable().optional(),
     "inspectorWidth": z.number().int().nullable().optional(),
+    "invalidExcludePatterns": z.array(z.string()).nullable().optional(),
     "mode": z.string().nullable().optional(),
     "pauseIndexingDuringAi": z.boolean().nullable().optional(),
     "theme": z.string().nullable().optional(),

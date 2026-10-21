@@ -503,6 +503,11 @@ public class LocalApiServer {
                         "errorCode",
                         ApiErrorCode.STORE_LOCKED.name())));
 
+    // Backup source/sink failures use the same unavailable state as the memory API.
+    app.exception(io.justsearch.agent.api.memory.MemoriesUnavailableException.class,
+        (e, ctx) -> ctx.status(503).json(Map.of(
+            "errorCode", ApiErrorCode.MEMORIES_UNAVAILABLE.name(), "error", e.getMessage(), "unavailable", true)));
+
     app.exception(io.justsearch.core.execution.EngineExecutorRejectedException.class,
         (failure, ctx) -> ApiErrorHandler.writeExecutorRefusal(ctx, failure, telemetry));
 

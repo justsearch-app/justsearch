@@ -10,6 +10,7 @@ import io.justsearch.app.services.encryption.DataKeyManager;
 import io.justsearch.app.services.encryption.EncryptionEnvelope;
 import io.justsearch.app.services.encryption.KeystoreRecord;
 import io.justsearch.app.services.encryption.WrongPassphraseException;
+import io.justsearch.configuration.persistence.StoreIds;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -125,11 +126,18 @@ final class ConversationBackupController {
 
     // 629 (#1/#E): restore via the ONE store list — each descriptor's sink, no per-store code here.
     Map<String, Object> summary = new LinkedHashMap<>();
+    int skipped = 0;
     for (StoreDescriptor d : headAssembly.authoredStores()) {
       List<Map<String, Object>> entries = sectionEntries(bundle.get(d.store().dirName()));
+      // Old backups can contain unaddressable session/run names. Do not replay those ids into
+      // the sinks' write APIs, or one stale entry would prevent every later valid restore.
+      int before = entries.size();
+      entries.removeIf(entry -> entry.containsKey("sessionId")
+          && (!(entry.get("sessionId") instanceof String id) || !StoreIds.isValid(id)));
+      skipped += before - entries.size();
       summary.put(d.store().dirName(), d.sink().restore(entries));
     }
-    ctx.json(Map.of("restored", summary));
+    ctx.json(skipped == 0 ? Map.of("restored", summary) : Map.of("restored", summary, "skipped", skipped));
   }
 
   /** A transient key-state wrapping the backup's own DEK, to open its sealed bundle. */
