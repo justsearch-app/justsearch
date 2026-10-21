@@ -218,3 +218,14 @@ describe('resolvePathLazy', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
+
+it('bounds the label cache over a long run, retaining recent Windows and UNC identities', async () => {
+  resetResolveCache();
+  for (let i = 0; i < 2000; i++) seedResolveCache('core.indexing-jobs', `hash-${i}`, `C:\\docs\\${i}.txt`);
+  seedResolveCache('core.indexing-jobs', 'unc', '\\\\server\\share\\file.txt');
+  expect(await resolvePathLazy('core.indexing-jobs', 'hash-1999')).toBe('C:\\docs\\1999.txt');
+  expect(await resolvePathLazy('core.indexing-jobs', 'unc')).toBe('\\\\server\\share\\file.txt');
+  // Oldest entries must have been evicted, so a definitive miss replaces the old path.
+  resetResourceCatalog();
+  expect(await resolvePathLazy('core.indexing-jobs', 'hash-0')).toBeNull();
+});

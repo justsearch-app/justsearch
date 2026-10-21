@@ -72,13 +72,19 @@ public final class HealthyFakeLlamaServer {
         ProcessHandle server = ownedHandle(line);
         if (server != null) {
           // Recheck the producer-recorded birth on the held handle immediately before termination.
-          if (!sameBirth(server, line)) throw new IOException("fake server identity changed");
-          server.destroyForcibly();
-          try {
-            server.onExit().get(5, TimeUnit.SECONDS);
-          } catch (Exception ignored) {
-            // A server that does not end is caught by the file-release check below.
+          if (!sameBirth(server, line)) {
+            // Exit can erase Info between acquiring this handle and rechecking its birth.
+            // Never signal an unreadable live identity; an exited or zombie handle needs no kill.
+            if (!server.isAlive() || (io.justsearch.configuration.PlatformPaths.isLinux()
+                && io.justsearch.app.api.runtime.child.LinuxProcessIdentity.observe(server.pid())
+                    .presence() == io.justsearch.app.api.runtime.child.ProcessTerminator.IdentityPresence.GONE))
+              continue;
+            throw new IOException("fake server identity changed");
           }
+          server.destroyForcibly();
+          if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(
+              List.of(server), java.time.Duration.ofSeconds(5)))
+            throw new IOException("fake server survived cleanup: " + server.pid());
         }
       }
     }
@@ -138,7 +144,9 @@ public final class HealthyFakeLlamaServer {
     }
     long pid = server.pid();
     server.destroyForcibly();
-    server.onExit().get(10, TimeUnit.SECONDS);
+    if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(
+        List.of(server), java.time.Duration.ofSeconds(10)))
+      throw new AssertionError("fake server survived crash: " + server.pid());
     return pid;
   }
 
@@ -175,7 +183,9 @@ public final class HealthyFakeLlamaServer {
   static void releaseLingerers(Path dir) throws Exception {
     if (!Files.isDirectory(dir)) return;
     Files.writeString(dir.resolve(LINGERER_EXIT), "exit", StandardCharsets.US_ASCII);
-    for (ProcessHandle lingerer : lingerers(dir)) lingerer.onExit().get(10, TimeUnit.SECONDS);
+    if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(
+        lingerers(dir), java.time.Duration.ofSeconds(10)))
+      throw new AssertionError("fake lingerer survived its exit signal");
   }
 
   /** The lingering process: records its identity, then waits for its exit signal. */
@@ -207,6 +217,8 @@ public final class HealthyFakeLlamaServer {
   }
 
   public static void main(String[] args) throws Exception {
+    // Capture the wrapper before publishing readiness; after its exit parent() can be PID 1.
+    ProcessHandle launcher = ProcessHandle.current().parent().orElse(null);
     String home = System.getProperty(HOME_PROPERTY);
     if (home != null) {
       var self = ProcessHandle.current();
@@ -220,7 +232,18 @@ public final class HealthyFakeLlamaServer {
           StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.CREATE,
           java.nio.file.StandardOpenOption.APPEND);
     }
+    if (behaviour.contains("--reject-reasoning") && List.of(args).contains("--reasoning-budget")) {
+      System.out.println("error while handling argument \"--reasoning-budget\": invalid stoi argument");
+      Thread.sleep(500);
+      System.exit(1);
+    }
     failLikeLlamaServerWhenAsked(behaviour, value(args, "-c", "4096"));
+    String apiKey = System.getenv("LLAMA_API_KEY");
+    if (behaviour.contains("--reject-api-key") && apiKey != null) {
+      System.out.println("LLAMA_API_KEY rejected by binary");
+      Thread.sleep(500);
+      System.exit(1);
+    }
     int port = Integer.parseInt(value(args, "--port", "-1"));
     String model = value(args, "-m", "model.gguf").replace('\\', '/');
     String window = value(args, "-c", "4096");
@@ -237,10 +260,11 @@ public final class HealthyFakeLlamaServer {
       exchange.getResponseBody().write(body);
       exchange.close();
     });
+    List<com.sun.net.httpserver.HttpContext> contexts = new ArrayList<>();
     var slots = new java.util.concurrent.Semaphore(Integer.parseInt(value(args, "-np", "1")));
     if (behaviour.contains("--single-slot-stream")) {
       server.setExecutor(command -> Thread.ofPlatform().daemon().start(command));
-      server.createContext("/v1/chat/completions", exchange -> {
+      contexts.add(server.createContext("/v1/chat/completions", exchange -> {
         exchange.getRequestBody().readAllBytes();
         boolean acquired = false;
         try {
@@ -258,9 +282,17 @@ public final class HealthyFakeLlamaServer {
         } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
         catch (IOException ended) { /* Client cancellation ends the exchange. */ }
         finally { exchange.close(); if (acquired) slots.release(); }
-      });
+      }));
+    } else {
+      contexts.add(server.createContext("/v1/chat/completions", exchange -> {
+        exchange.getRequestBody().readAllBytes();
+        byte[] body = "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}".getBytes(StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(200, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
+      }));
     }
-    server.createContext("/completion", exchange -> {
+    contexts.add(server.createContext("/completion", exchange -> {
       if (behaviour.contains("--single-slot-stream")) {
         Files.writeString(Path.of(home, "probe-attempts"), "probe\n", StandardCharsets.US_ASCII,
             java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
@@ -288,15 +320,46 @@ public final class HealthyFakeLlamaServer {
       exchange.getResponseBody().write(body);
       exchange.close();
       if (behaviour.contains("--single-slot-stream")) slots.release();
-    });
-    server.createContext("/props", exchange -> {
+    }));
+    contexts.add(server.createContext("/props", exchange -> {
       byte[] body = ("{\"model_path\":\"" + model + "\",\"n_ctx\":" + window + "}")
           .getBytes(StandardCharsets.UTF_8);
       exchange.getResponseHeaders().add("Content-Type", "application/json");
       exchange.sendResponseHeaders(200, body.length);
       exchange.getResponseBody().write(body);
       exchange.close();
-    });
+    }));
+    for (String path : List.of("/tokenize", "/apply-template")) {
+      contexts.add(server.createContext(path, exchange -> {
+        exchange.getRequestBody().readAllBytes();
+        byte[] body = (path.equals("/tokenize") ? "{\"tokens\":[1,2,3]}"
+            : "{\"prompt\":\"user: test\"}").getBytes(StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(200, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
+      }));
+    }
+    if (!behaviour.contains("--ignore-api-key")
+        && (behaviour.contains("--require-api-key") || apiKey != null)) {
+      String expected = apiKey == null ? "missing-engine-key" : apiKey;
+      for (var context : contexts) {
+        context.getFilters().add(new com.sun.net.httpserver.Filter() {
+          @Override public String description() { return "llama API authentication"; }
+          @Override public void doFilter(com.sun.net.httpserver.HttpExchange exchange,
+              Chain chain) throws IOException {
+            if (("Bearer " + expected).equals(
+                exchange.getRequestHeaders().getFirst("Authorization"))) {
+              chain.doFilter(exchange);
+            } else {
+              byte[] body = "Invalid API Key".getBytes(StandardCharsets.UTF_8);
+              exchange.sendResponseHeaders(401, body.length);
+              exchange.getResponseBody().write(body);
+              exchange.close();
+            }
+          }
+        });
+      }
+    }
     server.start();
     if (home != null && behaviour.contains("--spawn-lingerer")) {
       new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(), "-cp",
@@ -310,10 +373,10 @@ public final class HealthyFakeLlamaServer {
           StandardCharsets.US_ASCII, java.nio.file.StandardOpenOption.CREATE,
           java.nio.file.StandardOpenOption.APPEND);
     }
-    ProcessHandle launcher = ProcessHandle.current().parent().orElse(null);
     long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2);
     Path oomSignal = home == null ? null : Path.of(home, OOM_SIGNAL);
-    while (launcher != null && launcher.isAlive() && System.nanoTime() < deadline) {
+    while (launcher != null && (behaviour.contains("--ignore-parent") || launcher.isAlive())
+        && System.nanoTime() < deadline) {
       if (behaviour.contains("--oom-on-signal") && Files.deleteIfExists(oomSignal)) {
         // A KV or compute allocation that fails while serving, as b8571 reports it.
         System.out.println("CUDA error: out of memory");
@@ -405,6 +468,10 @@ public final class HealthyFakeLlamaServer {
         windows
             ? "@echo off\r\n\"" + java + "\" @\"" + argFile + "\" " + main + " %*\r\n"
             : "#!/bin/sh\nexec \"" + java + "\" @\"" + argFile + "\" " + main + " \"$@\"\n";
+    if (!windows && List.of(behaviour).contains("--wrapper")) {
+      body = "#!/bin/sh\n\"" + java + "\" @\"" + argFile + "\" " + main + " \"$@\" &\n"
+          + "server=$!\ntrap 'kill \"$server\" 2>/dev/null; wait \"$server\"' EXIT\nwait \"$server\"\n";
+    }
     Files.writeString(script, body, StandardCharsets.UTF_8);
     if (!script.toFile().setExecutable(true)) {
       throw new IOException("could not make " + script + " executable");

@@ -1,0 +1,34 @@
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java
+@@ -22,6 +22,10 @@
+  * <p>The production implementation is SQLite-backed; tests use scoped recording queues.
+  */
+ public interface JobQueue extends Closeable {
++  // Evidence-only API shape: use the pre-existing count answer; no indexed implementation added.
++  default boolean hasPendingIngestWork() { return jobStateCounts().pendingReadyCount() > 0; }
++  default boolean pollPendingBudgetExhausted() { return false; }
++
+ 
+   /**
+    * Batch-exit return of exact issued claims that have no pending commit owner. Implementations
+--- a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/IndexingJobsChangeStream.java
++++ b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/IndexingJobsChangeStream.java
+@@ -42,6 +42,8 @@
+  * <p>The wire {@link JobRow} carries a SHA-256 path hash, never a raw path (ADR-0028).
+  */
+ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Closeable {
++  static final String STATE_EXISTS_SQL = "SELECT 1 FROM jobs WHERE state=? LIMIT 1";
++
+ 
+   private static final Logger log = LoggerFactory.getLogger(IndexingJobsChangeStream.class);
+   private static final String JOBS_TABLE = "jobs";
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerIngestService.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerIngestService.java
+@@ -3235,6 +3235,7 @@
+           io.justsearch.ipc.IndexingJobsDelta.Builder deltaBuilder =
+               io.justsearch.ipc.IndexingJobsDelta.newBuilder();
+           switch (delta) {
++            case IndexingJobChangeFeed.Delta.Resync ignored -> {} // No baseline producer/handler.
+             case IndexingJobChangeFeed.Delta.Insert ins ->
+                 deltaBuilder.setInsert(toJobView(ins.row()));
+             case IndexingJobChangeFeed.Delta.Update upd ->

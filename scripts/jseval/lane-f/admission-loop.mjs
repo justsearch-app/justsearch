@@ -1026,20 +1026,16 @@ async function liveConnection(directory, baseUrl, tokenFile, partialArm, capture
       token = fs.readFileSync(tokenFile, 'utf8').trim();
       if (!token) throw new Error('EMPTY_TOKEN_FILE');
     } else {
-      const response = await fetch(`${normalizedBase}/api/mcp/token`, {
-        signal: AbortSignal.timeout(ARM_TIMEOUT_MS),
-      });
-      if (!response.ok) throw new Error('TOKEN_ENDPOINT_HTTP_FAILURE');
-      const bytes = await readBoundedBytes(response.body);
-      try {
-        const value = JSON.parse(new TextDecoder().decode(bytes))?.token;
-        if (typeof value !== 'string') throw new Error('TOKEN_ENDPOINT_INVALID');
-        token = value;
-      } catch (error) {
-        if (error?.message === 'TOKEN_ENDPOINT_INVALID') throw error;
-        throw new Error('TOKEN_ENDPOINT_INVALID');
-      }
+      token = process.env.JUSTSEARCH_SESSION_TOKEN?.trim();
+      if (token === undefined) throw new Error('Provide --token-file (canonical runtime manifest) or JUSTSEARCH_SESSION_TOKEN');
     }
+    if (token.startsWith('{')) {
+      const manifest = JSON.parse(token);
+      if (!manifest.head || typeof manifest.head !== 'object') throw new Error('INVALID_TOKEN_FILE');
+      token = manifest.head.sessionToken ?? '';
+      if (typeof token !== 'string') throw new Error('INVALID_TOKEN_FILE');
+    }
+
   } catch (error) {
     const code = setupFailure(error);
     writeCapture(directory, {
@@ -1104,9 +1100,9 @@ function readCapture(directory, name) {
 }
 
 // Sequential stage E traffic reuses this instrument's wire decoding and timings.
-export async function captureWorkload(directory, baseUrl, stopFile, endAtMs) {
+export async function captureWorkload(directory, baseUrl, stopFile, endAtMs, tokenFile) {
   if (endAtMs !== undefined && (!Number.isFinite(endAtMs) || endAtMs <= Date.now())) throw new Error('Invalid workload deadline');
-  const connection = await liveConnection(directory, baseUrl, undefined, 'workload');
+  const connection = await liveConnection(directory, baseUrl, tokenFile, 'workload');
   const start = process.hrtime.bigint();
   const deadline = endAtMs ?? Date.now() + 55 * 60 * 1000;
   const capture = { arm: 'workload', captureKind: 'stage-e-workload', requests: [] };
@@ -1170,7 +1166,7 @@ async function main() {
     const options = captureOptions(process.argv.slice(2), '--capture-workload');
     if (!options['--stop-file']) throw new Error('--stop-file required');
     await captureWorkload(options['--capture-workload'], options['--base-url'], options['--stop-file'],
-      options['--end-at-ms'] === undefined ? undefined : Number(options['--end-at-ms']));
+      options['--end-at-ms'] === undefined ? undefined : Number(options['--end-at-ms']), options['--token-file']);
     return;
   }
   if (process.argv.length === 3 && process.argv[2] === '--self-test') {

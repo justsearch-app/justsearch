@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.ipc.IndexingJobView;
+import io.justsearch.ipc.IndexingJobStatePresence;
 import io.justsearch.ipc.IndexingJobsDelta;
 import io.justsearch.ipc.IndexingJobsFrame;
 import io.justsearch.ipc.IndexingJobsSnapshot;
@@ -49,8 +50,9 @@ class StatusStateProducersTest {
     var sink = new AtomicReference<Consumer<IndexingJobsFrame>>();
     IndexingJobsSource source = (onFrame, onError, onCompleted) -> {
       sink.set(onFrame);
-      onFrame.accept(IndexingJobsFrame.newBuilder().setSeq(1L).setSnapshot(IndexingJobsSnapshot
-          .newBuilder().addItems(job("first", "PENDING", 1000L)).build()).build());
+      onFrame.accept(IndexingJobsFrame.newBuilder().setSeq(1L)
+          .setSnapshot(IndexingJobsSnapshot.getDefaultInstance())
+          .setStatePresence(IndexingJobStatePresence.newBuilder().addStates("PENDING")).build());
       return () -> {};
     };
     try (var executors = new TestEngineExecutors()) {
@@ -58,18 +60,21 @@ class StatusStateProducersTest {
       try {
         bridge.start().get(2, TimeUnit.SECONDS);
         long before = statusCounter();
-        Consumer<IndexingJobsDelta> delta = new Consumer<>() {
+        java.util.function.BiConsumer<IndexingJobsDelta, IndexingJobStatePresence> delta = new java.util.function.BiConsumer<>() {
           long seq = 1L;
-          @Override public void accept(IndexingJobsDelta d) {
-            sink.get().accept(IndexingJobsFrame.newBuilder().setSeq(++seq).setDelta(d).build());
+          @Override public void accept(IndexingJobsDelta d, IndexingJobStatePresence states) {
+            var frame = IndexingJobsFrame.newBuilder().setSeq(++seq).setDelta(d);
+            if (states != null) frame.setStatePresence(states);
+            sink.get().accept(frame.build());
           }
         };
-        delta.accept(IndexingJobsDelta.newBuilder().setUpdate(job("second", "PENDING", 1001L)).build());
-        delta.accept(IndexingJobsDelta.newBuilder().setUpdate(job("third", "PENDING", 1002L)).build());
-        delta.accept(IndexingJobsDelta.newBuilder().setDeletePathHash("second").build());
+        delta.accept(IndexingJobsDelta.newBuilder().setUpdate(job("second", "PENDING", 1001L)).build(), null);
+        delta.accept(IndexingJobsDelta.newBuilder().setUpdate(job("third", "PENDING", 1002L)).build(), null);
+        delta.accept(IndexingJobsDelta.newBuilder().setDeletePathHash("second").build(), null);
         assertEquals(before, statusCounter(),
             "more or fewer queued jobs in the same states is a measurement, not a state change");
-        delta.accept(IndexingJobsDelta.newBuilder().setUpdate(job("first", "PROCESSING", 2000L)).build());
+        delta.accept(IndexingJobsDelta.newBuilder().setUpdate(job("first", "PROCESSING", 2000L)).build(),
+            IndexingJobStatePresence.newBuilder().addAllStates(List.of("PENDING", "PROCESSING")).build());
         assertEquals(before + 1, statusCounter(), "a job state appearing is a state change");
       } finally {
         bridge.stop();

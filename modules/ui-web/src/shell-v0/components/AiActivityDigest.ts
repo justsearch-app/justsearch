@@ -110,12 +110,13 @@ export class AiActivityDigest extends JfElement {
     // The ONE live read path (same as ActionLedgerView): the stream delivers the snapshot frame +
     // every subsequent row, re-folding the FE Effect Journal each change — so the digest's count is
     // a projection of the same unified log the timeline renders (550 thesis I / 577 #20). This is
-    // ALWAYS-MOUNTED chrome, so it degrades when EventSource is unavailable (non-browser test env /
+    // ALWAYS-MOUNTED chrome, so it degrades when fetch is unavailable (non-browser test env /
     // SSR) exactly as startEffectIngest guards a missing fetch — the digest just stays empty.
     const canStream =
       this.multiplex !== undefined ||
       this.eventSourceFactory !== undefined ||
-      typeof EventSource !== 'undefined';
+      // eslint-disable-next-line no-restricted-globals -- Availability probe; requests use authorizedFetch.
+      typeof fetch !== 'undefined';
     this.stopStream = canStream
       ? openActionLedgerStream({
           apiBase: this.apiBase,

@@ -196,13 +196,20 @@ final class ChatJobAccountingTest {
     ProcessHandle observed = Mockito.mock(ProcessHandle.class);
     ProcessHandle late = Mockito.mock(ProcessHandle.class);
     Mockito.when(late.isAlive()).thenReturn(true);
-    Mockito.when(observed.isAlive()).thenAnswer(invocation -> !drained.get());
-    Mockito.when(observed.onExit()).thenAnswer(invocation -> {
-      drained.set(true);
-      return CompletableFuture.completedFuture(observed);
-    });
-    ChildHandle candidate = Mockito.mock(ChildHandle.class);
     var exit = new CompletableFuture<ExitOutcome>();
+    var observedExit = new CompletableFuture<ProcessHandle>();
+    Mockito.when(observed.isAlive()).thenAnswer(invocation -> {
+      boolean alive = !drained.get();
+      // The member exits after the post-stop snapshot, on its first liveness observation.
+      // Its exit does not depend on subscribing to onExit (Linux can poll zombie state instead).
+      if (exit.isDone()) {
+        drained.set(true);
+        observedExit.complete(observed);
+      }
+      return alive;
+    });
+    Mockito.when(observed.onExit()).thenReturn(observedExit);
+    ChildHandle candidate = Mockito.mock(ChildHandle.class);
     Mockito.when(candidate.exit()).thenReturn(exit);
     Mockito.when(candidate.descendants()).thenAnswer(invocation ->
         drained.get() ? List.of(late) : List.of(observed));

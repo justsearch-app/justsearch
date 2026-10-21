@@ -220,7 +220,7 @@ final class ChatResidencyRoutesTest {
     HttpClient http = mock(HttpClient.class);
     // An unloaded server is not listening: reaching it would be a refused connection.
     when(http.send(any(), any())).thenThrow(new java.net.ConnectException("Connection refused"));
-    var proxy = new OpenAiCompatController(http, () -> 8081, null);
+    var proxy = new OpenAiCompatController(http, () -> new io.justsearch.app.inference.LlamaServerEndpoint(8081, null), null);
     proxy.setResidencyGate(routes.gate());
     var exchange = new Exchange("/v1/chat/completions", "{}", null);
 

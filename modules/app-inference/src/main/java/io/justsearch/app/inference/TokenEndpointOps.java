@@ -36,7 +36,7 @@ final class TokenEndpointOps {
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
   private final Supplier<Mode> currentMode;
-  private final Supplier<Integer> serverPort;
+  private final Supplier<LlamaServerEndpoint> serverEndpoint;
 
   /**
    * Spec A §5.2: the AUX lease every exchange holds, from the lifecycle manager's generation
@@ -54,12 +54,12 @@ final class TokenEndpointOps {
       HttpClient httpClient,
       ObjectMapper objectMapper,
       Supplier<Mode> currentMode,
-      Supplier<Integer> serverPort,
+      Supplier<LlamaServerEndpoint> serverEndpoint,
       Supplier<GenerationLease> auxAdmission) {
     this.httpClient = httpClient;
     this.objectMapper = objectMapper;
     this.currentMode = currentMode;
-    this.serverPort = serverPort;
+    this.serverEndpoint = serverEndpoint;
     this.auxAdmission = java.util.Objects.requireNonNull(auxAdmission, "auxAdmission");
   }
 
@@ -98,7 +98,7 @@ final class TokenEndpointOps {
       String json = objectMapper.writeValueAsString(body);
 
       HttpRequest request =
-          buildJsonPostRequest(lease, serverPort.get(), PATH_TOKENIZE, json, ENDPOINT_TIMEOUT);
+          buildJsonPostRequest(lease, serverEndpoint.get(), PATH_TOKENIZE, json, ENDPOINT_TIMEOUT);
 
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -159,7 +159,7 @@ final class TokenEndpointOps {
       String json = objectMapper.writeValueAsString(buildApplyTemplateBody(messages, tools));
 
       HttpRequest request = buildJsonPostRequest(
-          lease, serverPort.get(), PATH_APPLY_TEMPLATE, json, ENDPOINT_TIMEOUT);
+          lease, serverEndpoint.get(), PATH_APPLY_TEMPLATE, json, ENDPOINT_TIMEOUT);
 
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -251,7 +251,7 @@ final class TokenEndpointOps {
     try {
       HttpRequest request =
           buildJsonPostRequest(
-              lease, serverPort.get(), PATH_TOKENIZE, "{\"content\":\"test\"}", PROBE_TIMEOUT);
+              lease, serverEndpoint.get(), PATH_TOKENIZE, "{\"content\":\"test\"}", PROBE_TIMEOUT);
 
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -299,7 +299,7 @@ final class TokenEndpointOps {
       String json = objectMapper.writeValueAsString(body);
 
       HttpRequest request =
-          buildJsonPostRequest(lease, serverPort.get(), PATH_APPLY_TEMPLATE, json, PROBE_TIMEOUT);
+          buildJsonPostRequest(lease, serverEndpoint.get(), PATH_APPLY_TEMPLATE, json, PROBE_TIMEOUT);
 
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());

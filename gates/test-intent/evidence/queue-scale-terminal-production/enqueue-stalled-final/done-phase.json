@@ -1,0 +1,10 @@
+{
+  "donePhaseOverflows": 3,
+  "convergence": {
+    "secondsSinceLastObservedDbChange": 0.0062090400024317205,
+    "expected": {},
+    "observed": {},
+    "snapshotSeq": 74686,
+    "match": true
+  }
+}

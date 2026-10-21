@@ -138,6 +138,12 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
     }
     this.dataDir = dataDir;
     this.runtimeDir = dataDir.resolve("runtime");
+    try {
+      Files.createDirectories(dataDir);
+      io.justsearch.configuration.persistence.OwnerOnlyDirectory.ensureOwnerOnlyDirectory(runtimeDir);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Cannot prepare runtime directory", e);
+    }
     this.manifestPath = runtimeDir.resolve(MANIFEST_FILENAME);
     this.instanceId = UUID.randomUUID().toString();
     // Tempdoc 501 §3.7: per-instance history mirroring tmp/dev-runner/runs/
@@ -293,6 +299,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
    */
   private void appendStartLog(String message) {
     try {
+      io.justsearch.configuration.persistence.OwnerOnlyDirectory.ensureOwnerOnlyDirectory(runtimeDir);
       Files.createDirectories(historyDir);
       Path startLog = historyDir.resolve(START_LOG_FILENAME);
       String line = Instant.now() + " " + message + "\n";
@@ -427,7 +434,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
   private synchronized RuntimeManifest publishOwnershipSeedLocked(List<ManagedChild> children)
       throws IOException {
     if (current.get() != null) throw new IllegalStateException("ownership seed already published");
-    Files.createDirectories(runtimeDir);
+    io.justsearch.configuration.persistence.OwnerOnlyDirectory.ensureOwnerOnlyDirectory(runtimeDir);
     RuntimeManifest manifest =
         RuntimeManifestBuilder.builder()
             .schemaVersion(RuntimeManifest.CURRENT_SCHEMA_VERSION)
@@ -466,7 +473,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
       previous = publishOwnershipSeedLocked(children);
     }
     if (previous.head().apiPort() != null) throw new IllegalStateException("publishHead called twice");
-    Files.createDirectories(runtimeDir);
+    io.justsearch.configuration.persistence.OwnerOnlyDirectory.ensureOwnerOnlyDirectory(runtimeDir);
 
     String apiBaseUrl = "http://127.0.0.1:" + apiPort;
     String readyAt = Instant.now().toString();
@@ -954,7 +961,8 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
     String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(manifest);
     // Canonical last-writer-wins path.
     Path tmp = manifestPath.resolveSibling(MANIFEST_FILENAME + ".tmp");
-    Files.writeString(tmp, json + "\n", StandardCharsets.UTF_8);
+    OwnerOnlyFile.createFresh(tmp);
+    Files.writeString(tmp, json + "\n", StandardCharsets.UTF_8, StandardOpenOption.WRITE);
     try {
       Files.move(tmp, manifestPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
     } catch (IOException atomicFailed) {
@@ -973,13 +981,18 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
     // Both writes best-effort: filesystem failures here do not block the
     // canonical manifest write.
     try {
+      io.justsearch.configuration.persistence.OwnerOnlyDirectory.ensureOwnerOnlyDirectory(runtimeDir);
       Files.createDirectories(historyDir);
       Path histPath = historyDir.resolve(MANIFEST_FILENAME);
-      Files.writeString(histPath, json + "\n", StandardCharsets.UTF_8);
+      // History retains ownership/shutdown evidence, but never the boot credential.
+      RuntimeManifest history = manifest.head() == null ? manifest
+          : RuntimeManifestBuilder.builder(manifest).head(manifest.head().publicProjection()).build();
+      String historyJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(history);
+      Files.writeString(histPath, historyJson + "\n", StandardCharsets.UTF_8);
       Path logPath = historyDir.resolve(INSTANCE_LOG_FILENAME);
       // ndjson: pretty-printed JSON would break the one-object-per-line
       // invariant; use the compact writer here.
-      String compact = mapper.writeValueAsString(manifest);
+      String compact = mapper.writeValueAsString(history);
       Files.writeString(
           logPath,
           compact + "\n",

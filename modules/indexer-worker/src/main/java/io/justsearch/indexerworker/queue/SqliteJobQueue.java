@@ -75,7 +75,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
    * VISIBLE terminal state, distinct from {@code FAILED} (which means "this file cannot be
    * parsed"): {@code RETRY_EXHAUSTED} means "we kept trying for a week and never got to read it".
    * Reset by anything that re-enqueues the path (a rescan, a watcher event on an mtime/size
-   * change), because the enqueue statement is {@code INSERT OR REPLACE}.
+   * change), because re-admission resets the prior retry run.
    */
   static final String STATE_RETRY_EXHAUSTED = "RETRY_EXHAUSTED";
 
@@ -135,6 +135,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         return null;
       });
       issued.forEach(this::releaseClaim);
+      // Returning an obsolete owner can also expose its already-PENDING replacement.
+      if (!issued.isEmpty()) {
+        claimCursor = null;
+        claimOrderVersion++;
+      }
     } catch (SQLException failure) {
       throw new OutcomeWriteException("Could not return unfinished processing claims", failure);
     } finally {
@@ -472,6 +477,25 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   // Only live processing capabilities: object identity prevents an older commit from finishing
   // a replacement claim for the same path. Dead JVMs cannot deliver callbacks after restart.
   private final Map<String, IndexJob> activeClaims = new HashMap<>();
+  static final int CLAIM_SKIP_BUDGET = 256;
+  private volatile boolean claimBudgetExhausted;
+  private ClaimKey claimCursor;
+  private long claimOrderVersion;
+  private long claimWalkVersion;
+  private Long claimRetryDeadline;
+
+  private record ClaimKey(long updated, String path) implements Comparable<ClaimKey> {
+    @Override public int compareTo(ClaimKey other) {
+      int time = Long.compare(updated,other.updated);
+      return time != 0 ? time : java.util.Arrays.compareUnsigned(
+          path.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+          other.path.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+  }
+
+  private record ClaimCandidate(ClaimKey key, String collection, String originator, String transport,
+      String scanId, String revision, Long walkEpoch, String plannedHash, String ingestionRoot) {}
+
   private boolean existedBeforeOpen;
   private boolean forceIntegrityCheck;
 
@@ -664,6 +688,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         stmt.execute("PRAGMA busy_timeout = " + BUSY_TIMEOUT_MS);
         stmt.execute("PRAGMA journal_mode = WAL");
         stmt.execute("PRAGMA synchronous = NORMAL");
+        // REPLACE must fire the implicit DELETE's count triggers, including for plain SQL.
+        stmt.execute("PRAGMA recursive_triggers = ON");
         // Enable incremental auto-vacuum. On new databases this takes effect immediately.
         // On existing databases with auto_vacuum=0, this has no effect until a full VACUUM.
         stmt.execute("PRAGMA auto_vacuum = 2");
@@ -674,10 +700,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // Run integrity check on existing databases (throws SQLException on corruption)
       performIntegrityCheck();
 
-      // Slice 445: attach change-stream after schema is up so the rowId cache
-      // sees the post-migration row set.
+      claimCursor = null;
+      claimBudgetExhausted = false;
+      // Attach the bounded change stream after the schema is ready.
       changeStream = new IndexingJobsChangeStream(connection, lock, this::ensureOpen);
       walkChanges = new SqliteRecordedWalkChanges(connection);
+      installClaimCursorInvalidation();
 
       log.info("SqliteJobQueue opened: {}", dbPath);
     } catch (SQLException | IOException | RuntimeException | Error failure) {
@@ -1033,7 +1061,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   /**
    * Tempdoc 813 Slice B: the single write path for the jobs table. {@code size_bytes} is listed in
-   * the INSERT precisely because the statement is {@code INSERT OR REPLACE} — an unlisted column
+   * the INSERT precisely because re-admission explicitly resets prior fields — an unlisted column
    * would be reset to its default on every re-enqueue of an already-queued path, so the caller's
    * entry is the sole authority for the recorded size (a re-enqueue restates it, including
    * restating it as unknown). Tempdoc 812 D2 puts {@code scan_id} on the same footing for the same
@@ -1069,11 +1097,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     try {
       ensureOpen();
 
-      // Tempdoc 885 item 21b: the unlisted columns are the reset. INSERT OR REPLACE restores every
-      // column not named here to its default, so re-enqueueing a path clears attempts, retry_after,
+      // Tempdoc 885 item 21b: the UPSERT explicitly restores the former REPLACE defaults, so re-enqueueing a path clears attempts, retry_after,
       // error_message, the last-outcome columns AND first_failed_at — which is exactly what makes a
       // rescan (or a watcher event on an mtime/size change) revive a RETRY_EXHAUSTED row with a
-      // fresh retry window, with no separate "reset" statement to keep in sync.
+      // fresh retry window. The shared conflict clause lists every reset field.
       //
       // Tempdoc 941 round 19 (F2): collection and scan_id are the two columns that must NOT ride
       // that reset, so each is carried through the row's own prior value when the caller states
@@ -1112,7 +1139,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       boolean exactCollection, String unitRevision)
       throws SQLException {
     String sql = """
-        INSERT OR REPLACE INTO jobs
+        INSERT INTO jobs
           (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root)
         VALUES (
           ?, 'PENDING', 0, ?,
@@ -1123,7 +1150,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
           COALESCE(?, lower(hex(randomblob(16)))), ?, ?,
           COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)))
-        """;
+        """ + SqliteSchema.REENQUEUE_JOB_ON_CONFLICT;
     int accepted = 0;
     try (PreparedStatement stmt = connection.prepareStatement(sql)) {
       for (JobQueue.EnqueueEntry entry : entries) {
@@ -1566,7 +1593,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   /**
    * Tempdoc 885 §UD open item 1: the re-enqueue and the state read share ONE transaction, because
-   * {@code INSERT OR REPLACE} destroys the state being reported. A read before the call would race
+   * re-admission resets the state being reported. A read before the call would race
    * the indexing loop claiming the same row.
    */
   @Override
@@ -1602,7 +1629,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             // Same-admission failure/recovery updates preserve the existing revision.
             String sql =
                 """
-                INSERT OR REPLACE INTO jobs
+                INSERT INTO jobs
                   (path, state, attempts, last_updated, collection, size_bytes, scan_id,
                    originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root)
                 VALUES (?, 'PENDING', 0, ?,
@@ -1612,7 +1639,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                   COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
                   lower(hex(randomblob(16))), ?, ?,
                   COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)))
-                """;
+                """ + SqliteSchema.REENQUEUE_JOB_ON_CONFLICT;
             int accepted;
             try (PreparedStatement write = connection.prepareStatement(sql)) {
               write.setString(1, normalizedPath);
@@ -1654,13 +1681,137 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override
+  public boolean hasPendingIngestWork() {
+    lock.lock();
+    try {
+      ensureOpen();
+      try (var query = connection.prepareStatement("""
+          SELECT EXISTS(SELECT 1 FROM jobs WHERE state='PENDING' AND retry_after IS NULL)
+            OR EXISTS(SELECT 1 FROM jobs WHERE state='PENDING' AND retry_after<=?)
+          """)) {
+        query.setLong(1,System.currentTimeMillis());
+        try (var row = query.executeQuery()) { return row.next() && row.getBoolean(1); }
+      }
+    } catch (SQLException failure) {
+      recordDbError();
+      log.debug("Pending-ingest readiness unavailable", failure);
+      return false;
+    } finally { lock.unlock(); }
+  }
+
+  @Override
+  public boolean pollPendingBudgetExhausted() { return claimBudgetExhausted; }
+
+  private boolean pendingWalkAllowsClaim(ClaimCandidate candidate, Map<String,Boolean> claimableWalks) throws SQLException {
+    if (candidate.walkEpoch() == null) return true;
+    Boolean cached=claimableWalks.get(candidate.scanId());
+    if(cached!=null)return cached;
+    try (var query = connection.prepareStatement("""
+        SELECT 1 FROM ingestion_walk_progress WHERE operation_key=? AND sealed_at IS NULL
+          AND (enumeration_outcome IS NULL OR enumeration_outcome='COMPLETE')
+          AND (captured_plan=0 OR (enumeration_outcome='COMPLETE' AND manifest_sha256 IS NOT NULL))
+        """)) {
+      query.setString(1,candidate.scanId());
+      try (var row = query.executeQuery()) {
+        boolean allowed=row.next();
+        claimableWalks.put(candidate.scanId(),allowed);
+        return allowed;
+      }
+    }
+  }
+
+  private List<ClaimCandidate> claimCandidates(boolean retryDue, long now, int budget, ClaimKey after) throws SQLException {
+    // Avoid walking future retries in age order when none are due. This seek uses the
+    // deadline index; the candidate walk below uses a covering, age-ordered index.
+    if (retryDue) {
+      try (var exists = connection.prepareStatement(
+          "SELECT 1 FROM jobs INDEXED BY idx_jobs_state_retry WHERE state='PENDING' AND retry_after<=? LIMIT 1")) {
+        exists.setLong(1, now);
+        try (var row = exists.executeQuery()) {
+          if (!row.next()) return List.of();
+        }
+      }
+    }
+    String sql = "SELECT path,last_updated,collection,originator,transport,scan_id,unit_revision,"
+        + "walk_seen_epoch,planned_source_sha256,ingestion_root FROM jobs INDEXED BY "
+        + (retryDue ? "idx_jobs_pending_retry" : "idx_jobs_pending_ready")
+        + " WHERE state='PENDING' AND " + (retryDue ? "retry_after<=?" : "retry_after IS NULL")
+        + (after == null ? " AND last_updated>=?" : " AND (last_updated,path)>(?,?)")
+        + " ORDER BY last_updated,path LIMIT ?";
+    var candidates = new ArrayList<ClaimCandidate>();
+    try (var query = connection.prepareStatement(sql)) {
+      int parameter = 1;
+      if (retryDue) query.setLong(parameter++,now);
+      if (after != null) {
+        query.setLong(parameter++,after.updated()); query.setString(parameter++,after.path());
+      } else query.setLong(parameter++,Long.MIN_VALUE);
+      query.setInt(parameter,budget);
+      try (var row = query.executeQuery()) {
+        while (row.next()) {
+          long epoch = row.getLong(8); Long walkEpoch = row.wasNull() ? null : epoch;
+          candidates.add(new ClaimCandidate(new ClaimKey(row.getLong(2),row.getString(1)),
+              row.getString(3),row.getString(4),row.getString(5),row.getString(6),row.getString(7),
+              walkEpoch,row.getString(9),row.getString(10)));
+        }
+      }
+    }
+    return candidates;
+  }
+
+  /** Observe every admission/retry write, including SQL helpers, without retaining job identities. */
+  private void installClaimCursorInvalidation() throws SQLException {
+    org.sqlite.Function.create(connection, "jobs_claim_order_changed", new org.sqlite.Function() {
+      @Override protected void xFunc() throws SQLException {
+        claimOrderVersion++;
+        if (claimCursor != null && new ClaimKey(value_long(0), value_text(1)).compareTo(claimCursor) <= 0) {
+          claimCursor = null;
+        }
+        result();
+      }
+    });
+    try (var stmt = connection.createStatement()) {
+      stmt.execute("""
+          CREATE TEMP TRIGGER jobs_claim_insert AFTER INSERT ON main.jobs
+          WHEN NEW.state='PENDING'
+          BEGIN SELECT jobs_claim_order_changed(NEW.last_updated,NEW.path); END
+          """);
+      stmt.execute("""
+          CREATE TEMP TRIGGER jobs_claim_update AFTER UPDATE ON main.jobs
+          WHEN NEW.state='PENDING' AND (OLD.state IS NOT NEW.state OR OLD.last_updated IS NOT NEW.last_updated
+            OR OLD.path IS NOT NEW.path OR OLD.retry_after IS NOT NEW.retry_after OR OLD.scan_id IS NOT NEW.scan_id
+            OR OLD.walk_seen_epoch IS NOT NEW.walk_seen_epoch OR OLD.unit_revision IS NOT NEW.unit_revision
+            OR OLD.planned_source_sha256 IS NOT NEW.planned_source_sha256)
+          BEGIN SELECT jobs_claim_order_changed(NEW.last_updated,NEW.path); END
+          """);
+    }
+  }
+
+  @Override
   public List<IndexJob> pollPending(int limit) {
+    claimBudgetExhausted = false;
     if (limit <= 0) return List.of();
     lockTimed();
     try {
       ensureOpen();
 
       long now = System.currentTimeMillis();
+      if (claimRetryDeadline != null && claimRetryDeadline <= now) claimCursor = null;
+      try (var deadline = connection.prepareStatement(
+          "SELECT MIN(retry_after) FROM jobs WHERE state='PENDING' AND retry_after>?")) {
+        deadline.setLong(1,now);
+        try (var row = deadline.executeQuery()) {
+          if (row.next()) {
+            long value = row.getLong(1); claimRetryDeadline = row.wasNull() ? null : value;
+          }
+        }
+      }
+      if (walkChanges != null && claimWalkVersion != walkChanges.changeVersion()) {
+        claimCursor = null;
+        claimWalkVersion = walkChanges.changeVersion();
+      }
+      var nextCursor = new ClaimKey[1];
+      var budgetStopped = new boolean[1];
+      long orderVersion = claimOrderVersion;
 
       // Local carrier for a candidate row selected before any mutation happens.
       record ClaimedRow(String path, String collection, JobQueue.EnqueueProvenance provenance,
@@ -1683,37 +1834,60 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       List<IndexJob> result =
           inTransaction(
               () -> {
-                String selectSql = """
-                    SELECT path, collection, originator, transport, scan_id, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root FROM jobs
-                    WHERE state = 'PENDING' AND (retry_after IS NULL OR retry_after <= ?)
-                      AND (walk_seen_epoch IS NULL OR EXISTS (
-                        SELECT 1 FROM ingestion_walk_progress p WHERE p.operation_key = jobs.scan_id
-                        AND p.sealed_at IS NULL AND (p.enumeration_outcome IS NULL OR p.enumeration_outcome = 'COMPLETE')
-                        AND (p.captured_plan = 0 OR (p.enumeration_outcome = 'COMPLETE' AND p.manifest_sha256 IS NOT NULL))))
-                    ORDER BY last_updated ASC, path ASC
-                    """;
-
+                int budget = (int) Math.min(Integer.MAX_VALUE - 1L, (long) limit + CLAIM_SKIP_BUDGET);
+                // The common case needs only the requested batch plus one lookahead row.
+                // Expand to the remaining skip budget only when a denied source runs out;
+                // fetching full metadata for 273 rows on every 16-row poll wastes read work.
+                int sourceCap = (int) Math.min((long) limit + 1, (long) budget + 1);
+                var ready = claimCandidates(false,now,sourceCap,claimCursor);
+                var due = claimCandidates(true,now,sourceCap,claimCursor);
+                int r = 0, d = 0, visited = 0;
+                // Many denied candidates share one walk. Cache only its SQL precondition,
+                // for this bounded poll; authority decisions below are always checked per row.
+                var claimableWalks=new HashMap<String,Boolean>();
+                long checkedWalkVersion=walkChanges==null?0:walkChanges.changeVersion();
                 List<ClaimedRow> claimedRows = new ArrayList<>();
-                try (PreparedStatement selectStmt = connection.prepareStatement(selectSql)) {
-                  selectStmt.setLong(1, now);
-                  try (ResultSet rs = selectStmt.executeQuery()) {
-                    // Filter live issued paths before applying the batch limit. A replaced oldest
-                    // row must neither acquire a second owner nor starve unrelated eligible work.
-                    while (claimedRows.size() < limit && rs.next()) {
-                      if (activeClaims.containsKey(rs.getString(1))) continue;
-                      long epochValue = rs.getLong(7);
-                      Long walkEpoch = rs.wasNull() ? null : epochValue;
-                      var decision = recordedClaimDecision(rs.getString(5), walkEpoch, rs.getString(8));
-                      if (decision == RecordedClaimDecision.DENY) continue;
-                      String originator = rs.getString(3);
-                      String transport = rs.getString(4);
-                      claimedRows.add(new ClaimedRow(rs.getString(1), rs.getString(2),
-                          originator == null && transport == null ? null
-                              : new JobQueue.EnqueueProvenance(originator, transport),
-                          rs.getString(5), rs.getString(6), walkEpoch, decision, rs.getString(8), rs.getString(9)));
-                    }
+                while (claimedRows.size() < limit && visited < budget) {
+                  // Re-read both sources after the last merged key before choosing again:
+                  // the exhausted source's next row may precede the other source's lookahead.
+                  if ((r == ready.size() && ready.size() == sourceCap)
+                      || (d == due.size() && due.size() == sourceCap)) {
+                    sourceCap = budget - visited + 1;
+                    ready = claimCandidates(false,now,sourceCap,nextCursor[0]);
+                    due = claimCandidates(true,now,sourceCap,nextCursor[0]);
+                    r = 0; d = 0;
                   }
+                  if (r == ready.size() && d == due.size()) break;
+                  ClaimCandidate row;
+                  if (d == due.size() || (r < ready.size()
+                      && ready.get(r).key().compareTo(due.get(d).key()) <= 0)) {
+                    row = ready.get(r);
+                    r++;
+                  } else {
+                    row = due.get(d);
+                    d++;
+                  }
+                  visited++;
+                  nextCursor[0] = row.key();
+                  long walkVersion=walkChanges==null?0:walkChanges.changeVersion();
+                  if(walkVersion!=checkedWalkVersion) {
+                    // A reentrant authority callback may have changed progress under this lock.
+                    claimableWalks.clear();
+                    checkedWalkVersion=walkVersion;
+                  }
+                  if (activeClaims.containsKey(row.key().path()) || !pendingWalkAllowsClaim(row,claimableWalks)) continue;
+                  var decision = recordedClaimDecision(row.scanId(), row.walkEpoch(), row.plannedHash());
+                  if (decision == RecordedClaimDecision.DENY) continue;
+                  claimedRows.add(new ClaimedRow(row.key().path(), row.collection(),
+                      row.originator() == null && row.transport() == null ? null
+                          : new JobQueue.EnqueueProvenance(row.originator(),row.transport()),
+                      row.scanId(),row.revision(),row.walkEpoch(),decision,row.plannedHash(),row.ingestionRoot()));
                 }
+                boolean more = r < ready.size() || d < due.size()
+                    || ready.size() == sourceCap || due.size() == sourceCap;
+                budgetStopped[0] = visited == budget && claimedRows.size() < limit && more;
+                // Preserve the cursor across full batches too, so a denied prefix is paid only once.
+                if (!more) nextCursor[0] = null;
 
                 if (claimedRows.isEmpty()) {
                   return List.<IndexJob>of();
@@ -1734,7 +1908,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 // not silently regress into re-claiming (and thus double-processing) a row a
                 // concurrent claim already moved to PROCESSING/DONE/FAILED.
                 String updateSql =
-                    "UPDATE jobs SET state = 'PROCESSING', last_updated = ? WHERE state = 'PENDING' AND path IN ("
+                    "UPDATE jobs INDEXED BY sqlite_autoindex_jobs_1 SET state = 'PROCESSING', last_updated = ? WHERE state = 'PENDING' AND path IN ("
                         + placeholders
                         + ")";
                 try (PreparedStatement updateStmt = connection.prepareStatement(updateSql)) {
@@ -1754,6 +1928,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 return claimed;
               });
 
+      // A reentrant authority callback may have admitted earlier work during this poll.
+      claimCursor = orderVersion == claimOrderVersion ? nextCursor[0] : null;
+      claimBudgetExhausted = budgetStopped[0];
       for (IndexJob claim : result) activeClaims.put(normalizePath(claim.path()), claim);
       if (!result.isEmpty()) {
         meters.recordDequeued(result.size());
@@ -1816,6 +1993,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       if (!isIssuedClaim(claim)) return false;
       if (!ownsClaim(claim)) {
         if (claim.walkEpoch() != null) inTransaction(superseded);
+        claimCursor = null;
+        claimOrderVersion++;
         releaseClaim(claim);
         return false;
       }
@@ -2132,6 +2311,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                       stmt.setString(1, transition.committedContentHash());
                       bindOutcomeUpdate(stmt, 2, now, outcome, normalizedPath);
                       rows = executeMutation(stmt::executeUpdate);
+                    } else {
+                      claimCursor = null;
+                      claimOrderVersion++;
                     }
                     rowCounts.add(rows);
                     if (rows > 0 || transition.claim() != null) {
@@ -2963,7 +3145,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       ensureOpen();
 
       String sql = """
-          SELECT COUNT(*) FROM jobs
+          SELECT COALESCE(SUM(n),0) FROM job_counts
           WHERE state IN ('PENDING', 'PROCESSING')
           """;
 
@@ -2988,7 +3170,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     try {
       ensureOpen();
 
-      String sql = "SELECT COUNT(*) FROM jobs WHERE state = 'DONE'";
+      String sql = "SELECT COALESCE(SUM(n),0) FROM job_counts WHERE state = 'DONE'";
 
       try (Statement stmt = connection.createStatement();
            ResultSet rs = stmt.executeQuery(sql)) {
@@ -3287,7 +3469,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       // 1) Failed count
       try (Statement stmt = connection.createStatement();
-           ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM jobs WHERE state IN ('FAILED', 'RETRY_EXHAUSTED')")) {
+           ResultSet rs = stmt.executeQuery("SELECT COALESCE(SUM(n),0) FROM job_counts WHERE state IN ('FAILED', 'RETRY_EXHAUSTED')")) {
         if (rs.next()) {
           failedCount = rs.getLong(1);
         }
@@ -3295,11 +3477,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       // 2) Last failed job (most recent last_updated)
       String lastFailedSql = """
-          SELECT path, error_message, last_updated
-          FROM jobs
-          WHERE state IN ('FAILED', 'RETRY_EXHAUSTED')
-          ORDER BY last_updated DESC
-          LIMIT 1
+          SELECT path,error_message,last_updated FROM (
+            SELECT * FROM (SELECT path,error_message,last_updated FROM jobs
+              WHERE state='FAILED' ORDER BY last_updated DESC LIMIT 1)
+            UNION ALL
+            SELECT * FROM (SELECT path,error_message,last_updated FROM jobs
+              WHERE state='RETRY_EXHAUSTED' ORDER BY last_updated DESC LIMIT 1)
+          ) ORDER BY last_updated DESC LIMIT 1
           """;
       try (PreparedStatement stmt = connection.prepareStatement(lastFailedSql);
            ResultSet rs = stmt.executeQuery()) {

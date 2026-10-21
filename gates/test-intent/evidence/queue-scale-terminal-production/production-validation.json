@@ -1,0 +1,25 @@
+{
+  "samples": 600,
+  "elapsedSeconds": 305.7825,
+  "expandedSamples": 599,
+  "maxStatusResponseMs": 53.60000002384186,
+  "maxYieldMs": 4.599999964237213,
+  "maxRenderedFileRows": 8,
+  "allAggregateCountsMatchStatus": true,
+  "longTaskCount": 261,
+  "maxLongTaskMs": 296,
+  "totalLongTaskMs": 26395,
+  "realSuccessDocsAtQuarterBoundaries": [
+    0,
+    576,
+    2672,
+    5104,
+    7120
+  ],
+  "coreDocumentCountStart": 9168,
+  "coreDocumentCountEnd": 9168,
+  "initialPending": 700016,
+  "finalPending": 692672,
+  "oneF1DatabaseReused": true,
+  "defaultPackagedHeap": "2g"
+}

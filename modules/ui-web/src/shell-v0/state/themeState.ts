@@ -105,7 +105,11 @@ function ensureSystemThemeListener(): void {
   systemThemeMql = window.matchMedia(SYSTEM_THEME_QUERY);
   if (typeof systemThemeMql.addEventListener === 'function') {
     systemThemeMql.addEventListener('change', () => {
-      if (followingSystemTheme) applyResolvedSystemTheme();
+      if (followingSystemTheme) {
+        applyResolvedSystemTheme();
+        // Refresh the paired inks with the fills, as explicit appearance changes do.
+        deriveRoleForegrounds();
+      }
     });
   }
 }

@@ -224,6 +224,27 @@ final class IndexingJobsCoalescingTest {
     }
   }
 
+  @Test
+  void statePresenceFramesAreBarriersAndSurviveLaterHeartbeats() throws Exception {
+    var delivered = new CopyOnWriteArrayList<IndexingJobsFrame>();
+    var delivery = new DelayedDeliveryExecutor();
+    var flow = EngineKnowledgeClient.indexingJobsHandoff(delivered::add, cause -> {}, delivery);
+    var presence = io.justsearch.ipc.IndexingJobStatePresence.newBuilder().addStates("PENDING").build();
+    try {
+      assertTrue(flow.publish(insert(1, "same", "PENDING").toBuilder().setStatePresence(presence).build()));
+      assertTrue(flow.publish(update(2, "same", "PENDING")));
+      assertTrue(flow.publish(update(3, "same", "PENDING")));
+      assertTrue(flow.publish(delete(4, "same").toBuilder()
+          .setStatePresence(io.justsearch.ipc.IndexingJobStatePresence.getDefaultInstance()).build()));
+      delivery.start();
+      assertTrue(flow.drainAndClose(2000));
+      assertEquals(List.of(1L, 3L, 4L), delivered.stream().map(IndexingJobsFrame::getSeq).toList());
+      assertEquals(presence, delivered.getFirst().getStatePresence());
+      assertTrue(delivered.getLast().hasStatePresence());
+      assertTrue(delivered.getLast().getStatePresence().getStatesList().isEmpty());
+    } finally { flow.close(); delivery.close(); }
+  }
+
   private static IndexingJobsFrame insert(long seq, String pathHash, String state) {
     return IndexingJobsFrame.newBuilder()
         .setSeq(seq)

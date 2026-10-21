@@ -37,7 +37,7 @@ final class OpenAiCompatTokenProgressTest {
     when(ctx.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(TestRequestContexts.browser());
     var body = ArgumentCaptor.forClass(InputStream.class);
     when(ctx.result(body.capture())).thenReturn(ctx);
-    var controller = new OpenAiCompatController(http, () -> 8081, null,
+    var controller = new OpenAiCompatController(http, () -> new io.justsearch.app.inference.LlamaServerEndpoint(8081, null), null,
         (OpenAiCompatController.ExchangeAdmission) (kind, work) -> lease);
     try {
       controller.handleChatCompletions(ctx);

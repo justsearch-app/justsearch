@@ -1,0 +1,32 @@
+18:50:58.651 [main] INFO com.tngtech.archunit.ArchConfiguration -- Reading ArchUnit properties from file:/home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/modules/app-services/build/resources/test/archunit.properties
+18:51:10.027 [main] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: /home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/tmp/builder/junit-12739664811127016057/encryption/keystore.replica.json
+18:51:20.612 [main] WARN io.justsearch.app.services.encryption.EncryptionKeystore -- Repaired encryption keystore recovery replica from authoritative primary: /home/elias/dev/justsearch/.claude/worktrees/keystore-timeout/tmp/builder/junit-12739664811127016057/encryption/keystore.replica.json
+
+Test run finished after 30260 ms
+[         3 containers found      ]
+[         0 containers skipped    ]
+[         3 containers started    ]
+[         0 containers aborted    ]
+[         3 containers successful ]
+[         0 containers failed     ]
+[         1 tests found           ]
+[         0 tests skipped         ]
+[         1 tests started         ]
+[         0 tests aborted         ]
+[         0 tests successful      ]
+[         1 tests failed          ]
+
+
+Failures (1):
+  JUnit Jupiter:KeystoreReplicaRepairTest:killBetweenPublicationsRepairsCurrentWrapsOnRestart()
+    MethodSource [className = 'io.justsearch.app.services.encryption.KeystoreReplicaRepairTest', methodName = 'killBetweenPublicationsRepairsCurrentWrapsOnRestart', methodParameterTypes = '']
+    => java.util.concurrent.TimeoutException: killBetweenPublicationsRepairsCurrentWrapsOnRestart() timed out after 30 seconds
+       java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+       java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+       Suppressed: java.lang.InterruptedException: sleep interrupted
+         java.base/java.lang.Thread.sleepNanos0(Native Method)
+         java.base/java.lang.Thread.sleepNanos(Thread.java:509)
+         java.base/java.lang.Thread.sleep(Thread.java:540)
+         io.justsearch.app.services.encryption.KeystoreReplicaRepairTest.killBetweenPublicationsRepairsCurrentWrapsOnRestart(KeystoreReplicaRepairTest.java:152)
+         java.base/java.lang.reflect.Method.invoke(Method.java:565)
+         [...]

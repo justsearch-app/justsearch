@@ -18,6 +18,8 @@
  * fall back to schema-blind rendering when null.
  */
 
+import { getSessionOrigin, resolveSessionTokenFromTauri } from '../http.js';
+import { authorizedFetch } from '../../shell-v0/api/authorizedFetch.js';
 import type { JsonSchema } from '@jsonforms/core';
 
 const CANONICAL_PREFIX = 'https://ssot.justsearch/v1/schemas/';
@@ -53,7 +55,7 @@ export function rewriteSchemaUrl(schemaUrl: string): string {
  */
 export async function fetchSchema(
   schemaUrl: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl?: typeof fetch,
 ): Promise<JsonSchema | null> {
   const url = rewriteSchemaUrl(schemaUrl);
   const cached = cache.get(url);
@@ -63,7 +65,14 @@ export async function fetchSchema(
 
   const promise = (async () => {
     try {
-      const response = await fetchImpl(url);
+      // External schema documents do not receive the Engine credential.
+      const fetcher = fetchImpl ?? (url.startsWith('/api/schemas/') ? authorizedFetch : fetch);
+      let target = url;
+      if (!fetchImpl && url.startsWith('/api/schemas/')) {
+        await resolveSessionTokenFromTauri();
+        target = (getSessionOrigin() ?? '') + url;
+      }
+      const response = await fetcher(target);
       if (!response.ok) {
         return null;
       }

@@ -348,6 +348,13 @@ public final class ExitLedgerWriter {
   }
 
   private void writeLine(Path file, byte[] bytes, boolean force) throws IOException {
+    Path runtime = ledgerDir.toAbsolutePath().getParent();
+    if (ledgerDir.getFileName().toString().equals("exit-ledger")
+        && runtime != null && runtime.getFileName() != null
+        && runtime.getFileName().toString().equals("runtime")) {
+      Files.createDirectories(runtime.getParent());
+      io.justsearch.configuration.persistence.OwnerOnlyDirectory.ensureOwnerOnlyDirectory(runtime);
+    }
     Files.createDirectories(ledgerDir);
     try (FileChannel channel =
         FileChannel.open(

@@ -15,6 +15,34 @@ import java.util.OptionalInt;
 public interface ProcessTerminator {
   enum IdentityPresence { PRESENT, GONE, UNKNOWN }
 
+  /** A Linux zombie has exited, even when its parent never reaps it. Unknown stays running. */
+  static boolean isRunning(ProcessHandle process) {
+    return process.isAlive()
+        && (!io.justsearch.configuration.PlatformPaths.isLinux()
+            || LinuxProcessIdentity.observe(process.pid()).presence() != IdentityPresence.GONE);
+  }
+
+  /** Waits on the original handle, including Linux exit before reaping. Never signals by PID. */
+  static boolean awaitExit(ProcessHandle process, Duration max) throws InterruptedException {
+    long deadline = System.nanoTime() + max.toNanos();
+    while (isRunning(process)) {
+      long remaining = deadline - System.nanoTime();
+      if (remaining <= 0) return false;
+      if (io.justsearch.configuration.PlatformPaths.isLinux()) {
+        // onExit would leave a JDK reaper waiting forever when the parent never reaps a zombie.
+        java.util.concurrent.TimeUnit.NANOSECONDS.sleep(
+            Math.min(remaining, java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(25)));
+      } else {
+        try {
+          process.onExit().get(remaining, java.util.concurrent.TimeUnit.NANOSECONDS);
+        } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException ended) {
+          return !isRunning(process);
+        }
+      }
+    }
+    return true;
+  }
+
   /** An unreadable identity is unknown, never absence. */
   default IdentityPresence identityPresence(long pid) {
     try {

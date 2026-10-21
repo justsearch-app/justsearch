@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T11:54:40.221Z",
+  "revision": "352fddb83630d23a7bea0136e03d5c139764fc45",
+  "tree": "625c832c08241e8feb48e6dfef3d43419f74ee0d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/ResourceView.render.test.ts\" \"src/shell-v0/hooks/resolvePathLazy.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/qh/test-intent-vitest-1894109-1792583674959.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1811
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts#names the bounded window and reads totals outside it from status",
+      "file": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:40f491de5eaf1a98d6f75a14cd9c81a96c6c72c7bee6fb11d952f063547269f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Q14 — indexing Resource window and queue totals names the bounded window and reads totals outside it from status",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts#bounds the label cache over a long run, retaining recent Windows and UNC identities",
+      "file": "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:baa028c9a41f0767f1213135bea693971bf89cac19f51695d0943f27835ec64c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bounds the label cache over a long run, retaining recent Windows and UNC identities",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "947be754d",
+    "revision": "947be754dc59485c01e34c53fe62f78a8bdc7d55",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/ResourceView.render.test.ts\" \"src/shell-v0/hooks/resolvePathLazy.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/qh/test-intent-vitest-1894109-1792583678187.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1816,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/qh/test-intent-vitest-1894109-1792583678187.json\n\nError: socket hang up\n    at Socket.socketCloseListener (node:_http_client:747:27)\n    at Socket.emit (node:events:526:24)\n    at TCP.<anonymous> (node:net:362:12) {\n  code: 'ECONNRESET'\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts#names the bounded window and reads totals outside it from status",
+        "classification": "assertion",
+        "detail": "Q14 — indexing Resource window and queue totals names the bounded window and reads totals outside it from status:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/queue-scale/modules/ui-web/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts#bounds the label cache over a long run, retaining recent Windows and UNC identities",
+        "classification": "assertion",
+        "detail": "bounds the label cache over a long run, retaining recent Windows and UNC identities:  AssertionError: expected 'C:\\docs\\0.txt' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/merge-947be754d/test-intent-before-SCuy6V/modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts:230:65\n    at file:///home/elias/dev/justsearch/.claude/worktrees/queue-"
+      }
+    ]
+  },
+  "digest": "sha256:616277a49ba73c1ef7d2e025fd91c9eb025835709e26261dfe6f2c58f32b8ebb"
+}

@@ -1,3 +1,4 @@
+import { runRecoveryCase } from '../recovery-scenario.mjs';
 import { runLifecycle } from '../lifecycle.mjs';
 import { awaitFixtureExit, fixturesExited, removeFixtureDirectory } from '../fixture-cleanup.mjs';
 /**
@@ -260,6 +261,7 @@ const RESTART_CASES = new Set([
 ]);
 
 export async function runCase({ testCase, policy, io }) {
+  if (testCase.id.startsWith('recovery-')) return runRecoveryCase({ name, testCase, policy, io });
   if (testCase.probe || (name === "tauri" && testCase.expect?.ledger)) return runLifecycle({ name, testCase, policy, io });
   if ((testCase.drives ?? []).some((d) => phases.includes(d)) && !(testCase.drives ?? []).includes('actuator')) {
     return runLifecycleCase({ testCase, policy, io });
@@ -388,15 +390,21 @@ export async function runCase({ testCase, policy, io }) {
         problems.push(`dev-runner exited ${code}, expected 0`);
       }
       const final = io.readJsonIfPresent(run.statePath);
-      if (final?.state !== 'stopping') problems.push(`final state ${final?.state}, expected stopping`);
+      if (final?.state !== 'stopped') problems.push(`final state ${final?.state}, expected stopped`);
       if (final?.incarnation !== 1) problems.push(`incarnation ${final?.incarnation}, expected 1 (no restart)`);
       return { problems };
     }
 
     if (testCase.expect.action === 'exhausted') {
-      const code = await Promise.race([run.exited, io.sleep(30_000).then(() => 'TIMEOUT')]);
-      const final = io.readJsonIfPresent(run.statePath);
-      if (code === 'TIMEOUT') problems.push('the dev-runner never gave up');
+      const final = await watchSupervisor({ statePath: run.statePath,
+        predicate: state => state.state === 'exhausted', timeoutMs: 30_000, io, seen: run.seen });
+      if (testCase.id === 'budget-exhausted-after-max-attempts') {
+        if (!final?.retryAt) problems.push('transient exhaustion must publish its delayed retry');
+        if (run.child.exitCode !== null) problems.push('the supervisor exited instead of owning the delayed retry');
+      } else {
+        const code = await Promise.race([run.exited, io.sleep(30_000).then(() => 'TIMEOUT')]);
+        if (code === 'TIMEOUT') problems.push('the non-transient supervisor never gave up');
+      }
       if (final?.state !== 'exhausted') {
         problems.push(`final state ${final?.state}, expected exhausted. seen: ${[...run.seen.keys()].join(' -> ')}`);
       }
