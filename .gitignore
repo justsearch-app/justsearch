@@ -64,7 +64,9 @@ SSOT/tools/node_modules/
 # Archives and large blobs
 *.zip
 # Small authentic release captures used by upgrade characterization tests.
-!modules/indexer-worker/src/test/resources/upgrade-030/*.zip
+!modules/indexer-worker/src/test/resources/upgrade-030/small.zip
+!modules/indexer-worker/src/test/resources/upgrade-030/migrating.zip
+!modules/indexer-worker/src/test/resources/upgrade-030/switching.zip
 *.dll
 *.so
 *.dylib

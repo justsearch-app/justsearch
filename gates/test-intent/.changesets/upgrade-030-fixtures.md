@@ -144,3 +144,14 @@ separate small text evidence. Independent acceptance is intentionally left to th
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1603f-6664-7d92-8046-097b16b3b819",
+  "verdict": "accept",
+  "digest": "sha256:c99315c17254c662d4b02eed849ee5240296bc4eb17f46f84b8741b45d61c973",
+  "note": "Both New entries have honest adopted-scenario and delegated-choice sources and all three named checks executed without skips; overall verification fails F6's broad ZIP ignore exception, outside this test-intent digest."
+}
+```
