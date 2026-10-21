@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// ci probe
 /**
  * Dev helper: starts the backend (runHeadless) and Vite together with a clean data dir and a free port.
  * Usage: npm run dev:all [-- --data-dir <path>]
