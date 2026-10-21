@@ -85,6 +85,7 @@ final class BulkPacePolicyUseTest {
               return out;
             });
     IndexingCoordinator coordinator = mock(IndexingCoordinator.class);
+    BackfillSnapshotTestSupport.install(fields,coordinator);
     when(coordinator.updateDocumentsBatch(anyList()))
         .thenAnswer(
             inv ->
