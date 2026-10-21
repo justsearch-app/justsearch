@@ -30,7 +30,7 @@ test('parses supported tool version formats', () => {
 
 test('enforces native floors while Rust remains advisory', () => {
   const supported = validatePrerequisites({
-    nodeVersion: 'v20.19.0', javaMajor: 24, pythonVersion: 'Python 3.13.1', rustVersion: null,
+    nodeVersion: 'v24.14.0', javaMajor: 24, pythonVersion: 'Python 3.13.1', rustVersion: null,
   });
   assert.equal(supported.ok, true);
   assert.equal(supported.warnings.length, 1);
@@ -40,6 +40,14 @@ test('enforces native floors while Rust remains advisory', () => {
   });
   assert.equal(unsupported.ok, false);
   assert.equal(unsupported.failures.length, 3);
+});
+
+test('rejects Node 23 at the contributor Node 24 boundary', () => {
+  const result = validatePrerequisites({
+    nodeVersion: 'v23.11.1', javaMajor: 24, pythonVersion: 'Python 3.13.1', rustVersion: null,
+  });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.failures, ['Node.js 24+ is required (found v23.11.1).']);
 });
 
 test('Python probing continues past an older interpreter to a supported spelling', () => {
