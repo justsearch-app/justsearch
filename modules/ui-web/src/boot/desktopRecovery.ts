@@ -4,6 +4,7 @@ import { installSupervisorStateBridge, isTerminal } from '../api/supervisorState
 import type { EngineRecovery } from '../shell-v0/components/EngineRecovery.js';
 import { installBackendRestartBridge } from '../api/backendRestart.js';
 import { resolveBootApiBase } from './apiBase.js';
+import { gateFactoryReset } from './factoryReset.js';
 
 const recoverySurfaces = new WeakMap<HTMLElement, {
   recovery: EngineRecovery;
@@ -37,6 +38,8 @@ export async function resolveBootWithRecovery(
     }
     return base;
   }
+
+  if (!await gateFactoryReset(root)) return null;
 
   const { EngineRecovery } = await import('../shell-v0/components/EngineRecovery.js');
   const recovery = new EngineRecovery();

@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T17:29:02.284Z",
+  "revision": "a53780a50b1af53ecc6fbf4e612f898f112e813b",
+  "tree": "588f6835c926dc856d9d89752b5c58928ec0122b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/explicit-stale/test-intent-vitest-1994458-1792517335204.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2990
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 a fresh timestamp with 'worker RPC stale' is unconfirmed, then recovers",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3d5d9b07810113065866cb9d63ab46be6976de1145da48818d8bc7116672a629",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "BrainSurface — enrichment progress card (807) S33.4 a fresh timestamp with 'worker RPC stale' is unconfirmed, then recovers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 a fresh timestamp with 'indexing lane stale' is unconfirmed, then recovers",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3d5d9b07810113065866cb9d63ab46be6976de1145da48818d8bc7116672a629",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "BrainSurface — enrichment progress card (807) S33.4 a fresh timestamp with 'indexing lane stale' is unconfirmed, then recovers",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a53780a50",
+    "revision": "a53780a50b1af53ecc6fbf4e612f898f112e813b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/explicit-stale/test-intent-vitest-1994458-1792517339473.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2594,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/explicit-stale/test-intent-vitest-1994458-1792517339473.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 a fresh timestamp with 'worker RPC stale' is unconfirmed, then recovers",
+        "classification": "assertion",
+        "detail": "BrainSurface — enrichment progress card (807) S33.4 a fresh timestamp with 'worker RPC stale' is unconfirmed, then recovers:  AssertionError: expected '\\n      \\n        \\n          \\n    \\…' to contain 'Indexing status unconfirmed'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/explicit-stale/test-intent-before-SK4HQ0/modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts:"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 a fresh timestamp with 'indexing lane stale' is unconfirmed, then recovers",
+        "classification": "assertion",
+        "detail": "BrainSurface — enrichment progress card (807) S33.4 a fresh timestamp with 'indexing lane stale' is unconfirmed, then recovers:  AssertionError: expected '\\n      \\n        \\n          \\n    \\…' to contain 'Indexing status unconfirmed'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/explicit-stale/test-intent-before-SK4HQ0/modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts:"
+      }
+    ]
+  },
+  "digest": "sha256:38d51469945bd5a63a614b51595c93f8a7a9648bf04745f11fa4f52824f58d04"
+}

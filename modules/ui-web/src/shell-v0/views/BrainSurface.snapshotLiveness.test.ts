@@ -85,6 +85,7 @@ function harness(live: boolean): Harness {
   el._unifiedAiState = {
     verdict: live ? LIVE_VERDICT : DEAD_VERDICT,
     snapshotLive: live,
+    indexingStatusLive: live,
     aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
     episodeMaxPendingJobs: 0,
     enrichSettleSamples: [],
@@ -105,6 +106,48 @@ function domOf(tpl: TemplateResult | symbol): HTMLElement {
 }
 
 describe('BrainSurface — enrichment progress card (807)', () => {
+  it.each([
+    { reason: 'worker RPC stale', workerRpcStale: true, staleSources: [] },
+    { reason: 'indexing lane stale', workerRpcStale: false, staleSources: ['indexing'] },
+  ])('S33.4 a fresh timestamp with $reason is unconfirmed, then recovers', ({ workerRpcStale, staleSources }) => {
+    const el = harness(true);
+    const fresh = {
+      ...(el.systemStatus as object),
+      meta: { workerRpcAtMs: Date.now(), workerRpcStale: false },
+    };
+    el.systemStatus = {
+      ...fresh,
+      meta: { ...fresh.meta, workerRpcStale },
+      operating: { freshness: { staleSources } },
+    };
+
+    const observed = domOf(el.renderEnrichmentProgress());
+    expect(observed.textContent).toContain('Indexing status unconfirmed');
+    expect(observed.textContent).toContain('pending when last observed');
+    expect(observed.textContent).not.toContain(DISCONNECTED);
+    expect(observed.textContent).not.toContain('Building semantic search');
+    expect(observed.querySelector('.spin, [class*="spin"]')).toBeNull();
+
+    el.systemStatus = fresh;
+    const recovered = domOf(el.renderEnrichmentProgress());
+    expect(recovered.textContent).toContain('Building semantic search');
+    expect(recovered.textContent).not.toContain('Indexing status unconfirmed');
+    expect(recovered.querySelector('.spin, [class*="spin"]')).not.toBeNull();
+  });
+
+  it('S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers', () => {
+    const el = harness(true);
+    const state = el._unifiedAiState as AiState;
+    state.indexingStatusLive = false;
+    const stale = domOf(el.renderEnrichmentProgress());
+    expect(stale.textContent).toContain('Indexing status unconfirmed');
+    expect(stale.textContent).not.toContain(DISCONNECTED);
+    expect(stale.textContent).not.toContain('Building semantic search');
+    expect(stale.querySelector('.spin, [class*="spin"]')).toBeNull();
+    state.indexingStatusLive = true;
+    expect(textOf(el.renderEnrichmentProgress())).toContain('Building semantic search');
+  });
+
   it('stops presenting as live progress when the snapshot is not live', () => {
     const text = textOf(harness(false).renderEnrichmentProgress());
     expect(text).not.toContain('Building semantic search');
@@ -395,7 +438,11 @@ describe('BrainSurface — Runtime card (807)', () => {
   });
 
   it('ANTI-REGRESSION: a healthy verdict leaves the Runtime readout and its controls alone', () => {
-    const dom = domOf(harness(true).renderRuntimeSection());
+    const el = harness(true);
+    // This preservation case describes one healthy queue observation on both transports.
+    const status = el.systemStatus as { worker: { enrichment: { embeddingPendingCount: number } } };
+    status.worker.enrichment.embeddingPendingCount = 4789;
+    const dom = domOf(el.renderRuntimeSection());
     expect(dom.textContent).not.toContain(DISCONNECTED);
     expect(dom.textContent).toContain('available'); // CUDA: available
     expect(dom.textContent).toContain(num(4789)); // embed queue, un-caveated

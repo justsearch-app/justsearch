@@ -345,14 +345,14 @@ describe('selectIndexingProgress — denominator honesty', () => {
     expect(p.phase).toBe('enriching');
   });
 
-  it('a pending count larger than its own total cannot push the percent negative', () => {
+  it('S33.5 an undrained stage with pending above its total has no percentage', () => {
     const p = select(
       snapshot({
         enrichment: { embeddingDocCount: 10, embeddingPendingCount: 999, embeddingEnabled: true },
       }),
       true,
     );
-    expect(p.enrichingPercent).toBe(0);
+    expect(p.enrichingPercent).toBeNull();
   });
 
   it('the CHUNK tier is gated on the embedding stage — same encoder, same applicability', () => {
