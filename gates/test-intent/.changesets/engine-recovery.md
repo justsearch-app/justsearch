@@ -568,3 +568,14 @@ acceptance/rejection record are preserved; a new independent acceptance is requi
   "note": "E2 remains incomplete: a real JVM Internal Error fatal report is omitted by the public diagnostic summary on the exact candidate, and the new diagnostics tests do not cover it."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15c6f-883e-7583-b133-70db91551f7b",
+  "verdict": "accept",
+  "digest": "sha256:f01ee97d68037165fc6e86198518ea9f1f2244066d72148029668b07ad250bd8",
+  "note": "All twelve entry classifications and delegated choices are supported; independent JVM parent/candidate checks, real SIGBUS summary, Linux Engine artifacts, browser recovery and both supervisor conformance suites confirm the cited behavior within this PR's scope."
+}
+```
