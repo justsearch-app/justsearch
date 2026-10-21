@@ -230,7 +230,7 @@ final class SyncDirectoryOps {
               if (!Files.isReadable(file)) {
                 throw new IOException("Reconciliation file is unreadable: " + file);
               }
-              if (!IngestionSkipPolicy.shouldSkip(file) && !isCloudPlaceholder(file)) {
+              if (!IngestionSkipPolicy.shouldSkipWithinRoot(file, root) && !isCloudPlaceholder(file)) {
                 // Conservatively account for the Path's spelling and component storage as well
                 // as the separately retained normalized disk key.
                 budget.retain(2L * file.toString().length());

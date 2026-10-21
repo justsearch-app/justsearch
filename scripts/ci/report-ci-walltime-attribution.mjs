@@ -186,7 +186,10 @@ export function buildWalltimeReport({ run = {}, jobs = [], selfJob = null, suite
   };
   const warnings = missing.map((name) => `required job missing or incomplete: ${name}`);
   for (const job of jobReports) {
-    if (UNIT_LANE_JOB.test(job.name) && job.name !== 'Unit tests (app-ui)' && !job.components) {
+    const raw = jobs.find((j) => (j.name || '<job>') === job.name);
+    const skipped = job.conclusion === 'skipped' || (Array.isArray(raw?.steps) && raw.steps.length > 0 && raw.steps.every((step) =>
+      step.conclusion === 'skipped' || /^(Set up job|Complete job)$/.test(step.name)));
+    if (!skipped && UNIT_LANE_JOB.test(job.name) && job.name !== 'Unit tests (app-ui)' && !job.components) {
       warnings.push(`unit attribution missing for ${job.name}`);
     }
   }

@@ -56,15 +56,25 @@ final class WorkerIngestionAuthority {
     return admit(job.path(), job.ingestionRoot());
   }
 
+  private volatile java.util.function.BiPredicate<Path, Path> userExclusions = (file, root) -> false;
+
+  void useFileExclusions(java.util.function.BiPredicate<Path, Path> exclusions) {
+    userExclusions = java.util.Objects.requireNonNull(exclusions, "exclusions");
+  }
+
+  boolean excludes(Path file, Path root) {
+    return IngestionSkipPolicy.shouldSkipWithinRoot(file, root) || userExclusions.test(file, root);
+  }
+
   SourceAdmission admit(Path filePath, Path root) throws IOException {
-    if (IngestionSkipPolicy.shouldSkipWithinRoot(filePath, root)) {
+    if (excludes(filePath, root)) {
       return SourceAdmission.terminal(
           SourceAdmissionAction.SKIP_DONE,
           outcome(
               IngestionOutcomeClass.SKIPPED_POLICY,
               IngestionReasonCodes.SKIPPED_TEMP_OR_SYSTEM,
               IngestionRetryPolicy.NONE,
-              "Skipped temporary or system file"));
+              "Skipped by ingestion or user exclusion policy"));
     }
 
     // Task t-20261013-ef3c41: "cannot read it" is never "it is gone". The snapshot is taken first

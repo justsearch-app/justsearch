@@ -386,7 +386,8 @@
       "status": "READY",
       "implementationSources": [
         "modules/app-services/src/main/java/io/justsearch/app/services/policy/UserPolicyWriter.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/policy/EnterprisePolicyServiceImpl.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/policy/EnterprisePolicyServiceImpl.java",
+        "modules/shell/src-tauri/src/updater.rs"
       ],
       "tests": [
         "modules/app-services/src/test/java/io/justsearch/app/services/policy/UserPolicyWriterTest.java"
@@ -683,10 +684,10 @@
     {
       "id": "jobs-db",
       "pathVerification": "COMPOSED",
-      "pathVerificationNote": "Only the base name is a literal (modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:589, dataDir.resolve(\"jobs.db\")). SQLite creates the -wal and -shm sidecars; corruption triage derives their sibling paths from dbPath (KnowledgeServer.java:2982-2985). Backup creation and restore also derive .bak paths from dbPath (SqliteJobQueue.java:2768-2769; KnowledgeServer.java:2972-2975); these are composed paths, not independent configured roots.",
+      "pathVerificationNote": "Only the base name is a literal (modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:589, dataDir.resolve(\"jobs.db\")). SQLite creates the -wal and -shm sidecars; corruption triage derives their sibling paths from dbPath (KnowledgeServer.java:2982-2985). Backup creation and restore also derive .bak paths from dbPath (SqliteJobQueue.java:2768-2769; KnowledgeServer.java:2972-2975); these are composed paths, not independent configured roots. MigrationJournalWitness resolves migration-journal-admissions against the configured index base (normally index/<collection>) and derives jobs.db.triage beside the database. Its .migration-journal-check-* directories are disposable validation copies under the database parent; they are not another durable authority.",
       "encryption": "UNSEALED_DERIVED_OS_DISK_ENCRYPTION",
-      "encryptionNote": "Plaintext SQLite: jobs.path and path_resolution.normalized_path store the user's paths (SqliteSchema.java:152-166, 273-280); document_identity stores only a path hash, random uid, and timestamps (SqliteSchema.java:300-305). StoreCatalog classifies JOBS_DB as DERIVED/OPAQUE, whose stated policy is OS disk encryption only (StoreCatalog.java:25-37); this is UNSEALED_DERIVED_OS_DISK_ENCRYPTION because the queue is rebuildable from watched roots. The separate watched-roots row is authored JSON and remains UNSEALED_GAP because nothing structural prevents sealing it (this register:568-572).",
-      "corruptionNote": "document_identity is restored indirectly: the existing pre-migration jobs.db backup can predate schema v11, so after backup restore (or a fresh queue rebuild when no backup exists) the Worker imports missing parent doc_id/doc_uid pairs from the serving Lucene index before indexing starts (KnowledgeServer.java:992-999,394-413; DocumentIdentityBootImport.java:30-31,50-114; SqliteDocumentIdentityStore.java:158-187), streaming them in transactions of 1000. Existing identity rows remain authoritative during normal and mid-migration restarts. Since v12 the scan is a seeding step, not a per-boot pass: it runs only when document_identity is empty or document_identity_import has no row for the serving generation, because every later parent resolves its uid through the store. A live parent whose doc_id/doc_uid docvalues are missing or blank is counted in parents_skipped and re-mints at its next admission rather than failing the boot. Recovery limit: if the identity rows and their backup are lost and the serving Lucene index is also lost or unreadable, the old random uids cannot be reconstructed; later admission mints new uids, so uid-keyed derived or feedback links to the lost identities can become orphaned. That is a total-data-loss boundary, not a recoverable migration case.",
+      "encryptionNote": "Plaintext SQLite: jobs.path and path_resolution.normalized_path store the user's paths (SqliteSchema.java:152-166, 273-280); document_identity stores only a path hash, random uid, and timestamps (SqliteSchema.java:300-305). StoreCatalog classifies JOBS_DB as DERIVED/OPAQUE, whose stated policy is OS disk encryption only (StoreCatalog.java:25-37); this is UNSEALED_DERIVED_OS_DISK_ENCRYPTION because the queue is rebuildable from watched roots. The separate watched-roots row is authored JSON and remains UNSEALED_GAP because nothing structural prevents sealing it (this register:568-572). The external admission witness holds only a nonnegative count; the triage receipt holds a quarantine basename and backup/unfinished/complete booleans. Disposable validation copies contain the same plaintext queue data, with the same OS-disk-encryption boundary.",
+      "corruptionNote": "document_identity is restored indirectly: the existing pre-migration jobs.db backup can predate schema v11, so after backup restore (or a fresh queue rebuild when no backup exists) the Worker imports missing parent doc_id/doc_uid pairs from the serving Lucene index before indexing starts (KnowledgeServer.java:992-999,394-413; DocumentIdentityBootImport.java:30-31,50-114; SqliteDocumentIdentityStore.java:158-187), streaming them in transactions of 1000. Existing identity rows remain authoritative during normal and mid-migration restarts. Since v12 the scan is a seeding step, not a per-boot pass: it runs only when document_identity is empty or document_identity_import has no row for the serving generation, because every later parent resolves its uid through the store. A live parent whose doc_id/doc_uid docvalues are missing or blank is counted in parents_skipped and re-mints at its next admission rather than failing the boot. Recovery limit: if the identity rows and their backup are lost and the serving Lucene index is also lost or unreadable, the old random uids cannot be reconstructed; later admission mints new uids, so uid-keyed derived or feedback links to the lost identities can become orphaned. That is a total-data-loss boundary, not a recoverable migration case. V23 adds a singleton switch_buffer_admissions counter initialized to zero and an AFTER INSERT trigger; replay removal does not lower the counter. Each acknowledged admission also atomically persists a monotonic high-water outside jobs.db and its backup. During an unfinished migration, a missing, empty, corrupt or witness-stale queue, or an interrupted/unfinished triage receipt, refuses boot before mutating the live queue and preserves repair evidence. Integrity/schema validation runs on a private queue/WAL copy and removes that scratch best-effort. Outside unfinished migration, an atomic triage receipt names the quarantine and records whether a backup existed before the first move, allowing interrupted triage to resume without interpreting replacement bytes as the lost journal. Invalid witness/receipt bytes fail loudly; a failed witness write cannot acknowledge an admission. Legacy unfinished migrations without an external witness retain their historical completeness gap and may resume with an intact queue; the V23 counter cannot retrospectively certify old admissions.",
       "catalogDirName": "jobs.db",
       "owner": "WORKER",
       "note": "Lane F F-5: pre-merge owner identity retained because the installed updater compares it; index execution is in the Engine.",
@@ -695,12 +696,16 @@
         "jobs.db",
         "jobs.db-wal",
         "jobs.db-shm",
-        "jobs.db.bak"
+        "jobs.db.bak",
+        "jobs.db.triage",
+        "jobs.db.corrupt*",
+        "index/*/migration-journal-admissions",
+        ".migration-journal-check-*/**"
       ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
-      "format": "SQLite WAL schema v22",
-      "currentVersion": 22,
+      "format": "SQLite WAL schema v23, an unversioned decimal admission high-water witness, and a strict unversioned JSON queue-triage receipt",
+      "currentVersion": 23,
       "readableLegacyVersions": [
         0,
         1,
@@ -723,13 +728,17 @@
         18,
         19,
         20,
-        21
+        21,
+        22
       ],
       "versionAuthority": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
-      "versionSource": { "file": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java", "symbol": "TARGET_VERSION" },
+      "versionSource": {
+        "file": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
+        "symbol": "TARGET_VERSION"
+      },
       "futureVersionRefusalTest": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
-      "writeMode": "TRANSACTIONAL",
-      "atomicity": "TRANSACTIONAL",
+      "writeMode": "SQLITE_TRANSACTIONAL_AND_FULL_REWRITE_SIDECARS",
+      "atomicity": "SQLITE_TRANSACTIONAL_WITH_ATOMIC_REPLACEMENT_OF_ADMISSION_AND_TRIAGE_SIDECARS",
       "corruptionPolicy": "FAIL_OR_REBUILD_DERIVED_QUEUE",
       "reconciliation": "RUN_EXISTING_SQLITE_MIGRATIONS_OR_REBUILD",
       "status": "READY",
@@ -739,7 +748,10 @@
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqlitePathResolutionStore.java",
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteDocumentIdentityStore.java",
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java",
-        "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/DocumentIdentityBootImport.java"
+        "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/DocumentIdentityBootImport.java",
+        "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/MigrationJournalWitness.java",
+        "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteQueueMigrationOps.java",
+        "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteQueueSwitchBufferOps.java"
       ],
       "tests": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
@@ -748,7 +760,8 @@
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SqlitePathResolutionStoreTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SqliteDocumentIdentityStoreTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/DocumentIdentityBootImportTest.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/DocumentIdentityBootImportGuardTest.java"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/DocumentIdentityBootImportGuardTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/MigrationJournalDurabilityBootTest.java"
       ],
       "fixtures": []
     },
@@ -1922,6 +1935,10 @@
     }
   ],
   "nonDurableWriteSites": [
+    {
+      "path": "modules/shell/src-tauri/src/open_guard_windows.rs",
+      "reason": "Included only by lib.rs open_guard_tests under cfg(test) and cfg(windows). WindowsProbe writes the embedded probe.ps1 into its test-owned tempfile::TempDir; the helper's snapshot.json is also confined there. Both are regenerated per probe and removed when the TempDir drops after GUI cleanup, including assertion failure. Optional observation output is a test-run diagnostic, not product state. No production binary includes these writes; losing them costs only a test rerun."
+    },
     {
       "path": "modules/shell/src-tauri/src/containment.rs",
       "reason": "The only persistence write in this mixed production/test source is inside linux_tests, compiled only under cfg(all(test, target_os = linux)). child_survives_caller_thread_exit_but_not_owner_death writes child.pid under its test-owned tempfile::TempDir so the test driver can observe its fixture child before ending the owner. The temporary directory is discarded after the case; losing the PID receipt costs only a test rerun. Production containment writes no state file."

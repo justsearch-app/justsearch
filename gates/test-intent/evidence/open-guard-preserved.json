@@ -1,0 +1,386 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T15:12:33.937Z",
+  "revision": "6f3d7280d5052539dac7bb70a90bf0af14127b21",
+  "tree": "f9239bf83bf95db4ec09deb3f75b402474d57f5a",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::urls_accept_only_web_and_mail\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6020
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_rejects_traversal\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 186
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_rejects_unc\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 189
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_rejects_executables\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 189
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_allows_normal_files\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 195
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_validate_path_allows_exe_when_not_blocked\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 182
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts\" \"src/shell-v0/commands/searchResultActions.test.ts\" \"src/shell-v0/components/chat/CitationsPanel.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/open-guard/tmp/test-intent-vitest-4025915-1792509152343.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1590
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::urls_accept_only_web_and_mail",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e4aff5bedda56de721d49363fd25609570aca4a01437dbfd7f8615a83f61ed05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::urls_accept_only_web_and_mail",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#tests::test_validate_path_rejects_traversal",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e4aff5bedda56de721d49363fd25609570aca4a01437dbfd7f8615a83f61ed05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tests::test_validate_path_rejects_traversal",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#tests::test_validate_path_rejects_unc",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e4aff5bedda56de721d49363fd25609570aca4a01437dbfd7f8615a83f61ed05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tests::test_validate_path_rejects_unc",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#tests::test_validate_path_rejects_executables",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e4aff5bedda56de721d49363fd25609570aca4a01437dbfd7f8615a83f61ed05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tests::test_validate_path_rejects_executables",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#tests::test_validate_path_allows_normal_files",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e4aff5bedda56de721d49363fd25609570aca4a01437dbfd7f8615a83f61ed05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tests::test_validate_path_allows_normal_files",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#tests::test_validate_path_allows_exe_when_not_blocked",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e4aff5bedda56de721d49363fd25609570aca4a01437dbfd7f8615a83f61ed05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tests::test_validate_path_allows_exe_when_not_blocked",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts#keeps browser opening outside Tauri",
+      "file": "modules/ui-web/src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d983b887f2a0f1dc373c98f37efb3b439671b5251fb8b636c47902849f43f58c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "desktop opening guard keeps browser opening outside Tauri",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/commands/searchResultActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7cf94cf601d43b5c3929a456336cac922abdd68e624154ad79872c3badc1420f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchResultActions (577 Phase 8) registers the core verbs for the search-result-row context, in priority order",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) is idempotent — a second boot call does not duplicate the verbs",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) verbs are disabled for a payload without a path",
+          "status": "passed"
+        },
+        {
+          "name": "searchResultActions (577 Phase 8) handlers ride the one platform/clipboard seams",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/chat/CitationsPanel.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6156ad4583ed2c66ad74ab5ddaba4742eb5c19e1bebf41e64612de2a744f2983",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CitationsPanel — 849 inclusion badge names a DROPPED passage as retrieved but never sent to the model",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — 849 inclusion badge a DROPPED passage does not ALSO claim it grounded a sentence",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — 849 inclusion badge names the partial and included states in the same vocabulary — and they KEEP their grounding",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — 849 inclusion badge renders NOTHING for a citation that said nothing about inclusion",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — 849 inclusion badge an unrecognised state is absence, not a guess",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel renders nothing when both arrays are empty",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel grades a CITED source by grounding (Grounds the answer), joining by ARRAY POSITION not the doc-ordinal",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel demotes a retrieved-but-UNCITED source to \"retrieved · not cited\", never high confidence",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel no citation-matches → neutral flat list (no trust grade, no BM25 %)",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel shows heading breadcrumb when present",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel renders citation-match fallback with confidence bars",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel clamps citation-match scores above 1.0 to 100%",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel clamps negative citation-match scores to 0%",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel fires citation-select exactly once per click",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel collapses sources by default and discloses on toggle (559 C-1)",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel leaves the SHIPPED default untouched — tiered sources (the disclosure path)",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel renders BODY ONLY when the host owns the disclosure — tiered sources (the disclosure path)",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel leaves the SHIPPED default untouched — flat sources (no matches, so no trust grade)",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel renders BODY ONLY when the host owns the disclosure — flat sources (no matches, so no trust grade)",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel leaves the SHIPPED default untouched — citation-matches only (no retrieval sources)",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel renders BODY ONLY when the host owns the disclosure — citation-matches only (no retrieval sources)",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel 822 §5.4 — the source card is the selection’s far side marks ONLY the card whose source key is selected",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel 822 §5.4 — the source card is the selection’s far side clicking a card publishes that source as the cross-surface selection",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel 822 §5.4 — the source card is the selection’s far side unsubscribes from the store on disconnect (no leaked listener)",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel 822 §5.4 — the source card is the selection’s far side announces the selected card to assistive tech, and only that card",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel 822 §5.4 — the source card is the selection’s far side renders a selected card IDENTICALLY to an unselected one with no --cp-* tokens set (the shipped-containment proof)",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel 822 §5.4 — the source card is the selection’s far side freezes the selected card’s un-overridden fill and edge at the base rule’s own tokens",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel 822 §5.4 — the source card is the selection’s far side leaves the hover edge on its shipped default (--cp-hover-edge is opt-in only)",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel 822 §5.4 — the source card is the selection’s far side keeps hover feedback on a card that is ALREADY selected",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — the grounding pass did not complete (865 PR-0) gives the sources their own heading, and never the \"not cited\" group",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — the grounding pass did not complete (865 PR-0) says \"this source\" when there is exactly one",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — the grounding pass did not complete (865 PR-0) ABSENT flag keeps the flat, ungraded list byte-for-byte",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — the grounding pass did not complete (865 PR-0) FULLTEXT_FALLBACK still wins — a keyword run is graded by nothing at all",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — the grounding pass did not complete (865 PR-0) a matcher that RAN still demotes its uncited sources — the honest verdict is untouched",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — 870 motion and type scale item 6a: the hover preview FADES — `display` alone could never animate",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — 870 motion and type scale item 7: nothing in this panel shouts — no uppercase, no hand-authored tracking",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — 870 motion and type scale item 7: two type roles — meta at xs, content at sm",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — excerpt display budget (868 §B.3) the premise: the two fixtures sit on either side of the budget",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — excerpt display budget (868 §B.3) an opened page is elided to the card budget, at a word boundary, with an ellipsis",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — excerpt display budget (868 §B.3) a retrieved excerpt under the budget renders byte-for-byte — the clamp is a ceiling, not a format",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — excerpt display budget (868 §B.3) the SOURCE keeps its full text — display shortened it, nothing else did",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — acquisition-neutral group copy (868 §B.3) says nothing about retrieval in ANY group copy when the set is mixed",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — acquisition-neutral group copy (868 §B.3) the neutral group still holds sources that describe themselves — each by its own route",
+          "status": "passed"
+        },
+        {
+          "name": "CitationsPanel — acquisition-neutral group copy (868 §B.3) a wholly-retrieved run reads the same — the copy is neutral, not conditional",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:0258e75cd8e538274551a8a486f2c255ffc2c92f27a6206169a423d5c47e5a05"
+}

@@ -239,8 +239,9 @@ public class VduBatchProcessor {
                 }
                 vduCapabilityState.clear(VduCapabilityState.REASON_CIRCUIT_OPEN);
 
+                String attemptId = java.util.UUID.randomUUID().toString();
                 int retryCount = knowledgeClient.markVduProcessing(
-                    docId, SchemaFields.VDU_MAX_RETRIES, engineContext);
+                    docId, SchemaFields.VDU_MAX_RETRIES, attemptId, engineContext);
                 if (retryCount < 0) {
                     // The legacy scalar cannot distinguish a missing parent from retry exhaustion.
                     // Do not invent a committed failed-unit acknowledgement from that ambiguity.
@@ -266,7 +267,7 @@ public class VduBatchProcessor {
                         // which looks only at PENDING, starts the next pass for it and refusals
                         // never spend the retries kept for documents that really fail.
                         LOG.info("VDU pass deferred at {}: generation unavailable", docId);
-                        try { knowledgeClient.releaseVduProcessing(docId, engineContext); }
+                        try { knowledgeClient.releaseVduProcessing(docId, attemptId, engineContext); }
                         catch (RuntimeException | Error writeFailure) {
                             if (writeFailure != failure) writeFailure.addSuppressed(failure);
                             throw writeFailure;
@@ -280,7 +281,7 @@ public class VduBatchProcessor {
                     circuitBreaker.recordFailure(failure);
                     // Control/write failures are outside the model catch: never recursively mark
                     // an unacknowledged write as a successful FAILED document.
-                    try { markVduFailed(knowledgeClient, docId, failure.getMessage(), engineContext); }
+                    try { markVduFailed(knowledgeClient, docId, failure.getMessage(), attemptId, engineContext); }
                     catch (RuntimeException | Error writeFailure) {
                         if (writeFailure != failure) writeFailure.addSuppressed(failure);
                         throw writeFailure;
@@ -312,7 +313,7 @@ public class VduBatchProcessor {
                     enrichment = buildNoTextEnrichment(result.pageCount(), result.enrichment());
                 }
                 if (!knowledgeClient.updateVduResult(
-                        docId, content, outcome, enrichment, result.pageCount(), engineContext)) {
+                        docId, content, outcome, enrichment, result.pageCount(), attemptId, engineContext)) {
                     throw new IllegalStateException("VDU result was not acknowledged by the index");
                 }
                 if (verdict.rejected()) { recordRejected(); failed++; }
@@ -378,11 +379,11 @@ public class VduBatchProcessor {
         return outcome;
     }
 
-    private void markVduFailed(KnowledgeClient knowledgeClient, String docId, String reason,
+    private void markVduFailed(KnowledgeClient knowledgeClient, String docId, String reason, String attemptId,
             EngineContext engineContext) {
         if (!knowledgeClient.updateVduResult(docId, null,
                 io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED,
-                buildErrorEnrichment(reason), 0, engineContext)) {
+                buildErrorEnrichment(reason), 0, attemptId, engineContext)) {
             throw new IllegalStateException("VDU failure was not acknowledged by the index");
         }
     }

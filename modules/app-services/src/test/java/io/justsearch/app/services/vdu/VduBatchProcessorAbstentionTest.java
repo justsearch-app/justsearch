@@ -96,7 +96,7 @@ class VduBatchProcessorAbstentionTest {
     VduProcessor processor = mock(VduProcessor.class);
     when(processor.hasVisionCapability()).thenReturn(true);
     when(processor.process(file, context)).thenReturn(result);
-    KnowledgeClient client = mock(KnowledgeClient.class);
+    KnowledgeClient client = VduAttemptTestSupport.client();
     when(client.queryPendingVduDocIds(context)).thenReturn(List.of(file.toString()));
     when(client.markVduProcessing(anyString(), anyInt(), same(context))).thenReturn(0);
     when(client.updateVduResult(anyString(), any(), any(), anyString(), anyInt(), same(context)))

@@ -30,8 +30,12 @@ policy, the certificate, each canonical measurement, and the backend run manifes
 retrieval-calibration, union-recall, and leak evaluation. A partial, stale, mismatched, or changed
 certificate rejects resume and promotion.
 
-The primary estimand is intention-to-treat: errored cells count as incorrect and as non-adoption.
-The completed-cell per-protocol view is retained only as a labeled secondary analysis. The checked-in
+The primary estimand is intention-to-treat: resource-exhausted cells count as incorrect.
+Adoption is reported separately over shared attempted pairs.
+The cleanly completed-cell view is retained only as a labeled secondary analysis under the record's
+`measured` block. In the published `estimands.intention_to_treat` block, the field
+`n_per_protocol_pairs` counts retained pairs, including resource-exhausted cells scored as incorrect;
+it does not count only pairs where both arms completed cleanly. The checked-in
 policy governs loss, paired retention, exclusion symmetry, adoption, uncertainty, per-stratum
 promotion, and effect classification. Seed, paired-observation, uncertainty, adoption, and outcome
 gates are reported for each required stratum; aggregate counts are descriptive. A valid outcome may

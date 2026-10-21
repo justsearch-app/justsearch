@@ -40,7 +40,7 @@ class VduDeferralDuringChatDrainTest {
     Path image = tempDir.resolve("scan.png");
     Files.writeString(image, "image");
     VduProcessor processor = mock(VduProcessor.class);
-    KnowledgeClient client = mock(KnowledgeClient.class);
+    KnowledgeClient client = VduAttemptTestSupport.client();
     GpuCapabilitiesService gpu = mock(GpuCapabilitiesService.class);
     EngineContext context = TestEngineContexts.durableInternal();
     when(processor.hasVisionCapability()).thenReturn(true);

@@ -67,10 +67,10 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
       Path second = fixture.file("second.png");
       when(fixture.client.queryPendingVduDocIds(any()))
           .thenReturn(List.of(first.toString(), second.toString()));
-      when(fixture.client.markVduProcessing(anyString(), anyInt(), any())).thenReturn(0);
+      when(fixture.client.markVduProcessing(anyString(), anyInt(), anyString(), any())).thenReturn(0);
       when(fixture.processor.process(any(Path.class), any()))
           .thenReturn(new VduProcessor.VduResult("acknowledged text", "{}", 1));
-      when(fixture.client.updateVduResult(anyString(), any(), any(), any(), anyInt(), any()))
+      when(fixture.client.updateVduResult(anyString(), any(), any(), any(), anyInt(), anyString(), any()))
           .thenReturn(true);
 
       var running = fixture.start();
@@ -94,19 +94,19 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
       Path untouched = fixture.file("untouched.png");
       when(fixture.client.queryPendingVduDocIds(any()))
           .thenReturn(List.of(failed.toString(), refused.toString(), untouched.toString()));
-      when(fixture.client.markVduProcessing(anyString(), anyInt(), any())).thenReturn(0, -1);
+      when(fixture.client.markVduProcessing(anyString(), anyInt(), anyString(), any())).thenReturn(0, -1);
       when(fixture.processor.process(any(Path.class), any()))
           .thenThrow(new VduProcessor.VduException("recorded model failure", null));
-      when(fixture.client.updateVduResult(anyString(), any(), any(), any(), anyInt(), any()))
+      when(fixture.client.updateVduResult(anyString(), any(), any(), any(), anyInt(), anyString(), any()))
           .thenReturn(true);
 
       var running = fixture.start();
       fixture.assertCleanupBoundary(running, 0, 1, "\"remaining\":2");
       assertTrue(fixture.store.find(fixture.operationKey).orElseThrow().checkpointCursor()
           .contains("\"blockedReason\":\"processing_refused\""));
-      verify(fixture.client, times(2)).markVduProcessing(anyString(), anyInt(), any());
+      verify(fixture.client, times(2)).markVduProcessing(anyString(), anyInt(), anyString(), any());
       verify(fixture.processor).process(any(Path.class), any());
-      verify(fixture.client).updateVduResult(anyString(), any(), any(), any(), anyInt(), any());
+      verify(fixture.client).updateVduResult(anyString(), any(), any(), any(), anyInt(), anyString(), any());
       fixture.releaseCleanup.countDown();
 
       OperationRecord terminal = fixture.await(running);
@@ -122,10 +122,10 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
     try (var fixture = new Fixture(directory.resolve("cancel.db"))) {
       Path file = fixture.file("cancel.png");
       when(fixture.client.queryPendingVduDocIds(any())).thenReturn(List.of(file.toString()));
-      when(fixture.client.markVduProcessing(anyString(), anyInt(), any())).thenReturn(0);
+      when(fixture.client.markVduProcessing(anyString(), anyInt(), anyString(), any())).thenReturn(0);
       when(fixture.processor.process(any(Path.class), any()))
           .thenReturn(new VduProcessor.VduResult("acknowledged text", "{}", 1));
-      when(fixture.client.updateVduResult(anyString(), any(), any(), any(), anyInt(), any()))
+      when(fixture.client.updateVduResult(anyString(), any(), any(), any(), anyInt(), anyString(), any()))
           .thenReturn(true);
 
       var running = fixture.start();
@@ -263,9 +263,9 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
     }
 
     void verifyNoDocumentEffects() throws Exception {
-      verify(client, never()).markVduProcessing(anyString(), anyInt(), any());
+      verify(client, never()).markVduProcessing(anyString(), anyInt(), anyString(), any());
       verify(processor, never()).process(any(Path.class), any());
-      verify(client, never()).updateVduResult(anyString(), any(), any(), any(), anyInt(), any());
+      verify(client, never()).updateVduResult(anyString(), any(), any(), any(), anyInt(), anyString(), any());
     }
 
     void assertOneAdmittedContextReachedEveryPort() throws Exception {
@@ -278,10 +278,10 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
       int acknowledged = (int) (store.find(operationKey).orElseThrow().unitsCompleted()
           + store.find(operationKey).orElseThrow().unitsFailed());
       verify(client, atLeastOnce())
-          .markVduProcessing(anyString(), anyInt(), eq(dispatchContext));
+          .markVduProcessing(anyString(), anyInt(), anyString(), eq(dispatchContext));
       verify(processor, times(acknowledged)).process(any(Path.class), eq(dispatchContext));
       verify(client, times(acknowledged))
-          .updateVduResult(anyString(), any(), any(), any(), anyInt(), eq(dispatchContext));
+          .updateVduResult(anyString(), any(), any(), any(), anyInt(), anyString(), eq(dispatchContext));
       // Spec A O2: no embedding hand-off, so the procedure no longer counts pending embeddings.
       verify(client, never()).countPendingEmbeddings(any());
     }

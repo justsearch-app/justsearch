@@ -29,6 +29,27 @@ test('only required hosted gate-mode production commands count', () => {
   assert.equal(check(command + ' --fixture tmp/tree').issues.length, 1);
   assert.equal(check('node scripts/governance/gates/engine-port/enforcer.test.mjs').issues.length, 1);
 });
+test('only the exact merge-queue exclusion retains PR and push production credit', () => {
+  const command = 'node scripts/governance/run.mjs --gate engine-port --mode gate';
+  assert.deepEqual(check(command, "    if: github.event_name != 'merge_group'\n").issues, []);
+  for (const condition of [
+    "github.event_name == 'workflow_dispatch'",
+    "always() && github.event_name == 'workflow_dispatch'",
+    "github.event_name == 'pull_request'",
+    "github.event_name != 'push'",
+    "github.event_name != 'merge_group' && false",
+  ]) assert.equal(check(command, `    if: ${condition}\n`).rows[0].production, false, condition);
+});
+
+test('matrix step exclusion retains production credit only on PRs and pushes', () => {
+  const command = 'node scripts/governance/run.mjs --gate engine-port --mode gate';
+  for (const condition of ["github.event_name != 'merge_group'", "always() && github.event_name != 'merge_group'"]) {
+    assert.deepEqual(check(command + `\n        if: ${condition}`).issues, []);
+  }
+  for (const condition of ["github.event_name == 'workflow_dispatch'", "github.event_name != 'push'"]) {
+    assert.equal(check(command + `\n        if: ${condition}`).rows[0].production, false, condition);
+  }
+});
 for (const option of ['--preflight HEAD', '--explain engine-port', '--suggest-changeset', '--help', '-h']) {
   for (const selection of ['--gate engine-port --mode gate', '--mode gate']) {
     for (const position of ['before', 'after']) {
