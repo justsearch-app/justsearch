@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, expect, it, vi } from 'vitest';
+import { fetchSseHarness } from '../test/fetchSse.js';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import '../shell-v0/views/LibrarySurface.js';
@@ -90,13 +91,11 @@ it('mount, render, timers, and corpus-growth updates send only observations with
     if (path === '/api/chat/conversations') body = { sessions: [] };
     return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
   });
-  vi.stubGlobal('fetch', fetcher);
-  vi.stubGlobal('EventSource', class {
-    static CONNECTING = 0; static OPEN = 1; static CLOSED = 2;
-    readyState = 1; onopen = null; onerror = null; onmessage = null;
-    constructor(url: string) { calls.push({ method: 'GET', path: new URL(url, 'http://idle.test').pathname }); }
-    addEventListener(): void {} removeEventListener(): void {} close(): void {}
+  const transport = fetchSseHarness(fetcher, (connection) => {
+    calls.push({ method: 'GET', path: new URL(connection.url, 'http://idle.test').pathname });
   });
+  vi.stubGlobal('fetch', transport.fetch);
+  vi.stubGlobal('EventSource', undefined);
   const host = createMockHostApi({
     platform: { capabilities: new Set<string>() },
     utilities: { formatRelativeTime: () => 'just now' },
@@ -156,30 +155,21 @@ it('an untouched shell open on Library: mount, reload, timers, streams, status d
     }],
   };
   seedSurfaceCatalog(catalog);
-  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+  const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(input), 'http://idle.test').pathname;
     calls.push({ method: (init?.method ?? 'GET').toUpperCase(), path });
     const body = path === '/api/indexing-roots/substrate' ? { items: [] }
       : path === '/api/knowledge/collection-facet' ? { facets: { collection: { folder: 4 } } }
         : { entries: [] };
     return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
-  }));
-  // Every stream the shell opens, so the test can deliver to it what the server would.
-  const streams: Array<{ listeners: Map<string, EventListener[]>; onmessage: ((e: MessageEvent) => void) | null }> = [];
-  vi.stubGlobal('EventSource', class {
-    static CONNECTING = 0; static OPEN = 1; static CLOSED = 2;
-    readyState = 1; onopen = null; onerror = null; onmessage: ((e: MessageEvent) => void) | null = null;
-    listeners = new Map<string, EventListener[]>();
-    constructor(url: string) {
-      calls.push({ method: 'GET', path: new URL(url, 'http://idle.test').pathname });
-      streams.push(this);
-    }
-    addEventListener(type: string, listener: EventListener): void {
-      this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
-    }
-    removeEventListener(): void {}
-    close(): void { this.readyState = 2; }
   });
+  // Every stream uses the product's fetch parser, with frames delivered as HTTP bytes.
+  const transport = fetchSseHarness(fetcher, (connection) => {
+    calls.push({ method: 'GET', path: new URL(connection.url, 'http://idle.test').pathname });
+  });
+  const streams = transport.connections;
+  vi.stubGlobal('fetch', transport.fetch);
+  vi.stubGlobal('EventSource', undefined);
   type Mounted = HTMLElement & { apiBase: string; updateComplete: Promise<unknown> };
   let shell: Mounted | null = null;
   async function settle(): Promise<void> {
@@ -209,16 +199,15 @@ it('an untouched shell open on Library: mount, reload, timers, streams, status d
   await settle();
   // Streams: the server's connect burst and heartbeats on every stream the shell holds open.
   expect(streams.length, 'the shell must really open its streams').toBeGreaterThan(0);
-  const frame = (payload: unknown, seq: number): MessageEvent => new MessageEvent('frame', {
-    data: JSON.stringify({ streamId: 'surface:indexing-jobs', frameKind: 'LIFECYCLE', seq,
-      ts: new Date(0).toISOString(), payload, resumeToken: `surface:indexing-jobs:${seq}` }),
+  const frame = (payload: unknown, seq: number) => ({
+    streamId: 'surface:indexing-jobs', frameKind: 'LIFECYCLE', seq,
+    ts: new Date(0).toISOString(), payload, resumeToken: `surface:indexing-jobs:${seq}`,
   });
-  for (const stream of streams) {
-    for (const listener of stream.listeners.get('open') ?? []) listener(new Event('open'));
+  for (const stream of streams.filter((connection) => !connection.closed)) {
+    await stream.open();
     for (const [index, kind] of ['connected', 'snapshot', 'heartbeat'].entries()) {
-      for (const listener of stream.listeners.get('frame') ?? []) listener(frame({ kind }, index + 1));
-      for (const listener of stream.listeners.get('message') ?? []) listener(new MessageEvent('message', { data: '{}' }));
-      stream.onmessage?.(new MessageEvent('message', { data: '{}' }));
+      await stream.emitFrame(frame({ kind }, index + 1));
+      await stream.emit('message', {});
     }
   }
   await settle();

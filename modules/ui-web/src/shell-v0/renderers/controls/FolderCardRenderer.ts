@@ -41,6 +41,7 @@ interface FolderCard {
    *  answer, not this poll's own number. The chip marks it visibly AND in the accessible name
    *  (`failedChipCopy`), which is what review finding S2-2 required. */
   readonly failedLastKnown?: boolean;
+  readonly removalBusy?: boolean;
 }
 
 export class FolderCardRenderer extends JsonFormsRendererBase {
@@ -151,7 +152,7 @@ export class FolderCardRenderer extends JsonFormsRendererBase {
   }
 
   private renderCard(f: FolderCard): TemplateResult {
-    return html`<div class="card" role="listitem">
+    return html`<div class="card" role="listitem" aria-busy=${f.removalBusy ? 'true' : 'false'}>
       <span class="card-icon">${icon({ name: 'folder', size: 24 })}</span>
       <div class="card-info">
         <div class="card-path">
@@ -169,11 +170,11 @@ export class FolderCardRenderer extends JsonFormsRendererBase {
       </div>
       <jf-button
         variant="danger"
-        label="Remove"
-        ?disabled=${!this.enabled}
-        .onActivate=${() => this.emitRemove(f.pathHash ?? '')}
+        label=${f.removalBusy ? 'Removing…' : 'Remove'}
+        .disabled=${!this.enabled || !!f.removalBusy}
+        .onActivate=${() => { if (!f.removalBusy) this.emitRemove(f.pathHash ?? ''); }}
       >
-        ${icon({ name: 'trash-2', size: 14 })} Remove
+        ${icon({ name: 'trash-2', size: 14 })} ${f.removalBusy ? 'Removing…' : 'Remove'}
       </jf-button>
     </div>`;
   }
@@ -193,7 +194,8 @@ export class FolderCardRenderer extends JsonFormsRendererBase {
       size="sm"
       label=${copy.label}
       title=${copy.title || nothing}
-      .onActivate=${() => this.emitShowFailed(f.pathHash ?? '')}
+      .disabled=${!!f.removalBusy}
+      .onActivate=${() => { if (!f.removalBusy) this.emitShowFailed(f.pathHash ?? ''); }}
       >${icon({ name: 'alert-circle', size: 12 })} ${copy.text}</jf-button
     >`;
   }

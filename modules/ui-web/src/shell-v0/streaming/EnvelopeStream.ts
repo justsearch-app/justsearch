@@ -24,6 +24,7 @@
  *  - The React `useEnvelopeStream<T>` hook (this directory's sibling).
  *  - Lit reactive controllers in slice 3a.2+ surface ports.
  */
+import { FetchEventSource, type StreamSource } from './FetchEventSource.js';
 
 import { observeStatusEvent } from '../../api/statusInvalidation.js';
 import type { SseEnvelope } from './envelope-types.js';
@@ -62,9 +63,9 @@ export interface EnvelopeStreamConfig<T> {
   reducer: EnvelopeReducer<T>;
   /**
    * Optional EventSource factory for tests. Defaults to
-   * `(url) => new EventSource(url)`.
+   * `(url) => new FetchEventSource(url)`.
    */
-  eventSourceFactory?: (url: string) => EventSource;
+  eventSourceFactory?: (url: string) => StreamSource;
   /**
    * Optional starting resume token. Appended to the URL as
    * `?since=<token>` on initial connect. Useful when remounting after
@@ -104,13 +105,13 @@ export type EnvelopeStreamListener<T> = (snapshot: EnvelopeStreamSnapshot<T>) =>
 export class EnvelopeStream<T> {
   private readonly url: string;
   private readonly reducer: EnvelopeReducer<T>;
-  private readonly factory: (url: string) => EventSource;
+  private readonly factory: (url: string) => StreamSource;
 
   private payload: T;
   private seq: number = 0;
   private resumeToken: string | null;
   private isConnected: boolean = false;
-  private source: EventSource | null = null;
+  private source: StreamSource | null = null;
 
   // ── FE-owned re-establishment state (tempdoc 604) ──
   private readonly watchdogStaleMs: number;
@@ -136,7 +137,7 @@ export class EnvelopeStream<T> {
     this.payload = config.initialState;
     this.reducer = config.reducer;
     this.factory =
-      config.eventSourceFactory ?? ((u) => new EventSource(u));
+      config.eventSourceFactory ?? ((u) => new FetchEventSource(u));
     this.resumeToken = config.initialResumeToken ?? null;
     this.watchdogStaleMs = config.watchdogStaleMs ?? STREAM_WATCHDOG_STALE_MS;
     this.reconnectBaseMs = config.reconnectBaseMs ?? 500;

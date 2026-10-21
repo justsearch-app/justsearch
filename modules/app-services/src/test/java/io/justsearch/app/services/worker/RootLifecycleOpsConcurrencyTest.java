@@ -30,7 +30,7 @@ final class RootLifecycleOpsConcurrencyTest {
   @TempDir Path tempDir;
 
   @Test
-  void retainedAncestorPreventsFalseCompletedSubtreeRemoval() throws Exception {
+  void retainedAncestorPreservesDocumentsWhenLegacyChildRegistrationIsRemoved() throws Exception {
     Path parent = Files.createDirectories(tempDir.resolve("ancestor"));
     Path nested = Files.createDirectories(parent.resolve("nested"));
     Path rootsFile = tempDir.resolve("ancestor.json");
@@ -47,11 +47,11 @@ final class RootLifecycleOpsConcurrencyTest {
       deletes.incrementAndGet();
       return deleted();
     });
-    assertEquals(-1, removing.removeWatchedPath(nested, TestEngineContexts.internal()));
+    assertEquals(0, removing.removeWatchedPath(nested, TestEngineContexts.internal()));
     assertEquals(0, deletes.get());
-    assertEquals(Set.of(parent, nested), roots.keySet());
+    assertEquals(Set.of(parent), roots.keySet());
     assertEquals(roots.keySet(), reloaded(rootsFile).keySet());
-    assertEquals(Set.of(parent.toString(), nested.toString()), watchers);
+    assertEquals(Set.of(parent.toString()), watchers);
     assertEquals(1, removing.removeWatchedPath(parent, TestEngineContexts.internal()));
     assertTrue(roots.isEmpty());
     assertTrue(watchers.isEmpty());
@@ -84,6 +84,9 @@ final class RootLifecycleOpsConcurrencyTest {
           mock(SyncOps.class), mock(ExecutorService.class), (body, context) -> queued.add(body));
       var context = TestEngineContexts.internal();
       scanning.addWatchedRoot("parent", parent, context);
+      // A legacy nested registration resumes its pending initialization. New overlaps are refused.
+      state.register(nested, "nested", false);
+      state.markInitializationPending(nested);
       scanning.addWatchedRoot("nested", nested, context);
       if (!entry.equals("initial")) {
         queued.clear();
@@ -328,13 +331,15 @@ final class RootLifecycleOpsConcurrencyTest {
   }
 
   @Test
-  void removalWaitsForNestedWatcherCreationAcrossClients() throws Exception {
+  void removalWaitsForLegacyNestedWatcherInitializationAcrossClients() throws Exception {
     Path parent = Files.createDirectories(tempDir.resolve("parent"));
     Path nested = Files.createDirectories(parent.resolve("nested"));
     Path rootsFile = tempDir.resolve("roots.json");
     Map<Path, Instant> roots = new ConcurrentHashMap<>();
     var state = new WatchedRootsState(roots, new WatchedRootsStore(rootsFile, null));
     state.register(parent, "default", false);
+    state.register(nested, "nested", false);
+    state.markInitializationPending(nested);
     state.persist();
     Set<String> watchers = ConcurrentHashMap.newKeySet();
     watchers.add(parent.toString());

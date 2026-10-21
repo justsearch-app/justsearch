@@ -1,0 +1,78 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T04:49:27.030Z",
+  "revision": "b3e8d63d4869cc506cf965d302649c106f0344d8",
+  "tree": "a3ac8dd6a4be76358786baab9f2072657e5abacf",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.IndexingControllerSaturationTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4059
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerSaturationTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerSaturationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e5be10cfce662cbc70de42481ed81476c5fd630f540bece4aa2257d3e7f8e8c0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "admittedRequestPreservesActualSubmissionRefusal(remove)",
+          "status": "passed"
+        },
+        {
+          "name": "admittedRequestPreservesActualSubmissionRefusal(retrieve)",
+          "status": "passed"
+        },
+        {
+          "name": "admittedRequestPreservesActualSubmissionRefusal(openRetrieve)",
+          "status": "passed"
+        },
+        {
+          "name": "admittedRequestPreservesActualSubmissionRefusal(status)",
+          "status": "passed"
+        },
+        {
+          "name": "admittedRequestPreservesActualSubmissionRefusal(clear)",
+          "status": "passed"
+        },
+        {
+          "name": "admittedRequestPreservesActualSubmissionRefusal(retry)",
+          "status": "passed"
+        },
+        {
+          "name": "admittedRequestPreservesActualSubmissionRefusal(cancel)",
+          "status": "passed"
+        },
+        {
+          "name": "admittedRequestPreservesActualSubmissionRefusal(gc)",
+          "status": "passed"
+        },
+        {
+          "name": "admittedRequestPreservesActualSubmissionRefusal(settle)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:30e8ab15a7c926165d887faafa564f7fa429373ba7ebb6bcb6637e73b553634c"
+}

@@ -190,7 +190,7 @@ export const SESSION_TOKEN_HEADER = 'X-JustSearch-Session';
  *
  * The session token is a per-BOOT fact of one Head incarnation, not a constant of the app's
  * lifetime. Holding it in three independent module variables made "forget it" a three-assignment
- * operation nobody performed, so a backend restart left every mutating call 401-ing forever
+ * operation nobody performed, so a backend restart left every protected call 401-ing forever
  * (R11-F2). One object, one `invalidate()`.
  *
  * `resolved` marks the resolution FINAL — see `resolveSessionTokenFromTauri` for when that is
@@ -215,7 +215,7 @@ const sessionBinding: SessionTokenBinding = {
 /**
  * Drop the cached token so the next resolve re-invokes the shell (tempdoc 805 G.1).
  *
- * Called when the shell announces a backend restart, and when the backend answers a mutating call
+ * Called when the shell announces a backend restart, and when the backend answers a request
  * with `UI_TOKEN_REQUIRED` — the two ways the webview learns its binding died. An in-flight
  * resolution is abandoned rather than awaited: it is resolving against the DEAD instance.
  */
@@ -259,7 +259,7 @@ async function resolvePortFromTauri(): Promise<number | null> {
  * a token actually obtained. A null FROM a Tauri runtime is transient: the
  * shell's `session_token` command waits at most ~10s, so a slow cold start
  * yields null while the real token arrives moments later. Caching that null
- * permanently would 401 every mutating call for the app's lifetime with no
+ * permanently would 401 every protected call for the app's lifetime with no
  * recovery, so it stays unresolved and the next caller retries.
  */
 export async function resolveSessionTokenFromTauri(): Promise<string | null> {
@@ -348,7 +348,7 @@ export async function resolveSmokeRunId(): Promise<string | null> {
  * - JSON body serialization
  * - Error handling with status codes
  * - Cancellation via AbortSignal
- * - Session token header on non-GET requests (prod mode)
+ * - Session token header on every method (prod mode)
  */
 export async function request<T>(
   baseUrl: string,
@@ -358,14 +358,15 @@ export async function request<T>(
   const { method = 'GET', body, signal, retries = MAX_RETRIES } = options;
   const url = `${baseUrl}${path}`;
 
-  // For non-GET requests, ensure the session token is resolved before proceeding.
+  // Resolve the per-boot token before every request.
   // This makes token correctness a property of the helper, not each callsite.
   let tokenForRequest = sessionBinding.token;
-  if (method !== 'GET' && !sessionBinding.resolved) {
+  if (!sessionBinding.resolved) {
     tokenForRequest = await resolveSessionTokenFromTauri();
   }
 
   let lastError: ApiError | null = null;
+  let tokenRefreshed = false;
 
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
@@ -376,8 +377,8 @@ export async function request<T>(
         headers['Content-Type'] = 'application/json';
       }
 
-      // Add session token for non-GET requests (prod mode security)
-      if (method !== 'GET' && tokenForRequest) {
+      // Authenticate reads, writes and streams in production.
+      if (tokenForRequest) {
         headers[SESSION_TOKEN_HEADER] = tokenForRequest;
       }
 
@@ -409,6 +410,14 @@ export async function request<T>(
           errorData = text ? JSON.parse(text) : null;
         } catch {
           // Not JSON
+        }
+
+        if (response.status === 401 && errorData?.errorCode === 'UI_TOKEN_REQUIRED' && !tokenRefreshed) {
+          tokenRefreshed = true;
+          invalidateSessionToken();
+          tokenForRequest = await resolveSessionTokenFromTauri();
+          attempt -= 1; // Authentication refresh is independent of the network retry budget.
+          continue;
         }
 
         throw createApiError(

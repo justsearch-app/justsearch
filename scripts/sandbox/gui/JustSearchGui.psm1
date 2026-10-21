@@ -563,8 +563,24 @@ function Get-AppSurfaceLedgerEntries {
   }
 
   $url = "$BaseUrl/api/action-ledger"
+  $headers = @{}
+  $uri = [Uri]$BaseUrl
+  if ($uri.IsLoopback -and $uri.Scheme -eq 'http') {
+    $token = $env:JUSTSEARCH_SESSION_TOKEN
+    if (-not $token) {
+      $manifestPath = Join-Path -Path $DataDir -ChildPath 'runtime\manifest.json'
+      if (Test-Path -LiteralPath $manifestPath) {
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw -ErrorAction Stop | ConvertFrom-Json
+        if ([int]$manifest.head.apiPort -ne $uri.Port) {
+          throw 'Action-ledger probe port differs from the canonical runtime manifest; supply JUSTSEARCH_SESSION_TOKEN for an explicit port.'
+        }
+        $token = [string]$manifest.head.sessionToken
+      }
+    }
+    if ($token) { $headers['X-JustSearch-Session'] = $token }
+  }
   try {
-    $resp = Invoke-RestMethod -Uri $url -UseBasicParsing -TimeoutSec $TimeoutSec -ErrorAction Stop
+    $resp = Invoke-RestMethod -Uri $url -UseBasicParsing -Headers $headers -TimeoutSec $TimeoutSec -ErrorAction Stop
   } catch {
     $respBody = $null
     if ($_.Exception.Response) {

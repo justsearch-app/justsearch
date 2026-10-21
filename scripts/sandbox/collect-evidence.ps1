@@ -12,7 +12,7 @@
       1. Discover the backend's API port (canonical: runtime manifest;
          fallback: listening-socket scan).
       2. Hit a fixed API sanity ladder and save each raw response body.
-      2.5. Fetch the session token (GET /api/mcp/token) and exercise the
+      2.5. Read the session token from the owner-only runtime manifest and exercise the
          MUTATING surface with it (POST /api/knowledge/search). A 401 here is
          reported as a LOUD FAILURE, not a quietly recorded status: the
          all-GET ladder above scored 6/6 in round 10 while every non-GET
@@ -697,6 +697,19 @@ if (-not $port) {
 $base = "http://127.0.0.1:$port"
 Write-Log "Using base URL: $base (source: $portSource)"
 
+$sessionToken = ""
+$sessionTokenNote = ""
+try {
+    $sessionToken = [string](Get-Content -LiteralPath $manifestPath -Raw -ErrorAction Stop | ConvertFrom-Json).head.sessionToken
+    $sessionTokenNote = "Read session token from canonical runtime manifest; credential value is excluded from evidence."
+} catch {
+    throw "Cannot read the session token from canonical runtime manifest: $manifestPath"
+}
+Write-Log $sessionTokenNote
+# Presence/length only -- the token itself is a credential and must never land
+# in an archived evidence directory.
+$sessionTokenNote | Write-Utf8NoBom -Path (Join-Path -Path $EvidenceDir -ChildPath "session-token-probe.txt")
+
 # ---------------------------------------------------------------------------
 # Step 2: API sanity ladder
 # ---------------------------------------------------------------------------
@@ -719,7 +732,7 @@ foreach ($apiPath in $ladderPaths) {
     Write-Log "GET $url"
 
     try {
-        $response = Invoke-WebRequest -Uri $url -UseBasicParsing -ErrorAction Stop
+        $response = Invoke-WebRequest -Uri $url -UseBasicParsing -Headers @{ "X-JustSearch-Session" = $sessionToken } -ErrorAction Stop
         $statusCode = [int]$response.StatusCode
         $body = $response.Content
         $body | Write-Utf8NoBom -Path $outFile
@@ -790,39 +803,6 @@ foreach ($apiPath in $ladderPaths) {
 # LOUDLY, because silently recording it is exactly the green that shipped a
 # product whose entire mutating surface was dead.
 
-$sessionToken = ""
-$sessionTokenNote = ""
-$tokenResult = Invoke-ApiRequest -Url "$base/api/mcp/token"
-if ($tokenResult.Ok) {
-    try {
-        $sessionToken = [string](($tokenResult.Body | ConvertFrom-Json).token)
-    }
-    catch {
-        $sessionToken = ""
-        $sessionTokenNote = "GET /api/mcp/token returned 200 but unparsable JSON ($($_.Exception.Message))"
-    }
-    if ($sessionTokenNote -eq "") {
-        if ([string]::IsNullOrWhiteSpace($sessionToken)) {
-            $sessionToken = ""
-            $sessionTokenNote = "GET /api/mcp/token returned an EMPTY token -- session-token enforcement is off (dev mode). A 200 on the POST rung below therefore proves reachability, NOT that the token chain works."
-        }
-        else {
-            $sessionTokenNote = "GET /api/mcp/token returned a token of length $($sessionToken.Length) (value deliberately NOT written to evidence)."
-        }
-    }
-}
-else {
-    $statusText = "no response"
-    if ($tokenResult.StatusCode -ne $null) {
-        $statusText = "HTTP $($tokenResult.StatusCode)"
-    }
-    $sessionTokenNote = "GET /api/mcp/token FAILED ($statusText; $($tokenResult.Error)) -- the POST rung below runs WITHOUT a session header, so a 401 there cannot distinguish 'enforcement armed' from 'token endpoint broken'."
-}
-Write-Log $sessionTokenNote
-# Presence/length only -- the token itself is a credential and must never land
-# in an archived evidence directory.
-$sessionTokenNote | Write-Utf8NoBom -Path (Join-Path -Path $EvidenceDir -ChildPath "session-token-probe.txt")
-
 $mutatingPath = "/api/knowledge/search"
 $mutatingUrl = "$base$mutatingPath"
 $mutatingFileName = "api-post-" + (Get-SanitizedFileName -ApiPath $mutatingPath) + ".json"
@@ -855,7 +835,7 @@ else {
 
     if ($mutatingResult.StatusCode -eq 401) {
         $mutatingFailReason = "FAIL: POST $mutatingPath returned 401 UNAUTHORIZED" +
-            "$(if ($sessionToken -ne '') { ' EVEN WITH the session token from GET /api/mcp/token' } else { ' and no session token could be obtained' })" +
+            "$(if ($sessionToken -ne '') { ' EVEN WITH the session token from the runtime manifest' } else { ' and no session token could be obtained' })" +
             " -- the product's entire mutating surface (search, ingest, chat) is unusable in this round. " +
             "Every GET rung above can still be green while this is true; that combination is the round-10 " +
             "false-green (finding F7). Do NOT read this round's ladder as a pass. Details: $mutatingFileName. $sessionTokenNote"
@@ -1412,7 +1392,7 @@ function Get-EmbedEpState {
         warm              = $false
         readError         = ""
     }
-    $response = Invoke-ApiRequest -Url "$BaseUrl/api/ai/runtime/status" -Method "GET"
+    $response = Invoke-ApiRequest -Url "$BaseUrl/api/ai/runtime/status" -Method "GET" -Headers @{ "X-JustSearch-Session" = $sessionToken }
     if (-not $response.Ok) {
         $result.readError = "GET /api/ai/runtime/status -> $($response.StatusCode) $($response.Error)"
         return $result
