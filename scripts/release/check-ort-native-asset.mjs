@@ -14,9 +14,9 @@
  *   node scripts/release/check-ort-native-asset.mjs <path-to-ort-native-cuda12-v1.24.3.zip>
  *
  * Exit 0 = every required DLL present. Exit 1 = missing DLLs listed (or the file is unreadable /
- * not a zip). The required DLL set and the version marker are READ FROM `OrtCudaHelper.java` — the
- * single authority the runtime itself checks against — never a second hardcoded copy that could
- * drift (same discipline as `scripts/dev/restage-ort-pack.mjs`, whose minimal central-directory
+ * not a zip). The required library IDs and version marker are READ FROM `OrtCudaHelper.java` — the
+ * authority the runtime checks against, with names resolved through the native-target contract —
+ * never a second hardcoded copy that could drift (same discipline as `scripts/dev/restage-ort-pack.mjs`, whose minimal central-directory
  * reader this borrows).
  *
  * Layout tolerance: entries may sit at the archive root OR under a single top-level directory
@@ -24,6 +24,7 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { nativeTarget } from '../lib/native-targets.cjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -33,16 +34,22 @@ const ORT_HELPER = resolve(
   'modules/ort-common/src/main/java/io/justsearch/ort/OrtCudaHelper.java',
 );
 
-/** Reads the required DLL set + version marker from the Java authority. */
-export function readRequiredDlls(helperPath = ORT_HELPER) {
+/** Read Java library IDs and resolve filenames with the same native-target contract as the runtime. */
+export function readRequiredDlls(helperPath = ORT_HELPER, target = nativeTarget()) {
   const java = readFileSync(helperPath, 'utf8');
-  const setBlock = java.match(/ORT_NATIVE_DLL_SET\s*=\s*List\.of\(([\s\S]*?)\)\s*;/);
-  const dlls = setBlock ? [...setBlock[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]) : [];
+  const setBlock = java.match(/ortNativeDllSet\(\)\s*\{\s*return\s+nativeLibraryNames\(([^)]*)\)\s*;/);
+  const ids = setBlock ? [...setBlock[1].matchAll(/"([^"]+)"/g)].map(m => m[1]) : [];
+  const dlls = ids.map(id => {
+    const name = target.libraries[id];
+    if (!name) throw new Error(`unknown ORT native library id: ${id}`);
+    return name;
+  });
   if (dlls.length === 0) {
-    throw new Error(`could not parse ORT_NATIVE_DLL_SET from ${helperPath}`);
+    throw new Error(`could not parse ortNativeDllSet() from ${helperPath}`);
   }
   const marker = java.match(/ORT_NATIVE_VERSION_MARKER\s*=\s*"([^"]*)"/);
-  return { dlls, marker: marker ? marker[1] : null };
+  const version = java.match(/EXPECTED_ORT_NATIVE_VERSION\s*=\s*"([^"]*)"/);
+  return { dlls, marker: marker ? marker[1] : null, version: version ? version[1] : null };
 }
 
 /**
@@ -96,8 +103,8 @@ export function missingRequiredFiles(names, required) {
 }
 
 /** Returns {missing, names} for an on-disk archive. */
-export function checkAsset(zipPath, helperPath = ORT_HELPER) {
-  const { dlls, marker } = readRequiredDlls(helperPath);
+export function checkAsset(zipPath, helperPath = ORT_HELPER, target = nativeTarget()) {
+  const { dlls, marker } = readRequiredDlls(helperPath, target);
   const names = listZipEntryNames(readFileSync(zipPath));
   return {
     required: dlls,

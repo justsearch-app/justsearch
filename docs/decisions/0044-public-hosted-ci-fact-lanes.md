@@ -7,7 +7,7 @@ date: 2026-06-27
 probes:
   - adr-0044-fact-lane-triggers-checked
   - adr-0044-advisory-fact-lane-bounded
-last_reviewed: 2026-09-05
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0044: Public hosted CI fact lanes
@@ -242,3 +242,14 @@ classic branch protection (`repos/<owner>/<repo>/branches/main/protection`) rath
 after this change lands; `scripts/ci/check-branch-protection.mjs` reports the declared-versus-
 live gap in the interval and is the only guard that can see it, because the default pull-request
 token cannot read branch-protection settings.
+
+## Amendment 2026-10-20: current hosted runner split and CodeQL exception
+
+The original Decision's Windows-hosted build/unit bullet is historical.
+`.github/workflows/ci.yml` runs the no-model `build` job on `ubuntu-latest`;
+`unit-tests` uses its lane matrix (currently Linux), with separate Windows
+native-test lanes. Required-check names and workflow triggers remain declared
+in the workflow-signal policy.
+[ADR-0052](0052-weekly-codeql-on-hosted-runners.md) amends the specialty-workflow
+rule for weekly hosted CodeQL; it also narrows
+[ADR-0026](0026-manual-ci-triggering.md)'s manual-only security statement.
