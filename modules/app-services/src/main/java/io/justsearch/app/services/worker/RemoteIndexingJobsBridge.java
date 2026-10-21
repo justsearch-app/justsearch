@@ -98,6 +98,7 @@ public final class RemoteIndexingJobsBridge {
   private volatile StreamAttempt activeSubscription;
 
   private static final class StreamAttempt {
+    final CompletableFuture<Void> snapshotDelivered = new CompletableFuture<>();
     KnowledgeClient.IndexingJobsStream stream; // Owned under subscriptionLock.
     boolean receivedFrame; // Cursor translation is owned under the bridge monitor.
     long sequenceOffset;
@@ -231,27 +232,23 @@ public final class RemoteIndexingJobsBridge {
    * calling start and will receive the snapshot via the regular delta path.
    *
    * <p>Idempotent on second call — a started bridge returns a future that
-   * resolves once the in-flight snapshot has been delivered (or never if the
-   * connection failed).
+   * resolves once the in-flight snapshot has been delivered, or fails if the
+   * connection fails or the bridge stops before that snapshot.
    */
   public CompletableFuture<Void> start() {
-    CompletableFuture<Void> snapshotDelivered = new CompletableFuture<>();
     StreamAttempt attempt;
     synchronized (subscriptionLock) {
       if (stopped) {
-        snapshotDelivered.completeExceptionally(new IllegalStateException("bridge stopped"));
-        return snapshotDelivered;
+        return CompletableFuture.failedFuture(new IllegalStateException("bridge stopped"));
       }
       if (!started.compareAndSet(false, true)) {
-        // Already started; return an already-completed future to avoid hanging callers.
-        snapshotDelivered.complete(null);
-        return snapshotDelivered;
+        return activeSubscription.snapshotDelivered;
       }
       attempt = new StreamAttempt();
       activeSubscription = attempt;
     }
-    openStream(attempt, snapshotDelivered);
-    return snapshotDelivered;
+    openStream(attempt, attempt.snapshotDelivered);
+    return attempt.snapshotDelivered;
   }
 
   /**
@@ -294,9 +291,10 @@ public final class RemoteIndexingJobsBridge {
    */
   public void stop() {
     KnowledgeClient.IndexingJobsStream open;
+    StreamAttempt attempt;
     synchronized (subscriptionLock) {
       stopped = true;
-      var attempt = activeSubscription;
+      attempt = activeSubscription;
       activeSubscription = null;
       open = attempt == null ? null : attempt.stream;
       if (attempt != null) attempt.stream = null;
@@ -305,6 +303,9 @@ public final class RemoteIndexingJobsBridge {
     reconnectRetries.shutdownNow();
     reconnects.shutdownNow();
     listeners.clear();
+    if (attempt != null) {
+      attempt.snapshotDelivered.completeExceptionally(new IllegalStateException("bridge stopped"));
+    }
     if (open != null) {
       try {
         open.close();
@@ -533,6 +534,7 @@ public final class RemoteIndexingJobsBridge {
         attempt.stream = null;
         started.set(false);
       }
+      snapshotDelivered.completeExceptionally(new IllegalStateException("stream completed before snapshot"));
       closeRetiredStream(dead);
       log.info("RemoteIndexingJobsBridge stream completed by producer");
     };

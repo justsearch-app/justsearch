@@ -1060,6 +1060,14 @@ class HeadAssemblyTest {
     try (HeadAssembly bootstrap = newDisconnectedHeadAssembly()) {
       var client = org.mockito.Mockito.mock(
           io.justsearch.app.services.worker.KnowledgeClient.class);
+      org.mockito.Mockito.doAnswer(call -> {
+        call.<java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame>>getArgument(0)
+            .accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder().setSeq(1)
+                .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.getDefaultInstance()).build());
+        return (io.justsearch.app.services.worker.KnowledgeClient.IndexingJobsStream) () -> {};
+      }).when(client).subscribeIndexingJobOutcomes(
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
       var ks = recoveryKnowledgeServer(client);
       try (var successfulRegistration = org.mockito.Mockito.mockStatic(
           io.justsearch.app.services.bootstrap.phases.AgentToolHandlers.class,

@@ -68,12 +68,11 @@ public final class IndexingJobsBridgeWiring {
             () -> {
               KnowledgeClient kc = knowledgeClientSupplier.get();
               return kc == null ? null : (IndexingJobsSource) (onFrame, onError, onCompleted) -> {
-                // Establish terminal registration before opening the view to callers.
-                outcomes.start().join();
-                return kc.subscribeIndexingJobs(onFrame, onError, onCompleted,
+                // Keep activation and shutdown runnable while preserving the registration barrier.
+                return subscribeAfterRegistration(outcomes.start(), () -> kc.subscribeIndexingJobs(onFrame, onError, onCompleted,
                     io.justsearch.app.services.intent.EngineProvenance.internal(
                         "indexing-jobs-bridge", io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
-                        io.justsearch.core.context.EngineContext.Urgency.BACKGROUND));
+                        io.justsearch.core.context.EngineContext.Urgency.BACKGROUND)), onError);
               };
             });
     RemoteIndexingJobsBridge.Subscription subscription =
@@ -108,6 +107,32 @@ public final class IndexingJobsBridgeWiring {
       catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
       throw failure;
     }
+  }
+
+  private static KnowledgeClient.IndexingJobsStream subscribeAfterRegistration(
+      java.util.concurrent.CompletableFuture<Void> registered,
+      Supplier<KnowledgeClient.IndexingJobsStream> subscribe,
+      java.util.function.Consumer<Throwable> onError) {
+    KnowledgeClient.IndexingJobsStream closed = () -> {};
+    var current = new java.util.concurrent.atomic.AtomicReference<KnowledgeClient.IndexingJobsStream>();
+    var unused = registered.whenComplete((ignored, failure) -> {
+      if (current.get() == closed) return;
+      if (failure != null) {
+        onError.accept(failure);
+        return;
+      }
+      try {
+        var opened = subscribe.get();
+        // Closing can race with subscribe returning its handle.
+        if (opened != null && !current.compareAndSet(null, opened)) opened.close();
+      } catch (RuntimeException | Error subscribeFailure) {
+        onError.accept(subscribeFailure);
+      }
+    });
+    return () -> {
+      var opened = current.getAndSet(closed);
+      if (opened != null && opened != closed) opened.close();
+    };
   }
 
   private static void emitTerminalOutcome(ActionLedgerChangeRegistry registry, IndexingJobView row) {

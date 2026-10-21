@@ -1847,6 +1847,70 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
         "modules/app-engine/src/test/java/io/justsearch/app/engine/BoundedHandoffTest.java#closeAfterOuterDrainCheckStillFencesTheConsumerCall"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/HeadAssemblyTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature",
+        "input re-encoding"
+      ],
+      "whatMoved": "Only recoveredWorkerPreparationDefersIndexingJobsUntilActivation: the fixture now acknowledges the separate terminal-outcome subscription with its required empty registration snapshot. Before: the mock supplied no outcome-port acknowledgement. After: the same recovered worker mock supplies that control acknowledgement; it supplies no job row or terminal event. Old -> new assertions are identical: verify(client, never()).subscribeIndexingJobs(...) before activation -> unchanged; verify(client).subscribeIndexingJobs(...) after activation -> unchanged; assertFalse(successfulRegistration.isClosed()) -> unchanged. All other inputs, observation, expected outcomes, conditions and test selection remain unchanged. The original test passes on the merge base; its adapted form passes on both 56ef4483e and the candidate in the attached preservation receipt.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q15",
+          "quote": "Live, reloaded and reconnected clients converge: concurrent writes during snapshot, more than 256 initial deltas, a reconnect and a browser reload all end with the same rows and no phantom jobs.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q17",
+          "quote": "The activity ledger and scan rollups keep today's terminal-event semantics (including later outcomes after retry or re-enqueue), also for rows never in the view, with no replay on reconnect.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/queue-scale-registration-lifecycle.json"
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/IndexingJobsRegistrationLifecycleTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Activation returns while the terminal registration acknowledgement is withheld; repeated starts share that pending readiness future and rows open only after acknowledgement. Stopping completes pending readiness exceptionally and prevents a late row subscription. Registration failure or producer completion before acknowledgement fails readiness without opening rows. A row handle returned after cancellation closes exactly once. The two-second test guard observes an otherwise withheld acknowledgement; cleanup releases it even on the fail-before implementation and joins every test-owned thread. No Engine, database, global configuration, clock or locale is created or modified.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q15",
+          "quote": "Live, reloaded and reconnected clients converge: concurrent writes during snapshot, more than 256 initial deltas, a reconnect and a browser reload all end with the same rows and no phantom jobs.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q17",
+          "quote": "The activity ledger and scan rollups keep today's terminal-event semantics (including later outcomes after retry or re-enqueue), also for rows never in the view, with no replay on reconnect.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Use a completion callback for terminal-outcome registration, return the pending readiness future immediately, and close pending or late row handles when stopped.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/queue-scale-registration-lifecycle.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/IndexingJobsRegistrationLifecycleTest.java"
+      ],
+      "repaired": true
     }
   ]
 }
