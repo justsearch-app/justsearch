@@ -238,3 +238,5 @@ Some detailed “current state” docs live under `docs/reference/` while the de
 
 - **Schema migration architecture (stable)**: `docs/explanation/11-index-schema-migration.md`
 - **UI user readiness verification notes (living checklist)**: `docs/reference/ui-user-readiness.md`
+
+This overview is maintained alongside the code.
