@@ -17,11 +17,6 @@ through the current writer, outside the walk or sync that resumed it.
 The new check extends the real Engine reload fixture (RuntimeReloadProducersHttpIntegrationTest).
 Fail-before ran against the previous candidate, 35ffcf3e8.
 
-The check simulates the volume change by rewriting the root's recorded volume in the Worker's
-volume ledger, then calls the Worker's directory sync directly. This is the accepted check: a real
-remount (OS mount detection, directory identity across a remount) and delivery by the periodic
-sync's timer stay unverified.
-
 ```json
 {
   "entries": [{

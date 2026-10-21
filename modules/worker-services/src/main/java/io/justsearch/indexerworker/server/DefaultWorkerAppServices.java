@@ -1160,18 +1160,6 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     producerOwnership.closeLoopRetainingNer(indexingLoop);
   }
 
-  /**
-   * Before A can close: every settled DELETE waiting on the fence becomes A's durable root
-   * receipt, through the same call a failed handoff's released callback makes on drained A. The
-   * fence's write lease admits it; the successor's reconciliation settles the receipt. A receipt
-   * that cannot be written refuses the handoff: the caller keeps A, and the waiting callback,
-   * still unacknowledged, reaches A once the fence is restored.
-   */
-  public void recordWaitingWatcherDeletes() {
-    workerWatcher.forEachSettlingDelete(
-        (witness, path) -> WatcherCallbacks.deleteAt(preparedWatcherTarget, witness, path));
-  }
-
   /** Moves the unchanged watcher and registrations after A's loop closes, inside the final fence. */
   public void installNativeWatcherHandoffTo(DefaultWorkerAppServices successor) {
     if (successor == null || successor.borrowedFrom != this
@@ -1181,6 +1169,18 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         || successor.mutationAdmission != mutationAdmission) {
       throw new IllegalArgumentException("Native watcher successor changed");
     }
+    // Before A can close: every settled DELETE waiting on the fence becomes A's durable root
+    // receipt, through the same call a failed handoff's released callback makes on drained A. The
+    // fence's write lease admits it; the successor's reconciliation settles the receipt.
+    workerWatcher.forEachSettlingDelete((witness, path) -> {
+      try {
+        WatcherCallbacks.deleteAt(preparedWatcherTarget, witness, path);
+      } catch (RuntimeException unrecorded) {
+        // The waiting callback still holds this DELETE and applies or reports it once admitted.
+        log.warn("A waiting watcher DELETE was not recorded before the handoff: {}",
+            unrecorded.getMessage());
+      }
+    });
     producerOwnership.transferWatcherTo(successor.producerOwnership);
     watcherCallbacks.target = successor.preparedWatcherTarget;
   }
