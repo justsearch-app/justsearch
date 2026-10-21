@@ -958,6 +958,12 @@ public final class ChatController {
       ctx.status(400).json(err);
       return;
     }
+    try (var ignoredWriting = conversationWork(Map.of("conversationId", sessionId))) {
+      compactOwned(ctx, sessionId, floorMessageId);
+    }
+  }
+
+  private void compactOwned(Context ctx, String sessionId, String floorMessageId) {
     // The prefix to summarize = the resolved history up to (not including) the
     // floor. If the floor is the first message there is nothing to compact.
     List<Map<String, Object>> full = conversationStore.loadHistory(sessionId);

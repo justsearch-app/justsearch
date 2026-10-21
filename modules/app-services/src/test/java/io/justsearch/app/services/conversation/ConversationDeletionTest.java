@@ -30,6 +30,7 @@ class ConversationDeletionTest {
     when(client.deleteHistoryTranscript(any(), any())).thenReturn(DeleteByIdResponse.newBuilder().setSuccess(true).build());
     try (var history = new AgentHistoryIndexer(new TestEngineExecutors(), temp.resolve("history"), () -> client)) {
       var deletion = deletion(store, runs, history);
+      store.createSession("conversation", "core.free-chat");
       store.appendMessage("conversation", "core.free-chat", Map.of("role", "user", "content", "private question"));
       seedRun(runs, "run", "conversation");
       seedRun(runs, "survivor", "other");
@@ -192,6 +193,7 @@ class ConversationDeletionTest {
     });
     try (var history = new AgentHistoryIndexer(new TestEngineExecutors(), temp.resolve("history"), () -> client)) {
       var deletion = deletion(store, runs, history);
+      store.createSession("conversation", "core.free-chat");
       store.appendMessage("conversation", "core.free-chat", Map.of("role", "user", "content", "private"));
       seedRun(runs, "run", "conversation");
       try {

@@ -309,6 +309,7 @@ final class ConversationApiAssembly {
                   String shapeId = c.get("shapeId") == null ? null : c.get("shapeId").toString();
                   try (var ignoredWriting = conversationStore.conversationWork().start(sid.toString())) {
                     if (c.get("messages") instanceof List<?> list) {
+                      if (!list.isEmpty()) conversationStore.createSession(sid.toString(), shapeId);
                       for (var msg : list) {
                         if (msg instanceof java.util.Map<?, ?> raw) {
                           var typed = new java.util.LinkedHashMap<String, Object>();

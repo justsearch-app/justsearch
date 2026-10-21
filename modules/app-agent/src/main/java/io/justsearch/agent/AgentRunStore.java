@@ -263,9 +263,8 @@ public final class AgentRunStore {
     try {
       var meta = readMeta(sessionId);
       if (meta == null) {
-        meta = new LinkedHashMap<>();
-        meta.put("sessionId", sessionId);
-        meta.put("startedAt", Instant.now().toString());
+        LOG.warn("Cannot checkpoint absent run {}", sessionId);
+        return;
       }
       meta.put("updatedAt", Instant.now().toString());
       meta.put("state", state);
@@ -593,7 +592,9 @@ public final class AgentRunStore {
     for (String runId : runIds) {
       if (!Files.exists(runDir(runId))) continue;
       try {
-        DiagnosticFileRetention.deleteDirectoryTree(runDir(runId));
+        synchronized (events) {
+          DiagnosticFileRetention.deleteDirectoryTree(runDir(runId));
+        }
         deleted++;
       } catch (IOException e) {
         throw new java.io.UncheckedIOException("Run deletion is incomplete; retry deleting the conversation", e);

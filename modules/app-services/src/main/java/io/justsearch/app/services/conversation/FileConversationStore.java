@@ -249,12 +249,27 @@ public final class FileConversationStore implements ConversationStore {
   }
 
   @Override
+  public void createSession(String sessionId, String shapeId) {
+    StoreIds.requireValid(sessionId);
+    try (var ignoredWriting = conversationWork.start(sessionId)) {
+      if (isLocked()) throw new io.justsearch.agent.api.encryption.KeyLockedException();
+      synchronized (titleWrites) {
+        if (readMeta(sessionId) != null) return;
+        var meta = new LinkedHashMap<String, Object>();
+        meta.put("shapeId", shapeId == null ? "" : shapeId);
+        meta.put("createdAtMs", System.currentTimeMillis());
+        writeMetaAtomic(resolveSessionDir(sessionId), meta, sessionId, true);
+      }
+    }
+  }
+
+  @Override
   public void appendMessage(String sessionId, String shapeId, Map<String, Object> message) {
     try (var ignoredWriting = conversationWork.start(sessionId)) {
       StoreIds.requireValid(sessionId);
       Path sessionDir = resolveSessionDir(sessionId);
       try {
-        Files.createDirectories(sessionDir);
+        requireSession(sessionId);
         // Slice 513: ensure id + hash are present before write. The store is the
         // authoritative source — callers don't need to know about hash semantics.
         Map<String, Object> enriched = enrichMessage(message, shapeId);
@@ -430,7 +445,7 @@ public final class FileConversationStore implements ConversationStore {
       if (preview instanceof String s && !s.isEmpty()) meta.put("firstUserMessage", s);
       meta.put("parentSessionId", parentSessionId);
       meta.put("branchPointMessageId", branchPointMessageId);
-      writeMetaAtomic(newSessionDir, meta, newSessionId);
+      writeMetaAtomic(newSessionDir, meta, newSessionId, true);
     }
   }
 
@@ -473,21 +488,14 @@ public final class FileConversationStore implements ConversationStore {
       Path sessionDir = resolveSessionDir(sessionId);
       Map<String, Object> existing = readMeta(sessionId);
       boolean clearing = floorMessageId == null || floorMessageId.isBlank();
-      if (existing == null && clearing) {
-        // Nothing to clear on an unknown session; don't materialise an empty one.
-        return;
-      }
-      Map<String, Object> meta =
-          existing == null ? new LinkedHashMap<>() : new LinkedHashMap<>(existing);
+      if (existing == null && clearing) return;
+      Map<String, Object> meta = new LinkedHashMap<>(requireSession(sessionId));
       // A plain rewind carries no summary — clear any prior compaction summary.
       meta.remove("contextFloorSummary");
       if (clearing) {
         meta.remove("contextFloor");
       } else {
         meta.put("contextFloor", floorMessageId);
-      }
-      if (existing == null) {
-        meta.putIfAbsent("createdAtMs", System.currentTimeMillis());
       }
       writeMetaAtomic(sessionDir, meta, sessionId);
     }
@@ -524,10 +532,7 @@ public final class FileConversationStore implements ConversationStore {
 
   private void writeTitle(
       String sessionId, Map<String, Object> existing, String title, String titleSource) {
-    // Tempdoc 838 — the scalar-meta-field write, mirroring setContextFloor, with ONE deliberate
-    // divergence: an unknown session is left alone rather than materialised. setContextFloor mints a
-    // meta for an id it has never seen; doing that here would create a zero-message conversation that
-    // listSessions then lists — a row that names nothing. The controller answers 404 for that case.
+    // Late auto-title replies and idempotent clear-title calls leave missing sessions alone.
     if (existing == null) return;
     Map<String, Object> meta = new LinkedHashMap<>(existing);
     if (title == null || title.isBlank()) {
@@ -554,17 +559,12 @@ public final class FileConversationStore implements ConversationStore {
         return;
       }
       Path sessionDir = resolveSessionDir(sessionId);
-      Map<String, Object> existing = readMeta(sessionId);
-      Map<String, Object> meta =
-          existing == null ? new LinkedHashMap<>() : new LinkedHashMap<>(existing);
+      Map<String, Object> meta = new LinkedHashMap<>(requireSession(sessionId));
       meta.put("contextFloor", floorMessageId);
       if (summaryText != null && !summaryText.isBlank()) {
         meta.put("contextFloorSummary", summaryText);
       } else {
         meta.remove("contextFloorSummary");
-      }
-      if (existing == null) {
-        meta.putIfAbsent("createdAtMs", System.currentTimeMillis());
       }
       writeMetaAtomic(sessionDir, meta, sessionId);
     }
@@ -605,22 +605,14 @@ public final class FileConversationStore implements ConversationStore {
   @Override
   public void setTurnOpen(String sessionId, boolean open) {
     StoreIds.requireValid(sessionId);
-    // Tempdoc 834 §4.3 — one boolean on meta.json, written through the same atomic path the floor
-    // and exclusion toggles use. Written only for sessions that already exist (a turn cannot be
-    // open on a conversation with no record); clearing an unknown session is a no-op.
-    Map<String, Object> existing = readMeta(sessionId);
-    if (existing == null && !open) {
-      return;
+    try (var ignoredWriting = conversationWork.start(sessionId)) {
+      Map<String, Object> existing = readMeta(sessionId);
+      if (existing == null && !open) return;
+      Map<String, Object> meta = new LinkedHashMap<>(requireSession(sessionId));
+      if (open) meta.put("turnOpen", true);
+      else meta.remove("turnOpen");
+      writeMetaAtomic(resolveSessionDir(sessionId), meta, sessionId);
     }
-    Map<String, Object> meta =
-        existing == null ? new LinkedHashMap<>() : new LinkedHashMap<>(existing);
-    if (open) {
-      meta.put("turnOpen", true);
-      meta.putIfAbsent("createdAtMs", System.currentTimeMillis());
-    } else {
-      meta.remove("turnOpen");
-    }
-    writeMetaAtomic(resolveSessionDir(sessionId), meta, sessionId);
   }
 
   @Override
@@ -636,8 +628,7 @@ public final class FileConversationStore implements ConversationStore {
     Path sessionDir = resolveSessionDir(sessionId);
     Map<String, Object> existing = readMeta(sessionId);
     if (existing == null && !present) return; // nothing to remove on an unknown session
-    Map<String, Object> meta =
-        existing == null ? new LinkedHashMap<>() : new LinkedHashMap<>(existing);
+    Map<String, Object> meta = new LinkedHashMap<>(requireSession(sessionId));
     Object raw = meta.get(key);
     java.util.LinkedHashSet<Object> ids = new java.util.LinkedHashSet<>();
     if (raw instanceof List<?> l) ids.addAll(l);
@@ -650,9 +641,6 @@ public final class FileConversationStore implements ConversationStore {
       meta.remove(key);
     } else {
       meta.put(key, new ArrayList<>(ids));
-    }
-    if (existing == null) {
-      meta.putIfAbsent("createdAtMs", System.currentTimeMillis());
     }
     writeMetaAtomic(sessionDir, meta, sessionId);
   }
@@ -670,7 +658,19 @@ public final class FileConversationStore implements ConversationStore {
     return ids;
   }
 
+  private Map<String, Object> requireSession(String sessionId) {
+    Map<String, Object> meta = readMeta(sessionId);
+    if (meta == null) throw new IllegalArgumentException("No such conversation: " + sessionId);
+    return meta;
+  }
+
   private void writeMetaAtomic(Path sessionDir, Map<String, Object> meta, String sessionId) {
+    writeMetaAtomic(sessionDir, meta, sessionId, false);
+  }
+
+  private void writeMetaAtomic(
+      Path sessionDir, Map<String, Object> meta, String sessionId, boolean creating) {
+    if (!creating) requireSession(sessionId);
     try {
       AtomicFileWrites.replace(
           sessionDir.resolve("meta.json"),
@@ -873,14 +873,10 @@ public final class FileConversationStore implements ConversationStore {
   private void updateMeta(Path sessionDir, String shapeId, Map<String, Object> message) {
     Path metaFile = sessionDir.resolve("meta.json");
     try {
-      Map<String, Object> meta;
-      if (Files.exists(metaFile)) {
-        Map<String, Object> existing = readRawMeta(metaFile);
-        meta = new LinkedHashMap<>(existing);
-      } else {
-        meta = new LinkedHashMap<>();
-        meta.put("createdAtMs", System.currentTimeMillis());
+      if (!Files.isRegularFile(metaFile)) {
+        throw new IllegalArgumentException("No such conversation: " + sessionDir.getFileName());
       }
+      Map<String, Object> meta = new LinkedHashMap<>(readRawMeta(metaFile));
       // Tempdoc 863 §4.A.5 A-10.1 — FIRST WINS. This was an unconditional overwrite on every append,
       // so a conversation's declared shape was really "the shape of its most recent turn". That is
       // the wrong fact to store: `listSessions(shapeId, …)` filters rows by it and

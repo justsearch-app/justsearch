@@ -71,10 +71,16 @@ public interface ConversationStore {
   List<Map<String, Object>> loadHistory(String sessionId);
 
   /**
-   * Append a message to the session's history. Creates the session directory
-   * if it doesn't exist (first append = session creation).
+   * Append a message to an existing session. An absent session is refused; only
+   * {@link #createSession} and {@link #branchFrom} may create conversation records.
    */
   void appendMessage(String sessionId, String shapeId, Map<String, Object> message);
+
+  /**
+   * Explicit conversation creation at dispatch or backup import, before the first append.
+   * Idempotent for an existing session; it preserves its metadata and declared shape.
+   */
+  default void createSession(String sessionId, String shapeId) {}
 
   /** Shared writer/deletion exclusion; absent for stores that do not persist. */
   default ConversationWork conversationWork() { return null; }
