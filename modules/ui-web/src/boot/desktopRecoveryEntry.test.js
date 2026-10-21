@@ -1,5 +1,10 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from 'vitest';
+import indexHtml from '../../index.html?raw';
+
+it('the app entry has no automatic Google Fonts contacts', () => {
+  expect(indexHtml).not.toMatch(/fonts\.(?:googleapis|gstatic)\.com/i);
+});
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
