@@ -272,15 +272,18 @@ final class EngineKnowledgeClientInferenceQueueTest {
         long submitted = System.nanoTime();
         var probe = start(() -> client.search(inference("probe", kind), client(1)));
         await(() -> queued(registry, INFERENCE) == 1 || probe.isDone());
-        TimeUnit.MILLISECONDS.sleep(600);
+        assertEquals(1, queued(registry, INFERENCE), "the probe must wait behind the holder");
+        assertFalse(probe.isDone());
+        long released = System.nanoTime();
         held.release.complete(null);
 
         assertEquals("completed", probe.get(5, TimeUnit.SECONDS));
         CallContext call = held.contexts.get("probe");
         assertNotNull(call, "the queued request never ran");
-        long slackNanos = TimeUnit.MILLISECONDS.toNanos(100);
-        assertTrue(call.deadlineNanos() - submitted <= TimeUnit.MILLISECONDS.toNanos(budgetMs) + slackNanos,
-            "the deadline restarted when the request left the queue");
+        assertTrue(call.startNanos() >= submitted && call.startNanos() < released,
+            "the call starts before the queue is released");
+        assertEquals(TimeUnit.MILLISECONDS.toNanos(budgetMs),
+            call.deadlineNanos() - call.startNanos(), "the original deadline is preserved");
         assertEquals(call.deadlineNanos(), call.inferenceRequest().deadlineNanos());
         assertEquals("completed", holder.get(5, TimeUnit.SECONDS));
       } finally {

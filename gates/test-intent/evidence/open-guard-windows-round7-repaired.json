@@ -1,0 +1,112 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T13:37:39.343Z",
+  "revision": "75bab60ce95c96530f73caa180795e804343595d",
+  "tree": "822a398ef68e0fdf393e404966e3d474d5a099f1",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26100",
+    "node": "v22.23.3",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": true
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::windows_folder_does_not_execute_neighbor_cmd\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 24645
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13790
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_folder_does_not_execute_neighbor_cmd",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e4aff5bedda56de721d49363fd25609570aca4a01437dbfd7f8615a83f61ed05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::windows_folder_does_not_execute_neighbor_cmd",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e4aff5bedda56de721d49363fd25609570aca4a01437dbfd7f8615a83f61ed05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "df947d57e9c6e9c2745f9c3e09fbc651632bdeea",
+    "revision": "df947d57e9c6e9c2745f9c3e09fbc651632bdeea",
+    "overlays": [
+      "modules/shell/src-tauri/Cargo.toml",
+      "modules/shell/src-tauri/Cargo.lock",
+      "modules/shell/src-tauri/resources/headless/.ci-placeholder",
+      "modules/shell/src-tauri/src/open_guard_windows.rs",
+      "modules/shell/src-tauri/src/open_guard_windows.ps1",
+      "modules/shell/src-tauri/src/windows_reveal.rs"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/open-guard-round9-before-interface.patch",
+        "contentDigest": "sha256:eea35fc2dffadc4c50f41018a1414e8d3804f215043fd88c55c89421ddbfd836"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::windows_folder_does_not_execute_neighbor_cmd\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 16131,
+        "output": "\nrunning 1 test\ntest open_guard_tests::windows_folder_does_not_execute_neighbor_cmd ... FAILED\n\nfailures:\n\n---- open_guard_tests::windows_folder_does_not_execute_neighbor_cmd stdout ----\n\nthread 'open_guard_tests::windows_folder_does_not_execute_neighbor_cmd' (6212) panicked at src\\lib.rs:3258:9:\nassertion `left == right` failed: neighbor .cmd executed for D:\\a\\justsearch\\justsearch\\candidate\\tmp\\open-guard\\windows-round9-f1dded38e949423ba8fc45c820bd0f66\\.tmp8bWjDm\\Invoice\n  left: true\n right: false\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\nGUI cleanup:  \n\n\nfailures:\n    open_guard_tests::windows_folder_does_not_execute_neighbor_cmd\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 180 filtered out; finished in 4.77s\n\n\n\u001b[1m\u001b[92m   Compiling\u001b[0m shell v0.3.0 (D:\\a\\justsearch\\justsearch\\candidate\\tmp\\open-guard\\windows-round9-f1dded38e949423ba8fc45c820bd0f66\\test-intent-before-W4nZES\\modules\\shell\\src-tauri)\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: function `request_head_shutdown` is never used\u001b[0m\n   \u001b[1m\u001b[96m--> \u001b[0msrc\\lib.rs:208:4\n    \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m208\u001b[0m \u001b[1m\u001b[96m|\u001b[0m fn request_head_shutdown(port: u16, token: &str) -> bool {\n    \u001b[1m\u001b[96m|\u001b[0m    \u001b[1m\u001b[93m^^^^^^^^^^^^^^^^^^^^^\u001b[0m\n    \u001b[1m\u001b[96m|\u001b[0m\n    \u001b[1m\u001b[96m= \u001b[0m\u001b[1m\u001b[97mnote\u001b[0m: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: function `restart_headless_backend` is never used\u001b[0m\n    \u001b[1m\u001b[96m--> \u001b[0msrc\\lib.rs:1044:15\n     \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m1044\u001b[0m \u001b[1m\u001b[96m|\u001b[0m pub(crate) fn restart_headless_backend(\n     \u001b[1m\u001b[96m|\u001b[0m               \u001b[1m\u001b[93m^^^^^^^^^^^^^^^^^^^^^^^^\u001b[0m\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: variant `Unsupported` is never constructed\u001b[0m\n  \u001b[1m\u001b[96m--> \u001b[0msrc\\containment.rs:40:5\n   \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m38\u001b[0m \u001b[1m\u001b[96m|\u001b[0m pub(crate) enum ContainmentError {\n   \u001b[1m\u001b[96m|\u001b[0m                 \u001b[1m\u001b[96m----------------\u001b[0m \u001b[1m\u001b[96mvariant in this enum\u001b[0m\n\u001b[1m\u001b[96m39\u001b[0m \u001b[1m\u001b[96m|\u001b[0m     /// Not Windows: there is no job to create.\n\u001b[1m\u001b[96m40\u001b[0m \u001b[1m\u001b[96m|\u001b[0m     Unsupported,\n   \u001b[1m\u001b[96m|\u001b[0m     \u001b[1m\u001b[93m^^^^^^^^^^^\u001b[0m\n   \u001b[1m\u001b[96m|\u001b[0m\n   \u001b[1m\u001b[96m= \u001b[0m\u001b[1m\u001b[97mnote\u001b[0m: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: function `resolve_manifest_path` is never used\u001b[0m\n  \u001b[1m\u001b[96m--> \u001b[0msrc\\platform_paths.rs:97:8\n   \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m97\u001b[0m \u001b[1m\u001b[96m|\u001b[0m pub fn resolve_manifest_path() -> PathBuf {\n   \u001b[1m\u001b[96m|\u001b[0m        \u001b[1m\u001b[93m^^^^^^^^^^^^^^^^^^^^^\u001b[0m\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: function `relative_path` is never used\u001b[0m\n  \u001b[1m\u001b[96m--> \u001b[0msrc\\native_targets.rs:35:15\n   \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m35\u001b[0m \u001b[1m\u001b[96m|\u001b[0m pub(crate) fn relative_path(id: &str) -> &'static str { native_name(\"paths\", id) }\n   \u001b[1m\u001b[96m|\u001b[0m               \u001b[1m\u001b[93m^^^^^^^^^^^^^\u001b[0m\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: field `close_app` is never read\u001b[0m\n  \u001b[1m\u001b[96m--> \u001b[0msrc\\quit.rs:15:18\n   \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m15\u001b[0m \u001b[1m\u001b[96m|\u001b[0m     SessionEnd { close_app: bool },\n   \u001b[1m\u001b[96m|\u001b[0m     \u001b[1m\u001b[96m----------\u001b[0m   \u001b[1m\u001b[93m^^^^^^^^^\u001b[0m\n   \u001b[1m\u001b[96m|\u001b[0m     \u001b[1m\u001b[96m|\u001b[0m\n   \u001b[1m\u001b[96m|\u001b[0m     \u001b[1m\u001b[96mfield in this variant\u001b[0m\n   \u001b[1m\u001b[96m|\u001b[0m\n   \u001b[1m\u001b[96m= \u001b[0m\u001b[1m\u001b[97mnote\u001b[0m: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: fields `started` and `deadline` are never read\u001b[0m\n  \u001b[1m\u001b[96m--> \u001b[0msrc\\quit.rs:70:9\n   \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m69\u001b[0m \u001b[1m\u001b[96m|\u001b[0m pub(crate) struct QuitTicket {\n   \u001b[1m\u001b[96m|\u001b[0m                   \u001b[1m\u001b[96m----------\u001b[0m \u001b[1m\u001b[96mfields in this struct\u001b[0m\n\u001b[1m\u001b[96m70\u001b[0m \u001b[1m\u001b[96m|\u001b[0m     pub started: Instant,\n   \u001b[1m\u001b[96m|\u001b[0m         \u001b[1m\u001b[93m^^^^^^^\u001b[0m\n\u001b[1m\u001b[96m71\u001b[0m \u001b[1m\u001b[96m|\u001b[0m     pub deadline: Instant,\n   \u001b[1m\u001b[96m|\u001b[0m         \u001b[1m\u001b[93m^^^^^^^^\u001b[0m\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: methods `suspended_ms_since` and `note_power` are never used\u001b[0m\n   \u001b[1m\u001b[96m--> \u001b[0msrc\\supervisor.rs:618:8\n    \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m580\u001b[0m \u001b[1m\u001b[96m|\u001b[0m pub trait Actuator {\n    \u001b[1m\u001b[96m|\u001b[0m           \u001b[1m\u001b[96m--------\u001b[0m \u001b[1m\u001b[96mmethods in this trait\u001b[0m\n\u001b[1m\u001b[96m...\u001b[0m\n\u001b[1m\u001b[96m618\u001b[0m \u001b[1m\u001b[96m|\u001b[0m     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    \u001b[1m\u001b[96m|\u001b[0m        \u001b[1m\u001b[93m^^^^^^^^^^^^^^^^^^\u001b[0m\n\u001b[1m\u001b[96m...\u001b[0m\n\u001b[1m\u001b[96m621\u001b[0m \u001b[1m\u001b[96m|\u001b[0m     fn note_power(&self, _event: PowerEvent) {}\n    \u001b[1m\u001b[96m|\u001b[0m        \u001b[1m\u001b[93m^^^^^^^^^^\u001b[0m\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: function `commit_head` is never used\u001b[0m\n    \u001b[1m\u001b[96m--> \u001b[0msrc\\updater.rs:1313:10\n     \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m1313\u001b[0m \u001b[1m\u001b[96m|\u001b[0m async fn commit_head(\n     \u001b[1m\u001b[96m|\u001b[0m          \u001b[1m\u001b[93m^^^^^^^^^^^\u001b[0m\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: function `head_shutdown_receipt_path` is never used\u001b[0m\n    \u001b[1m\u001b[96m--> \u001b[0msrc\\updater.rs:1687:4\n     \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m1687\u001b[0m \u001b[1m\u001b[96m|\u001b[0m fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     \u001b[1m\u001b[96m|\u001b[0m    \u001b[1m\u001b[93m^^^^^^^^^^^^^^^^^^^^^^^^^^\u001b[0m\n\n\u001b[1m\u001b[93mwarning\u001b[0m: `shell` (lib test) generated 10 warnings\n\u001b[1m\u001b[92m    Finished\u001b[0m `test` profile [unoptimized + debuginfo] target(s) in 11.24s\n\u001b[1m\u001b[92m     Running\u001b[0m unittests src\\lib.rs (D:\\a\\justsearch\\justsearch\\candidate\\modules\\shell\\src-tauri\\target\\debug\\deps\\shell_lib-d47f73f597db9a46.exe)\n\u001b[1m\u001b[91merror\u001b[0m: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5095,
+        "output": "\nrunning 1 test\ntest open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd ... FAILED\n\nfailures:\n\n---- open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd stdout ----\n\nthread 'open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd' (2336) panicked at src\\lib.rs:3258:9:\nassertion `left == right` failed: neighbor .cmd executed for D:\\a\\justsearch\\justsearch\\candidate\\tmp\\open-guard\\windows-round9-f1dded38e949423ba8fc45c820bd0f66\\.tmpgioC7v\\Q3 [draft]\n  left: true\n right: false\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\nGUI cleanup:  \n\n\nfailures:\n    open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 180 filtered out; finished in 4.65s\n\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: function `request_head_shutdown` is never used\u001b[0m\n   \u001b[1m\u001b[96m--> \u001b[0msrc\\lib.rs:208:4\n    \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m208\u001b[0m \u001b[1m\u001b[96m|\u001b[0m fn request_head_shutdown(port: u16, token: &str) -> bool {\n    \u001b[1m\u001b[96m|\u001b[0m    \u001b[1m\u001b[93m^^^^^^^^^^^^^^^^^^^^^\u001b[0m\n    \u001b[1m\u001b[96m|\u001b[0m\n    \u001b[1m\u001b[96m= \u001b[0m\u001b[1m\u001b[97mnote\u001b[0m: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: function `restart_headless_backend` is never used\u001b[0m\n    \u001b[1m\u001b[96m--> \u001b[0msrc\\lib.rs:1044:15\n     \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m1044\u001b[0m \u001b[1m\u001b[96m|\u001b[0m pub(crate) fn restart_headless_backend(\n     \u001b[1m\u001b[96m|\u001b[0m               \u001b[1m\u001b[93m^^^^^^^^^^^^^^^^^^^^^^^^\u001b[0m\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: variant `Unsupported` is never constructed\u001b[0m\n  \u001b[1m\u001b[96m--> \u001b[0msrc\\containment.rs:40:5\n   \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m38\u001b[0m \u001b[1m\u001b[96m|\u001b[0m pub(crate) enum ContainmentError {\n   \u001b[1m\u001b[96m|\u001b[0m                 \u001b[1m\u001b[96m----------------\u001b[0m \u001b[1m\u001b[96mvariant in this enum\u001b[0m\n\u001b[1m\u001b[96m39\u001b[0m \u001b[1m\u001b[96m|\u001b[0m     /// Not Windows: there is no job to create.\n\u001b[1m\u001b[96m40\u001b[0m \u001b[1m\u001b[96m|\u001b[0m     Unsupported,\n   \u001b[1m\u001b[96m|\u001b[0m     \u001b[1m\u001b[93m^^^^^^^^^^^\u001b[0m\n   \u001b[1m\u001b[96m|\u001b[0m\n   \u001b[1m\u001b[96m= \u001b[0m\u001b[1m\u001b[97mnote\u001b[0m: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: function `resolve_manifest_path` is never used\u001b[0m\n  \u001b[1m\u001b[96m--> \u001b[0msrc\\platform_paths.rs:97:8\n   \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m97\u001b[0m \u001b[1m\u001b[96m|\u001b[0m pub fn resolve_manifest_path() -> PathBuf {\n   \u001b[1m\u001b[96m|\u001b[0m        \u001b[1m\u001b[93m^^^^^^^^^^^^^^^^^^^^^\u001b[0m\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: function `relative_path` is never used\u001b[0m\n  \u001b[1m\u001b[96m--> \u001b[0msrc\\native_targets.rs:35:15\n   \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m35\u001b[0m \u001b[1m\u001b[96m|\u001b[0m pub(crate) fn relative_path(id: &str) -> &'static str { native_name(\"paths\", id) }\n   \u001b[1m\u001b[96m|\u001b[0m               \u001b[1m\u001b[93m^^^^^^^^^^^^^\u001b[0m\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: field `close_app` is never read\u001b[0m\n  \u001b[1m\u001b[96m--> \u001b[0msrc\\quit.rs:15:18\n   \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m15\u001b[0m \u001b[1m\u001b[96m|\u001b[0m     SessionEnd { close_app: bool },\n   \u001b[1m\u001b[96m|\u001b[0m     \u001b[1m\u001b[96m----------\u001b[0m   \u001b[1m\u001b[93m^^^^^^^^^\u001b[0m\n   \u001b[1m\u001b[96m|\u001b[0m     \u001b[1m\u001b[96m|\u001b[0m\n   \u001b[1m\u001b[96m|\u001b[0m     \u001b[1m\u001b[96mfield in this variant\u001b[0m\n   \u001b[1m\u001b[96m|\u001b[0m\n   \u001b[1m\u001b[96m= \u001b[0m\u001b[1m\u001b[97mnote\u001b[0m: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: fields `started` and `deadline` are never read\u001b[0m\n  \u001b[1m\u001b[96m--> \u001b[0msrc\\quit.rs:70:9\n   \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m69\u001b[0m \u001b[1m\u001b[96m|\u001b[0m pub(crate) struct QuitTicket {\n   \u001b[1m\u001b[96m|\u001b[0m                   \u001b[1m\u001b[96m----------\u001b[0m \u001b[1m\u001b[96mfields in this struct\u001b[0m\n\u001b[1m\u001b[96m70\u001b[0m \u001b[1m\u001b[96m|\u001b[0m     pub started: Instant,\n   \u001b[1m\u001b[96m|\u001b[0m         \u001b[1m\u001b[93m^^^^^^^\u001b[0m\n\u001b[1m\u001b[96m71\u001b[0m \u001b[1m\u001b[96m|\u001b[0m     pub deadline: Instant,\n   \u001b[1m\u001b[96m|\u001b[0m         \u001b[1m\u001b[93m^^^^^^^^\u001b[0m\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: methods `suspended_ms_since` and `note_power` are never used\u001b[0m\n   \u001b[1m\u001b[96m--> \u001b[0msrc\\supervisor.rs:618:8\n    \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m580\u001b[0m \u001b[1m\u001b[96m|\u001b[0m pub trait Actuator {\n    \u001b[1m\u001b[96m|\u001b[0m           \u001b[1m\u001b[96m--------\u001b[0m \u001b[1m\u001b[96mmethods in this trait\u001b[0m\n\u001b[1m\u001b[96m...\u001b[0m\n\u001b[1m\u001b[96m618\u001b[0m \u001b[1m\u001b[96m|\u001b[0m     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    \u001b[1m\u001b[96m|\u001b[0m        \u001b[1m\u001b[93m^^^^^^^^^^^^^^^^^^\u001b[0m\n\u001b[1m\u001b[96m...\u001b[0m\n\u001b[1m\u001b[96m621\u001b[0m \u001b[1m\u001b[96m|\u001b[0m     fn note_power(&self, _event: PowerEvent) {}\n    \u001b[1m\u001b[96m|\u001b[0m        \u001b[1m\u001b[93m^^^^^^^^^^\u001b[0m\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: function `commit_head` is never used\u001b[0m\n    \u001b[1m\u001b[96m--> \u001b[0msrc\\updater.rs:1313:10\n     \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m1313\u001b[0m \u001b[1m\u001b[96m|\u001b[0m async fn commit_head(\n     \u001b[1m\u001b[96m|\u001b[0m          \u001b[1m\u001b[93m^^^^^^^^^^^\u001b[0m\n\n\u001b[1m\u001b[93mwarning\u001b[0m\u001b[1m\u001b[97m: function `head_shutdown_receipt_path` is never used\u001b[0m\n    \u001b[1m\u001b[96m--> \u001b[0msrc\\updater.rs:1687:4\n     \u001b[1m\u001b[96m|\u001b[0m\n\u001b[1m\u001b[96m1687\u001b[0m \u001b[1m\u001b[96m|\u001b[0m fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     \u001b[1m\u001b[96m|\u001b[0m    \u001b[1m\u001b[93m^^^^^^^^^^^^^^^^^^^^^^^^^^\u001b[0m\n\n\u001b[1m\u001b[93mwarning\u001b[0m: `shell` (lib test) generated 10 warnings\n\u001b[1m\u001b[92m    Finished\u001b[0m `test` profile [unoptimized + debuginfo] target(s) in 0.36s\n\u001b[1m\u001b[92m     Running\u001b[0m unittests src\\lib.rs (D:\\a\\justsearch\\justsearch\\candidate\\modules\\shell\\src-tauri\\target\\debug\\deps\\shell_lib-d47f73f597db9a46.exe)\n\u001b[1m\u001b[91merror\u001b[0m: test failed, to rerun pass `--lib`\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_folder_does_not_execute_neighbor_cmd",
+        "classification": "assertion",
+        "detail": "open_guard_tests::windows_folder_does_not_execute_neighbor_cmd:  ---- open_guard_tests::windows_folder_does_not_execute_neighbor_cmd stdout ----\n\nthread 'open_guard_tests::windows_folder_does_not_execute_neighbor_cmd' (6212) panicked at src\\lib.rs:3258:9:\nassertion `left == right` failed: neighbor .cmd executed for D:\\a\\justsearch\\justsearch\\candidate\\tmp\\open-guard\\windows-round9-f1dded38e949423ba8fc45c820bd0f66\\.tmp8bWjDm\\Invoice\n  left: true\n right: false\nnote: run with `RUST_BACKTRACE=1` env"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd",
+        "classification": "assertion",
+        "detail": "open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd:  ---- open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd stdout ----\n\nthread 'open_guard_tests::windows_bracket_folder_does_not_execute_neighbor_cmd' (2336) panicked at src\\lib.rs:3258:9:\nassertion `left == right` failed: neighbor .cmd executed for D:\\a\\justsearch\\justsearch\\candidate\\tmp\\open-guard\\windows-round9-f1dded38e949423ba8fc45c820bd0f66\\.tmpgioC7v\\Q3 [draft]\n  left: true\n right: false\nnote: run "
+      }
+    ]
+  },
+  "digest": "sha256:1ccda4eb00d37c14ab55f093fc5276628d4678ef59d4234f183e44cf4cfd5fbf"
+}

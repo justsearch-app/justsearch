@@ -322,22 +322,30 @@ export class SecuritySurface extends JfElement {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ container, passphrase }),
       });
-      const data = (await res.json()) as { restored?: Record<string, number>; error?: string };
+      const data = (await res.json()) as { restored?: Record<string, number>; skipped?: number; error?: string };
       if (!res.ok) {
         this.encError = data.error ?? 'Could not restore the backup.';
         return;
       }
       const restored = data.restored ?? {};
       const total = Object.values(restored).reduce((a, b) => a + (b || 0), 0);
+      const skipped = data.skipped ?? 0;
       this.encImportSummary =
         total === 0
-          ? 'Nothing new to restore (everything in the backup already exists here).'
+          ? skipped > 0
+            ? 'Nothing new to restore.'
+            : 'Nothing new to restore (everything in the backup already exists here).'
           : 'Restored ' +
             Object.entries(restored)
               .filter(([, v]) => (v || 0) > 0)
               .map(([k, v]) => `${v} ${k}`)
               .join(', ') +
             '.';
+      if (skipped > 0) {
+        this.encImportSummary += skipped === 1
+          ? ' Skipped 1 entry with an invalid id.'
+          : ` Skipped ${skipped} entries with invalid ids.`;
+      }
       this.encShowImport = false;
     } catch {
       this.encError = 'Could not restore the backup.';

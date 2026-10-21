@@ -83,36 +83,62 @@ final class RecordedRootPreparationTest {
     Path root = Files.createDirectories(tempDir.resolve("removed")).toAbsolutePath().normalize();
     CountDownLatch scanEntered = new CountDownLatch(1);
     CountDownLatch releaseScan = new CountDownLatch(1);
+    Path rootsFile = tempDir.resolve("watched_roots.json");
     Fixture fixture =
         new Fixture(
             ExcludeMatcher::empty,
             (rootPath, collection, mode, excludes, progress, context) -> {
               scanEntered.countDown();
               try {
-                releaseScan.await(10, TimeUnit.SECONDS);
+                assertTrue(releaseScan.await(10, TimeUnit.SECONDS), "scan escape timeout fired");
               } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new AssertionError("walk was interrupted", e);
               }
               return ScanRootProgress.newBuilder().setComplete(true).build();
-            });
+            }, rootsFile);
 
     fixture.ops.addWatchedRoot("notes", root, TestEngineContexts.internal());
     Consumer<io.justsearch.core.context.EngineContext> queued = fixture.queuedWalk.get();
     assertNotNull(queued, "the initial walk must be captured for deterministic execution");
-    ExecutorService walker = Executors.newSingleThreadExecutor();
+    ExecutorService walker = Executors.newFixedThreadPool(2);
+    AtomicReference<Thread> removing = new AtomicReference<>();
     try {
       var walk = walker.submit(() -> queued.accept(TestEngineContexts.internal()));
       assertTrue(scanEntered.await(10, TimeUnit.SECONDS));
-      fixture.ops.removeWatchedPath(root, TestEngineContexts.internal());
+      var removal = walker.submit(() -> {
+        removing.set(Thread.currentThread());
+        return fixture.ops.removeWatchedPath(root, TestEngineContexts.internal());
+      });
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      var threads = java.lang.management.ManagementFactory.getThreadMXBean();
+      boolean blockedOnProducer = false;
+      while (!removal.isDone() && System.nanoTime() < deadline) {
+        Thread thread = removing.get();
+        var info = thread == null ? null : threads.getThreadInfo(thread.threadId());
+        if (info != null && info.getThreadState() == Thread.State.BLOCKED
+            && info.getLockInfo().getIdentityHashCode()
+                == System.identityHashCode(fixture.state.lifecycleLock())) {
+          blockedOnProducer = true;
+          break;
+        }
+        Thread.sleep(1);
+      }
+      assertTrue(blockedOnProducer, "removal must wait on the producer fence");
+      assertFalse(removal.isDone(), "removal cannot finish while scanning owns the fence");
       releaseScan.countDown();
       walk.get(10, TimeUnit.SECONDS);
+      removal.get(10, TimeUnit.SECONDS);
     } finally {
+      releaseScan.countDown();
       walker.shutdownNow();
     }
 
     assertEquals(null, fixture.state.getCollection(root));
     assertFalse(fixture.watchedRoots.containsKey(root));
+    var persisted = new WatchedRootsStore(rootsFile, null).loadPersistedRootsWithErrors();
+    assertFalse(persisted.roots().containsKey(root));
+    assertFalse(persisted.collections().containsKey(root));
   }
 
   private static final class Fixture {

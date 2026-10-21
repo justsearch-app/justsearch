@@ -552,7 +552,7 @@ export class CitationsPanel extends JfElement {
           data-open-file
           title="Open ${docName}"
           aria-label="Open file ${docName}"
-          @click=${() => void openLocalFile(s.parentDocId)}
+          @click=${() => void openLocalFile(s.parentDocId).catch(() => { /* Already reported. */ })}
         >
           Open ${docName}
         </button>

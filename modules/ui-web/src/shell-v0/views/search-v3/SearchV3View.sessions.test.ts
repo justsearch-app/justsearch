@@ -317,7 +317,7 @@ describe('New session parks the conversation and returns the window to the hero'
     expect(await questionsOf(el)).toEqual([]);
   });
 
-  it('halts an answer still streaming when the reader starts a new session', async () => {
+  it('does not call an answer left streaming "stopped" when the reader starts a new session', async () => {
     const el = await mount();
     await send(el, 'a long one');
     await settle(el);
@@ -326,13 +326,16 @@ describe('New session parks the conversation and returns the window to the hero'
 
     await newSession(el);
     await settle(el);
-    // Back on the parked session, the turn reads as stopped rather than as forever-running.
+    // Leaving is not a Stop: the Engine finishes and saves the answer, so back on the parked
+    // session nothing reads as stopped, nor as forever-running; the record shows what was saved.
     await clickRow((await rowsOf(el))[0] as Sv3SessionRow);
     await settle(el);
     const main = await region(el, 'jf-sv3-main');
-    expect(
-      (main.shadowRoot?.querySelector('[data-testid="sv3-turn"]') as HTMLElement).dataset.status,
-    ).toBe('halted');
+    const statuses = [...(main.shadowRoot?.querySelectorAll<HTMLElement>('[data-testid="sv3-turn"]') ?? [])].map(
+      (turn) => turn.dataset.status,
+    );
+    expect(statuses).not.toContain('halted');
+    expect(statuses).not.toContain('streaming');
   });
 });
 

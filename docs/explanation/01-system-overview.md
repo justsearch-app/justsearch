@@ -19,7 +19,7 @@ the *rate of change* differs, a module boundary — an interface in a contract m
 ArchUnit — is enough. That rule is [ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md),
 which makes ADR-0001 (three OS processes) and ADR-0002 (gRPC + MMF hybrid IPC) superseded designs.
 
-Applying it leaves **one JVM — the Engine — plus two native process boundaries.** The application
+Applying it leaves **one JVM — the Engine — plus two child-process boundaries.** The application
 half (HTTP + MCP API, agent loop, conversation, RAG assembly) and the index half (Lucene, job queue,
 indexing loop, pacing, durable stores) are both JVM code with the same failure domain and no scarce
 resource to partition, so they share a process and meet at **ports**.
@@ -27,7 +27,7 @@ resource to partition, so they share a process and meet at **ports**.
 ```mermaid
 graph TD
     User[User] --> Engine[Engine JVM\nHeadlessApp.java]
-    Engine -- HTTP --> AI[Inference Server\n(llama-server.exe)]
+    Engine -- HTTP --> AI[Inference Server\n(llama-server; .exe on Windows)]
     Engine -- child processes --> Extract[Extraction sandbox pool\n(Tika / PDF / Office / OCR)]
 
     subgraph "Engine (one JVM)"
@@ -119,24 +119,62 @@ detect and the ordinal-450 tier had nothing left to cross.
 
 ### 4. The Inference Server ("The Brain")
 *   **Boundary rationale:** a separate native binary with its own toolchain that owns VRAM — a different runtime, a different failure domain, and a scarce resource, so it clears the rule on all three counts.
-*   **Executable:** `llama-server.exe` (Native Binary, no JVM).
+*   **Executable:** `llama-server` (`llama-server.exe` on Windows; native binary, no JVM).
 *   **Managed By:** `InferenceLifecycleManager.java`
 *   **Arguments:** `-m <model_path> [--mmproj <mmproj_path>] --host 127.0.0.1 --port <port> -c <ctx_size> -ngl <gpu_layers> <vram-tuning-flags...>` (loopback bind is always injected as defense-in-depth).
 *   **Role:** Providing Intelligence (LLM Chat & RAG).
 *   **VRAM Management:**
-    *   **Zombie Killing:** On Windows, `Process.destroy()` can leave VRAM locked. We use `taskkill /F /PID` to enforce release.
+    *   **Owned-process termination:** `ProcessTerminator` uses the Windows FFM `TerminateProcess` implementation when available, with platform-specific termination on Linux and other targets.
     *   **Hung/Crash Recovery:** Health or process-exit detection marks the exact managed owner Offline and reports its failure once. `KnowledgeServerHealthMonitor` is the sole automatic retry authority; `InferenceLifecycleManager` only performs the one same-configuration recovery action that the monitor admits.
     *   **External Instance Adoption:** If a healthy `llama-server` is already listening on the configured port, the manager can **adopt** it after probing `GET /props` (prevents restart loops and avoids accidentally adopting unrelated HTTP services). Adopted servers are still health-monitored; if they die mid-session, inference switches to Offline.
     *   **Health & Props:** The manager polls `GET /health` during startup and reads `GET /props` (best-effort) to learn the *actual* `n_ctx` and `model_alias` for diagnostics.
 
+## Network behavior
+
+Search, indexing and built-in inference run on the device; loopback listeners do not imply
+zero outbound connections. Current network paths are:
+
+- **Desktop updates:** the Tauri UI schedules an update check 30 seconds after launch, without
+  an off switch. The Rust shell fetches the release descriptor, detached signature and updater
+  metadata from the configured HTTPS release feed (GitHub in release builds). It verifies the
+  signature and rejects older release sequences. Download/install requires user consent.
+- **AI installation:** user-initiated Install AI, repair and resume can download registry-pinned
+  model and runtime assets from GitHub and Hugging Face, with SHA-256 verification. Offline packs
+  are a separate import path. `downloadsEnabled` only gates this installer; its unexpected
+  policy-snapshot errors fail open (see [Enterprise Policy](15-enterprise-policy.md)).
+- **Trace export:** `TracingBootstrap` enables an OTLP/HTTP exporter when
+  `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` or `OTEL_EXPORTER_OTLP_ENDPOINT` is set. The endpoint is not
+  restricted to loopback. Emitted spans can include file paths; detailed index/search tracing can
+  include bounded document excerpts (16 documents × 1024 characters). See
+  [Observability](08-observability.md) and the
+  [search span contract](../reference/contracts/search-execution-spans.md).
+- **Tokenizer dependency:** DJL 0.36.0's tokenizer initialization calls `Ec2Utils.callHome`.
+  Unless `OPT_OUT_TRACKING=true` or DJL offline mode is supplied, it attempts a link-local
+  `169.254.169.254` metadata probe; if instance metadata answers,
+  it sends the instance ID, region and library version to DJL's S3 telemetry endpoint. On Linux,
+  CUDA-flavor tokenizer initialization can also download JNI libraries from `publish.djl.ai`.
+  Preparing the bundled CPU cache does not force DJL's flavor. These are dependency code paths;
+  whether a particular network answers the probe is environment-dependent.
+- **Frontend resources:** `modules/ui-web/index.html` still declares Google Fonts stylesheet and
+  preconnect links. Desktop CSP blocks the external stylesheet/font fetches; preconnect traffic
+  has not been measured. Browser development use is not confined by the Tauri CSP.
+- **User-connected tools:** configured MCP host child processes and external MCP clients receive
+  the data their tools expose and may use their own network connections. Opening an external
+  link invokes the system browser. Plugin installation from a URL uses frontend `fetch`, subject
+  to desktop CSP's loopback restriction.
+
+The webview CSP governs page requests, not Rust-shell downloads, JVM exporters or native/dependency
+code. See the [Threat Model](../reference/security/threat-model.md) for the inbound trust controls.
+
 ## Module roles
 
-The Engine and the two native boundaries above are assembled from Gradle modules. The "half" column
+The Engine and the two child-process boundaries above are assembled from Gradle modules. The "half" column
 says which side of the Engine's port seam a module sits on — it is a **module** boundary, not a
 process one, except for the `Brain` rows. This table gives each significant module's **role**; the
-authoritative inventory and the full dependency graph
+module inventory and a parsed dependency graph
 are generated into `docs/reference/architecture/module-deps.md` by
-`node scripts/architecture/module-deps.mjs`.
+`node scripts/architecture/module-deps.mjs`. The parser currently includes test-suite declarations
+as production edges and omits `compileOnly`; inspect the declaring build file for precise coupling.
 
 | Module | Half | Role |
 |---|---|---|
@@ -166,7 +204,7 @@ are generated into `docs/reference/architecture/module-deps.md` by
 ### "Verify, Don't Guess"
 The system is built to be deterministic.
 *   **Port Discovery (gRPC):** *Retired.* The Knowledge Server's gRPC listener used to bind port `0` (ephemeral) and write the assigned port to a shared **Memory-Mapped File (MMF)**. Lane F stage A merged the two halves into one JVM, so there is no second port to discover and no handoff to verify — the gRPC channel, the MMF bus and (at item A14) gRPC itself are deleted. See [ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md).
-*   **Port Discovery (HTTP):** The UI-facing HTTP API is usually configured (default `33221`), but can also be ephemeral. The backend prints `JUSTSEARCH_API_PORT=<port>` to stdout and the desktop shell injects it (Tauri `api_port` command / bridge). In browser dev mode, if no explicit port is provided, the UI auto-discovers by scanning a small loopback range (currently `33221..33250`) and validating the `/api/status` payload.
+*   **Port Discovery (HTTP):** The UI-facing HTTP API is usually configured (default `8080`), but can also be ephemeral. The backend prints `JUSTSEARCH_API_PORT=<port>` to stdout and the desktop shell injects it (Tauri `api_port` command / bridge). The UI resolves the endpoint from the `api_port` URL parameter, legacy bridge, Tauri command, or `VITE_API_PORT`, then falls back to the Vite proxy; it does not scan ports.
 *   **State Polling:** The frontend polls `/api/status` to determine if the backend is ready, rather than assuming it is after X seconds.
 *   **Lifecycle Gate:** Automation uses `GET /api/health` as a **contract-tested gate** (schema 2). It returns HTTP `200` for `READY|DEGRADED` and `503` otherwise; `/api/status` remains the richer "what's running?" payload.
 

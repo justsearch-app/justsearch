@@ -828,6 +828,12 @@ public final class KnowledgeServerBootstrap implements Closeable {
             return latchIndexFatal(
                     new WorkerDown(LifecycleReasonCode.INDEX_CORRUPT, INDEX_CORRUPT_DETAIL));
         }
+        if (io.justsearch.ipc.WorkerFatalReasonMarker.MIGRATION_JOURNAL_UNAVAILABLE.equals(fatal)) {
+            return latchIndexFatal(new WorkerDown(
+                    LifecycleReasonCode.INDEX_MIGRATION_JOURNAL_UNAVAILABLE,
+                    "Search is unavailable because an unfinished index migration has lost its job journal. "
+                            + "The database files have been kept for repair."));
+        }
         if (io.justsearch.ipc.WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH.equals(fatal)) {
             return latchIndexFatal(
                     new WorkerDown(

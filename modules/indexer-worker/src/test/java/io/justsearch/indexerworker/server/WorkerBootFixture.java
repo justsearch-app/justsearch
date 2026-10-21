@@ -168,6 +168,10 @@ final class WorkerBootFixture {
    */
   static String seedInFlightGreen(Layout layout, String greenFingerprint, int docs)
       throws Exception {
+    // A healthy in-flight migration already owns its job journal. Missing journals are a
+    // different durability scenario, exercised by MigrationJournalDurabilityBootTest.
+    try (var queue = new io.justsearch.indexerworker.queue.SqliteJobQueue(
+        layout.dataDir().resolve("jobs.db"))) { queue.open(); }
     IndexGenerationManager.State inFlight =
         layout.genManager().startMigration("schema_mismatch");
     String greenId = inFlight.building_generation();

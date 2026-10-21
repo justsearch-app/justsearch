@@ -2,35 +2,34 @@
 title: Enterprise Policy (v2+)
 type: explanation
 status: draft
-description: "Config-file policy delivery, precedence, and enforcement targets."
+description: "Current config-file policy enforcement, restrictive merges, and platform limits."
 ---
 
 # Enterprise Policy (v2+)
 
-This document specifies how JustSearch should support **enterprise policy enforcement** starting in v2, using **config files** (not registry/GPO-first).
+This document describes current **enterprise policy enforcement** using **config files**. Machine policy is Windows-only; Linux uses the user policy under AI Home.
 
 ## 1. Goals
 
 - Allow enterprise admins to enforce:
-  - **downloads disabled** (force offline/import-only),
+  - **downloads disabled** for Install AI when the effective-policy snapshot succeeds,
   - **Online AI disabled** (AI features off),
   - **GPU acceleration disabled** (force CPU-only even if GPU packs are present),
-  - allowlists for **models** (by SHA-256),
+  - allowlists for **pack-import files** (by SHA-256; not Install AI downloads or later model use),
   - allowlists for **offline packs** (by pack manifest digest),
   - (optional) disallow adopting external inference servers.
 - Provide a deterministic **precedence order**:
   - machine policy → user policy → UI settings → defaults.
-- Keep the v1 security posture:
-  - fail closed on mismatches (hash/policy/pack allowlist).
+- Reject offline pack digest/hash mismatches. Install AI download-policy checks are best-effort: an unexpected error reading the policy snapshot permits the download to continue.
 
 ## 1.1 Implementation status (what is enforced today)
 
 Policy is implemented and exposed via `GET /api/policy/effective`. Enforcement status:
 
 - **Enforced today (v2)**:
-  - `downloadsEnabled` blocks v1 “Install AI” downloads.
+  - `downloadsEnabled=false` blocks “Install AI” downloads when the snapshot is available. `checkPolicy()` logs unexpected snapshot errors and continues; `policyBlocksDownloads()` returns `false` on an exception. These download checks fail open on unexpected errors.
   - `onlineAiEnabled` blocks switching into Online inference mode.
-  - Offline pack import allowlisting by manifest digest and model allowlisting by SHA-256.
+  - Offline pack import allowlisting by manifest digest and file SHA-256 (`allowlists.modelSha256`). The hash allowlist applies on pack import only; Install AI downloads verify registry-pinned hashes but do not enforce this policy allowlist.
 
 - **Enforced in v3 (runtime + inference)**:
   - `gpuAccelerationEnabled=false`:
@@ -48,13 +47,12 @@ HTTP error codes (v3):
 - `POLICY_EXTERNAL_SERVER_DISALLOWED`:
   - returned when policy disallows adopting an already-running external `llama-server` on the configured port.
 
-v3 note (external server adoption):
+## 2. Policy file locations
 
-- The current runtime behavior can “attach” to an already-running `llama-server` when `/health` is up on the configured port. This is useful for crash recovery, but it complicates policy enforcement and GPU self-test/rollback. Full v3 should define an explicit rule for when external servers are allowed; see `docs/explanation/16-gpu-booster-pack.md` §5.3.
+Machine policy is supported only on Windows. `resolveMachinePolicyPath()` returns `null` on
+Linux and other non-Windows platforms; those platforms have only the user-writable policy.
 
-## 2. Policy file locations (Windows)
-
-### 2.1 Machine policy (admin-managed)
+### 2.1 Machine policy (admin-managed, Windows only)
 
 - **Path**: `%PROGRAMDATA%\\JustSearch\\policy.v1.json`
 - **Security expectation**:
@@ -87,7 +85,7 @@ UI helper note (v2+):
 
 Notes:
 
-- `<AI_HOME>` is `%APPDATA%\\io.justsearch.shell\\` in packaged desktop runs.
+- `<AI_HOME>` is the OS app-data directory selected by the shell (Windows: `%APPDATA%\\io.justsearch.shell\\`; Linux: `${XDG_DATA_HOME:-~/.local/share}/io.justsearch.shell`).
 - For developer/test runs, AI Home may be overridden via `JUSTSEARCH_HOME` / `-Djustsearch.home`.
 
 ## 3. Precedence (locked)
@@ -97,14 +95,14 @@ Notes:
 3. **UI settings**
 4. **Defaults**
 
-Where conflicts exist, higher precedence wins.
+Policy constrains settings and defaults. User policy may only tighten machine boolean restrictions.
 
 ### 3.1 Merge semantics (important)
 
-Policy should be merged in a way that preserves enterprise enforcement:
+The policy service merges values as follows:
 
 - **Booleans** (`downloadsEnabled`, `onlineAiEnabled`, `gpuAccelerationEnabled`, `disallowExternalInferenceServers`):
-  - higher-precedence policy overrides lower-precedence policy.
+  - user policy may only tighten: enabled flags are ANDed with the machine/default values, and `disallowExternalInferenceServers` is ORed. A present but unloadable Windows machine policy disables AI toggles and disallows adoption.
 - **Allowlists**:
   - if machine policy exists, it is treated as the **authoritative allowlist** source for offline pack import (**empty list = deny all**).
   - when machine policy is absent, user policy `allowlists.packManifestSha256` may be used as the **primary allowlist** (power-user opt-in).
@@ -139,7 +137,7 @@ See allowlist evaluation rules in `docs/explanation/14-ai-pack-spec.md`.
 ### 4.2 Field meanings
 
 - `downloadsEnabled`:
-  - `false` ⇒ the app must not download models (and should surface “Import AI Pack” as the primary CTA).
+  - `false` ⇒ Install AI blocks model/runtime downloads if the policy snapshot succeeds; unexpected snapshot errors fail open as described above. This flag does not disable the shell update check or dependency-internal network activity.
 - `onlineAiEnabled`:
   - `false` ⇒ Online AI mode must be disabled (CPU or GPU). App should remain usable for search/indexing.
 - `gpuAccelerationEnabled` (optional, default `true`):
@@ -151,7 +149,7 @@ v3 note:
 
 - GPU Booster Pack selection/activation (and its hardware gates) are described in `docs/explanation/16-gpu-booster-pack.md` and rely on NVML-first detection with safe fallbacks.
 - `allowlists.modelSha256`:
-  - when non-empty, only those hashes may be installed/used for recommended assets (downloads and offline import should enforce).
+  - when non-empty, each imported pack file must match the active machine and user hash lists. It is enforced on pack import only, not on Install AI downloads or later model use.
 - `allowlists.packManifestSha256`:
   - allowlisted offline packs by **manifest digest** (see `docs/explanation/14-ai-pack-spec.md`).
 
@@ -159,10 +157,10 @@ Hash normalization note:
 
 - All SHA-256 values should be treated as **hex, case-insensitive**. Implementations should normalize to lowercase for comparisons/logging.
 
-### 4.3 Enforcement points (where policy must be applied)
+### 4.3 Current enforcement points
 
 - **Install AI (v1 downloads)**:
-  - if `downloadsEnabled=false`, block model downloads and surface “offline import required”.
+  - if the snapshot returns `downloadsEnabled=false`, block downloads with `DOWNLOADS_DISABLED`; on an unexpected snapshot exception, continue.
 - **Offline import (v2/v3 AI Pack import)**:
   - enforce `allowlists.packManifestSha256` allowlisting rules:
     - if machine policy exists: it is authoritative (empty list = deny all packs)

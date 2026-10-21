@@ -61,9 +61,9 @@ function buildGenerated(release) {
   }
 
   const hw = (release.cohort && release.cohort.hardware) || {};
-  const vramGb = hw.gpu_vram_bytes ? Math.round(hw.gpu_vram_bytes / 1e9) : null;
+  const vramGib = hw.gpu_vram_bytes ? Math.round(hw.gpu_vram_bytes / 2 ** 30) : null;
   const sha = release.cohort && release.cohort.git_sha ? release.cohort.git_sha.slice(0, 9) : "unknown";
-  const env = [hw.gpu_name, vramGb ? `${vramGb} GB VRAM` : null, hw.ort_version ? `ORT ${hw.ort_version}` : null]
+  const env = [hw.gpu_name, vramGib ? `${vramGib} GiB VRAM` : null, hw.ort_version ? `ORT ${hw.ort_version}` : null]
     .filter(Boolean)
     .join(", ");
 
