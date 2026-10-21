@@ -13,8 +13,9 @@ rem              runtime activation of an LLM model already present on disk
 rem
 rem Usage:   justsearch-headless.cmd [headless^|mcp-lite]     (default: headless)
 rem
-rem To reuse an existing install's data + models, set before launching:
-rem   set JUSTSEARCH_DATA_DIR=%%LOCALAPPDATA%%\JustSearch\data
+rem To reuse the desktop app's index, settings and models, quit it first.
+rem Set both variables to its data folder before launching:
+rem   set JUSTSEARCH_DATA_DIR=%%APPDATA%%\io.justsearch.shell
 rem   set JUSTSEARCH_HOME=%%APPDATA%%\io.justsearch.shell
 rem
 rem The runtime manifest (GET /api/runtime/manifest) reports the active mode
