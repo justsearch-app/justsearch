@@ -68,6 +68,38 @@ it('keeps a refused Add draft reachable and allows correction and retry', async 
   expect(el.showManualInput).toBe(false);
 });
 
+// S34.2: exercise the preview response boundary, including typing, before submission.
+it.each(['inside', 'containing'])('explains a preview overlap (%s) and blocks click and Enter before Add', async (relationship) => {
+  vi.useFakeTimers();
+  try {
+    const { el, fetch, invoke } = await mount(); await draft(el);
+    fetch.mockImplementation(async (path: string) => path === '/api/indexing-roots/preview'
+      ? new Response(JSON.stringify({ exists: true, isDir: true, fileCount: 0, capped: false,
+        alreadyWatched: false, overlap: { path: '/docs', relationship } }))
+      : new Response('{}', { status: 503 }));
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>('[aria-label="Folder path"]')!;
+    input.value = '/new'; input.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(350); await pump(el);
+    const line = el.shadowRoot!.querySelector('.add-preview')!;
+    expect(line.textContent).toContain('/docs');
+    expect(line.textContent).toContain(relationship === 'inside' ? 'inside' : 'contains');
+    expect(line.getAttribute('role')).toBe('status');
+    const add = button(el, 'Add') as ReturnType<typeof button> & { availability: { kind: string; reason: string } };
+    expect(add.availability.kind).toBe('unavailable');
+    expect(add.availability.reason).toContain('/docs');
+    add.onActivate();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await pump(el); expect(invoke).not.toHaveBeenCalled();
+    // Correcting the path fetches a new preview; older servers may omit overlap.
+    fetch.mockResolvedValue(new Response(JSON.stringify({ exists: true, isDir: true, fileCount: 0, alreadyWatched: false })));
+    input.value = '/corrected'; input.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(350); await pump(el);
+    expect((button(el, 'Add') as typeof add).availability.kind).toBe('available');
+    button(el, 'Add').onActivate(); await pump(el);
+    expect(invoke).toHaveBeenCalledWith('core.add-watched-root', { path: '/corrected', collection: 'reports' });
+  } finally { document.body.replaceChildren(); vi.useRealTimers(); }
+});
+
 it('submits Add once while waiting and announces its outcome', async () => {
   const request = deferred<{ success: boolean }>(); const invoke = vi.fn(() => request.promise);
   const { el } = await mount({ invoke }); await draft(el);

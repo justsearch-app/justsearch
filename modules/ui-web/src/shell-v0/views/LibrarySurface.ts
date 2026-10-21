@@ -90,6 +90,16 @@ interface FolderPreview {
   /** Tempdoc 599 Fix 3 — the count walk hit its cap; fileCount is a lower bound ("N+"). */
   readonly capped: boolean;
   readonly alreadyWatched: boolean;
+  /** Optional for older Engines; exact membership still uses alreadyWatched. */
+  readonly overlap?: { readonly path: string; readonly relationship: 'inside' | 'containing' };
+}
+
+function overlapExplanation(preview: FolderPreview): string | null {
+  const overlap = preview.overlap;
+  if (!overlap) return null;
+  return overlap.relationship === 'inside'
+    ? `This folder is inside the watched folder “${overlap.path}” and is already covered by it. Choose a separate folder.`
+    : `This folder contains the watched folder “${overlap.path}”. Choose a separate folder.`;
 }
 
 // The substrate list response: a thin {items, count} envelope around the generated IndexedRootView.
@@ -486,6 +496,7 @@ export class LibrarySurface extends JfElement {
       gap: 0.35rem;
       margin-bottom: 1rem;
       font-size: var(--font-size-sm);
+      overflow-wrap: anywhere;
     }
     .add-preview.ok {
       color: var(--text-success);
@@ -1184,6 +1195,9 @@ export class LibrarySurface extends JfElement {
         fileCount: typeof body?.fileCount === 'number' ? body.fileCount : -1,
         capped: Boolean(body?.capped),
         alreadyWatched: Boolean(body?.alreadyWatched),
+        ...(typeof body?.overlap?.path === 'string' && body.overlap.path.trim()
+          && (body.overlap.relationship === 'inside' || body.overlap.relationship === 'containing')
+          ? { overlap: { path: body.overlap.path, relationship: body.overlap.relationship } } : {}),
       };
     } catch {
       // Silent: preview is advisory; the Add path still validates server-side.
@@ -1214,6 +1228,8 @@ export class LibrarySurface extends JfElement {
     if (!p.exists) return unavailableBecause('Path not found');
     if (!p.isDir) return unavailableBecause('Not a folder');
     if (p.alreadyWatched) return unavailableBecause('Already watched');
+    const overlap = overlapExplanation(p);
+    if (overlap) return unavailableBecause(overlap);
     return AVAILABLE;
   }
 
@@ -1675,6 +1691,10 @@ export class LibrarySurface extends JfElement {
     }
     if (p.alreadyWatched) {
       return html`<div class="add-preview warn">${icon({ name: 'alert-circle', size: 14 })} Already watched</div>`;
+    }
+    const overlap = overlapExplanation(p);
+    if (overlap) {
+      return html`<div class="add-preview warn" role="status">${icon({ name: 'alert-circle', size: 14 })} ${overlap}</div>`;
     }
     const files =
       p.fileCount >= 0
