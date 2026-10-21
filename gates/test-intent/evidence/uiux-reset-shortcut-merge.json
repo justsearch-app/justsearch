@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T02:37:05.267Z",
+  "revision": "f047b040e38e3ba6c22a191301a4fbc7286b5a3a",
+  "tree": "beb7db6d4639de2ca82d99a7a1c76df693c5eb57",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::m2_incomplete_reset_never_initializes_shortcuts_and_cancel_preserves_saved_choice\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4065
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::m3_completed_reset_removes_shortcut_choice_before_initialization\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5008
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#tests::m2_incomplete_reset_never_initializes_shortcuts_and_cancel_preserves_saved_choice",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:0dbb954edf3c7ebd05aecc118790e2be2ac1a0c9ac13b7860be3f4b3a8992031",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tests::m2_incomplete_reset_never_initializes_shortcuts_and_cancel_preserves_saved_choice",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#tests::m3_completed_reset_removes_shortcut_choice_before_initialization",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:0dbb954edf3c7ebd05aecc118790e2be2ac1a0c9ac13b7860be3f4b3a8992031",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tests::m3_completed_reset_removes_shortcut_choice_before_initialization",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:504168dbdf97cbacb0f435a7085838c604b7b56515683c50a95cbd6e5152a300"
+}

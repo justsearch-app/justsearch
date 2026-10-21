@@ -7,15 +7,15 @@ mod engine_host;
 mod engine_probe;
 #[allow(dead_code)]
 mod exit_ledger;
-mod platform_paths;
-mod native_targets;
 #[cfg(target_os = "linux")]
 mod linux_process;
+mod native_targets;
+mod platform_paths;
 // Lane F stage B item B10: the Engine supervisor (design 7.1). The DECISION half is a pure
 // function over the register the dev-runner also reads; only the actuator lives in this file.
 mod quit;
-mod session_window;
 mod search_shortcut;
+mod session_window;
 mod shell_actuator;
 mod supervisor;
 mod updater;
@@ -402,10 +402,19 @@ fn resolve_app_data_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<
         .map_err(|e| format!("app_data_dir() failed: {e}"))
 }
 
+/// Recovery must finish before preferences, native shortcuts or normal work start.
+fn after_factory_reset(status: &factory_reset::Status, initialize: impl FnOnce()) {
+    if !status.blocks_backend() {
+        initialize();
+    }
+}
+
 fn reset_blocks_search(app: &tauri::AppHandle) -> bool {
-    app.try_state::<Arc<BackendState>>().is_some_and(|state| {
-        state.reset_status.lock().expect("reset status mutex poisoned").blocks_backend()
-    })
+    app.state::<Arc<BackendState>>()
+        .reset_status
+        .lock()
+        .expect("reset status mutex poisoned")
+        .blocks_backend()
 }
 
 fn maybe_run_factory_reset<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> factory_reset::Status {
@@ -803,7 +812,10 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         .join("native-bin")
         .join("onnxruntime")
         .join("cuda12");
-    if ort_cuda_dir.join(native_targets::library_name("ort-cuda")).exists() {
+    if ort_cuda_dir
+        .join(native_targets::library_name("ort-cuda"))
+        .exists()
+    {
         cmd.env("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", &ort_cuda_dir);
         cmd.env("JUSTSEARCH_GPU_ENABLED", "true");
     }
@@ -977,7 +989,11 @@ fn reconcile_registered_children(data_dir: &std::path::Path) -> Result<(), Strin
                 return Err("Incomplete managed child identity".into());
             }
             #[cfg(target_os = "linux")]
-            if !child.identity.as_ref().is_some_and(|id| id.valid(child.pid)) {
+            if !child
+                .identity
+                .as_ref()
+                .is_some_and(|id| id.valid(child.pid))
+            {
                 return Err("Incomplete Linux managed child identity".into());
             }
             Ok(child)
@@ -1050,7 +1066,10 @@ try {
 #[cfg(target_os = "linux")]
 fn terminal_kill_if_identity_matches(child: &ManagedChildRecord) -> Result<(), String> {
     linux_process::terminate(
-        child.identity.as_ref().ok_or("Missing Linux managed child identity")?,
+        child
+            .identity
+            .as_ref()
+            .ok_or("Missing Linux managed child identity")?,
         std::path::Path::new(&child.executable),
     )
 }
@@ -1323,21 +1342,41 @@ async fn confirm_delete_data(
 
 #[tauri::command]
 fn factory_reset_status(state: tauri::State<'_, Arc<BackendState>>) -> factory_reset::Status {
-    state.reset_status.lock().expect("reset status mutex poisoned").clone()
+    state
+        .reset_status
+        .lock()
+        .expect("reset status mutex poisoned")
+        .clone()
 }
 
 #[tauri::command]
-fn retry_factory_reset(app: tauri::AppHandle, state: tauri::State<'_, Arc<BackendState>>) -> Result<(), String> {
-    let status = state.reset_status.lock().expect("reset status mutex poisoned");
-    if status.phase != factory_reset::Phase::Incomplete { return Err("Reset is not incomplete".into()); }
+fn retry_factory_reset(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<BackendState>>,
+) -> Result<(), String> {
+    let status = state
+        .reset_status
+        .lock()
+        .expect("reset status mutex poisoned");
+    if status.phase != factory_reset::Phase::Incomplete {
+        return Err("Reset is not incomplete".into());
+    }
     app.request_restart();
     Ok(())
 }
 
 #[tauri::command]
-fn cancel_factory_reset(app: tauri::AppHandle, state: tauri::State<'_, Arc<BackendState>>) -> Result<(), String> {
-    let mut status = state.reset_status.lock().expect("reset status mutex poisoned");
-    if status.phase != factory_reset::Phase::Incomplete { return Err("Reset is not incomplete".into()); }
+fn cancel_factory_reset(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<BackendState>>,
+) -> Result<(), String> {
+    let mut status = state
+        .reset_status
+        .lock()
+        .expect("reset status mutex poisoned");
+    if status.phase != factory_reset::Phase::Incomplete {
+        return Err("Reset is not incomplete".into());
+    }
     let dir = resolve_app_data_dir(&app)?;
     factory_reset::cancel(&dir)?;
     *status = factory_reset::read_status(&dir);
@@ -1346,9 +1385,17 @@ fn cancel_factory_reset(app: tauri::AppHandle, state: tauri::State<'_, Arc<Backe
 }
 
 #[tauri::command]
-fn complete_factory_reset_storage(app: tauri::AppHandle, state: tauri::State<'_, Arc<BackendState>>) -> Result<(), String> {
-    let mut status = state.reset_status.lock().expect("reset status mutex poisoned");
-    if status.phase != factory_reset::Phase::AwaitingStorage { return Err("Reset is not awaiting window storage cleanup".into()); }
+fn complete_factory_reset_storage(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<BackendState>>,
+) -> Result<(), String> {
+    let mut status = state
+        .reset_status
+        .lock()
+        .expect("reset status mutex poisoned");
+    if status.phase != factory_reset::Phase::AwaitingStorage {
+        return Err("Reset is not awaiting window storage cleanup".into());
+    }
     let dir = resolve_app_data_dir(&app)?;
     factory_reset::storage_cleared(&dir)?;
     *status = factory_reset::read_status(&dir);
@@ -1357,9 +1404,17 @@ fn complete_factory_reset_storage(app: tauri::AppHandle, state: tauri::State<'_,
 }
 
 #[tauri::command]
-fn acknowledge_factory_reset(app: tauri::AppHandle, state: tauri::State<'_, Arc<BackendState>>) -> Result<(), String> {
-    let mut status = state.reset_status.lock().expect("reset status mutex poisoned");
-    if status.phase != factory_reset::Phase::Complete { return Err("Reset is not complete".into()); }
+fn acknowledge_factory_reset(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<BackendState>>,
+) -> Result<(), String> {
+    let mut status = state
+        .reset_status
+        .lock()
+        .expect("reset status mutex poisoned");
+    if status.phase != factory_reset::Phase::Complete {
+        return Err("Reset is not complete".into());
+    }
     let dir = resolve_app_data_dir(&app)?;
     factory_reset::dismiss(&dir)?;
     *status = factory_reset::read_status(&dir);
@@ -1562,8 +1617,12 @@ pub fn run() {
             let launch_data_dir = resolve_app_data_dir(app.handle()).ok();
             // Incomplete reset is a recovery-only launch. No backend, updater, or normal
             // data-writing work starts until reset completes or the user cancels it.
-            let reset_status = state.reset_status.lock().expect("reset status mutex poisoned").clone();
-            search_shortcut::after_factory_reset(&reset_status, || {
+            let reset_status = state
+                .reset_status
+                .lock()
+                .expect("reset status mutex poisoned")
+                .clone();
+            after_factory_reset(&reset_status, || {
                 search_shortcut::initialize(app.handle());
                 update_coordinator.initialize(app.handle());
                 // Best-effort: spawn the bundled headless backend.
@@ -1585,7 +1644,6 @@ pub fn run() {
                         },
                     );
                     eprintln!("Failed to spawn headless backend: {err}");
-
                 }
                 let reconciliation_app = app.handle().clone();
                 let reconciliation_state = state.clone();
@@ -1668,16 +1726,26 @@ pub fn run() {
             // Show reset recovery even if restart retained --minimized from autostart.
             // Window-state plugin restores position/size but not visibility (VISIBLE
             // flag is excluded), so we control show/hide here.
-            let launch = search_shortcut::LaunchRequest::from_args(&std::env::args().collect::<Vec<_>>());
+            let launch =
+                search_shortcut::LaunchRequest::from_args(&std::env::args().collect::<Vec<_>>());
             if reset_blocks_search(app.handle()) {
                 search_shortcut::foreground(app.handle());
             } else if app.state::<search_shortcut::SearchShortcut>().has_pending() {
                 search_shortcut::foreground(app.handle());
             } else if launch.focus_search {
                 search_shortcut::summon(app.handle());
-            } else if std::env::args().any(|arg| arg == "--focus-search") && !launch.deep_links.is_empty() {
+            } else if std::env::args().any(|arg| arg == "--focus-search")
+                && !launch.deep_links.is_empty()
+            {
                 search_shortcut::summon_deep_link(app.handle(), launch.deep_links[0].clone());
-            } else if launch.show_window || state.reset_status.lock().expect("reset status mutex poisoned").phase != factory_reset::Phase::Idle {
+            } else if launch.show_window
+                || state
+                    .reset_status
+                    .lock()
+                    .expect("reset status mutex poisoned")
+                    .phase
+                    != factory_reset::Phase::Idle
+            {
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.show();
                     let _ = w.set_focus();
@@ -1745,13 +1813,18 @@ pub fn run() {
         // Plugins initialize before configured WebViews are constructed. Run after
         // single-instance (a second launch must not wipe a live instance) and before
         // window-state (which otherwise caches and restores pre-reset settings).
-        .plugin(tauri::plugin::Builder::<tauri::Wry>::new("factory-reset")
-            .setup(|app, _| {
-                let status = maybe_run_factory_reset(app);
-                *app.state::<Arc<BackendState>>().reset_status.lock().expect("reset status mutex poisoned") = status;
-                Ok(())
-            })
-            .build())
+        .plugin(
+            tauri::plugin::Builder::<tauri::Wry>::new("factory-reset")
+                .setup(|app, _| {
+                    let status = maybe_run_factory_reset(app);
+                    *app.state::<Arc<BackendState>>()
+                        .reset_status
+                        .lock()
+                        .expect("reset status mutex poisoned") = status;
+                    Ok(())
+                })
+                .build(),
+        )
         // Slice 489 §15 — OS-level deep-link plugin (tauri-plugin-deep-link).
         // Pair with single-instance above so all incoming URLs land in the
         // running instance, not a fresh process. The plugin is initialized
@@ -1841,6 +1914,88 @@ mod tests {
         (child, record)
     }
 
+    #[test]
+    fn m2_incomplete_reset_never_initializes_shortcuts_and_cancel_preserves_saved_choice() {
+        let dir = tempdir().unwrap();
+        let preference = dir.path().join("search-shortcut.v1.json");
+        let saved = br#"{"version":1,"enabled":false}"#;
+        fs::write(&preference, saved).unwrap();
+        factory_reset::request(dir.path()).unwrap();
+        let incomplete =
+            factory_reset::run_pending(dir.path(), || Err("ownership unavailable".into()));
+        assert_eq!(incomplete.phase, factory_reset::Phase::Incomplete);
+        let mut initialized = false;
+        // This is the production setup gate, enclosing shortcut initialization,
+        // preference I/O, updater initialization and backend supervision.
+        after_factory_reset(&incomplete, || {
+            initialized = true;
+            let _ = fs::read(&preference).unwrap();
+            fs::write(
+                &preference,
+                b"normal startup must not write during recovery",
+            )
+            .unwrap();
+        });
+        assert!(
+            !initialized,
+            "recovery must not initialize shortcuts or access their file"
+        );
+        assert_eq!(fs::read(&preference).unwrap(), saved);
+
+        factory_reset::cancel(dir.path()).unwrap();
+        // Cancel requests an automatic shell restart; its next start keeps the off choice.
+        let cancelled =
+            factory_reset::run_pending(dir.path(), || panic!("cancelled reset must not delete"));
+        after_factory_reset(&cancelled, || {
+            initialized = true;
+            assert_eq!(fs::read(&preference).unwrap(), saved);
+        });
+        assert!(
+            initialized,
+            "cancel must allow normal startup on the automatic restart"
+        );
+        assert_eq!(fs::read(&preference).unwrap(), saved);
+    }
+
+    #[test]
+    fn m3_completed_reset_removes_shortcut_choice_before_initialization() {
+        let dir = tempdir().unwrap();
+        let preference = dir.path().join("search-shortcut.v1.json");
+        fs::write(&preference, br#"{"version":1,"enabled":false}"#).unwrap();
+        factory_reset::request(dir.path()).unwrap();
+        let awaiting = factory_reset::run_pending(dir.path(), || Ok(()));
+        assert_eq!(awaiting.phase, factory_reset::Phase::AwaitingStorage);
+        assert!(
+            !preference.exists(),
+            "disk reset must remove the saved shortcut choice"
+        );
+        let mut initialized = false;
+        after_factory_reset(&awaiting, || initialized = true);
+        assert!(
+            !initialized,
+            "shortcut initialization must wait for window storage cleanup"
+        );
+
+        factory_reset::storage_cleared(dir.path()).unwrap();
+        // Storage acknowledgement requests an automatic restart, before registration.
+        let complete =
+            factory_reset::run_pending(dir.path(), || panic!("complete reset must not wipe again"));
+        assert_eq!(complete.phase, factory_reset::Phase::Complete);
+        after_factory_reset(&complete, || {
+            initialized = true;
+            // The preserved SC8 preference test establishes missing-file = on.
+            assert_eq!(
+                fs::read(&preference).unwrap_err().kind(),
+                std::io::ErrorKind::NotFound
+            );
+        });
+        assert!(
+            initialized,
+            "complete reset must allow shortcut registration on restart"
+        );
+        assert!(!preference.exists());
+    }
+
     #[cfg(windows)]
     #[test]
     fn exhaustion_cleans_registered_children() {
@@ -1850,17 +2005,29 @@ mod tests {
         let manifest = serde_json::json!({ "schemaVersion": 2, "children": [{
             "pid": record.pid, "startedAt": record.started_at, "executable": record.executable
         }] });
-        fs::write(dir.path().join("runtime/manifest.json"), manifest.to_string()).unwrap();
+        fs::write(
+            dir.path().join("runtime/manifest.json"),
+            manifest.to_string(),
+        )
+        .unwrap();
         cleanup_after_supervision(&supervisor::Outcome::NoEngine, dir.path());
         assert!(child.try_wait().unwrap().is_none());
         // Q15-I1: this manifest may belong to the incumbent holding the data directory.
-        cleanup_after_supervision(&supervisor::Outcome::Exhausted {
-            reason: "DATA_DIR_LOCKED".into(), exit_code: 2,
-        }, dir.path());
+        cleanup_after_supervision(
+            &supervisor::Outcome::Exhausted {
+                reason: "DATA_DIR_LOCKED".into(),
+                exit_code: 2,
+            },
+            dir.path(),
+        );
         assert!(child.try_wait().unwrap().is_none());
-        cleanup_after_supervision(&supervisor::Outcome::Exhausted {
-            reason: "restart budget exhausted".into(), exit_code: 1,
-        }, dir.path());
+        cleanup_after_supervision(
+            &supervisor::Outcome::Exhausted {
+                reason: "restart budget exhausted".into(),
+                exit_code: 1,
+            },
+            dir.path(),
+        );
         assert!(child.try_wait().unwrap().is_some());
     }
 
@@ -1876,7 +2043,11 @@ mod tests {
             { "pid": record.pid, "startedAt": record.started_at, "executable": record.executable },
             { "pid": mismatch.pid, "startedAt": mismatch.started_at, "executable": mismatch.executable }
         ] });
-        fs::write(dir.path().join("runtime/manifest.json"), manifest.to_string()).unwrap();
+        fs::write(
+            dir.path().join("runtime/manifest.json"),
+            manifest.to_string(),
+        )
+        .unwrap();
         let host = EngineHost::default();
         let error = host
             .admit(PreparedCommand {
@@ -1924,13 +2095,22 @@ mod tests {
         let dir = tempdir().unwrap();
         fs::create_dir(dir.path().join("runtime")).unwrap();
         let path = dir.path().join("runtime/manifest.json");
-        for bad in ["null", "{}", r#"{"schemaVersion":3,"children":[]}"#,
-            r#"{"schemaVersion":2}"#, r#"{"schemaVersion":2,"children":null}"#,
-            r#"{"schemaVersion":2,"children":{}}"#, r#"{"schemaVersion":2,"children":[{}]}"#] {
+        for bad in [
+            "null",
+            "{}",
+            r#"{"schemaVersion":3,"children":[]}"#,
+            r#"{"schemaVersion":2}"#,
+            r#"{"schemaVersion":2,"children":null}"#,
+            r#"{"schemaVersion":2,"children":{}}"#,
+            r#"{"schemaVersion":2,"children":[{}]}"#,
+        ] {
             fs::write(&path, bad).unwrap();
             assert!(reconcile_registered_children(dir.path()).is_err(), "{bad}");
         }
-        for good in [r#"{"schemaVersion":1}"#, r#"{"schemaVersion":2,"children":[]}"#] {
+        for good in [
+            r#"{"schemaVersion":1}"#,
+            r#"{"schemaVersion":2,"children":[]}"#,
+        ] {
             fs::write(&path, good).unwrap();
             reconcile_registered_children(dir.path()).unwrap();
         }

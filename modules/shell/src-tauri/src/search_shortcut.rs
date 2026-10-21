@@ -166,13 +166,6 @@ fn register(state: &mut ShortcutState, registration: &mut impl FnMut(bool) -> Re
     }
 }
 
-/// Recovery must finish before reading preferences or registering native shortcuts.
-pub(crate) fn after_factory_reset(status: &super::factory_reset::Status, initialize: impl FnOnce()) {
-    if !status.blocks_backend() {
-        initialize();
-    }
-}
-
 pub(crate) fn initialize(app: &tauri::AppHandle) {
     let runtime = app.state::<SearchShortcut>();
     let mut state = runtime
@@ -309,10 +302,6 @@ pub(crate) fn foreground(app: &tauri::AppHandle) {
 }
 
 pub(crate) fn summon(app: &tauri::AppHandle) {
-    if super::reset_blocks_search(app) {
-        foreground(app);
-        return;
-    }
     app.state::<SearchShortcut>().pending.request();
     foreground(app);
     let _ = app.emit(SUMMON_EVENT, ());
@@ -320,10 +309,6 @@ pub(crate) fn summon(app: &tauri::AppHandle) {
 
 /// Tauri's cold-link parser ignores mixed arguments. Retain their explicit destination until ready.
 pub(crate) fn summon_deep_link(app: &tauri::AppHandle, url: String) {
-    if super::reset_blocks_search(app) {
-        foreground(app);
-        return;
-    }
     app.state::<SearchShortcut>().pending.request_deep_link(url);
     foreground(app);
     let _ = app.emit(SUMMON_EVENT, ());
