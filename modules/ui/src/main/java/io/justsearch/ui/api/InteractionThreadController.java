@@ -80,6 +80,7 @@ public final class InteractionThreadController {
   /** Handles {@code GET /api/thread/{id}}. */
   public void handleGet(Context ctx) {
     String conversationId = ctx.pathParam("id");
+    if (StoreIdRequest.rejectUnsafe(ctx, conversationId)) return;
     try {
       List<InteractionEvent> events = new ArrayList<>();
       // Tempdoc 863 §4.A.5 (F2) — the runs whose ANSWER this plane actually holds. This is the one
@@ -206,6 +207,7 @@ public final class InteractionThreadController {
       // segment, §26.A). Absent ⇒ a stand-alone background run, visible only in the cross-conversation
       // inbox (/api/presence). The 7-arg AgentRequest sets conversationId; the others default it null.
       Object convObj = body.get("conversationId");
+      if (StoreIdRequest.rejectBody(ctx, body)) return;
       String conversationId = convObj instanceof String c && !c.isBlank() ? c : null;
       io.justsearch.agent.api.AgentRequest request =
           new io.justsearch.agent.api.AgentRequest(
@@ -260,6 +262,7 @@ public final class InteractionThreadController {
   @SuppressWarnings("unchecked")
   public void handlePostEvent(Context ctx) {
     String conversationId = ctx.pathParam("id");
+    if (StoreIdRequest.rejectUnsafe(ctx, conversationId)) return;
     if (conversationId == null || conversationId.isBlank()) {
       ctx.status(400).json(Map.of("error", "conversationId is required"));
       return;
