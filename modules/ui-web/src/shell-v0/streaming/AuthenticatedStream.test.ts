@@ -9,7 +9,7 @@ afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); mocks.invoke.mockRes
 describe('default EnvelopeStream authenticated transport', () => {
   it('sends a header, refreshes a rejected token, and parses chunked SSE frames', async () => {
     vi.stubGlobal('EventSource', class { addEventListener() {} removeEventListener() {} close() {} });
-    mocks.invoke.mockResolvedValueOnce('old-token').mockResolvedValueOnce('new-token');
+    mocks.invoke.mockResolvedValueOnce({ origin: 'http://127.0.0.1:33221', token: 'old-token' }).mockResolvedValueOnce({ origin: 'http://127.0.0.1:33221', token: 'new-token' });
     const encoder = new TextEncoder();
     let controller!: ReadableStreamDefaultController<Uint8Array>;
     const body = new ReadableStream<Uint8Array>({ start(value) { controller = value; } });
@@ -39,7 +39,7 @@ describe('default EnvelopeStream authenticated transport', () => {
 
 it('reconnects after EOF with the resume checkpoint and a newly resolved boot token', async () => {
   vi.stubGlobal('EventSource', class { addEventListener() {} removeEventListener() {} close() {} });
-  mocks.invoke.mockResolvedValueOnce('boot-one').mockResolvedValueOnce('boot-two');
+  mocks.invoke.mockResolvedValueOnce({ origin: 'http://127.0.0.1:33221', token: 'boot-one' }).mockResolvedValueOnce({ origin: 'http://127.0.0.1:33221', token: 'boot-two' });
   const frame = (seq: number) => new TextEncoder().encode('event: frame\ndata: ' + JSON.stringify({
     streamId: 'test', frameKind: 'UPDATE', seq, resumeToken: 'r' + seq, payload: {},
   }) + '\n\n');
@@ -65,7 +65,7 @@ it('reconnects after EOF with the resume checkpoint and a newly resolved boot to
 
 it('retries a cold-start null token on the next connection instead of caching failure', async () => {
   vi.stubGlobal('EventSource', class { addEventListener() {} removeEventListener() {} close() {} });
-  mocks.invoke.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue('published-late');
+  mocks.invoke.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue({ origin: 'http://127.0.0.1:33221', token: 'published-late' });
   const body = new ReadableStream<Uint8Array>({ start() {} });
   const send = vi.fn()
     .mockResolvedValueOnce(Response.json({ errorCode: 'UI_TOKEN_REQUIRED' }, { status: 401 }))

@@ -1,0 +1,2 @@
+{"streamId": "surface:indexing-jobs", "frameKind": "LIFECYCLE", "seq": 94847, "ts": "2026-10-20T11:50:42.833593189Z", "payload": {"kind": "connected", "statusChangeCounter": 63, "statusChangeEpoch": "a4f326c8-1797-44e5-804f-c85a8dcab523"}, "resumeToken": "<redacted>"}
+{"streamId": "surface:indexing-jobs", "frameKind": "LIFECYCLE", "seq": 94848, "ts": "2026-10-20T11:50:42.836329404Z", "payload": {"items": [], "kind": "snapshot", "snapshotSeq": 94940, "statusChangeCounter": 63, "statusChangeEpoch": "a4f326c8-1797-44e5-804f-c85a8dcab523"}, "resumeToken": "<redacted>"}

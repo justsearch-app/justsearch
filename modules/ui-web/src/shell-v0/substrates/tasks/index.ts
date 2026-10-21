@@ -70,6 +70,40 @@ const _tasks = new Map<string, Task>();
 const _cancelFns = new Map<string, () => void>();
 const _listeners = new Set<() => void>();
 let _seq = 0;
+// External mirrors own their bounded live set, including failures. Pruning those rows here
+// fights their next reconciliation and turns a stable window into endless remove/insert churn.
+const _mirrored = new Set<string>();
+const _namespaces = new Map<string, Set<string>>();
+let batchDepth = 0;
+let changedInBatch = false;
+
+function namespace(id: string): string { return id.slice(0, id.indexOf(':') + 1); }
+function putTask(task: Task): void {
+  _tasks.set(task.id, task);
+  const key = namespace(task.id);
+  let ids = _namespaces.get(key);
+  if (!ids) { ids = new Set(); _namespaces.set(key, ids); }
+  ids.add(task.id);
+}
+function deleteTask(id: string): void {
+  _tasks.delete(id);
+  _mirrored.delete(id);
+  _cancelFns.delete(id);
+  const key = namespace(id);
+  const ids = _namespaces.get(key);
+  ids?.delete(id);
+  if (ids?.size === 0) _namespaces.delete(key);
+}
+
+/** Publish a reconciled set once, after all its row changes have been applied. */
+export function batchTaskChanges(update: () => void): void {
+  batchDepth++;
+  try { update(); }
+  finally {
+    batchDepth--;
+    if (batchDepth === 0 && changedInBatch) { changedInBatch = false; notify(); }
+  }
+}
 
 // S7 review follow-up: bound in-memory accumulation. Finished tasks are
 // pruned oldest-first (Map preserves insertion order) once the total exceeds
@@ -78,14 +112,14 @@ const MAX_RETAINED = 50;
 
 function pruneFinished(): void {
   if (_tasks.size <= MAX_RETAINED) return;
-  for (const [id, t] of _tasks) {
+  for (const [id, task] of _tasks) {
     if (_tasks.size <= MAX_RETAINED) break;
-    // Only terminal tasks are prunable; queued + running are live and retained.
-    if (isTerminalStatus(t.status)) _tasks.delete(id);
+    if (!_mirrored.has(id) && isTerminalStatus(task.status)) deleteTask(id);
   }
 }
 
 function notify(): void {
+  if (batchDepth > 0) { changedInBatch = true; return; }
   notifyAll(_listeners);
 }
 
@@ -102,7 +136,8 @@ export interface StartTaskOptions {
 
 export function startTask(opts: StartTaskOptions): string {
   const id = opts.id ?? `task-${++_seq}`;
-  _tasks.set(id, {
+  _mirrored.delete(id);
+  putTask({
     id,
     label: opts.label,
     status: 'running',
@@ -120,7 +155,7 @@ export function startTask(opts: StartTaskOptions): string {
 export function updateTaskProgress(id: string, progress: number): void {
   const t = _tasks.get(id);
   if (!t || t.status !== 'running') return;
-  _tasks.set(id, { ...t, progress });
+  putTask({ ...t, progress });
   notify();
 }
 
@@ -132,7 +167,7 @@ export function completeTask(
   // Terminal-state guard (S7 review): only a running task may transition.
   // Prevents e.g. a late completeTask flipping a cancelled task to succeeded.
   if (!t || t.status !== 'running') return;
-  _tasks.set(id, {
+  putTask({
     ...t,
     status,
     ...(status === 'succeeded' ? { progress: 1 } : {}),
@@ -153,7 +188,7 @@ export function cancelTask(id: string): void {
       /* swallow — best-effort cancel */
     }
   }
-  _tasks.set(id, { ...t, status: 'cancelled' });
+  putTask({ ...t, status: 'cancelled' });
   _cancelFns.delete(id);
   notify();
 }
@@ -168,8 +203,7 @@ export function cancelTask(id: string): void {
  */
 export function removeTask(id: string): void {
   if (!_tasks.has(id)) return;
-  _tasks.delete(id);
-  _cancelFns.delete(id);
+  deleteTask(id);
   notify();
 }
 
@@ -200,7 +234,8 @@ export function upsertMirroredTask(opts: {
   ) {
     return; // no-op: suppress redundant listener fires (stable reconcile)
   }
-  _tasks.set(opts.id, {
+  _mirrored.add(opts.id);
+  putTask({
     id: opts.id,
     label: opts.label,
     status: opts.status,
@@ -209,7 +244,6 @@ export function upsertMirroredTask(opts: {
     ...(opts.progress !== undefined ? { progress: opts.progress } : {}),
     ...(opts.originSurfaceId !== undefined ? { originSurfaceId: opts.originSurfaceId } : {}),
   });
-  pruneFinished();
   notify();
 }
 
@@ -217,7 +251,10 @@ export function getTask(id: string): Task | undefined {
   return _tasks.get(id);
 }
 
-export function listTasks(): readonly Task[] {
+export function listTasks(taskNamespace?: string): readonly Task[] {
+  if (taskNamespace !== undefined) {
+    return Array.from(_namespaces.get(taskNamespace) ?? [], id => _tasks.get(id)!);
+  }
   return Array.from(_tasks.values());
 }
 
@@ -228,7 +265,7 @@ export function listRunningTasks(): readonly Task[] {
 export function clearFinishedTasks(): void {
   for (const [id, t] of _tasks) {
     // Clear only terminal tasks; queued + running are live and retained.
-    if (isTerminalStatus(t.status)) _tasks.delete(id);
+    if (isTerminalStatus(t.status)) deleteTask(id);
   }
   notify();
 }
@@ -246,4 +283,8 @@ export function __resetTasksForTest(): void {
   _cancelFns.clear();
   _listeners.clear();
   _seq = 0;
+  _mirrored.clear();
+  _namespaces.clear();
+  batchDepth = 0;
+  changedInBatch = false;
 }

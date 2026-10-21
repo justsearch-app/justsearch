@@ -275,7 +275,7 @@ public class LocalApiServer {
             this.HeadAssemblyRef,
             this.settingsController,
             this::getPort,
-            this::resolveLlamaServerPort,
+            this::resolveLlamaServerEndpoint,
             this::getCachedGpuSnapshot,
             () -> (double) inflightRequests.get());
     // Carve-out C1: seed the reassignable knowledgeSearchController field from the Result (it is
@@ -776,11 +776,20 @@ public class LocalApiServer {
   }
 
   /**
-   * The port the running llama-server listens on, for the {@code /v1} proxy. A managed launch binds
-   * a fresh loopback port, never the configured one (ADR-0051 decision 2), so the live runtime's
-   * port wins; the configured port (tempdoc 374 alpha.17 R5, read live from ConfigStore) is the
-   * fallback while no runtime reports one. Defaulting mirrors {@code InferenceConfig.from}.
+   * The current launch's address and private credential for the {@code /v1} proxy. Managed
+   * launches bind fresh loopback ports (ADR-0051 decision 2); their launch owner supplies both
+   * values together. Isolated compositions fall back to numeric external-runtime information
+   * without a managed credential.
    */
+  private io.justsearch.app.inference.LlamaServerEndpoint resolveLlamaServerEndpoint() {
+    if (HeadAssemblyRef != null && HeadAssemblyRef.serviceOut() != null
+        && HeadAssemblyRef.serviceOut().inferenceManager() != null) {
+      return HeadAssemblyRef.serviceOut().inferenceManager().servingEndpoint();
+    }
+    // Isolated API compositions may expose only numeric external-runtime information.
+    return new io.justsearch.app.inference.LlamaServerEndpoint(resolveLlamaServerPort(), null);
+  }
+
   private int resolveLlamaServerPort() {
     if (HeadAssemblyRef != null
         && HeadAssemblyRef.inference().onlineAi()

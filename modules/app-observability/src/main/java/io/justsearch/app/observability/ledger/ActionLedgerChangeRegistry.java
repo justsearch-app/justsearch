@@ -44,7 +44,11 @@ public final class ActionLedgerChangeRegistry {
   }
 
   public ActionLedgerChangeRegistry(ActionEventJournal journal) {
-    this.channel = new SseStreamChannel(STREAM_ID);
+    this(journal, new SseStreamChannel(STREAM_ID));
+  }
+
+  public ActionLedgerChangeRegistry(ActionEventJournal journal, SseStreamChannel channel) {
+    this.channel = Objects.requireNonNull(channel, "channel");
     this.journal = Objects.requireNonNull(journal, "journal");
   }
 
@@ -107,6 +111,13 @@ public final class ActionLedgerChangeRegistry {
   public void broadcastActionEvent(ActionEvent event) {
     Objects.requireNonNull(event, "event");
     publish(event);
+  }
+
+  /** Keep terminal acceptance synchronous; SSE observers cannot stall the job-feed drainer. */
+  public void broadcastActionEventAsync(ActionEvent event) {
+    Objects.requireNonNull(event, "event");
+    journal.append(event);
+    if (store.append(event)) channel.publishAsync(SseFrameKind.UPDATE, ActionLedgerProjection.toWireRow(event));
   }
 
   private void publish(ActionEvent event) {

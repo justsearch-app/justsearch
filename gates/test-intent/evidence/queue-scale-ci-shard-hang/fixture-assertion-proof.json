@@ -1,0 +1,16 @@
+{
+  "test": "modules/app-services/src/test/java/io/justsearch/app/services/HeadAssemblyTest.java#recoveredWorkerPreparationDefersIndexingJobsUntilActivation",
+  "before": "56ef4483e",
+  "assertionCallsCompared": 3,
+  "normalizedOld": [
+    "org.mockito.Mockito.verify(client,org.mockito.Mockito.never()).subscribeIndexingJobs(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());",
+    "org.mockito.Mockito.verify(client).subscribeIndexingJobs(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());",
+    "assertFalse(successfulRegistration.isClosed());"
+  ],
+  "normalizedNew": [
+    "org.mockito.Mockito.verify(client,org.mockito.Mockito.never()).subscribeIndexingJobs(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());",
+    "org.mockito.Mockito.verify(client).subscribeIndexingJobs(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());",
+    "assertFalse(successfulRegistration.isClosed());"
+  ],
+  "identical": true
+}

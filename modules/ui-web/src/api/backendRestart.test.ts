@@ -32,7 +32,7 @@ describe('installBackendRestartBridge', () => {
       fire = handler;
       return Promise.resolve(() => {});
     });
-    mocks.invoke.mockResolvedValueOnce('tok-boot-1').mockResolvedValueOnce('tok-boot-2');
+    mocks.invoke.mockResolvedValueOnce({ origin: 'http://127.0.0.1:43210', token: 'tok-boot-1' }).mockResolvedValueOnce({ origin: 'http://127.0.0.1:43210', token: 'tok-boot-2' });
 
     const { resolveSessionTokenFromTauri, getSessionToken } = await import('./http.js');
     const { installBackendRestartBridge } = await import('./backendRestart.js');
@@ -56,7 +56,7 @@ describe('installBackendRestartBridge', () => {
       fire = handler;
       return Promise.resolve(() => {});
     });
-    mocks.invoke.mockResolvedValue('tok-boot-1');
+    mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:43210', token: 'tok-boot-1' });
 
     const { resolveSessionTokenFromTauri, getSessionToken } = await import('./http.js');
     const { installBackendRestartBridge } = await import('./backendRestart.js');

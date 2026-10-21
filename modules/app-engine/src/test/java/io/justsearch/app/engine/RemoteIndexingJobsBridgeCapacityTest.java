@@ -56,7 +56,7 @@ class RemoteIndexingJobsBridgeCapacityTest {
         onFrame.accept(IndexingJobsFrame.newBuilder().setSeq(sequence)
             .setSnapshot(IndexingJobsSnapshot.newBuilder().addItems(
                 io.justsearch.ipc.IndexingJobView.newBuilder().setPathHash("job")
-                    .setState(sequence == 1 ? "PENDING" : "DONE"))).build());
+                    .setState(sequence == 1 ? "PROCESSING" : "FAILED"))).build());
         if (sequence == 2) replaced.countDown();
         return () -> {};
       };
@@ -83,7 +83,7 @@ class RemoteIndexingJobsBridgeCapacityTest {
         } else {
           assertTrue(replaced.await(5, TimeUnit.SECONDS), "capacity recovery must reconnect without a caller start()");
           assertEquals(2L, bridge.latestSnapshotSeq(), "a fresh snapshot replaces stale cached state");
-          assertEquals("DONE", bridge.latestSnapshot().getFirst().state());
+          assertEquals("FAILED", bridge.latestSnapshot().getFirst().state());
           assertEquals(2, calls.get());
         }
       } finally {

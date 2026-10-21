@@ -196,11 +196,11 @@ final class SqliteIngestionWalkOps {
         throw new IllegalStateException("Path belongs to another active recorded walk");
       }
       try (var insert = connection.prepareStatement("""
-          INSERT OR REPLACE INTO jobs
+          INSERT INTO jobs
             (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator,
              transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root)
           VALUES (?, 'PENDING', 0, ?, ?, ?, ?, ?, ?, lower(hex(randomblob(16))), ?, ?, ?)
-          """)) {
+          """ + SqliteSchema.REENQUEUE_JOB_ON_CONFLICT)) {
         insert.setString(1, path); insert.setLong(2, now);
         insert.setString(3, declaredCollection != null ? declaredCollection : priorCollection);
         if (entry.sizeBytes() >= 0) insert.setLong(4, entry.sizeBytes());

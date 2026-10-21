@@ -1,0 +1,27 @@
+{
+  "singleDatabaseReused": true,
+  "realFilesReadmittedAfterUnwitnessedSetup": 12000,
+  "root": "/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/terminal-continuity/scale/corpus",
+  "counts": [
+    [
+      "PENDING",
+      700016
+    ],
+    [
+      "DONE",
+      200000
+    ],
+    [
+      "FAILED",
+      1000
+    ],
+    [
+      "PROCESSING",
+      0
+    ],
+    [
+      "RETRY_EXHAUSTED",
+      98984
+    ]
+  ]
+}
