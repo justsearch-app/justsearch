@@ -369,9 +369,12 @@ review record remain as history. The Windows account-level P9 check remains unve
       "whatMoved": "Rename the unused try-with-resources static mock binding nativeSecurity to the unnamed variable _. The conditional initializer, static-mock answer, resource order, lifetime and automatic close are identical. Every input, precondition, injected failure, assertion, tag and platform condition is unchanged. Main/test PMD and compilation pass for all four touched JVM modules; the focused runtime permission suite passes. The three v5 execution receipts refresh this file’s digest without changing their check selection or before-state assertions.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261019-5ec1a1 request",
-          "quote": "Make the smallest change that keeps the mock's scope and behavior exactly the same; an unnamed `_` resource is one option, if both PMD and Error Prone accept it."
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261019-5ec1a1 request",
+          "delegationScope": "implementation choices inside the agreed folder-protection scenarios P1-P9",
+          "choice": "CI's PMD rule rejects the unused static-mock binding; rename it to the unnamed variable _ and change nothing else about the mock.",
+          "label": "agent choice"
         }
       ]
     }
@@ -425,5 +428,16 @@ The existing rejection and acceptance records below are preserved byte-for-byte.
   "verdict": "accept",
   "digest": "sha256:aab87b23d0f89721090da8b839eb062b1b9b899579f96c14b54977c4881ca643",
   "note": "Entries match P1-P9 and the delegated choices; on main eae9993ac the 11 JVM repair and 2 hard-link/iterator checks fail by assertion (the 2 Rust repair checks only per receipt) while the preservation checks and the adapted keystore fixture (assertions unchanged) pass, all pass on da6d23a8b, and live Linux runs confirm owner-only keystore files at every #857 crash point; the preamble's 'PR/gate base 4f5954535' is stale but the flagged before-content is unchanged."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "21a0aa59-d546-4456-b0a8-e104e23f4067",
+  "verdict": "reject",
+  "digest": "sha256:4c602b17a1a125c11fab45a377dd92ab82d2813a0ebe120ac739d0d44a5804d6",
+  "note": "The new Adaptation entry for RuntimeDirectoryPermissionsTest cites as owner-words a quote ('Make the smallest change that keeps the mock's scope...') that is not among the owner's words in this task; otherwise the _ rename keeps the mock's scope and assertions, windowsRepairIncludesExistingFilesAndSkipsEveryReparsePoint fails by assertion on eae9993ac and passes on d9252652e, linkedRuntime preservation passes on both, and PMD/tests pass."
 }
 ```
