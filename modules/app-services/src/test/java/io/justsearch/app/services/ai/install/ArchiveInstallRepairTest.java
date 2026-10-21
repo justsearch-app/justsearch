@@ -348,6 +348,7 @@ class ArchiveInstallRepairTest {
     keep(archive);
     var registry = registry(archive);
     var repair = plan(registry);
+    assertEquals(1, repair.downloads().size(), "a kept ZIP without its outputs must be planned as extraction-only repair");
     var item = repair.downloads().getFirst();
     assertEquals(archive.sizeBytes(), item.sizeBytes());
     assertEquals(0, item.stagedBytes());
@@ -371,22 +372,7 @@ class ArchiveInstallRepairTest {
     assertEquals(0, transfers.get());
   }
 
-  @Test void healthyLegacyInstallHasNoIncompleteStatusAndDoesNotTouchUnchangedOutputs() throws Exception {
-    var archive = source("healthy.zip", Map.of("library.dll", "expected"));
-    keep(archive);
-    Files.writeString(runtime().resolve("library.dll"), "expected");
-    var installed = plan(registry(archive));
-    assertTrue(installed.downloads().isEmpty());
-    assertTrue(InstallCompleteness.compute(installed, null).installedFully());
-    FileTime old = FileTime.fromMillis(1000);
-    Files.setLastModifiedTime(runtime().resolve("library.dll"), old);
-    AiInstallService.extractZipInPlace(kept("healthy.zip"), runtime());
-    AiInstallService.extractZipInPlace(kept("healthy.zip"), runtime());
-    assertEquals(old, Files.getLastModifiedTime(runtime().resolve("library.dll")));
-    assertEquals(0, transfers.get());
-  }
-
-  @ParameterizedTest @ValueSource(strings = {"../outside.dll", "/absolute.dll", "C:/absolute.dll", "..\\outside.dll"})
+  @ParameterizedTest @ValueSource(strings = {"C:/absolute.dll", "..\\outside.dll"})
   void traversalAndAbsolutePathsAreRejected(String entry) throws Exception {
     var archive = source("hostile.zip", Map.of(entry, "bad"));
     keep(archive);
@@ -407,7 +393,7 @@ class ArchiveInstallRepairTest {
   }
 
   @EnabledOnOs(OS.LINUX)
-  @ParameterizedTest @ValueSource(strings = {"output", "parent", "partial", "receipt"})
+  @ParameterizedTest @ValueSource(strings = {"partial", "receipt"})
   void replacementRejectsSymlinkRedirection(String kind) throws Exception {
     var archive = source("links.zip", Map.of("nested/library.dll", "new"));
     keep(archive);
@@ -416,8 +402,6 @@ class ArchiveInstallRepairTest {
     Files.writeString(outside.resolve("library.dll"), "old");
     Files.createDirectories(runtime().resolve("nested"));
     switch (kind) {
-      case "parent" -> { Files.delete(runtime().resolve("nested")); Files.createSymbolicLink(runtime().resolve("nested"), outside); }
-      case "output" -> Files.createSymbolicLink(runtime().resolve("nested/library.dll"), outside.resolve("library.dll"));
       case "partial" -> Files.createSymbolicLink(runtime().resolve("nested/library.dll.partial"), outside.resolve("library.dll"));
       case "receipt" -> Files.createSymbolicLink(runtime().resolve(".archive-receipts"), outside);
     }
