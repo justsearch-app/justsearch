@@ -166,9 +166,12 @@ public final class KnowledgeServer implements Closeable {
   private IndexRootLock indexRootLock;
   private boolean closePrepared;
   private WorkerAppServices pendingAppServices;
+  /** Constructor context, held only while the serialized reload calls its normal factory. */
+  private DefaultWorkerAppServices runtimeReloadSource;
   private DeferredRuntime.PreparedUpgrade pendingDeferredUpgrade;
   private final Object closeLock = new Object();
   private final ReentrantLock runtimeSwapLock = new ReentrantLock();
+  private final AtomicInteger runtimeReloads = new AtomicInteger();
 
   /** Serializes dev service replacement with admin runtime replacement and shutdown. */
   final class DevReplacementLease implements AutoCloseable {
@@ -3231,6 +3234,14 @@ public final class KnowledgeServer implements Closeable {
    * {@link DevReloadManager}'s hot-reload path so all three observe the same wiring.
    */
   DefaultWorkerAppServices newAppServices() {
+    if (runtimeReloadSource != null) {
+      var runtime = (RunningRuntime) ingestLifecycle;
+      bindTerminalWriterFaultSource(runtime);
+      return DefaultWorkerAppServices.prepareRuntimeReload(workerExecutors,
+          fixedRuntimeContext(runtime, activeIndexPath),
+          () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
+          embeddingTelemetry, indexingPacing, childControl, serviceConfiguration, runtimeReloadSource);
+    }
     return newAppServices(infraCtx, ingestLifecycle);
   }
 
@@ -3512,6 +3523,43 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
+  /** Reuses the native handoff so watches and selected models survive a same-generation reload. */
+  private void reconstructAppServicesAfterRuntimeReload(DefaultWorkerAppServices source,
+      io.justsearch.indexerworker.services.WorkerMutationAdmission.FinalFence mutations) {
+    closePendingAppServices();
+    final DefaultWorkerAppServices successor;
+    runtimeReloadSource = source;
+    try {
+      successor = newAppServices();
+    } finally {
+      runtimeReloadSource = null;
+    }
+    pendingAppServices = successor;
+    try {
+      wireAppServicesPostConstruction(successor);
+      if (initialEncoderSet != null) retainProducerModels(successor, initialEncoderSet);
+      if (successor.ownsNativeProducer()) {
+        successor.prepareIndexingLoop();
+        source.installNativeWatcherHandoffTo(successor);
+        mutations.install(successor.mutationOwnerToken());
+        source.close();
+        publishServingView(successor);
+        successor.activatePreparedIndexingLoop();
+        mutations.certifySuccessor();
+      } else {
+        source.close();
+        successor.startIndexingLoop();
+        publishServingView(successor);
+      }
+      pendingAppServices = null;
+    } catch (Exception | Error failure) {
+      try { closePendingAppServices(); }
+      catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      if (failure instanceof Error fatal) throw fatal;
+      throw new IllegalStateException("Application-service replacement failed; owners retained", failure);
+    }
+  }
+
   /** Called only after the replacement service has started and is published to Engine callers. */
   void notifyRecordedServicesPublished() {
     // Every caller has released its own transition lock. Wait for a competing transition
@@ -3635,34 +3683,95 @@ public final class KnowledgeServer implements Closeable {
       throw new IllegalStateException("Runtime reload refused during encoder recovery or close");
     }
     final long elapsed;
+    runtimeReloads.incrementAndGet();
     runtimeSwapLock.lock();
     try {
-      if (closeStarted || encoderRecoveryReservation != null) {
-        throw new IllegalStateException("Runtime reload refused during encoder recovery or close");
+      for (;;) {
+        if (closeStarted || encoderRecoveryReservation != null) {
+          throw new IllegalStateException("Runtime reload refused during encoder recovery or close");
+        }
+        var migration = indexGenerationManager == null ? null
+            : indexGenerationManager.readStateBestEffort();
+        if (indexGenerationManager != null && migration == null) {
+          throw new IllegalStateException("Runtime reload refused: migration state is unavailable");
+        }
+        if (buildingIndexPath != null || searchLifecycle != ingestLifecycle
+            || (migration != null && (migration.building_generation() != null
+                || "MIGRATING".equals(migration.migration_state())
+                || "SWITCHING".equals(migration.migration_state())))) {
+          throw new IllegalStateException("Runtime reload refused during migration");
+        }
+        ServingView current;
+        publicationLock.writeLock().lock();
+        try {
+          synchronized (servingViewMonitor) {
+            current = servingView;
+            if (current == null || current.retirementListeners.isEmpty()) {
+              // Stop new captures atomically with the last listener check. A subscription whose
+              // registration is still in flight observes retiring and ends itself on registration.
+              if (current != null) current.retiring = true;
+              break;
+            }
+          }
+        } finally {
+          publicationLock.writeLock().unlock();
+        }
+        // Idle observers retain the view. Their existing callbacks must be able to re-enter
+        // lifecycle operations, so notify outside both locks, then recheck the selected owner and
+        // admission guards. Another reload, migration or shutdown may have won while unlocked.
+        runtimeSwapLock.unlock();
+        try { notifyServingViewRetirement(current); }
+        finally { runtimeSwapLock.lock(); }
       }
       try {
         retireServingView();
       } catch (IOException refusal) {
         throw new IllegalStateException("Runtime reload retains active serving holders", refusal);
       }
-      long startNanos = System.nanoTime();
-      LuceneRuntime old = this.ingestLifecycle;
-      if (old instanceof RunningRuntime running) {
-        running.drainAndClose(drainTimeout, reason);
-      } else if (old != null) {
-        try {
-          old.close();
-        } catch (Exception e) {
-          log.warn("swapRuntime: best-effort close of non-RunningRuntime old: {}", e.getMessage());
-        }
+      if (closeStarted || Thread.currentThread().isInterrupted()) {
+        if (servingView != null) restoreServingViewAfterRefusedRetirement(servingView);
+        throw new IllegalStateException("Runtime reload refused during close or interruption");
       }
-      RunningRuntime fresh = opener.get();
-      publishIngestLifecycle(fresh);
-      this.searchLifecycle = fresh;
-      reconstructAppServicesAfterDeferredUpgrade();
-      elapsed = (System.nanoTime() - startNanos) / 1_000_000L;
+      // A previously refused candidate can also retain work against the selected runtime.
+      closePendingAppServices();
+      long startNanos = System.nanoTime();
+      // The loop owns extraction and enrichment/backfill work that has no RPC serving lease.
+      // Its bounded close and admitted mutations must drain before their runtime can close.
+      var source = appServices instanceof DefaultWorkerAppServices producer
+          && producer.ownsNativeProducer() ? producer : null;
+      final io.justsearch.indexerworker.services.WorkerMutationAdmission.FinalFence mutations;
+      try {
+        mutations = source == null ? null : source.closeForRuntimeReload();
+        if (source == null && appServices != null) appServices.close();
+      } catch (InterruptedException | java.util.concurrent.TimeoutException refusal) {
+        if (refusal instanceof InterruptedException) Thread.currentThread().interrupt();
+        if (servingView != null) restoreServingViewAfterRefusedRetirement(servingView);
+        throw new IllegalStateException("Runtime reload retains active producer mutations", refusal);
+      } catch (IOException failure) {
+        throw new IllegalStateException("Runtime reload retains active producers", failure);
+      }
+      try (mutations) {
+        if (closeStarted) throw new IllegalStateException("Runtime reload refused during close");
+        LuceneRuntime old = this.ingestLifecycle;
+        if (old instanceof RunningRuntime running) {
+          running.drainAndClose(drainTimeout, reason);
+        } else if (old != null) {
+          try {
+            old.close();
+          } catch (Exception e) {
+            log.warn("swapRuntime: best-effort close of non-RunningRuntime old: {}", e.getMessage());
+          }
+        }
+        RunningRuntime fresh = opener.get();
+        publishIngestLifecycle(fresh);
+        this.searchLifecycle = fresh;
+        if (source != null) reconstructAppServicesAfterRuntimeReload(source, mutations);
+        else reconstructAppServicesAfterDeferredUpgrade();
+        elapsed = (System.nanoTime() - startNanos) / 1_000_000L;
+      }
     } finally {
       runtimeSwapLock.unlock();
+      runtimeReloads.decrementAndGet();
     }
     notifyRecordedServicesPublished();
     return elapsed;
@@ -6737,6 +6846,19 @@ public final class KnowledgeServer implements Closeable {
     return captureServingView(true);
   }
 
+  /** A planned physical transition is not a failed health observation. */
+  public java.util.Optional<ServingLease> tryCaptureHealthView() {
+    if (!runtimeSwapLock.tryLock()) return java.util.Optional.empty();
+    try {
+      return java.util.Optional.of(captureServingView());
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  /** Includes reloads waiting to acquire the physical transition lock. */
+  public boolean runtimeReloadInProgress() { return runtimeReloads.get() != 0; }
+
   private ServingLease captureServingView(boolean allowAcceptedIndexRecovery) {
     publicationLock.readLock().lock();
     try {
@@ -7555,7 +7677,12 @@ public final class KnowledgeServer implements Closeable {
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
     IOException refusal = null;
     synchronized (servingViewMonitor) {
-      while (retiring.holders != 0) {
+      // Older issued views can share this physical runtime (for example after query settings
+      // publication). Draining only the current view would close their runtime underneath them.
+      while (retiring.holders != 0 || retiredServingViews.stream().anyMatch(view ->
+          (view.holders != 0 || view.cleanupRunning)
+              && (referencesRuntime(view, retiring.ingestRuntime)
+                  || referencesRuntime(view, retiring.searchRuntime)))) {
         long remaining = deadline - System.nanoTime();
         if (remaining <= 0) {
           refusal = new IOException("Index serving view still has active holders; owner retained");

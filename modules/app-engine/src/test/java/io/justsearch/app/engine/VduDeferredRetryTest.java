@@ -85,7 +85,9 @@ final class VduDeferredRetryTest {
     docId = io.justsearch.indexerworker.util.PathNormalizer.normalizePath(picture.toAbsolutePath().toString());
     assertTrue(Files.exists(Path.of(docId)), "the pass reads the document at its id");
     var layout = new IndexGenerationManager(directory.resolve("index")).initializeOrLoad();
-    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTestingWithVduRetryCount(0))
+    var catalogFields=new java.util.ArrayList<>(FieldCatalogDef.forChunkTestingWithVduRetryCount(0).fields());
+    catalogFields.add(new FieldCatalogDef.FieldDef(SchemaFields.SOURCE_SHA256,"keyword",true,false,java.util.List.of(),null,null,false));
+    runtime = IndexSchema.fromCatalog(new FieldCatalogDef("deferred-vdu-revision",catalogFields))
         .atPath(layout.activeGenerationPath()).withExecutorRegistrations(luceneExecutors).open();
     Map<String, Object> fields = new HashMap<>();
     fields.put(SchemaFields.DOC_ID, docId);
@@ -94,6 +96,7 @@ final class VduDeferredRetryTest {
     fields.put(SchemaFields.CONTENT, "baseline");
     fields.put(SchemaFields.CONTENT_PREVIEW, "baseline");
     fields.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING);
+    fields.put(SchemaFields.SOURCE_SHA256,"a".repeat(64));
     fields.put(SchemaFields.INDEXED_AT, System.currentTimeMillis());
     runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
     runtime.commitOps().commitAndTrack();

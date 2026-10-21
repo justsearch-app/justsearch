@@ -184,6 +184,29 @@ public final class IndexingCoordinator {
     return joinOrUnwrap(op.completion());
   }
 
+  /** Conditional single-item publication, including a chunk's parent revision. */
+  public boolean updateDocumentIf(String docId, DocumentFieldOps.EnrichmentInput input,
+      Map<String, Object> updates) {
+    return input != null && updateDocumentsBatchIf(List.of(Map.entry(docId, updates)),
+        Map.of(docId, input)).updatedCount() == 1;
+  }
+
+  /** A batch's comparisons and writes share the same current reader and mutation lock. */
+  public BatchUpdateResult updateDocumentsBatchIf(
+      List<Map.Entry<String, Map<String, Object>>> updates,
+      Map<String, DocumentFieldOps.EnrichmentInput> inputs) {
+    if (updates == null || updates.isEmpty()) return new BatchUpdateResult(0, 0);
+    acquireReadLockTimed();
+    try {
+      guardBackpressure();
+      try {
+        dispatchLock.lock();
+        try { return writeOps.get().updateDocumentsBatchIf(updates, inputs); }
+        finally { dispatchLock.unlock(); }
+      } finally { session.queueDepth.decrementAndGet(); }
+    } finally { releaseWriteBarrierAndReport(); }
+  }
+
   /** Pass-through convenience. Direct delete, no RMW envelope — takes {@link #dispatchLock}. */
   public void deleteByPathPrefix(String pathPrefix) {
     acquireReadLockTimed();
