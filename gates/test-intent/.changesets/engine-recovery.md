@@ -9,7 +9,7 @@ author-session: 01a1563a-7f02-7081-9d04-646e3ac0b504
 
 Owner adopted the E1–E21 scenarios on 2026-10-20. Entries below quote the relevant
 scenarios verbatim. Engine-side queue scenarios E8–E15 belong to a later assignment.
-Coverage is against the merge-base with origin/main, 738e6a443. There are thirteen flagged items;
+Coverage is against the merge-base with origin/main, 0c826d98e. There are thirteen flagged items;
 separate entries distinguish new assertions from unchanged test formatting in the same item.
 No acceptance record is written by the builder. Governance tooling is unchanged. The current
 correction refreshes Java execution evidence for the expanded fatal-header checks; all existing
@@ -186,7 +186,7 @@ acceptance on the changed digest.
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/engine-recovery-rust.json",
+      "evidence": "gates/test-intent/evidence/engine-recovery-merge-831-841-host.json",
       "newChecks": [
         "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::manual_restart_after_finished_exhaustion_reaches_ready_with_a_new_generation",
         "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::manual_restart_refuses_quit_and_update_holds_without_admitting_a_child"
@@ -402,7 +402,7 @@ acceptance on the changed digest.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/engine-recovery-merge-839-updater.json",
+      "evidence": "gates/test-intent/evidence/engine-recovery-merge-831-841-updater.json",
       "newChecks": [
         "modules/shell/src-tauri/src/updater.rs#updater::tests::download_failures_and_rejections_return_to_actionable_error"
       ],
@@ -737,6 +737,45 @@ exposed. The unmodified evidence runner records that new assertion failing on th
 and the complete candidate lockdown file passing. Supplemental command outcomes, including the
 main comparison and Windows startup-budget analysis, are in
 `gates/test-intent/evidence/engine-recovery-ci-39601040562.txt`.
+
+## Merge #831/#841 evidence refresh (2026-10-21)
+
+Merged origin/main 0c826d98e as 831dd64d1, the only commit in this follow-up.
+The gate found stale source digests only for entries 2 and 10. Entry 2 now cites the unmodified
+runner's fresh artifact: both manual restart checks executed and passed using this worktree's
+existing cargo target. Product code and tests have not changed since the merge, and every
+acceptance/rejection record is retained verbatim.
+
+Entry 10's runner stopped with exit 2 before replaying its before-state check: the existing
+`engine-recovery-updater-before.patch` no longer applies to the merged main's updater.rs
+(the context at line 2983 fails). No compatibility fixture is changed in this follow-up;
+the user's instruction is to stop and report a failed rerun. Entry 10 therefore still cites
+its old evidence and remains invalid. The runner executed in a shared candidate clone under
+TMPDIR; all before-state Git metadata stayed in that clone. A temporary cargo wrapper selects
+this worktree's existing target for the candidate and the existing persistent second target
+`/home/elias/.cache/justsearch-private-folders-builder/repair-evidence-cargo` for the before-state.
+The latter was found after the cache-location question, resolving the missing path.
+An initial wrapper setup used the wrong cwd and was interrupted by recorded process identity
+before any test ran; its unintended temporary target was removed. No Gradle or broad suite ran.
+Temporary clones were removed; raw logs remain at `tmp/builder/evidence-merge-831-841/`.
+
+## Authorized context-only patch refresh (2026-10-21)
+
+The owner authorized resuming entry 10 after the compatibility patch failed to apply.
+Only the patch's three EOF context lines and hunk position changed: line 2983 after
+`actor_hold_witness_tests` becomes line 3517 after #831's new Linux-only `connection_tests`.
+Every added Rust line remains byte-identical. No helper signature, validation, coordinator
+mutation, production caller or test assertion changed. The context-only comparison and
+`git apply --check --cached` against the exact merged base both pass.
+
+Entry 10 now cites `engine-recovery-merge-831-841-updater.json`, written by the unmodified
+execution-evidence runner. The candidate check executed and passed (cargo exit 0). The same
+check on base 0c826d98e fails by assertion (cargo exit 101): "transport left recovery actions
+disabled", actual "downloading", expected "error". The runner exits 0 and records the updated
+patch digest. The same two existing cargo targets are reused; no Gradle or broad suite ran.
+Details and actual commands are in `gates/test-intent/evidence/engine-recovery-updater-context-831.md`.
+Older evidence artifacts and every acceptance/rejection record are preserved. All changes after
+the existing merge commit remain uncommitted; product code and tests are unchanged.
 
 ## Acceptance records
 
