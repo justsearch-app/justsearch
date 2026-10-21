@@ -29,9 +29,27 @@ import tools.jackson.databind.json.JsonMapper;
  */
 public final class EncryptionKeystore {
 
+  public enum SaveOutcome { SAVED, FAILED_ROLLED_BACK, SAVED_WITHOUT_REPLICA }
+
+  public record SaveResult(SaveOutcome outcome, IOException failure) {
+    public void requireSaved() {
+      if (outcome == SaveOutcome.FAILED_ROLLED_BACK) {
+        throw new UncheckedIOException("Encryption change failed; previous credentials remain in force", failure);
+      }
+    }
+
+    public String warning() {
+      return outcome == SaveOutcome.SAVED_WITHOUT_REPLICA
+          ? "Your encryption change was saved, but its recovery replica could not be written. "
+              + "The new credentials are in force. Keep your recovery key safe and retry the change to restore the replica."
+          : null;
+    }
+  }
+
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
   private final Path file;
   private final Path replica;
+  private boolean restoredFromReplica;
 
   public EncryptionKeystore(Path dataDir) {
     this.file = Objects.requireNonNull(dataDir, "dataDir").resolve("encryption").resolve("keystore.json");
@@ -57,12 +75,17 @@ public final class EncryptionKeystore {
       }
       KeystoreRecord restored = decode(backup);
       AtomicFileWrites.replaceStrict(file, backup);
+      restoredFromReplica = true;
       LoggerFactory.getLogger(EncryptionKeystore.class)
           .warn("Restored encryption keystore from recovery replica: {}", replica);
       return Optional.of(restored);
     } catch (IOException e) {
       throw new UncheckedIOException("failed to read or restore encryption keystore", e);
     }
+  }
+
+  public String recoveryNotice() {
+    return restoredFromReplica ? "Your encryption key was restored from its recovery replica." : null;
   }
 
   private static byte[] readIfPresent(Path path) throws IOException {
@@ -114,14 +137,45 @@ public final class EncryptionKeystore {
     return new CorruptDurableStoreException("encryption-keystore", message, cause);
   }
 
-  public void save(KeystoreRecord record) {
+  public SaveResult save(KeystoreRecord record) {
     validate(record);
     try {
       byte[] bytes = MAPPER.writeValueAsBytes(record);
+      byte[] previous = readIfPresent(file);
+      removeAbandonedTemps();
+      // Refuse before changing credentials if the old replica cannot be invalidated. This
+      // guarantees that even failed rollback cannot later resurrect revoked credentials.
+      Files.deleteIfExists(replica);
       AtomicFileWrites.replaceStrict(file, bytes);
-      AtomicFileWrites.replaceStrict(replica, bytes);
+      try {
+        AtomicFileWrites.replaceStrict(replica, bytes);
+      } catch (IOException replicaFailure) {
+        try {
+          if (previous == null) Files.deleteIfExists(file);
+          else AtomicFileWrites.replaceStrict(file, previous);
+        } catch (IOException rollbackFailure) {
+          replicaFailure.addSuppressed(rollbackFailure);
+          LoggerFactory.getLogger(EncryptionKeystore.class)
+              .warn("Encryption change saved without recovery replica; rollback also failed", replicaFailure);
+          return new SaveResult(SaveOutcome.SAVED_WITHOUT_REPLICA, replicaFailure);
+        }
+        return new SaveResult(SaveOutcome.FAILED_ROLLED_BACK, replicaFailure);
+      }
+      restoredFromReplica = false;
+      return new SaveResult(SaveOutcome.SAVED, null);
     } catch (IOException e) {
-      throw new UncheckedIOException("failed to write encryption keystore", e);
+      return new SaveResult(SaveOutcome.FAILED_ROLLED_BACK, e);
+    }
+  }
+
+  private void removeAbandonedTemps() throws IOException {
+    if (!Files.exists(file.getParent())) return;
+    try (var entries = Files.newDirectoryStream(file.getParent(), path -> {
+      String name = path.getFileName().toString();
+      return (name.startsWith("keystore.json.") || name.startsWith("keystore.replica.json."))
+          && name.endsWith(".tmp");
+    })) {
+      for (Path path : entries) Files.delete(path);
     }
   }
 }

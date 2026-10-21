@@ -23,6 +23,20 @@ No repaired behavior is included in that patch. Preservation-before evidence is 
 in the entries below. Unchanged lifecycle, PBKDF2, strict-writer and backup-import checks are
 included in the preservation runs alongside the new checks.
 
+Round 2 follows the orchestrator's decisions after independent verifier cases V5 and V6
+rejected 36d97a92f. The new checks use that exact revision as their before-state. The original
+F3 evidence retains its original before-state, 50eafae23, and is rerun on the revised candidate.
+The V5/V6 source was read from the verifier's own/VerifierOwnCasesTest.java and its recorded
+candidate failures; the new port preserves restart-without-retry and known-credential observations.
+
+Save results distinguish SAVED, FAILED_ROLLED_BACK and SAVED_WITHOUT_REPLICA. The existing
+String/void manager entry points preserve compatibility; the control endpoints consume the typed
+results directly. Stale replica invalidation precedes publication, so a failed rollback cannot
+revive revoked wraps even if subsequent storage operations also fail. Abandoned temp removal
+also precedes publication, so cleanup refusal leaves the prior credentials in force. Existing
+SystemNotice rendering on Security & Privacy displays restoration and degraded-save warnings;
+no new notice transport or startup channel is introduced. Windows remains hosted-CI-only.
+
 ```json
 {
   "entries": [
@@ -214,6 +228,89 @@ included in the preservation runs alongside the new checks.
       "newChecks": [
         "modules/shell/src-tauri/src/lib.rs#tests::reset_removes_primary_and_replica_before_reporting_success"
       ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreRollbackTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Verifier V5/V6 are ported with their original restart-without-retry observations: a reported failure preserves the known recovery key and old password. A separate injected replica-publication failure observes two forced primary writes and exact-byte rollback. The next successful save removes only the keystore writers' abandoned temp files.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "If the replica write fails after the primary was replaced, the save restores the primary to its previous bytes (forced write and atomic replace, as for any save) and reports the failure. The user's state then matches what they were told: the old password and old recovery key work.",
+          "location": "task t-20261021-f3 user turn 4"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Leftover temporary files from a killed save that still hold old wraps: remove them on the next successful save.",
+          "location": "task t-20261021-f3 user turn 4"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f3-save-outcomes-repaired.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreRollbackTest.java#failedRecoveryRotationWithoutRetryKeepsKnownRecoveryKeyAfterRestart",
+        "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreRollbackTest.java#failedPasswordChangeWithoutRetryKeepsOldPasswordAfterRestart",
+        "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreRollbackTest.java#replicaPublicationFailureRestoresPreviousBytesThroughForcedWriter",
+        "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreRollbackTest.java#nextSuccessfulSaveRemovesOnlyAbandonedKeystoreTemps"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/KeystoreSaveOutcomeHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Through real HTTP handlers, setup, password change and recovery rotation report each of the three save outcomes. A failed rollback returns success-with-warning and the committed recovery key when applicable, advances in-memory wraps to match the primary, preserves existing ciphertext, and leaves no stale replica that could revive old credentials. A successful rollback reports failure with the old primary bytes and credentials preserved. Full saves identify the saved outcome and retain identical durable copies. Restored-key status exposes the recovery warning.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "If the replica write fails after the primary was replaced, the save restores the primary to its previous bytes (forced write and atomic replace, as for any save) and reports the failure. The user's state then matches what they were told: the old password and old recovery key work.",
+          "location": "task t-20261021-f3 user turn 4"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "If that restore also fails, report the true state instead of a plain failure. The new credentials are in force, so the caller must get the new recovery key to show, plus a warning that the backup copy could not be written. Invalidate the stale replica so revoked credentials can't come back through it. Make the result type say which of the three outcomes happened (saved; failed and rolled back; saved without replica), and make the callers (setup, password change, recovery rotation, through their real interfaces) handle each.",
+          "location": "task t-20261021-f3 user turn 4"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Restoring from the replica at start is currently only a warning in the Engine log. If the app has an existing user-visible notice or startup-warning channel, use it. If there is none, keep the log line and say so; don't build a new channel.",
+          "location": "task t-20261021-f3 user turn 4"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f3-save-outcomes-repaired.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/KeystoreSaveOutcomeHttpTest.java#rollbackFailureReportsSavedWithoutReplica",
+        "modules/ui/src/test/java/io/justsearch/ui/api/KeystoreSaveOutcomeHttpTest.java#replicaFailureReportsRolledBackThroughHttp",
+        "modules/ui/src/test/java/io/justsearch/ui/api/KeystoreSaveOutcomeHttpTest.java#recoveryFromReplicaIsExposedThroughEncryptionStatus",
+        "modules/ui/src/test/java/io/justsearch/ui/api/KeystoreSaveOutcomeHttpTest.java#successfulSaveReportsSavedThroughHttp"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SecuritySurface.keystore-warning.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The existing Security & Privacy surface renders the existing SystemNotice component for restored-key and saved-without-replica warnings. Setup and recovery rotation retain the returned one-time key and the existing save-key gate while displaying the warning; password changes show the same warning without claiming ordinary full success.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "If that restore also fails, report the true state instead of a plain failure. The new credentials are in force, so the caller must get the new recovery key to show, plus a warning that the backup copy could not be written. Invalidate the stale replica so revoked credentials can't come back through it. Make the result type say which of the three outcomes happened (saved; failed and rolled back; saved without replica), and make the callers (setup, password change, recovery rotation, through their real interfaces) handle each.",
+          "location": "task t-20261021-f3 user turn 4"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Restoring from the replica at start is currently only a warning in the Engine log. If the app has an existing user-visible notice or startup-warning channel, use it. If there is none, keep the log line and say so; don't build a new channel.",
+          "location": "task t-20261021-f3 user turn 4"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f3-save-notices-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SecuritySurface.keystore-warning.test.ts"
+      ],
+      "repaired": true
     }
   ]
 }

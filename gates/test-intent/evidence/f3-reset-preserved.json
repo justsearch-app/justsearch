@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T05:32:46.028Z",
-  "revision": "50eafae23a304df420f87ee9b287cfd3da0a945d",
-  "tree": "98037d6c5c310ef62dabe1a02f49b94601578e9c",
+  "createdAt": "2026-10-21T06:06:31.782Z",
+  "revision": "36d97a92f2472310f75c05daf5e1bc7cacc7fd80",
+  "tree": "88380ba3ddfff0168fc9df27b0fdc8bec796dfbe",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::reset_removes_primary_and_replica_before_reporting_success\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7248
+      "durationMs": 7554
     }
   ],
   "checks": [
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:8d8f591af7dce8bce6594f1946feb67720e96d7d8df6bd99f1afa30aa6372807"
+  "digest": "sha256:560e0881f4d8a589823e72bb81153c5f66b7d5c0213095e0ed75395c1014d2cd"
 }
