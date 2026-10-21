@@ -622,3 +622,14 @@ The merge is the only commit; this changeset and its new execution evidence rema
   "note": "All twelve entries follow scoped owner intent and preserve existing oracles; JVM before failures are assertions, candidate and HEAD~1 pass 13 cases, real SIGBUS summary passes, retention fails before and passes after, both supervisor suites pass, and register semantics match the code."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15dac-78fd-7103-96c0-ad9d503e7759",
+  "verdict": "accept",
+  "digest": "sha256:413750e658b6796888da17581208078eff59cc21d7e99f1121849bf7b3d2e0e0",
+  "note": "All twelve test-intent entries follow the agreed scenarios and scoped delegation; independent before/after checks, real JVM evidence, merge preservation and register review found no defect."
+}
+```
