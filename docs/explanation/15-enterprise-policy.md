@@ -12,7 +12,7 @@ This document describes current **enterprise policy enforcement** using **config
 ## 1. Goals
 
 - Allow enterprise admins to enforce:
-  - **downloads disabled** (force offline/import-only),
+  - **downloads disabled** for Install AI model/runtime downloads (not app updates or dependency-internal traffic),
   - **Online AI disabled** (AI features off),
   - **GPU acceleration disabled** (force CPU-only even if GPU packs are present),
   - allowlists for **pack-import files** (by SHA-256; not Install AI downloads or later model use),
@@ -21,7 +21,9 @@ This document describes current **enterprise policy enforcement** using **config
 - Provide a deterministic **precedence order**:
   - machine policy → user policy → UI settings → defaults.
 - Keep the v1 security posture:
-  - fail closed on mismatches (hash/policy/pack allowlist).
+  - reject offline-pack hash/digest mismatches and packs that are not allowlisted;
+  - a present but unloadable Windows machine policy disables app updates and AI toggles;
+  - Install AI downloads and GPU use fail closed when a configured policy service gives no snapshot; the Online-mode switch does not.
 
 ## 1.1 Implementation status (what is enforced today)
 
@@ -203,7 +205,7 @@ Hash normalization note:
   - enforce `allowlists.modelSha256` when packs contain models.
 - **Online AI runtime**:
   - if `onlineAiEnabled=false`, block switching to Online mode (CPU or GPU).
-  - if `gpuAccelerationEnabled=false`, reject explicit GPU runtime activation; a configured activation policy service that throws or returns no snapshot also denies activation. Prevent Install AI and boot from automatically selecting CUDA executables or publishing CUDA native paths. A boot policy-load failure also prevents these automatic selections. Keep saved executable and GPU-layer preferences; owned launches apply zero GPU layers and hide CUDA devices while policy forbids GPU acceleration.
+  - if `gpuAccelerationEnabled=false`, reject explicit runtime activation (CPU and GPU variants alike); a configured activation policy service that throws or returns no snapshot also denies activation. Prevent Install AI and boot from automatically selecting CUDA executables or publishing CUDA native paths. A boot policy-load failure also prevents these automatic selections. Keep saved executable and GPU-layer preferences; owned launches apply zero GPU layers and hide CUDA devices while policy forbids GPU acceleration.
 - **External server adoption**:
   - if `disallowExternalInferenceServers=true`, disallow “adopt an already-running llama-server” modes.
 
