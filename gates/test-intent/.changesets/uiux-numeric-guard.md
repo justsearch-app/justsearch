@@ -2,8 +2,138 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: uiux-numeric-guard-nx1
+author-session: uiux-numeric-guard-nx2
 ---
+
+# NX2 repair contract recorded before tests and implementation
+
+Started 2026-10-21 20:24 CEST; estimate 1–2 hours; return for a decision at
+2026-10-22 00:24 CEST. Baseline d36738d92. NX1 and NX2 are **agent choice**:
+orchestrator decisions under the user's delegation, not owner words.
+
+NX2 supersedes historical NX1 table rows only for currency, colon parts,
+three-part slash dates, dotted strings with at least two dots, unit ranges,
+and unit exponents. Superseded rows below retain their inputs with current NX2 expectations and
+the prior NX1 rejection noted; the NX2 table is the current oracle for those forms. All other rows remain required.
+Only an undecided claim withholds. An undecided passage form supplies no
+values; its presence cannot veto separate decided supporting values.
+
+| Sentence (literal) | Passage (literal) | Eligible | Decision |
+| --- | --- | --- | --- |
+| The rate is %-5. | The rate is 5. | Reject | NX2 / NG1–NG3, NG7 |
+| Oran %-5. | Oran 5. | Reject | NX2 / NG1–NG3, NG7 |
+| The rate is % -5. | The rate is -5. | Reject | NX2 / NG1–NG3, NG7 |
+| The rate is %5. | The rate is 5. | Reject | NX2 / NG1–NG3, NG7 |
+| The rate is %-5. | The rate is %-5. | Reject | NX2 / NG1–NG3, NG7 |
+| The rate is % -5. | The rate is % -5. | Reject | NX2 / NG1–NG3, NG7 |
+| The value is 0x10. | The values are 0 and 10. | Reject | NX2 / NG1–NG3, NG7 |
+| The value is 0x10. | The value is 0x10. | Reject | NX2 / NG1–NG3, NG7 |
+| The value is 0. | The value is 0x10. | Reject | NX2 / NG1–NG3, NG7 |
+| The value is 10. | The value is 0x10. | Reject | NX2 / NG1–NG3, NG7 |
+| The value is 1883 and 0x10. | The values are 1883, 0 and 10. | Reject | NX2 / NG1–NG3, NG7 |
+| The date is 21/10/2026. | The parts are 21 and 2026. | Reject | NX2 / NG1–NG3, NG7 |
+| The date is 21.10.2026. | The parts are 21 and 2026. | Reject | NX2 / NG1–NG3, NG7 |
+| The fraction is 3/4. | The parts are 3 and 4. | Reject | NX2 / NG1–NG3, NG7 |
+| The interval is 5kg-10kg. | The value is 5 kg. | Reject | NX2 / NG1–NG3, NG7 |
+| The price is $5. | The price is 15. | Reject | NX2 / NG1–NG3, NG7 |
+| The price is $-5. | The price is 5. | Reject | NX2 / NG1–NG3, NG7 |
+| The time is 1:30. | The value is 1. | Reject | NX2 / NG1–NG3, NG7 |
+| The version is v1.2.3. | The values are 1 and 2. | Reject | NX2 / NG1–NG3, NG7 |
+| The value is 1.5. | The values are 1 and 5. | Reject | NX2 / NG1–NG3, NG7 |
+| Opened in 1883. | Opened in 18830; the value is 0x10. | Reject | NX2 / NG1–NG3, NG7 |
+| The area is 5m². | The area is 50 m². | Reject | NX2 / NG1–NG3, NG7 |
+| The date is 21/10/2026. | The date is 21/10/2026. | Accept | NX2 / NG1–NG3, NG7 |
+| The date is 21/10/2026. | The parts are 21, 10 and 2026. | Accept | NX2 / NG1–NG3, NG7 |
+| The date is 2026-10-21. | The parts are 2026, 10 and 21. | Accept | NX2 / NG1–NG3, NG7 |
+| The date is 21.10.2026. | The parts are 21, 10 and 2026. | Accept | NX2 / NG1–NG3, NG7 |
+| The date is ٢٠٢٦/١٠/٢١. | The parts are 2026, 10 and 21. | Accept | NX2 / NG1–NG3, NG7 |
+| The interval is 5kg-10kg. | The interval is 5kg-10kg. | Accept | NX2 / NG1–NG3, NG7 |
+| The interval is 5kg-10kg. | The values are 5 and 10. | Accept | NX2 / NG1–NG3, NG7 |
+| The interval is 5–10 kg. | The values are 5 and 10. | Accept | NX2 / NG1–NG3, NG7 |
+| The interval is 5°-10°. | The values are 5 and 10. | Accept | NX2 / NG1–NG3, NG7 |
+| The price is $5. | The price is $5. | Accept | NX2 / NG1–NG3, NG7 |
+| The price is $5. | The value is 5. | Accept | NX2 / NG1–NG3, NG7 |
+| The price is 5 €. | The value is 5. | Accept | NX2 / NG1–NG3, NG7 |
+| The price is € 5. | The value is 5. | Accept | NX2 / NG1–NG3, NG7 |
+| The price is -$5. | The value is -5. | Accept | NX2 / NG1–NG3, NG7 |
+| The price is $-5. | The value is -5. | Accept | NX2 / NG1–NG3, NG7 |
+| The time is 1:30. | The time is 1:30. | Accept | NX2 / NG1–NG3, NG7 |
+| The time is 1:30. | The parts are 1 and 30. | Accept | NX2 / NG1–NG3, NG7 |
+| The version is v1.2.3. | The version is v1.2.3. | Accept | NX2 / NG1–NG3, NG7 |
+| The version is v1.2.3. | The parts are 1, 2 and 3. | Accept | NX2 / NG1–NG3, NG7 |
+| The value is 1.2.3. | The parts are 1, 2 and 3. | Accept | NX2 / NG1–NG3, NG7 |
+| The area is 5m². | The value is 5. | Accept | NX2 / NG1–NG3, NG7 |
+| Opened in 1883. | Opened in 1883; admission costs $5. | Accept | NX2 / NG1–NG3, NG7 |
+| Opened in 1883. | Opened in 1883; the value is 0x10. | Accept | NX2 / NG1–NG3, NG7 |
+| Opened in 1883. | The value is 0x10; opened in 1883. | Accept | NX2 / NG1–NG3, NG7 |
+| Opened in 1883. | Opened in 1883; the fraction is 3/4. | Accept | NX2 / NG1–NG3, NG7 |
+| Opened in 1883. | Opened in 1883; the rate is %-5. | Accept | NX2 / NG1–NG3, NG7 |
+| Opened in 1883. | Opened in 1883; the value is 1e3. | Accept | NX2 / NG1–NG3, NG7 |
+| Opened in 1883. | Opened in 1883; the value is --5. | Accept | NX2 / NG1–NG3, NG7 |
+| The value is 5. | The value is 0x10; a separate value is 5. | Accept | NX2 / NG1–NG3, NG7 |
+| The value is 5. | The rate is %-5; a separate value is 5. | Accept | NX2 / NG1–NG3, NG7 |
+| The area is measured in m². | Some passage. | Accept | NX2 / GN1 |
+| Volume is measured in cm³. | Some passage. | Accept | NX2 / GN1 |
+
+Additional NX2 boundary cases recorded before their checks:
+
+| Sentence (literal) | Passage (literal) | Eligible | Decision |
+| --- | --- | --- | --- |
+| The interval is 5 kg–10 kg. | The values are 5 and 10. | Accept | NX2 |
+| The interval is 10 - 20. | The values are 10 and 20. | Accept | NX2 |
+| The interval is 10– 20. | The values are 10 and 20. | Accept | NX2 |
+| The interval is -5 - -3. | The values are -5 and -3. | Accept | NX2 |
+| Opened in 1883. | The value is 0x10,1883. | Accept | NX2 |
+| Opened in 1883. | The value is 1883,0x10. | Accept | NX2 |
+| Opened in 1883. | The value is 0x10 1883. | Accept | NX2 |
+| Opened in 1883. | The value is 1883 0x10. | Accept | NX2 |
+| The date is 1/234/567. | The parts are 1, 234 and 567. | Accept | NX2 |
+| The value is 0b101. | The values are 0 and 101. | Reject | NX2 |
+| The value is 101. | The value is 0b101. | Reject | NX2 |
+| The rate is ％-٥. | The rate is 5. | Reject | NX2 |
+| The value is 1. | The value is 1e3. | Reject | NX2 |
+| The value is 3. | The value is 1e3. | Reject | NX2 |
+| The value is 1. | The value is 1/2. | Reject | NX2 |
+| The value is 2. | The value is 1/2. | Reject | NX2 |
+
+NX2 replacements for every superseded NX1 row (the other rows remain unchanged):
+
+| Sentence (literal) | Passage (literal) | Eligible | Decision |
+| --- | --- | --- | --- |
+| The value is $5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 supersedes NX1 |
+| The value is $5. | The value is $5. | Accept | NX2 supersedes NX1 |
+| The value is 5. | The value is $5. | Accept | NX2 supersedes NX1 |
+| The value is -$5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 supersedes NX1 |
+| The value is -$5. | The value is -$5. | Accept | NX2 supersedes NX1 |
+| The value is 5. | The value is -$5. | Reject | NX2 supersedes NX1 |
+| The value is $-5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 supersedes NX1 |
+| The value is $-5. | The value is $-5. | Accept | NX2 supersedes NX1 |
+| The value is 5. | The value is $-5. | Reject | NX2 supersedes NX1 |
+| The value is 5€. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 supersedes NX1 |
+| The value is 5€. | The value is 5€. | Accept | NX2 supersedes NX1 |
+| The value is 5. | The value is 5€. | Accept | NX2 supersedes NX1 |
+| The value is € 5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 supersedes NX1 |
+| The value is € 5. | The value is € 5. | Accept | NX2 supersedes NX1 |
+| The value is 5. | The value is € 5. | Accept | NX2 supersedes NX1 |
+| The value is 1:5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 supersedes NX1 |
+| The value is 1:5. | The value is 1:5. | Accept | NX2 supersedes NX1 |
+| The value is 5. | The value is 1:5. | Accept | NX2 supersedes NX1 |
+| The value is 1.2.3. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 supersedes NX1 |
+| The value is 1.2.3. | The value is 1.2.3. | Accept | NX2 supersedes NX1 |
+| The value is 5. | The value is 1.2.3. | Reject | NX2 supersedes NX1 |
+| The value is 5kg-10kg. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 supersedes NX1 |
+| The value is 5kg-10kg. | The value is 5kg-10kg. | Accept | NX2 supersedes NX1 |
+| The value is 5. | The value is 5kg-10kg. | Accept | NX2 supersedes NX1 |
+| The value is 5°-10°. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 supersedes NX1 |
+| The value is 5°-10°. | The value is 5°-10°. | Accept | NX2 supersedes NX1 |
+| The value is 5. | The value is 5°-10°. | Accept | NX2 supersedes NX1 |
+
+D8 percentage spacing on range endpoints, recorded before adding preservation checks:
+
+| Sentence (literal) | Passage (literal) | Eligible | Decision |
+| --- | --- | --- | --- |
+| The interval is 5 %-10%. | The values are 5% and 10%. | Accept | NX2 / D8 percentage spacing |
+| The interval is 5 %--10%. | The values are 5% and -10%. | Accept | NX2 / D8 percentage spacing |
 
 # NX1 repair contract recorded before implementation
 
@@ -18,7 +148,8 @@ as a value. En/em dashes between numbers separate endpoints; parentheses and
 adjacent sentence punctuation do not invent a sign. Slash-separated three-part
 dates retain their parts; two-part slash notation is ambiguous with fractions.
 
-The sweep found no agreed equivalence for currency notation, separated/repeated
+Historical NX1 rationale (NX2 supersedes the currency, parts and unit-range
+withholding described here): the sweep found no agreed equivalence for currency notation, separated/repeated
 or dangling signs, repeated/prefix percentages, per-mille notation, other grouping
 or decimal marks, repeated decimal points, exponents, fractions, lexical ordinals,
 superscripts, powers, or standalone dash variants. NG2/NX1 withhold these forms
@@ -111,21 +242,21 @@ unit suffixes remain ignored under D8. The table lists each discovered form.
 | The value is %5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
 | The value is %5. | The value is %5. | Reject | NG2/NX1 (unagreed) |
 | The value is 5. | The value is %5. | Reject | NG2/NX1 (unagreed) |
-| The value is $5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
-| The value is $5. | The value is $5. | Reject | NG2/NX1 (unagreed) |
-| The value is 5. | The value is $5. | Reject | NG2/NX1 (unagreed) |
-| The value is -$5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
-| The value is -$5. | The value is -$5. | Reject | NG2/NX1 (unagreed) |
+| The value is $5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is $5. | The value is $5. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is 5. | The value is $5. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is -$5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is -$5. | The value is -$5. | Accept | NX2 (supersedes NX1 Reject) |
 | The value is 5. | The value is -$5. | Reject | NG2/NX1 (unagreed) |
-| The value is $-5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
-| The value is $-5. | The value is $-5. | Reject | NG2/NX1 (unagreed) |
+| The value is $-5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is $-5. | The value is $-5. | Accept | NX2 (supersedes NX1 Reject) |
 | The value is 5. | The value is $-5. | Reject | NG2/NX1 (unagreed) |
-| The value is 5€. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
-| The value is 5€. | The value is 5€. | Reject | NG2/NX1 (unagreed) |
-| The value is 5. | The value is 5€. | Reject | NG2/NX1 (unagreed) |
-| The value is € 5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
-| The value is € 5. | The value is € 5. | Reject | NG2/NX1 (unagreed) |
-| The value is 5. | The value is € 5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5€. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is 5€. | The value is 5€. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is 5. | The value is 5€. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is € 5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is € 5. | The value is € 5. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is 5. | The value is € 5. | Accept | NX2 (supersedes NX1 Reject) |
 | The value is 5‰. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
 | The value is 5‰. | The value is 5‰. | Reject | NG2/NX1 (unagreed) |
 | The value is 5. | The value is 5‰. | Reject | NG2/NX1 (unagreed) |
@@ -153,11 +284,11 @@ unit suffixes remain ignored under D8. The table lists each discovered form.
 | The value is 1·5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
 | The value is 1·5. | The value is 1·5. | Reject | NG2/NX1 (unagreed) |
 | The value is 5. | The value is 1·5. | Reject | NG2/NX1 (unagreed) |
-| The value is 1:5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
-| The value is 1:5. | The value is 1:5. | Reject | NG2/NX1 (unagreed) |
-| The value is 5. | The value is 1:5. | Reject | NG2/NX1 (unagreed) |
-| The value is 1.2.3. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
-| The value is 1.2.3. | The value is 1.2.3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1:5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is 1:5. | The value is 1:5. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is 5. | The value is 1:5. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is 1.2.3. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is 1.2.3. | The value is 1.2.3. | Accept | NX2 (supersedes NX1 Reject) |
 | The value is 5. | The value is 1.2.3. | Reject | NG2/NX1 (unagreed) |
 | The value is 1..5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
 | The value is 1..5. | The value is 1..5. | Reject | NG2/NX1 (unagreed) |
@@ -347,12 +478,12 @@ Range preservation counterexamples, recorded before their corrective edit:
 | The value is 5%--10%. | The value is 5% and -10%. | Accept | D8/F1/NX1 |
 | The value is 5%–10%. | The value is 5% and 10%. | Accept | D8/F1/NX1 |
 | The value is 5%—-10%. | The value is 5% and -10%. | Accept | D8/F1/NX1 |
-| The value is 5kg-10kg. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
-| The value is 5kg-10kg. | The value is 5kg-10kg. | Reject | NG2/NX1 (unagreed) |
-| The value is 5. | The value is 5kg-10kg. | Reject | NG2/NX1 (unagreed) |
-| The value is 5°-10°. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
-| The value is 5°-10°. | The value is 5°-10°. | Reject | NG2/NX1 (unagreed) |
-| The value is 5. | The value is 5°-10°. | Reject | NG2/NX1 (unagreed) |
+| The value is 5kg-10kg. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is 5kg-10kg. | The value is 5kg-10kg. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is 5. | The value is 5kg-10kg. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is 5°-10°. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is 5°-10°. | The value is 5°-10°. | Accept | NX2 (supersedes NX1 Reject) |
+| The value is 5. | The value is 5°-10°. | Accept | NX2 (supersedes NX1 Reject) |
 | The value is JDK-15. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
 | The value is JDK-15. | The value is JDK-15. | Reject | NG2/NX1 (unagreed) |
 | The value is 5. | The value is JDK-15. | Reject | NG2/NX1 (unagreed) |
@@ -643,7 +774,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-original-refreshed-repaired.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx2-refreshed-original-repaired.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#rejectsLiteralIncompatiblePairs",
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#reselectsCompatibleWindowAcrossSubBatches",
@@ -687,10 +818,11 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-refreshed-preserved.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx2-refreshed-preserved.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesLiteralCompatiblePairs",
-        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesNumberFreeCorpusAndThreshold"
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesNumberFreeCorpusAndThreshold",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesSpacedPercentRanges"
       ]
     },
     {
@@ -743,7 +875,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-original-refreshed-repaired.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx2-refreshed-original-repaired.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#rejectsBothCounterexamplesOnSuppliedAndLookupPaths",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#rejectsMissingYearInLongLookupDocument",
@@ -788,10 +920,11 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-refreshed-preserved.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx2-refreshed-preserved.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesReferencesOrdinalsAndNumberFreeCorpus",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesCompatibleNumbersAndOriginalThreshold"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesCompatibleNumbersAndOriginalThreshold",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesSpacedPercentRanges"
       ]
     },
     {
@@ -951,7 +1084,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
         "modules/reranker/src/test/java/io/justsearch/reranker/NumericCitationScorerDecimalIntegrationTest.java"
       ],
       "class": "New",
-      "behaviour": "NX1 consumes each leading-decimal value whole; F1 keeps minus and percentage notation; NG2 withholds unagreed notation rather than extracting supporting subvalues. Scores, thresholds and scored counts remain owned by the original producers.",
+      "behaviour": "NX1 consumes each leading-decimal value whole; F1 keeps minus and percentage notation. NX2 replaces the previously over-withheld currency, part and unit-range rows; the remaining undecided forms stay withheld as claims and supply no passage values. Original thresholds and scored counts remain unchanged.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -980,9 +1113,25 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "scenario": "NG7",
           "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Decided: amendment NX2, now at the end of /home/elias/dev/justsearch/tmp/verify/agreed/wp4.5.md. Implement it: first add its literal pairs (X1-X4 included) to the table, then the checks, each shown to fail on d36738d92 for the reason under test, then the change.",
+          "delegationLocation": "task t-20261019-bd718f request",
+          "delegationScope": "Implement the agreed NX1 and NX2 numeric guard amendments; preserve scenarios outside their explicit overrides.",
+          "choice": "NX1: A value written with a leading decimal point is a decimal: \".5\" is the value 0.5 (the agreed leading-zero rule makes \".5\" and \"0.5\" the same value) and never 5; \"-.5\" is -0.5 and \"+.5%\" is 0.5% (a plus sign is no sign; the minus and the percent are kept per F1). Reject \".5\" vs \"5\", \"-.5\" vs \"5\", \"+.5%\" vs \"5%\", \".5\" vs \"-.5\", \".5%\" vs \".5\"; accept \".5\" vs \"0.5\" and \"+.5%\" vs \"0.5%\". The same must hold for every way a number's leading characters can be lost to tokenization: every value is read whole or not at all.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Decided: amendment NX2, now at the end of /home/elias/dev/justsearch/tmp/verify/agreed/wp4.5.md. Implement it: first add its literal pairs (X1-X4 included) to the table, then the checks, each shown to fail on d36738d92 for the reason under test, then the change.",
+          "delegationLocation": "task t-20261019-bd718f request",
+          "delegationScope": "Implement the agreed NX1 and NX2 numeric guard amendments; preserve scenarios outside their explicit overrides.",
+          "choice": "NX2: - Only the claim decides withholding. A claim sentence withholds verification only when it contains a numeric form that no agreed rule decides. A form in the passage that no rule decides contributes no values and never withholds or vetoes a claim; each claim value must still be found among the passage's decided values (D8 containment). Example: a supported \"1883\" keeps its mark when the passage also contains an unrelated undecided form.\n- An undecided form is consumed whole, on either side: its digit pieces never become separate values (for example \"0x10\" never yields 0 and 10).\n- Sign or percent written in a position no rule decides (\"%-5\", \"% -5\", \"%5\") makes the claim withhold; it is never read as the bare number.\n- Forms D8 already decides are compared, never withheld: date parts (three groups such as 21/10/2026, 2026-10-21, 21.10.2026: each part is a value; two slash groups such as 3/4 stay undecided); range endpoints, with or without units (5kg-10kg, 5–10 kg: 5 and 10; a range dash is not a minus); units are ignored, including currency symbols ($5, 5 €: 5) and unit exponents (m², cm³ are units, not numbers; a sentence whose only digits are unit exponents counts as numeric-free under GN1); clock times (1:30: parts 1 and 30, like date parts); dotted strings with two or more dots (v1.2.3: parts 1, 2 and 3; a single dot stays a decimal point).\n- Record every form this decides as literal accepted/rejected pairs in the table before implementing, including the verifier's counterexamples X1-X4.",
+          "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx1-repaired.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx2-refreshed-nx1-repaired.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#repairsLeadingDecimalsAndWithholdsUnsupportedNotation",
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#repairsExplicitNx1EquivalencesWithoutChangingScoresOrThresholds",
@@ -1024,10 +1173,95 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-refreshed-preserved.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx2-refreshed-preserved.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#preservesAgreedWholeValuesAndPunctuation"
       ]
+    },
+    {
+      "items": [
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericCitationScorerDecimalIntegrationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "NX2: prefix percent and undecided lexical forms cannot lose leading characters or supply digit pieces; decided date/time/version parts, prices and unit ranges retain exact matches. Unit-only exponent prose is numeric-free. Independent decided passage values survive unrelated undecided notation. Raw cosine assertions exercise supplied and indexed passages; real CPU scorer reproduces X1/X2; scores, thresholds and scored counts are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG1",
+          "quote": "A sentence that states a numeric value the chosen passage does not contain as a whole value is not verified against that passage. Applies to Ask and Delegate, cross-encoder and cosine scoring, supplied passages and index lookups, live and after cold reload. Both WP4.4 counterexamples no longer verify against the passage lacking the number.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG2",
+          "quote": "The guard only withholds a verdict; it never grants one. A sentence whose values all appear in the passage gets exactly the verdict it gets today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "An explicit table of accepted and rejected sentence/passage pairs (decision D8) passes: whole values not substrings (99 vs 2099), 1.5 vs 15, signed values, percentages, ranges, dates, the agreed grouping formats, non-Latin digits. Values inside inline code and table cells count as claims.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG6",
+          "quote": "After the guard, the match list, the matched-sentence count, the marks, the source grades, the coverage note and the frame agree; a rejected sentence still counts as scored, never as not scored. Holds on Ask, Delegate and the raw citation API (RetrieveContextController.java:335-345).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG7",
+          "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "GN1",
+          "quote": "Sentences without numbers get exactly the same matches as before on a fixed corpus.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Decided: amendment NX2, now at the end of /home/elias/dev/justsearch/tmp/verify/agreed/wp4.5.md. Implement it: first add its literal pairs (X1-X4 included) to the table, then the checks, each shown to fail on d36738d92 for the reason under test, then the change.",
+          "delegationLocation": "task t-20261019-bd718f request",
+          "delegationScope": "Implement the agreed NX1 and NX2 numeric guard amendments; preserve scenarios outside their explicit overrides.",
+          "choice": "NX1: A value written with a leading decimal point is a decimal: \".5\" is the value 0.5 (the agreed leading-zero rule makes \".5\" and \"0.5\" the same value) and never 5; \"-.5\" is -0.5 and \"+.5%\" is 0.5% (a plus sign is no sign; the minus and the percent are kept per F1). Reject \".5\" vs \"5\", \"-.5\" vs \"5\", \"+.5%\" vs \"5%\", \".5\" vs \"-.5\", \".5%\" vs \".5\"; accept \".5\" vs \"0.5\" and \"+.5%\" vs \"0.5%\". The same must hold for every way a number's leading characters can be lost to tokenization: every value is read whole or not at all.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Decided: amendment NX2, now at the end of /home/elias/dev/justsearch/tmp/verify/agreed/wp4.5.md. Implement it: first add its literal pairs (X1-X4 included) to the table, then the checks, each shown to fail on d36738d92 for the reason under test, then the change.",
+          "delegationLocation": "task t-20261019-bd718f request",
+          "delegationScope": "Implement the agreed NX1 and NX2 numeric guard amendments; preserve scenarios outside their explicit overrides.",
+          "choice": "NX2: - Only the claim decides withholding. A claim sentence withholds verification only when it contains a numeric form that no agreed rule decides. A form in the passage that no rule decides contributes no values and never withholds or vetoes a claim; each claim value must still be found among the passage's decided values (D8 containment). Example: a supported \"1883\" keeps its mark when the passage also contains an unrelated undecided form.\n- An undecided form is consumed whole, on either side: its digit pieces never become separate values (for example \"0x10\" never yields 0 and 10).\n- Sign or percent written in a position no rule decides (\"%-5\", \"% -5\", \"%5\") makes the claim withhold; it is never read as the bare number.\n- Forms D8 already decides are compared, never withheld: date parts (three groups such as 21/10/2026, 2026-10-21, 21.10.2026: each part is a value; two slash groups such as 3/4 stay undecided); range endpoints, with or without units (5kg-10kg, 5–10 kg: 5 and 10; a range dash is not a minus); units are ignored, including currency symbols ($5, 5 €: 5) and unit exponents (m², cm³ are units, not numbers; a sentence whose only digits are unit exponents counts as numeric-free under GN1); clock times (1:30: parts 1 and 30, like date parts); dotted strings with two or more dots (v1.2.3: parts 1, 2 and 3; a single dot stays a decimal point).\n- Record every form this decides as literal accepted/rejected pairs in the table before implementing, including the verifier's counterexamples X1-X4.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx2-repaired.json",
+      "newChecks": [
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#comparesNx2FormerlyWithheldDecidedForms",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#rejectsNx2UndecidedClaimsAndMissingParts",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#extractsNx2DecidedValuesBesideUndecidedForms",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#ignoresNx2UnitExponents",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#rejectsNx2PrefixPercentAndUndecidedPieces",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#retainsNx2DecidedFormsAndUnrelatedPassageNotation",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#retainsNx2UnitOnlyExactMatches",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#rejectsNx2PrefixPercentAndUndecidedPieces",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#retainsNx2DecidedFormsAndUnrelatedPassageNotation",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#retainsNx2UnitOnlyExactMatches",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericCitationScorerDecimalIntegrationTest.java#rejectsNx2CounterexamplesThroughRealModel"
+      ],
+      "repaired": true
     }
   ]
 }
@@ -1145,6 +1379,106 @@ Final command results:
 - Test-intent: only independent acceptance is missing; the rolling reconsider-rate
   warning is recorded above. The builder has not authored an acceptance record.
 
+
+## NX2 builder observations (2026-10-21; implementation and execution evidence)
+
+Production changes are confined to NumericConsistency.java, still shared by both
+scorers. An undecided claim withholds; an undecided passage form contributes no
+digit pieces and cannot veto separate decided values. Sentence keys, scores,
+thresholds, persistence formats and the UI producer gate retain their previous
+ownership. The literal table has 368 distinct pairs after applying NX2's explicit
+overrides; the standalone table sweep passes all 368. Its temporary harness is
+scaffolding, not a durable product check.
+
+Final script-written evidence (all checks executed, no selected check skipped):
+
+| Artifact under gates/test-intent/evidence/ | Checks | Before |
+| --- | --- | --- |
+| uiux-numeric-guard-nx2-repaired.json | 11 pass | all 11 assertion-fail on d36738d92 |
+| uiux-numeric-guard-nx2-refreshed-nx1-repaired.json | 8 pass | all 8 assertion-fail on 3ec058b1e |
+| uiux-numeric-guard-nx2-refreshed-original-repaired.json | 7 pass | all 7 assertion-fail on 76efc1c10 |
+| uiux-numeric-guard-nx2-refreshed-preserved.json | 7 pass | separate preservation run passes on d36738d92 |
+
+Every earlier JSON/XML evidence artifact is retained byte-for-byte. Fresh
+script-produced evidence was moved to the separate NX2 names above so refreshed
+test-file digests do not overwrite the earlier historical evidence.
+
+Before-failure observations on unchanged d36738d92:
+
+- rejectsNx2CounterexamplesThroughRealModel: expected an empty match list;
+  %-5/5 returned score 0.9739656448364258, Turkish %-5/5 returned
+  0.8926525712013245, and the hexadecimal pieces also returned a match.
+- rejectsNx2PrefixPercentAndUndecidedPieces: expected zero raw cosine matches,
+  got one on both supplied and indexed paths for prefix-percent and hexadecimal
+  counterexamples. The deterministic cross-encoder loop similarly returned a
+  ScoredMatch where an empty list was required.
+- retainsNx2DecidedFormsAndUnrelatedPassageNotation: dates, unit ranges,
+  prices, clocks and dotted versions expected the exact original match but got
+  none; a supported 1883 claim with an unrelated $5 also got none.
+- retainsNx2UnitOnlyExactMatches / ignoresNx2UnitExponents: expected the exact
+  original match / numeric-free metadata for m² and cm³, got no match / nonempty
+  metadata. All three unit-only checks and both existing numeric-free corpus
+  checks pass on known-good 3ec058b1e (five selected methods).
+
+The added spaced-percentage range preservation cases passed on d36738d92,
+failed by assertion on the first NX2 candidate, and pass after fixing the range
+normalization. No pre-existing expectation outside NX2's explicit overrides was
+removed or weakened. The baseline token/Gradle XML, first-candidate token failure,
+and final comparison logs are retained under tmp/nx2/.
+
+Tests added or rewritten (all durable):
+
+| File | Scenarios |
+| --- | --- |
+| NumericConsistencyTokenizationTest.java | NG1, NG2, NG3, NG7, GN1 |
+| CitationScorerNumericTest.java | NG1, NG2, NG3, NG7, GN1 |
+| CitationMatchOpsNumericTest.java | NG1, NG2, NG3, NG6, NG7, GN1; F4 raw results |
+| NumericCitationScorerDecimalIntegrationTest.java | NG1, NG3, NG7; actual CPU model |
+
+Final validation (every Gradle call through js-gradle-slot, including the
+containing sequential evidence/check script; at most one invocation at a time):
+
+- Focused numeric reranker/Worker suites pass, including every old pair/check
+  that NX2 does not supersede and the NX1 leading-decimal repair.
+- One hundred selected preservation checks pass before and after without skips:
+  reranker 4, worker-services 35, app-services 44, app-agent 1, ui 16. These cover
+  fixed numeric-free exact matches, NG4-NG6, WP4.4 passage/source checks, Ask event
+  and file-store reloads, Delegate mapping, HTTP-handler counts and MCP output.
+- pmdMain passes for reranker, worker-services, app-services, app-agent and ui.
+- ./gradlew build -x test -PskipWebBuild=true: BUILD SUCCESSFUL, 1m 28s,
+  332 actionable tasks. Model-gated integration skips in this normal-environment
+  build are not claimed as passes; explicit CPU regression evidence executes.
+- npm run lint and npm run typecheck: exit 0. Full npx vitest run --maxWorkers=4:
+  555 files / 7240 tests passed. Root UI gates: 28/28 passed.
+
+The scorer measurement follows the existing F5 protocol and identical six
+fixtures/model hashes: CPU model, two warm-up suites, five timed suite sums,
+2000ms deadline, one Gradle worker, resource snapshots in tmp/nx2/. XML is retained
+as uiux-numeric-guard-nx2-performance-{before,after}.xml. The five-run median is
+196163488 ns before and 182841069 ns after (ratio 0.932085, within 10%). All six
+fixtures are scored in all five runs on each side. This is a scorer measurement;
+it is not production Ask question-set timing or a rag-qa result.
+
+Remaining unverified in this builder assignment: live/cold Engine and browser
+combinations (NG1/NG6/GN3), production Ask timing/coverage (NG8), and production Ask
+rag-qa before/after verified counts (NG9). The dev stack was expressly unavailable;
+backend, file-store and HTTP-handler checks do not substitute for those checks.
+
+The manual before and known-good copies were shared clones inside the assigned
+TMPDIR: d36738d92 and 3ec058b1e, respectively. Each received its own hard-linked
+frontend dependencies only where package-lock.json matched. Both clones were
+removed after comparison; the evidence runner removed its managed before
+worktrees. No model, corpus or installer was copied or changed. No dev server was
+started and no other session's process was stopped. The queued evidence wrapper
+that was canceled before acquiring a slot is recorded as exit 143; the completed
+sequential evidence/check runner exits 0. No commit, push or acceptance record
+was made.
+
+Test-intent coverage/evidence is complete. Independent acceptance remains stale
+and must be supplied by the verifier; the historical rejection is retained.
+The gate also reports reconsider-rate: 1 third-reviewer tie-break among 9 audited
+PRs in 28 days (11.1%, above one in ten), a non-failing delivery finding.
+
 ## Acceptance records
 
 ```json
@@ -1155,5 +1489,16 @@ Final command results:
   "verdict": "reject",
   "digest": "sha256:f8b76f3d681d78b7a5058cb34c8b0f870c159ba6328168132c50049320da968e",
   "note": "NG1/NG3 and D8/F1 fail for decimals without a leading zero: .5, -.5 and +.5% are treated as 5, 5 and 5%. Both scorers accept the mismatch; real HTTP Ask and Delegate publish verified citations, and both browser windows render the mark. The 41 literal pairs pass, but these extra equivalences were not agreed. See verifier evidence dvn67dxr."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp4.5-verifier-1ahxvgxn",
+  "verdict": "reject",
+  "digest": "sha256:0d9ce40fdf7e9cc3cd8a917623d93fce17e4be5a017a0531695c6c7b2d62d0e7",
+  "note": "NG1/F1/NX1 fail: %-5 verifies against 5 (real CPU scorers, Ask, Delegate, both windows and cold reload); 0x10 still verifies against 0 and 10. D8/GN1 regress: date parts, unit ranges and m²-only prose lose marks; an unrelated $5 in a passage vetoes its supported 1883 claim. The 330 literal pairs and the leading-decimal repair pass. Evidence: /home/elias/.cache/am/1ahxvgxn/evidence."
 }
 ```

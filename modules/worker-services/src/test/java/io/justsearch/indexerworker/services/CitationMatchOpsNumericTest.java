@@ -41,6 +41,142 @@ class CitationMatchOpsNumericTest extends io.justsearch.adapters.lucene.runtime.
   }
 
   @Test
+  void preservesSpacedPercentRanges() {
+    String[][] pairs = {
+        {"The interval is 5 %-10%.", "The values are 5% and 10%."},
+        {"The interval is 5 %--10%.", "The values are 5% and -10%."}
+    };
+    assertAll(java.util.Arrays.stream(pairs).map(pair -> () -> {
+      var result = execute(pair[0], List.of(DOC_A), List.of(pair[1]), 0.9);
+      assertEquals(1, result.getMatchesCount(), java.util.Arrays.toString(pair));
+      assertEquals(1.0, result.getMatches(0).getSimilarity(), 0.0);
+      assertEquals(1, result.getSentencesScored());
+    }));
+  }
+
+  @Test
+  void rejectsNx2PrefixPercentAndUndecidedPieces() throws Exception {
+    String[][] pairs = {
+        {"The rate is %-5.", "The rate is 5."},
+        {"Oran %-5.", "Oran 5."},
+        {"The rate is % -5.", "The rate is -5."},
+        {"The rate is %5.", "The rate is 5."},
+        {"The rate is %-5.", "The rate is %-5."},
+        {"The rate is % -5.", "The rate is % -5."},
+        {"The value is 0x10.", "The values are 0 and 10."},
+        {"The value is 0x10.", "The value is 0x10."},
+        {"The value is 0.", "The value is 0x10."},
+        {"The value is 10.", "The value is 0x10."},
+        {"The value is 1883 and 0x10.", "The values are 1883, 0 and 10."},
+        {"The date is 21/10/2026.", "The parts are 21 and 2026."},
+        {"The date is 21.10.2026.", "The parts are 21 and 2026."},
+        {"The fraction is 3/4.", "The parts are 3 and 4."},
+        {"The interval is 5kg-10kg.", "The value is 5 kg."},
+        {"The price is $5.", "The price is 15."},
+        {"The price is $-5.", "The price is 5."},
+        {"The time is 1:30.", "The value is 1."},
+        {"The version is v1.2.3.", "The values are 1 and 2."},
+        {"The value is 1.5.", "The values are 1 and 5."},
+        {"Opened in 1883.", "Opened in 18830; the value is 0x10."},
+        {"The area is 5m².", "The area is 50 m²."},
+        {"The value is 0b101.", "The values are 0 and 101."},
+        {"The value is 101.", "The value is 0b101."},
+        {"The rate is ％-٥.", "The rate is 5."},
+        {"The value is 1.", "The value is 1e3."},
+        {"The value is 3.", "The value is 1e3."},
+        {"The value is 1.", "The value is 1/2."},
+        {"The value is 2.", "The value is 1/2."}
+    };
+    assertAll(java.util.Arrays.stream(pairs).map(pair -> () -> {
+      index(DOC_A, pair[1]);
+      assertAll(List.of(true, false).stream().map(supplied -> () -> {
+        var result = execute(pair[0], List.of(DOC_A), supplied ? List.of(pair[1]) : List.of(), 0.5);
+        assertEquals(0, result.getMatchesCount(), java.util.Arrays.toString(pair) + ", supplied=" + supplied);
+        assertEquals(1, result.getSentencesScored());
+      }));
+    }));
+  }
+
+  @Test
+  void retainsNx2DecidedFormsAndUnrelatedPassageNotation() throws Exception {
+    String[][] pairs = {
+        {"The date is 21/10/2026.", "The date is 21/10/2026."},
+        {"The date is 21/10/2026.", "The parts are 21, 10 and 2026."},
+        {"The date is 2026-10-21.", "The parts are 2026, 10 and 21."},
+        {"The date is 21.10.2026.", "The parts are 21, 10 and 2026."},
+        {"The date is ٢٠٢٦/١٠/٢١.", "The parts are 2026, 10 and 21."},
+        {"The interval is 5kg-10kg.", "The interval is 5kg-10kg."},
+        {"The interval is 5kg-10kg.", "The values are 5 and 10."},
+        {"The interval is 5–10 kg.", "The values are 5 and 10."},
+        {"The interval is 5°-10°.", "The values are 5 and 10."},
+        {"The price is $5.", "The price is $5."},
+        {"The price is $5.", "The value is 5."},
+        {"The price is 5 €.", "The value is 5."},
+        {"The price is € 5.", "The value is 5."},
+        {"The price is -$5.", "The value is -5."},
+        {"The price is $-5.", "The value is -5."},
+        {"The time is 1:30.", "The time is 1:30."},
+        {"The time is 1:30.", "The parts are 1 and 30."},
+        {"The version is v1.2.3.", "The version is v1.2.3."},
+        {"The version is v1.2.3.", "The parts are 1, 2 and 3."},
+        {"The value is 1.2.3.", "The parts are 1, 2 and 3."},
+        {"The area is 5m².", "The value is 5."},
+        {"Opened in 1883.", "Opened in 1883; admission costs $5."},
+        {"Opened in 1883.", "Opened in 1883; the value is 0x10."},
+        {"Opened in 1883.", "The value is 0x10; opened in 1883."},
+        {"Opened in 1883.", "Opened in 1883; the fraction is 3/4."},
+        {"Opened in 1883.", "Opened in 1883; the rate is %-5."},
+        {"Opened in 1883.", "Opened in 1883; the value is 1e3."},
+        {"Opened in 1883.", "Opened in 1883; the value is --5."},
+        {"The value is 5.", "The value is 0x10; a separate value is 5."},
+        {"The value is 5.", "The rate is %-5; a separate value is 5."},
+        {"The interval is 5 kg–10 kg.", "The values are 5 and 10."},
+        {"The interval is 10 - 20.", "The values are 10 and 20."},
+        {"The interval is 10– 20.", "The values are 10 and 20."},
+        {"The interval is -5 - -3.", "The values are -5 and -3."},
+        {"Opened in 1883.", "The value is 0x10,1883."},
+        {"Opened in 1883.", "The value is 1883,0x10."},
+        {"Opened in 1883.", "The value is 0x10 1883."},
+        {"Opened in 1883.", "The value is 1883 0x10."},
+        {"The date is 1/234/567.", "The parts are 1, 234 and 567."}
+    };
+    assertAll(java.util.Arrays.stream(pairs).map(pair -> () -> {
+      index(DOC_A, pair[1]);
+      assertAll(List.of(true, false).stream().map(supplied -> () -> {
+        var result = execute(pair[0], List.of(DOC_A), supplied ? List.of(pair[1]) : List.of(), 0.5);
+        assertEquals(1, result.getMatchesCount(), java.util.Arrays.toString(pair) + ", supplied=" + supplied);
+        assertEquals(1, result.getSentencesScored());
+        assertEquals(1.0, result.getMatches(0).getSimilarity(), 0.0);
+        assertEquals(DOC_A, result.getMatches(0).getParentDocId());
+        assertEquals(AnswerSegmentation.splitSentences(pair[0]).getFirst(), result.getMatches(0).getSentenceText());
+        assertEquals(0, execute(pair[0], List.of(DOC_A), List.of("alternative: " + pair[1]), 0.9)
+            .getMatchesCount(), "containment cannot raise a score");
+      }));
+    }));
+  }
+
+  @Test
+  void retainsNx2UnitOnlyExactMatches() throws Exception {
+    String[][] pairs = {
+        {"The area is measured in m².", "Some passage."},
+        {"Volume is measured in cm³.", "Some passage."}
+    };
+    assertAll(java.util.Arrays.stream(pairs).map(pair -> () -> {
+      index(DOC_A, pair[1]);
+      assertAll(List.of(true, false).stream().map(supplied -> () -> {
+        var result = execute(pair[0], List.of(DOC_A), supplied ? List.of(pair[1]) : List.of(), 0.5);
+        assertEquals(1, result.getMatchesCount(), java.util.Arrays.toString(pair) + ", supplied=" + supplied);
+        assertEquals(1, result.getSentencesScored());
+        assertEquals(1.0, result.getMatches(0).getSimilarity(), 0.0);
+        assertEquals(DOC_A, result.getMatches(0).getParentDocId());
+        assertEquals(AnswerSegmentation.splitSentences(pair[0]).getFirst(), result.getMatches(0).getSentenceText());
+        assertEquals(0, execute(pair[0], List.of(DOC_A), List.of("alternative: " + pair[1]), 0.9)
+            .getMatchesCount(), "containment cannot raise a score");
+      }));
+    }));
+  }
+
+  @Test
   void rejectsBothCounterexamplesOnSuppliedAndLookupPaths() throws Exception {
     index(DOC_A, "Vespera Observatory opened in 1883.");
     for (boolean supplied : List.of(true, false)) {

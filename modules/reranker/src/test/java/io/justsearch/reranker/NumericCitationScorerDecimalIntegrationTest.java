@@ -33,6 +33,20 @@ class NumericCitationScorerDecimalIntegrationTest {
   }
 
   @Test
+  void rejectsNx2CounterexamplesThroughRealModel() {
+    String[][] pairs = {
+        {"The rate is %-5.", "The rate is 5."},
+        {"Oran %-5.", "Oran 5."},
+        {"The value is 0x10.", "The values are 0 and 10."}
+    };
+    assertAll(java.util.Arrays.stream(pairs).map(pair -> () -> {
+      var result = scorer.scoreAll(List.of(pair[0]), List.of(pair[1]), List.of("nx2"), 0.5, 2000);
+      assertEquals(List.of(), result.matches(), java.util.Arrays.toString(pair));
+      assertEquals(1, result.sentencesScored());
+    }));
+  }
+
+  @Test
   void rejectsLeadingDecimalCounterexamplesThroughRealModel() {
     assertAll(List.of(".5", "-.5", "+.5%").stream().map(value -> () -> {
       String sentence = "The voltage is " + value + ".";

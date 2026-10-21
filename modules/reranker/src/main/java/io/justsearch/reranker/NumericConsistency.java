@@ -1,9 +1,12 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.reranker;
 
+import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
 
 /**
@@ -27,12 +30,21 @@ public final class NumericConsistency {
   private static final Pattern INLINE_CODE = Pattern.compile("(`+)(.*?)\\1(?!`)", Pattern.DOTALL);
   // No agreed interpretation for these forms. Never turn their pieces into supporting values.
   private static final String UNSUPPORTED = "unsupported numeric notation";
-  private static final Pattern SLASH_DATE =
-      Pattern.compile("(?<![0-9/])[0-9]{4}/[0-9]{1,2}/[0-9]{1,2}(?![0-9/])");
+  private static final Pattern UNIT_EXPONENT = Pattern.compile("(\\p{L}+)[²³]");
+  private static final Pattern CURRENCY = Pattern.compile("\\p{Sc}[ \\u00a0\\u202f]*");
+  // Separate parts with punctuation: spaces could turn 1/234/567 into the grouped integer 1234567.
+  private static final Pattern PARTS = Pattern.compile(
+      "(?<![\\p{L}\\p{N}./:])(?:[vV]?[0-9]+(?:\\.[0-9]+){2,}"
+          + "|[0-9]+(?:/[0-9]+){2}|[0-9]+(?::[0-9]+)+)(?![0-9/:]|\\.[0-9.])");
+  private static final Pattern RANGE = Pattern.compile(
+      "([0-9](?:[ \\u00a0\\u202f]*[%\\u066a\\uff05])?)"
+          + "(?:[ \\u00a0\\u202f]*(?![eE]\\b)[\\p{L}°]+(?=[-–—])"
+          + "|(?![eE]\\b)[\\p{L}°]+[ \\u00a0\\u202f]*|[ \\u00a0\\u202f]*)[-–—]"
+          + "[ \\u00a0\\u202f]*(?=[+\\-]?\\.?[0-9])");
   private static final Pattern UNSUPPORTED_NOTATION = Pattern.compile(
-      "[\\p{No}\\p{Nl}]|\\p{Sc}[ \\u00a0\\u202f+\\-]*\\.?[0-9]"
-          + "|[0-9][ \\u00a0\\u202f]*[\\p{Sc}‰‱]"
+      "[\\p{No}\\p{Nl}]|[0-9][ \\u00a0\\u202f]*[‰‱]"
           + "|[0-9]['’][0-9]|[0-9][_٫٬．·․⋅˙:⁄/\\^×]|[_٫٬．·․⋅˙:⁄/\\^×][0-9]"
+          + "|[0-9]\\p{L}+[+\\-]?[0-9]"
           + "|[\\p{M}\\p{Cf}]\\.?[0-9]|[0-9][\\p{M}\\p{Cf}]"
           + "|[0-9][\\p{Zs}&&[^ \\u00a0\\u202f]][0-9]"
           + "|[0-9](?:[eE](?![a-zA-Z])|(?:st|nd|rd|th)\\b)"
@@ -77,29 +89,65 @@ public final class NumericConsistency {
   public static Set<String> proseValues(String text) {
     if (text == null || text.isEmpty()) return Set.of();
     String numericText = withoutReferences(protectInlineCode(normalizeDigits(text)));
-    numericText = SLASH_DATE.matcher(numericText).replaceAll(match -> match.group().replace('/', ' '));
-    if (UNSUPPORTED_NOTATION.matcher(numericText).find()) return Set.of(UNSUPPORTED);
-    Set<String> values = new HashSet<>();
-    var matcher = NUMBER.matcher(numericText);
-    while (matcher.find()) {
-      if (incompleteNumber(numericText, matcher.start(), matcher.end())) return Set.of(UNSUPPORTED);
-      String token = matcher.group();
-      // A hyphen between digits separates range endpoints / date parts. A unary sign remains.
-      if (token.charAt(0) == '-' && matcher.start() > 0
-          && endsNumber(numericText.charAt(matcher.start() - 1))) {
-        token = token.substring(1);
+    numericText = UNIT_EXPONENT.matcher(numericText).replaceAll("$1");
+    numericText = CURRENCY.matcher(numericText).replaceAll("");
+    numericText = PARTS.matcher(numericText).replaceAll(match -> match.group().replaceFirst("^[vV]", "")
+        .replaceAll("[./:]", ";"));
+    numericText = RANGE.matcher(numericText).replaceAll("$1;");
+
+    // Mark undecided lexical forms before collecting values. Keep separate decided values even
+    // when an undecided form occurs in the same passage; only claims use the withholding marker.
+    BitSet undecided = new BitSet(numericText.length());
+    var unsupported = UNSUPPORTED_NOTATION.matcher(numericText);
+    while (unsupported.find()) markUndecided(numericText, undecided, unsupported.start(), unsupported.end());
+    List<MatchResult> numbers = numbers(numericText);
+    for (MatchResult number : numbers) {
+      if (incompleteNumber(numericText, number.start(), number.end())) {
+        markUndecided(numericText, undecided, number.start(), number.end());
       }
-      String integer = token.replaceFirst("^[+\\-]", "").split("\\.", 2)[0]
+    }
+    Set<String> values = new HashSet<>();
+    if (!undecided.isEmpty()) values.add(UNSUPPORTED);
+    for (MatchResult number : numbers) {
+      int unknown = undecided.nextSetBit(number.start());
+      if (unknown < 0 || unknown >= number.end()) values.add(canonical(number.group()));
+    }
+    return Set.copyOf(values);
+  }
+
+  private static List<MatchResult> numbers(String text) {
+    List<MatchResult> numbers = new ArrayList<>();
+    var matcher = NUMBER.matcher(text);
+    while (matcher.find()) {
+      String integer = matcher.group().replaceFirst("^[+\\-]", "").split("\\.", 2)[0]
           .replaceFirst("[ \\u00a0\\u202f]*[%\\u066a\\uff05]$", "");
       if (integer.chars().anyMatch(c -> c == ',' || c == ' ' || c == '\u00a0' || c == '\u202f')
           && !GROUPED_INTEGER.matcher(integer).matches()) {
-        var parts = UNGROUPED_NUMBER.matcher(token);
-        while (parts.find()) values.add(canonical(parts.group()));
+        var parts = UNGROUPED_NUMBER.matcher(text).region(matcher.start(), matcher.end());
+        while (parts.find()) numbers.add(parts.toMatchResult());
       } else {
-        values.add(canonical(token));
+        numbers.add(matcher.toMatchResult());
       }
     }
-    return Set.copyOf(values);
+    return numbers;
+  }
+
+  /** Consume an undecided form whole so none of its digit pieces can support another claim. */
+  private static void markUndecided(String text, BitSet undecided, int start, int end) {
+    while (start > 0 && notationCharacter(text.charAt(start - 1))) start--;
+    while (end < text.length() && notationCharacter(text.charAt(end))) end++;
+    undecided.set(start, end);
+  }
+
+  private static boolean notationCharacter(char character) {
+    return Character.isLetterOrDigit(character) || ".+-–—%/'’_٫٬．·․⋅˙:⁄^×".indexOf(character) >= 0
+        || switch (Character.getType(character)) {
+          case Character.OTHER_NUMBER, Character.LETTER_NUMBER, Character.NON_SPACING_MARK,
+              Character.COMBINING_SPACING_MARK, Character.ENCLOSING_MARK, Character.FORMAT,
+              Character.MATH_SYMBOL, Character.CURRENCY_SYMBOL, Character.OTHER_SYMBOL,
+              Character.DASH_PUNCTUATION -> true;
+          default -> false;
+        };
   }
 
   /** Regex search must never resume inside an unsupported signed/decimal/percent expression. */
@@ -109,7 +157,7 @@ public final class NumericConsistency {
     if (previous >= 0) {
       char prefix = text.charAt(previous);
       if ((prefix == '.' && previous == start - 1)
-          || (isPercent(prefix) && text.charAt(start) != '-')) return true;
+          || isPercent(prefix)) return true;
       if (prefix == '+' || prefix == '-') {
         // A second minus may be a negative range endpoint: 5--3 or .5--.3.
         if (previous != start - 1 || prefix != '-' || previous == 0
