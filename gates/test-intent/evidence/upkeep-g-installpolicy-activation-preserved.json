@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T07:13:35.428Z",
-  "revision": "5e97d3af4f3c79119a0ce757f2474321ebb3e67c",
-  "tree": "99bcdfbfde9ae499ff52964f9257c4eb76625d28",
+  "createdAt": "2026-10-21T08:19:02.281Z",
+  "revision": "7bf2426291b7ef4261aaff445e937c08bd2e1c40",
+  "tree": "2c9236e50ba0fc03fdd65571d608f24be1a069d6",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceTest.absentPolicyServiceKeepsActivationPermissive\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4815
+      "durationMs": 2936
     }
   ],
   "checks": [
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:38f8fe714280febfbe4ff2f56b4b6b82aafe3029ca03813569bada68a108acaa"
+  "digest": "sha256:80fee97ab60367c57ed4dd6d950b328e77646e884cf7c38751aeec2539107978"
 }

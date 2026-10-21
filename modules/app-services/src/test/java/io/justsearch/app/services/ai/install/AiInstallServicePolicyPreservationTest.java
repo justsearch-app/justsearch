@@ -87,7 +87,7 @@ final class AiInstallServicePolicyPreservationTest {
         var resolved = builder.build();
         ConfigStore.setGlobal(new ConfigStore(resolved));
         var service = new AiInstallService(null, store, null,
-            restart == 0 ? null : () -> new io.justsearch.app.api.EffectivePolicy(true, true, false, false,
+            restart == 0 ? null : () -> new io.justsearch.app.api.EffectivePolicy(true, true, true, false, false,
                 List.of(), List.of(), "test", false, null, null, false), home);
         var select = AiInstallService.class.getDeclaredMethod("applyCudaServerExe");
         select.setAccessible(true);

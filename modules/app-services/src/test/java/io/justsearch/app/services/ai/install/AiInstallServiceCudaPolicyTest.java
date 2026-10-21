@@ -24,7 +24,7 @@ final class AiInstallServiceCudaPolicyTest {
   @TempDir Path home;
 
   private static EffectivePolicy gpuOff() {
-    return new EffectivePolicy(true, true, false, false, List.of(), List.of(),
+    return new EffectivePolicy(true, true, true, false, false, List.of(), List.of(),
         "test", false, null, null, false);
   }
 

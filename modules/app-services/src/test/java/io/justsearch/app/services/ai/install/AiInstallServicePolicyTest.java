@@ -29,7 +29,7 @@ final class AiInstallServicePolicyTest {
   private static final String POLICY_REASON = "GPU acceleration is disabled by administrator policy";
 
   private static EffectivePolicy policy(boolean downloads, boolean gpu) {
-    return new EffectivePolicy(downloads, true, gpu, false, List.of(), List.of(),
+    return new EffectivePolicy(true, downloads, true, gpu, false, List.of(), List.of(),
         "test", false, null, null, false);
   }
 
