@@ -84,3 +84,14 @@ evidence remains valid. No acceptance record is authored by the builder.
   "note": "New combination checks follow the agreed recovery-only rule RS4 and preference contract SC8; both executed and passed in this independent session. Production startup and activation guards were reviewed against both branch states and exercised on the real private-Xvfb shell. Existing test changes are formatting-only adaptations; no oracle is weakened."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "a44gv5wx-verifier-2",
+  "verdict": "accept",
+  "digest": "sha256:5f725de1fcb153818dfeea5002b523cc79c7d93e47ef023d25e7c33e0acc21bd",
+  "note": "M2/M3 expectations follow supplied agreed RS4 recovery-only and SC8 preference scenarios. The exact candidate and bbc028999 execute both combination checks; private-Xvfb real shells preserve reset gating and preference deletion/default-on through automatic process restart. Existing lib.rs tests retain their oracles under formatting. RN3 is a valid normal-start catalog input adaptation: compared against the real candidate Engine response and authoritative schema, with every assertion and 8-second/60-second deadline unchanged; named RN3 failed all three before runs and passed all three candidate runs under two loaded CPUs. This accepts test intent, not a claim that all live scenarios pass; the separate report identifies an inherited cancellation defect."
+}
+```
