@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -241,7 +242,11 @@ class KeystoreDurabilityTest {
   }
 
   @Test
+  @Timeout(120)
   void processKillAtEachPublicationStepRetainsUnlockableData() throws Exception {
+    // Windows passes take 27-29 s; observed intervals between child publication repairs reach
+    // 9.1 s. Allow eight such intervals (~73 s) plus headroom for setup, recovery and cleanup.
+    // Each child still has its own 30 s bound, so a stuck child fails before the suite timeout.
     // Steps: before/after primary rename, before/after replica rename. The paused subprocess
     // uses the real forced writer and filesystem; only the pause is injected.
     for (String action : List.of("password", "recovery")) {
@@ -252,20 +257,29 @@ class KeystoreDurabilityTest {
         String sealed = new StoreCipher(keys).seal("conversation before rotation");
         Path log = dir.resolve(action + step + ".log");
         Path args = dir.resolve("child.args");
-        Files.writeString(args, "-XX:+EnableDynamicAgentLoading\n-cp\n\""
+        Files.writeString(args, "-XX:+EnableDynamicAgentLoading\n\"-Djava.io.tmpdir="
+            + System.getProperty("java.io.tmpdir").replace('\\', '/') + "\"\n-cp\n\""
             + System.getProperty("java.class.path").replace('\\', '/') + "\"\n");
         boolean windows = System.getProperty("os.name").startsWith("Windows");
         Path java = Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java");
+        long started = System.nanoTime();
         Process child = new ProcessBuilder(java.toString(), "@" + args, KeystoreDurabilityTest.class.getName(),
             dir.toString(), Integer.toString(step), action).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        boolean paused = false;
         try {
-          long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+          long deadline = started + TimeUnit.SECONDS.toNanos(30);
           while (child.isAlive() && System.nanoTime() < deadline
               && !Files.readString(log).contains("PUBLICATION PAUSED")) Thread.sleep(10);
-          assertTrue(Files.readString(log).contains("PUBLICATION PAUSED"),
-              action + " publication step " + step + ": " + Files.readString(log));
+          paused = Files.readString(log).contains("PUBLICATION PAUSED");
+          assertTrue(paused,
+              action + " publication step " + step + " did not pause within 30 s: " + Files.readString(log));
         } finally {
+          long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
           child.destroyForcibly(); // Owned Process object, never a name or an unqualified PID.
+          System.out.println(action + " publication step " + step + ": "
+              + (paused ? "start-to-pause=" : "not paused; elapsed=")
+              + elapsedMillis + " ms");
+          if (!paused) System.out.println("Child output: " + Files.readString(log));
           assertTrue(child.waitFor(10, TimeUnit.SECONDS), "owned child must exit");
         }
         var restarted = manager();

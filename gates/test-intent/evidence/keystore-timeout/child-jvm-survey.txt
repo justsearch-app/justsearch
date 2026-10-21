@@ -1,0 +1,57 @@
+Windows neighbouring-test survey, 2026-10-21.
+Scope: app-services and configuration non-main Java sources, direct ProcessBuilder/java.home and indirect ManagedChatSeam/SlowStartFakeLlamaServer callers.
+CI sample: five runs, six windows-native-contracts artifact sets: 39597325251/1, 39605828637/1+2, 39615523562/1 (main), 39632460020/1 (PR #873), 39632831411/1.
+Near-limit screening threshold: >=20 s (two thirds of the 30 s default); also inspect every reported failure, regardless of duration.
+Only the two keystore kill methods failed or reached that threshold across ALL app-services/configuration XML in this sample.
+Observed other child JVM tests:
+REPORT run-39597325251/windows-native-contracts-attempt-1/modules/configuration/build/test-results/test/TEST-io.justsearch.configuration.persistence.ContendedFileReadsTest.xml sha256=009120e831be11ca1c6acda6a1d5d04aed0aeff13522230a256b6711490ad583 timestamp=2026-10-21T10:14:35.909Z
+  {"classname": "io.justsearch.configuration.persistence.ContendedFileReadsTest", "name": "readsWhileAnExternalSharedLockIsHeld()", "time": "0.102"} failed=False skipped=False
+  {"classname": "io.justsearch.configuration.persistence.ContendedFileReadsTest", "name": "waitsForAnExternalExclusiveLockThenReadsTheExactBytes()", "time": "0.26"} failed=False skipped=False
+REPORT run-39605828637/windows-native-contracts-attempt-1/modules/configuration/build/test-results/test/TEST-io.justsearch.configuration.persistence.ContendedFileReadsTest.xml sha256=009120e831be11ca1c6acda6a1d5d04aed0aeff13522230a256b6711490ad583 timestamp=2026-10-21T10:14:35.909Z REUSED IDENTICAL XML
+  {"classname": "io.justsearch.configuration.persistence.ContendedFileReadsTest", "name": "readsWhileAnExternalSharedLockIsHeld()", "time": "0.102"} failed=False skipped=False
+  {"classname": "io.justsearch.configuration.persistence.ContendedFileReadsTest", "name": "waitsForAnExternalExclusiveLockThenReadsTheExactBytes()", "time": "0.26"} failed=False skipped=False
+REPORT run-39605828637/windows-native-contracts-attempt-2/modules/configuration/build/test-results/test/TEST-io.justsearch.configuration.persistence.ContendedFileReadsTest.xml sha256=009120e831be11ca1c6acda6a1d5d04aed0aeff13522230a256b6711490ad583 timestamp=2026-10-21T10:14:35.909Z REUSED IDENTICAL XML
+  {"classname": "io.justsearch.configuration.persistence.ContendedFileReadsTest", "name": "readsWhileAnExternalSharedLockIsHeld()", "time": "0.102"} failed=False skipped=False
+  {"classname": "io.justsearch.configuration.persistence.ContendedFileReadsTest", "name": "waitsForAnExternalExclusiveLockThenReadsTheExactBytes()", "time": "0.26"} failed=False skipped=False
+REPORT run-39615523562/windows-native-contracts-attempt-1/modules/configuration/build/test-results/test/TEST-io.justsearch.configuration.persistence.ContendedFileReadsTest.xml sha256=009120e831be11ca1c6acda6a1d5d04aed0aeff13522230a256b6711490ad583 timestamp=2026-10-21T10:14:35.909Z REUSED IDENTICAL XML
+  {"classname": "io.justsearch.configuration.persistence.ContendedFileReadsTest", "name": "readsWhileAnExternalSharedLockIsHeld()", "time": "0.102"} failed=False skipped=False
+  {"classname": "io.justsearch.configuration.persistence.ContendedFileReadsTest", "name": "waitsForAnExternalExclusiveLockThenReadsTheExactBytes()", "time": "0.26"} failed=False skipped=False
+REPORT run-39632831411/windows-native-contracts-attempt-1/modules/configuration/build/test-results/test/TEST-io.justsearch.configuration.persistence.ContendedFileReadsTest.xml sha256=009120e831be11ca1c6acda6a1d5d04aed0aeff13522230a256b6711490ad583 timestamp=2026-10-21T10:14:35.909Z REUSED IDENTICAL XML
+  {"classname": "io.justsearch.configuration.persistence.ContendedFileReadsTest", "name": "readsWhileAnExternalSharedLockIsHeld()", "time": "0.102"} failed=False skipped=False
+  {"classname": "io.justsearch.configuration.persistence.ContendedFileReadsTest", "name": "waitsForAnExternalExclusiveLockThenReadsTheExactBytes()", "time": "0.26"} failed=False skipped=False
+UNIQUE XML REPORTS: 1
+REPORT run-39597325251/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.chat.LlamaStopCodeSeamTest.xml sha256=5a2c398634c7d29ea6a0f94aaeefa76f1dec849fd12d23fde46ef14403677d81 timestamp=2026-10-21T12:30:39.817Z
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "deactivatingChatEndsTheMainServerWithTheChildStopCode()", "time": "2.364"} failed=False skipped=False
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "quitEndsTheMainServerWithTheChildStopCode()", "time": "0.663"} failed=False skipped=False
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "theSelfTestCandidateIsEndedWithTheChildStopCode()", "time": "1.115"} failed=False skipped=False
+REPORT run-39605828637/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.chat.LlamaStopCodeSeamTest.xml sha256=24b6d90fb1a1e4cce2a5a0315d0c831518eb61aad2d6097b812f76117ced847b timestamp=2026-10-21T13:31:15.212Z
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "deactivatingChatEndsTheMainServerWithTheChildStopCode()", "time": "2.459"} failed=False skipped=False
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "quitEndsTheMainServerWithTheChildStopCode()", "time": "1.167"} failed=False skipped=False
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "theSelfTestCandidateIsEndedWithTheChildStopCode()", "time": "1.511"} failed=False skipped=False
+REPORT run-39605828637/windows-native-contracts-attempt-2/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.chat.LlamaStopCodeSeamTest.xml sha256=3c1d4533becc28e7f334a5059405ed6d4de016ed3c1287374d64b6e6ad9ea04e timestamp=2026-10-21T13:58:25.459Z
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "deactivatingChatEndsTheMainServerWithTheChildStopCode()", "time": "2.476"} failed=False skipped=False
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "quitEndsTheMainServerWithTheChildStopCode()", "time": "0.734"} failed=False skipped=False
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "theSelfTestCandidateIsEndedWithTheChildStopCode()", "time": "1.036"} failed=False skipped=False
+REPORT run-39615523562/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.chat.LlamaStopCodeSeamTest.xml sha256=469a8c3d1a0ad941d70d997b76bcdb475558686f9df43e338c6decfc5e7bc9d4 timestamp=2026-10-21T14:35:13.584Z
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "deactivatingChatEndsTheMainServerWithTheChildStopCode()", "time": "2.705"} failed=False skipped=False
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "quitEndsTheMainServerWithTheChildStopCode()", "time": "0.759"} failed=False skipped=False
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "theSelfTestCandidateIsEndedWithTheChildStopCode()", "time": "1.068"} failed=False skipped=False
+REPORT run-39632460020/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.chat.LlamaStopCodeSeamTest.xml sha256=0516f2687b9a1ec10250e62a7642337abaed619c2de5b474970c3b8abe36e1a4 timestamp=2026-10-21T16:29:10.329Z
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "deactivatingChatEndsTheMainServerWithTheChildStopCode()", "time": "2.388"} failed=False skipped=False
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "quitEndsTheMainServerWithTheChildStopCode()", "time": "1.163"} failed=False skipped=False
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "theSelfTestCandidateIsEndedWithTheChildStopCode()", "time": "1.156"} failed=False skipped=False
+REPORT run-39632831411/windows-native-contracts-attempt-1/modules/app-services/build/test-results/test/TEST-io.justsearch.app.services.chat.LlamaStopCodeSeamTest.xml sha256=25912684a5d053e49c7c006501a3df6e80324bb3b45fb7bbb2c5192ae4aa368c timestamp=2026-10-21T16:29:49.384Z
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "deactivatingChatEndsTheMainServerWithTheChildStopCode()", "time": "2.152"} failed=False skipped=False
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "quitEndsTheMainServerWithTheChildStopCode()", "time": "0.845"} failed=False skipped=False
+  {"classname": "io.justsearch.app.services.chat.LlamaStopCodeSeamTest", "name": "theSelfTestCandidateIsEndedWithTheChildStopCode()", "time": "1.043"} failed=False skipped=False
+UNIQUE XML REPORTS: 6
+
+ContendedFileReadsTest uses the default 30 s; its child-JVM methods are 0.102 and 0.260 s. Five uploaded copies share timestamp 10:14:35.909Z and the same digest, so these are ONE observed execution per method, not five fresh runs.
+LlamaStopCodeSeamTest uses the default 30 s and launches JVM fixtures via ManagedChatSeam -> SlowStartFakeLlamaServer.install. Eighteen method executions across six fresh reports passed; max 2.705 s.
+No evidence justifies modifying either class.
+
+Other direct/indirect child fixtures were examined. ChatJobAccountingTest has per-method explicit 60/120 s Windows limits; ChatLaunchFailureTextTest has a class-level 120 s limit. ChatLaunchCompatibilityTest and SelfTestProcessOwnershipTest default to 30 s but lack Windows/cross-platform tags, and their XML is absent from this Windows-native sample. RuntimeActivationSelfTestSeamTest, RuntimeActivationAuthenticationTest, SelfTestSessionSeamTest, ChatActivationSeamTest, ChatControllerLifecycleSeamTest, OfflinePassChatSeamTest and AiInstallAcquisitionFreezeSeamTest also use the fake JVM via ManagedChatSeam without those Windows lane tags; no Windows execution is claimed.
+AutomaticVdu* loaded/recovery/breaker/retry-budget tests have explicit 120/150/300 s limits. IndexedRoot*ScopeTest uses cmd /c mklink on Windows, not a child JVM. GpuSwitchBarrierTest, ChatJobEndFailureTest and RuntimeActivationSelfTestStopFailureTest use logical/mock controls for the matching launcher references.
+The current CI workflow runs untagged unit suites only on Ubuntu; the native Windows lane selects windows/cross-platform tags. Missing Windows evidence is NOT a pass and does NOT justify raising unobserved limits.
+
+Source search used rg over modules/app-services/src and modules/configuration/src excluding main for java.home, ProcessBuilder, ChildSelfTestLauncher, DefaultChildControl, then followed ManagedChatSeam and SlowStartFakeLlamaServer callers.
