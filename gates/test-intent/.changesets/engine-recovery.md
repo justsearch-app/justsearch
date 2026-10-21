@@ -9,7 +9,7 @@ author-session: 01a1563a-7f02-7081-9d04-646e3ac0b504
 
 Owner adopted the E1–E21 scenarios on 2026-10-20. Entries below quote the relevant
 scenarios verbatim. Engine-side queue scenarios E8–E15 belong to a later assignment.
-Coverage is against the merge-base with origin/main, 4f4e20514. There are twelve flagged items;
+Coverage is against the merge-base with origin/main, 738e6a443. There are thirteen flagged items;
 separate entries distinguish new assertions from unchanged test formatting in the same item.
 No acceptance record is written by the builder. Governance tooling is unchanged. The current
 correction refreshes Java execution evidence for the expanded fatal-header checks; all existing
@@ -402,7 +402,7 @@ acceptance on the changed digest.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/engine-recovery-merge-821-851.json",
+      "evidence": "gates/test-intent/evidence/engine-recovery-merge-839-updater.json",
       "newChecks": [
         "modules/shell/src-tauri/src/updater.rs#updater::tests::download_failures_and_rejections_return_to_actionable_error"
       ],
@@ -556,6 +556,27 @@ acceptance on the changed digest.
         "modules/shell/src-tauri/src/recovery.rs#recovery::tests::native_oom_summary_redacts_source_paths_and_keeps_the_byte_bound"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/boot/boot-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Reconcile the real Chromium/SES boot checks with E3: the old RN3 test used an exhausted supervisor and expected Try connecting again to reload. Its reload and both event-reload assertions stay, with the nonterminal starting precondition where that action still applies. A new terminal check requires the visible Restart JustSearch action to invoke restart_engine exactly once without navigation, retain recovery until the host announces running, and then reload into the mounted shell with the new API binding. This catches a real callback defect: the composed button retained the initial nonterminal reload closure after its label became Restart JustSearch. The callback now reads the current supervisor at activation. On merged parent 2a64b161f the new test fails by assertion (zero restart_engine calls and a navigation); with the fix all five boot checks pass. No existing timeout or assertion is weakened or deleted. Factory-reset gating and ordinary browser/desktop boot remain covered.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-51b072",
+          "scenario": "E3",
+          "quote": "Desktop, restart budget spent: the recovery screen shows the cause (exit reason, count, problematic frame when known) and a restart action; pressing it brings the Engine back to READY without quitting the app, and the UI reconnects to the new instance's port and token, ignoring stale manifests and late probe results.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/engine-recovery-lockdown-restart.json",
+      "newChecks": [
+        "modules/ui-web/src/boot/boot-lockdown.test.ts"
+      ],
+      "repaired": true
     }
   ]
 }
@@ -698,6 +719,24 @@ checks and the existing folder/heap repair proofs against their original before 
 pre-existing test bodies/assertions and every older artifact are retained. Entry 14 records the
 new repaired-header assertions; entry 8 keeps its original API checks and adds E2 as a source.
 No acceptance record is written by the builder, and no commit is made.
+
+## CI run 39601040562: merge and real-lockdown restart repair (2026-10-21)
+
+Merged origin/main 738e6a443 into 3b0c4a161 as 2a64b161f, the only commit in this follow-up.
+Main's TLS-provider initialization and its updater tests remain intact. Entry 10 has fresh
+execution evidence against that main revision; the unchanged predecessor-byte acceptance is
+exposed by the existing compatibility patch, and fails its transport-error state assertion.
+Entry 12 and all other valid evidence artifacts are retained.
+
+The CI Frontend lockdown tests failure was RN3 Engine recovery Retry and both desktop event
+reloads mount under real lockdown (30-second timeout looking for Try connecting again).
+The original suite passes 14/14 on main and fails 1/14 on the merged branch. E3 deliberately
+changes the exhausted action to native restart. Entry 15 records the split between nonterminal
+reload preservation and terminal native restart, and the callback repair its real-browser check
+exposed. The unmodified evidence runner records that new assertion failing on the merged parent
+and the complete candidate lockdown file passing. Supplemental command outcomes, including the
+main comparison and Windows startup-budget analysis, are in
+`gates/test-intent/evidence/engine-recovery-ci-39601040562.txt`.
 
 ## Acceptance records
 

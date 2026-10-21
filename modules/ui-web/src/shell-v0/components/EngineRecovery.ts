@@ -136,7 +136,7 @@ export class EngineRecovery extends JfElement {
         ${this.error || status?.state === 'error' ? html`<p role="alert">${this.error || status?.error
           || 'The update could not finish. Try checking for updates again.'}</p>` : nothing}
         <div class="actions">
-          <jf-button .disabled=${this.busy || updating} .onActivate=${() => terminal ? this.restartEngine() : this.onRetry()}>${terminal ? 'Restart JustSearch' : 'Try connecting again'}</jf-button>
+          <jf-button .disabled=${this.busy || updating} .onActivate=${() => isTerminal(this.supervisor) ? this.restartEngine() : this.onRetry()}>${terminal ? 'Restart JustSearch' : 'Try connecting again'}</jf-button>
           ${this.supervisor?.crashFile ? html`<jf-button .onActivate=${() => this.openCrashFolder()}>Open crash folder</jf-button>` : nothing}
           <jf-button .disabled=${this.busy || updating} .onActivate=${() => this.runUpdateAction(false)}>Check for updates</jf-button>
           ${available ? html`<jf-button variant="primary" .disabled=${this.busy || updating}
