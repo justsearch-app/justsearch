@@ -1473,8 +1473,7 @@ message IndexingJobView {
   string scan_id = 8;
 }
 
-// Snapshot frame: full collection at the point of subscription. Only one snapshot
-// frame per stream (the first frame); subsequent frames are deltas.
+// Bounded window at subscription, reconnect, or a committed resynchronization.
 message IndexingJobsSnapshot {
   repeated IndexingJobView items = 1;
 }
@@ -1488,6 +1487,11 @@ message IndexingJobsDelta {
   }
 }
 
+// Presence across the entire queue, independent of the bounded row window.
+message IndexingJobStatePresence {
+  repeated string states = 1;
+}
+
 message IndexingJobsFrame {
   oneof body {
     IndexingJobsSnapshot snapshot = 1;
@@ -1495,6 +1499,8 @@ message IndexingJobsFrame {
   }
   // Monotonic across snapshot + deltas. Used by head-side bridge for resume.
   int64 seq = 3;
+  // Included in every snapshot, and the last delta of a commit only when changed.
+  IndexingJobStatePresence state_presence = 4;
 }
 
 // --- Indexing-jobs Operations (slice 445 §A.9 composed Operations) ---

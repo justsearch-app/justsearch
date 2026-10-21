@@ -203,7 +203,7 @@ export function canonicalizeJsonMaps(value) {
 }
 
 async function fetchJson(url) {
-  const response = await fetch(url, { headers: { accept: 'application/json' } });
+  const response = await fetch(url, { headers: { accept: 'application/json', ...(process.env.JUSTSEARCH_SESSION_TOKEN ? { 'X-JustSearch-Session': process.env.JUSTSEARCH_SESSION_TOKEN } : {}) } });
   if (!response.ok) throw new Error(`capture failed: GET ${url} -> HTTP ${response.status}`);
   return response.json();
 }

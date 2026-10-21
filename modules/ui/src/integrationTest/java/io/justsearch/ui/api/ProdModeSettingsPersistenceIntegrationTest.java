@@ -106,7 +106,7 @@ class ProdModeSettingsPersistenceIntegrationTest extends LocalApiIntegrationTest
   @Test
   @DisplayName("(b)+(c) settings are writable and survive a fresh store load")
   void settingsWriteIsAcceptedAndPersists() throws Exception {
-    HttpJsonResponse current = getJson("/api/settings/v2");
+    HttpJsonResponse current = getJson("/api/settings/v2", tokenHeader());
     assertEquals(200, current.statusCode(), current.body());
     String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
     HttpJsonResponse resp =
@@ -172,7 +172,8 @@ class ProdModeSettingsPersistenceIntegrationTest extends LocalApiIntegrationTest
     long deadline = System.currentTimeMillis() + 90_000;
     String last = "";
     while (System.currentTimeMillis() < deadline) {
-      HttpJsonResponse resp = getJson("/api/ai/runtime/status");
+      HttpJsonResponse resp = getJson("/api/ai/runtime/status", tokenHeader());
+      assertEquals(200, resp.statusCode(), resp.body());
       last = resp.body();
       JsonNode activation = resp.json().path("activation");
       String state = activation.path("state").asText("");

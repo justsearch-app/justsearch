@@ -19,7 +19,9 @@ import { html, css, nothing, type TemplateResult } from 'lit';
 import { createSettingsAttempt, executeSettingsAttempt, readSettingsObservation, SettingsAttemptError, type SettingsAttempt, type SettingsWitness } from '../../api/settingsAttempt.js';
 import { JfElement } from '../primitives/JfElement.js';
 import '../components/OpButton.js';
+import type { OpSuccessEventDetail, OpErrorEventDetail } from '../components/OpButton.js';
 import '../components/Button.js';
+import type { JfButton } from '../components/Button.js';
 import '../components/IngestionSummary.js';
 // Tempdoc 571 §11 / 578 — Library ⊇ Browse: Library hosts the Browse file-tree as a tab.
 import '../components/SurfaceTabs.js';
@@ -88,6 +90,16 @@ interface FolderPreview {
   /** Tempdoc 599 Fix 3 — the count walk hit its cap; fileCount is a lower bound ("N+"). */
   readonly capped: boolean;
   readonly alreadyWatched: boolean;
+  /** Optional for older Engines; exact membership still uses alreadyWatched. */
+  readonly overlap?: { readonly path: string; readonly relationship: 'inside' | 'containing' };
+}
+
+function overlapExplanation(preview: FolderPreview): string | null {
+  const overlap = preview.overlap;
+  if (!overlap) return null;
+  return overlap.relationship === 'inside'
+    ? `This folder is inside the watched folder “${overlap.path}” and is already covered by it. Choose a separate folder.`
+    : `This folder contains the watched folder “${overlap.path}”. Choose a separate folder.`;
 }
 
 // The substrate list response: a thin {items, count} envelope around the generated IndexedRootView.
@@ -151,6 +163,12 @@ export class LibrarySurface extends JfElement {
     excludesInvalidPatterns: { state: true },
     excludesLoaded: { state: true },
     excludesBusy: { state: true },
+    addBusy: { state: true },
+    removingHashes: { state: true },
+    actionMessage: { state: true },
+    reindexOutcome: { state: true },
+    reindexOutcomeError: { state: true },
+    reindexOutcomeBusy: { state: true },
     pendingPath: { state: true },
     pendingCollection: { state: true },
     pendingPreview: { state: true },
@@ -186,6 +204,19 @@ export class LibrarySurface extends JfElement {
   private excludesSavedText: string | null = null;
   private excludesAttempt: SettingsAttempt | null = null;
   private excludesLoadStarted = false;
+  declare addBusy: boolean;
+  declare removingHashes: ReadonlySet<string>;
+  declare actionMessage: string | null;
+  declare reindexOutcome: string | null;
+  declare reindexOutcomeError: boolean;
+  declare reindexOutcomeBusy: boolean;
+  private reindexOutcomeKey: string | null = null;
+  private reindexReadSerial = 0;
+  private lastReindexReadAtMs = 0;
+  private surfaceSerial = 0;
+  private confirmingHashes = new Set<string>();
+  private refreshSerial = 0;
+  private rootsObserved = false;
   declare pendingPath: string;
   /**
    * Tempdoc 914 D4 — the optional collection the new watched root's documents are tagged with.
@@ -279,6 +310,12 @@ export class LibrarySurface extends JfElement {
     this.excludesInvalidPatterns = [];
     this.excludesLoaded = false;
     this.excludesBusy = false;
+    this.addBusy = false;
+    this.removingHashes = new Set();
+    this.actionMessage = null;
+    this.reindexOutcome = null;
+    this.reindexOutcomeError = false;
+    this.reindexOutcomeBusy = false;
     this.pendingPath = '';
     this.pendingCollection = '';
     this.pendingPreview = null;
@@ -335,7 +372,11 @@ export class LibrarySurface extends JfElement {
     .actions {
       display: flex;
       gap: 0.5rem;
-      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 640px) {
+      .header { flex-wrap: wrap; }
+      .add-row input { min-inline-size: 0; }
     }
     /* 574 B1 — the button look is the jf-button atom's single authority; the per-surface
        base + primary/danger variant fork (§14 V2) is deleted. */
@@ -427,7 +468,9 @@ export class LibrarySurface extends JfElement {
       text-align: center;
       color: var(--text-secondary);
     }
+    .action-message { margin-bottom: 1rem; overflow-wrap: anywhere; }
     .error-banner {
+      overflow-wrap: anywhere;
       display: flex;
       align-items: center;
       gap: 0.5rem;
@@ -457,6 +500,7 @@ export class LibrarySurface extends JfElement {
       gap: 0.35rem;
       margin-bottom: 1rem;
       font-size: var(--font-size-sm);
+      overflow-wrap: anywhere;
     }
     .add-preview.ok {
       color: var(--text-success);
@@ -575,6 +619,7 @@ export class LibrarySurface extends JfElement {
       this.isTauri = this.host_.platform.capabilities.has('folder-picker');
     }
     void this.refresh();
+    if (this.reindexOutcomeKey) void this.checkReindexOutcome();
     if (!this.excludesLoadStarted) void this.loadExcludes();
     this.presentationUnsub = subscribePresentation(() => this.requestUpdate());
     // 595 §4.3 — observe the one Stability axis so an empty roots list during a
@@ -613,6 +658,9 @@ export class LibrarySurface extends JfElement {
       // Tempdoc 599 §9.3 — ride the existing status tick to live-refresh the rows (counts-free, no
       // new poller), so a folder's "Indexing · N remaining → ✓ indexed" updates without re-nav.
       void this.refresh({ live: true });
+      if (this.reindexOutcomeKey && Date.now() - this.lastReindexReadAtMs >= LIVE_REFRESH_MIN_MS) {
+        void this.checkReindexOutcome();
+      }
     });
   }
 
@@ -622,6 +670,17 @@ export class LibrarySurface extends JfElement {
   protected override settleTransients(): void {
     this.loading = false;
     this.error = null;
+    this.surfaceSerial++;
+    this.refreshSerial++;
+    this.refreshing = false;
+    this.addBusy = false;
+    this.removingHashes = new Set();
+    this.confirmingHashes.clear();
+    this.actionMessage = null;
+    this.reindexOutcome = null;
+    this.reindexOutcomeError = false;
+    this.reindexReadSerial++;
+    this.reindexOutcomeBusy = false;
     this.gapDecisionError = null;
     this.gapRequestSerial++;
     this.gapDecisionAttemptSerial++;
@@ -683,7 +742,8 @@ export class LibrarySurface extends JfElement {
         // Tempdoc 804 §B9 (F8) — never the raw hash as the row's name (see folderRowLabel).
         displayPath: folderRowLabel(pathHash, this.resolvedPaths[pathHash]).label,
         status: !this.indexingActivity.confirmed && fs.glyph === 'indexed' ? 'pending' : fs.glyph,
-        metaText: this.folderActivityText(fs.metaText),
+        metaText: this.removingHashes.has(pathHash) ? 'Removing folder…' : this.folderActivityText(fs.metaText),
+        removalBusy: this.removingHashes.has(pathHash),
         walkError: undefined,
         // Tempdoc 599 §16/B1 — the clickable "N failed" chip's count (the declared renderer emits an
         // intent the surface handles by opening the failed-files drawer). Named `failed` (the seam's
@@ -716,14 +776,15 @@ export class LibrarySurface extends JfElement {
    * full refresh by pathHash, so it does not flicker to "count pending". Live refreshes are
    * throttled and never toggle the loading spinner or clobber the error banner.
    */
-  private async refresh(opts: { live?: boolean } = {}): Promise<void> {
+  private async refresh(opts: { live?: boolean; force?: boolean } = {}): Promise<boolean> {
     const live = opts.live === true;
-    if (live) {
-      if (this.refreshing) return;
+    if (live && !opts.force) {
+      if (this.refreshing) return false;
       const sinceLast = Date.now() - this.lastLiveRefreshAtMs;
-      if (sinceLast < LIVE_REFRESH_MIN_MS) return;
+      if (sinceLast < LIVE_REFRESH_MIN_MS) return false;
       this.lastLiveRefreshAtMs = Date.now();
     }
+    const serial = ++this.refreshSerial;
     this.refreshing = true;
     if (!live) {
       this.loading = true;
@@ -735,6 +796,7 @@ export class LibrarySurface extends JfElement {
         throw new Error(`HTTP ${res.status}`);
       }
       const body = parseWireContract(listResponseSchema, await res.json(), ENDPOINT);
+      if (serial !== this.refreshSerial) return false;
       let items = body.items ?? [];
       if (live) {
         // Counts-free rows carry fileCount=-1; keep the last-known filesystem count per folder.
@@ -753,6 +815,7 @@ export class LibrarySurface extends JfElement {
         provisional: this.provisional,
       });
       this.roots = items;
+      this.rootsObserved = true;
       // Lazy-resolve hashes via core.resolve-path-hash (slice 450 §1.1).
       for (const r of this.roots) {
         const hash = r.pathHash;
@@ -769,16 +832,19 @@ export class LibrarySurface extends JfElement {
       if (!live) {
         void this.loadOtherSources();
       }
+      return true;
     } catch (err) {
+      if (serial !== this.refreshSerial) return false;
       // Live (background) failures stay silent — don't clobber the surface with a tick error.
       if (!live) {
         this.error = err instanceof Error ? err.message : String(err);
       }
+      return false;
     } finally {
-      if (!live) {
+      if (serial === this.refreshSerial) {
         this.loading = false;
+        this.refreshing = false;
       }
-      this.refreshing = false;
     }
   }
 
@@ -1038,13 +1104,13 @@ export class LibrarySurface extends JfElement {
    *
    * The native picker answers WHICH folder, not which collection, so it now fills the same add form
    * the browser flow uses (path pre-filled, preview fetched) and the user confirms with Add — that is
-   * where the collection field lives, in both modes. A cancelled picker still just opens the form.
+   * where the collection field lives, in both modes. Cancelling the picker leaves the form unchanged.
    */
   private async handleAddFolderClick(): Promise<void> {
     if (this.host_.platform.capabilities.has('folder-picker')) {
       const picked = await this.host_.platform.pickFolder();
-      this.showManualInput = true;
       if (picked) {
+        this.showManualInput = true;
         this.pendingPath = picked;
         this.pendingPreview = null;
         void this.fetchPreview(picked);
@@ -1060,11 +1126,37 @@ export class LibrarySurface extends JfElement {
     if (!path) return;
     // Tempdoc 599 §9.4 — don't create the job if the preview already says it can't be added.
     if (this.addAvailability().kind !== 'available') return;
-    await this.invoke(OP_ADD, this.addRootArgs(path));
-    this.pendingPath = '';
-    this.pendingCollection = '';
-    this.pendingPreview = null;
-    this.showManualInput = false;
+    const serial = this.surfaceSerial;
+    this.addBusy = true;
+    this.error = null;
+    this.actionMessage = 'Adding folder…';
+    try {
+      const result = await this.host_.data.invokeOperation(OP_ADD, this.addRootArgs(path));
+      if (serial !== this.surfaceSerial) return;
+      if (!result.success) throw new Error(result.message || 'Add refused');
+      this.pendingPath = '';
+      this.pendingCollection = '';
+      this.pendingPreview = null;
+      this.showManualInput = false;
+      this.actionMessage = 'Folder added. Indexing activity is shown below.';
+      await this.refresh({ live: true, force: true });
+      if (serial === this.surfaceSerial) {
+        this.addBusy = false;
+        await this.updateComplete;
+        const addButton = this.renderRoot.querySelector<JfButton>('[data-add-folder]');
+        await addButton?.updateComplete;
+        if (serial === this.surfaceSerial) addButton?.focus();
+      }
+    } catch (err) {
+      if (serial !== this.surfaceSerial) return;
+      this.actionMessage = null;
+      this.addBusy = false;
+      this.error = `Folder was not added. ${err instanceof Error ? err.message : String(err)} Correct the path or retry Add.`;
+      await this.updateComplete;
+      this.renderRoot.querySelector<HTMLInputElement>('[aria-label="Folder path"]')?.focus();
+    } finally {
+      if (serial === this.surfaceSerial) this.addBusy = false;
+    }
   }
 
   /**
@@ -1114,6 +1206,9 @@ export class LibrarySurface extends JfElement {
         fileCount: typeof body?.fileCount === 'number' ? body.fileCount : -1,
         capped: Boolean(body?.capped),
         alreadyWatched: Boolean(body?.alreadyWatched),
+        ...(typeof body?.overlap?.path === 'string' && body.overlap.path.trim()
+          && (body.overlap.relationship === 'inside' || body.overlap.relationship === 'containing')
+          ? { overlap: { path: body.overlap.path, relationship: body.overlap.relationship } } : {}),
       };
     } catch {
       // Silent: preview is advisory; the Add path still validates server-side.
@@ -1126,6 +1221,7 @@ export class LibrarySurface extends JfElement {
    * settled preview that can't be added yields a soft `unavailable` with a reachable reason.
    */
   private addAvailability() {
+    if (this.addBusy) return unavailableBecause('Adding folder…', true);
     const path = this.pendingPath.trim();
     if (!path) return unavailableBecause('Enter a folder path', true);
     // Tempdoc 914 D4 — a supplied collection must not name an app-internal corpus. The AUTHORITY is
@@ -1143,36 +1239,175 @@ export class LibrarySurface extends JfElement {
     if (!p.exists) return unavailableBecause('Path not found');
     if (!p.isDir) return unavailableBecause('Not a folder');
     if (p.alreadyWatched) return unavailableBecause('Already watched');
+    const overlap = overlapExplanation(p);
+    if (overlap) return unavailableBecause(overlap);
     return AVAILABLE;
   }
 
   private async handleRemoveRoot(pathHash: string): Promise<void> {
+    if (this.removingHashes.has(pathHash) || this.confirmingHashes.has(pathHash)) return;
     const resolved = this.resolvedPaths[pathHash];
     if (!resolved) {
       this.error = 'Path resolution pending; retry in a moment.';
       return;
     }
-    const ok = await this.host_.ui.showConfirmDialog(
-      // 813 §19 (W3) — the confirm states the ENRICHMENT consequence too: removal also discards
-      // whatever semantic work was still in flight for this folder. Deliberately no numeric latency:
-      // the stop-to-quiet bound is mode-dependent (combined mode checkpoints at 1-8 document
-      // granularity; individual mode retains whole-batch atomicity), so "within seconds" would
-      // overclaim exactly where the old copy underclaimed.
-      `Remove ${resolved}? Files indexed from this folder will be removed from search results, and any enrichment still running for it is stopped and discarded.`,
-      { confirmLabel: 'Remove', destructive: true },
-    );
-    if (!ok) return;
-    await this.invoke(OP_REMOVE, { path: resolved });
+    const serial = this.surfaceSerial;
+    this.confirmingHashes.add(pathHash);
+    let affected = [pathHash];
+    let acquired = false;
+    try {
+      // Confirm every legacy registration affected by subtree removal. The wire remains hash-only.
+      await Promise.all(this.roots.map(async (root) => {
+        const hash = root.pathHash;
+        if (!hash || this.resolvedPaths[hash]) return;
+        const path = await resolvePathLazy(RESOURCE_ID, hash, { apiBase: this.apiBase });
+        if (path && serial === this.surfaceSerial) this.resolvedPaths = { ...this.resolvedPaths, [hash]: path };
+      }));
+      if (serial !== this.surfaceSerial) return;
+      if (this.roots.some(root => root.pathHash && !this.resolvedPaths[root.pathHash])) {
+        this.error = 'Could not check which watched folders this removal affects. Retry when their paths are available.';
+        return;
+      }
+      const paths = this.roots.map(root => ({ hash: root.pathHash ?? '', path: this.resolvedPaths[root.pathHash ?? ''] ?? '' }));
+      const enclosing = paths.find(other => other.hash !== pathHash && this.pathInside(resolved, other.path));
+      const nested = paths.filter(other => other.hash !== pathHash && this.pathInside(other.path, resolved));
+      const nestedHashes = nested.map(other => other.hash);
+      if (nestedHashes.some(hash => this.removingHashes.has(hash))) {
+        this.error = 'A folder inside this one is being removed. Wait for its outcome, then retry.';
+        return;
+      }
+      const consequence = enclosing
+        ? `Its files stay searchable because the enclosing watched folder ${enclosing.path} covers them. Only the selected registrations and their own watchers are removed.`
+        : 'Files indexed from this folder will be removed from search results, and any enrichment still running for it is stopped and discarded.';
+      const inner = nested.length ? ` This also removes these watched folders: ${nested.map(other => other.path).join(', ')}.` : '';
+      const ok = await this.host_.ui.showConfirmDialog(`Remove ${resolved}? ${consequence}${inner}`,
+        { confirmLabel: 'Remove', destructive: true });
+      if (!ok || serial !== this.surfaceSerial) return;
+      if ([pathHash, ...nestedHashes].some(hash => this.removingHashes.has(hash))) return;
+      affected = [pathHash, ...nestedHashes];
+      this.removingHashes = new Set([...this.removingHashes, ...affected]);
+      acquired = true;
+      this.error = null;
+      this.actionMessage = `Removing folder ${resolved}…`;
+      let removed = false;
+      try {
+        const result = await this.host_.data.invokeOperation(OP_REMOVE, { path: resolved });
+        if (serial !== this.surfaceSerial) return;
+        if (!result.success) throw new Error(result.message || 'Remove refused');
+        removed = true;
+      } catch (err) {
+        if (serial !== this.surfaceSerial) return;
+        const errorClass = (err as { errorClass?: string } | null)?.errorClass;
+        // Any response can be lost after effects completed, including a server-side error.
+        // Reconcile membership before labelling the removal a failure.
+        const observed = await this.refresh({ live: true, force: true });
+        if (serial !== this.surfaceSerial) return;
+        removed = observed && !this.roots.some(root => root.pathHash === pathHash);
+        if (!removed) {
+          this.error = errorClass === 'NETWORK_ERROR' || errorClass === 'SERIALIZATION_ERROR'
+            ? 'Removal outcome is unconfirmed. Return to Library to check current folders, or retry Remove.'
+            : `Removal did not complete. ${err instanceof Error ? err.message : String(err)} You can retry Remove. Live watching is unconfirmed.`;
+        }
+      }
+      if (serial !== this.surfaceSerial) return;
+      if (removed) {
+        // The synchronous result proves removal; invalidate older list reads before publishing it.
+        this.refreshSerial++;
+        this.roots = this.roots.filter(root => !affected.includes(root.pathHash ?? ''));
+        this.actionMessage = enclosing ? 'Folder removed. Its files stay searchable through the enclosing watched folder.' : 'Folder removed from Library and search results.';
+        await this.refresh({ live: true, force: true });
+        if (serial === this.surfaceSerial) {
+          await this.updateComplete;
+          this.renderRoot.querySelector<HTMLElement>('[data-add-folder]')?.focus();
+        }
+      } else {
+        this.actionMessage = null;
+      }
+    } catch (err) {
+      if (serial === this.surfaceSerial) {
+        this.actionMessage = null;
+        this.error = `Removal did not complete. ${err instanceof Error ? err.message : String(err)} You can retry Remove.`;
+      }
+    } finally {
+      if (serial === this.surfaceSerial) {
+        this.confirmingHashes.delete(pathHash);
+        if (acquired) this.removingHashes = new Set([...this.removingHashes].filter(hash => !affected.includes(hash)));
+        if (this.error) {
+          await this.updateComplete;
+          this.renderRoot.querySelector<HTMLElement>('.error-banner')?.focus();
+        }
+      }
+    }
+  }
+
+  private pathInside(child: string, parent: string): boolean {
+    // These are Engine-resolved paths; Windows paths compare case-insensitively, on segment edges.
+    const normalize = (path: string) => {
+      const slash = path.replaceAll('\\', '/');
+      return (/^[a-z]:/i.test(slash) || slash.startsWith('//') ? slash.toLowerCase() : slash).replace(/\/+$/, '');
+    };
+    return !!parent && normalize(child).startsWith(normalize(parent) + '/');
+  }
+
+  private async reindexAccepted(detail: { structuredData?: unknown }): Promise<void> {
+    if (!this.isConnected) return;
+    this.error = null;
+    const data = detail.structuredData;
+    const key = data && typeof data === 'object' && 'operationKey' in data ? data.operationKey : undefined;
+    this.reindexReadSerial++;
+    this.reindexOutcomeBusy = false;
+    this.reindexOutcomeKey = typeof key === 'string' && /^[0-9a-f-]{36}$/.test(key) ? key : null;
+    this.reindexOutcomeError = false;
+    this.reindexOutcome = 'Reindex accepted. Completion has not yet been confirmed.';
+    if (this.reindexOutcomeKey) await this.checkReindexOutcome();
+  }
+
+  private async checkReindexOutcome(): Promise<void> {
+    const key = this.reindexOutcomeKey;
+    if (!key || this.reindexOutcomeBusy) return;
+    const serial = ++this.reindexReadSerial;
+    this.reindexOutcomeBusy = true;
+    this.lastReindexReadAtMs = Date.now();
+    try {
+      const response = await this.doFetch(`/api/operation-history/${encodeURIComponent(key)}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const outcome = parseWireContract(operationOutcomeViewSchema, await response.json(), 'reindex outcome');
+      if (serial !== this.reindexReadSerial) return;
+      this.reindexOutcomeError = outcome.state === 'failed';
+      if (outcome.state === 'complete') {
+        this.reindexOutcome = 'Reindex completed for the recorded request. Current indexing activity is shown below.';
+        this.reindexOutcomeKey = null;
+      } else if (outcome.state === 'failed') {
+        this.reindexOutcome = `Reindex did not complete${outcome.result?.code ? ` (${outcome.result.code})` : ''}. Check folder availability and retry Reindex; failed files can also be retried below.`;
+        this.reindexOutcomeKey = null;
+      } else {
+        this.reindexOutcome = `Reindex accepted. ${['accepted', 'running'].includes(outcome.state) ? 'Completion has not yet been confirmed.' : 'Its outcome is unavailable; check again before retrying.'}`;
+      }
+    } catch {
+      if (serial === this.reindexReadSerial) this.reindexOutcome = 'Reindex accepted. Its outcome could not be read; check again before retrying.';
+    } finally {
+      if (serial === this.reindexReadSerial) this.reindexOutcomeBusy = false;
+    }
   }
 
   /**
    * Tempdoc 626 §Axis-C — the one-click recovery for an "unverified" folder (its reconcile couldn't
    * verify deletions). {@code core.reindex} is incremental-all-roots; {@code force:true} bypasses the
    * unchanged fast-path so deletions are re-checked and the per-root unverified state clears once the
-   * reconcile verifies it. {@link #invoke} surfaces errors and refreshes the rows on completion.
+   * reconcile verifies it. The accepted operation receipt separately reports its completion.
    */
   private async handleReindexToVerify(): Promise<void> {
-    await this.invoke('core.reindex', { force: true });
+    const serial = this.surfaceSerial;
+    try {
+      this.error = null;
+      const result = await this.host_.data.invokeOperation('core.reindex', { force: true });
+      if (serial !== this.surfaceSerial) return;
+      if (!result.success) throw new Error(result.message || 'Reindex refused');
+      await this.reindexAccepted(result);
+    } catch (err) {
+      if (serial !== this.surfaceSerial) return;
+      this.error = `Reindex was not confirmed. ${err instanceof Error ? err.message : String(err)} You can retry Reindex.`;
+    }
   }
 
   private async handlePreviewExcludes(): Promise<void> {
@@ -1239,7 +1474,8 @@ export class LibrarySurface extends JfElement {
       size="sm"
       label=${copy.label}
       title=${copy.title || nothing}
-      .onActivate=${() => openFailedJobs(pathHash)}
+      .disabled=${this.removingHashes.has(pathHash)}
+      .onActivate=${() => { if (!this.removingHashes.has(pathHash)) openFailedJobs(pathHash); }}
       >${icon({ name: 'alert-circle', size: 12 })} ${copy.text}</jf-button
     >`;
   }
@@ -1268,7 +1504,7 @@ export class LibrarySurface extends JfElement {
       lastKnownFailed: this.lastKnownFailed[pathHash],
     });
     return html`
-      <div class="card">
+      <div class="card" aria-busy=${this.removingHashes.has(pathHash) ? 'true' : 'false'}>
         <span class="card-icon">${icon({ name: 'folder', size: 24 })}</span>
         <div class="card-info">
           <div class="card-path">
@@ -1280,7 +1516,7 @@ export class LibrarySurface extends JfElement {
             >
           </div>
           <div class="card-meta">
-            ${this.folderActivityText(status.metaText)}${status.failed > 0
+            ${this.removingHashes.has(pathHash) ? 'Removing folder…' : this.folderActivityText(status.metaText)}${status.failed > 0
               ? this.renderFailedChip(pathHash, status)
               : nothing}${status.state === 'unverified'
               ? html`<jf-button
@@ -1288,6 +1524,7 @@ export class LibrarySurface extends JfElement {
                   variant="ghost"
                   size="sm"
                   label="Reindex to verify"
+                  .disabled=${this.removingHashes.has(pathHash)}
                   .onActivate=${() => this.handleReindexToVerify()}
                   >${icon({ name: 'refresh-cw', size: 12 })} Reindex</jf-button
                 >`
@@ -1296,10 +1533,11 @@ export class LibrarySurface extends JfElement {
         </div>
         <jf-button
           variant="danger"
-          label="Remove"
+          label=${this.removingHashes.has(pathHash) ? 'Removing…' : 'Remove'}
+          .disabled=${this.removingHashes.has(pathHash)}
           .onActivate=${() => this.handleRemoveRoot(pathHash)}
         >
-          ${icon({ name: 'trash-2', size: 14 })} Remove
+          ${icon({ name: 'trash-2', size: 14 })} ${this.removingHashes.has(pathHash) ? 'Removing…' : 'Remove'}
         </jf-button>
       </div>
     `;
@@ -1391,7 +1629,12 @@ export class LibrarySurface extends JfElement {
                supersedes the slice 509 <jf-op-button>. LibrarySurface
                is user-tier; core.reindex's wire audience=USER passes
                the gate. -->
-          <jf-operation context="button" operation-id="core.reindex" api-base=${this.apiBase} @op-success=${() => this.refresh()}></jf-operation>
+          ${this.rootsObserved && this.roots.length === 0 && !this.provisional
+            ? html`<span>No watched folders to reindex.</span>`
+            : html`<jf-operation context="button" operation-id="core.reindex" api-base=${this.apiBase}
+                @op-success=${(e: CustomEvent<OpSuccessEventDetail>) => void this.reindexAccepted(e.detail)}
+                @op-error=${(e: CustomEvent<OpErrorEventDetail>) => { this.error = `Reindex was not confirmed. ${e.detail.message} You can retry Reindex.`; }}
+              ></jf-operation>`}
           <!-- Tempdoc 813 §6: the manual "Process pending enrichment" trigger — drains the pending
                VDU + embedding work for already-indexed documents, same catalog-driven pattern as
                core.reindex above. Its LABEL comes from the operation catalog (one string, both
@@ -1403,7 +1646,9 @@ export class LibrarySurface extends JfElement {
           ></jf-operation>
           <jf-button
             variant="primary"
+            data-add-folder
             label="Add Folder"
+            .disabled=${this.addBusy}
             .onActivate=${() => this.handleAddFolderClick()}
           >
             ${icon({ name: 'folder-plus', size: 14 })} Add Folder
@@ -1458,6 +1703,10 @@ export class LibrarySurface extends JfElement {
     if (p.alreadyWatched) {
       return html`<div class="add-preview warn">${icon({ name: 'alert-circle', size: 14 })} Already watched</div>`;
     }
+    const overlap = overlapExplanation(p);
+    if (overlap) {
+      return html`<div class="add-preview warn" role="status">${icon({ name: 'alert-circle', size: 14 })} ${overlap}</div>`;
+    }
     const files =
       p.fileCount >= 0
         ? ` · ${p.fileCount.toLocaleString()}${p.capped ? '+' : ''} ${p.fileCount === 1 && !p.capped ? 'file' : 'files'}`
@@ -1469,6 +1718,15 @@ export class LibrarySurface extends JfElement {
     return html`
       ${this.renderHeader()}
       ${this.renderReindexDecision()}
+      <div class="action-message" role="status" aria-live="polite">${this.actionMessage ?? ''}</div>
+      ${this.reindexOutcome ? html`<div class="action-message" role=${this.reindexOutcomeError ? 'alert' : 'status'}>
+        ${this.reindexOutcome}
+        ${this.reindexOutcomeKey ? html`<jf-button label="Check reindex outcome" .disabled=${this.reindexOutcomeBusy}
+          .onActivate=${() => this.checkReindexOutcome()}>Check reindex outcome</jf-button>` : nothing}
+        <p>${this.indexingActivity.summary}${this.indexingActivity.detail ? ` — ${this.indexingActivity.detail}` : ''}</p>
+      </div>` : nothing}
+      ${this.roots.some(root => root.status === 'unavailable')
+        ? html`<p>Some watched folders were last observed offline. Reindex cannot cover their files until they are available.</p>` : nothing}
       ${!this.isTauri
         ? html`<div class="browser-banner">
             ${icon({ name: 'alert-circle', size: 14 })}
@@ -1480,7 +1738,7 @@ export class LibrarySurface extends JfElement {
         : nothing}
 
       ${this.error
-        ? html`<div class="error-banner">
+        ? html`<div class="error-banner" role="alert" tabindex="-1">
             ${icon({ name: 'alert-circle', size: 14 })}
             <span>${this.error}</span>
             <jf-button
@@ -1499,6 +1757,7 @@ export class LibrarySurface extends JfElement {
               <input
                 type="text"
                 aria-label="Folder path"
+                ?disabled=${this.addBusy}
                 placeholder="C:\\path\\to\\folder"
                 .value=${this.pendingPath}
                 @keydown=${(e: KeyboardEvent) => {
@@ -1513,6 +1772,7 @@ export class LibrarySurface extends JfElement {
                 class="add-collection"
                 type="text"
                 aria-label="Collection (optional)"
+                ?disabled=${this.addBusy}
                 data-testid="library-add-collection"
                 placeholder="Collection (optional)"
                 .value=${this.pendingCollection}
@@ -1529,7 +1789,7 @@ export class LibrarySurface extends JfElement {
                 .onActivate=${() => this.handleAddRoot()}
                 >Add</jf-button
               >
-              <jf-button label="Cancel" .onActivate=${() => (this.showManualInput = false)}
+              <jf-button label="Cancel" .disabled=${this.addBusy} .onActivate=${() => (this.showManualInput = false)}
                 >Cancel</jf-button
               >
             </div>

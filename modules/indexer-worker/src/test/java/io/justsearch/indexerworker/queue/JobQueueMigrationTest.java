@@ -1024,7 +1024,7 @@ final class JobQueueMigrationTest {
         assertTrue(rs.next());
         assertEquals(SqliteSchema.TARGET_VERSION, rs.getInt(1));
       }
-      assertEquals(23, SqliteSchema.TARGET_VERSION);
+      assertEquals(24, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {

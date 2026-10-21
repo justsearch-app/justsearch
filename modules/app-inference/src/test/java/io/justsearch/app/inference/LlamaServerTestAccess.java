@@ -55,10 +55,19 @@ final class LlamaServerTestAccess {
   /** Makes {@code child} (may be null) the launched server of a newly installed owner. */
   static void installChild(
       LlamaServerOps ops, LlamaServerOps.StartResult start, ChildHandle child) throws Exception {
+    installChild(ops, start, child,
+        new LlamaServerEndpoint(start.context().inference().serverPort(), null));
+  }
+
+  static void installChild(LlamaServerOps ops, LlamaServerOps.StartResult start, ChildHandle child,
+      LlamaServerEndpoint endpoint) throws Exception {
     var field = LlamaServerOps.class.getDeclaredField("child");
     field.setAccessible(true);
     field.set(ops, child);
-    installActive(ops, start, child, start.context().inference().serverPort());
+    var install = LlamaServerOps.class.getDeclaredMethod(
+        "installActive", LlamaServerOps.StartResult.class, ChildHandle.class, LlamaServerEndpoint.class);
+    install.setAccessible(true);
+    install.invoke(ops, start, child, endpoint);
   }
 
   /** A java launch of {@code main} on the test classpath. */

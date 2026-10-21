@@ -12,7 +12,7 @@ const ENTRY = path.join(REPO_ROOT, 'scripts', 'prod', 'justsearch-mcp.mjs');
 function startMcp(entry, args = []) {
   const child = spawn(process.execPath, [entry, ...args], {
     cwd: REPO_ROOT,
-    env: process.env,
+    env: { ...process.env, JUSTSEARCH_SESSION_TOKEN: 'mock-session-token' },
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
   });
@@ -107,11 +107,6 @@ async function startMockApi(responses, outcomeResponses = []) {
       if (request.method === 'GET' && request.url === '/api/status') {
         response.writeHead(200, { 'Content-Type': 'application/json' });
         response.end('{"status":"ok"}');
-        return;
-      }
-      if (request.method === 'GET' && request.url === '/api/mcp/token') {
-        response.writeHead(200, { 'Content-Type': 'application/json' });
-        response.end('{"token":"mock-session-token"}');
         return;
       }
       if (request.method === 'GET' && request.url.startsWith('/api/operation-history/')) {

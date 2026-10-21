@@ -214,7 +214,7 @@ final class IndexingJobsBridgeResubscribeTest {
         .setSeq(seq)
         .setSnapshot(
             IndexingJobsSnapshot.newBuilder()
-                .addItems(IndexingJobView.newBuilder().setPathHash(pathHash).setState("PENDING")))
+                .addItems(IndexingJobView.newBuilder().setPathHash(pathHash).setState("PROCESSING")))
         .build();
   }
 

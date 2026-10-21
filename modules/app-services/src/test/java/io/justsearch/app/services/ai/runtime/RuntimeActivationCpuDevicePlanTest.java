@@ -99,7 +99,10 @@ final class RuntimeActivationCpuDevicePlanTest {
       assertEquals("0", spec.command().get(spec.command().indexOf("-ngl") + 1));
       assertEquals("none", spec.command().get(spec.command().indexOf("--device") + 1));
       assertTrue(spec.command().contains("--no-mmproj-offload"));
-      assertEquals(Map.of("CUDA_VISIBLE_DEVICES", "-1"), spec.environment());
+      var environment = new java.util.HashMap<>(spec.environment());
+      String privateKey = environment.remove("LLAMA_API_KEY");
+      assertTrue(privateKey != null && privateKey.matches("[A-Za-z0-9_-]{43}"));
+      assertEquals(Map.of("CUDA_VISIBLE_DEVICES", "-1"), environment);
       assertEquals(99, settings.getGpuLayers(), "probing must not rewrite the saved preference");
     } finally {
       ConfigStore.restoreGlobal(installed, previous);

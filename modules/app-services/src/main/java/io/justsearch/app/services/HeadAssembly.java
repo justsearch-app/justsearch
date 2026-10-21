@@ -1274,7 +1274,7 @@ public final class HeadAssembly implements AutoCloseable {
     var agentToolsCatalog = io.justsearch.agent.api.registry.OperationCatalog.of("core", List.of());
     var resourceOut =
         io.justsearch.app.services.bootstrap.phases.ResourceSubstrateInit.run(
-            io.justsearch.app.services.bootstrap.phases.BootstrapHelpers.initialRuntimeContext());
+            io.justsearch.app.services.bootstrap.phases.BootstrapHelpers.initialRuntimeContext(), executors);
     var metricsOut = io.justsearch.app.services.bootstrap.phases.MetricSubstrateInit.run(executors, telemetry);
     var operationOut =
         io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.run(operations, attempts, engineAdmission,
@@ -2002,7 +2002,19 @@ public final class HeadAssembly implements AutoCloseable {
             if (perSourceSearch != null) perSourceSearch.close();
           }
         } finally {
-          try { foregroundDocumentOwner.close(); } finally { backgroundDocumentOwner.close(); }
+          try { foregroundDocumentOwner.close(); }
+          finally {
+            try { backgroundDocumentOwner.close(); }
+            finally {
+              try {
+                if (substrateOut != null && substrateOut.resourceOut() != null)
+                  substrateOut.resourceOut().indexingJobsChangeRegistry().channel().close();
+              } finally {
+                if (substrateOut != null && substrateOut.operationOut() != null)
+                  substrateOut.operationOut().actionLedgerChangeRegistry().channel().close();
+              }
+            }
+          }
         }
       }
     }

@@ -1,0 +1,1074 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T12:02:35.849Z",
+  "revision": "947be754dc59485c01e34c53fe62f78a8bdc7d55",
+  "tree": "5ffb80433461529f393991350a7c3563d22bf1ba",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::connect_failure_and_observed_exit_send_no_commit_bytes\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 18598
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"shell_actuator::commit_transport_tests::request_written_then_missing_receipt_is_ambiguous_delivery\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 18787
+    },
+    {
+      "command": "npx vitest run \"src/api/backendRestart.test.ts\" \"src/api/http.test.ts\" \"src/api/registry/AuthenticatedCatalogs.test.ts\" \"src/shell-v0/api/authorizedFetch.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/controllers/liveRuns.test.ts\" \"src/shell-v0/streaming/AuthenticatedStream.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/shell-proof/tmp/builder/test-intent-vitest-2056980-1792584151565.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4282
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/api/backendRestart.test.ts",
+      "file": "modules/ui-web/src/api/backendRestart.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7e1ea952fc550b924573057b5ab8f58802390edf05cddea47a0c273291927db5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "installBackendRestartBridge invalidates the cached session token when the shell announces a restart",
+          "status": "passed"
+        },
+        {
+          "name": "installBackendRestartBridge runs the caller callback AFTER invalidation",
+          "status": "passed"
+        },
+        {
+          "name": "installBackendRestartBridge no-ops outside Tauri (browser dev) without touching the event API",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/http.test.ts",
+      "file": "modules/ui-web/src/api/http.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3be7d10eda59293cf3f336471fd6b32e4a6a45eea54ecb8124f0e8679bbd92cb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "http module SESSION_TOKEN_HEADER constant should be X-JustSearch-Session",
+          "status": "passed"
+        },
+        {
+          "name": "http module getSessionToken returns null when token has not been resolved",
+          "status": "passed"
+        },
+        {
+          "name": "http module request function authenticates GET and retries once with the newly resolved token after a restart",
+          "status": "passed"
+        },
+        {
+          "name": "http module request function omits the token on browser/dev GETs when none is available",
+          "status": "passed"
+        },
+        {
+          "name": "http module request function includes Content-Type header when body is provided",
+          "status": "passed"
+        },
+        {
+          "name": "http module request function serializes body as JSON",
+          "status": "passed"
+        },
+        {
+          "name": "http module request function passes AbortSignal when provided",
+          "status": "passed"
+        },
+        {
+          "name": "http module request function retries on server errors",
+          "status": "passed"
+        },
+        {
+          "name": "http module request function does not retry on 4xx errors",
+          "status": "passed"
+        },
+        {
+          "name": "http module request function does not retry an unsafe 503 (UPGRADE_PREPARING)",
+          "status": "passed"
+        },
+        {
+          "name": "http module request function does not retry an unsafe 503 (SERVICE_UNAVAILABLE)",
+          "status": "passed"
+        },
+        {
+          "name": "http module request function does not retry after fetch rejects with a custom caller abort reason",
+          "status": "passed"
+        },
+        {
+          "name": "http module generateSessionToken utility (backend) normalizeNonBlankString returns null for empty strings",
+          "status": "passed"
+        },
+        {
+          "name": "http module generateSessionToken utility (backend) normalizeNonBlankString returns trimmed string for non-empty",
+          "status": "passed"
+        },
+        {
+          "name": "http module normalizePort returns null for invalid ports",
+          "status": "passed"
+        },
+        {
+          "name": "http module normalizePort returns port number for valid ports",
+          "status": "passed"
+        },
+        {
+          "name": "http module resolveApiEndpoint does not invent a proxy API for a desktop host with no Engine port",
+          "status": "passed"
+        },
+        {
+          "name": "http module resolveApiEndpoint uses the Tauri api_port command for packaged desktop origins",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/registry/AuthenticatedCatalogs.test.ts",
+      "file": "modules/ui-web/src/api/registry/AuthenticatedCatalogs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6c8d8a3014db0ff2ac5e6211aa71616e429f0c698253f44ad562600970b1b5e4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "authenticates the default operation boot fetch",
+          "status": "passed"
+        },
+        {
+          "name": "authenticates the default operation refresh fetch",
+          "status": "passed"
+        },
+        {
+          "name": "authenticates the default resource boot fetch",
+          "status": "passed"
+        },
+        {
+          "name": "authenticates the default resource refresh fetch",
+          "status": "passed"
+        },
+        {
+          "name": "authenticates the default surface boot fetch",
+          "status": "passed"
+        },
+        {
+          "name": "authenticates the default shape boot fetch",
+          "status": "passed"
+        },
+        {
+          "name": "authenticates the default diagnostic boot fetch",
+          "status": "passed"
+        },
+        {
+          "name": "authenticates canonical Engine schema reads",
+          "status": "passed"
+        },
+        {
+          "name": "keeps external schema documents credential-free",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/api/authorizedFetch.test.ts",
+      "file": "modules/ui-web/src/shell-v0/api/authorizedFetch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f19611a84e40864b81b0a016fb4c99c2f4efdbb14e77f85e419dd85cc2c1d69",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "authorizedFetch attaches the session token to a POST when one resolves",
+          "status": "passed"
+        },
+        {
+          "name": "authorizedFetch attaches the resolved session token to GET requests",
+          "status": "passed"
+        },
+        {
+          "name": "authorizedFetch preserves the caller's explicit session header",
+          "status": "passed"
+        },
+        {
+          "name": "authorizedFetch keeps other headers when it adds the token",
+          "status": "passed"
+        },
+        {
+          "name": "performFetch (host.data.fetch — the covering doFetch seam) carries the session header on a non-GET when a token resolves",
+          "status": "passed"
+        },
+        {
+          "name": "performFetch (host.data.fetch — the covering doFetch seam) omits the session header when no token is available (browser / dev)",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient default fetch path carries the session header on the invoke POST",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient default fetch path omits the session header when no token is available",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient default fetch path still honours an explicitly injected fetchImpl (testability preserved)",
+          "status": "passed"
+        },
+        {
+          "name": "session-token resolver caching (804 D3 hazard) does NOT cache a Tauri-runtime null — a later call re-attempts and picks the token up",
+          "status": "passed"
+        },
+        {
+          "name": "session-token resolver caching (804 D3 hazard) a POST issued before the token exists does not doom later POSTs",
+          "status": "passed"
+        },
+        {
+          "name": "session-token resolver caching (804 D3 hazard) caches a resolved token (one invoke for many calls)",
+          "status": "passed"
+        },
+        {
+          "name": "session-token resolver caching (804 D3 hazard) single-flights concurrent resolutions on the retryable path",
+          "status": "passed"
+        },
+        {
+          "name": "session-token resolver caching (804 D3 hazard) caches the non-Tauri verdict permanently (no invoke, no retry cost)",
+          "status": "passed"
+        },
+        {
+          "name": "session-token resolver caching (804 D3 hazard) invalidateSessionToken clears the cache so the next resolve re-invokes",
+          "status": "passed"
+        },
+        {
+          "name": "one-shot 401 heal (805 G.1 — a restart the shell has not announced yet) re-resolves and retries exactly once, then returns the second 401",
+          "status": "passed"
+        },
+        {
+          "name": "one-shot 401 heal (805 G.1 — a restart the shell has not announced yet) heals a single stale-token 401 and returns the retry response",
+          "status": "passed"
+        },
+        {
+          "name": "one-shot 401 heal (805 G.1 — a restart the shell has not announced yet) does NOT retry a 401 carrying a different errorCode",
+          "status": "passed"
+        },
+        {
+          "name": "one-shot 401 heal (805 G.1 — a restart the shell has not announced yet) does NOT retry a non-401 response",
+          "status": "passed"
+        },
+        {
+          "name": "one-shot 401 heal (805 G.1 — a restart the shell has not announced yet) leaves a probed response body readable by the caller",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f1251f30b371ee6c1c050a19841069f9f6874a0de124ad73ffce46819fc3ecfe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onSessionStarted sets sessionId",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onRunStarted is the identity frame: runId IS the sessionId",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onRunStarted does NOT move a controller already pinned to a conversation",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) session_started still sets identity — dual-read, never deleted (the persisted ledger reads it)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onStateSnapshot reads the park and the run autonomy level, not just the active agent",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) 859 D1 — the gate facts are known WHILE the run is running starts as NOT-REPORTED, so nothing can render a step count as a confident zero",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) 859 D1 — the gate facts are known WHILE the run is running learns the step count from the run's own progress frames, before any terminal",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) 859 D1 — the gate facts are known WHILE the run is running never walks the count backwards, and never invents one from a malformed frame",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) 859 D1 — the gate facts are known WHILE the run is running a REATTACHING tab reads the step count off the primer, whose frames the ring may have evicted",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) 859 D1 — the gate facts are known WHILE the run is running a fresh dispatch forgets the previous run's counts rather than carrying them over",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) a snapshot-carried held call is renderable AND answerable after the ring evicted its frame",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) a snapshot approval the replay ring ALSO announces opens exactly one ceremony",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) a snapshot does NOT re-hold a call the run has already moved past",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onChunk appends text to streamingText (multiple chunks concatenate)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolCallProposed adds a tool call with status=\"proposed\"",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolBatchProposed records the turn's proposed tool-call batch",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) clears currentToolBatch on done and on a new session (F2 — no stale plan)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolCallPending adds a tool call with status=\"pending\" AND commits streamingText into a tool-call-group",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolCallProposed does NOT commit streamingText (only pending does)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolCallApproved updates status to \"approved\" when toolCall exists",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolCallApproved is a no-op for unknown callIds",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolExecStarted commits streamingText when the call is NOT already grouped",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolExecStarted skips re-committing when the call is already grouped (pending → started)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolExecStarted is a no-op for unknown callIds",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolExecCompleted sets status, success, output, executionId from result wrapper",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolExecCompleted falls back to flat fields when result wrapper is absent",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) accumulates each call’s grounding delta, in call order, without deduping",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) a call with no grounding key adds nothing — absent means \"established nothing\"",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) a delta from a NEW run starts the set over rather than appending to the previous run’s",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) groundingDeltaPaths joins groundingDeltas by `path`, live, on every access",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) journals a successful tool-call as an originator:agent invoke-operation entry + wires undo via executionId",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) does NOT journal a failed tool-call (no state change to undo/digest)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) skips vop_ tools (they self-journal via the virtual path)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) journals without an executionId → entry exists but carries no undoable mapping",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) chains tool-calls within a turn via causation; a new session starts a fresh chain",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolCallRejected sets status=\"rejected\" with rejectReason",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onDone commits streamingText, then appends assistant-text when finalResp differs",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onDone does NOT double-append when finalResp === streamingText.trim (dedup invariant)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onDone with no finalResponse still commits streamingText + clears isStreaming",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) nextEntryId emits zero-padded ids so lexical order == temporal order past the 9->10 boundary",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onDone populates answerSources + answerCitations from the typed done payload",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onDone with absent grounding fields → empty answerSources/answerCitations (ungrounded run)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onBudgetUpdate appends to budgetUpdates with default-zero filling",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onBudgetGate parks the run; a budget_update or new run clears it",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onError appends an error entry + clears isStreaming",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onError with no error field falls back to \"Unknown error\"",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onProgress appends a progress entry with message or falls back to phase",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onProgress carries the backend severity (undefined when absent)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onHandoffProposed appends a handoff entry with from/to/reason in content",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onHandoffExecuted sets activeAgentId to toAgentId",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolCallPending populates sessionId when it arrives in the event payload",
+          "status": "passed"
+        },
+        {
+          "name": "sessionLabel (561 #4 — human label, never the raw UUID) uses the backend first-user-message preview when present",
+          "status": "passed"
+        },
+        {
+          "name": "sessionLabel (561 #4 — human label, never the raw UUID) falls back to initialMessage, then a neutral label — never the UUID",
+          "status": "passed"
+        },
+        {
+          "name": "sessionLabel (561 #4 — human label, never the raw UUID) treats a blank preview as absent",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedRunPresentation (834 §5.2 — the four honest rows) a terminal run is FINISHED, with no interruption marker, even if interruptedAt is stamped",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedRunPresentation (834 §5.2 — the four honest rows) a non-terminal run with no interruptedAt is NOT_INTERRUPTED — the ordinary live/idle case",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedRunPresentation (834 §5.2 — the four honest rows) mid-step states are RESUMABLE — \"Interrupted when the app closed. Resume.\"",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedRunPresentation (834 §5.2 — the four honest rows) WAITING_APPROVAL is RESUMABLE_AT_APPROVAL — same offer, different copy",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedRunPresentation (834 §5.2 — the four honest rows) the budget/context gates are FORK_ONLY — non-terminal but NOT resumable",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedRunPresentation (834 §5.2 — the four honest rows) defensive branch: an interrupted non-terminal state the store did not mark resumable is FORK_ONLY",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods checkAvailability sets available=true and populates tools on 200",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods checkAvailability sets available=false on non-200",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods checkAvailability sets available=false on fetch error",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods send posts message and processes SSE events into state",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods send appends error entry on non-200 HTTP (via consumeShapeStream throw)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods send does not double-append error when SSE error event fires + consumeShapeStream throws (D1)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods reattaches to the live run when the stream DROPS mid-run (after session_started)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods does NOT reattach when the initial send POST fails (no run established)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods reattaches on load to a live run ANOTHER tab started (found by the enumeration)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods does NOT reattach on load when this tab already owns/observes a run",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods does nothing on load when the enumeration reports no live run",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods reattaches when the live run conversation matches this tab",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods does NOT reattach when the live run belongs to a DIFFERENT conversation",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods does NOT adopt a live run of another SHAPE (a workflow run is not reattachable here)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods takes the NEWEST agent run — the enumeration is already ordered, so the first row wins",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods degrades to \"no live run\" when the enumeration fails — discovery never throws into mount",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods falls back quietly to the record when the observed run answers the typed 404",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods approveCall sends POST with sessionId and callId",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods approveCall is a no-op when sessionId is null",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods rejectCall sends POST with sessionId, callId, and reason",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods steer sends POST to /api/chat/agent/steer with sessionId and text",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods steer is a no-op (returns false, no fetch) when there is no live session",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods onDirectiveAcknowledged appends a human-origin steer-directive entry",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods onDirectiveAcknowledged shows nothing for an acknowledgement without an id",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods steer surfaces a system note when the POST fails (404)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a queued direction becomes applied in place, one entry, keyed by its id",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a not-applied direction keeps its reason, and a late queued report does not undo a final one",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a final outcome reported after done reaches the live display of both windows",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods after done, only direction reports still reach the display",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a replayed old acknowledgement is not shown as Steered; a replayed applied direction still is",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods steer names a connection failure as such, not as a finished run, without claiming non-application",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods steer names an HTTP error other than 404 by its status, without claiming non-application",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a lost answer to a direction the run took shows only the run report, in both windows",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a 5xx answer is settled by the run report that follows it, in both windows",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods an unconfirmed send is not settled by an earlier direction with the same text",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a blocked send keeps its note when an identical later send is reported, in both windows",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a blocked send is not settled by an earlier identical send reported after it failed, in both windows",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods two unconfirmed identical sends are each settled only by their own report, in both windows",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods another client's report without a request id never settles this window's blocked note, in both windows",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods another client's report without a request id never settles this window's 5xx note, in both windows",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a 404 refusal of a direction still says the run already finished, in both windows",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods steer before the run has a session says so instead of dropping the direction silently",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods runKind: defaults null, set on start, cleared on terminal",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods runKind: runWorkflow marks the run NOT steerable (workflow)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods approveCall surfaces an error when the POST is not ok (no silent stuck-PENDING)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods rejectCall surfaces an error when the POST is not ok",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods send issues a single-agent run request (empty agentProfiles, no initialAgentId)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods cancelSession commits streaming text and sends DELETE for session",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods loadSessions populates sessions array",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods loadSessions maps the real backend field names (startedAt/state) onto startedAtEpochMs/status",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods loadSessions tolerates a payload already in the startedAtEpochMs/status shape",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods loadHistory projects agent operation rows from the one action ledger, filtered to the session",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods loadTimeline projects the workspace activity stream from the one ledger",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods loadHistory is empty (no fetch) when there is no active session",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods resumeSession consumes SSE and sets session state",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods resumeSession appends error on non-200 HTTP",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods notify batches multiple synchronous mutations into one onUpdate call",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods destroy stops polling and aborts active stream",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods fork returns a shallow copy of conversation up to fromIndex",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods fork returns empty array when fromIndex is -1",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods fork returns full conversation when fromIndex exceeds length",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods loadForkedConversation resets state and retains referenced toolCalls",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods backend AUTO verdict: queues callId when sessionId is null, flushes (approves) on session_started",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods the backend verdict is the SOLE auto-approval authority: AUTO approves, non-AUTO does not",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods assist + LOW: calls approveCall immediately when sessionId is set",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods assist: does NOT auto-approve MEDIUM or HIGH",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods backend AUTO: auto-approves MEDIUM directly; backend typed_confirm HIGH routes to the ceremony host",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods watch: auto-approves NOTHING — routes even LOW through the ceremony host",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods ceremony APPROVAL drives the unified approve endpoint (tempdoc 550 C3 / 565 §15.C)",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display uses the complete frozen server display and verdict before approving the owning run",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display refuses unavailable or malformed live details (status 404) without raw fallback",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display refuses unavailable or malformed live details (status 500) without raw fallback",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display refuses unavailable or malformed live details (status 200) without raw fallback",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display refuses unavailable or malformed live details (status 0) without raw fallback",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display ignores a lookup that arrives after done",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display ignores a lookup that arrives after error",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display ignores a lookup that arrives after replacement",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display ignores a lookup that arrives after approved",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display ignores a lookup that arrives after destroy",
+          "status": "passed"
+        },
+        {
+          "name": "loadReplayFromExport (585 §D Phase 2 — D3 shareable replay) replays an exported transcript through the same handlers and enters replay mode",
+          "status": "passed"
+        },
+        {
+          "name": "loadReplayFromExport (585 §D Phase 2 — D3 shareable replay) returns false (and does not enter replay) for a transcript with no usable events",
+          "status": "passed"
+        },
+        {
+          "name": "605 — run identity + conclude-drain approveCall routes to the explicit owner run, not a later/stale this.sessionId (M2)",
+          "status": "passed"
+        },
+        {
+          "name": "605 — run identity + conclude-drain rejectCall routes to the explicit owner run too",
+          "status": "passed"
+        },
+        {
+          "name": "605 — run identity + conclude-drain onError (the abnormal terminal — the M1 trigger) drains the run and surfaces ONE notice when ≥1 was denied",
+          "status": "passed"
+        },
+        {
+          "name": "605 — run identity + conclude-drain cancelSession drains the halted run",
+          "status": "passed"
+        },
+        {
+          "name": "605 — run identity + conclude-drain a terminal with no open ceremony (0 denied) surfaces NO notice",
+          "status": "passed"
+        },
+        {
+          "name": "605 — run identity + conclude-drain a REPLAY terminal does NOT drain (replay is not a live run conclusion)",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-4: a tool boundary closes the region INTO the conversation, in order",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-5: a text chunk does NOT close the region — one entry, with the prose ordered BEFORE it",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-6: the exempt set is EXACTLY these four names — every other event cuts",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-6b: every dispatch name is classified — cut, transparent, or deliberately exempt",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-7: budget_update CUTS the region — the highest-frequency real cut in a journal",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-7b: slice D’s budget_raised progress note is a legitimate flush carrier",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-7c: the durable/ephemeral split is RECORD-side — live, EVERY progress phase carries",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-8: an AUTO-RUN tool (exec_started with no prior pending) closes the region too",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-9: handoff_proposed closes on the PRODUCING agent’s side of the boundary",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-10: onDone closes the open region BEFORE the terminal answer entry",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) a mid-run cut that commits the prose does not make `done` render the answer twice",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) F3: a NEW run does not inherit the previous run’s committed prose",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) F3b: a FORK re-roll returning the same text still prints its answer",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) an empty region produces no entry — a blank thought is not a thought",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) the three primers do NOT cut — they describe or open the run rather than advance it",
+          "status": "passed"
+        },
+        {
+          "name": "keyed background scheduling captures one key and conversation across a token retry; a new action has a new key",
+          "status": "passed"
+        },
+        {
+          "name": "keyed background scheduling reports unconfirmed scheduling without starting presence polling (409)",
+          "status": "passed"
+        },
+        {
+          "name": "keyed background scheduling reports unconfirmed scheduling without starting presence polling (200)",
+          "status": "passed"
+        },
+        {
+          "name": "keyed background scheduling reports unconfirmed scheduling without starting presence polling (200)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/liveRuns.test.ts",
+      "file": "modules/ui-web/src/shell-v0/controllers/liveRuns.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dcea111338a919b53cbcbbde07f8057d802174a5405bac2f6533978c73ff034d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fetchLiveRuns (834 §5.1) sends the session token on this GET, and narrows by shape at the server",
+          "status": "passed"
+        },
+        {
+          "name": "fetchLiveRuns (834 §5.1) never sends a conversationId filter — the caller guard is asymmetric, an equality filter is not",
+          "status": "passed"
+        },
+        {
+          "name": "fetchLiveRuns (834 §5.1) degrades to no live runs on a non-2xx",
+          "status": "passed"
+        },
+        {
+          "name": "fetchLiveRuns (834 §5.1) degrades to no live runs when the fetch throws",
+          "status": "passed"
+        },
+        {
+          "name": "fetchLiveRuns (834 §5.1) degrades to no live runs when the body fails the generated validator",
+          "status": "passed"
+        },
+        {
+          "name": "discoverLiveAgentRun (834 §15.3) takes the first row — the enumeration is already newest-first, so no re-sort is needed",
+          "status": "passed"
+        },
+        {
+          "name": "discoverLiveAgentRun (834 §15.3) refuses a run of another shape even if the server returned one",
+          "status": "passed"
+        },
+        {
+          "name": "discoverLiveAgentRun (834 §15.3) a caller with NO conversation adopts the newest agent run — the cross-tab case",
+          "status": "passed"
+        },
+        {
+          "name": "discoverLiveAgentRun (834 §15.3) a caller pinned to a conversation refuses a run belonging to a DIFFERENT one",
+          "status": "passed"
+        },
+        {
+          "name": "discoverLiveAgentRun (834 §15.3) a pinned caller still adopts a run that carries no conversation of its own",
+          "status": "passed"
+        },
+        {
+          "name": "discoverLiveAgentRun (834 §15.3) skips a mismatched row and takes the next adoptable one",
+          "status": "passed"
+        },
+        {
+          "name": "discoverLiveAgentRun (834 §15.3) answers null on an empty enumeration",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/streaming/AuthenticatedStream.test.ts",
+      "file": "modules/ui-web/src/shell-v0/streaming/AuthenticatedStream.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e8aace2cd386809ba2765e5e2098559d700482eaa06ac6d06dc22b9b3c0293e7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "default EnvelopeStream authenticated transport sends a header, refreshes a rejected token, and parses chunked SSE frames",
+          "status": "passed"
+        },
+        {
+          "name": "reconnects after EOF with the resume checkpoint and a newly resolved boot token",
+          "status": "passed"
+        },
+        {
+          "name": "retries a cold-start null token on the next connection instead of caching failure",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::connect_failure_and_observed_exit_send_no_commit_bytes",
+      "file": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:3b484a480226d22c04d6a587cf83f5025620c89c09660a4186f28c4a816915f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::commit_transport_tests::connect_failure_and_observed_exit_send_no_commit_bytes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::request_written_then_missing_receipt_is_ambiguous_delivery",
+      "file": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:3b484a480226d22c04d6a587cf83f5025620c89c09660a4186f28c4a816915f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shell_actuator::commit_transport_tests::request_written_then_missing_receipt_is_ambiguous_delivery",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:1d0f8dda325f0fc6187b506648bbdb00d28b923e930ad2445466be2ab8d7ee0e"
+}

@@ -114,6 +114,12 @@ export class JfButton extends JfElement {
         border-color: transparent;
         color: var(--accent-on-tint);
       }
+      @media (forced-colors: active) {
+        :host([variant='primary']) jf-control::part(control) {
+          background: ButtonFace;
+          color: ButtonText;
+        }
+      }
       :host([variant='ghost']) jf-control::part(control) {
         background: transparent;
         border-color: transparent;
