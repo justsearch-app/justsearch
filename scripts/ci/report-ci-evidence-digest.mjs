@@ -41,6 +41,7 @@ const UNIT_ARTIFACTS = new Map([
 ]);
 const WINDOWS_ARTIFACTS = new Map([
   ['Windows-native tests (contracts)', 'windows-native-contracts'],
+  ['Windows-native tests (contracts-2)', 'windows-native-contracts-2'],
 ]);
 const BUILD_ATTRIBUTION_ARTIFACT = 'build-attribution';
 const BUILD_ATTRIBUTION_KIND = 'justsearch-build-attribution.v1';
@@ -264,7 +265,7 @@ function normalizeJob(job, policyEntry, artifacts, jobNames) {
   const baseArtifact = skipped || splitAggregate
     ? null : UNIT_ARTIFACTS.get(name) || null;
   const localCommand = shard?.localCommand;
-  const part = Boolean(shard) || /^Windows-native tests \((?:node|contracts)\)$/.test(name);
+  const part = Boolean(shard) || name === 'Windows-native tests (node)' || WINDOWS_ARTIFACTS.has(name);
   const partBase = skipped ? null : baseArtifact || WINDOWS_ARTIFACTS.get(name);
   const selected = partBase ? selectJobArtifact(artifacts, partBase, job) : null;
   const partArtifact = part && partBase ? selected?.name || `${partBase}-attempt-${job.run_attempt || 1}` : null;

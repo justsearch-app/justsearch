@@ -69,7 +69,7 @@ test('PRs scope fixed jobs and main runs every slow tier', () => {
   const mainOnly = "github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')";
   for (const id of ['jseval-suite', 'license-and-notices', 'build', 'app-ui-ui', 'app-ui-ui-2', 'app-ui-services', 'app-ui-services-2', 'app-ui-services-3',
     'unit-tests-search-worker-1', 'unit-tests-search-worker-2', 'unit-tests-platform-contracts-1', 'unit-tests-platform-contracts-2', 'shell-rust-tests', 'shell-rust-tests-linux',
-    'windows-native-node', 'windows-native-contracts', 'lifecycle-integration-tests']) {
+    'windows-native-node', 'windows-native-contracts', 'windows-native-contracts-2', 'lifecycle-integration-tests']) {
     assert.equal(jobs[id].needs, 'changes', id);
     assert.match(jobs[id].if, /^needs\.changes\.outputs\.[a-z]+ != 'false'$/, id);
     assert.ok(!jobs[id].strategy, `${id}: literal check names must report even when skipped`);

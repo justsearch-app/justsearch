@@ -64,14 +64,19 @@ author-session: ci-one-run-builder-20261021
     },
     {
       "items": [
-        "scripts/ci/unit-test-shard-policy.v1.json"
+        "scripts/ci/unit-test-shard-policy.v1.json",
+        "scripts/ci/test-verify-unit-test-shard-policy.mjs",
+        "scripts/ci/test-windows-contract-diagnostics.mjs",
+        "scripts/ci/test-report-unit-test-attribution.mjs",
+        "scripts/ci/test-lifecycle-suite-coverage.mjs",
+        "scripts/ci/test-report-ci-evidence-digest.mjs"
       ],
       "class": "Adaptation",
       "moved": [
         "split",
         "instrumentation"
       ],
-      "whatMoved": "Replace matrices with literal jobs and preserve the required names. The repair splits Linux Java unit lanes into disjoint measured class partitions and gives each Gradle task one shard owner. Windows supervisor conformance runs on selected PR lanes; only the six listed cases are skipped on PRs, and every case runs on main and dispatch. Engine-discovery retains its listed PR exclusion.",
+      "whatMoved": "Replace matrices with literal jobs and preserve the required names. The repair splits Linux Java unit lanes into disjoint measured class partitions and gives each Gradle task one shard owner. Windows supervisor conformance runs on selected PR lanes; only the six listed cases are skipped on PRs, and every case runs on main and dispatch. Engine-discovery retains its listed PR exclusion. Split the twelve complete Windows tag-filtered Test tasks into two measured module partitions (257.408 and 255.902 summed suite seconds). Preserve all fifteen safety-class requirements in their owning part, each part's evidence, main cache writes and the required aggregate. Inventory checks reject any lost or duplicated task.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -93,6 +98,11 @@ author-session: ci-one-run-builder-20261021
           "scenario": "O12",
           "quote": "Known flake families no longer block PRs; deterministic failures in the PR lanes still do.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Then split the step across two Windows jobs under the existing \"Windows-native tests\" aggregate, balanced from measured task times, so that with today's worst case (15.6 min) each part's step stays under about 9 min. Every test the step runs today must still run in exactly one part (add a check for it, like the Linux shard policy does). Keep the dev-runner and conformance steps in the job the classifier selects them for.",
+          "location": "task ci-one-run request; fix round H1, 2026-10-21"
         }
       ]
     },
@@ -142,7 +152,7 @@ author-session: ci-one-run-builder-20261021
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Use traced dev-runner inputs in place of the Java-lane implication without changing the static reader drift guard; require enqueue messages to equal the squash preview; verify exact per-version advisory attribution and both queued auto-merge guard races. The guard executes only a script from the trusted base commit. The configuration contention flake joins the PR-only exclusion list and still runs on main.",
+      "whatMoved": "Use traced dev-runner inputs in place of the Java-lane implication without changing the static reader drift guard; require enqueue messages to equal the squash preview; verify exact per-version advisory attribution and both queued auto-merge guard races, comparing enqueue time with the synchronize payload's updated_at without anonymous requests and disabling on uncertain metadata. The guard executes only a script from the trusted base commit. The configuration contention flake joins the PR-only exclusion list and still runs on main.",
       "sources": [
         {
           "kind": "owner-words",
@@ -163,6 +173,11 @@ author-session: ci-one-run-builder-20261021
           "kind": "owner-words",
           "quote": "The guard must leave auto-merge alone when the PR's head is no longer the head this event was for (a later run handles it) or when auto-merge was enabled after this workflow run was created (GraphQL autoMergeRequest.enabledAt against the run's created_at).",
           "location": "task ci-one-run request; fix-round G4, 2026-10-21"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Compare enabledAt with the event's own pull_request.updated_at from the payload (the time of the push) instead; make no extra request. (b) Fail closed: if a timestamp is missing or invalid, or anything is uncertain, disable auto-merge (losing a re-enqueue is the lesser harm). Only \"head changed again\" and \"enabled after this push\" leave it alone. Update the tests to match.",
+          "location": "task ci-one-run request; fix round H2, 2026-10-21"
         }
       ]
     }

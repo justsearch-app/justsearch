@@ -391,6 +391,17 @@ console.log('test-report-ci-evidence-digest: PASS');
   assert.match(report.jobs.find((j) => j.name === ui.name).localReproduction[0], /:modules:ui:ciUnitTest1/);
 }
 
+// The second Windows contracts job owns its own attribution artifact too.
+{
+  const windows = { ...job('Windows-native tests (contracts-2)', 'success', 1, 2), run_attempt: 1 };
+  const windowsPolicy = { workflows: [{ ...policy.workflows[0], requiredStatusChecks: ['Windows-native tests'] }] };
+  const report = buildDigest({ policy: windowsPolicy, run: greenRun, jobsDoc: { jobs: [windows] },
+    artifactsDoc: artifacts(['windows-native-contracts-2-attempt-1']) });
+  assert.equal(report.partEvidence[0].artifactPresent, true);
+  assert.equal(report.partEvidence[0].job, windows.name);
+  assert.equal(report.jobs[0].factLane.required, true);
+}
+
 // Hosted CP5: GitHub gives unchanged parts the current workflow attempt number
 // while retaining their original execution timestamps and artifacts.
 {

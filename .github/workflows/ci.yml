@@ -1758,12 +1758,18 @@ jobs:
           node scripts/supervisor-conformance/run.mjs --adapter dev-runner --case fileless-clean-local-restart-is-not-counted --repeat 50
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Main populates this part's cache; PRs only read it. Convention-plugin changes
+      # invalidate task fingerprints even when setup-gradle restores an archive.
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      - name: Windows coverage (@Tag windows or cross-platform) for the Linux-migrated modules
+      # Balanced from run 39648200837: 257s summed suites here, 256s in part 2.
+      # Both parts retain a cold startup; full tasks keep the original tag selection.
+      - name: Windows coverage (@Tag windows or cross-platform), part 1
         id: windows-coverage
-        run: ./gradlew.bat :modules:app-api:test :modules:app-util:test :modules:app-agent:test :modules:app-services:test :modules:app-observability:test :modules:ui:test :modules:adapters-lucene:test :modules:app-inference:test :modules:worker-services:test :modules:ort-common:test :modules:configuration:test :modules:indexer-worker:test -PwindowsOnly=true -PskipWebBuild=true --continue --console=plain
+        run: ./gradlew.bat :modules:app-services:test :modules:worker-services:test :modules:adapters-lucene:test :modules:configuration:test :modules:ort-common:test -PwindowsOnly=true -PskipWebBuild=true --build-cache --profile --continue --console=plain
 
       - name: Require Windows safety class execution
         if: always() && (steps.windows-coverage.outcome == 'success' || steps.windows-coverage.outcome == 'failure')
@@ -1802,11 +1808,65 @@ jobs:
             build/ci/windows-unit-test-attribution.md
             modules/**/build/test-results/test/TEST-*.xml
             modules/**/build/reports/tests/test/**
+            build/reports/profile/**
+          retention-days: 30
+
+  windows-native-contracts-2:
+    needs: changes
+    if: needs.changes.outputs.windows != 'false'
+    name: Windows-native tests (contracts-2)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            ${{ env.JAVA_VERSION }}
+
+      # Main populates this part's cache; PRs only read it. Convention-plugin changes
+      # invalidate task fingerprints even when setup-gradle restores an archive.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # Balanced from run 39648200837: 256s summed suites here, 257s in part 1.
+      # Both parts retain a cold startup; full tasks keep the original tag selection.
+      - name: Windows coverage (@Tag windows or cross-platform), part 2
+        id: windows-coverage
+        run: ./gradlew.bat :modules:app-api:test :modules:app-util:test :modules:app-agent:test :modules:app-observability:test :modules:ui:test :modules:app-inference:test :modules:indexer-worker:test -PwindowsOnly=true -PskipWebBuild=true --build-cache --profile --continue --console=plain
+
+      - name: Require Windows safety class execution
+        if: always() && (steps.windows-coverage.outcome == 'success' || steps.windows-coverage.outcome == 'failure')
+        run: node scripts/ci/report-unit-test-attribution.mjs --lane windows-native-contracts-2 --runner-label windows-latest --require-windows-classes --out-json build/ci/windows-unit-test-attribution.json --out-md build/ci/windows-unit-test-attribution.md
+
+      - name: Preserve Windows-native test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-native-contracts-2-attempt-${{ github.run_attempt }}
+          path: |
+            build/ci/windows-unit-test-attribution.json
+            build/ci/windows-unit-test-attribution.md
+            modules/**/build/test-results/test/TEST-*.xml
+            modules/**/build/reports/tests/test/**
+            build/reports/profile/**
           retention-days: 30
 
   windows-native-tests:
     name: Windows-native tests
-    needs: [windows-native-node, windows-native-contracts]
+    needs: [windows-native-node, windows-native-contracts, windows-native-contracts-2]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -1815,8 +1875,9 @@ jobs:
         env:
           NODE_RESULT: ${{ needs.windows-native-node.result }}
           CONTRACTS_RESULT: ${{ needs.windows-native-contracts.result }}
+          CONTRACTS_SECOND_RESULT: ${{ needs.windows-native-contracts-2.result }}
         run: |
-          [[ "$NODE_RESULT" = success || "$NODE_RESULT" = skipped ]] && [[ "$CONTRACTS_RESULT" = success || "$CONTRACTS_RESULT" = skipped ]]
+          [[ "$NODE_RESULT" = success || "$NODE_RESULT" = skipped ]] && [[ "$CONTRACTS_RESULT" = success || "$CONTRACTS_RESULT" = skipped ]] && [[ "$CONTRACTS_SECOND_RESULT" = success || "$CONTRACTS_SECOND_RESULT" = skipped ]]
 
   # The `shell` crate ran in NO lane until now. The only `cargo` invocation anywhere in CI was
   # `dump-cargo-licenses.mjs` (this file, "License and notices"), which compiles nothing. So

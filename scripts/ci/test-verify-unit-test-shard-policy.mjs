@@ -230,3 +230,45 @@ console.log('test-verify-unit-test-shard-policy: PASS');
     }
   }
 }
+
+// The Windows split retains exactly the twelve complete pre-split Test tasks.
+// Mutating workflow and owners together cannot erase or duplicate their coverage.
+{
+  const read = file => fs.readFileSync(new URL('../../' + file, import.meta.url), 'utf8');
+  const original = JSON.parse(read('scripts/ci/unit-test-shard-policy.v1.json'));
+  const workflowText = read('.github/workflows/ci.yml');
+  const workflowSignalPolicy = JSON.parse(read('scripts/ci/workflow-signal-policy.v1.json'));
+  const parts = original.windowsParts.filter(part => part.gradleTasks.length);
+  assert.equal(parts.length, 2, 'Windows coverage must have two independent jobs');
+  const modules = ['app-api', 'app-util', 'app-agent', 'app-services', 'app-observability', 'ui',
+    'adapters-lucene', 'app-inference', 'worker-services', 'ort-common', 'configuration', 'indexer-worker'];
+  const tasks = parts.flatMap(part => part.gradleTasks);
+  assert.deepEqual([...tasks].sort(), modules.map(module => `:modules:${module}:test`).sort());
+  const check = policy => validateUnitTestShardPolicy({ policy, workflowText, workflowSignalPolicy });
+  for (const part of parts) {
+    const job = workflowText.slice(workflowText.indexOf(`  ${part.jobId}:\n`)).split(/\n  [\w-]+:\n/)[0];
+    assert.match(job, /cache-read-only: \$\{\{ github.ref != 'refs\/heads\/main' \}\}/);
+    assert.match(job, /-PwindowsOnly=true -PskipWebBuild=true --build-cache --profile --continue/);
+    for (const entry of part.requiredClasses) {
+      const candidates = modules.filter(module => fs.existsSync(new URL(
+        `../../modules/${module}/src/test/java/${entry.name.replaceAll('.', '/')}.java`, import.meta.url)));
+      assert.equal(candidates.length, 1, entry.name);
+      assert.ok(part.gradleTasks.includes(`:modules:${candidates[0]}:test`), `${entry.name}: safety evidence belongs to the task's part`);
+    }
+    for (const task of part.gradleTasks) {
+      const omitted = structuredClone(original);
+      omitted.windowsParts.find(entry => entry.jobId === part.jobId).gradleTasks = part.gradleTasks.filter(entry => entry !== task);
+      assert.match(check(omitted).issues.join('\n'), /Windows test task inventory differs/);
+      const duplicate = structuredClone(original);
+      duplicate.windowsParts.find(entry => entry.jobId !== part.jobId).gradleTasks.push(task);
+      assert.match(check(duplicate).issues.join('\n'), /Windows test task inventory differs/);
+      // Scope the mutation to Windows: the same task may also have a Linux owner.
+      const start = workflowText.indexOf(`  ${part.jobId}:\n`);
+      const missingInPart = workflowText.slice(0, start) + workflowText.slice(start).replace(`${task} `, '');
+      assert.equal(validateUnitTestShardPolicy({ policy: original, workflowText: missingInPart, workflowSignalPolicy }).ok, false);
+    }
+  }
+  const classes = parts.flatMap(part => part.requiredClasses.map(entry => entry.name));
+  assert.equal(classes.length, 15);
+  assert.equal(new Set(classes).size, 15, 'each safety class has one owner');
+}

@@ -182,7 +182,17 @@
       "requiredCheck": "Windows-native tests",
       "owner": "Windows-only tagged tests and release signing contract",
       "hardTimeoutSeconds": 1500,
-      "notes": "Initial split budget: preserves all tests and per-test budgets; review after comparable uncached hosted runs.",
+      "notes": "Contracts part 1: 257.408s summed Windows suites in run 39648200837; cold-step forecast about 9 min, hosted split timing unverified. Includes conditional conformance and release contracts.",
+      "advisoryBudgets": {
+        "maxWallSeconds": 1200
+      }
+    },
+    {
+      "job": "Windows-native tests (contracts-2)",
+      "requiredCheck": "Windows-native tests",
+      "owner": "Windows-only tagged tests, second module partition",
+      "hardTimeoutSeconds": 1500,
+      "notes": "Contracts part 2: 255.902s summed Windows suites in run 39648200837; cold-step forecast about 9 min, hosted split timing unverified.",
       "advisoryBudgets": {
         "maxWallSeconds": 1200
       }

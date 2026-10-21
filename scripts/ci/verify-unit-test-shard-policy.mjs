@@ -230,6 +230,13 @@ export function validateUnitTestShardPolicy({ policy, workflowText, workflowSign
     });
     if (!sameList([...owners.keys()].sort(), expected.sort())) issues.push('unit test task inventory differs: every complete task or class partition must have exactly one owner');
   }
+  if (policy.windowsTestModules) {
+    const tasks = (policy.windowsParts ?? []).flatMap(part => part.gradleTasks ?? []);
+    const expected = policy.windowsTestModules.map(module => `:modules:${module}:test`);
+    if (!sameList([...tasks].sort(), expected.sort())) {
+      issues.push('Windows test task inventory differs: every original task must have exactly one shard owner');
+    }
+  }
   for (const lane of policyLanes) {
     const missing = missingStringFields(lane, REQUIRED_LANE_FIELDS);
     if (missing.length > 0) issues.push(`${lane.lane || '<unknown>'}: missing fields: ${missing.join(', ')}`);
@@ -266,7 +273,7 @@ export function validateUnitTestShardPolicy({ policy, workflowText, workflowSign
             // Coverage attribution must still run after a failed Gradle execution. Its only
             // permitted bypass is when that execution never ran (an earlier failure/cancel).
             const coverage = partJob.runs.find(candidate => candidate.step?.id === 'windows-coverage');
-            return !(part === 'windows-native-contracts'
+            return !((policy.windowsParts ?? []).some(entry => entry.jobId === part && entry.requiredClasses?.length)
               && run.text.startsWith('node scripts/ci/report-unit-test-attribution.mjs ')
               && run.text.includes('--require-windows-classes')
               && run.step.if === "always() && (steps.windows-coverage.outcome == 'success' || steps.windows-coverage.outcome == 'failure')"
