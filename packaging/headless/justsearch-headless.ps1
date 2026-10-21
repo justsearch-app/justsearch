@@ -11,8 +11,10 @@
                the install plan (~2.1 GB vs ~10.7 GB) — does NOT currently gate
                runtime activation of an LLM model already present on disk
 
-  To reuse an existing install's data + models, set $env:JUSTSEARCH_DATA_DIR and
-  $env:JUSTSEARCH_HOME before launching.
+  To reuse the desktop app's index, settings and models, quit it first, then set
+  both variables to its data folder before launching:
+    $env:JUSTSEARCH_DATA_DIR = "$env:APPDATA\io.justsearch.shell"
+    $env:JUSTSEARCH_HOME = "$env:APPDATA\io.justsearch.shell"
 
   The runtime manifest (GET /api/runtime/manifest) reports the active mode under
   mode.intent / mode.realized.
@@ -34,4 +36,4 @@ $java = Join-Path $here 'runtime\bin\java.exe'
 if (-not (Test-Path $java)) { $java = 'java' }
 
 $cp = "$here\ui-headless.jar;$here\lib\*"
-& $java -cp $cp "-Djustsearch.mode=$Mode" io.justsearch.ui.HeadlessApp
+& $java -cp $cp "-Djustsearch.prod=true" "-Djustsearch.mode=$Mode" io.justsearch.ui.HeadlessApp

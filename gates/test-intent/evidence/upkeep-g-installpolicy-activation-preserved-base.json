@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T08:19:43.338Z",
+  "revision": "ca0e3518e07594388926af04442085cd30c1fbd5",
+  "tree": "a233fc1fb5df159cb5defe78d0ac00710f3fc9fe",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceTest.absentPolicyServiceKeepsActivationPermissive\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4524
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceTest.java#absentPolicyServiceKeepsActivationPermissive",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:10332ef04a6d1315b040288edc9b801a5624d16b952c0215c316b69bcfc00b65",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "absentPolicyServiceKeepsActivationPermissive()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:71f6beefb73da5fc0d9531e934d17cda418ae5a153a26023a0f255f5d7751b95"
+}

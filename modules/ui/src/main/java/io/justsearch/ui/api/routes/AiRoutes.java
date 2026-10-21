@@ -75,6 +75,8 @@ public final class AiRoutes {
     app.get("/api/chat/conversations", chatController::handleListSessions, ActivityRole.OBSERVATION);
     app.get("/api/chat/conversations/{sessionId}/history", chatController::handleLoadHistory, ActivityRole.OBSERVATION);
     app.delete("/api/chat/conversations/{sessionId}", chatController::handleDeleteConversation, ActivityRole.USER_ACTION);
+    // The reader's Stop on a running turn, named by the turnId it was dispatched with.
+    app.post("/api/chat/conversations/{sessionId}/stop", chatController::handleStopTurn, ActivityRole.USER_ACTION);
     // Slice 513 — conversation branching.
     app.post("/api/chat/conversations/{sessionId}/branch", chatController::handleBranchConversation, ActivityRole.USER_ACTION);
     // Tempdoc 610 Phase C — effective-context floor (rewind): set / clear.

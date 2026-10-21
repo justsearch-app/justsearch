@@ -1,9 +1,9 @@
 ---
 title: Workflow Telemetry Contract v1
 type: contract
-status: stable
+status: historical
 updated: 2026-03-10
-description: Run-centric workflow evidence, join rules, derived metrics, and comparison constraints.
+description: Historical design of the removed workflow-telemetry subsystem, including evidence, join rules, derived metrics, and comparison constraints.
 ---
 
 # Workflow Telemetry Contract v1

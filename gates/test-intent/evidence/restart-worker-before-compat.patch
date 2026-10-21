@@ -1,0 +1,104 @@
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/index/IndexGenerationManager.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/index/IndexGenerationManager.java
+@@ -377,8 +377,14 @@
+     record Fenced() implements BootOwnership {}
+     record Recorded(String operationKey, String sourceGeneration, String source,
+         String targetFingerprint, boolean captureComplete, boolean continuationAuthorized,
+-        List<String> projectionSourceIds)
++        List<String> projectionSourceIds, boolean previousSourcePointerProven)
+         implements BootOwnership {
++      public Recorded(String operationKey, String sourceGeneration, String source,
++          String targetFingerprint, boolean captureComplete, boolean continuationAuthorized,
++          List<String> projectionSourceIds) {
++        this(operationKey, sourceGeneration, source, targetFingerprint, captureComplete,
++            continuationAuthorized, projectionSourceIds, false);
++      }
+       public Recorded(String operationKey, String sourceGeneration, String source,
+           String targetFingerprint, boolean captureComplete) {
+         this(operationKey, sourceGeneration, source, targetFingerprint, captureComplete, true, null);
+@@ -2506,6 +2512,8 @@
+     Objects.requireNonNull(state, "state");
+     Files.createDirectories(basePath);
+ 
++    haltAtPointerPublication("before-backup", state);
++
+     // 1) Write tmp
+     JSON.writerWithDefaultPrettyPrinter().writeValue(stateTmpPath.toFile(), state);
+ 
+@@ -2518,6 +2526,8 @@
+         log.debug("Failed to rotate state.json -> state.json.prev (continuing): {}", e.getMessage());
+       }
+     }
++
++    haltAtPointerPublication("after-backup", state);
+ 
+     // 3) Move tmp -> state.json (prefer atomic)
+     try {
+@@ -2530,9 +2540,28 @@
+       Files.move(stateTmpPath, statePath, StandardCopyOption.REPLACE_EXISTING);
+     }
+ 
++    haltAtPointerPublication("after-publication", state);
++
+     // 4) Invalidate the read cache so the next readStateBestEffort() re-reads from disk.
+     cache = null;
+     stateMoveProbe.afterMove(state);
++  }
++
++  /** Deterministic process-kill cut for the installed worker recovery harness. */
++  private void haltAtPointerPublication(String point, State state) throws IOException {
++    if (!"1".equals(SystemAccess.envVar("JUSTSEARCH_SUPERVISOR_HARNESS"))
++        || !point.equals(SystemAccess.envVar("JUSTSEARCH_POINTER_PUBLICATION_CUT"))
++        || !Objects.equals(state.migration_state(), SystemAccess.envVar("JUSTSEARCH_POINTER_CUT_PHASE"))
++        || Files.exists(basePath.resolve("pointer-publication-cut"))) return;
++    io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
++        basePath.resolve("pointer-publication-cut"), JSON.writeValueAsBytes(
++            Map.of("point", point, "pid", ProcessHandle.current().pid(), "state", state)));
++    haltHarnessWriter();
++  }
++
++  @SuppressWarnings("PMD.DoNotTerminateVM")
++  private static void haltHarnessWriter() {
++    Runtime.getRuntime().halt(73);
+   }
+ 
+   private Path resolveGenerationPath(String genId) throws IOException {
+--- a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java
++++ b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java
+@@ -1189,6 +1189,10 @@
+       long signalBusMs = (tPhase - tPrev) / 1_000_000;
+       tPrev = tPhase;
+ 
++      // Instrumentation only: hold the same installed barrier before opening the baseline queue.
++      awaitIndexStartHarnessBarrier(startupConfiguration.paths().dataDir(),
++          startupConfiguration.paths().indexBasePath());
++
+       // 2. Initialize job queue (with corruption triage). Tempdoc 417 Phase 3c: write-failure
+       // callback late-binds to WorkerOpsMetricCatalog (constructed later in
+       // registerTelemetryGauges); the lambda silently no-ops until the catalog is wired.
+@@ -1282,6 +1286,14 @@
+           IndexRecoveryMarker.write(activeGenerationPath, "interrupted_backup_first");
+         }
+       });
++      // Inject after ownership reconciliation so both the baseline and candidate reach the actual
++      // fallback writer. Its next process must then recover the interrupted repair on its own.
++      if ("1".equals(SystemAccess.envVar("JUSTSEARCH_SUPERVISOR_HARNESS"))
++          && java.util.Objects.toString(SystemAccess.envVar("JUSTSEARCH_REAL_RECOVERY_SCENARIO"), "")
++              .startsWith("pointer-recovery-")
++          && !Files.exists(effectiveIndexBasePath.resolve("pointer-publication-cut"))) {
++        Files.writeString(effectiveIndexBasePath.resolve("state.json"), "{torn native pointer");
++      }
+       IndexGenerationManager.BootLayout boot;
+       if (recoveryStartContext != null && recoveryStartContext.generationState() != null) {
+         var inspected = genManager.inspectCurrentLayoutForBoot().orElseThrow(
+--- a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/RecordedIngestionLifecycle.java
++++ b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/RecordedIngestionLifecycle.java
+@@ -15,6 +15,8 @@
+ 
+ /** Indexer-local attachment for the Engine's recorded-ingestion owner. */
+ public interface RecordedIngestionLifecycle {
++  default boolean generationPendingAtBoot() throws IOException { return false; }
++
+   /** Observe application authority once, before generation fallback or any writable runtime opens. */
+   default IndexGenerationManager.BootOwnership bootOwnership(JobQueue queue) throws IOException {
+     return new IndexGenerationManager.BootOwnership.Native();

@@ -88,7 +88,7 @@ final class OfflinePassChatSeamTest {
     assertEquals(List.of("model.gguf"), seam.models());
 
     EngineContext context = TestEngineContexts.durableInternal();
-    KnowledgeClient client = mock(KnowledgeClient.class);
+    KnowledgeClient client = VduAttemptTestSupport.client();
     when(client.countPendingVdu(context)).thenReturn(0);
     when(client.countPendingEmbeddings(context)).thenReturn(12);
     OfflineCoordinator coordinator = newCoordinator(manager, context, client);

@@ -143,7 +143,7 @@ Exit codes:
 
 ## Gate inputs (tempdoc 742)
 
-Some gates consume a report artifact from `tmp/` (Knip, npm-audit, module-deps,
+Some gates consume a report artifact from `tmp/` (Knip, npm-audit,
 the JVM dead-class scan, PIT strength). Historically each enforcer independently
 treated a missing report as warn-and-pass. Because that choice was copied by
 precedent, the `dead-code` (Knip) gate was **silently inert for its entire life**:
@@ -204,8 +204,8 @@ dropped id would report a pass for a gate that never ran).
 | `ssot-catalog-sync` | `gates/ssot-catalog-sync/mirrors.json` | the declared root↔classpath catalog file pairs | no (the invariant is "copies match"; fix by syncing, not editing a baseline) |
 | `test-efficacy` | `gates/test-efficacy/strength-baseline.v1.json` | `tmp/pit-strength-report.v1.json` (produced by `scripts/ci/report-pit-strength.mjs --run`) | yes (raises `minStrength`, lowers `maxNoCoverage`) |
 
-(The registry holds further gate kinds — `module-deps`, `adr-coverage`,
-`tempdoc-wiring`, `wire`, `dead-code`, `atom-fork-ratchet` and the register
+(The registry holds further gate kinds — `adr-coverage`, `wire`, `dead-code`,
+`atom-fork-ratchet` and the register
 gates — listed in `governance/registry.v1.json`; the table above names the
 representative ratchet-file gates.)
 
@@ -314,7 +314,7 @@ actually enforces today, stated with its gaps rather than as a slogan:
 - **A live value over its pin fails everywhere** — `silent-growth` without a
   changeset, `declared-growth-without-repin` with one. No gaps.
 - **A pin RAISE without a changeset fails only where a baseline-shift block
-  exists** — `config-surface`, `dead-code`, `module-deps`, `npm-audit`,
+  exists** — `config-surface`, `dead-code`, `npm-audit`,
   `test-efficacy`. It is **not** detected by `atom-fork-ratchet`, which has no
   such block: raising one of its rows by hand yields only `rebalance-available`.
   (Tempdoc 930 chunk F retired four of the five gates that used to sit on this

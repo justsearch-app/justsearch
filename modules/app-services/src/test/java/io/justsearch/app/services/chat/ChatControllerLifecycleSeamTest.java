@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.ModeTransitionException;
+import io.justsearch.app.api.runtime.child.ChildControl;
+import io.justsearch.app.api.runtime.child.ChildSpec;
 import io.justsearch.app.inference.InferenceConfig;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import java.lang.reflect.Field;
@@ -35,8 +37,6 @@ import org.junit.jupiter.api.io.TempDir;
  */
 final class ChatControllerLifecycleSeamTest {
 
-  private static final long START_DELAY_MS = 1_500;
-
   @TempDir Path directory;
 
   private ManagedChatSeam seam;
@@ -44,7 +44,7 @@ final class ChatControllerLifecycleSeamTest {
 
   @BeforeEach
   void setUp() throws Exception {
-    seam = new ManagedChatSeam(directory, START_DELAY_MS);
+    seam = new ManagedChatSeam(directory, 0);
     manager = seam.manager();
   }
 
@@ -59,14 +59,17 @@ final class ChatControllerLifecycleSeamTest {
     assertEquals(List.of("model.gguf"), seam.models(), "the first start launches once");
 
     // X: a relaunch whose server takes a while to become healthy.
+    seam.holdHealth();
     CompletableFuture<Throwable> x = apply("x.gguf");
-    await(() -> seam.models().size() == 2, "X to launch");
+    seam.awaitHealth(2);
+    assertFalse(x.isDone(), "X is held in its health wait");
 
     // A, B and C arrive one after another while X is still starting.
     List<CompletableFuture<Throwable>> waiting = new ArrayList<>();
     for (String target : List.of("a.gguf", "b.gguf", "c.gguf")) {
       waiting.add(applyAndAwaitBlocked(target));
     }
+    seam.releaseHealth();
 
     assertEquals(null, x.get(60, TimeUnit.SECONDS), "X completes");
     assertEquals(null, waiting.get(2).get(60, TimeUnit.SECONDS), "C completes");
@@ -83,15 +86,36 @@ final class ChatControllerLifecycleSeamTest {
 
   @Test
   void quitWhileTheServerIsStartingLeavesNothingRunningAndRefusesLaterStarts() throws Exception {
+    seam.holdHealth();
     CompletableFuture<Throwable> start = background(() -> manager.switchToOnlineMode());
-    await(() -> seam.models().size() == 1, "the start to launch");
+    seam.awaitHealth(1);
+    assertFalse(start.isDone(), "quit is requested during the health wait");
 
+    InferenceLifecycleManager stopped = manager;
+    ChildControl launcher = (ChildControl) field(stopped, "childControl");
+    ChildSpec restart = (ChildSpec) field(field(field(stopped, "serverOps"), "child"), "spec");
     seam.quit();
     manager = null;
 
+    // The default setup gives the manager ownership of this launcher, so quit must close it.
+    try {
+      assertTrue((boolean) field(launcher, "closed"), "quit permanently closes its owned launcher");
+      var refused = assertThrows(IllegalStateException.class, () -> launcher.start(restart));
+      assertEquals("child control is closed", refused.getMessage());
+      assertTrue(launcher.list().isEmpty(), "a refused restart must not launch a child");
+    } finally {
+      launcher.close(); // also release a child retained by a broken refusal
+    }
     assertNotNull(start.get(30, TimeUnit.SECONDS), "a start cut short by quit does not succeed");
     await(seam::noneAlive, "every launched server to end");
-    Thread.sleep(START_DELAY_MS);
+    // Observe launcher bypasses after the last child exits, including the two-second regression.
+    long observationEnd = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2_500);
+    assertNotNull(background(stopped::switchToOnlineMode).get(30, TimeUnit.SECONDS),
+        "a terminal manager refuses a later start");
+    while (System.nanoTime() < observationEnd) {
+      assertEquals(1, seam.models().size(), "nothing relaunches after quit");
+      Thread.sleep(20);
+    }
     assertEquals(1, seam.models().size(), "nothing relaunches after quit");
     assertTrue(seam.noneAlive());
   }
@@ -103,17 +127,29 @@ final class ChatControllerLifecycleSeamTest {
    */
   @Test
   void noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains() throws Exception {
-    seam.startDelay(4_000); // a wide health-wait window
+    seam.holdHealth();
     Object lifecycleLock = lifecycleLock(manager);
 
-    // A start's health wait.
+    // A start waits for its port, then for a healthy response; neither phase may hold the lock.
+    seam.holdPortBinding();
     CompletableFuture<Throwable> start = background(() -> manager.switchToOnlineMode());
-    await(() -> seam.models().size() == 1, "the start to launch");
+    // The child signals before binding and remains held throughout the lock probe.
+    seam.awaitPortBinding(1);
+    try {
+      assertLockFree(lifecycleLock, "while a start waits for health before its port binds");
+      assertFalse(start.isDone(), "the probe ran before the port bound");
+    } finally {
+      seam.releasePortBinding();
+    }
+    seam.awaitHealth(1);
     assertLockFree(lifecycleLock, "while a start waits for health");
     assertFalse(start.isDone(), "the probe ran during the health wait");
+    seam.releaseHealth();
     assertNull(start.get(60, TimeUnit.SECONDS), "the start completes");
 
-    // A relaunch's drain of an in-flight reply, then the relaunched server's health wait.
+    // A relaunch drains, waits for its port, then waits for a healthy response.
+    seam.holdHealth();
+    seam.holdPortBinding();
     AutoCloseable reply = exchange(manager, "GENERATE");
     InferenceConfig candidate = seam.withModel("b.gguf");
     var resolved = seam.resolvedWithModel("b.gguf");
@@ -125,14 +161,26 @@ final class ChatControllerLifecycleSeamTest {
         prepared.completeExceptionally(failure);
       }
     });
-    await(() -> draining(manager), "the relaunch to drain");
-    assertLockFree(lifecycleLock, "while a relaunch drains an in-flight reply");
-    assertEquals(1, seam.models().size(), "the probe ran during the drain");
-    reply.close();
+    try {
+      await(() -> draining(manager), "the relaunch to drain");
+      assertLockFree(lifecycleLock, "while a relaunch drains an in-flight reply");
+      assertEquals(1, seam.models().size(), "the probe ran during the drain");
+    } finally {
+      reply.close();
+    }
 
-    await(() -> seam.models().size() == 2, "the candidate to launch");
+    seam.awaitPortBinding(2);
+    try {
+      assertLockFree(lifecycleLock,
+          "while a relaunched server is waiting for health before its port binds");
+      assertFalse(prepared.isDone(), "the probe ran before the candidate's port bound");
+    } finally {
+      seam.releasePortBinding();
+    }
+    seam.awaitHealth(2);
     assertLockFree(lifecycleLock, "while a relaunched server is waiting for health");
     assertFalse(prepared.isDone(), "the probe ran during the candidate's health wait");
+    seam.releaseHealth();
     prepared.get(60, TimeUnit.SECONDS).abort();
   }
 
@@ -167,7 +215,7 @@ final class ChatControllerLifecycleSeamTest {
   }
 
   private static Object lifecycleLock(InferenceLifecycleManager manager) throws Exception {
-    return invoke(field(manager, "runner"), "lock");
+    return field(field(manager, "runner"), "lock");
   }
 
   /**
@@ -258,10 +306,11 @@ final class ChatControllerLifecycleSeamTest {
       }
     });
     await(() -> {
-      Thread.State state = caller.getState();
-      return state == Thread.State.WAITING || state == Thread.State.BLOCKED
-          || state == Thread.State.TIMED_WAITING || result.isDone();
+      return result.isDone() || java.util.Arrays.stream(caller.getStackTrace())
+          .anyMatch(frame -> frame.getClassName().equals(ChatServerControllerImpl.class.getName())
+              && frame.getMethodName().equals("await"));
     }, "the request for " + model + " to wait");
+    assertFalse(result.isDone(), "the accepted target waits behind X");
     return result;
   }
 

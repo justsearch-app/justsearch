@@ -1,0 +1,323 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T01:35:12.943Z",
+  "revision": "8ab5d0fab01976b6a50dd83f2337364d12c34378",
+  "tree": "8ff146a65e3cb155a8b17bbb8dd26f82000b8bd8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc8_reads_off_before_registration_and_preserves_future_or_corrupt_bytes\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1438
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc9_focus_flag_beats_minimized_and_deep_links_keep_their_destination\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1405
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sn1_sn3_plain_launch_and_minimized_arguments_keep_their_behavior\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1385
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc5_sc6_pending_requests_coalesce_and_a_consumed_request_cannot_replay\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1771
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc10_wayland_detection_fails_closed_even_with_xwayland_display\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1643
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc7_sc8_registration_conflict_and_off_switch_report_real_state\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1587
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc8_failed_save_restores_the_choice_and_registration\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1781
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc8_unavailable_sessions_persist_the_choice_without_attempting_registration\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1774
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-vitest-3234587-1792460073793.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4991
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc8_reads_off_before_registration_and_preserves_future_or_corrupt_bytes",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d539d665c4e1d6610bb904db43fb90471a94bad0b3777ce6a4ef253f5997463b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc8_reads_off_before_registration_and_preserves_future_or_corrupt_bytes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc9_focus_flag_beats_minimized_and_deep_links_keep_their_destination",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d539d665c4e1d6610bb904db43fb90471a94bad0b3777ce6a4ef253f5997463b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc9_focus_flag_beats_minimized_and_deep_links_keep_their_destination",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sn1_sn3_plain_launch_and_minimized_arguments_keep_their_behavior",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d539d665c4e1d6610bb904db43fb90471a94bad0b3777ce6a4ef253f5997463b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sn1_sn3_plain_launch_and_minimized_arguments_keep_their_behavior",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc5_sc6_pending_requests_coalesce_and_a_consumed_request_cannot_replay",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d539d665c4e1d6610bb904db43fb90471a94bad0b3777ce6a4ef253f5997463b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc5_sc6_pending_requests_coalesce_and_a_consumed_request_cannot_replay",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc10_wayland_detection_fails_closed_even_with_xwayland_display",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d539d665c4e1d6610bb904db43fb90471a94bad0b3777ce6a4ef253f5997463b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc10_wayland_detection_fails_closed_even_with_xwayland_display",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc7_sc8_registration_conflict_and_off_switch_report_real_state",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d539d665c4e1d6610bb904db43fb90471a94bad0b3777ce6a4ef253f5997463b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc7_sc8_registration_conflict_and_off_switch_report_real_state",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc8_failed_save_restores_the_choice_and_registration",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d539d665c4e1d6610bb904db43fb90471a94bad0b3777ce6a4ef253f5997463b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc8_failed_save_restores_the_choice_and_registration",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc8_unavailable_sessions_persist_the_choice_without_attempting_registration",
+      "file": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:d539d665c4e1d6610bb904db43fb90471a94bad0b3777ce6a4ef253f5997463b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "search_shortcut::tests::sc8_unavailable_sessions_persist_the_choice_without_attempting_registration",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC4 leaves a modal and an ordinary field in charge, including a modal button",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f6329b7cc79a7d22ce1d776a1c6dcc4cd757152eaf223ba1bdb6ad7804308a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC4 leaves a modal and an ordinary field in charge, including a modal button",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "8ab5d0fab",
+    "revision": "8ab5d0fab01976b6a50dd83f2337364d12c34378",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc8_reads_off_before_registration_and_preserves_future_or_corrupt_bytes\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 13709
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc9_focus_flag_beats_minimized_and_deep_links_keep_their_destination\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1824
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sn1_sn3_plain_launch_and_minimized_arguments_keep_their_behavior\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1522
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc5_sc6_pending_requests_coalesce_and_a_consumed_request_cannot_replay\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1502
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc10_wayland_detection_fails_closed_even_with_xwayland_display\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1556
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc7_sc8_registration_conflict_and_off_switch_report_real_state\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 3317
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc8_failed_save_restores_the_choice_and_registration\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1688
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"search_shortcut::tests::sc8_unavailable_sessions_persist_the_choice_without_attempting_registration\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1610
+      },
+      {
+        "command": "npx vitest run \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-vitest-3234587-1792460106933.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5849,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-shortcut/tmp/shortcut-repair/test-intent-vitest-3234587-1792460106933.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc8_reads_off_before_registration_and_preserves_future_or_corrupt_bytes",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc9_focus_flag_beats_minimized_and_deep_links_keep_their_destination",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sn1_sn3_plain_launch_and_minimized_arguments_keep_their_behavior",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc5_sc6_pending_requests_coalesce_and_a_consumed_request_cannot_replay",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc10_wayland_detection_fails_closed_even_with_xwayland_display",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc7_sc8_registration_conflict_and_off_switch_report_real_state",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc8_failed_save_restores_the_choice_and_registration",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/search_shortcut.rs#search_shortcut::tests::sc8_unavailable_sessions_persist_the_choice_without_attempting_registration",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts#SC4 leaves a modal and an ordinary field in charge, including a modal button",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:450763e83389ad451b768a3ffeb6c1d4025f21d42d7115b1e8a46fd1b00ff5c9"
+}

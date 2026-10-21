@@ -67,8 +67,8 @@ function buildGenerated(release) {
   lines.push(
     "> Generated from `scripts/jseval/release.v1.json` (tempdoc 623). Each per-corpus number below is a",
     "> **projection** of one cohort-identical release (same config/commit/hardware), not a hand-typed value.",
-    "> The (config × mode) ablation tables in each corpus block stay hand-authored. Reproduction tolerance",
-    "> is the within-machine ±2σ envelope, scoped to equivalent hardware/setup (tempdoc 623 F-α).",
+    "> The (config × mode) ablation tables in each corpus block stay hand-authored. No calibrated reproduction envelope",
+    "> is published; compare each run's measured spread directly (see the benchmark methodology).",
     "",
     `**Release:** \`${relId}\` · default mode \`${release.default_mode}\` · ${hwStr}`,
     "",

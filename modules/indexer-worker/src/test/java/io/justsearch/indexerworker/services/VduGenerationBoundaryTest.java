@@ -35,6 +35,7 @@ final class VduGenerationBoundaryTest {
   @ValueSource(strings = {"update", "mark", "recover"})
   void activeServingTargetCommitsBeforeAcknowledging(String operation) throws Exception {
     try (var fixture = new Fixture()) {
+      fixture.prepare(operation);
       fixture.call(operation);
       var order = inOrder(fixture.index, fixture.commits);
       fixture.verifyMutation(order.verify(fixture.index), operation);
@@ -48,6 +49,7 @@ final class VduGenerationBoundaryTest {
   @ValueSource(strings = {"update", "mark", "recover"})
   void distinctServingRuntimeRefusesBeforeAnyEffect(String operation) throws Exception {
     try (var fixture = new Fixture()) {
+      fixture.prepare(operation);
       fixture.service = fixture.service(mock(RunningRuntime.class));
       fixture.assertRefused(operation);
       verifyNoInteractions(fixture.index, fixture.fields, fixture.commits);
@@ -58,6 +60,7 @@ final class VduGenerationBoundaryTest {
   @ValueSource(strings = {"update", "mark", "recover"})
   void acceptedMigrationBeforeRestartRefusesEvenWithTheSameRuntime(String operation) throws Exception {
     try (var fixture = new Fixture()) {
+      fixture.prepare(operation);
       fixture.generations.startMigration("before-restart");
       fixture.assertRefused(operation);
       verifyNoInteractions(fixture.index, fixture.fields, fixture.commits);
@@ -68,6 +71,7 @@ final class VduGenerationBoundaryTest {
   @ValueSource(strings = {"update", "mark", "recover"})
   void transitionInsideCoveringCommitCannotBeAcknowledgedAsCompleted(String operation) throws Exception {
     try (var fixture = new Fixture()) {
+      fixture.prepare(operation);
       doAnswer(call -> {
         fixture.generations.startMigration("commit-interleaving");
         return null;
@@ -75,8 +79,12 @@ final class VduGenerationBoundaryTest {
       fixture.assertRefused(operation);
       fixture.verifyMutation(verify(fixture.index), operation);
       verify(fixture.commits).commitAndTrack(any());
-      verify(fixture.commits).maybeRefreshBlocking();
+      verify(fixture.commits,times(operation.equals("recover") ? 1 : 2)).maybeRefreshBlocking();
     }
+  }
+
+  private static CallContext context() {
+    var base=CallContext.none();return new CallContext(null,null,null,base.engineContext().withWorkId(java.util.UUID.randomUUID()),base.provenance(),base.childLifetime());
   }
 
   private final class Fixture implements AutoCloseable {
@@ -88,6 +96,11 @@ final class VduGenerationBoundaryTest {
     private final DocumentFieldOps fields = mock(DocumentFieldOps.class);
     private final IndexingCoordinator index = mock(IndexingCoordinator.class);
     private final CommitOps commits = mock(CommitOps.class);
+    private final String attempt=java.util.UUID.randomUUID().toString();
+    private final CallContext ctx=context();
+    private final java.util.Map<String,String> state=new java.util.HashMap<>(java.util.Map.of(
+        SchemaFields.DOC_UID,"uid",SchemaFields.SOURCE_SHA256,"a".repeat(64),SchemaFields.CONTENT,"baseline",
+        SchemaFields.VDU_STATUS,"PENDING",SchemaFields.VDU_RETRY_COUNT,"0"));
     private WorkerIngestService service;
 
     private Fixture() throws Exception {
@@ -96,7 +109,13 @@ final class VduGenerationBoundaryTest {
       when(runtime.documentFieldOps()).thenReturn(fields);
       when(runtime.indexingCoordinator()).thenReturn(index);
       when(runtime.commitOps()).thenReturn(commits);
-      when(index.updateDocument(eq(DOC), anyMap())).thenReturn(true);
+      when(fields.getEnrichmentInputs(List.of(DOC))).thenAnswer(call -> java.util.Map.of(DOC,
+          new DocumentFieldOps.EnrichmentInput("baseline",java.util.Map.copyOf(state),null,java.util.Map.of())));
+      when(fields.getDocumentFieldOrThrow(DOC,SchemaFields.VDU_RETRY_COUNT)).thenAnswer(call->state.get(SchemaFields.VDU_RETRY_COUNT));
+      when(index.updateDocument(eq(DOC), anyMap())).thenAnswer(call->{
+        java.util.Map<String,Object> updates=call.getArgument(1);updates.forEach((key,value)->state.put(key,value.toString()));return true;
+      });
+      when(index.updateDocumentIf(eq(DOC),anyMap(),anyMap())).thenReturn(true);
       when(index.updateDocumentIf(eq(DOC), eq(STILL_PROCESSING), eq(RESET_TO_PENDING)))
           .thenReturn(true);
       when(fields.queryDocIdsByFieldOrThrow(
@@ -110,13 +129,19 @@ final class VduGenerationBoundaryTest {
           base, activePath, runtime, serving, null, 0L);
     }
 
+    private void prepare(String operation) {
+      if(operation.equals("update")) assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder()
+          .setDocId(DOC).setAttemptId(attempt).build(),ctx).getSuccess());
+      clearInvocations(index,fields,commits);
+    }
+
     private void call(String operation) {
       switch (operation) {
         case "update" -> assertTrue(service.updateVduResult(UpdateVduResultRequest.newBuilder()
-            .setDocId(DOC).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY).build(),
-            CallContext.none()).getSuccess());
+            .setDocId(DOC).setAttemptId(attempt).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY).build(),
+            ctx).getSuccess());
         case "mark" -> assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder()
-            .setDocId(DOC).setMaxRetries(3).build(), CallContext.none()).getSuccess());
+            .setDocId(DOC).setAttemptId(attempt).setMaxRetries(3).build(), ctx).getSuccess());
         case "recover" -> assertEquals(1, service.recoverVduProcessing(
             RecoverVduProcessingRequest.getDefaultInstance(), CallContext.none()).getRecoveredCount());
         default -> throw new IllegalArgumentException(operation);
@@ -127,6 +152,8 @@ final class VduGenerationBoundaryTest {
     private void verifyMutation(IndexingCoordinator verifier, String operation) {
       if ("recover".equals(operation)) {
         verifier.updateDocumentIf(eq(DOC), eq(STILL_PROCESSING), eq(RESET_TO_PENDING));
+      } else if(operation.equals("update")) {
+        verifier.updateDocumentIf(eq(DOC),anyMap(),anyMap());
       } else {
         verifier.updateDocument(eq(DOC), anyMap());
       }

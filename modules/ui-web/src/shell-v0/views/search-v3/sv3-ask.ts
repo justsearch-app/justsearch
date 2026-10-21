@@ -44,6 +44,7 @@ import {
 } from '../../../api/streams.js';
 import type { CoreRagAskHandlers } from '../../../api/generated/shape-handlers/core-rag-ask.js';
 import { buildRequestBody } from '../unifiedChatRequest.js';
+import { authorizedFetch } from '../../api/authorizedFetch.js';
 // The ONE stream-error vocabulary (slice 497; inventory E9). A technical code becomes the same
 // sentence here as it does in the shipped window; an abort never reaches it (see the catch below).
 import { friendlyStreamError } from '../../utils/streamError.js';
@@ -201,8 +202,19 @@ export interface Sv3AskRequest {
    * matches). Omitted asks the whole index; the window never sends an empty list for a choice.
    */
   readonly docIds?: readonly string[];
+  /**
+   * The conversation so far, as `{role, content}` messages, for a FOLLOW-UP (S2.0) — the window's
+   * effective context (`sv3-context.ts` sv3FollowUpContext). The ask shape is ephemeral, so this is
+   * all the model and the follow-up rewrite know of the earlier turns. Omitted or empty sends none.
+   */
+  readonly context?: readonly { readonly role: string; readonly content: string }[];
+  /** This dispatch's own id, which the reader's Stop names to the Engine ({@link sv3StopAsk}). */
+  readonly turnId?: string;
   readonly signal?: AbortSignal;
 }
+
+/** The `errorCode` the Engine ends a turn with when the reader's Stop ended it. */
+const SV3_STOPPED_CODE = 'CANCELLED';
 
 export interface Sv3AskSink {
   /** Streaming text, delta by delta. The accumulated answer lives in the caller's turn. */
@@ -239,8 +251,17 @@ export interface Sv3AskSink {
   onDone(usage: Sv3ContextUsage | null): void;
   /** The session lock refused this send (HTTP 423) — the ONLY 423 consumer in this window. */
   onRefused(): void;
-  /** The reader pressed Stop. Whatever streamed so far is kept; the turn is halted, not failed. */
+  /**
+   * The Engine ended the turn because the reader pressed Stop, and saved it as stopped. Whatever
+   * streamed so far is kept; the turn is halted, not failed.
+   */
   onHalted(): void;
+  /**
+   * The window let the stream go (it left the conversation, or went away) and was told nothing more:
+   * the Engine goes on and saves the turn as it ends, so what this window holds of it is not what is
+   * saved.
+   */
+  onLeft(): void;
   onFailed(message: string): void;
 }
 
@@ -361,6 +382,12 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   // is the shipped window's authority over the per-shape body and this window may not widen it. The
   // fields land beside `conversationId`, which arrives the same way and for the same reason.
   Object.assign(body, sv3EffortParams(req.effort ?? SV3_EFFORT_DEFAULT));
+  // The follow-up's conversation, read by `ExternalContextInjector` (into the prompt) and
+  // `QueryRewriteInjector` (to rewrite the question). Same late-add as the fields above.
+  if (req.context !== undefined && req.context.length > 0) {
+    body.context = req.context.map((m) => ({ role: m.role, content: m.content }));
+  }
+  if (req.turnId !== undefined) body.turnId = req.turnId;
 
   let sources: readonly RetrievalCitation[] = [];
   let matches: readonly CitationMatch[] = [];
@@ -494,6 +521,11 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
     // test environments), so keying on the error's shape would report the reader's own Stop as a
     // backend failure on some runtimes and not others.
     if (req.signal?.aborted === true) {
+      sink.onLeft();
+      return;
+    }
+    // The Engine's own end of a turn the reader stopped: it is saved as stopped (`CANCELLED`).
+    if ((err as Error & { code?: string }).code === SV3_STOPPED_CODE) {
       sink.onHalted();
       return;
     }
@@ -512,4 +544,36 @@ export async function sv3Ask(req: Sv3AskRequest, sink: Sv3AskSink): Promise<void
   }
 
   sink.onDone(usage);
+}
+
+/**
+ * The reader's Stop, told to the Engine (S2.3). Aborting the stream alone only leaves: the Engine
+ * keeps answering and saves a turn the reader never saw finish. Told, it ends the turn and saves it
+ * as stopped, with its question, its "Interpreted as" note, its thinking, its sources and what had
+ * streamed. A Stop that overtakes its dispatch stops the turn when it starts. A closed tab sends
+ * nothing, and a turn whose answer is already saved is left as it is.
+ *
+ * The stream is NOT let go here: the turn's own stream says how it ended — stopped (and saved so)
+ * or finished first — and carries every word the Engine sent before the Stop landed, which is what
+ * it saves. Resolves whether the Engine took the Stop; false when it was refused or never answered,
+ * and the answer goes on.
+ */
+export async function sv3StopAsk(
+  apiBase: string,
+  conversationId: string,
+  turnId: string,
+): Promise<boolean> {
+  try {
+    const response = await authorizedFetch(
+      `${apiBase}/api/chat/conversations/${encodeURIComponent(conversationId)}/stop`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ turnId }),
+      },
+    );
+    return response.ok;
+  } catch {
+    return false;
+  }
 }

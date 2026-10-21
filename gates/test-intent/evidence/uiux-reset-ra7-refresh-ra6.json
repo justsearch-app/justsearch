@@ -1,0 +1,132 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T04:51:24.671Z",
+  "revision": "5737dd4269d435ec9084a7ea39b9ea912488f3eb",
+  "tree": "09315010aa3f5c4bc8a9be1fbfea040593be4708",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5303
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::ra6_legacy_forms_resume_with_the_same_phases_and_receipts\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11065
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::ra6_every_marker_write_carries_format_version_one\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3098
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9ad2605dc2647af9aacef772ee29371ccc7ec0318bea0a0ce62e1582ede11f1c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_legacy_forms_resume_with_the_same_phases_and_receipts",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9ad2605dc2647af9aacef772ee29371ccc7ec0318bea0a0ce62e1582ede11f1c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::ra6_legacy_forms_resume_with_the_same_phases_and_receipts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_every_marker_write_carries_format_version_one",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:9ad2605dc2647af9aacef772ee29371ccc7ec0318bea0a0ce62e1582ede11f1c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::ra6_every_marker_write_carries_format_version_one",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7252f42c7",
+    "revision": "7252f42c7942a219e03364a0e0350e24c18f2546",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5762,
+        "output": "\nrunning 1 test\ntest factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled ... FAILED\n\nfailures:\n\n---- factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled stdout ----\n\nthread 'factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled' (2497429) panicked at src/factory_reset.rs:457:13:\nassertion `left == right` failed: future marker must be refused\n  left: Requested\n right: Incomplete\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 171 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/agent-method/sessions/agent-session-iil745mt/tmp/test-intent-before-1SXakV/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:899:15\n    |\n899 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.73s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::ra6_legacy_forms_resume_with_the_same_phases_and_receipts\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 11101
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::ra6_every_marker_write_carries_format_version_one\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1021,
+        "output": "\nrunning 1 test\ntest factory_reset::tests::ra6_every_marker_write_carries_format_version_one ... FAILED\n\nfailures:\n\n---- factory_reset::tests::ra6_every_marker_write_carries_format_version_one stdout ----\n\nthread 'factory_reset::tests::ra6_every_marker_write_carries_format_version_one' (2499928) panicked at src/factory_reset.rs:583:13:\nassertion `left == right` failed: written requested marker must carry its format version\n  left: Null\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    factory_reset::tests::ra6_every_marker_write_carries_format_version_one\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 171 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/.cache/agent-method/sessions/agent-session-iil745mt/tmp/test-intent-before-1SXakV/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:899:15\n    |\n899 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.98s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/modules/shell/src-tauri/target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled",
+        "classification": "assertion",
+        "detail": "factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled:  ---- factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled stdout ----\n\nthread 'factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled' (2497429) panicked at src/factory_reset.rs:457:13:\nassertion `left == right` failed: future marker must be refused\n  left: Requested\n right: Incomplete\nnote: run with `RUST_BACKTRACE=1` environment variable to dis"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_legacy_forms_resume_with_the_same_phases_and_receipts",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_every_marker_write_carries_format_version_one",
+        "classification": "assertion",
+        "detail": "factory_reset::tests::ra6_every_marker_write_carries_format_version_one:  ---- factory_reset::tests::ra6_every_marker_write_carries_format_version_one stdout ----\n\nthread 'factory_reset::tests::ra6_every_marker_write_carries_format_version_one' (2499928) panicked at src/factory_reset.rs:583:13:\nassertion `left == right` failed: written requested marker must carry its format version\n  left: Null\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n  "
+      }
+    ]
+  },
+  "digest": "sha256:4a859dc12a6742f5f005b8dc4bb92f1791f5f99235f869fcc3cca3b2dbbb039a"
+}

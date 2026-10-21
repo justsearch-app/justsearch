@@ -17,6 +17,10 @@ function aiState(opts: { chat?: boolean; docs?: number; snapshotLive?: boolean }
     // Tempdoc 807 A.3 — a fixture whose subject is not liveness asserts a LIVE snapshot: these tests
     // describe a backend that is answering. The liveness test below passes `false` explicitly.
     snapshotLive: opts.snapshotLive ?? true,
+    indexingStatusLive: opts.snapshotLive ?? true,
+    status: { worker: { core: { indexState: 'IDLE', indexHealthy: true, pendingJobs: 0 } } },
+    episodeMaxPendingJobs: 0,
+    enrichSettleSamples: [],
     capabilities: { chat: opts.chat ?? true, rag: false, extract: false, embedding: false },
     runtime: { mode: 'online' },
     readiness: UNKNOWN,

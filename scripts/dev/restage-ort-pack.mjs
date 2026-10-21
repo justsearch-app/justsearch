@@ -9,10 +9,9 @@
  * silently falls back to CPU — killing GPU inference for every ONNX eval run.
  *
  * This helper completes such a pack: it validates the dir against
- * `OrtCudaHelper.ORT_NATIVE_DLL_SET` (the 4 required DLLs) + the version marker, extracts any
- * missing DLL from the gradle-cache `onnxruntime_gpu-<version>.jar` (entries under
- * `ai/onnxruntime/native/win-x64/`), writes the `ort-native-version.txt` marker, and prints a
- * summary. It NEVER deletes anything. Exits nonzero if it cannot complete the pack.
+ * `OrtCudaHelper.ortNativeDllSet()` (the four required native libraries) + the version marker,
+ * extracts missing libraries from the gradle-cache `onnxruntime_gpu-<version>.jar` (entries in
+ * the current platform’s native resource directory), writes the version marker, and prints a summary. It NEVER deletes anything. Exits nonzero if it cannot complete the pack.
  *
  * The required version, DLL set, and marker filename are read from OrtCudaHelper.java at runtime —
  * no second hardcoded copy that could drift from the Java authority.
@@ -26,14 +25,12 @@ import { resolve, dirname, join, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { inflateRawSync } from 'node:zlib';
+import { nativeTarget } from '../lib/native-targets.cjs';
+import { readRequiredDlls } from '../release/check-ort-native-asset.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const ORT_HELPER = resolve(
-  REPO_ROOT,
-  'modules/ort-common/src/main/java/io/justsearch/ort/OrtCudaHelper.java',
-);
 const DEFAULT_PACK = 'tmp/ort-variant-test/cuda-12.4-v1.24.3';
-const JAR_ENTRY_PREFIX = 'ai/onnxruntime/native/win-x64/';
+const target = nativeTarget();
 
 function die(msg) {
   console.error(`[restage-ort-pack] ERROR — ${msg}`);
@@ -42,23 +39,15 @@ function die(msg) {
 
 /** Read the single ORT authority (OrtCudaHelper.java) so nothing is hardcoded twice. */
 function readOrtAuthority() {
-  let java;
+  let authority;
   try {
-    java = readFileSync(ORT_HELPER, 'utf8');
-  } catch {
-    die(`cannot read OrtCudaHelper.java at ${ORT_HELPER}`);
+    authority = readRequiredDlls();
+  } catch (error) {
+    die(error.message);
   }
-  const strConst = (name) => {
-    const m = java.match(new RegExp(`${name}\\s*=\\s*"([^"]*)"`));
-    return m ? m[1] : null;
-  };
-  const version = strConst('EXPECTED_ORT_NATIVE_VERSION');
-  const marker = strConst('ORT_NATIVE_VERSION_MARKER');
-  const setBlock = java.match(/ORT_NATIVE_DLL_SET\s*=\s*List\.of\(([\s\S]*?)\)\s*;/);
-  const dlls = setBlock ? [...setBlock[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]) : [];
+  const { version, marker, dlls } = authority;
   if (!version) die('could not parse EXPECTED_ORT_NATIVE_VERSION from OrtCudaHelper.java');
   if (!marker) die('could not parse ORT_NATIVE_VERSION_MARKER from OrtCudaHelper.java');
-  if (dlls.length === 0) die('could not parse ORT_NATIVE_DLL_SET from OrtCudaHelper.java');
   return { version, marker, dlls };
 }
 
@@ -162,7 +151,7 @@ if (missing.length > 0) {
     die(
       `${missing.length} DLL(s) missing but no onnxruntime_gpu-${version}.jar found in the gradle ` +
         `cache. Searched:\n  ${searched.join('\n  ')}\n` +
-        `Run './gradlew.bat :modules:ort-common:dependencies' (or any build touching onnxruntime_gpu) ` +
+        `Run './gradlew :modules:ort-common:dependencies' (gradlew.bat on Windows) (or any build touching onnxruntime_gpu) ` +
         `to populate the cache, then re-run.`,
     );
   }
@@ -179,7 +168,7 @@ if (missing.length > 0) {
 const completed = [];
 const failures = [];
 for (const dll of missing) {
-  const entryName = JAR_ENTRY_PREFIX + dll;
+  const entryName = Object.values(target.ortResources).find(name => name.endsWith(`/${dll}`));
   const entry = jarEntries.get(entryName);
   if (!entry) {
     failures.push(`${dll} — no entry '${entryName}' in ${jarPath}`);

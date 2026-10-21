@@ -1,7 +1,0 @@
-{
-  "kind": "discipline-gate-registry.v1",
-  "version": 1,
-  "gates": [
-    { "id": "class-size", "title": "x", "enforcer": "", "ruleDescriptions": "", "baseline": { "kind": "ratchet-file", "path": "" }, "classifications": "scripts/governance/_fixtures/tempdoc-wiring/positive/cls.mjs" }
-  ]
-}

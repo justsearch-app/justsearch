@@ -1532,23 +1532,23 @@ public final class KnowledgeServerMigrationOps {
   private static boolean replayVduResult(
       DrainSwitchBufferContext context, io.justsearch.ipc.UpdateVduResultRequest request)
       throws IOException {
-    boolean splade = context.chunkSpladeEnabledSupplier().getAsBoolean();
+    io.justsearch.indexerworker.services.VduResultWriter.validate(request);
+    // This reader is only for legacy journal rows. They never recorded source/attempt proof,
+    // so neither TEXT nor EMPTY is authorised against the current parent. Retire the exact
+    // journal revision after arranging the same targeted refresh as a hashless live claim.
+    var service = replayService(context);
     if (context.publisher() == null) {
-      return io.justsearch.indexerworker.services.VduResultWriter.apply(
-          context.ingestLifecycle(), request, splade);
+      service.refreshLegacyVduSource(request.getDocId());
+    } else {
+      try {
+        context.publisher().underFileMutationFence(() -> {
+          try { service.refreshLegacyVduSource(request.getDocId()); return true; }
+          catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+        });
+      } catch (java.io.UncheckedIOException failure) { throw failure.getCause(); }
     }
-    try {
-      return context.publisher().underFileMutationFence(() -> {
-        try {
-          return io.justsearch.indexerworker.services.VduResultWriter.apply(
-              context.ingestLifecycle(), request, splade);
-        } catch (IOException e) {
-          throw new java.io.UncheckedIOException(e);
-        }
-      });
-    } catch (java.io.UncheckedIOException e) {
-      throw e.getCause();
-    }
+    context.log().info("Retired unverifiable legacy VDU result: {}", request.getDocId());
+    return true;
   }
 
   /**

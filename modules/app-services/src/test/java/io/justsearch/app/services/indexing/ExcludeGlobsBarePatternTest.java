@@ -2,6 +2,7 @@ package io.justsearch.app.services.indexing;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.justsearch.configuration.excludes.ExclusionPatterns;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -18,49 +19,49 @@ class ExcludeGlobsBarePatternTest {
 
   @Test
   void bareName_expandsToDirectoryAndFile() {
-    List<String> result = ExcludeGlobs.expandBarePattern("dist");
+    List<String> result = ExclusionPatterns.expandBarePattern("dist");
     assertEquals(List.of("**/dist/**", "**/dist"), result);
   }
 
   @Test
   void bareNameTrailingSlash_expandsToDirectoryOnly() {
-    List<String> result = ExcludeGlobs.expandBarePattern("dist/");
+    List<String> result = ExclusionPatterns.expandBarePattern("dist/");
     assertEquals(List.of("**/dist/**"), result);
   }
 
   @Test
   void bareGlobWithoutSlash_prependsDoublestar() {
-    List<String> result = ExcludeGlobs.expandBarePattern("*.log");
+    List<String> result = ExclusionPatterns.expandBarePattern("*.log");
     assertEquals(List.of("**/*.log"), result);
   }
 
   @Test
   void alreadyQualifiedPattern_unchanged() {
-    List<String> result = ExcludeGlobs.expandBarePattern("**/node_modules/**");
+    List<String> result = ExclusionPatterns.expandBarePattern("**/node_modules/**");
     assertEquals(List.of("**/node_modules/**"), result);
   }
 
   @Test
   void anchoredPathPattern_unchanged() {
-    List<String> result = ExcludeGlobs.expandBarePattern("dist/**");
+    List<String> result = ExclusionPatterns.expandBarePattern("dist/**");
     assertEquals(List.of("dist/**"), result);
   }
 
   @Test
   void trailingSlashWithInternalSlash_anchored() {
-    List<String> result = ExcludeGlobs.expandBarePattern("src/dist/");
+    List<String> result = ExclusionPatterns.expandBarePattern("src/dist/");
     assertEquals(List.of("src/dist/**"), result);
   }
 
   @Test
   void dotPrefix_expandsCorrectly() {
-    List<String> result = ExcludeGlobs.expandBarePattern(".git");
+    List<String> result = ExclusionPatterns.expandBarePattern(".git");
     assertEquals(List.of("**/.git/**", "**/.git"), result);
   }
 
   @Test
   void questionMarkGlob_prependsDoublestar() {
-    List<String> result = ExcludeGlobs.expandBarePattern("?.tmp");
+    List<String> result = ExclusionPatterns.expandBarePattern("?.tmp");
     assertEquals(List.of("**/?.tmp"), result);
   }
 

@@ -190,6 +190,7 @@ export const API_ROUTES = {
   "POST /api/chat/conversations/{sessionId}/context-floor/summary": { method: "POST", path: "/api/chat/conversations/{sessionId}/context-floor/summary", cohort: "conversation", requiredCapabilities: [] },
   "POST /api/chat/conversations/{sessionId}/messages/{messageId}/exclude": { method: "POST", path: "/api/chat/conversations/{sessionId}/messages/{messageId}/exclude", cohort: "conversation", requiredCapabilities: [] },
   "POST /api/chat/conversations/{sessionId}/sources/exclude": { method: "POST", path: "/api/chat/conversations/{sessionId}/sources/exclude", cohort: "conversation", requiredCapabilities: [] },
+  "POST /api/chat/conversations/{sessionId}/stop": { method: "POST", path: "/api/chat/conversations/{sessionId}/stop", cohort: "conversation", requiredCapabilities: [] },
   "POST /api/chat/conversations/{sessionId}/title": { method: "POST", path: "/api/chat/conversations/{sessionId}/title", cohort: "conversation", requiredCapabilities: [] },
   "POST /api/chat/dispatch": { method: "POST", path: "/api/chat/dispatch", cohort: "conversation", requiredCapabilities: [] },
   "POST /api/chat/extract": { method: "POST", path: "/api/chat/extract", cohort: "conversation", requiredCapabilities: [] },
