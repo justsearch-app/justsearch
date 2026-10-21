@@ -1994,3 +1994,14 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
   "note": "All 35 entries preserve or explicitly supersede agreed intent, receipts match current tests, and merged Resource, rail, resolver and responsiveness claims independently fail before and pass after."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15cd9-2ccb-73f2-9d32-2bb68cc40fb7",
+  "verdict": "accept",
+  "digest": "sha256:9e9bc91f5fa8f1184bab8ae79a180f731a722a3fb04163038b7cd25588290019",
+  "note": "All 37 test-intent entries preserve or explicitly supersede agreed intent with matching receipts and independent reruns; two baseline-existing startup and recovery defects are reported separately."
+}
+```
