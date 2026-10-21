@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
 class BgeM3BackfillOpsTest {
 
   @org.junit.jupiter.api.BeforeEach void snapshots() throws Exception {
-    BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, false, java.util.Set.of(SchemaFields.IS_CHUNK));
+    BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, false, Set.of(SchemaFields.IS_CHUNK));
   }
 
   @Mock DocumentFieldOps documentFieldOps;

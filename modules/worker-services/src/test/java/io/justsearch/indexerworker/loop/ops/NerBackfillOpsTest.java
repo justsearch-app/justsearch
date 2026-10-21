@@ -28,8 +28,8 @@ import org.slf4j.LoggerFactory;
 @ExtendWith(MockitoExtension.class)
 class NerBackfillOpsTest {
 
-  @org.junit.jupiter.api.BeforeEach void snapshots() throws Exception {
-    BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, true, java.util.Set.of());
+  @BeforeEach void snapshots() throws Exception {
+    BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, true, Set.of());
   }
 
   @Mock DocumentFieldOps documentFieldOps;

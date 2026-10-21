@@ -81,7 +81,7 @@ final class EnrichmentPreservationTest extends LuceneExecutorTestBase {
           SchemaFields.CHUNK_PARENT_CONTENT_SHA256,revision)));
       commit(runtime);
       var hashes=new java.util.concurrent.atomic.AtomicInteger();
-      try(var digest=mockStatic(io.justsearch.indexing.chunking.ChunkParentRevision.class,call -> {
+      try(var ignored=mockStatic(io.justsearch.indexing.chunking.ChunkParentRevision.class,call -> {
         if(call.getMethod().getName().equals("sha256Hex")) hashes.incrementAndGet();
         return call.callRealMethod();
       })) {
@@ -119,8 +119,8 @@ final class EnrichmentPreservationTest extends LuceneExecutorTestBase {
       var inputs=new HashMap<String,Object>(capture(runtime,List.of("current-child")));inputs.putAll(old);
       Map<String,Object> update=Map.of(SchemaFields.CHUNK_VECTOR,new float[]{1,0,0,0},SchemaFields.CHUNK_EMBEDDING_STATUS,"COMPLETED");
       var updates=List.of(Map.entry("current-child",update),Map.entry("old-child",update));
-      io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.BatchUpdateResult applied;
-      try { applied=(io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.BatchUpdateResult)runtime.indexingCoordinator().getClass()
+      LuceneRuntimeTypes.BatchUpdateResult applied;
+      try { applied=(LuceneRuntimeTypes.BatchUpdateResult)runtime.indexingCoordinator().getClass()
           .getMethod("updateDocumentsBatchIf",List.class,Map.class).invoke(runtime.indexingCoordinator(),updates,inputs); }
       catch(NoSuchMethodException beforeGuardedPublication) { applied=runtime.indexingCoordinator().updateDocumentsBatch(updates); }
       assertEquals(1,applied.updatedCount(),"a current sibling cannot authorize the old incarnation's expectation");

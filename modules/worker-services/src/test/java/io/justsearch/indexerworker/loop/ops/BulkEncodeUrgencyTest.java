@@ -73,7 +73,7 @@ class BulkEncodeUrgencyTest {
   private final WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
 
   @org.junit.jupiter.api.BeforeEach void snapshots() {
-    BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator,false,java.util.Set.of(SchemaFields.IS_CHUNK));
+    BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator,false,Set.of(SchemaFields.IS_CHUNK));
   }
 
   private void assertOnlyBackground() {
@@ -203,7 +203,7 @@ class BulkEncodeUrgencyTest {
 
   @Test
   void nerBackfillAcquiresBackground() throws Exception {
-    BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator,true,java.util.Set.of());
+    BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator,true,Set.of());
     Encoding encoding = mock(Encoding.class);
     when(encoding.getIds()).thenReturn(new long[] {101, 7, 102});
     when(encoding.getAttentionMask()).thenReturn(new long[] {1, 1, 1});
