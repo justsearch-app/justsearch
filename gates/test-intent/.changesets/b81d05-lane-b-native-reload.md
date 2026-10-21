@@ -14,8 +14,10 @@ watch call. The native handoff now leaves a failed reload's fence on the drained
 waiting DELETE becomes the same durable root obligation the closing path records, and the native
 successor discharges pending root receipts before it is published.
 
-The five new checks extend main's real Engine reload fixture (RuntimeReloadProducersHttpIntegrationTest);
-its existing checks are unchanged. Fail-before ran against the previous merge, c15478a96.
+The four new checks extend main's real Engine reload fixture (RuntimeReloadProducersHttpIntegrationTest);
+its existing checks are unchanged. Fail-before ran against the previous merge, c15478a96. The
+earlier fifth check, a crash during native reconciliation from a seeded receipt, is replaced by the
+crash checks in b81d05-lane-b-waiting-delete-durable.
 
 ```json
 {
@@ -23,7 +25,7 @@ its existing checks are unchanged. Fail-before ran against the previous merge, c
     "items": ["modules/ui/src/integrationTest/java/io/justsearch/app/engine/RuntimeReloadProducersHttpIntegrationTest.java"],
     "class": "New",
     "repaired": true,
-    "behaviour": "Through the real Engine, its admin reload HTTP handler, native filesystem watching, SQLite and Lucene search: a watched file's DELETE that settles while a native reload holds the mutation fence is kept as a durable root receipt when the reload fails at the opener, or at service reconstruction after the watcher was handed to the successor. The next reload returns 200, the deleted file is gone from search, its sibling stays searchable and the receipt is retired. A successful native reload discharges an existing receipt before it returns, without another watch call. In a separate JVM halted after a failed handoff, or after the native successor's reconciliation commit but before receipt cleanup, the receipt survives the process death and the restarted Engine applies it once the root is watched, keeping the sibling.",
+    "behaviour": "Through the real Engine, its admin reload HTTP handler, native filesystem watching, SQLite and Lucene search: a watched file's DELETE that settles while a native reload holds the mutation fence is kept as a durable root receipt when the reload fails at the opener, or at service reconstruction after the watcher was handed to the successor. The next reload returns 200, the deleted file is gone from search, its sibling stays searchable and the receipt is retired. A successful native reload discharges an existing receipt before it returns, without another watch call. In a separate JVM halted after a failed handoff, the receipt survives the process death and the restarted Engine applies it once the root is watched, keeping the sibling.",
     "sources": [
       {
         "kind": "owner-adopted-scenario",
@@ -45,8 +47,7 @@ its existing checks are unchanged. Fail-before ran against the previous merge, c
       "modules/ui/src/integrationTest/java/io/justsearch/app/engine/RuntimeReloadProducersHttpIntegrationTest.java#failedOpenerKeepsTheWaitingWatcherDeleteUntilRetry",
       "modules/ui/src/integrationTest/java/io/justsearch/app/engine/RuntimeReloadProducersHttpIntegrationTest.java#failedReconstructionKeepsTheWaitingWatcherDeleteUntilRetry",
       "modules/ui/src/integrationTest/java/io/justsearch/app/engine/RuntimeReloadProducersHttpIntegrationTest.java#successfulNativeReloadDischargesAnExistingWatcherReceipt",
-      "modules/ui/src/integrationTest/java/io/justsearch/app/engine/RuntimeReloadProducersHttpIntegrationTest.java#watcherObligationSurvivesProcessDeathAfterFailedHandoff",
-      "modules/ui/src/integrationTest/java/io/justsearch/app/engine/RuntimeReloadProducersHttpIntegrationTest.java#watcherObligationSurvivesProcessDeathDuringNativeReconciliation"
+      "modules/ui/src/integrationTest/java/io/justsearch/app/engine/RuntimeReloadProducersHttpIntegrationTest.java#watcherObligationSurvivesProcessDeathAfterFailedHandoff"
     ]
   }]
 }
