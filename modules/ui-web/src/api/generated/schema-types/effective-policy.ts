@@ -18,6 +18,7 @@ export type PolicySourceNullable = {
       modelSha256?: string[] | null;
       packManifestSha256?: string[] | null;
     } | null;
+    appUpdatesEnabled?: boolean | null;
     disallowExternalInferenceServers?: boolean | null;
     downloadsEnabled?: boolean | null;
     gpuAccelerationEnabled?: boolean | null;
@@ -36,6 +37,7 @@ export const policySourceNullableSchema = z.strictObject({
       "modelSha256": z.array(z.string()).nullable().optional(),
       "packManifestSha256": z.array(z.string()).nullable().optional(),
     }).nullable().optional(),
+    "appUpdatesEnabled": z.boolean().nullable().optional(),
     "disallowExternalInferenceServers": z.boolean().nullable().optional(),
     "downloadsEnabled": z.boolean().nullable().optional(),
     "gpuAccelerationEnabled": z.boolean().nullable().optional(),
@@ -51,6 +53,7 @@ export interface EffectivePolicy {
   aiDisabledOverride?: boolean;
   allowlistedModelSha256?: string[] | null;
   allowlistedPackManifestSha256?: string[] | null;
+  appUpdatesEnabled?: boolean;
   disallowExternalInferenceServers?: boolean;
   downloadsEnabled?: boolean;
   gpuAccelerationEnabled?: boolean;
@@ -64,6 +67,7 @@ export const effectivePolicySchema = z.strictObject({
   "aiDisabledOverride": z.boolean().optional(),
   "allowlistedModelSha256": z.array(z.string()).nullable().optional(),
   "allowlistedPackManifestSha256": z.array(z.string()).nullable().optional(),
+  "appUpdatesEnabled": z.boolean().optional(),
   "disallowExternalInferenceServers": z.boolean().optional(),
   "downloadsEnabled": z.boolean().optional(),
   "gpuAccelerationEnabled": z.boolean().optional(),

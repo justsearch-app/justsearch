@@ -73,8 +73,8 @@ export class EngineRecovery extends JfElement {
     try {
       if (install) await installAppUpdate();
       else await checkForAppUpdate();
-    } catch {
-      this.error = 'The update could not finish. Try checking for updates again.';
+    } catch (error) {
+      this.error = error instanceof Error ? error.message : String(error);
     } finally {
       this.busy = false;
     }
@@ -133,7 +133,7 @@ export class EngineRecovery extends JfElement {
         ${status?.state === 'repair_required' ? html`<p>The last update needs repair. Automatic restart may be paused until the update is recovered.</p>` : nothing}
         ${this.busy && !updating ? html`<p role="status">Please wait…</p>` : nothing}
         ${updating ? html`<p role="status">${status?.state === 'checking' ? 'Checking for updates…' : 'Updating JustSearch…'}</p>` : nothing}
-        ${this.error || status?.state === 'error' ? html`<p role="alert">${this.error
+        ${this.error || status?.state === 'error' ? html`<p role="alert">${this.error || status?.error
           || 'The update could not finish. Try checking for updates again.'}</p>` : nothing}
         <div class="actions">
           <jf-button .disabled=${this.busy || updating} .onActivate=${() => terminal ? this.restartEngine() : this.onRetry()}>${terminal ? 'Restart JustSearch' : 'Try connecting again'}</jf-button>
