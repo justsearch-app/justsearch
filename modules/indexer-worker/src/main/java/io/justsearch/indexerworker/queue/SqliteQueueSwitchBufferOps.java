@@ -108,12 +108,13 @@ final class SqliteQueueSwitchBufferOps {
       String sql =
           """
           SELECT
-            COALESCE(SUM(CASE WHEN state = 'PENDING' THEN 1 ELSE 0 END), 0) AS pending_count,
-            COALESCE(SUM(CASE WHEN state = 'PENDING' AND (retry_after IS NULL OR retry_after <= ?) THEN 1 ELSE 0 END), 0) AS pending_ready_count,
-            COALESCE(SUM(CASE WHEN state = 'PROCESSING' THEN 1 ELSE 0 END), 0) AS processing_count,
-            COALESCE(SUM(CASE WHEN state = 'DONE' THEN 1 ELSE 0 END), 0) AS done_count,
-            COALESCE(SUM(CASE WHEN state IN ('FAILED', 'RETRY_EXHAUSTED') THEN 1 ELSE 0 END), 0) AS failed_count
-          FROM jobs
+            COALESCE(SUM(CASE WHEN state='PENDING' THEN n ELSE 0 END),0) AS pending_count,
+            COALESCE(SUM(CASE WHEN state='PENDING' THEN n ELSE 0 END),0)
+              - (SELECT COUNT(*) FROM jobs WHERE state='PENDING' AND retry_after>?) AS pending_ready_count,
+            COALESCE(SUM(CASE WHEN state='PROCESSING' THEN n ELSE 0 END),0) AS processing_count,
+            COALESCE(SUM(CASE WHEN state='DONE' THEN n ELSE 0 END),0) AS done_count,
+            COALESCE(SUM(CASE WHEN state IN ('FAILED','RETRY_EXHAUSTED') THEN n ELSE 0 END),0) AS failed_count
+          FROM job_counts
           """;
       try (PreparedStatement stmt = conn.prepareStatement(sql)) {
         stmt.setLong(1, now);
@@ -155,11 +156,9 @@ final class SqliteQueueSwitchBufferOps {
       Connection conn = connSupplier.get();
       String sql =
           """
-          SELECT
-            COALESCE(SUM(CASE WHEN size_bytes IS NOT NULL THEN size_bytes ELSE 0 END), 0) AS known_bytes,
-            COALESCE(SUM(CASE WHEN size_bytes IS NULL THEN 1 ELSE 0 END), 0) AS unknown_size_jobs
-          FROM jobs
-          WHERE state IN ('PENDING', 'PROCESSING')
+          SELECT COALESCE(SUM(known_bytes),0) AS known_bytes,
+            COALESCE(SUM(unknown_size),0) AS unknown_size_jobs
+          FROM job_counts WHERE state IN ('PENDING','PROCESSING')
           """;
       try (PreparedStatement stmt = conn.prepareStatement(sql);
           ResultSet rs = stmt.executeQuery()) {

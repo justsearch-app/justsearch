@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T14:19:36.351Z",
+  "revision": "18ef2232a8692280edfbed254dbf226e7e40eccf",
+  "tree": "33cad9185ac35eddfca0e6d7820f6635ce9177b6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/ResourceView.render.test.ts\" \"src/shell-v0/hooks/resolvePathLazy.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/merge-evidence/test-intent-vitest-3246302-1792505972624.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1534
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts#names the bounded window and reads totals outside it from status",
+      "file": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:97e98d12864761c73b7ea3cffb1519142d357f41baa77998c568250089244569",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Q14 — indexing Resource window and queue totals names the bounded window and reads totals outside it from status",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts#bounds the label cache over a long run, retaining recent Windows and UNC identities",
+      "file": "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:baa028c9a41f0767f1213135bea693971bf89cac19f51695d0943f27835ec64c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bounds the label cache over a long run, retaining recent Windows and UNC identities",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f6a14b5a66e7b879c711ef9ca54280723de2c242",
+    "revision": "f6a14b5a66e7b879c711ef9ca54280723de2c242",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/ResourceView.render.test.ts\" \"src/shell-v0/hooks/resolvePathLazy.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/merge-evidence/test-intent-vitest-3246302-1792505975125.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1066,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/merge-evidence/test-intent-vitest-3246302-1792505975125.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts#names the bounded window and reads totals outside it from status",
+        "classification": "assertion",
+        "detail": "Q14 — indexing Resource window and queue totals names the bounded window and reads totals outside it from status:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/queue-scale/modules/ui-web/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts#bounds the label cache over a long run, retaining recent Windows and UNC identities",
+        "classification": "assertion",
+        "detail": "bounds the label cache over a long run, retaining recent Windows and UNC identities:  AssertionError: expected 'C:\\docs\\0.txt' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/merge-evidence/test-intent-before-ojs9HG/modules/ui-web/src/shell-v0/hooks/resolvePathLazy.test.ts:230:65\n    at file:///home/elias/dev/justsearch/.claude/worktrees/queue-s"
+      }
+    ]
+  },
+  "digest": "sha256:e7e057f6c4f2dc1884ae8ed8e492d11cd8be47e3e6e235a02dbc2e195bbb11e7"
+}

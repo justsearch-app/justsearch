@@ -1,0 +1,45 @@
+[
+  {
+    "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/IndexingJobsBridgeWiringTest.java",
+    "assertionCalls": 24,
+    "allCallsIdenticalIgnoringWhitespace": true,
+    "calls": [
+      "assertEquals(4,ledger.store().recent().size(),\"lateroutcomesafterretryarestillrecorded\")",
+      "assertTrue(ledger.store().recent().stream().allMatch(event->((ActionEvent.Index)event).scanId().equals(\"scan-42\")))",
+      "assertEquals(4,ledger.store().recent().size(),\"reconnectsnapshotsneverreplayledgeroutcomes\")",
+      "assertTrue(evt.isPresent())",
+      "assertEquals(\"system\",idx.originator())",
+      "assertEquals(\"WORKER_INDEXER\",idx.transport())",
+      "assertEquals(\"h1\",idx.pathHash())",
+      "assertEquals(\"DONE\",idx.state())",
+      "assertTrue(evt.isPresent())",
+      "assertEquals(\"FAILED\",idx.state())",
+      "assertEquals(3,idx.attempts())",
+      "assertEquals(\"boom\",idx.errorMessage())",
+      "assertTrue(IndexingJobsBridgeWiring.terminalIndexEvent(job(\"h3\",\"PENDING\",0,\"\")).isEmpty())",
+      "assertTrue(IndexingJobsBridgeWiring.terminalIndexEvent(job(\"h4\",\"PROCESSING\",0,\"\")).isEmpty())",
+      "assertEquals(\"scan-42\",tagged.scanId())",
+      "assertEquals(\"\",keyless.scanId())",
+      "assertTrue(IndexingJobsBridgeWiring.terminalIndexEvent(job(\"h5\",\"done\",0,\"\")).isPresent())",
+      "assertTrue(IndexingJobsBridgeWiring.terminalIndexEvent(job(\"h6\",\"queued\",0,\"\")).isEmpty())",
+      "assertTrue(IndexingJobsBridgeWiring.terminalIndexEvent(null).isEmpty())",
+      "assertDoesNotThrow(()->java.util.concurrent.CompletableFuture.runAsync(()->sink.get().accept(frame),executors.register(io.justsearch.core.execution.EngineExecutorSpec.virtual(\"test.commit-\"+seq,io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,1)).openVirtual()).get(250,java.util.concurrent.TimeUnit.MILLISECONDS))",
+      "assertTrue(entered.await(1,java.util.concurrent.TimeUnit.SECONDS))",
+      "assertEquals(2,ledger.store().recent().size())",
+      "assertTrue(ledger.store().recent().stream().allMatch(event->((ActionEvent.Index)event).scanId().equals(\"scan-outside-window\")))",
+      "assertEquals(2,ledger.store().recent().size(),\"snapshotsneverreplayterminalactivity\")"
+    ]
+  },
+  {
+    "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/IndexingJobsSseIsolationTest.java",
+    "assertionCalls": 5,
+    "allCallsIdenticalIgnoringWhitespace": true,
+    "calls": [
+      "assertTrue(entered.await(1,TimeUnit.SECONDS))",
+      "assertNull(error.get(),\"astalledSSEobservermustneveroverflowtheworker-to-headhandoff\")",
+      "assertEquals(2002,wired.bridge().latestSnapshotSeq())",
+      "assertNotSame(drainThread.get(),observerThread.get(),\"serialization/sendingcannotrunonthedrainthread\")",
+      "assertInstanceOf(StreamOverflowException.class,error.get())"
+    ]
+  }
+]

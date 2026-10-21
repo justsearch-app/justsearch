@@ -1,0 +1,4 @@
+{"event": "task-start", "task": ":modules:ui:test", "time": 1792557244484}
+{"event": "start", "task": ":modules:ui:test", "cls": "io.justsearch.ui.HeadlessAppComponentRegistryCoverageTest", "name": "productionApiPhaseRegistersAllFourComponentsInTheEngineRootRegistry()", "time": 1792557258284}
+{"event": "end", "task": ":modules:ui:test", "cls": "io.justsearch.ui.HeadlessAppComponentRegistryCoverageTest", "name": "productionApiPhaseRegistersAllFourComponentsInTheEngineRootRegistry()", "time": 1792557260249, "durationMs": 1963, "result": "SUCCESS"}
+{"event": "task-end", "task": ":modules:ui:test", "time": 1792557738170, "durationMs": 493678, "tests": 2022, "failed": 0, "skipped": 1}
