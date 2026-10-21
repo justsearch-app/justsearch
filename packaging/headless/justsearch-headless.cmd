@@ -33,5 +33,5 @@ set "HERE=%~dp0"
 set "JAVA=%HERE%runtime\bin\java.exe"
 if not exist "%JAVA%" set "JAVA=java"
 
-"%JAVA%" -cp "%HERE%ui-headless.jar;%HERE%lib\*" "-Djustsearch.mode=%MODE%" io.justsearch.ui.HeadlessApp
+"%JAVA%" -cp "%HERE%ui-headless.jar;%HERE%lib\*" "-Djustsearch.prod=true" "-Djustsearch.mode=%MODE%" io.justsearch.ui.HeadlessApp
 endlocal

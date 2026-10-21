@@ -42,6 +42,56 @@ public final class DocumentFieldOps {
   private final RuntimeSession session;
   private final ReadPathOps readPathOps;
 
+  /** Recheck IDs retained by a backfill cache before starting another batch. */
+  public Set<String> excludedProcessingIds(List<String> docIds) {
+    var allows = session.sourceProcessingPolicy;
+    if (allows == null || docIds.isEmpty()
+        || io.justsearch.configuration.excludes.ExclusionPatterns.current().isEmpty()) return Set.of();
+    try {
+      var fields = getDocumentFieldsBatch(docIds,
+          Set.of(SchemaFields.PATH, SchemaFields.PARENT_DOC_ID, SchemaFields.PROJECTION_SOURCE_ID));
+      Map<String, String> parents = new HashMap<>();
+      Set<String> excluded = new LinkedHashSet<>();
+      for (String id : docIds) {
+        if (!fields.containsKey(id)) {
+          excluded.add(id);
+          continue;
+        }
+        String source = processingSource(id, fields.get(id), parents);
+        if (!allows.test(source)) excluded.add(id);
+      }
+      return excluded;
+    } catch (IOException unreadable) {
+      // Unknown source scope cannot authorise more processing; retain its pending state.
+      return Set.copyOf(docIds);
+    }
+  }
+
+  private String processingSource(String id, Map<String, String> fields,
+      Map<String, String> parents) throws IOException {
+    String projectionSource = fields.get(SchemaFields.PROJECTION_SOURCE_ID);
+    if (projectionSource != null && !projectionSource.isBlank()) return null;
+    String source = fields.get(SchemaFields.PATH);
+    if (source != null && !source.isBlank()) return source;
+    String parent = fields.get(SchemaFields.PARENT_DOC_ID);
+    if (parent != null && !parent.isBlank()) {
+      if (!parents.containsKey(parent)) {
+        projectionSource = getDocumentFieldOrThrow(parent, SchemaFields.PROJECTION_SOURCE_ID);
+        source = getDocumentFieldOrThrow(parent, SchemaFields.PATH);
+        parents.put(parent, projectionSource != null && !projectionSource.isBlank()
+            ? null : source == null || source.isBlank() ? parent : source);
+      }
+      return parents.get(parent);
+    }
+    return id;
+  }
+
+  private static boolean processingSelection(String field, String value) {
+    return ("PENDING".equals(value) || SchemaFields.NER_STATUS_COMPLETED.equals(value))
+        && Set.of(SchemaFields.EMBEDDING_STATUS, SchemaFields.CHUNK_EMBEDDING_STATUS,
+            SchemaFields.SPLADE_STATUS, SchemaFields.NER_STATUS, SchemaFields.VDU_STATUS).contains(field);
+  }
+
   /** Stored parent identity used to seed/rebuild the Worker document-identity store. */
   public record StoredDocumentIdentity(String docId, String docUid) {}
 
@@ -643,19 +693,51 @@ public final class DocumentFieldOps {
                         BooleanClause.Occur.MUST_NOT)
                     .build()
                 : valueQuery;
-        var topDocs = searcher.search(query, limit);
+        var allows = session.sourceProcessingPolicy;
+        if (allows != null && processingSelection(field, value)
+            && !io.justsearch.configuration.excludes.ExclusionPatterns.current().isEmpty()) {
+          // Stream eligible IDs so excluded heads neither starve later files nor require
+          // repeated full-index searches. Status selections have no relevance ordering.
+          List<String> eligible = new ArrayList<>();
+          Map<String, String> parents = new HashMap<>();
+          Set<String> storedAllowlist = Set.of(idField, SchemaFields.PATH,
+              SchemaFields.PARENT_DOC_ID, SchemaFields.PROJECTION_SOURCE_ID);
+          searcher.search(query, new org.apache.lucene.search.SimpleCollector() {
+            private org.apache.lucene.index.StoredFields storedFields;
 
+            @Override
+            protected void doSetNextReader(LeafReaderContext leaf) throws IOException {
+              if (eligible.size() >= limit) throw new org.apache.lucene.search.CollectionTerminatedException();
+              storedFields = leaf.reader().storedFields();
+            }
+
+            @Override
+            public void collect(int doc) throws IOException {
+              Map<String, String> fields = SearchResultFormatter.extractFromStoredFields(
+                  storedFields, doc, false, storedAllowlist);
+              String id = fields.get(idField);
+              if (id != null && !id.isBlank() && allows.test(processingSource(id, fields, parents))) {
+                eligible.add(id);
+                if (eligible.size() >= limit) throw new org.apache.lucene.search.CollectionTerminatedException();
+              }
+            }
+
+            @Override
+            public org.apache.lucene.search.ScoreMode scoreMode() {
+              return org.apache.lucene.search.ScoreMode.COMPLETE_NO_SCORES;
+            }
+          });
+          return eligible;
+        }
+        var topDocs = searcher.search(query, limit);
         List<String> docIds = new ArrayList<>(topDocs.scoreDocs.length);
         org.apache.lucene.index.StoredFields storedFields = searcher.storedFields();
         Set<String> storedAllowlist = Set.of(idField);
         for (var scoreDoc : topDocs.scoreDocs) {
-          Map<String, String> fields =
-              SearchResultFormatter.extractFromStoredFields(
-                  storedFields, scoreDoc.doc, false, storedAllowlist);
+          Map<String, String> fields = SearchResultFormatter.extractFromStoredFields(
+              storedFields, scoreDoc.doc, false, storedAllowlist);
           String docId = fields.get(idField);
-          if (docId != null && !docId.isBlank()) {
-            docIds.add(docId);
-          }
+          if (docId != null && !docId.isBlank()) docIds.add(docId);
         }
         return docIds;
       });

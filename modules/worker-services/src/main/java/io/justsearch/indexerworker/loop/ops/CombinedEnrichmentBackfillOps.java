@@ -408,6 +408,8 @@ public final class CombinedEnrichmentBackfillOps {
         pendingIds.add(id);
       }
 
+      pendingIds.removeAll(context.documentFieldOps().excludedProcessingIds(pendingIds));
+      chunkDocIds.retainAll(pendingIds);
       if (pendingIds.isEmpty()) {
         return CombinedOutcome.none();
       }

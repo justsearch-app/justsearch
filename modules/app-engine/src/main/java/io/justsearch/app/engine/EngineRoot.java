@@ -1027,6 +1027,7 @@ public final class EngineRoot implements WorkerHost {
     try {
       started.installProjectionSeedSources(projectionSeedSources);
       started.bindBootRootBindings(authority.roots().snapshotBindings());
+      started.bindExclusionRoots(authority.roots()::watchedPaths);
       if (startContext != null) started.bindIndexStartContext(startContext);
       else started.bindBootQueryRoleSelection(exactBootQuery);
       started.start();

@@ -30,10 +30,11 @@ From an installed bundle (the launcher sits next to `ui-headless.jar`):
 justsearch-headless.cmd mcp-lite
 ```
 
-On Linux, from an installed Gradle distribution, use its native launcher:
+On Linux, from a source checkout after `:modules:ui:installDist`, start the installed
+distribution's native launcher in production mode:
 
 ```sh
-JUSTSEARCH_MODE=mcp-lite /absolute/path/to/ui/bin/ui
+JAVA_OPTS=-Djustsearch.prod=true JUSTSEARCH_MODE=mcp-lite modules/ui/build/install/ui/bin/ui
 ```
 
 On Windows, the PowerShell form is:
@@ -71,6 +72,26 @@ node scripts/lib/tool-invoker.cjs gradle :modules:ui:runHeadless -Pmode=mcp-lite
 
 `-Pmode` sets `-Djustsearch.mode`; omit it for `full-desktop`. The equivalent environment
 variable is `JUSTSEARCH_MODE` (see `docs/reference/configuration/environment-variables.md`).
+This dev task stays in development mode and does not require a session token.
+
+## Authenticate API requests
+
+The packaged headless launchers and the Linux production command above require a
+per-boot session token on every POST, PUT and DELETE request, including search and
+the MCP endpoint. Read `head.sessionToken` from the local
+`<data>/runtime/manifest.json` file, where `<data>` is the Engine data directory
+(or `JUSTSEARCH_DATA_DIR` when set), and send it in the `X-JustSearch-Session` header:
+
+```bash
+SESSION_TOKEN=$(jq -r '.head.sessionToken' "$JUSTSEARCH_DATA_DIR/runtime/manifest.json")
+curl -s -X POST http://127.0.0.1:33221/api/knowledge/search \
+  -H "X-JustSearch-Session: $SESSION_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"example"}'
+```
+
+Use the Engine's actual API port in place of `33221` if different. The token changes
+on each boot; missing or incorrect tokens receive HTTP `401` on protected requests.
 
 ## Confirm the active mode
 
@@ -98,10 +119,10 @@ curl -s http://127.0.0.1:33221/api/ai/install/plan-preview | jq '.tiers'
 
 ## Notes
 
-- The service binds to `127.0.0.1` only. These launchers do not set production mode, so they
-  do not mint or enforce the desktop app's per-boot mutation token by default. Host/Origin
-  filters still apply; local callers can mutate without that token. Use these launchers
-  only where all local callers are trusted. The desktop shell explicitly enables production mode.
-- Agent clients connect over the production MCP endpoint (`POST /mcp`); which tools a lite
+- The service binds only to loopback (`127.0.0.1`); production POST, PUT and DELETE
+  requests, including `POST /mcp`, also require the per-boot session token.
+- Agent clients connect over the production MCP endpoint (`POST /mcp`) and must send
+  the token in the `X-JustSearch-Session` header (the production MCP server discovers
+  the Engine through the manifest and fetches the token from `/api/mcp/token`); which tools a lite
   deployment exposes is governed separately (see the MCP production server reference).
 - This is a launch mode, not a separate build — the same `ui-headless.jar` runs every mode.

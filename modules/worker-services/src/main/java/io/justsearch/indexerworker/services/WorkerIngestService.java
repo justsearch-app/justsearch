@@ -751,6 +751,7 @@ public final class WorkerIngestService {
     for (Path root : declared) {
       roots.add(root.toAbsolutePath().normalize());
     }
+    bootExclusionRoots = List.copyOf(roots);
     try {
       if (rootVolumes.beginUpgradeSeeding(roots)) {
         log.info("Upgrade: the volume of {} declared roots is confirmed on evidence", roots.size());
@@ -1216,6 +1217,43 @@ public final class WorkerIngestService {
     }
   }
 
+  private volatile java.util.Collection<Path> bootExclusionRoots = List.of();
+  private volatile Supplier<java.util.Collection<Path>> exclusionRoots = () -> bootExclusionRoots;
+
+  /**
+   * The composing owner binds its current file policy and Head-owned watched membership before
+   * publication. Construction alone must not bind: temporary replay services share the runtime
+   * but never own its processing policy.
+   */
+  public void useExclusionRoots(Supplier<java.util.Collection<Path>> roots) {
+    exclusionRoots = java.util.Objects.requireNonNull(roots, "roots");
+    if (ingestLifecycle != null) {
+      ingestLifecycle.useSourceProcessingPolicy(this::sourceProcessingAllowed);
+    }
+  }
+
+  /** Current user policy, including saved roots not yet registered with a native watcher. */
+  public boolean isUserExcluded(Path file, Path root) {
+    var patterns = io.justsearch.configuration.excludes.ExclusionPatterns.current();
+    if (patterns.isEmpty()) return false;
+    if (patterns.isExcludedPath(root, file) || rootWatcherRegistry.isUserExcluded(file)) return true;
+    for (Path watched : exclusionRoots.get()) {
+      if (patterns.isExcludedPath(watched, file)) return true;
+    }
+    return false;
+  }
+
+  private boolean sourceProcessingAllowed(String source) {
+    if (source == null || source.isBlank()) return true;
+    try {
+      Path file = Path.of(source);
+      // Projection and non-file document IDs have no filesystem exclusion scope.
+      return !file.isAbsolute() || !isUserExcluded(file, file);
+    } catch (InvalidPathException nonFile) {
+      return true;
+    }
+  }
+
   public BatchResponse submitBatch(BatchRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       List<String> filePaths = request.getFilePathsList();
@@ -1252,10 +1290,10 @@ public final class WorkerIngestService {
 
         for (String pathStr : filePaths) {
           Path sanitized = sanitizePath(pathStr);
-          if (sanitized != null) {
-            validPaths.add(sanitized);
-          } else {
+          if (sanitized == null) {
             rejected++;
+          } else if (!isUserExcluded(sanitized, sanitized)) {
+            validPaths.add(sanitized);
           }
         }
 
@@ -1264,7 +1302,8 @@ public final class WorkerIngestService {
         }
 
         if (validPaths.isEmpty()) {
-          return batchErrorResponse("All paths were invalid or unsafe");
+          return rejected == filePaths.size()
+              ? batchErrorResponse("All paths were invalid or unsafe") : batchSuccessResponse(0);
         }
         if (request.getRootAdded()) {
           // Round 8b (decision 1): an explicit ingest request is a deliberate add and records the
@@ -1646,13 +1685,26 @@ public final class WorkerIngestService {
         try {
           // The chunk replacement holds the file-mutation fence, so a prune of this file never
           // sees part of it and no replacement chunk lands after the file was removed.
-          boolean applied;
+          String refusal;
           try {
-            applied = withFileMutationFence(() -> {
+            refusal = withFileMutationFence(() -> {
               try {
                 ingestLifecycle.commitOps().maybeRefreshBlocking();
-                if (!vduClaimMatches(docId, claim)) return false;
-                return VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled(), claim.expectedRevision());
+                if (ingestLifecycle.documentFieldOps().excludedProcessingIds(List.of(docId)).contains(docId)) {
+                  // Already under the mutation lease, monitor and file fence: reset this exact
+                  // claim directly instead of re-entering the public release admission path.
+                  if (resetVduStatusToPending(docId, claim.owner(), Set.of(claim.attemptId()))) {
+                    ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
+                    ingestLifecycle.commitOps().maybeRefreshBlocking();
+                  }
+                  requireServingVduTarget();
+                  return "Source is excluded by the current policy";
+                }
+                if (!vduClaimMatches(docId, claim)
+                    || !VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled(), claim.expectedRevision())) {
+                  return "VDU source revision changed: " + docId;
+                }
+                return null;
               } catch (IOException e) {
                 throw new java.io.UncheckedIOException(e);
               }
@@ -1660,9 +1712,9 @@ public final class WorkerIngestService {
           } catch (java.io.UncheckedIOException e) {
             throw e.getCause();
           }
-          if (!applied) {
+          if (refusal != null) {
             vduProcessingClaims.remove(docId, claim);
-            return updateVduErrorResponse("VDU source revision changed: " + docId);
+            return updateVduErrorResponse(refusal);
           }
           vduProcessingClaims.remove(docId);
           ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_UPDATE);
@@ -2450,6 +2502,9 @@ public final class WorkerIngestService {
           return withFileMutationFence(() -> {
             try {
               ingestLifecycle.commitOps().maybeRefreshBlocking();
+              if (ingestLifecycle.documentFieldOps().excludedProcessingIds(List.of(docId)).contains(docId)) {
+                return markVduErrorResponse("Source is excluded by the current policy");
+              }
               var input = ingestLifecycle.documentFieldOps().getEnrichmentInputs(List.of(docId)).get(docId);
               if (input == null) return markVduErrorResponse("Document not found: " + docId);
               if (input.fields().getOrDefault(SchemaFields.SOURCE_SHA256, "").isBlank()) {
@@ -2595,6 +2650,7 @@ public final class WorkerIngestService {
   /** Refresh just an unverifiable legacy source, with the queue's existing durable source witness. */
   public void refreshLegacyVduSource(String docId) throws IOException {
     ingestLifecycle.commitOps().maybeRefreshBlocking();
+    if (ingestLifecycle.documentFieldOps().excludedProcessingIds(List.of(docId)).contains(docId)) return;
     var input = ingestLifecycle.documentFieldOps().getEnrichmentInputs(List.of(docId)).get(docId);
     if (input == null || !input.fields().getOrDefault(SchemaFields.SOURCE_SHA256, "").isBlank()) return;
     var expected = vduRevision(input.fields());
@@ -2621,7 +2677,7 @@ public final class WorkerIngestService {
   }
 
   private boolean resetVduStatusToPending(String docId, java.util.UUID procedureOwner, Set<String> attemptIds)
-      throws Exception {
+      throws IOException {
     synchronized (vduMutationMonitor) {
       VduProcessingClaim claim = vduProcessingClaims.get(docId);
       if (procedureOwner != null
@@ -2780,6 +2836,11 @@ public final class WorkerIngestService {
         String rawOldPath = mapping.getOldPath();
         String rawNewPath = mapping.getNewPath();
         if (rawOldPath.isBlank() || rawNewPath.isBlank()) {
+          failedPaths.add(rawOldPath);
+          continue;
+        }
+        Path destination = Path.of(rawNewPath);
+        if (isUserExcluded(destination, destination)) {
           failedPaths.add(rawOldPath);
           continue;
         }
