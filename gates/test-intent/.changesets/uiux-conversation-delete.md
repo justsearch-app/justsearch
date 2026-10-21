@@ -572,3 +572,14 @@ All checks are durable. Compatibility patch adds signatures only to the before-s
   "note": "Reviewed before-state tests, agreed scenarios and sources before the diff. All 24 named checks passed without skips on the exact candidate and failed by assertion before, independently replayed to scratch evidence. Test expectations accepted. Product verification fails S52.2: in-flight compaction recreates deleted conversation metadata and its private summary."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-nedof9ll",
+  "verdict": "accept",
+  "digest": "sha256:a2257255f55ae416996bd968608285b167454834867cb311dace5b366408c92e",
+  "note": "Reviewed baseline tests, agreed scenarios and sources before the diff. Independently replayed 37 repair checks: all passed without skips and failed by assertion before. All 146 preservation cases passed on both versions. Test intent accepted; product verification fails S52.1/S52.2 for accepted queued background work recreating a deleted conversation and S52.3 for locked run-only listing."
+}
+```
