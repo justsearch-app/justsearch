@@ -348,6 +348,27 @@ final class RuntimeReloadProducersHttpIntegrationTest {
   }
 
   @Test
+  void refusedReceiptWriteKeepsTheOldOwnerAndTheWaitingDelete() throws Exception {
+    try (var f = new Fixture()) {
+      var files = f.watchedFiles();
+      var source = (DefaultWorkerAppServices) f.server.appServices();
+      f.refuseNextReceipt(source);
+      var refused = f.reloadWithSettledDeleteWaiting(files.gone(), f::reopen);
+      assertFalse(source.producerClosed(),
+          "the old owner must not close over a waiting delete that is not durable");
+      assertSame(source, f.server.appServices(), "the old owner must stay the serving owner");
+      assertEquals(500, refused.statusCode(), refused.body());
+      assertTrue(refused.body().contains("Application-service replacement failed"), refused.body());
+      f.awaitReceipts(1, "the released delete reaches the old owner, which records it");
+      f.useNormalReload();
+      assertReloadSuccess(f.post());
+      f.awaitCount("reloadobligationgone", 0);
+      f.awaitCount("reloadobligationkept", 1);
+      assertEquals(List.of(), f.receipts());
+    }
+  }
+
+  @Test
   void successfulNativeReloadDischargesAnExistingWatcherReceipt() throws Exception {
     try (var f = new Fixture()) {
       f.unwatchedFilesWithReceipt();
@@ -721,6 +742,18 @@ final class RuntimeReloadProducersHttpIntegrationTest {
           io.justsearch.indexerworker.queue.WatcherRootReconciliation.OPERATION, debt.encode()));
       assertEquals(1, count("reloadobligationgone"), "the receipt's delete is not yet applied");
       return files;
+    }
+
+    /** The owner's next watcher receipt write is refused, as a failing store would refuse it. */
+    void refuseNextReceipt(DefaultWorkerAppServices owner) throws Exception {
+      var ingest = owner.ingestService();
+      var real = (io.justsearch.indexerworker.queue.SwitchBufferCapableQueue) field(ingest, "jobQueue");
+      var refusing = mock(io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.class,
+          withSettings().defaultAnswer(org.mockito.AdditionalAnswers.delegatesTo(real)));
+      doReturn(false).doAnswer(org.mockito.AdditionalAnswers.delegatesTo(real)).when(refusing)
+          .putSwitchBuffer(anyString(),
+              eq(io.justsearch.indexerworker.queue.WatcherRootReconciliation.OPERATION), anyString());
+      set(ingest, "jobQueue", refusing);
     }
 
     String recordedVolume(Path ledger, Path root) throws Exception {

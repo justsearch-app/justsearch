@@ -173,7 +173,11 @@ final class WatcherDeleteCrashRecoveryTest extends LuceneExecutorTestBase {
             try {
               WorkerIngestService.class.getMethod("reconcileReloadedWatcherRootsFrom", WorkerIngestService.class)
                   .invoke(successor, service);
-            } catch (NoSuchMethodException beforeRepair) { /* parent asserts the missing crash cut */ }
+            } catch (NoSuchMethodException beforeRepair) {
+              // A build without reload reconciliation dies at the same point; the parent asserts
+              // the outcome (the debt and its effect), not the crash cut.
+              Runtime.getRuntime().halt(71);
+            }
           }
           return;
         }

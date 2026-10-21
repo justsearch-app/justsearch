@@ -3551,6 +3551,7 @@ public final class KnowledgeServer implements Closeable {
       if (successor.ownsNativeProducer()) {
         successor.prepareIndexingLoop();
         handedOff = true;
+        source.recordWaitingWatcherDeletes();
         source.installNativeWatcherHandoffTo(successor);
         mutations.install(successor.mutationOwnerToken());
         source.close();
@@ -8881,6 +8882,15 @@ public final class KnowledgeServer implements Closeable {
           if (old.encoderSet != null) successor.attachEncoderSet(old.encoderSet);
           if (old.queryRoleSet != null) successor.attachQueryRoleSet(old.queryRoleSet);
           retired = old;
+        }
+        // A settled DELETE waiting on the fence is recorded through A first; if that fails, the
+        // migration is refused while A still serves.
+        try {
+          incumbent.recordWaitingWatcherDeletes();
+        } catch (RuntimeException unrecorded) {
+          log.warn("Live Green start refused: a waiting watcher DELETE was not recorded ({})",
+              unrecorded.getMessage());
+          return false;
         }
         // All reversible preparation is complete. The old loop no longer owns a running batch;
         // its extractor can leave without closing the A model set still used by search leases.
