@@ -581,3 +581,13 @@ An independent verifier supplies acceptance after checking the final candidate a
   "note": "Delta 5dae1007b..28c2d7508 verified: Linux PMD, store gate, four CI classes, 13 paired installed cases, SIGKILL/temp cleanup and rollback checks. Windows contracts independent; native candidate unverified. Separate Codex session only."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-822d-round2",
+  "verdict": "accept",
+  "digest": "sha256:7182cd5f7c4618d81b4787c235b688bc9f4580ac709a3cae4ab9bfca50685a7f"
+}
+```
