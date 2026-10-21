@@ -651,3 +651,14 @@ are recorded separately. A separate session must review these entries and append
   "note": "On 5a7973f27 I reran the Rust (13 assertion fail-before, 3 preservation pass, 16/16 after) and web (9 assertion fail-before, 1 preservation pass, 241/241 after) receipts, confirmed the merge kept this PR's 35 paths with http.ts, http.test.ts and lib.rs changes intact, ran the installed production Engine live (released manifest port impostor got zero bytes), and found the commit-transport shim honestly classified as Incidental with its narrower actor boundary disclosed."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "4a6ff386-7b73-4d9a-b22d-7a675720f3e9",
+  "verdict": "accept",
+  "digest": "sha256:ab6c0f3ad52cc5e75d860f78f64d48e0c253976c1002a6b79e66984fce177569",
+  "note": "On c69138640 every shell credential sender (shutdown, prepare, cancel, commit, reconcile) still connects only through connect_engine/connect_proven and #839's TLS install touches no socket path; reran on base 738e6a443 the 16 Rust receipts (13 assertion fail-before, 3 preservation pass), candidate lib 229 pass and bin 142 pass with the same 7 handoff failures as base, and web 241/241."
+}
+```
