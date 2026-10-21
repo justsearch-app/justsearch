@@ -30,7 +30,7 @@ This spec covers v2 + v3. The current implementation status is:
   - Runtime activation is a separate step (`POST /api/ai/runtime/activate`) and is gated by policy + self-test.
 - **Not implemented yet (future)**:
   - `kind: "vision"` and `kind: "combo"` packs and their non-runtime asset roles.
-  - Automatic activation as part of offline pack import. Separately, runtime discovery can prefer CUDA and Windows startup can select an installed `cuda12` variant when GPU layers are requested; see [AI Setup + Verification](13-ai-setup-and-verification.md).
+  - Automatic activation as part of offline pack import. Separately, runtime discovery can prefer CUDA; Install AI and Windows startup can select an installed `cuda12` variant when GPU policy permits (startup also requires positive GPU layers); see [AI Setup + Verification](13-ai-setup-and-verification.md).
 
 ## 1. Goals
 

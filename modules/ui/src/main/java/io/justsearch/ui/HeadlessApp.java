@@ -891,9 +891,10 @@ public class HeadlessApp {
     // Policy discovery mirrors its effective flags into the resolver's process sources.
     // A later settings candidate must not mistake that boot publication for an encoder change.
     try {
-      new EnterprisePolicyServiceImpl().snapshot();
-    } catch (Exception ignored) {
-      // best-effort; policy loading itself fails closed where required.
+      java.util.Objects.requireNonNull(new EnterprisePolicyServiceImpl().snapshot());
+    } catch (Exception failure) {
+      log.warn("Boot policy load failed; GPU acceleration disabled", failure);
+      SystemAccess.setSysProp("policy.gpu_acceleration_enabled", "false");
     }
   }
 
@@ -1010,6 +1011,7 @@ public class HeadlessApp {
 
   private static void maybeMirrorOrtNativePath(ConfigStore configStore) {
     try {
+      if (configStore != null && !configStore.get().ai().gpuAccelerationAllowed()) return;
       Path home = PlatformPaths.resolveDataDir();
       if (home == null) {
         log.debug("ORT native_path mirror: data dir unresolved; skipping");
@@ -2811,6 +2813,7 @@ public class HeadlessApp {
       int gpuLayers = settings.getGpuLayers();
       ConfigStore cs = activeConfigStore != null ? activeConfigStore : ConfigStore.globalOrNull();
       if (cs != null) {
+        if (!cs.get().ai().gpuAccelerationAllowed()) return null;
         gpuLayers = cs.get().ai().gpuLayers();
       }
       if (gpuLayers <= 0) {
