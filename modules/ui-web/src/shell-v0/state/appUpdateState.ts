@@ -51,9 +51,9 @@ function publish(status: AppUpdateStatus | null): AppUpdateStatus | null {
   return status;
 }
 
-async function invoke<T>(command: string): Promise<T> {
+async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke: tauriInvoke } = await import('@tauri-apps/api/core');
-  return tauriInvoke<T>(command);
+  return args ? tauriInvoke<T>(command, args) : tauriInvoke<T>(command);
 }
 
 export function getAppUpdateStatus(): AppUpdateStatus | null {
@@ -77,15 +77,19 @@ export async function refreshAppUpdateStatus(): Promise<AppUpdateStatus | null> 
 }
 
 export async function checkForAppUpdate(): Promise<AppUpdateStatus> {
+  return checkAppUpdate(false);
+}
+
+async function checkAppUpdate(automatic: boolean): Promise<AppUpdateStatus> {
   const current = snapshot;
-  publish({
+  if (!automatic) publish({
     state: 'checking',
     currentVersion: current?.currentVersion ?? 'unknown',
     availableVersion: current?.availableVersion,
     releaseSequence: current?.releaseSequence,
   });
   try {
-    const status = await invoke<AppUpdateStatus>('check_for_app_update');
+    const status = await invoke<AppUpdateStatus>('check_for_app_update', automatic ? { automatic: true } : undefined);
     publish(status);
     return status;
   } catch (error) {
@@ -116,7 +120,7 @@ export function startAppUpdateMonitor(delayMs = 30_000): () => void {
   let stopped = false;
   void refreshAppUpdateStatus();
   const timer = window.setTimeout(() => {
-    if (!stopped) void checkForAppUpdate().catch(() => undefined);
+    if (!stopped) void checkAppUpdate(true).catch(() => undefined);
   }, delayMs);
   return () => {
     stopped = true;
