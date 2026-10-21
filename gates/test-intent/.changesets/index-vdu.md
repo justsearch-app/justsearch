@@ -304,3 +304,14 @@ F1/F2 follow the adopted b81d05 scenarios. I5 uses five alternating pairs on mat
   "note": "Reviewed lint-only delta a12b918ff..96cb76b63: assertions, inputs and behavioral paths preserved; removed snapshot/helpers are obsolete remnants. Candidate uncached pmdTest passed; full indexer-worker tests passed (1227 passed, 28 skipped; all 44 tests in changed files passed). Race evidence validates. Baseline reproduced seven PMD violations and two pre-existing test failures; stale RP7 comment and gate reconsider-rate warning noted."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-99a0bca19-20261021",
+  "verdict": "accept",
+  "digest": "sha256:e0356303f1bb72e4d01ca3d257492a626380741a505e88efcfafd7f48344d62e",
+  "note": "Verified 5654b0163..99a0bca19: identical executable bytecode; resource debug name alone differs. Same 92 tests passed before/after, none skipped. Requested compilation/pmdAll and uncached worker PMD passed. Refreshed evidence validates."
+}
+```
