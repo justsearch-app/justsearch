@@ -682,7 +682,8 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
     indexed(runtime, key(removed), 1);
     indexed(runtime, key(live), 1);
     bufferPrune(null);
-    assertTrue(queue.putSwitchBuffer("path:" + key(removed), "DELETE", key(removed)));
+    assertTrue(queue.putSwitchBuffer("path:" + key(removed), "DELETE", new io.justsearch.indexerworker.queue.SwitchBufferDelete(key(removed),
+        io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.EXPLICIT, null).encode()));
     Files.delete(gone);
 
     KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(bestEffort(runtime, publisher));

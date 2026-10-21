@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import semver from 'semver';
 
 export const GITHUB_ADVISORY_REPORT_SCHEMA = 'github-advisory-report.v2';
 export const GITHUB_ADVISORY_PROVIDER = 'github-global-security-advisories';
@@ -155,13 +156,22 @@ export async function queryGitHubAdvisories(specs, {
         if (!Array.isArray(row.vulnerabilities) || !row.vulnerabilities.length) {
           throw new Error(`GitHub advisory ${advisory.ghsa_id} has no package attribution`);
         }
-        const names = new Set(row.vulnerabilities.filter((v) => v?.package?.ecosystem === 'npm').map((v) => v.package.name));
-        // Batches contain one version per package. GitHub's affects filter has
-        // already matched that version; no local approximation of its range.
         const affected = batch.flatMap((spec) => {
           const at = spec.lastIndexOf('@');
           const name = spec.slice(0, at);
-          return names.has(name) ? [{ package: name, version: spec.slice(at + 1) }] : [];
+          const version = spec.slice(at + 1);
+          const entries = row.vulnerabilities.filter(v => v?.package?.ecosystem === 'npm' && v.package.name === name);
+          const matches = entries.some(entry => {
+            // GitHub separates conjunctive comparators with commas; node-semver
+            // uses whitespace for the same intersection.
+            const range = typeof entry.vulnerable_version_range === 'string'
+              ? entry.vulnerable_version_range.replaceAll(',', ' ') : null;
+            if (!semver.valid(version) || typeof range !== 'string' || !range.trim() || !semver.validRange(range)) {
+              throw new Error(`GitHub advisory ${advisory.ghsa_id} has unreadable vulnerable range for ${spec}`);
+            }
+            return semver.satisfies(version, range);
+          });
+          return matches ? [{ package: name, version }] : [];
         });
         if (!affected.length) throw new Error(`GitHub advisory ${advisory.ghsa_id} matches no queried package`);
         const unique = new Map([...(prior?.affected ?? []), ...affected].map((entry) => [`${entry.package}@${entry.version}`, entry]));

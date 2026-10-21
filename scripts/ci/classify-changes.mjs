@@ -3,12 +3,18 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-export const LANES = Object.freeze(['build', 'license', 'ui', 'services', 'search', 'platform', 'windows', 'devrunner', 'rust', 'lifecycle', 'integration', 'jseval']);
+export const LANES = Object.freeze(['build', 'license', 'ui', 'services', 'search', 'platform', 'windows', 'devrunner', 'rust', 'lifecycle', 'integration', 'jseval', 'frontend']);
 const java = ['build', 'ui', 'services', 'search', 'platform', 'windows', 'jseval', 'lifecycle', 'integration'];
-const contracts = [...java, 'rust'];
+const contracts = [...java, 'rust', 'frontend'];
 // Unclaimed paths deliberately select everything. Rules overlap: a mixed diff and
 // a file consumed by several lanes both take the union, never first-match wins.
 export const RULES = [
+  // Documentation consumed by scoped code is an input, even though ordinary docs are cheap.
+  [/^docs\/reference\/legal\/ai-runtime-and-model-redistribution\.md$/, ['license']],
+  // The advisory axe sweep consumes Vite, the Python capture/gate and its fixtures,
+  // the shared register, and schema/token data. It has its own selector so a Java
+  // closure alone does not start a browser sweep.
+  [/^(?:modules\/ui-web\/|scripts\/jseval\/|governance\/(?:ui-a11y-baseline|ui-proportion-baseline|status-facts)\.v1\.json$|modules\/configuration\/src\/main\/resources\/ai\/model-registry\.v2\.json$|package(?:-lock)?\.json$)/, ['frontend']],
   [/^(?:docs\/|\.claude\/|\.codex\/|\.agents\/|AGENTS\.md$|[^/]+\.md$)/, []],
   [/^modules\/(?:adapters-lucene|ai-backend|api-contract-projection-java|app-agent|app-agent-api|app-api|app-config|app-engine|app-inference|app-observability|app-services|app-util|configuration|core|core-contracts|extension-substrate|gpu-bridge|indexer-worker|indexing|infra-core|ipc-common|ort-common|prompt-support|reranker|telemetry|worker-core|worker-services)\//, java],
   [/^modules\/ui\//, java.filter((lane) => lane !== 'search')],
@@ -43,7 +49,7 @@ export const RULES = [
   [/^native\/bound-exec\//, ['devrunner', 'windows']],
   [/^(?:scripts\/(?:dev|lib|supervisor-conformance|testing)\/|scripts\/agent-analytics\/(?:861-w5-remove-worktree-teardown|936-remove-worktree-cli|952-worktree-lifecycle-cli)\.test\.mjs$|scripts\/jseval\/lane-f\/e-crash-evidence\.mjs$|scripts\/ci\/pr-flakes\.(?:mjs|tsv)$)/, ['devrunner', 'windows']],
   [/^governance\/(?:supervision-contract\.v1\.json$|store-recoverability\.v1\.json$|worktree-lifecycle\.v1\.json$|exit-ledger\.v1\.schema\.json$|fixtures\/exit-ledger\/)/, ['devrunner', 'windows']],
-  [/^(?:contracts\/native-targets\/spec\.v1\.json|package(?:-lock)?\.json|dev-runner\.cjs)$/, ['devrunner', 'windows']],
+  [/^(?:contracts\/(?:native-targets|platform-paths)\/spec\.v1\.json|modules\/shell\/src-tauri\/tauri\.conf\.json|package(?:-lock)?\.json|dev-runner\.cjs)$/, ['devrunner', 'windows']],
   [/^\.gitignore$/, ['devrunner', 'windows', 'jseval']],
   [/^models\//, [...contracts, 'license']],
   [/^(?:licenses?\/|notices?\/|NOTICE|LICENSE|native-licenses\/)/, ['license']],

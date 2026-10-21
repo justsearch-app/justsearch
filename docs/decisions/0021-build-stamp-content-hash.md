@@ -4,7 +4,7 @@ type: decision
 status: accepted - startup injection gap; owner review open
 description: "The Engine distribution content hash is generated, but normal startup does not inject it into the running JVM; hot reload sets it. The dev-runner uses a separate mtime-based head stamp for startup freshness. Owner review of the content-hash startup gap remains open."
 date: 2026-04-06
-probes: none - the build-stamp hash is verified by its own runtime staleness check, which fails at boot rather than at gate time.
+probes: none - normal startup does not inject the build-stamp hash; jseval skips the comparison when the stamp is missing and warns without aborting on a mismatch.
 last_reviewed: 2026-09-02
 ---
 

@@ -234,7 +234,8 @@ withTempRoot((root) => {
   const policy = JSON.parse(fs.readFileSync(new URL('./unit-test-shard-policy.v1.json', import.meta.url), 'utf8'));
   const requiredClasses = policy.windowsParts.flatMap(part => part.requiredClasses ?? []);
   const resultPath = (name) => path.join(root, `modules/example/build/test-results/test/TEST-${name}.xml`);
-  const testcase = (name, body = '') => `<testcase classname="${requiredClasses.at(-1).name}" name="${name}">${body}</testcase>`;
+  const prune = requiredClasses.find(entry => entry.name.endsWith('.PruneMissingDifferentVolumeTest'));
+  const testcase = (name, body = '') => `<testcase classname="${prune.name}" name="${name}">${body}</testcase>`;
   for (const entry of requiredClasses) {
     write(resultPath(entry.name), suiteXml({ name: entry.name, tests: 1, skipped: 0 }));
   }
@@ -293,7 +294,6 @@ withTempRoot((root) => {
     + `<testcase classname="${contended.name}" name="portableCase()"/>`
     + `<testcase classname="${contended.name}" name="${rotation.name}"><skipped/></testcase></testsuite>`);
   assert.equal(run().status, 0, 'preserve the named @EnabledOnOs(OS.LINUX) skip');
-  const prune = requiredClasses.at(-1);
   const allowed = prune.allowedSkips[0];
   const skip = (name, message) => testcase(name, `<skipped message="${message}"/>`);
   write(resultPath(prune.name), `<testsuite name="${prune.name}" tests="2" skipped="1">`

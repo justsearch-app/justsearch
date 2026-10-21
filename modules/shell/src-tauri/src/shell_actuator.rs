@@ -459,7 +459,8 @@ fn epoch() -> u64 {
         .as_millis() as u64
 }
 pub(crate) fn write_atomic(path: &Path, bytes: &str) -> Result<(), String> {
-    std::fs::create_dir_all(path.parent().ok_or("no parent")?).map_err(|e| e.to_string())?;
+    crate::exit_ledger::ensure_owner_only_directory(path.parent().ok_or("no parent")?)
+        .map_err(|e| e.to_string())?;
     let tmp = path.with_extension("tmp");
     std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
     std::fs::rename(tmp, path).map_err(|e| e.to_string())

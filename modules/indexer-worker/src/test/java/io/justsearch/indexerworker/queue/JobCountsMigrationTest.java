@@ -28,7 +28,7 @@ final class JobCountsMigrationTest {
     }
     try(var queue=new SqliteJobQueue(db)) {
       assertDoesNotThrow(queue::open);
-      assertEquals(24,version(queue),"V23 belongs to main's admission counter; counts require V24");
+      assertEquals(25,version(queue),"V23 belongs to main's admission counter; counts require V24; V25 follows");
       var conn=JobCountsTest.connection(queue);
       JobCountsTest.assertExact(queue,conn);
       try(var stmt=conn.createStatement();var row=stmt.executeQuery("SELECT path,state,attempts,last_updated,size_bytes,scan_id FROM jobs")) {
@@ -38,7 +38,7 @@ final class JobCountsMigrationTest {
       assertEquals(sourceVersion==23?41:0,queue.switchBufferAdmissions());
     }
     try(var queue=new SqliteJobQueue(db)) {
-      queue.open();assertEquals(24,version(queue));JobCountsTest.assertExact(queue,JobCountsTest.connection(queue));
+      queue.open();assertEquals(25,version(queue));JobCountsTest.assertExact(queue,JobCountsTest.connection(queue));
       assertEquals(sourceVersion==23?41:0,queue.switchBufferAdmissions());
     }
   }
@@ -59,7 +59,7 @@ final class JobCountsMigrationTest {
       stmt.execute("DROP TABLE switch_buffer_admissions");stmt.execute("PRAGMA user_version=23");
     }
     try(var queue=new SqliteJobQueue(db)) {
-      assertDoesNotThrow(queue::open);assertEquals(24,version(queue));
+      assertDoesNotThrow(queue::open);assertEquals(25,version(queue));
       assertEquals(0,assertDoesNotThrow(queue::switchBufferAdmissions));
       JobCountsTest.assertExact(queue,JobCountsTest.connection(queue));assertEquals(1,queue.queueDepth());
     }

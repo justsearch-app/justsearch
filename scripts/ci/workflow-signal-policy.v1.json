@@ -16,7 +16,7 @@
         "push"
       ],
       "owner": "ADR-0044 / public hosted CI fact lanes",
-      "note": "PR lanes are selected by changed inputs; required names always report. Main and dispatch run the full suite, including Integration tests, Measured axe and CI wall-clock attribution. Main never cancels the running run.",
+      "note": "PR lanes are selected by changed inputs; required names always report. Measured axe stays advisory and runs on PRs with frontend inputs, pushes to main and dispatch. Main and dispatch run the full suite, including Integration tests and CI wall-clock attribution. Main never cancels the running run.",
       "failureDefault": "product-regression",
       "staleDays": 14,
       "blocking": true,

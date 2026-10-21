@@ -36,6 +36,7 @@ follows a newer run that covers the requested commit. If main fails in your chan
 a fix or revert PR at once through the normal path. Report a failure in a test listed in
 `scripts/ci/pr-flakes.tsv`; do not revert for that listed flake.
 
+Measured axe remains advisory and runs on PRs when the frontend input lane is selected.
 Secret scan and Public claims always run. The classifier fails safe for unknown paths, workflow
 changes, missing diff evidence and non-PR events. Fixed jobs preserve the twelve required names;
 aggregates accept success or intentional skip and reject failure or cancellation. Main writes the

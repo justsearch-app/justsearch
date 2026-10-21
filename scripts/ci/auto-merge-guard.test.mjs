@@ -4,19 +4,24 @@ import guardAutoMerge from './auto-merge-guard.cjs';
 
 async function exercise({ head = 'a'.repeat(40), eventHead = 'a'.repeat(40),
   enabledAt = '2026-10-21T12:00:00Z', pushedAt = '2026-10-21T12:01:00Z', queryError,
-  missingPr = false, missingRequest = false, missingEnabledAt = false, mutationError } = {}) {
+  missingPr = false, missingRequest = false, missingEnabledAt = false, mutationError, queryFailures = 0, mutationFailures = 0 } = {}) {
   const context = { repo: { owner: 'owner', repo: 'repo' },
     payload: { pull_request: { number: 9, node_id: 'event-pr-id', updated_at: pushedAt, head: { sha: eventHead } } } };
   const mutations = [];
   const messages = [];
+  let reads = 0;
+  const delays = [];
   const github = {
     graphql: async (query, args) => {
       if (query.includes('mutation')) {
         assert.match(query, /disablePullRequestAutoMerge/);
         mutations.push(args);
+        if (mutations.length <= mutationFailures) throw new Error('transient disable failure');
         if (mutationError) throw new Error(mutationError);
         return {};
       }
+      reads++;
+      if (reads <= queryFailures) throw new Error('transient read failure');
       if (queryError) throw new Error(queryError);
       assert.match(query, /autoMergeRequest\s*{\s*enabledAt/);
       assert.deepEqual(args, { ...context.repo, number: 9 });
@@ -27,10 +32,10 @@ async function exercise({ head = 'a'.repeat(40), eventHead = 'a'.repeat(40),
   // Any anonymous metadata request would fail these cases, including rate-limit failures.
   const fetch = test.mock.method(globalThis, 'fetch', () => { throw new Error('Unexpected anonymous request'); });
   try {
-    await guardAutoMerge({ github, context, core: { info: message => messages.push(message) } });
+    await guardAutoMerge({ github, context, core: { info: message => messages.push(message) }, sleep: async ms => delays.push(ms) });
     assert.equal(fetch.mock.callCount(), 0);
   } finally { fetch.mock.restore(); }
-  return { mutations, messages };
+  return { mutations, messages, reads, delays };
 }
 test('disables an enqueue older than this push on the event head', async () => {
   const { mutations, messages } = await exercise();
@@ -71,5 +76,18 @@ for (const override of [{ queryError: 'HTTP 503' }, { missingPr: true }]) {
   });
 }
 test('a failure to disable is reported', async () => {
-  await assert.rejects(exercise({ mutationError: 'HTTP 403' }), /HTTP 403/);
+  await assert.rejects(exercise({ mutationError: 'HTTP 403' }), /PR #9: auto-merge is still on.*3 attempts: HTTP 403/);
+});
+
+test('retries the state read before making the enqueue decision', async () => {
+  const { reads, delays, mutations } = await exercise({ queryFailures: 2, enabledAt: null });
+  assert.equal(reads, 3);
+  assert.deepEqual(delays, [250, 500]);
+  assert.deepEqual(mutations, []);
+});
+test('retries a transient disable failure and reports success', async () => {
+  const { mutations, delays, messages } = await exercise({ mutationFailures: 2 });
+  assert.equal(mutations.length, 3);
+  assert.deepEqual(delays, [250, 500]);
+  assert.match(messages.at(-1), /Disabled auto-merge for PR #9/);
 });

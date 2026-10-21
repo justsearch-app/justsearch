@@ -44,6 +44,7 @@ import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferDelete;
 import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
 import io.justsearch.indexerworker.identity.DocumentIdentityStore;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps;
@@ -3498,6 +3499,9 @@ public final class KnowledgeServer implements Closeable {
    * registered wrapper — see {@code EngineKnowledgeClient}, which holds a supplier for exactly this
    * reason. Mirrors {@code DevReloadManager.performReload}'s swap.
    */
+  // A failed opener/reconstruction must not discard the retiring watcher's root authority.
+  private io.justsearch.indexerworker.services.WorkerIngestService reloadRootAuthority;
+
   private void reconstructAppServicesAfterDeferredUpgrade() {
     log.info("Reconstructing appServices after DeferredRuntime.prepareWriterUpgrade()");
     closePendingAppServices();
@@ -3512,9 +3516,14 @@ public final class KnowledgeServer implements Closeable {
       }
       if (oldServices != null) oldServices.close();
       this.appServices = null; // The incumbent has actually closed; callers see unavailability.
+      if (reloadRootAuthority != null) {
+        newServices.ingestService().reconcileReloadedWatcherRootsFrom(reloadRootAuthority);
+        reloadRootAuthority.handWatchedRootsTo(newServices.ingestService());
+      }
       newServices.startIndexingLoop();
       publishServingView(newServices);
       pendingAppServices = null;
+      reloadRootAuthority = null;
     } catch (Exception | Error failure) {
       try { closePendingAppServices(); }
       catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
@@ -3535,14 +3544,18 @@ public final class KnowledgeServer implements Closeable {
       runtimeReloadSource = null;
     }
     pendingAppServices = successor;
+    boolean handedOff = false;
     try {
       wireAppServicesPostConstruction(successor);
       if (initialEncoderSet != null) retainProducerModels(successor, initialEncoderSet);
       if (successor.ownsNativeProducer()) {
         successor.prepareIndexingLoop();
+        handedOff = true;
         source.installNativeWatcherHandoffTo(successor);
         mutations.install(successor.mutationOwnerToken());
         source.close();
+        // The same durable root obligations the closing path discharges, before B is published.
+        successor.ingestService().reconcilePendingWatcherRoots();
         publishServingView(successor);
         successor.activatePreparedIndexingLoop();
         mutations.certifySuccessor();
@@ -3553,6 +3566,8 @@ public final class KnowledgeServer implements Closeable {
       }
       pendingAppServices = null;
     } catch (Exception | Error failure) {
+      try { if (handedOff) source.withdrawNativeWatcherHandoff(mutations); }
+      catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
       try { closePendingAppServices(); }
       catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
       if (failure instanceof Error fatal) throw fatal;
@@ -3623,6 +3638,14 @@ public final class KnowledgeServer implements Closeable {
         pendingDeferredUpgrade = null;
         // Only a no-throw gate opens after B is publicly selected; no jobs were claimed before it.
         candidate.activatePreparedIndexingLoop();
+        // A root watched while only the reader served (an automatic restore at start) gets its
+        // pending watcher receipts applied now that a writer serves it. A failure keeps them
+        // pending for the next watch, start or reload; it must not undo the published upgrade.
+        try {
+          candidate.ingestService().reconcilePendingWatcherRoots();
+        } catch (RuntimeException pending) {
+          log.warn("Pending watcher receipts wait after the writer upgrade: {}", pending.getMessage());
+        }
       } catch (RuntimeException | Error failure) {
         try { closePendingAppServices(); }
         catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
@@ -3739,6 +3762,11 @@ public final class KnowledgeServer implements Closeable {
       // Its bounded close and admitted mutations must drain before their runtime can close.
       var source = appServices instanceof DefaultWorkerAppServices producer
           && producer.ownsNativeProducer() ? producer : null;
+      // Only the closing path hands roots over by registry; a native handoff shares its registry.
+      if (source == null && reloadRootAuthority == null
+          && appServices instanceof DefaultWorkerAppServices current) {
+        reloadRootAuthority = current.ingestService();
+      }
       final io.justsearch.indexerworker.services.WorkerMutationAdmission.FinalFence mutations;
       try {
         mutations = source == null ? null : source.closeForRuntimeReload();
@@ -8530,9 +8558,10 @@ public final class KnowledgeServer implements Closeable {
           covered.add(unit);
         }
       } else if ("DELETE".equals(op.op())) {
-        String unit = DocumentIdentityStore.pathHash(op.payload());
+        String path = SwitchBufferDelete.decode(op.payload()).path();
+        String unit = DocumentIdentityStore.pathHash(path);
         if (ingestLifecycle.documentFieldOps()
-            .getDocumentField(op.payload(), SchemaFields.DOC_ID) != null) {
+            .getDocumentField(path, SchemaFields.DOC_ID) != null) {
           addCandidateGap(gaps, rowGaps, op, unit, "DELETE_NOT_APPLIED");
         } else {
           covered.add(unit);

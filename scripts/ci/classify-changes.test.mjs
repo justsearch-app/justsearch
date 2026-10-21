@@ -7,9 +7,19 @@ import { classifyDiff, classifyPaths, LANES } from './classify-changes.mjs';
 const selected = (paths) => Object.entries(classifyPaths(paths)).filter(([, value]) => value).map(([lane]) => lane);
 const all = (value) => assert.deepEqual(value, Object.fromEntries(LANES.map((lane) => [lane, true])));
 test('O1 docs and agent files need no scoped lanes', () => {
-  assert.deepEqual(selected(['docs/reference/testing/test-intent.md', 'docs/reference/legal/ai-runtime-and-model-redistribution.md', 'AGENTS.md', '.claude/settings.json']), []);
+  assert.deepEqual(selected(['docs/reference/testing/test-intent.md', 'docs/reference/contributing/mcp-dev-tools.md', 'AGENTS.md', '.claude/settings.json']), []);
+});
+test('the generated legal document selects only its notice-producing lane', () => {
+  assert.deepEqual(selected(['docs/reference/legal/ai-runtime-and-model-redistribution.md']), ['license']);
 });
 for (const [path, lanes] of [
+  ['docs/reference/legal/ai-runtime-and-model-redistribution.md', ['license']],
+  ['scripts/jseval/jseval/ui_a11y_gate.py', ['frontend']],
+  ['governance/ui-a11y-baseline.v1.json', ['frontend']],
+  ['governance/ui-proportion-baseline.v1.json', ['frontend']],
+  ['governance/status-facts.v1.json', ['frontend']],
+  ['modules/configuration/src/main/resources/ai/model-registry.v2.json', ['frontend']],
+  ['modules/ui-web/src/api/statusPoll.ts', ['frontend']],
   ['.gitignore', ['devrunner', 'windows', 'jseval']],
   ['modules/ui-web/src/api/statusPoll.ts', ['ui', 'services', 'lifecycle', 'build']],
   ['modules/ui-web/scripts/dev-all.cjs', ['devrunner', 'ui', 'services']],
@@ -74,7 +84,7 @@ for (const path of [
 // consumer edge. Expand folders over tracked files so adding a new reader or file
 // cannot quietly weaken the classifier. Runtime opens are audited separately.
 test('tracked repository paths named by Java, Node and Rust tests select their readers', () => {
-  const tracked = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }).split('\0').filter(Boolean);
+  const tracked = [...new Set(execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }).split('\0').filter(Boolean))];
   const present = new Set(tracked);
   const folders = new Map();
   for (const file of tracked) {
@@ -98,7 +108,9 @@ test('tracked repository paths named by Java, Node and Rust tests select their r
       for (const source of tracked.filter(file => file.startsWith(`modules/${module}/src/test`) && file.endsWith('.java'))) add(source, lane);
     }
   }
+  add('scripts/codegen/gen-notices.mjs', 'license');
   for (const source of tracked) {
+    if (/^scripts\/jseval\/jseval\/ui.*\.py$/.test(source)) add(source, 'frontend');
     if (/^modules\/shell\/src-tauri\/.*\.rs$/.test(source)) add(source, 'rust');
     if (/^scripts\/dev\/test-dev-runner-.*\.mjs$/.test(source)) add(source, 'devrunner');
     if (/^scripts\/lib\/.*\.test\.mjs$/.test(source)) { add(source, 'devrunner'); add(source, 'windows'); }
@@ -107,10 +119,56 @@ test('tracked repository paths named by Java, Node and Rust tests select their r
   const classification = new Map();
   const gaps = new Set();
   const checked = new Map();
+  // Check each (literal, lane) once. Folder expansion and classification are
+  // indexed/cached, including joined paths: never literals x all tracked files.
+  const checkLiteral = (literal, source, lanes) => {
+    if (!literal.includes('/')) return; // checkout root markers are not reads
+    const files = present.has(literal) ? [literal] : folders.get(literal);
+    if (!files) return;
+    if (!checked.has(literal)) checked.set(literal, new Set());
+    for (const lane of lanes) {
+      if (checked.get(literal).has(lane)) continue;
+      checked.get(literal).add(lane);
+      for (const file of files) {
+        if (!classification.has(file)) classification.set(file, classifyPaths([file]));
+        if (!classification.get(file)[lane]) {
+          gaps.add(`${lane}: ${source} names ${literal} -> ${file}`);
+          break;
+        }
+      }
+    }
+  };
   for (const [source, lanes] of readers) {
     // Git still lists deleted/moved sources until staged; the destination runs in Public claims.
     let text;
     try { text = readFileSync(source, 'utf8'); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+    // Bound each path expression to a line. Exclude calls nested in the
+    // expression rather than scanning arbitrary source prefixes repeatedly.
+    const expressions = [...text.matchAll(/\b(?:join|resolve|Path\.of|Paths\.get)\(([^;{}()\r\n]{1,1000})\)/g)];
+    const bindings = new Map();
+    for (const expression of expressions) {
+      const strings = [...expression[1].matchAll(/["']([^"'\r\n]+)["']/g)].map(entry => entry[1]);
+      if (!strings.length) continue;
+      const first = expression[1].split(',')[0].trim();
+      const base = bindings.get(first);
+      // A scratch variable (work, data, modelsRoot, ...) is not the checkout.
+      if (!base && !/^["']/.test(first) && !/^(?:REPO_ROOT|ROOT|repoRoot|root|HERE|__dirname|parent)$/.test(first)) continue;
+      let literal = path.posix.join(...(base ? [base, ...strings] : strings));
+      if (literal.startsWith('../')) literal = path.posix.normalize(path.posix.join(path.posix.dirname(source), literal));
+      const declaration = text.slice(Math.max(0, expression.index - 80), expression.index).match(/(?:const|let|var) (\w+) = (?:path\.)?$/);
+      if (declaration && folders.has(literal)) {
+        bindings.set(declaration[1], literal);
+        // A folder assigned as the base of later joins is a locator, not a
+        // recursive read. The child expressions below supply the actual inputs.
+        const uses = text.slice(expression.index + expression[0].length);
+        if (uses.includes(`join(${declaration[1]},`) && !new RegExp(`(?:readdir|copy|fingerprint)\\w*\\([^;\\n]*\\b${declaration[1]}\\b`).test(uses)) continue;
+      }
+      checkLiteral(literal, source, lanes);
+    }
+    for (const expression of text.matchAll(/(?:["'][^"'\r\n]+["']\s*\/\s*)+["'][^"'\r\n]+["']/g)) {
+      const strings = [...expression[0].matchAll(/["']([^"'\r\n]+)["']/g)].map(entry => entry[1]);
+      checkLiteral(path.posix.join(...strings), source, lanes);
+    }
     for (const match of text.matchAll(/"((?:\\.|[^"\\\r\n])*)"|'((?:\\.|[^'\\\r\n])*)'|`((?:\\.|[^`\\])*)`/g)) {
       // Fixture strings and assertions do not read repository data. Inspect path
       // construction, file reads, and named path constants; bare root markers
@@ -131,22 +189,15 @@ test('tracked repository paths named by Java, Node and Rust tests select their r
       }
       if (!literal.includes('/') && folders.has(literal)) continue;
       if (!literal.includes('/') && /assert(?:True|False|Equals)/.test(prefix)) continue;
-      const files = present.has(literal) ? [literal] : folders.get(literal);
-      if (!files) continue;
-      if (!checked.has(literal)) checked.set(literal, new Set());
-      for (const lane of lanes) {
-        if (checked.get(literal).has(lane)) continue;
-        checked.get(literal).add(lane);
-        for (const file of files) {
-          if (!classification.has(file)) classification.set(file, classifyPaths([file]));
-          if (!classification.get(file)[lane]) {
-            gaps.add(`${lane}: ${source} names ${literal} -> ${file}`);
-            break;
-          }
-        }
-      }
+      if ([...bindings.values()].includes(literal) && folders.has(literal)) continue;
+      checkLiteral(literal, source, lanes);
     }
   }
+  // ui_fixtures resolves this relative to the discovered frontend fixture dir.
+  const fixtureSource = 'scripts/jseval/jseval/ui_fixtures.py';
+  assert.match(readFileSync(fixtureSource, 'utf8'), /configuration\/src\/main\/resources\/ai\/model-registry\.v2\.json/);
+  checkLiteral('modules/configuration/src/main/resources/ai/model-registry.v2.json', fixtureSource, ['frontend']);
+  console.log(`classifier read audit: ${readers.size} readers, ${checked.size} repository inputs, ${gaps.size} gaps`);
   assert.deepEqual([...gaps].sort(), []);
 });
 

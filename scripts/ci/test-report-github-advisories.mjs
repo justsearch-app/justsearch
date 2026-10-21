@@ -92,6 +92,30 @@ const exact = await queryGitHubAdvisories(['lodash@4.17.20', 'lodash@4.17.21', '
 });
 assert.deepEqual(exact[0].affected, [{ package: 'lodash', version: '4.17.20' }],
   'a safe version beside a vulnerable version is never attributed its advisory');
+// A multi-package advisory can be returned through just one affected package.
+// Each package's OWN range decides attribution, including multiple entries for a name.
+const multiPackage = {
+  ...advisory('GHSA-35JH-R3H4-6JHM'),
+  vulnerabilities: [
+    { package: { ecosystem: 'npm', name: 'pkg-a' }, vulnerable_version_range: '>= 1.0.0, < 2.0.0' },
+    { package: { ecosystem: 'npm', name: 'pkg-b' }, vulnerable_version_range: '< 2.0.0' },
+    { package: { ecosystem: 'npm', name: 'pkg-b' }, vulnerable_version_range: '>= 4.0.0, < 5.0.0' },
+  ],
+};
+const multiple = await queryGitHubAdvisories(['pkg-a@1.0.0', 'pkg-b@3.0.0', 'pkg-b@4.1.0'], {
+  fetchImpl: async () => ({ ok: true, json: async () => [multiPackage] }),
+  retries: 0, timeoutSignalFactory: () => undefined,
+});
+assert.deepEqual(multiple[0].affected, [
+  { package: 'pkg-a', version: '1.0.0' }, { package: 'pkg-b', version: '4.1.0' },
+], 'a clean version of the second named package must not inherit the first package match');
+for (const range of [undefined, '', 'not a range']) {
+  await assert.rejects(queryGitHubAdvisories(['pkg-a@1.0.0'], {
+    fetchImpl: async () => ({ ok: true, json: async () => [{ ...multiPackage,
+      vulnerabilities: [{ package: { ecosystem: 'npm', name: 'pkg-a' }, vulnerable_version_range: range }],
+    }] }), retries: 0, timeoutSignalFactory: () => undefined,
+  }), /unreadable vulnerable range for pkg-a@1.0.0/);
+}
 await assert.rejects(queryGitHubAdvisories(['unrelated@1.0.0'], {
   fetchImpl: async () => ({ ok: true, json: async () => [advisory('GHSA-35JH-R3H4-6JHM')] }),
   retries: 0, timeoutSignalFactory: () => undefined,

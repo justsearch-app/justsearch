@@ -76,7 +76,7 @@ author-session: ci-one-run-builder-20261021
         "split",
         "instrumentation"
       ],
-      "whatMoved": "Replace matrices with literal jobs and preserve the required names. The repair splits Linux Java unit lanes into disjoint measured class partitions and gives each Gradle task one shard owner. Windows supervisor conformance runs on selected PR lanes; only the six listed cases are skipped on PRs, and every case runs on main and dispatch. Engine-discovery retains its listed PR exclusion. Split the twelve complete Windows tag-filtered Test tasks into two measured module partitions (257.408 and 255.902 summed suite seconds). Preserve all fifteen safety-class requirements in their owning part, each part's evidence, main cache writes and the required aggregate. Inventory checks reject any lost or duplicated task.",
+      "whatMoved": "Replace matrices with literal jobs and preserve the required names. The repair splits Linux Java unit lanes into disjoint measured class partitions and gives each Gradle task one shard owner. Windows supervisor conformance runs on selected PR lanes; only the six listed cases are skipped on PRs, and every case runs on main and dispatch. Engine-discovery retains its listed PR exclusion. Split the twelve complete Windows tag-filtered Test tasks into two module partitions; after hosted runs showed part 1 slower, separate app-services from worker-services and move observability into part 1 using full task timings including test compilation. Move dev-runner conformance and its diagnostics to the dev-runner-selected Windows node job. Preserve all fifteen safety-class requirements in their owning part, each part's evidence, main cache writes and the required aggregate. Inventory checks reject any lost or duplicated task.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -152,8 +152,13 @@ author-session: ci-one-run-builder-20261021
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Use traced dev-runner inputs in place of the Java-lane implication without changing the static reader drift guard; require enqueue messages to equal the squash preview; verify exact per-version advisory attribution and both queued auto-merge guard races, comparing enqueue time with the synchronize payload's updated_at without anonymous requests and disabling on uncertain metadata. The guard executes only a script from the trusted base commit. The configuration contention flake joins the PR-only exclusion list and still runs on main.",
+      "whatMoved": "Use traced dev-runner inputs in place of the Java-lane implication and expand the indexed static reader audit to joined paths and frontend/notice inputs; require enqueue messages to equal the squash preview; verify exact per-package/version advisory attribution against each package's own vulnerable range and both queued auto-merge guard races, comparing enqueue time with the synchronize payload's updated_at without anonymous requests and disabling on uncertain metadata. Retry the guard read and disable operations three times with short backoff; a failed disable names the PR and says auto-merge is still on. The guard executes only a script from the trusted base commit. The configuration contention flake joins the PR-only exclusion list and still runs on main.",
       "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Attribute an advisory to a package and version only when the advisory's own vulnerable package entry names that package and the queried version matches.",
+          "location": "task ci-one-run request; fix round K5, 2026-10-21"
+        },
         {
           "kind": "owner-words",
           "quote": "Replace the coarse \"Java selects dev-runner\" rule with the exact traced inputs (keep the static drift guard and the audit at zero gaps).",

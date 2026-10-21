@@ -45,6 +45,8 @@ and `push` to `main`, and it may also be dispatched manually with `workflow_disp
 [ADR-0053](0053-one-pr-ci-run-and-squash-auto-merge.md) supersedes the event-selection and
 publication rules: PRs run affected lanes, main and dispatch run the full suite, and validated
 squash auto-merge needs only the PR run. Every required context still reports on every PR.
+Measured axe stays advisory, running on PRs with affected frontend inputs, pushes to main
+and manual dispatch to gather stability evidence before any promotion to required.
 
 The CI workflow is organized as stable **fact lanes**:
 

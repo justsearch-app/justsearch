@@ -47,6 +47,7 @@ jobs:
       lifecycle: ${{ steps.classify.outputs.lifecycle }}
       integration: ${{ steps.classify.outputs.integration }}
       jseval: ${{ steps.classify.outputs.jseval }}
+      frontend: ${{ steps.classify.outputs.frontend }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -787,13 +788,15 @@ jobs:
         run: python -m pytest scripts/jseval/tests -q -p no:cacheprovider
 
   measured-axe:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: changes
+    if: needs.changes.outputs.frontend != 'false'
     name: Measured axe (advisory)
     # Tempdoc 930 §22.2 follow-up 5. Chunk H retired twelve static a11y/token oracles in
     # favour of measurement, but only half the replacement ran on PRs: the four-palette
     # contrast sweep (`check-contrast-matrix`, inside the required `Public claims` lane via
     # run-ui-web-gates.mjs). The other half — `jseval ui-a11y-gate`, real axe-core against
-    # the rendered page — was local-only. This advisory sweep now runs on manual dispatch.
+    # the rendered page — was local-only. This sweep runs on PRs, pushes to main and
+    # manual dispatch as advisory, gathering stability evidence before promotion to required.
     #
     # Nothing about that gate needs the backend, which is why it can run here: `--fixtures`
     # intercepts every `/api/*` request in Playwright and serves committed schema-valid
@@ -803,7 +806,7 @@ jobs:
     # dev stack. Measured locally at 350s wall for the register's 20 surfaces including a
     # cold Vite start, exit 0.
     #
-    # ADVISORY, following `integration-tests`: deliberately absent from
+    # ADVISORY: deliberately absent from
     # scripts/ci/workflow-signal-policy.v1.json's requiredStatusChecks and from
     # scripts/ci/public-ci-local-repro.v1.json (adding an entry to the latter while the job
     # is not a required check FAILS validatePublicCiLocalRepro by design). Promotion to a
@@ -867,8 +870,8 @@ jobs:
         run: python -m playwright install --with-deps chromium
 
       - name: Measured axe over the a11y baseline register
-        # Exit 0 clean · 1 a NEW axe rule not in the surface's `knownRules` · 2 a capture
-        # error. The per-surface verdict JSON goes to stderr; `pipefail` keeps the gate's
+        # Exit 0 clean · 1 a NEW axe rule or any serious/critical violation · 2 a capture
+        # or axe error. Per-surface verdict JSON goes to stderr; `pipefail` keeps the gate's
         # exit code rather than tee's (agent-lessons `piped-exit-masked`).
         run: |
           set -o pipefail
@@ -1702,6 +1705,30 @@ jobs:
           npm run test:dev-runner -- --verbose
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # The actuator half of design 7.1's supervisor contract, against the dev-runner. The decision
+      # half is proven by `--self-test` in the Public-claims lane; this is the half that needs a real
+      # child, and Windows is the only place where the thing §2 re-cut — a cooldown floored on the
+      # process handle closing — is a real constraint rather than a no-op.
+      - name: Supervisor conformance (dev-runner adapter)
+        run: |
+          node scripts/supervisor-conformance/run.mjs --adapter dev-runner
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Supervisor conformance repeated restart (dev-runner)
+        if: (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+        shell: pwsh
+        run: |
+          node scripts/supervisor-conformance/run.mjs --adapter dev-runner --case fileless-clean-local-restart-is-not-counted --repeat 50
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Preserve supervisor conformance diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: supervisor-conformance-windows-attempt-${{ github.run_attempt }}
+          path: tmp/supervisor-conformance/**
+          retention-days: 7
+
   windows-native-contracts:
     needs: changes
     if: needs.changes.outputs.windows != 'false'
@@ -1741,23 +1768,6 @@ jobs:
         timeout-minutes: 5
         run: node scripts/ci/run-node-tests.mjs scripts/lib/engine-discovery.test.mjs
 
-      # The actuator half of design 7.1's supervisor contract, against the dev-runner. The decision
-      # half is proven by `--self-test` in the Public-claims lane; this is the half that needs a real
-      # child, and Windows is the only place where the thing §2 re-cut — a cooldown floored on the
-      # process handle closing — is a real constraint rather than a no-op.
-      - name: Supervisor conformance (dev-runner adapter)
-        if: needs.changes.outputs.devrunner != 'false' || needs.changes.outputs.rust != 'false'
-        run: |
-          node scripts/supervisor-conformance/run.mjs --adapter dev-runner
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Supervisor conformance repeated restart (dev-runner)
-        if: (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
-        shell: pwsh
-        run: |
-          node scripts/supervisor-conformance/run.mjs --adapter dev-runner --case fileless-clean-local-restart-is-not-counted --repeat 50
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
       # Main populates this part's cache; PRs only read it. Convention-plugin changes
       # invalidate task fingerprints even when setup-gradle restores an archive.
       - name: Setup Gradle
@@ -1765,11 +1775,12 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      # Balanced from run 39648200837: 257s summed suites here, 256s in part 2.
+      # Separate app-services from worker-services; move observability here to
+      # balance complete task costs, including compilation, from run 39656031315.
       # Both parts retain a cold startup; full tasks keep the original tag selection.
       - name: Windows coverage (@Tag windows or cross-platform), part 1
         id: windows-coverage
-        run: ./gradlew.bat :modules:app-services:test :modules:worker-services:test :modules:adapters-lucene:test :modules:configuration:test :modules:ort-common:test -PwindowsOnly=true -PskipWebBuild=true --build-cache --profile --continue --console=plain
+        run: ./gradlew.bat :modules:app-services:test :modules:app-observability:test :modules:adapters-lucene:test :modules:configuration:test :modules:ort-common:test -PwindowsOnly=true -PskipWebBuild=true --build-cache --profile --continue --console=plain
 
       - name: Require Windows safety class execution
         if: always() && (steps.windows-coverage.outcome == 'success' || steps.windows-coverage.outcome == 'failure')
@@ -1789,14 +1800,6 @@ jobs:
           ./scripts/ci/test-sign-windows-diagnostics.ps1
           ./scripts/ci/test-verify-pe-signatures.ps1
           ./scripts/release/test-sign-vendored-payload.ps1
-
-      - name: Preserve supervisor conformance diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: supervisor-conformance-windows-attempt-${{ github.run_attempt }}
-          path: tmp/supervisor-conformance/**
-          retention-days: 7
 
       - name: Preserve Windows-native test results
         if: always()
@@ -1841,11 +1844,12 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      # Balanced from run 39648200837: 256s summed suites here, 257s in part 1.
+      # Worker-services shares this part's indexer-worker compilation; part 1 owns
+      # app-services and observability. Every full task has one owner.
       # Both parts retain a cold startup; full tasks keep the original tag selection.
       - name: Windows coverage (@Tag windows or cross-platform), part 2
         id: windows-coverage
-        run: ./gradlew.bat :modules:app-api:test :modules:app-util:test :modules:app-agent:test :modules:app-observability:test :modules:ui:test :modules:app-inference:test :modules:indexer-worker:test -PwindowsOnly=true -PskipWebBuild=true --build-cache --profile --continue --console=plain
+        run: ./gradlew.bat :modules:app-api:test :modules:app-util:test :modules:app-agent:test :modules:ui:test :modules:app-inference:test :modules:worker-services:test :modules:indexer-worker:test -PwindowsOnly=true -PskipWebBuild=true --build-cache --profile --continue --console=plain
 
       - name: Require Windows safety class execution
         if: always() && (steps.windows-coverage.outcome == 'success' || steps.windows-coverage.outcome == 'failure')

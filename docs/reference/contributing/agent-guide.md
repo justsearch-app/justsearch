@@ -348,6 +348,8 @@ The public repository has two CI postures:
   pushes to `main`, and can also be dispatched manually. ADR-0044 owns this
   public hosted lane, amended by ADR-0053. PRs run affected lanes; main and manual dispatch
   run the full suite, including the slow tiers. Every required name reports on every PR.
+  Measured axe stays advisory; on PRs it runs for affected frontend inputs, and it runs
+  on pushes to main and manual dispatch.
 - Self-hosted, release, and benchmark/specialty workflows stay manually dispatched unless a
   later ADR changes their trigger policy. ADR-0026 remains the historical basis for that posture.
   CodeQL runs weekly on Mondays at 04:17 UTC and can also be dispatched manually (ADR-0052).

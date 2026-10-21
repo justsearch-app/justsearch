@@ -8,7 +8,7 @@ import { load } from 'js-yaml';
 const root = path.resolve(import.meta.dirname, '../..');
 fs.mkdirSync(path.join(root, 'tmp'), { recursive: true });
 const jobs = load(fs.readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8')).jobs;
-const job = jobs['windows-native-contracts'];
+const job = jobs['windows-native-node'];
 
 for (const id of ['windows-native-contracts', 'windows-native-contracts-2']) {
   const coverageJob = jobs[id];

@@ -433,6 +433,8 @@ final class CommittedNativeProjectionEffectsTest extends LuceneExecutorTestBase 
 
   private static SwitchBufferCapableQueue.SwitchBufferOp op(
       String generation, String key, String kind, String payload, long sequence) {
+    if ("DELETE".equals(kind)) payload = new io.justsearch.indexerworker.queue.SwitchBufferDelete(
+        payload, io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.EXPLICIT, null).encode();
     return new SwitchBufferCapableQueue.SwitchBufferOp(
         generation, key, kind, payload, sequence, "v" + sequence);
   }

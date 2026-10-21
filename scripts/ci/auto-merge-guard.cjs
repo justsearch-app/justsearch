@@ -1,15 +1,24 @@
 /** Invalidate an enqueue for this synchronize event, without undoing a newer enqueue. */
-module.exports = async function guardAutoMerge({ github, context, core }) {
+module.exports = async function guardAutoMerge({ github, context, core, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
   const eventPr = context.payload.pull_request;
   const number = eventPr.number;
+  const retry = async operation => {
+    for (let attempt = 0; ; attempt++) {
+      try { return await operation(); } catch (error) {
+        if (attempt === 2) throw error;
+        core.info(`PR #${number}: retrying auto-merge operation after ${error.message}`);
+        await sleep(250 * (attempt + 1));
+      }
+    }
+  };
   let pr;
   try {
-    const result = await github.graphql(`
+    const result = await retry(() => github.graphql(`
       query($owner: String!, $repo: String!, $number: Int!) {
         repository(owner: $owner, name: $repo) {
           pullRequest(number: $number) { id headRefOid autoMergeRequest { enabledAt } }
         }
-      }`, { ...context.repo, number });
+      }`, { ...context.repo, number }));
     pr = result?.repository?.pullRequest;
   } catch (error) {
     core.info(`PR #${number}: cannot read auto-merge state (${error.message}); disabling it conservatively.`);
@@ -41,9 +50,13 @@ module.exports = async function guardAutoMerge({ github, context, core }) {
   // Missing metadata must never preserve an enqueue for an unvalidated head.
   // The trusted event's node_id also lets us disable when the state query fails.
   const id = pr?.id || eventPr.node_id;
-  if (!id) throw new Error(`PR #${number}: cannot disable auto-merge: missing pull request node ID.`);
-  await github.graphql(`mutation($id: ID!) {
+  if (!id) throw new Error(`PR #${number}: auto-merge is still on; cannot disable it: missing pull request node ID.`);
+  try {
+    await retry(() => github.graphql(`mutation($id: ID!) {
     disablePullRequestAutoMerge(input: {pullRequestId: $id}) { pullRequest { number } }
-  }`, { id });
+  }`, { id }));
+  } catch (error) {
+    throw new Error(`PR #${number}: auto-merge is still on; disabling it failed after 3 attempts: ${error.message}`);
+  }
   core.info(`Disabled auto-merge for PR #${number}: its head changed or enqueue metadata is uncertain; run enqueue again.`);
 };

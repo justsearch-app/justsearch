@@ -7,10 +7,7 @@
     {
       "surface": "search",
       "uiShotStep": "home",
-      "knownRules": [
-        "aria-valid-attr-value"
-      ],
-      "note": "UNEXPLAINED DEBT, labelled rather than justified. This row predates the public history (it arrives whole in the initial-release squash 29579e51), so no rationale was ever recorded and none can be recovered from the log. It is carried because deleting it would turn a known violation into a NEW one on the next capture, not because anyone judged aria-valid-attr-value acceptable on the search surface. Whoever next touches this surface should diagnose it and either fix it or replace this note with a real reason — do not read it as a justified exception."
+      "knownRules": []
     },
     {
       "surface": "library",
@@ -30,18 +27,12 @@
     {
       "surface": "settings-light",
       "uiShotStep": "settings-light",
-      "knownRules": [
-        "color-contrast"
-      ],
-      "note": "color-contrast: pre-existing light-palette defects in chat view/status deck/walkthrough card, measured by these steps because 855 added their light variants to this register; reproducible on home-light with no modal open; owned by those surfaces, logged to observations 2026-08-19. (select-name fixed in 855 P1 — jf-enter-action-picker now carries a real accessible name.)"
+      "knownRules": []
     },
     {
       "surface": "security-light",
       "uiShotStep": "security-light",
-      "knownRules": [
-        "color-contrast"
-      ],
-      "note": "color-contrast: pre-existing light-palette defects in chat view/status deck/walkthrough card, measured by these steps because 855 added their light variants to this register; reproducible on home-light with no modal open; owned by those surfaces, logged to observations 2026-08-19."
+      "knownRules": []
     },
     {
       "surface": "health",

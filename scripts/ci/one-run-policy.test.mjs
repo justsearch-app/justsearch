@@ -52,12 +52,21 @@ test('main keeps the running run and runs all slow tiers without masking failure
   assert.match(workflow.concurrency.group, /github.event_name == 'push'.*refs\/heads\/main.*'main'/);
   assert.equal(workflow.concurrency['cancel-in-progress'], "${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}");
   const mainOnly = "github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')";
-  for (const id of ['integration-tests', 'measured-axe']) {
+  for (const id of ['integration-tests']) {
     assert.equal(workflow.jobs[id].if, mainOnly);
     assert.notEqual(workflow.jobs[id]['continue-on-error'], true);
   }
-  const contracts = workflow.jobs['windows-native-contracts'].steps.find(step => step.name === 'Supervisor conformance (dev-runner adapter)');
-  assert.equal(contracts.if, "needs.changes.outputs.devrunner != 'false' || needs.changes.outputs.rust != 'false'");
+  const axe = workflow.jobs['measured-axe'];
+  assert.equal(axe.needs, 'changes');
+  assert.equal(axe.if, "needs.changes.outputs.frontend != 'false'");
+  assert.equal(axe.name, 'Measured axe (advisory)');
+  const node = workflow.jobs['windows-native-node'];
+  assert.equal(node.if, "needs.changes.outputs.devrunner != 'false'");
+  const conformance = node.steps.find(step => step.name === 'Supervisor conformance (dev-runner adapter)');
+  assert.equal(conformance.if, undefined, 'dev-runner conformance follows its containing lane');
+  for (const id of ['windows-native-contracts', 'windows-native-contracts-2']) {
+    assert.ok(!workflow.jobs[id].steps.some(step => /Supervisor conformance/.test(step.name)));
+  }
   const tauri = workflow.jobs['shell-rust-tests'].steps.find(step => step.name === 'Supervisor conformance (Tauri adapter)');
   assert.equal(tauri.if, undefined, 'the selected Rust lane exercises conformance on PRs');
   for (const job of Object.values(workflow.jobs)) for (const step of job.steps) {
@@ -76,4 +85,12 @@ test('the synchronize guard cannot execute PR code and has only its required per
   assert.equal(checkout.with['persist-credentials'], false);
   assert.match(script.with.script, /require\('\.\/scripts\/ci\/auto-merge-guard\.cjs'\)/);
   assert.match(script.with.script, /await guardAutoMerge\(\{ github, context, core \}\)/);
+});
+
+test('the MCP documentation reader stays in always-on Public claims', () => {
+  const job = workflow.jobs['public-claims'];
+  assert.equal(job.if, 'always()');
+  const step = job.steps.find(step => step.run?.includes('node scripts/dev/test-dev-mcp-surface-honesty.mjs'));
+  assert.ok(step);
+  assert.equal(step.if, undefined);
 });
