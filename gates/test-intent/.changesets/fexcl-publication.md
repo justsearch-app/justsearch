@@ -127,3 +127,14 @@ Independent acceptance is left to the verifier.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-verifier-fexcl-90cf88f64",
+  "verdict": "accept",
+  "digest": "sha256:c4418f47a1e3f68e8d6df41c5dcd7f8707d8a8430a8ebbd0f6992ed772a50e8a",
+  "note": "Round 2 on 90cf88f64: lock cycle and config-lock holds fail on 226be391d and pass here; real Engine with VDU: save deletes nothing, mid-VDU result refused, Apply removes excluded docs and enrichment, Preview revert re-enriches; full suite 2 env-only failures; lint clean"
+}
+```
