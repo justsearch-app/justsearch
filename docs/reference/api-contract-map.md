@@ -1006,6 +1006,13 @@ operation-invocation error body it replaced: `{"success": false, "message": "...
 - Query parameter: `counts=true` -- includes a per-root bounded file count (capped scan, `-1` if the count itself failed).
 - Response: `{"roots": [{collection, path, fileCount, lastIndexed?}]}` -- `collection` defaults to `"default"` when the root was added without one; `lastIndexed` is omitted (not empty-string) when the root has never completed a scan.
 
+`POST /api/indexing-roots/preview` previews a proposed Library folder without changing registrations.
+
+- Request body: `{"path": string}`; the path is normalized to an absolute path.
+- Response: `{exists, isDir, fileCount, capped, alreadyWatched, overlap?}`. Existing fields retain their meanings. `alreadyWatched` describes exact path membership only.
+- Optional additive `overlap: {path: string, relationship: "inside" | "containing"}` names one normalized watched folder that overlaps the proposed folder; the relationship describes the proposed folder relative to that watched folder. It is omitted for exact re-add (even with legacy nesting) and when no overlap is found. Path-segment ancestry is used, so a sibling sharing a text prefix is not an overlap.
+- Library explains an overlap and makes Add unavailable before submission. Older clients may ignore this additional field; older Engines may omit it. The Engine still refuses new nested additions at submission, including races after preview; exact re-add remains idempotent.
+
 `POST /api/indexing/roots` adds a folder to the Library.
 
 - Request body: `{"path": string, "collection"?: string}` -- `path` is required and must resolve (after `Path.of(path).toAbsolutePath().normalize()`) to an **existing directory**; `collection` is optional and defaults to `"default"` when omitted.
