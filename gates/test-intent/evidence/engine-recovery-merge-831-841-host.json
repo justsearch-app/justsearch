@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T14:15:35.377Z",
+  "revision": "831dd64d1be3b311ea986ca3bfa53103d8c951da",
+  "tree": "b2763b0c1e98efdd8ceac1c2ec332cac74dcb319",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::manual_restart_after_finished_exhaustion_reaches_ready_with_a_new_generation\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12184
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::manual_restart_refuses_quit_and_update_holds_without_admitting_a_child\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1797
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::manual_restart_after_finished_exhaustion_reaches_ready_with_a_new_generation",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:aebfe395081aa104f3abca10df99cee0b44bbde9f9902c791cbae93b564c0230",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::manual_restart_after_finished_exhaustion_reaches_ready_with_a_new_generation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::manual_restart_refuses_quit_and_update_holds_without_admitting_a_child",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:aebfe395081aa104f3abca10df99cee0b44bbde9f9902c791cbae93b564c0230",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::manual_restart_refuses_quit_and_update_holds_without_admitting_a_child",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:e7539208c3e5e3c6dfe738afab8169ae635dcbacea0d518f200d7d628ec08410"
+}

@@ -1,0 +1,58 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T11:51:19.611Z",
+  "revision": "dfa1d18e18df58dad28a963c3c54415ec5403a70",
+  "tree": "f2f7c1f7b4752bd06e4ee205ce8fbcc30079d66a",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:configuration:test --tests \"io.justsearch.configuration.persistence.WindowsOwnerOnlyDirectoryTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1684
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/WindowsOwnerOnlyDirectoryTest.java",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/persistence/WindowsOwnerOnlyDirectoryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7f794af8055a0392dc66ed7f68261789773ef47fa9d60e68a9865ee0e0fb264c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "openedHandleRejectsHardLinkedFilesAndReparsePointsButAllowsRealDirectories()",
+          "status": "passed"
+        },
+        {
+          "name": "creationDescriptorIsProtectedAndGrantsOnlyOwnerAndSystemInheritableFullControl()",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableNativePermissionsWarnOnceAndPreserveContents(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "repairSetsDaclAndProtectsItWithoutChangingOwnerGroupOrSacl()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:1c530023912f3e117f4476c53131b8be4dc332c986a9a7c5201143af214625ce"
+}

@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -131,7 +132,11 @@ class KeystoreReplicaRepairTest {
   }
 
   @Test
+  @Timeout(90)
   void killBetweenPublicationsRepairsCurrentWrapsOnRestart() throws Exception {
+    // Windows passes take 19-23 s, and completed repair intervals reach 13.6 s under load.
+    // Four such intervals (~55 s) plus setup/recovery headroom fit in 90 s; each child is
+    // still bounded to 30 s so a stalled publication fails before the whole-test timeout.
     for (String action : List.of("password", "recovery")) {
       for (int step : List.of(2, 3)) {
         var keys = manager();
@@ -140,19 +145,28 @@ class KeystoreReplicaRepairTest {
         String oldRecovery = keys.regenerateRecovery();
         Path log = dir.resolve(action + step + ".log");
         Path args = dir.resolve("child.args");
-        Files.writeString(args, "-XX:+EnableDynamicAgentLoading\n-cp\n\""
+        Files.writeString(args, "-XX:+EnableDynamicAgentLoading\n\"-Djava.io.tmpdir="
+            + System.getProperty("java.io.tmpdir").replace('\\', '/') + "\"\n-cp\n\""
             + System.getProperty("java.class.path").replace('\\', '/') + "\"\n");
         boolean windows = System.getProperty("os.name").startsWith("Windows");
         Path java = Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java");
+        long started = System.nanoTime();
         Process child = new ProcessBuilder(java.toString(), "@" + args, KeystoreDurabilityTest.class.getName(),
             dir.toString(), Integer.toString(step), action).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        boolean paused = false;
         try {
-          long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+          long deadline = started + TimeUnit.SECONDS.toNanos(30);
           while (child.isAlive() && System.nanoTime() < deadline
               && !Files.readString(log).contains("PUBLICATION PAUSED")) Thread.sleep(10);
-          assertTrue(Files.readString(log).contains("PUBLICATION PAUSED"), Files.readString(log));
+          paused = Files.readString(log).contains("PUBLICATION PAUSED");
+          assertTrue(paused,
+              action + " publication step " + step + " did not pause within 30 s: " + Files.readString(log));
         } finally {
+          long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
           child.destroyForcibly();
+          System.out.println(action + " publication step " + step + ": "
+              + (paused ? "start-to-pause=" : "not paused; elapsed=") + elapsedMillis + " ms");
+          if (!paused) System.out.println("Child output: " + Files.readString(log));
           assertTrue(child.waitFor(10, TimeUnit.SECONDS));
         }
         var restarted = assertDoesNotThrow(this::manager);

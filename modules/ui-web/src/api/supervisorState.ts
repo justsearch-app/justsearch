@@ -29,7 +29,8 @@ type SupervisorStateName =
   | 'running'
   | 'stopping'
   | 'restarting'
-  | 'exhausted';
+  | 'exhausted'
+  | 'stopped';
 
 /**
  * The state record as both supervisors write it. Optional fields are optional in the file too — a
@@ -59,12 +60,16 @@ export interface SupervisorState {
     counted?: boolean;
     incarnation?: number;
   } | null;
+  retryAt?: string | null;
+  notReady?: string | null;
+  recentExits?: { count: number; codes: Record<string, number>; firstAt?: string | null; lastAt?: string | null; incomplete?: boolean } | null;
+  crashFile?: { name: string; at: string; exception?: string | null; problematicFrame?: string | null } | null;
   updatedAt?: string;
 }
 
 /** True when the supervisor has given up: design 7.1's terminal state, `ENGINE_RESTART_EXHAUSTED`. */
 export function isTerminal(state: SupervisorState | null | undefined): boolean {
-  return state?.state === 'exhausted';
+  return state?.state === 'exhausted' || (state?.state === 'stopped' && !['quit', 'upgrade'].includes(state.reason ?? ''));
 }
 
 /**
@@ -121,7 +126,7 @@ function isSupervisorState(value: unknown): value is SupervisorState {
   const state = value as Partial<SupervisorState>;
   return state.schemaVersion === 1
     && state.kind === 'engine-supervisor-state.v1'
-    && ['starting', 'running', 'stopping', 'restarting', 'exhausted'].includes(state.state ?? '')
+    && ['starting', 'running', 'stopping', 'restarting', 'exhausted', 'stopped'].includes(state.state ?? '')
     && Number.isInteger(state.incarnation)
     && Number.isInteger(state.restartCount)
     && Number.isInteger(state.maxRestartAttempts);
