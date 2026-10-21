@@ -55,7 +55,7 @@ Local indexing, retrieval, and built-in inference are anchored in the Engine and
    `scripts/agent-analytics/` is a separate tool.
 3. **AI downloads and automatic update checks.** Install AI downloads from `github.com` and
    `huggingface.co` with consent; repair and upgrades can download again. On Windows with supported
-   NVIDIA hardware it also downloads a CUDA `llama-server` build and selects it automatically unless
+   NVIDIA hardware, when downloads and GPU acceleration are permitted by policy, it also downloads a CUDA `llama-server` build and selects it automatically unless
    the user configured an executable. Desktop builds with an embedded release URL check it by default
    about 30 seconds after chrome mount. CI-built installers embed the repository's configured GitHub
    release URL, including branch candidates and pre-releases. Discovery fetches `release.v1.json`,

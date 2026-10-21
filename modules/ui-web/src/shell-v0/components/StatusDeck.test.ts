@@ -31,6 +31,7 @@ function makeAiState(overrides: Partial<AiState> = {}): AiState {
     stability: { kind: 'settled' },
     verdict: { kind: 'operational', severity: 'ok', reasons: [] },
     snapshotLive: true,
+    indexingStatusLive: true,
     status: null,
     inference: null,
     lastSettledIndex: null,
@@ -45,7 +46,8 @@ function makeAiState(overrides: Partial<AiState> = {}): AiState {
   // Tempdoc 807 — keep the fixture COHERENT: a test that overrides `connection` to an unreachable
   // origin must not silently keep `snapshotLive: true` (production derives one from the other in
   // `buildSnapshot`). An explicit override still wins, so a test can pin the pair deliberately.
-  return { ...built, snapshotLive: overrides.snapshotLive ?? isSnapshotLive(built.connection) };
+  const live = overrides.snapshotLive ?? isSnapshotLive(built.connection);
+  return { ...built, snapshotLive: live, indexingStatusLive: overrides.indexingStatusLive ?? live };
 }
 
 function make(): StatusDeck {
@@ -225,7 +227,7 @@ describe('StatusDeck (slice 461)', () => {
       .map((g) => g.textContent ?? '')
       .find((t) => t.includes('queue:'));
 
-  it('630: queue reads "paused" on the main-surface bar when energy saver is active', async () => {
+  it('S33.1 energy saver names continued text indexing and deferred enrichment', async () => {
     const el = make();
     el.aiState = makeAiState({
       index: { documentCount: known(0), searchableDocumentCount: known(0), pendingJobs: known(5), embeddingPending: known(0), embeddingBlocked: known(false), embeddingQueueSize: known(0), vduQueueSize: known(0) },
@@ -235,7 +237,9 @@ describe('StatusDeck (slice 461)', () => {
       } as unknown as AiState['status'],
     });
     await el.updateComplete;
-    expect(queueText(el)).toContain('paused');
+    expect(queueText(el)).toContain('Text indexing continues');
+    expect(queueText(el)).toContain('Idle enrichment deferred to save energy.');
+    expect(queueText(el)).not.toContain('paused');
   });
 
   it('630: queue stays the plain active count when not energy-reduced', async () => {
@@ -348,10 +352,11 @@ describe('StatusDeck (slice 461)', () => {
 
   it('595 §15.1 (E1): a visually-hidden aria-live announcer mirrors the verdict, politely', async () => {
     const announcer = (el: StatusDeck) =>
-      el.shadowRoot?.querySelector('[data-testid="verdict-announcer"]');
+      el.shadowRoot?.querySelector('[data-testid="indexing-announcer"]');
     const el = make();
     el.aiState = makeAiState({
       verdict: { kind: 'transitioning', severity: 'busy', reasons: ['rebuilding'] },
+      status: { worker: { core: { indexState: 'INDEXING', pendingJobs: 4, indexHealthy: true } } } as AiState['status'],
     });
     await el.updateComplete;
     const a = announcer(el);

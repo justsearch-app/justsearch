@@ -66,14 +66,13 @@ final class HelpIngestMarkerRecoveryTest {
         "a stale marker that survives the re-ingest would make the next boot skip it again");
   }
 
-  // Upgrading from a v2 marker re-ingests the help exactly once and writes v3. No @DisplayName, so
+  // Upgrading from a v2 marker re-ingests the current help exactly once and writes v4. No @DisplayName, so
   // the JUnit report names the method and test-intent evidence can select this case by it.
   @Test
-  void v2MarkerReingestsOnceAndWritesV3() throws Exception {
+  void v2MarkerReingestsOnceAndWritesV4() throws Exception {
     Path dataDir = Files.createDirectories(tempDir.resolve("data"));
     Path workingDir = helpTreeUnder(tempDir.resolve("working"));
-    // The marker every install that ingested the pre-v3 help carries. Pins the v2 -> v3 upgrade of
-    // the corrected help content: with HELP_FILES_VERSION still "v2" this marker would suppress it.
+    // A historical v2 marker must also advance to the current shortcut-help generation.
     Files.writeString(dataDir.resolve(MARKER), "v2");
 
     KnowledgeClient first = mock(KnowledgeClient.class);
@@ -83,20 +82,38 @@ final class HelpIngestMarkerRecoveryTest {
     }
     // JUnit assertions rather than Mockito verify, so a before-state failure is an assertion failure.
     assertEquals(1, submitBatchCalls(first), "a v2 marker must trigger exactly one help re-ingest");
-    assertEquals("v3", Files.readString(dataDir.resolve(MARKER)).trim());
+    assertEquals("v4", Files.readString(dataDir.resolve(MARKER)).trim());
 
     KnowledgeClient second = mock(KnowledgeClient.class);
     try (var fixture =
         KnowledgeServerBootstrapTestFixture.create(configFor(dataDir, workingDir))) {
       fixture.bootstrap().tryIngestHelpFiles(second, configFor(dataDir, workingDir), helpSource(workingDir));
     }
-    assertEquals(0, submitBatchCalls(second), "the v3 marker must suppress a second re-ingest");
+    assertEquals(0, submitBatchCalls(second), "the v4 marker must suppress a second re-ingest");
   }
 
   private static long submitBatchCalls(KnowledgeClient client) {
     return org.mockito.Mockito.mockingDetails(client).getInvocations().stream()
         .filter(invocation -> invocation.getMethod().getName().equals("submitBatch"))
         .count();
+  }
+
+  @Test
+  void v3MarkerReingestsOnceAndWritesV4() throws Exception {
+    Path dataDir = Files.createDirectories(tempDir.resolve("data"));
+    Path workingDir = helpTreeUnder(tempDir.resolve("working"));
+    Files.writeString(dataDir.resolve(MARKER), "v3");
+    KnowledgeClient first = mock(KnowledgeClient.class);
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(dataDir, workingDir))) {
+      fixture.bootstrap().tryIngestHelpFiles(first, configFor(dataDir, workingDir), helpSource(workingDir));
+    }
+    assertEquals(1, submitBatchCalls(first), "a v3 marker must trigger the shortcut-help upgrade");
+    assertEquals("v4", Files.readString(dataDir.resolve(MARKER)).trim());
+    KnowledgeClient second = mock(KnowledgeClient.class);
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(dataDir, workingDir))) {
+      fixture.bootstrap().tryIngestHelpFiles(second, configFor(dataDir, workingDir), helpSource(workingDir));
+    }
+    assertEquals(0, submitBatchCalls(second), "the upgraded marker suppresses another ingest");
   }
 
   @Test

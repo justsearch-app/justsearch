@@ -3,10 +3,13 @@ package io.justsearch.app.services.ai.runtime;
 import io.justsearch.app.api.AiRuntimeStatusResponse;
 import io.justsearch.app.api.AiRuntimeActivationStatus;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -125,6 +128,43 @@ class RuntimeActivationServiceTest {
   }
 
   @Test
+  void activationBlockedWhenPolicySnapshotThrows() throws Exception {
+    setHome(tmp);
+    assertFailedPolicyReadBlocksActivation(() -> {
+      throw new IllegalStateException("policy unavailable");
+    });
+  }
+
+  @Test
+  void activationBlockedWhenPolicySnapshotIsNull() throws Exception {
+    setHome(tmp);
+    assertFailedPolicyReadBlocksActivation(() -> null);
+  }
+
+  private void assertFailedPolicyReadBlocksActivation(EnterprisePolicyService policy)
+      throws Exception {
+    var service = new RuntimeActivationService(processExecutors,
+        OnlineAiService.unavailable(),
+        new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY), null, policy);
+    assertEquals("GPU acceleration is disabled by administrator policy.",
+        assertThrows(IllegalStateException.class, service::enforceActivationPolicy).getMessage());
+    service.startActivate("cuda-12.4");
+    var status = awaitDone(service);
+    assertEquals("failed", status.state);
+    assertEquals("POLICY_GPU_DISABLED", status.errorCode);
+    assertEquals("GPU acceleration is disabled by administrator policy.", status.message);
+  }
+
+  @Test
+  void absentPolicyServiceKeepsActivationPermissive() throws Exception {
+    setHome(tmp);
+    var service = new RuntimeActivationService(processExecutors,
+        OnlineAiService.unavailable(),
+        new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY), null, null);
+    assertDoesNotThrow(service::enforceActivationPolicy);
+  }
+
+  @Test
   void activationBlockedWhenGpuDisabledByPolicy() throws Exception {
     setHome(tmp);
 
@@ -233,8 +273,8 @@ class RuntimeActivationServiceTest {
       when(policy.snapshot()).thenReturn(effective);
       var service = new RuntimeActivationService(processExecutors, OnlineAiService.unavailable(),
           intent.settings(), null, policy, null, handle);
-      org.junit.jupiter.api.Assertions.assertSame(failure,
-          org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+      assertSame(failure,
+          assertThrows(IllegalStateException.class,
               () -> service.startActivate("cuda12")));
       assertEquals("failed", service.getActivationStatus().state);
       service.startActivate("cuda12");
@@ -308,10 +348,10 @@ class RuntimeActivationServiceTest {
           intent.settings(), null, policy, null, handle);
 
       var attempt = service.startActivate("cuda12");
-      var completionFailure = org.junit.jupiter.api.Assertions.assertThrows(
+      var completionFailure = assertThrows(
           java.util.concurrent.CompletionException.class,
           () -> attempt.completion().toCompletableFuture().join());
-      org.junit.jupiter.api.Assertions.assertSame(publicationFailure, completionFailure.getCause());
+      assertSame(publicationFailure, completionFailure.getCause());
       assertEquals("RUNTIME_ACTIVATION_FAILED", service.getActivationStatus().errorCode);
       assertEquals(ComponentState.STARTING, handle.snapshot().state());
     }

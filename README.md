@@ -203,8 +203,9 @@ version.
 To **run** the full desktop app, the easy path is the [installer](#install-windows) above; running the
 Engine stack from source is a developer workflow — see [`CONTRIBUTING.md`](CONTRIBUTING.md). The installed
 app offers **Install AI** with your consent (about **10 GB** on Windows or **8 GB** on Linux with a
-supported NVIDIA GPU; **2–4 GB** without one). On Windows this includes a CUDA build of `llama-server`
-that is selected automatically on supported NVIDIA hardware, unless you set your own executable.
+supported NVIDIA GPU; **2–4 GB** without one). On Windows, when downloads and GPU acceleration are
+permitted by policy, this includes a CUDA build of `llama-server` that is selected automatically on
+supported NVIDIA hardware, unless you set your own executable.
 Building from source does not download models: keyword search works without them, and
 `node scripts/dev/doctor.mjs` names the step to the next tier. See [Privacy](#privacy) for downloads,
 update checks, and optional trace export.
@@ -226,7 +227,7 @@ Indexing, retrieval, and built-in AI inference run locally. Network activity has
 
 - **Install AI** downloads models and runtimes from `github.com` and `huggingface.co` (and their download
   redirects), with your consent. Repair and upgrades can download them again. On Windows, supported NVIDIA
-  hardware also gets a CUDA build of `llama-server`, selected automatically unless you chose your own executable.
+  hardware also gets a CUDA build of `llama-server` when downloads and GPU acceleration are permitted by policy, selected automatically unless you chose your own executable.
 - **The desktop app checks for updates by default**, about 30 seconds after the desktop chrome mounts when a release URL is
   embedded. CI-built installers embed the repository's configured URL, including branch candidates and pre-releases.
   Discovery fetches `release.v1.json`, `release.v1.json.sig` and `latest.json` from GitHub, following download/CDN redirects;

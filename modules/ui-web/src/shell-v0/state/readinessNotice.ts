@@ -1,3 +1,4 @@
+import type { IndexingProgress } from './indexingProgress.js';
 // SPDX-License-Identifier: Apache-2.0
 /**
  * readinessNotice — Tempdoc 577 Goal 1 Phase 2 (Ext III).
@@ -836,7 +837,18 @@ export function severityForCodes(codes: readonly string[]): Severity {
  * Tempdoc 805 §G.2: the impairing wording is licensed by `classifyConsequence`, not
  * by severity, so a passage-only gap can no longer claim a keyword fallback.
  */
-export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeView | null {
+export function readinessNotice(
+  verdict: SystemHealthVerdict,
+  activity?: IndexingProgress['activity'],
+): ReadinessNoticeView | null {
+  if (activity && !activity.confirmed && verdict.kind !== 'unreachable' && verdict.reasons.some(isIndexingObservation)) {
+    return {
+      headline: activity.summary,
+      body: 'Waiting for a fresh status observation; index details are last observed.',
+      causes: wordCauses(verdict.reasons, activity),
+      remedy: pickRemedy(verdict.reasons),
+    };
+  }
   // Tempdoc 637 #1: a dead/replaced FE→backend binding surfaces AS a loud notice at its own
   // layer — never a silent empty result one layer up. The backend is unreachable, so the remedy
   // is a client action (reload), conveyed in the body; the button falls back to Open Health
@@ -846,7 +858,7 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
     return {
       headline: 'Backend disconnected.',
       body: 'Lost the connection to the search backend — reconnecting automatically. Reload the app if this persists.',
-      causes: wordCauses(verdict.reasons),
+      causes: wordCauses(verdict.reasons, activity),
       remedy: OPEN_HEALTH,
     };
   }
@@ -862,7 +874,7 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
     return {
       headline: 'Index migration needs operator review.',
       body: 'The current index remains available while the candidate waits for an operator to review its data gaps.',
-      causes: wordCauses(['migration.awaiting_gap_acceptance']),
+      causes: wordCauses(['migration.awaiting_gap_acceptance'], activity),
       remedy: OPEN_HEALTH,
     };
   }
@@ -870,7 +882,7 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
     return {
       headline: 'Activating the new index.',
       body: 'The current index remains available until cutover while the freshly-built index is activated.',
-      causes: wordCauses(['index.activating']),
+      causes: wordCauses(['index.activating'], activity),
       remedy: OPEN_HEALTH,
     };
   }
@@ -884,7 +896,7 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
     return {
       headline: 'Semantic search paused; keyword search available.',
       body: 'Keyword search remains available while the index is rebuilt; semantic ranking resumes afterward.',
-      causes: wordCauses([semanticPauseReason]),
+      causes: wordCauses([semanticPauseReason], activity),
       remedy: OPEN_HEALTH,
     };
   }
@@ -903,7 +915,7 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
     return {
       headline: 'Reindex required.',
       body: 'Semantic search is degraded until the index is rebuilt — results may be keyword-only.',
-      causes: wordCauses(reindexCauses),
+      causes: wordCauses(reindexCauses, activity),
       remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
     };
   }
@@ -916,7 +928,7 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
       return {
         headline: 'Index format is out of date.',
         body: 'Search is fully working — both semantic and keyword retrieval are active. Rebuilding will pick up newer index features.',
-        causes: wordCauses(codes.filter((c) => c !== INDEX_SCHEMA_MISMATCH)),
+        causes: wordCauses(codes.filter((c) => c !== INDEX_SCHEMA_MISMATCH), activity),
         remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
       };
     }
@@ -925,7 +937,7 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
     return {
       headline: 'Reduced search capability.',
       body: 'An optional capability is unavailable; results are still fully semantic.',
-      causes: wordCauses(codes),
+      causes: wordCauses(codes, activity),
       remedy: pickRemedy(codes),
     };
   }
@@ -945,7 +957,7 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
       body: schemaRefused
         ? 'The stored index cannot be opened under the current schema policy. Repair or rebuild it before searching.'
         : 'The search index is unavailable after a startup or recovery failure. Open Health for the cause and recovery steps.',
-      causes: wordCauses(unavailableCauses),
+      causes: wordCauses(unavailableCauses, activity),
       remedy: OPEN_HEALTH,
     };
   }
@@ -953,7 +965,7 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
     return {
       headline: 'An index model is unavailable.',
       body: 'Text search remains available, but an index-selected model is missing or changed. Model-backed search or answer features may be reduced.',
-      causes: wordCauses(codes.filter((code) => code === 'index.model_not_installed')),
+      causes: wordCauses(codes.filter((code) => code === 'index.model_not_installed'), activity),
       remedy: OPEN_HEALTH,
     };
   }
@@ -962,7 +974,7 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
     return {
       headline: 'Semantic search partially degraded.',
       body: 'Passage-level precision is reduced while passage embeddings are missing — results are still ranked semantically.',
-      causes: wordCauses(passageCauses),
+      causes: wordCauses(passageCauses, activity),
       remedy: pickRemedy(passageCauses),
     };
   }
@@ -971,7 +983,7 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
     return {
       headline: 'AI features unavailable.',
       body: 'Search is fully working — both semantic and keyword retrieval are active. Chat and answer features are unavailable until the AI model is online.',
-      causes: wordCauses(aiCauses),
+      causes: wordCauses(aiCauses, activity),
       remedy: pickRemedy(aiCauses),
     };
   }
@@ -987,7 +999,7 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
   return {
     headline: 'Semantic search degraded.',
     body: 'Showing keyword results; relevance ranking may be reduced.',
-    causes: wordCauses(listed),
+    causes: wordCauses(listed, activity),
     remedy: pickRemedy(listed),
   };
 }
@@ -1012,11 +1024,10 @@ export function warrantsSearchDegradationBanner(verdict: SystemHealthVerdict): b
 }
 
 /** Word each known code; unknown codes word generically (deduped, original order). */
-function wordCauses(codes: readonly string[]): string[] {
+function wordCauses(codes: readonly string[], activity?: IndexingProgress['activity']): string[] {
   const out: string[] = [];
   for (const code of codes) {
-    const row = CAUSE_ROWS.find((c) => c.code === code);
-    const wording = row ? row.wording : `Degraded: ${code}`;
+    const wording = reasonFor(code, activity).wording;
     if (!out.includes(wording)) out.push(wording);
   }
   return out;
@@ -1030,6 +1041,14 @@ function pickRemedy(codes: readonly string[]): NoticeRemedy {
   return OPEN_HEALTH;
 }
 
+/** Worker-derived readiness and migration observations share the indexing confirmation clock. */
+export function isIndexingObservation(code: string): boolean {
+  return code.startsWith('index.') || code.startsWith('migration.') ||
+    code.startsWith('chunk_embedding.') || code.startsWith('encoders.health.') || code === 'encoders.reloading' ||
+    code === 'rebuilding' || code === 'generation-switch' || code === 'catching-up' ||
+    code === 'inference.gpu_yielded_to_indexing' || code === 'inference.up_for_background';
+}
+
 /**
  * Tempdoc 596 §17 — the per-affordance read-seam over the ONE reason vocabulary. The CONTROL-scoped
  * projection (`projectAvailability`) reads `{ wording, remedy }` for a single reason-code here, the
@@ -1037,7 +1056,17 @@ function pickRemedy(codes: readonly string[]): NoticeRemedy {
  * project from — so a control's reason and the window's reason, and their remedies, cannot drift. An
  * unknown code words generically (mirrors `wordCauses`' fallback), never silence.
  */
-export function reasonFor(code: string): { wording: string; remedy?: NoticeRemedy } {
+export function reasonFor(
+  code: string,
+  activity?: IndexingProgress['activity'],
+): { wording: string; remedy?: NoticeRemedy } {
   const row = CAUSE_ROWS.find((c) => c.code === code);
-  return row ? { wording: row.wording, remedy: row.remedy } : { wording: `Degraded: ${code}` };
+  const cause = row ? { wording: row.wording, remedy: row.remedy } : { wording: `Degraded: ${code}` };
+  if (activity && isIndexingObservation(code)) {
+    if (!activity.confirmed) return { ...cause, wording: `${activity.summary} — last observed: ${cause.wording}` };
+    if (code === 'inference.gpu_yielded_to_indexing' || code === 'inference.up_for_background') {
+      return { ...cause, wording: [activity.summary, activity.detail, 'Chat is off in the current AI mode.'].filter(Boolean).join(' — ') };
+    }
+  }
+  return cause;
 }
