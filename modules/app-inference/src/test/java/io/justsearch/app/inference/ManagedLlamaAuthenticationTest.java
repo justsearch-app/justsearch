@@ -280,7 +280,7 @@ final class ManagedLlamaAuthenticationTest {
     String first = key(0);
     ProcessHandle serving = servingDescendant();
     manager.switchToIndexingMode();
-    awaitDescendantExit(serving);
+    assertFalse(running(serving), "stop confirms that the serving descendant exited");
     manager.switchToOnlineMode();
     assertWorking();
     assertTrue(servingDescendant().isAlive());
@@ -292,30 +292,16 @@ final class ManagedLlamaAuthenticationTest {
   }
 
   @Test
-  void aServingWrapperDescendantBlocksRestartUntilItEnds() throws Exception {
+  void aNonCooperativeWrapperDescendantIsEndedAndRestartAuthenticates() throws Exception {
     Assumptions.assumeFalse(System.getProperty("os.name").startsWith("Windows"),
-        "Windows ends the wrapper's job; this checks the POSIX waiting barrier");
+        "explicit shell-wrapper fixture is POSIX");
     create("--require-api-key", "--wrapper", "--ignore-parent");
     manager.switchToOnlineMode();
     assertWorking();
     String first = key(0);
-    int firstPort = manager.servingPort();
     ProcessHandle serving = servingDescendant();
     manager.switchToIndexingMode();
-    assertTrue(serving.isAlive(), "this fixture deliberately outlives its wrapper");
-    assertEquals(200, status(firstPort, "/props", first));
-    assertEquals(401, status(firstPort, "/props", null));
-    var refused = assertThrows(ModeTransitionException.class, manager::switchToOnlineMode);
-    assertTrue(refused.getMessage().contains("descendant is still running"), refused::getMessage);
-    assertTrue(refused.getMessage().contains("no LLAMA_SERVER starts beside it"), refused::getMessage);
-    assertFalse(manager.isOnline());
-    assertEquals(1, HealthyFakeLlamaServer.launches(tmp.resolve("fake")).size(),
-        "refusal must not spawn a second serving process");
-    assertEquals(200, status(firstPort, "/props", first));
-
-    HealthyFakeLlamaServer.crashLatest(tmp.resolve("fake"));
-    awaitDescendantExit(serving);
-    HealthyFakeLlamaServer.install(tmp.resolve("fake"), "--require-api-key", "--wrapper");
+    assertFalse(running(serving), "stop confirms that the serving descendant exited");
     int nextLaunch = launches.size();
     manager.switchToOnlineMode();
     assertWorking();
@@ -334,12 +320,82 @@ final class ManagedLlamaAuthenticationTest {
     return ProcessHandle.of(pid).orElseThrow();
   }
 
-  private static void awaitDescendantExit(ProcessHandle serving) throws InterruptedException {
-    // The cooperative fixture polls its parent. Allow STOP_WAIT (12 s) plus a 3 s load margin;
-    // Linux does not kill descendants, so this is a fixture bound, not a termination guarantee.
-    long deadline = System.nanoTime() + Duration.ofSeconds(15).toNanos();
-    while (serving.isAlive() && System.nanoTime() < deadline) Thread.sleep(10);
-    assertFalse(serving.isAlive(), "the serving fixture must exit within the bounded wait");
+  private static boolean running(ProcessHandle process) {
+    return process != null && process.isAlive()
+        && (!System.getProperty("os.name").equals("Linux")
+            || io.justsearch.app.api.runtime.child.LinuxProcessIdentity.observe(process.pid())
+                .presence() != io.justsearch.app.api.runtime.child.ProcessTerminator.IdentityPresence.GONE);
+  }
+
+  @Test
+  void aRejectedIgnoredKeyWrapperLeavesNoUnauthenticatedServer() throws Exception {
+    Assumptions.assumeFalse(System.getProperty("os.name").startsWith("Windows"),
+        "explicit shell-wrapper fixture is POSIX");
+    create("--wrapper", "--ignore-api-key", "--ignore-parent");
+    var rejected = assertThrows(ModeTransitionException.class, manager::switchToOnlineMode);
+    assertTrue(rejected.getMessage().contains("this llama-server ignores its API key"));
+    assertFalse(manager.isOnline());
+    List<String> argv = HealthyFakeLlamaServer.launches(tmp.resolve("fake")).getLast();
+    int port = Integer.parseInt(argv.get(argv.indexOf("--port") + 1));
+    assertNoUnauthenticatedServer(port);
+    assertFalse(running(recordedServingProcess()), "rejection ends the serving descendant");
+    assertTrue(control.list().isEmpty());
+    String rejectedKey = key(0);
+    HealthyFakeLlamaServer.install(tmp.resolve("fake"), "--require-api-key", "--wrapper", "--ignore-parent");
+    manager.switchToOnlineMode();
+    assertWorking();
+    assertFalse(rejectedKey.equals(key(1)));
+    assertEquals(401, status(manager.servingPort(), "/props", rejectedKey));
+  }
+
+  @Test
+  void aRejectedSelfTestWrapperLeavesNoUnauthenticatedServer() throws Exception {
+    Assumptions.assumeFalse(System.getProperty("os.name").startsWith("Windows"),
+        "explicit shell-wrapper fixture is POSIX");
+    Path executable = HealthyFakeLlamaServer.install(tmp.resolve("fake"),
+        "--wrapper", "--ignore-api-key", "--ignore-parent");
+    int port;
+    try (var socket = new ServerSocket(0)) { port = socket.getLocalPort(); }
+    var probe = new io.justsearch.app.inference.chat.SelfTestSpec.Probe() {
+      @Override public boolean healthy(int candidatePort) {
+        try { return status(candidatePort, "/health", null) == 200; }
+        catch (Exception notReady) { return false; }
+      }
+      @Override public void exercise(int candidatePort) throws Exception {
+        if (status(candidatePort, "/props", null) != 401)
+          throw new IOException("this llama-server ignores its API key");
+        fail("an ignored-key runtime must be rejected before chat");
+      }
+    };
+    var spec = new io.justsearch.app.inference.chat.SelfTestSpec(
+        List.of(executable.toString(), "--port", Integer.toString(port), "-c", "4096"),
+        null, List.of(), tmp.resolve("selftest.log"), port, Duration.ofSeconds(10), probe,
+        Map.of("LLAMA_API_KEY", UUID.randomUUID().toString()));
+    var result = new io.justsearch.app.inference.chat.ChildSelfTestLauncher(control).run(spec);
+    assertFalse(result.exercised());
+    assertTrue(result.failure().contains("this llama-server ignores its API key"));
+    assertNoUnauthenticatedServer(port);
+    assertFalse(running(recordedServingProcess()), "self-test rejection ends the serving descendant");
+    assertTrue(control.list().isEmpty());
+    create("--require-api-key", "--wrapper", "--ignore-parent");
+    manager.switchToOnlineMode();
+    assertWorking();
+  }
+
+  private ProcessHandle recordedServingProcess() throws IOException {
+    long pid = Long.parseLong(Files.readAllLines(tmp.resolve("fake/pids.txt")).getLast().trim());
+    return ProcessHandle.of(pid).orElse(null);
+  }
+
+  private static void assertNoUnauthenticatedServer(int port) throws Exception {
+    try {
+      int unauthenticated = status(port, "/props", null);
+      assertNotEquals(200, unauthenticated,
+          "K8 rejection must not leave a descendant serving /props unauthenticated");
+      fail("the rejected serving process must be ended, HTTP status " + unauthenticated);
+    } catch (java.net.ConnectException ended) {
+      // A refused connection confirms the rejected server no longer holds its listener.
+    }
   }
 
   @Test

@@ -82,9 +82,9 @@ import java.util.concurrent.TimeoutException;
  *
  * <p>A chat server ({@code LLAMA_SERVER} or {@code LLAMA_SELF_TEST}) whose stop failed blocks the
  * start of every chat server until a retry of its stop confirms it gone. What an exited chat root
- * left running in its own Windows job is ended through that job ({@link #endRemaining}, and before
- * the next chat start), each member recorded first as an intended cleanup; elsewhere it blocks
- * the next chat start until it exits.
+ * left running is ended through its Windows job, or retained JDK handles elsewhere ({@link
+ * #endRemaining}, and before the next chat start), each member recorded first as an intended
+ * cleanup. Any survivor blocks the next chat start until it exits.
  *
  * <p>A GPU start waits for every pending release poll to finish ({@link #GPU_RELEASE_BOUND}) and
  * is refused only when one is still running after that. Each adapter reading is bounded ({@link
@@ -389,16 +389,16 @@ public final class DefaultChildControl implements ChildControl {
   }
 
   /**
-   * Ends what an exited chat root left running in its own job: each member is recorded first
-   * ({@code child-note} {@code intended_cleanup:<reason>:job_member:<pid>@<start>}), then the job is
-   * ended through its handle and every recorded member awaited, and each outcome recorded after its
+   * Ends what an exited chat root left running: each member is recorded first
+   * ({@code child-note} {@code intended_cleanup:<reason>:job_member:<pid>@<start>}), then its Windows job or
+   * retained descendant handles are ended and every recorded member awaited, and each outcome recorded after its
    * intent: {@code cleanup_ended:...} or {@code cleanup_not_ended:...:<cause>}. A member not ended
    * keeps its scope held, so it is counted and refuses chat starts until it exits; that exit is
    * recorded too. When the job cannot be ended at all a chat start is refused with "chat start
    * blocked: could not end leftover chat processes (<native error>)". A GPU child's memory is
    * sampled before and its release polled after (unless its stop ended the Engine), so the next GPU
-   * start waits for it. Off Windows nothing can be ended: a running member refuses the chat start
-   * beside it, as before.
+   * start waits for it. Off Windows the original JDK handles receive TERM, a one-second grace window,
+   * then KILL. Linux zombies have exited regardless of their parent's reaping.
    *
    * @return how many members were ended
    */
@@ -412,17 +412,21 @@ public final class DefaultChildControl implements ChildControl {
     }
     // A member recorded as not ended stays counted after its job was closed, until its own exit.
     members = new ArrayList<>(members);
-    for (ProcessHandle leftover : held.notEndedMembers.values()) {
+    for (var entry : held.notEndedMembers.entrySet()) {
+      ProcessHandle leftover = entry.getValue();
+      if (!ProcessTerminator.isRunning(leftover)) {
+        if (held.notEndedMembers.remove(entry.getKey(), leftover)) {
+          append(LedgerRecordType.CHILD_NOTE,
+              noteFields(held.childId, "leftover_exited:job_member:" + entry.getKey()));
+        }
+        continue;
+      }
       boolean listed = members.stream().anyMatch(member -> member.pid() == leftover.pid());
-      if (leftover.isAlive() && !listed) {
+      if (!listed) {
         members.add(leftover);
       }
     }
     if (members.isEmpty()) return 0;
-    if (!held.descendants.endable()) {
-      throw new IOException("a " + held.spec.kind() + " descendant is still running (root pid "
-          + held.pid() + "); no " + starting + " starts beside it");
-    }
     Intent stopped;
     synchronized (held) {
       stopped = held.intent;
@@ -440,7 +444,7 @@ public final class DefaultChildControl implements ChildControl {
           "intended_cleanup:" + reason + ":job_member:" + identity)));
     }
     try {
-      held.descendants.end();
+      held.descendants.end(members);
     } catch (IOException | RuntimeException failure) {
       String cause = String.valueOf(failure.getMessage());
       for (var member : identities.entrySet()) {
@@ -456,21 +460,20 @@ public final class DefaultChildControl implements ChildControl {
       boolean ended = false;
       if (interrupted == null) {
         try {
-          member.getKey().onExit()
-              .get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
-          ended = true;
+          ended = ProcessTerminator.awaitExit(member.getKey(),
+              Duration.ofNanos(Math.max(0, deadline - System.nanoTime())));
         } catch (InterruptedException stop) {
           interrupted = stop;
-        } catch (ExecutionException | TimeoutException survived) {
-          // recorded below as not ended
         }
       }
-      if (ended || !member.getKey().isAlive()) {
+      if (ended || !ProcessTerminator.isRunning(member.getKey())) {
         noteDurability(held, append(LedgerRecordType.CHILD_NOTE, noteFields(held.childId,
             "cleanup_ended:" + reason + ":job_member:" + member.getValue())));
       } else {
         notEnded(held, reason, member.getKey(), member.getValue(),
-            interrupted != null ? "interrupted" : "outlived_job_end");
+            interrupted != null ? "interrupted"
+                : io.justsearch.configuration.PlatformPaths.isWindows()
+                    ? "outlived_job_end" : "outlived_cleanup");
         if (outlived == null) outlived = member.getKey();
       }
     }
@@ -481,7 +484,9 @@ public final class DefaultChildControl implements ChildControl {
     }
     if (outlived != null) {
       throw new IOException("a " + held.spec.kind() + " descendant (pid " + outlived.pid()
-          + ") outlived the end of its job; no " + starting + " starts beside it");
+          + (io.justsearch.configuration.PlatformPaths.isWindows()
+              ? ") outlived the end of its job; no " : ") outlived cleanup; no ")
+          + starting + " starts beside it");
     }
     if (before.isPresent()) {
       synchronized (held) {
@@ -505,11 +510,15 @@ public final class DefaultChildControl implements ChildControl {
     String token = "cleanup_not_ended:" + reason + ":job_member:" + identity + ":" + cause;
     noteDurability(held, append(LedgerRecordType.CHILD_NOTE, noteFields(held.childId,
         token.length() > MAX_NOTE ? token.substring(0, MAX_NOTE) : token)));
-    if (held.notEndedMembers.putIfAbsent(identity, member) == null) {
+    // Linux observes later exits (including unreaped zombies) when the admission barrier retries.
+    // Do not leave a JDK onExit reaper waiting forever for a zombie's parent to reap it.
+    if (held.notEndedMembers.putIfAbsent(identity, member) == null
+        && !io.justsearch.configuration.PlatformPaths.isLinux()) {
       member.onExit().thenRun(() -> {
-        held.notEndedMembers.remove(identity, member);
-        append(LedgerRecordType.CHILD_NOTE,
-            noteFields(held.childId, "leftover_exited:job_member:" + identity));
+        if (held.notEndedMembers.remove(identity, member)) {
+          append(LedgerRecordType.CHILD_NOTE,
+              noteFields(held.childId, "leftover_exited:job_member:" + identity));
+        }
       });
     }
   }
@@ -697,6 +706,8 @@ public final class DefaultChildControl implements ChildControl {
           cooperate(held, sharedGrace);
         }
       }
+      if (held.descendants != null && !io.justsearch.configuration.PlatformPaths.isWindows())
+        held.descendants.observe();
       boolean exited = held.os.awaitExit(Duration.ZERO);
       for (int call = 0; !exited && call < TERMINATE_CALLS; call++) {
         Instant calledAt = clock.instant();
@@ -713,6 +724,18 @@ public final class DefaultChildControl implements ChildControl {
       if (!exited) {
         survived(held);
         return;
+      }
+      if (held.descendants != null && !io.justsearch.configuration.PlatformPaths.isWindows()) {
+        try {
+          endScope(held, intent.request().reason().name(), held.spec.kind(), false);
+        } catch (IOException | RuntimeException unverified) {
+          // The root has exited; retain its scope as the start barrier for any survivor or
+          // unreadable membership. Owners also verify endRemaining before certifying cleanup.
+          String token = "cleanup_not_ended:" + intent.request().reason() + ":"
+              + unverified.getMessage();
+          noteDurability(held, append(LedgerRecordType.CHILD_NOTE, noteFields(held.childId,
+              token.length() > MAX_NOTE ? token.substring(0, MAX_NOTE) : token)));
+        }
       }
       recordExit(held, ExitOutcome.Phase.STOPPING);
     } catch (InterruptedException interrupted) {

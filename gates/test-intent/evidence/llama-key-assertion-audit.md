@@ -1,6 +1,6 @@
 # Llama key assertion audit
 
-Compared merge-base `f003a5c6476776ed2e56d9e0882f8bbaf55fc731` with branch head `dc1bcaa07a18351991fdd24c991ffb4963a3ca56`.
+Historical source comparison: auth baseline `f003a5c6476776ed2e56d9e0882f8bbaf55fc731` with initial ignored-key repair `dc1bcaa07a18351991fdd24c991ffb4963a3ca56`. Current review parent is `0109762bc16244364dacdff4752a95521d8d9275`; subsequent wrapper and #858 cleanup oracle changes are documented in the changeset.
 
 This is a source comparison, not D4 execution evidence. Java assertion invocations were tokenized with strings retained and comments/whitespace ignored. Nested assertions are counted individually; mocks and fixture handlers are reviewed in the changeset. No test or production file was edited for this audit.
 
@@ -102,6 +102,19 @@ assertThrows ( IllegalStateException . class , ( ) - > new OpenAiCompatControlle
 
 ## Execution evidence status
 
-The owner subsequently authorized running the unchanged official `run-evidence.mjs` under one outer Gradle slot and allowed its own detached before-state worktrees. All three producer invocations exited 0 and removed their before-state worktrees. The sealed artifacts are `llama-key-initial-auth.json` (15 candidate cases passed; 15 assertion failures on f003a5c64), `llama-key-cpu-environment.json` (5 passed; 5 assertion failures on f003a5c64), and `llama-key-ignored-key.json` (6 passed; 4 assertion failures and 2 preserved passing cases on 673b54a1b), in this directory. This source audit does not substitute for those execution artifacts. No evidence JSON was hand-authored or edited.
+The orchestrator subsequently authorized running the unchanged official `run-evidence.mjs` under one outer Gradle slot and allowed its own detached before-state worktrees. All three producer invocations exited 0 and removed their before-state worktrees. The sealed artifacts are `llama-key-initial-auth.json` (15 candidate cases passed; 15 assertion failures on f003a5c64), `llama-key-cpu-environment.json` (5 passed; 5 assertion failures on f003a5c64), and `llama-key-ignored-key.json` (6 passed; 4 assertion failures and 2 preserved passing cases on 673b54a1b), in this directory. This source audit does not substitute for those execution artifacts. No evidence JSON was hand-authored or edited.
 
 The two CPU environment checks retain exact equality to `{CUDA_VISIBLE_DEVICES=-1}` after removing and validating the newly required private key; these are classified New, not a pure adaptation. The shutdown assertion changes only its reflected endpoint argument, retaining the same expected InvocationTargetException, IOException cause and no-spawn oracle. OpenAiCompatControllerTest likewise changes only the endpoint supplied inside its existing assertThrows lambda. The only other removed-or-reencoded assertions are the two CPU whole-environment checks described above.
+
+## Linux zombie wait fixture adaptation (#858)
+
+Compared `ChatJobAccountingTest#selfTestChecksMembershipAfterObservedDescendantsDrain` at review parent `0109762bc16244364dacdff4752a95521d8d9275` with the current fixture. All four assertion statements are byte-identical after removing leading indentation:
+
+```java
+assertTrue(drained.get(), "the initially observed descendant exited during cleanup");
+assertTrue(late.isAlive(), "the later scope member is still running");
+assertFalse(result.exercised(), "a late scope member must prevent a successful self-test");
+assertTrue(result.failure().contains("still running"), result.failure());
+```
+
+The member still exits after the post-stop snapshot and exposes a still-running late member. Only its exit trigger moves from an `onExit` subscription to the first liveness observation, so kernel polling and future waiting see the same exit facts. The original assertions still reject a self-test that skips the final membership read. The unchanged official producer records a passing preservation check on both parent production (with this fixture overlaid) and candidate production in `llama-key-drain-adaptation-before.json` and `llama-key-drain-adaptation.json`; no fail-before is claimed for this adaptation.

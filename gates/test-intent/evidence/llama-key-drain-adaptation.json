@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T08:31:00.487Z",
+  "revision": "0109762bc16244364dacdff4752a95521d8d9275",
+  "tree": "e6c215cab62e8c7c38a21d80bbda2f503eddf6fe",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.ChatJobAccountingTest.selfTestChecksMembershipAfterObservedDescendantsDrain\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2551
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java#selfTestChecksMembershipAfterObservedDescendantsDrain",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06068565be3b05684f0e1488aa33193da1164e47aad8258ace64ae613cf3254f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "selfTestChecksMembershipAfterObservedDescendantsDrain()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:114fb73850116bb2f28e39d0e061d0ffd3916a005732d61106a48df9820b0fec"
+}

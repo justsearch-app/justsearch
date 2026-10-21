@@ -72,13 +72,19 @@ public final class HealthyFakeLlamaServer {
         ProcessHandle server = ownedHandle(line);
         if (server != null) {
           // Recheck the producer-recorded birth on the held handle immediately before termination.
-          if (!sameBirth(server, line)) throw new IOException("fake server identity changed");
-          server.destroyForcibly();
-          try {
-            server.onExit().get(5, TimeUnit.SECONDS);
-          } catch (Exception ignored) {
-            // A server that does not end is caught by the file-release check below.
+          if (!sameBirth(server, line)) {
+            // Exit can erase Info between acquiring this handle and rechecking its birth.
+            // Never signal an unreadable live identity; an exited or zombie handle needs no kill.
+            if (!server.isAlive() || (io.justsearch.configuration.PlatformPaths.isLinux()
+                && io.justsearch.app.api.runtime.child.LinuxProcessIdentity.observe(server.pid())
+                    .presence() == io.justsearch.app.api.runtime.child.ProcessTerminator.IdentityPresence.GONE))
+              continue;
+            throw new IOException("fake server identity changed");
           }
+          server.destroyForcibly();
+          if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(
+              List.of(server), java.time.Duration.ofSeconds(5)))
+            throw new IOException("fake server survived cleanup: " + server.pid());
         }
       }
     }
@@ -138,7 +144,9 @@ public final class HealthyFakeLlamaServer {
     }
     long pid = server.pid();
     server.destroyForcibly();
-    server.onExit().get(10, TimeUnit.SECONDS);
+    if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(
+        List.of(server), java.time.Duration.ofSeconds(10)))
+      throw new AssertionError("fake server survived crash: " + server.pid());
     return pid;
   }
 
@@ -175,7 +183,9 @@ public final class HealthyFakeLlamaServer {
   static void releaseLingerers(Path dir) throws Exception {
     if (!Files.isDirectory(dir)) return;
     Files.writeString(dir.resolve(LINGERER_EXIT), "exit", StandardCharsets.US_ASCII);
-    for (ProcessHandle lingerer : lingerers(dir)) lingerer.onExit().get(10, TimeUnit.SECONDS);
+    if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(
+        lingerers(dir), java.time.Duration.ofSeconds(10)))
+      throw new AssertionError("fake lingerer survived its exit signal");
   }
 
   /** The lingering process: records its identity, then waits for its exit signal. */

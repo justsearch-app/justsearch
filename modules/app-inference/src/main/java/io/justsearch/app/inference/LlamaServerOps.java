@@ -995,14 +995,15 @@ final class LlamaServerOps {
 
   /**
    * I6: what the exited server started (a wrapper's server, a crash reporter in its job) ends
-   * before the next launch. ChildControl ends the server's own job, recording each member as an
-   * intended cleanup with {@code request}'s reason, so a crash-recovery restart does not wait on
-   * it. Where nothing can be ended (off Windows) the processes are awaited, and ChildControl
-   * refuses the next chat start beside any still running.
+   * before the next launch. ChildControl ends the server's own job on Windows, or its retained
+   * descendant handles elsewhere, recording each member as an intended cleanup with {@code
+   * request}'s reason. Any survivor still refuses the next chat start. Linux zombies have exited
+   * and do not hold the barrier, even when their parent never reaps them.
    */
   private void endLeftRunning(
       ChildHandle exited, List<ProcessHandle> started, StopRequest request) {
-    if (started.stream().noneMatch(ProcessHandle::isAlive)) return;
+    if (started.stream().noneMatch(
+        io.justsearch.app.api.runtime.child.ProcessTerminator::isRunning)) return;
     try {
       int ended = childControl.endRemaining(exited, request);
       LOG.info("Ended {} process(es) llama-server PID {} left running ({})", ended, exited.pid(),

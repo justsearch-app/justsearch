@@ -8,7 +8,7 @@ author-session: 01a15751-d591-7723-a5d5-9aa16695d081
 # Llama key test intent
 
 Covers every flagged item against merge-base `50eafae23a304df420f87ee9b287cfd3da0a945d`.
-Current review head: `950a3a2ed898447a68734eee492095a43791dd62`.
+Current review parent: `0109762bc16244364dacdff4752a95521d8d9275` (candidate includes the uncommitted cleanup repair).
 The owner adopted K1–K9 on 2026-10-20: "i agree, proceed accordingly".
 The three isolated new test classes are exempt; their checks are referenced where they establish
 new shared-fixture expectations. Existing review records are retained below.
@@ -22,14 +22,16 @@ Parameterized activation and no-device checks use class-level check IDs: their J
 are `[1] false`, `[2] true`, or numeric values and do not include method names. Class-level IDs
 execute every case without changing test display names or the evidence runner. Both activation
 methods (success/rotation and ignored-key rejection), in both session modes, therefore run in
-each activation evidence file. The initial-auth before-state is f003a5c64; the ignored-key
-before-state is its actual parent 673b54a1b.
+each activation evidence file. The auth repair is checked against f003a5c64, the readiness-guard repair against its
+historical parent 673b54a1b, and descendant cleanup against current review parent 0109762bc.
+These targeted before-states are distinct from the current merge-base named above.
 
 ## Execution results
 
 Each producer command ran as `js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs ...`
 with `JAVA_TOOL_OPTIONS` unset, `TMPDIR` set to the assigned builder folder, and its temporary
-before-state rooted there. All three primary security-evidence producer invocations exited 0. The separate load diagnostic
+before-state rooted there. The refreshed initial-auth and ignored-key producers and the new descendant-cleanup producer
+exited 0. The CPU environment artifact is retained because both named check files are unchanged. The separate load diagnostic
 returned 1 because its old-race target was not reproduced within the bound. The producer's recorded
 Gradle commands and raw assertion-failure output are in the sealed JSON files; before-state
 Gradle exit 1 is expected and preserved rather than hidden.
@@ -39,6 +41,7 @@ Gradle exit 1 is expected and preserved rather than hidden.
 | `gates/test-intent/evidence/llama-key-initial-auth.json` | 16 cases passed, none skipped | f003a5c64 | 16 assertion failures: missing environment key, unauthenticated client exchanges, refusal/cleanup and lost-bind rotation expectations |
 | `gates/test-intent/evidence/llama-key-cpu-environment.json` | 5 cases passed, none skipped | f003a5c64 | 5 assertion failures: private key absent from the captured self-test environment |
 | `gates/test-intent/evidence/llama-key-ignored-key.json` | 6 cases passed, none skipped | 673b54a1b | 4 assertion failures: initial/recovery readiness wrongly succeeded and both activation paths reported passed; the 2 existing activation-success cases still passed |
+| `gates/test-intent/evidence/llama-key-descendant-cleanup.json` | 9 cases passed, none skipped | 0109762bc | 9 assertion failures: descendants survive stop/rejection, both rejected-wrapper probes still read unauthenticated /props HTTP 200, the unreaped zombie holds the scope, cleanup has no TERM/KILL attempt, and self-test descendants prevent main reload |
 
 No before-state production source was changed and no compatibility patch was needed. The
 wrapper test and fake were reworked on the candidate as recorded in entry 3. Only the candidate test files named by each check and the explicitly recorded shared
@@ -47,22 +50,37 @@ records the existing assertions and their two mechanical endpoint argument conve
 After all runs, `git worktree list --porcelain` contained no worktree under the assigned builder
 folder; each producer removed its before-state worktree. The evidence runner itself is unchanged.
 
-## Wrapper rework status
+The separate drain-fixture preservation producer exited 0 on parent production and on the
+candidate, with one executed passing check in each artifact and no skips. Both use the identical
+adapted fixture; its four original assertions are unchanged, as recorded in the assertion audit.
+No assertion fail-before is claimed for that adaptation.
 
-The two replacement K6 methods each passed 100 repetitions at eight-way concurrency, then the
-unchanged evidence producer repeated the 200-case candidate load successfully. The old wrapper
-assertion did not reproduce in the official bounded 2,000-attempt search. That producer result
-is explicitly non-assertion evidence, not a claimed successful fail-before. See
-`gates/test-intent/evidence/llama-key-wrapper-load.json` and the archived driver, raw reports and
-reproduction notes in `gates/test-intent/evidence/llama-key-wrapper-load/README.md`.
+Final validation ran `spotlessApply :modules:app-api:test :modules:app-inference:test
+:modules:app-services:test --continue -PskipWebBuild=true` in one Gradle invocation: 5,008 passed,
+17 pre-existing skips, zero failures/errors (460 / 560 / 4,005 total cases respectively).
+The additional #759 ownership selection passed 71 cases without skips. Every Gradle invocation
+used `js-gradle-slot` with its default wait and `JAVA_TOOL_OPTIONS` unset. The final
+`build -x test -PskipWebBuild=true` exited 0. Full raw reports and command logs are retained under
+`/home/elias/.cache/justsearch-llama-key-builder/linux-cleanup/`.
 
-**Delivery is blocked by a separate observed K8/K6 composition failure:** an ignored-key runtime
-under a wrapper whose descendant ignores parent death is rejected and never reported online,
-but unauthenticated /props still returns 200 after rejection. The temporary process/HTTP probe
-fails the intended cleanup assertion; its source, raw XML and Gradle log are retained in that
-same evidence folder. Its finally block cleans up the recorded-identity descendant. The Linux
-stop policy is unchanged, as delegated, and this failure is not treated as an accepted residual.
-A decision on failed-launch cleanup is required before claiming K8 for this composition.
+## Wrapper cleanup and #858
+
+The earlier wrapper load evidence remains historical evidence for the former waiting-only Linux
+checks, including the bounded old-race search that did not reproduce its target. The latest
+accepted record's K8 composition failure is repaired here: Linux shared child control now sends
+TERM, waits up to one second, then sends KILL through descendant handles captured while an
+ancestor was alive. Every attempted member receives the same cleanup intent/outcome ledger
+notes as Windows. Unreadable membership or any running survivor retains the start barrier.
+Linux zombies have exited even when a container parent never reaps them. Linux waits poll
+kernel state instead of creating a JDK exit future that could remain pending forever; a later
+exit of a recorded survivor is noted when the admission barrier next observes it.
+
+This closes [#858](https://github.com/justsearch-app/justsearch/issues/858)'s implementation scope in PR #838 and supersedes the earlier delegated choice
+against Linux descendant termination. It changes no Windows job cleanup. The durable main and
+self-test wrapper probes exercise the previously exposed unauthenticated /props boundary. The
+new sealed `llama-key-descendant-cleanup.json` evidence compares these expectations with review
+parent 0109762bc. Existing acceptance records below are preserved; the updated digest requires
+independent acceptance.
 
 ## Owner-adopted scenarios
 
@@ -196,7 +214,7 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
       "change": "modified",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "K6 adds initial and recovery lost-bind expectations: each of two physical launches has a 43-character base64url key only in its environment, neither argv contains it, and the retry key differs. The 58 previous managed-adoption assertion calls remain unchanged. The shared fakes reject missing/wrong credentials with 401 when a key or require-key mode is supplied; protected health-independent chat/token/template/props traffic must authenticate. New fake modes exercise reasoning retry, key refusal and a wrapper with a distinct serving process. Existing unauthenticated/external fixture mode is retained when no key is supplied. Main lifecycle and self-test checks establish authenticated success, key rotation and isolation, old-key rejection, environment-only transport, bounded refusal/cleanup and a protected cleanup survivor. These expectations follow K1/K3/K4/K5/K6/K7/K8; the 43-character encoding follows the orchestrator's delegated choice of 32 random bytes encoded as base64url. The ignored-key follow-up has its own entry/evidence below. The former wrapper StopsWithIt assertion is replaced by two K6 checks under the delegated I6 stop contract. For a cooperative serving descendant, a 15-second polling bound after stop (STOP_WAIT of 12 seconds plus 3 seconds margin) observes the fixture's own parent-poll exit; a restart then serves with a different environment key, rejecting the obsolete key. For a descendant explicitly ignoring parent death, stop leaves that protected server running: the next Engine online request must receive the product's descendant-is-still-running refusal without spawning another process. The test ends that recorded-identity fixture, then requires restart with a fresh working key. No Linux descendant-killing guarantee is asserted or added; Windows job cleanup is unchanged. The removed assertion was assertTrue(ProcessHandle.of(serving).map(p -> !p.isAlive()).orElse(true), \"stopping the owned wrapper also ends its serving descendant\"); it asserted immediate descendant exit, which the Linux stop design never promised. The cooperative fixture now captures its parent before publishing health readiness, so a fast stop cannot make it adopt PID 1 as the parent it polls.",
+      "behaviour": "K6 adds initial and recovery lost-bind expectations: each of two physical launches has a 43-character base64url key only in its environment, neither argv contains it, and the retry key differs. The 58 previous managed-adoption assertion calls remain unchanged. The shared fakes reject missing/wrong credentials with 401 when a key or require-key mode is supplied; protected health-independent chat/token/template/props traffic must authenticate. New fake modes exercise reasoning retry, key refusal and a wrapper with a distinct serving process. Existing unauthenticated/external fixture mode is retained when no key is supplied. Main lifecycle and self-test checks establish authenticated success, key rotation and isolation, old-key rejection, environment-only transport, bounded refusal/cleanup and a protected cleanup survivor. These expectations follow K1/K3/K4/K5/K6/K7/K8; the 43-character encoding follows the orchestrator's delegated choice of 32 random bytes encoded as base64url. The ignored-key follow-up has its own entry/evidence below. The current K6 wrapper checks require both cooperative and non-cooperative serving descendants to be ended after stop, followed by a restart whose new key reaches its distinct serving process and whose obsolete key is rejected. Exit polling treats Linux zombies as exited regardless of parent reaping. This supersedes the earlier waiting-only Linux choice: #858's descendant-cleanup scope is implemented here, with an additional fail-before against review parent 0109762bc in entry 6. Windows job cleanup is unchanged. The original removed assertion was assertTrue(ProcessHandle.of(serving).map(p -> !p.isAlive()).orElse(true), \"stopping the owned wrapper also ends its serving descendant\"); that immediate isAlive oracle raced with Linux parent reaping. The subsequently accepted Linux survivor assertions (assertTrue(serving.isAlive(), \"this fixture deliberately outlives its wrapper\"), product refusal while the descendant served, and restart only after the test ended it) are replaced because the new delegated cleanup choice requires the Engine to end that descendant. The cooperative fixture still captures its parent before publishing health readiness. Fake crash/cleanup waits now recognize Linux zombies and fail if a recorded-identity fixture actually survives, without depending on PID 1 reaping it. If a fixture exits between acquiring its birth-matched handle and rechecking Info, cleanup skips signalling only after independently confirming exit or Linux zombie state; an unreadable or mismatched identity that is still running continues to throw. This fixes the observed after-each exit race without relaxing the live-process birth guard.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -260,7 +278,15 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
           "delegationQuote": "resume with remaining work autonomously",
           "delegationLocation": "task t-20261019-5ec1a1 request",
           "delegationScope": "implementation choices inside the agreed security scenarios K1-K9",
-          "choice": "keep the existing Linux stop design that LlamaServerOps.endLeftRunning documents (I6): off Windows, descendants a stopped wrapper left running are awaited up to STOP_WAIT, and ChildControl refuses the next chat start while any still runs. This PR does not add Linux descendant killing.",
+          "choice": "off Windows, end what an exited chat root left running, for both a stop and a rejected launch (K8). Use the descendant ProcessHandles captured while the root was alive (the JDK checks a handle's start time before signalling, so a reused PID is not hit). Send TERM, wait a short bound, then KILL.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261019-5ec1a1 request",
+          "delegationScope": "implementation choices inside the agreed security scenarios K1-K9",
+          "choice": "Make the product treat a zombie (Linux /proc state Z) as exited for the barrier and cleanup: a container whose PID 1 is the Engine's JVM would otherwise block chat forever. Make the tests independent of the launcher's reaping.",
           "label": "agent choice"
         }
       ],
@@ -276,7 +302,7 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java#reasoningFlagRetryRotatesTheKeyAndAuthenticates",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java#stableCrashRecoveryRotatesTheKeyAndAuthenticates",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java#aCooperativeWrapperDescendantExitsAndRestartAuthenticates",
-        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java#aServingWrapperDescendantBlocksRestartUntilItEnds",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java#aNonCooperativeWrapperDescendantIsEndedAndRestartAuthenticates",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java#modelSwitchAndEngineRestartUseNewKeysAndRejectThePreviousKeys",
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationAuthenticationTest.java"
       ],
@@ -369,6 +395,106 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationAuthenticationTest.java"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChatDescendantCleanupTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "K8/#858: a wrapper's serving descendant that ignores its parent's death and LLAMA_API_KEY must no longer serve unauthenticated /props after main or self-test rejection; the Engine stays offline, gives the ignores-API-key error, leaves no running owned child and admits a protected replacement. K6: stopping a non-cooperative authenticated wrapper ends the serving descendant; restart authenticates with a fresh key and rejects the obsolete key. Shared Linux child-control checks require TERM for a cooperative descendant and KILL after the short grace for one ignoring TERM, intended_cleanup before cleanup_ended ledger notes, and admission of the next chat kind. A logical retained-handle survivor that refuses both signals must produce cleanup_not_ended, refuse the next chat without spawning it, and admit one after its observed exit. Descendant signals in that seam target a refusing test handle; the only OS processes it stops are its two owned sleep roots. A deliberately non-reaping live parent keeps a real zombie so the retained-scope check cannot pass by relying on PID 1; that zombie must not hold the barrier. The two pre-existing self-test ownership checks change only the Linux cleanup expectations forced by the new policy. An unexpectedly exited wrapper still fails the self-test after its serving descendant is ended and recorded (S19); a normal controlled stop ends its descendant before returning, so that successful probe can pass and main reload proceeds without an Engine restart. Windows failure/job-cleanup assertions remain. Removed Linux assertions were assertTrue(fixture.descendantAlive(), \"the serving descendant outlived its wrapper\"), assertTrue(fixture.descendantAlive()), assertEquals(List.of(), seam.models(), \"closing the self-test session must not spawn main beside its surviving descendant\"), assertFalse(manager.isOnline()), assertTrue(manager.view().toString().contains(\"descendant\"), \"chat status must explain the refusal: \" + manager.view()), and assertDoesNotThrow(() -> { manager.switchToOnlineMode(); }, \"an explicit retry can launch once the recorded descendant exits\"). The common assertFalse(result.exercised(), \"a live descendant must make cleanup fail\") and its failure-contains-still-running assertion remain unchanged on both platforms for an unexpectedly exited wrapper. The normal-stop assertFalse(session.run(...).exercised(), \"the descendant survives the forced wrapper stop\") remains for Windows and becomes a success assertion only on POSIX after the shared stop verifies cleanup. Identity-matched fixture exit polling now counts zombies as exited; no pre-existing check is skipped or weakened to avoid a failure.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-5ec1a1",
+          "scenario": "K5",
+          "quote": "AI-activation self-test (controller-managed and child launcher): its server is protected the same way (K1), its own key differs from the main server's (neither authorizes the other), and activation succeeds; failure, cancel and rollback unchanged; a child that survives failed cleanup stays protected and still blocks a conflicting launch.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-5ec1a1",
+          "scenario": "K6",
+          "quote": "Each launch has a new key: bind-race retry on a fresh port, context-window step-down, reasoning-flag retry, crash recovery, Engine restart, online/offline and model switches all reach an authenticated working server; an obsolete key is rejected. Unit tests use a fake that returns 401 without the expected key (fails today), extending the managed-adoption lost-bind cases; where a test runner's wrapper PID differs from the serving process, lifecycle checks still hold and the key reaches the serving process.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-5ec1a1",
+          "scenario": "K8",
+          "quote": "If the key cannot be passed (environment rejected, binary refuses), the launch fails with a bounded, actionable error and the child is cleaned up; never an unauthenticated server.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261019-5ec1a1 request",
+          "delegationScope": "implementation choices inside the agreed security scenarios K1-K9",
+          "choice": "off Windows, end what an exited chat root left running, for both a stop and a rejected launch (K8). Use the descendant ProcessHandles captured while the root was alive (the JDK checks a handle's start time before signalling, so a reused PID is not hit). Send TERM, wait a short bound, then KILL.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261019-5ec1a1 request",
+          "delegationScope": "implementation choices inside the agreed security scenarios K1-K9",
+          "choice": "Make the product treat a zombie (Linux /proc state Z) as exited for the barrier and cleanup: a container whose PID 1 is the Engine's JVM would otherwise block chat forever. Make the tests independent of the launcher's reaping.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261019-5ec1a1 request",
+          "delegationScope": "implementation choices inside the agreed security scenarios K1-K9",
+          "choice": "Record intents and outcomes the same way the Windows path does (intended_cleanup / cleanup_ended / cleanup_not_ended). Keep the start barrier for any member that survives. Keep Windows unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/llama-key-descendant-cleanup.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChatDescendantCleanupTest.java#termEndsACooperativeDescendantAndRecordsItsCleanup",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChatDescendantCleanupTest.java#killEndsADescendantThatIgnoresTermAndAllowsTheNextChat",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChatDescendantCleanupTest.java#anUnreapedZombieIsAbsentFromTheRetainedScope",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChatDescendantCleanupTest.java#aMemberSurvivingBothSignalsStillBlocksTheNextChat",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java#aNonCooperativeWrapperDescendantIsEndedAndRestartAuthenticates",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java#aRejectedIgnoredKeyWrapperLeavesNoUnauthenticatedServer",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAuthenticationTest.java#aRejectedSelfTestWrapperLeavesNoUnauthenticatedServer",
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#exitedSelfTestWrapperIsCleanedBeforeResultReturns",
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestProcessOwnershipTest.java#selfTestDescendantsEndBeforeMainReload"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatJobAccountingTest.java"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Only the logical drain fixture changes: the observed member exits on its first liveness observation after the root stop, with the same completed exit future available to callers. The old fixture caused exit only as a side effect of subscribing to onExit; Linux must poll kernel state instead, because an unreaped zombie never completes the JDK future. The initially observed scope still contains only that member; its exit reveals a still-running late member, so the unchanged four assertions still require the post-drain membership recheck and a failed self-test. No assertion, failure injection, condition, tag or other method changes. Assertion comparison and before/after producer evidence: gates/test-intent/evidence/llama-key-assertion-audit.md; gates/test-intent/evidence/llama-key-drain-adaptation-before.json; gates/test-intent/evidence/llama-key-drain-adaptation.json. The parent artifact is pinned here by its producer self-digest sha256:715766a7d0545ab9d69e7a066c0edc94cdbe99aa7c2f00e066129179ba254284.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-5ec1a1",
+          "scenario": "K5",
+          "quote": "AI-activation self-test (controller-managed and child launcher): its server is protected the same way (K1), its own key differs from the main server's (neither authorizes the other), and activation succeeds; failure, cancel and rollback unchanged; a child that survives failed cleanup stays protected and still blocks a conflicting launch.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261019-5ec1a1 request",
+          "delegationScope": "implementation choices inside the agreed security scenarios K1-K9",
+          "choice": "Make the product treat a zombie (Linux /proc state Z) as exited for the barrier and cleanup: a container whose PID 1 is the Engine's JVM would otherwise block chat forever. Make the tests independent of the launcher's reaping.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/llama-key-drain-adaptation.json"
     }
   ]
 }
