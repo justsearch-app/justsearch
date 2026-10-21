@@ -1,0 +1,25 @@
+diff --git a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java
+index b35f14112..2651f4846 100644
+--- a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java
++++ b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java
+@@ -44,7 +44,6 @@ import io.justsearch.indexerworker.metrics.OperationalMetrics;
+ import io.justsearch.indexerworker.queue.JobQueue;
+ import io.justsearch.indexerworker.queue.SqliteJobQueue;
+ import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+-import io.justsearch.indexerworker.queue.SwitchBufferDelete;
+ import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
+ import io.justsearch.indexerworker.identity.DocumentIdentityStore;
+ import io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps;
+@@ -8377,10 +8376,9 @@ public final class KnowledgeServer implements Closeable {
+           covered.add(unit);
+         }
+       } else if ("DELETE".equals(op.op())) {
+-        String path = SwitchBufferDelete.decode(op.payload()).path();
+-        String unit = DocumentIdentityStore.pathHash(path);
++        String unit = DocumentIdentityStore.pathHash(op.payload());
+         if (ingestLifecycle.documentFieldOps()
+-            .getDocumentField(path, SchemaFields.DOC_ID) != null) {
++            .getDocumentField(op.payload(), SchemaFields.DOC_ID) != null) {
+           addCandidateGap(gaps, rowGaps, op, unit, "DELETE_NOT_APPLIED");
+         } else {
+           covered.add(unit);

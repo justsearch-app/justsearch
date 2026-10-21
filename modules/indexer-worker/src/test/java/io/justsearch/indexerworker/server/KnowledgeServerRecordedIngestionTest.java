@@ -826,6 +826,72 @@ final class KnowledgeServerRecordedIngestionTest {
     }
   }
 
+  /** P1: a watched root withdrawn during SWITCHING still lets the refused candidate roll back. */
+  @Test
+  void refusalWithWithdrawnRootAbandonsCandidateAndKeepsSourceRows(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = preparedLayout(tempDir);
+    var lifecycle = org.mockito.Mockito.mock(RecordedIngestionLifecycle.class);
+    var server = new KnowledgeServer(new TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(layout.dataDir()), null,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle);
+    String operation = "01994180-0000-7000-8000-000000000199";
+    var manager = org.mockito.Mockito.spy(layout.genManager());
+    String active = manager.readStateBestEffort().active_generation();
+    String building = manager.startRecordedMigration(operation, "recorded-test",
+        "a".repeat(64), active, List.of()).building_generation();
+    org.mockito.Mockito.when(lifecycle.recordedPrecommitRefused(operation)).thenReturn(true);
+    var source = org.mockito.Mockito.mock(RunningRuntime.class);
+    var green = org.mockito.Mockito.mock(RunningRuntime.class);
+    var owner = new Object();
+    var producer = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
+    org.mockito.Mockito.when(producer.mutationAdmission()).thenReturn(
+        new io.justsearch.indexerworker.services.WorkerMutationAdmission(owner));
+    org.mockito.Mockito.when(producer.mutationOwnerToken()).thenReturn(owner);
+    org.mockito.Mockito.when(producer.pauseProducerForCutover(10_000)).thenReturn(true);
+    var closed = new AtomicBoolean();
+    org.mockito.Mockito.doAnswer(invocation -> { closed.set(true); return null; })
+        .when(producer).close();
+    org.mockito.Mockito.when(producer.producerClosed()).thenAnswer(ignored -> closed.get());
+    // The real watcher receipt of a file deleted during SWITCHING; then its root is renamed away.
+    Path root = Files.createDirectories(tempDir.resolve("watched")).toAbsolutePath();
+    Path file = root.resolve("gone.txt");
+    String payload = new io.justsearch.indexerworker.queue.SwitchBufferDelete(file.toString(),
+        io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.WATCHER, root.toString(),
+        "recorded-root-identity", "default").encode();
+    Files.move(root, tempDir.resolve("watched-withdrawn"));
+    try (var queue = new SqliteJobQueue(tempDir.resolve("refusal-jobs.db"))) {
+      queue.open();
+      assertTrue(queue.putSwitchBufferForGeneration(building, "path:" + file, "DELETE", payload));
+      server.appServices = producer;
+      setField(server, "generationBootOwnership", new IndexGenerationManager.BootOwnership.Recorded(
+          operation, active, "recorded-test", "a".repeat(64), true));
+      setField(server, "indexGenerationManager", manager);
+      setField(server, "activeIndexPath", layout.activePath());
+      setField(server, "searchLifecycle", source);
+      setField(server, "ingestLifecycle", green);
+      setField(server, "jobQueue", queue);
+      var restarted = new AtomicBoolean();
+      setField(server, "migrationRestartAction", (Runnable) () -> restarted.set(true));
+
+      var reconcile = KnowledgeServer.class.getDeclaredMethod("reconcileRefusedRecordedCandidate");
+      reconcile.setAccessible(true);
+      reconcile.invoke(server);
+
+      assertTrue(restarted.get(), "the refused candidate must roll back instead of retaining Green");
+      org.mockito.Mockito.verify(manager).abandonBuildingGeneration("recorded candidate refused");
+      org.mockito.Mockito.verify(manager).retireRefusedRecordedGeneration(operation, active);
+      assertTrue(closed.get(), "the candidate producer must release its resources");
+      var state = manager.readStateBestEffort();
+      assertEquals(active, state.active_generation());
+      assertEquals(null, state.building_generation());
+      assertEquals("IDLE", state.migration_state());
+      org.mockito.Mockito.verify(source, org.mockito.Mockito.never()).indexingCoordinator();
+      assertTrue(queue.listSwitchBufferOpsStrict().isEmpty(),
+          "the abandoned candidate's journal must not block a new rebuild");
+    }
+  }
+
   @Test
   void refusalRecoveryRetriesExactCandidateAfterPointerWasAlreadyCleared(@TempDir Path tempDir)
       throws Exception {

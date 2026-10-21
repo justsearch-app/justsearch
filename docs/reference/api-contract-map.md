@@ -525,6 +525,10 @@ The unreleased queue branch also used V23: V24 idempotently ensures main's admis
 objects before adding bookkeeping, so those development databases can upgrade without
 discarding jobs or resetting an existing admission counter. Historical V23 execution receipts
 describe that unreleased branch; new migration evidence is explicitly named V24.
+V25 follows V24 without a table-layout change: switch-buffer DELETE payloads carry their
+origin and watcher-reconciliation receipts are kept as switch-buffer rows, so older binaries,
+which would read a versioned DELETE as a raw path, refuse V25. Neither adds a `jobs` row, so
+`job_counts` and the claim indexes are unaffected.
 
 The indexing-jobs worker/head bridge carries an optional `state_presence` message on existing
 `IndexingJobsFrame` frames: every snapshot contains the set of states present anywhere in jobs.db;
