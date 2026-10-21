@@ -385,6 +385,8 @@ public class IndexingController {
       wire.put("matchedFiles", result.matchedFiles());
       wire.put("perPattern", perPattern);
       wire.put("capped", result.capped());
+      wire.put("confirmedRemovals", result.confirmedRemovals());
+      wire.put("uncheckedScopes", result.uncheckedScopes());
       ctx.status(200).json(wire);
     } catch (Exception e) {
       if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;

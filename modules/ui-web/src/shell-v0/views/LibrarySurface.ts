@@ -110,6 +110,15 @@ const listResponseSchema = z
   })
   .loose();
 
+// Operation results are untrusted wire data; absent partial-scope fields cannot mean success.
+const excludesResultSchema = z.object({
+  dryRun: z.boolean(), matchedFiles: z.number().int().nonnegative(),
+  confirmedRemovals: z.number().int().nonnegative(), capped: z.boolean(),
+  perPattern: z.array(z.object({ pattern: z.string(), matches: z.number().int().nonnegative() })),
+  uncheckedScopes: z.array(z.object({ path: z.string(), status: z.enum(['not_checked', 'not_removed']), reason: z.string() })),
+});
+type ExcludesResult = z.infer<typeof excludesResultSchema>;
+
 type GapDecisionView = { reindexKey: string; gapListHash: string;
   gaps: readonly { unitId: string; reason: string }[] };
 
@@ -163,6 +172,10 @@ export class LibrarySurface extends JfElement {
     excludesInvalidPatterns: { state: true },
     excludesLoaded: { state: true },
     excludesBusy: { state: true },
+    excludesError: { state: true },
+    excludesNotice: { state: true },
+    excludesResult: { state: true },
+    excludesConflict: { state: true },
     addBusy: { state: true },
     removingHashes: { state: true },
     actionMessage: { state: true },
@@ -200,6 +213,10 @@ export class LibrarySurface extends JfElement {
   declare excludesInvalidPatterns: string[];
   declare excludesLoaded: boolean;
   declare excludesBusy: boolean;
+  declare private excludesError: string | null;
+  declare private excludesNotice: string;
+  declare private excludesResult: ExcludesResult | null;
+  declare private excludesConflict: boolean;
   private excludesWitness: SettingsWitness | null = null;
   private excludesSavedText: string | null = null;
   private excludesAttempt: SettingsAttempt | null = null;
@@ -310,6 +327,10 @@ export class LibrarySurface extends JfElement {
     this.excludesInvalidPatterns = [];
     this.excludesLoaded = false;
     this.excludesBusy = false;
+    this.excludesError = null;
+    this.excludesNotice = '';
+    this.excludesResult = null;
+    this.excludesConflict = false;
     this.addBusy = false;
     this.removingHashes = new Set();
     this.actionMessage = null;
@@ -375,7 +396,7 @@ export class LibrarySurface extends JfElement {
       flex-wrap: wrap;
     }
     @media (max-width: 640px) {
-      .header { flex-wrap: wrap; }
+      .header, .excludes-header { flex-wrap: wrap; }
       .add-row input { min-inline-size: 0; }
     }
     /* 574 B1 — the button look is the jf-button atom's single authority; the per-surface
@@ -553,6 +574,9 @@ export class LibrarySurface extends JfElement {
       gap: 1rem;
       margin-bottom: 0.5rem;
     }
+    .excludes-section pre { white-space: pre-wrap; }
+    .excludes-section pre, .excludes-section li { overflow-wrap: anywhere; }
+    .excludes-header > div { min-width: 0; }
     .excludes-header h3 {
       margin: 0;
       font-size: var(--font-size-md);
@@ -668,6 +692,9 @@ export class LibrarySurface extends JfElement {
    *  spinner / error would otherwise survive navigation). Folder/excludes drafts, the active tab, and the
    *  fetched roots are recoverable and KEPT. */
   protected override settleTransients(): void {
+    this.excludesError = null;
+    this.excludesNotice = '';
+    this.excludesResult = null;
     this.loading = false;
     this.error = null;
     this.surfaceSerial++;
@@ -1030,14 +1057,18 @@ export class LibrarySurface extends JfElement {
     }
   }
 
-  private async loadExcludes(): Promise<void> {
+  private async loadExcludes(keepDraft = false): Promise<void> {
     if (this.excludesBusy || this.excludesAttempt) return;
     this.excludesLoadStarted = true;
     this.excludesBusy = true;
     try {
       const body = await readSettingsObservation((path, init) => this.doFetch(path, init));
-      this.excludesText = (body.ui?.excludePatterns ?? []).join('\n');
-      this.excludesSavedText = this.excludesText;
+      this.excludesSavedText = (body.ui?.excludePatterns ?? []).join('\n');
+      if (!keepDraft) this.excludesText = this.excludesSavedText;
+      this.excludesConflict = false;
+      this.excludesError = null;
+      this.excludesResult = null;
+      this.excludesNotice = keepDraft ? 'Latest saved patterns loaded below. Review them before saving your retained draft.' : '';
       this.excludesInvalidPatterns = body.ui?.invalidExcludePatterns ?? [];
       this.excludesWitness = body.witness;
       this.excludesLoaded = true;
@@ -1053,9 +1084,7 @@ export class LibrarySurface extends JfElement {
 
   private async persistExcludes(): Promise<boolean> {
     if (!this.excludesLoaded || !this.excludesWitness) return false;
-    // Existing literal fallbacks are readable, but cannot be submitted as new glob syntax.
-    if (!this.excludesAttempt && this.excludesInvalidPatterns.length > 0
-        && this.excludesText === this.excludesSavedText) return true;
+    if (!this.excludesAttempt && this.excludesText === this.excludesSavedText) return true;
     try {
       if (!this.excludesAttempt) {
         const patterns = this.excludesText.split('\n').map((value) => value.trim()).filter(Boolean);
@@ -1066,34 +1095,25 @@ export class LibrarySurface extends JfElement {
       this.excludesAttempt = null;
       this.excludesSavedText = this.excludesText;
       this.excludesInvalidPatterns = [];
+      this.excludesNotice = 'Patterns saved. Future indexing skips these matches. Existing search results have not been removed.';
       return true;
     } catch (err) {
-      // An uncertain save remains the same attempt on the next Preview/Apply click.
-      // Do not let an edited draft acquire a newer witness while that row is unresolved.
+      // An uncertain save retains its exact key and bytes until Save checks the receipt.
       const state = err instanceof SettingsAttemptError ? err.response?.['state'] : undefined;
+      const invalid = err instanceof SettingsAttemptError && ['INVALID_REQUEST', 'INVALID_PATH'].includes(err.code);
       const terminal = state === 'FAILED' || state === 'CANCELLED'
         || (err instanceof SettingsAttemptError && ['VERSION_CONFLICT', 'SETTINGS_READ_ONLY', 'INVALID_REQUEST', 'INVALID_PATH',
           'OPERATION_KEY_INVALID', 'OPERATION_KEY_REUSED', 'OPERATION_KEY_EXPIRED'].includes(err.code));
       if (terminal) {
         this.excludesAttempt = null;
-        this.excludesLoaded = false;
-        this.excludesWitness = null;
+        if (!invalid) {
+          this.excludesLoaded = false;
+          this.excludesWitness = null;
+        }
       }
-      this.error = err instanceof Error ? err.message : String(err);
+      this.excludesConflict = err instanceof SettingsAttemptError && err.code === 'VERSION_CONFLICT';
+      this.excludesError = err instanceof Error ? err.message : String(err);
       return false;
-    }
-  }
-
-  private async invoke(
-    operationId: string,
-    args: Record<string, unknown> = {},
-  ): Promise<void> {
-    this.error = null;
-    try {
-      await this.host_.data.invokeOperation(operationId, args);
-      await this.refresh();
-    } catch (err) {
-      this.error = err instanceof Error ? err.message : String(err);
     }
   }
 
@@ -1410,19 +1430,51 @@ export class LibrarySurface extends JfElement {
     }
   }
 
+  private async handleSaveExcludes(): Promise<void> {
+    if (this.excludesBusy || !this.excludesLoaded) return;
+    this.excludesBusy = true;
+    this.excludesError = null;
+    this.excludesNotice = '';
+    this.excludesResult = null;
+    try { await this.persistExcludes(); }
+    finally { this.excludesBusy = false; }
+  }
+
   private async handlePreviewExcludes(): Promise<void> {
-    await this.saveAndInvokeExcludes(OP_PREVIEW);
+    await this.invokeExcludes(false);
   }
 
   private async handleApplyExcludes(): Promise<void> {
-    await this.saveAndInvokeExcludes(OP_APPLY);
+    await this.invokeExcludes(true);
   }
 
-  private async saveAndInvokeExcludes(operation: string): Promise<void> {
-    if (this.excludesBusy || !this.excludesLoaded) return;
+  private async invokeExcludes(apply: boolean): Promise<void> {
+    if (this.excludesBusy || !this.excludesLoaded || this.excludesAttempt
+        || this.excludesText !== this.excludesSavedText) return;
     this.excludesBusy = true;
+    this.excludesError = null;
+    this.excludesNotice = '';
+    this.excludesResult = null;
     try {
-      if (await this.persistExcludes()) await this.invoke(operation, {});
+      if (apply && !await this.host_.ui.showConfirmDialog(
+        'Apply saved patterns to the watched folders on disk? Matching files and folders will be removed from search. Offline, missing or unreadable scope may remain searchable and will be listed in the result.',
+        { confirmLabel: 'Apply', destructive: true, typedConfirmWord: OP_APPLY })) {
+        this.excludesNotice = 'Apply cancelled. Nothing was removed.';
+        return;
+      }
+      const result = apply
+        ? await this.host_.data.invokeOperation(OP_APPLY, {}, { consented: true })
+        : await this.host_.data.invokeOperation(OP_PREVIEW, {});
+      if (!result.success) throw new Error(result.message ?? 'Exclusion operation failed');
+      const parsed = excludesResultSchema.safeParse(result.structuredData);
+      if (!parsed.success || parsed.data.dryRun === apply) {
+        this.excludesNotice = `${apply ? 'Apply' : 'Preview'} outcome is unconfirmed. Check again before relying on this result.`;
+      } else {
+        this.excludesResult = parsed.data;
+      }
+      if (apply) await this.refresh();
+    } catch (err) {
+      this.excludesError = `${apply ? 'Apply outcome is unconfirmed. Some matches may already have been removed. Retry to reconcile. ' : ''}${err instanceof Error ? err.message : String(err)}`;
     } finally {
       this.excludesBusy = false;
     }
@@ -1817,7 +1869,7 @@ export class LibrarySurface extends JfElement {
         ? html`<jf-ingestion-summary .host_=${this.host_}></jf-ingestion-summary>`
         : nothing}
 
-      <div class="excludes-section">
+      <section class="excludes-section" aria-label="Exclude patterns">
         <div class="excludes-header">
           <div>
             <h3>Exclude patterns</h3>
@@ -1829,35 +1881,63 @@ export class LibrarySurface extends JfElement {
               <code>{draft,final}</code> matches either alternative.
               These meanings also apply to patterns saved by earlier versions.
             </p>
+            <p id="excludes-help">Save changes what future indexing skips; it does not remove existing search results.
+              Preview counts matches on disk using the saved list and removes nothing.
+              Apply uses the saved list to remove matches from search. During an index rebuild, removal may wait until the rebuild finishes.
+              Missing or offline files cannot be checked.</p>
           </div>
           <div class="actions">
+            <jf-button label="Save patterns" .disabled=${!this.excludesLoaded || this.excludesBusy || (!this.excludesAttempt && this.excludesText === this.excludesSavedText)}
+              .onActivate=${() => void this.handleSaveExcludes()}>Save patterns</jf-button>
             <jf-button label="Reload saved patterns" .disabled=${this.excludesBusy || this.excludesAttempt !== null}
               .onActivate=${() => void this.loadExcludes()}>Reload saved patterns</jf-button>
-            <jf-button label="Preview" .disabled=${!this.excludesLoaded || this.excludesBusy}
+            <jf-button label="Preview" .disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null || this.excludesText !== this.excludesSavedText}
               .onActivate=${() => void this.handlePreviewExcludes()}
               >Preview</jf-button
             >
-            <jf-button label="Apply" .disabled=${!this.excludesLoaded || this.excludesBusy}
+            <jf-button label="Apply" .disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null || this.excludesText !== this.excludesSavedText}
               .onActivate=${() => void this.handleApplyExcludes()}
               >Apply</jf-button
             >
           </div>
         </div>
         ${this.excludesAttempt && !this.excludesBusy
-          ? html`<p>Save completion is unknown. Retry Preview or Apply to check the same save.</p>` : nothing}
+          ? html`<p>Save completion is unknown. Retry Save patterns to check the same save. Your draft is retained.</p>` : nothing}
+        ${this.excludesConflict ? html`<jf-button label="Review latest settings, keep draft" .disabled=${this.excludesBusy}
+          .onActivate=${() => void this.loadExcludes(true)}>Review latest settings, keep draft</jf-button>` : nothing}
+        ${this.excludesLoaded && this.excludesText !== this.excludesSavedText ? html`<p>Unsaved draft. Save before Preview or Apply.</p>
+          <details><summary>Current saved patterns</summary><pre>${this.excludesSavedText || '(none)'}</pre></details>` : nothing}
         ${this.excludesInvalidPatterns.length > 0
           ? html`<div role="status"><ul>${this.excludesInvalidPatterns.map((pattern) => html`<li>“${pattern}” has invalid pattern syntax and is matched as a literal name. Correct or remove it.</li>`)}</ul></div>`
           : nothing}
         <textarea
           aria-label="Exclude patterns"
+          aria-busy=${this.excludesBusy}
+          aria-describedby=${this.excludesError ? 'excludes-help excludes-error' : 'excludes-help'}
+          aria-invalid=${this.excludesError ? 'true' : 'false'}
           ?disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null}
           .value=${this.excludesText}
           @input=${(e: Event) =>
             (this.excludesText = (e.target as HTMLTextAreaElement).value)}
           placeholder="**/node_modules/**"
         ></textarea>
-      </div>
+        ${this.excludesError ? html`<p id="excludes-error" role="alert">${this.excludesError}</p>` : nothing}
+        <div role="status" aria-live="polite" aria-atomic="true" data-testid="excludes-result">
+          ${this.excludesBusy ? 'Working on exclusions…' : this.excludesResult ? this.renderExcludesResult(this.excludesResult) : this.excludesNotice}
+        </div>
+      </section>
     `;
+  }
+
+  private renderExcludesResult(result: ExcludesResult): TemplateResult {
+    const partial = result.capped || result.uncheckedScopes.length > 0;
+    return html`<p>${result.dryRun ? (partial ? 'Partial Preview' : 'Preview complete') : (partial ? 'Partial Apply' : 'Apply complete')}.
+      ${result.dryRun ? `${result.matchedFiles} matching files found on disk. Files may not have been indexed. Nothing was removed.`
+        : `${result.confirmedRemovals} matching files or folders confirmed no longer searchable. This counts confirmed deletion requests, including matches that were never indexed.`}</p>
+      ${result.capped ? html`<p>Entry cap reached. Remaining disk scope was not checked.</p>` : nothing}
+      ${result.uncheckedScopes.length ? html`<ul>${result.uncheckedScopes.map((scope) => html`<li>${scope.status === 'not_checked' ? 'Not checked' : 'Not removed'}: ${scope.path} — ${scope.reason}</li>`)}</ul>
+        <p>Some matches may remain searchable. Retry Apply after resolving the listed scope.</p>` : nothing}
+      ${result.dryRun ? html`<ul>${result.perPattern.map((match) => html`<li>${match.pattern}: ${match.matches} files</li>`)}</ul>` : nothing}`;
   }
 
   private renderReindexDecision(): TemplateResult | typeof nothing {

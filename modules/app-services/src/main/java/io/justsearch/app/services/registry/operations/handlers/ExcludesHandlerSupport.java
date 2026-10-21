@@ -88,6 +88,9 @@ final class ExcludesHandlerSupport {
     out.put("matchedFiles", r.matchedFiles());
     out.put("capped", r.capped());
     out.put("perPattern", perPattern);
+    out.put("confirmedRemovals", r.confirmedRemovals());
+    out.put("uncheckedScopes", r.uncheckedScopes().stream().map(scope ->
+        Map.of("path", scope.path(), "status", scope.status(), "reason", scope.reason())).toList());
     return out;
   }
 }

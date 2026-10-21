@@ -1,0 +1,94 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T09:42:06.502Z",
+  "revision": "ae50fbc4e94d5c9f6909b893985af38f1cd10811",
+  "tree": "d4ac7cbe5fb9067e4048f0405c42cfb4bd1f82df",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/LibrarySurface.settings-attempt.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-excludes-editor/tmp/wp3.2/continuation-tmp/test-intent-vitest-3336279-1792575725238.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1263
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:76f8e152ba8e261ada0ecb8391910b3ccd9310d5f2ef02421330a1e7eb0f439c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library retained-base exclusions AX1 editor preserves the saved list and names every literal fallback warning",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions AX1 unchanged legacy list can be previewed and applied without replacing the saved policy",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions AX2 pattern help explains character classes and alternatives for previously saved lists",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions keeps the witness read with the draft and never refreshes it before saving",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions failed or unwitnessed load (503) keeps editing/save disabled and never posts empty patterns",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions failed or unwitnessed load (200) keeps editing/save disabled and never posts empty patterns",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions preserves a conflicting draft and blocks effects until explicit reload and a new attempt",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions waits through open202 during Save and rejects overlapping clicks",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions retains uncertain bytes across timeout and a later check instead of minting a new mutation",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions renders disabled controls after failed load and retains a conflicting draft across remount",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions unblocks reload after a stalled GET and ignores its late result after a newer observation",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions EX4 editor reports input limit refusal without applying or discarding the draft",
+          "status": "passed"
+        },
+        {
+          "name": "Library retained-base exclusions EX4 editor reports expanded limit refusal without applying or discarding the draft",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:90442653bbcf2735b195ef0586b394591a8dc0328ec1565019e0af9036ce9074"
+}
