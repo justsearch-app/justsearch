@@ -22,12 +22,12 @@ describe('IndexingOverlay (slice 460)', () => {
     __resetModalityForTest();
   });
 
-  it('renders header + explain text', async () => {
+  it('S33.4 without an observation renders an unconfirmed header and explanation', async () => {
     const el = make();
     await el.updateComplete;
-    expect(el.shadowRoot?.querySelector('h3')?.textContent).toBe('Batch Processing Active');
+    expect(el.shadowRoot?.querySelector('h3')?.textContent).toBe('Indexing status unconfirmed');
     expect(el.shadowRoot?.querySelector('.explain')?.textContent).toContain(
-      'embeddings',
+      'Waiting for a fresh status observation.',
     );
   });
 
