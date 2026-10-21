@@ -1,0 +1,108 @@
+--- a/modules/shell/src-tauri/src/lib.rs
++++ b/modules/shell/src-tauri/src/lib.rs
+@@ -3787,3 +3787,18 @@
+         }
+     }
+ }
++
++// Test-only observation adapters. The real before-state command still returns a string.
++#[cfg(test)]
++mod engine_conn;
++#[cfg(all(test, target_os = "linux"))]
++mod engine_conn_test_support;
++#[cfg(all(test, target_os = "linux"))]
++mod session_credential_tests;
++#[cfg(test)]
++struct SessionCredential { origin: String, token: String }
++#[cfg(test)]
++fn session_credential(state: &BackendState) -> Option<SessionCredential> {
++    // Project the legacy token-only response: no issued origin and no port readiness guard.
++    state.get_session_token().map(|token| SessionCredential { origin: String::new(), token })
++}
+--- a/modules/shell/src-tauri/src/shell_actuator.rs
++++ b/modules/shell/src-tauri/src/shell_actuator.rs
+@@ -738,3 +738,18 @@
+     }
+ 
+ }
++
++#[cfg(all(test, target_os = "linux"))]
++mod connection_tests {
++    include!("shell_connection_tests.rs");
++    // Signature adapters only. Both call the UNCHANGED before-state actor senders.
++    fn post(host: &EngineHost, path: &str, body: &Value, timeout_ms: u64) -> Result<Value, String> {
++        let binding = host.binding_snapshot();
++        super::post(binding.port.unwrap(), binding.token.as_deref().unwrap(), path, body, timeout_ms)
++    }
++    fn post_before_send(host: &EngineHost, path: &str, body: &Value, timeout_ms: u64,
++        before_send: impl FnOnce() -> bool) -> (Result<Value, String>, bool) {
++        let binding = host.binding_snapshot();
++        super::post_before_send(binding.port.unwrap(), binding.token.as_deref().unwrap(), path, body, timeout_ms, before_send)
++    }
++}
+--- a/modules/shell/src-tauri/src/updater.rs
++++ b/modules/shell/src-tauri/src/updater.rs
+@@ -3457,3 +3457,7 @@
+ #[cfg(test)]
+ #[path = "updater_actor_hold_witness_tests.rs"]
+ mod actor_hold_witness_tests;
++
++#[cfg(all(test, target_os = "linux"))]
++#[path = "updater_connection_tests.rs"]
++mod connection_tests;
+--- /dev/null
++++ b/modules/shell/src-tauri/src/engine_conn.rs
+@@ -0,0 +1,53 @@
++//! Before-state API scaffolding; no socket ownership check or transfer decoding is added.
++use std::net::{TcpStream, SocketAddr};
++use std::time::Duration;
++use serde_json::{Value, json};
++pub(crate) fn connect_proven(port: u16, _expected_pid: u32, timeout: Duration) -> Result<TcpStream, String> {
++    // Exactly the old actor's connect, deliberately ignoring PID.
++    TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], port)), timeout).map_err(|error| error.to_string())
++}
++pub(crate) fn post_connected(mut stream: TcpStream, port: u16, token: &str, path: &str,
++    body: &Value, timeout: Duration, before_send: impl FnOnce() -> bool) -> (Result<Value, String>, bool) {
++    use std::io::{Read, Write};
++    let mut sent = false;
++    let result = (|| {
++        if token.contains(['\r', '\n']) {
++            return Err("Invalid session token".into());
++        }
++        stream
++            .set_read_timeout(Some(timeout))
++            .map_err(|e| e.to_string())?;
++        stream
++            .set_write_timeout(Some(timeout))
++            .map_err(|e| e.to_string())?;
++        let body = body.to_string();
++        if !before_send() {
++            return Err("Engine exited or quit before upgrade commit request".into());
++        }
++        sent = true;
++        write!(stream,"POST {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-JustSearch-Session: {token}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).map_err(|e|e.to_string())?;
++        let mut response = String::new();
++        stream
++            .read_to_string(&mut response)
++            .map_err(|e| e.to_string())?;
++        let (headers, body) = response
++            .split_once("\r\n\r\n")
++            .ok_or("Malformed HTTP response")?;
++        if !headers
++            .lines()
++            .next()
++            .is_some_and(|line| line.contains(" 2"))
++        {
++            return Err("Shutdown rejected".into());
++        }
++        serde_json::from_str(body).or_else(|_| Ok(json!({"accepted":true})))
++    })();
++    (result, sent)
++}
++fn decode_chunks(body: &[u8]) -> Result<Vec<u8>, String> {
++    // The old raw sender passes the transfer body directly to JSON without decoding it.
++    Ok(body.to_vec())
++}
++#[cfg(test)]
++#[path = "engine_conn_tests.rs"]
++mod tests;

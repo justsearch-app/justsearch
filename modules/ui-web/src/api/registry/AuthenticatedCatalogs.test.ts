@@ -17,7 +17,7 @@ const calls = [
 ] as const;
 
 it.each(calls)('authenticates the default %s fetch', async (_name, call) => {
-  mocks.invoke.mockResolvedValue('owner-boot-token');
+  mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:33221', token: 'owner-boot-token' });
   // Seed conditional-read caches so 304 is a valid response, without first-install backoff.
   for (const [name, primitive] of [['surfaceCatalog', 'Surface'], ['conversationShapeCatalog', 'ConversationShape']]) {
     localStorage.setItem(`justsearch.${name}.body`, JSON.stringify({ schemaVersion: '1.0', catalogVersion: 1, namespace: 'core', primitive, entries: [] }));
@@ -31,7 +31,7 @@ it.each(calls)('authenticates the default %s fetch', async (_name, call) => {
 });
 
 it('authenticates canonical Engine schema reads', async () => {
-  mocks.invoke.mockResolvedValue('owner-boot-token');
+  mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:33221', token: 'owner-boot-token' });
   const send = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ type: 'object' })));
   vi.stubGlobal('fetch', send);
   const { fetchSchema } = await import('./schemaFetcher.js');
@@ -40,7 +40,7 @@ it('authenticates canonical Engine schema reads', async () => {
 });
 
 it('keeps external schema documents credential-free', async () => {
-  mocks.invoke.mockResolvedValue('owner-boot-token');
+  mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:33221', token: 'owner-boot-token' });
   const send = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ type: 'object' })));
   vi.stubGlobal('fetch', send);
   const { fetchSchema } = await import('./schemaFetcher.js');

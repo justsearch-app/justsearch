@@ -259,18 +259,13 @@ impl Actuator for ShellActuator {
             "incarnation":self.wire_incarnation(),"requestNonce":uuid::Uuid::new_v4().to_string(),"issuedBy":"tauri-shell"});
         if reason == "upgrade" {
             if let Some((preparation, nonce)) = self.host.take_upgrade() {
-                let binding = self.host.binding_snapshot();
-                let receipt = match (binding.port, binding.token) {
-                    (Some(port), Some(token)) => post_before_send(
-                        port,
-                        &token,
-                        "/api/upgrade/commit-shutdown",
-                        &json!({"schemaVersion":1,"preparationId":preparation,"shutdownNonce":nonce}),
-                        1000,
-                        || self.host.child_pid().is_some() && !self.host.quit_started(),
-                    ),
-                    _ => (Err("Upgrade binding unavailable".into()), false),
-                };
+                let receipt = post_before_send(
+                    &self.host,
+                    "/api/upgrade/commit-shutdown",
+                    &json!({"schemaVersion":1,"preparationId":preparation,"shutdownNonce":nonce}),
+                    1000,
+                    || !self.host.quit_started(),
+                );
                 let (mut receipt, sent) = receipt;
                 if !sent {
                     receipt = Err(UPGRADE_COMMIT_NOT_SENT.into());
@@ -284,11 +279,8 @@ impl Actuator for ShellActuator {
             }
         }
         if reason == "quit" {
-            let binding = self.host.binding_snapshot();
-            if let (Some(port), Some(token)) = (binding.port, binding.token) {
-                if post(port, &token, "/api/lifecycle/shutdown", &body, 200).is_ok() {
-                    return Ok(());
-                }
+            if post(&self.host, "/api/lifecycle/shutdown", &body, 200).is_ok() {
+                return Ok(());
             }
         }
         write_atomic(&self.request_path(), &format!("{body}\n"))
@@ -566,67 +558,38 @@ fn identity_check(record: &Value) -> &'static str {
 }
 
 /// Bounded loopback HTTP from the actor, including during runtime teardown.
-fn post(
-    port: u16,
-    token: &str,
+pub(crate) fn post(
+    host: &EngineHost,
     path: &str,
     body: &Value,
     timeout_ms: u64,
 ) -> Result<Value, String> {
-    post_before_send(port, token, path, body, timeout_ms, || true).0
+    post_before_send(host, path, body, timeout_ms, || true).0
 }
 
 /// The boolean means a write was attempted, including a partial/failed write.
 /// A connect failure cannot deliver a commit; every error after this boundary can.
 fn post_before_send(
-    port: u16,
-    token: &str,
+    host: &EngineHost,
     path: &str,
     body: &Value,
     timeout_ms: u64,
     before_send: impl FnOnce() -> bool,
 ) -> (Result<Value, String>, bool) {
-    use std::io::{Read, Write};
-    let mut sent = false;
-    let result = (|| {
-        if token.contains(['\r', '\n']) {
-            return Err("Invalid session token".into());
-        }
-        let timeout = Duration::from_millis(timeout_ms);
-        let mut stream = std::net::TcpStream::connect_timeout(
-            &std::net::SocketAddr::from(([127, 0, 0, 1], port)),
-            timeout,
-        )
-        .map_err(|e| e.to_string())?;
-        stream
-            .set_read_timeout(Some(timeout))
-            .map_err(|e| e.to_string())?;
-        stream
-            .set_write_timeout(Some(timeout))
-            .map_err(|e| e.to_string())?;
-        let body = body.to_string();
-        if !before_send() {
-            return Err("Engine exited or quit before upgrade commit request".into());
-        }
-        sent = true;
-        write!(stream,"POST {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-JustSearch-Session: {token}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).map_err(|e|e.to_string())?;
-        let mut response = String::new();
-        stream
-            .read_to_string(&mut response)
-            .map_err(|e| e.to_string())?;
-        let (headers, body) = response
-            .split_once("\r\n\r\n")
-            .ok_or("Malformed HTTP response")?;
-        if !headers
-            .lines()
-            .next()
-            .is_some_and(|line| line.contains(" 2"))
-        {
-            return Err("Shutdown rejected".into());
-        }
-        serde_json::from_str(body).or_else(|_| Ok(json!({"accepted":true})))
-    })();
-    (result, sent)
+    let timeout = Duration::from_millis(timeout_ms);
+    let (stream, binding) = match host.connect_engine(timeout) {
+        Ok(endpoint) => endpoint,
+        Err(error) => return (Err(error), false),
+    };
+    crate::engine_conn::post_connected(
+        stream,
+        binding.port.unwrap(),
+        binding.token.as_deref().unwrap(),
+        path,
+        body,
+        timeout,
+        before_send,
+    )
 }
 
 #[cfg(test)]
@@ -739,3 +702,7 @@ mod linux_identity_tests {
     }
 
 }
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "shell_connection_tests.rs"]
+mod connection_tests;

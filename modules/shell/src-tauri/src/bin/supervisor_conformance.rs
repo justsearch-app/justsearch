@@ -32,6 +32,8 @@ mod binding;
 #[path = "../engine_host.rs"]
 #[allow(dead_code)]
 mod engine_host;
+#[path = "../engine_conn.rs"]
+mod engine_conn;
 #[path = "../engine_probe.rs"]
 mod engine_probe;
 #[path = "../supervisor.rs"]
@@ -67,6 +69,7 @@ mod updater_probe {
     include!("support/updater_probe.inc.rs");
 }
 // AppHandle paths are never driven by the conformance binary. Fail explicitly if used.
+#[cfg_attr(test, derive(Default))]
 pub struct BackendState {
     host: Arc<engine_host::EngineHost>,
 }
@@ -358,3 +361,7 @@ fn write_control_result(
     std::fs::write(&tmp, serde_json::to_vec(&payload).unwrap()).unwrap();
     std::fs::rename(tmp, path).unwrap();
 }
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "../engine_conn_test_support.rs"]
+mod engine_conn_test_support;
