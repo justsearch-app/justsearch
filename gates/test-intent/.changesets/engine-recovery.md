@@ -788,3 +788,14 @@ No acceptance record is written by the builder, and no commit is made.
   "note": "Entry 8 leaves fatal-crash recovery evidence incomplete: the running Rust shell and JS recovery summaries omit a real native-OOM fatal report and can present an older crash instead."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15e65-043d-7571-a951-0ccf9f3d6f17",
+  "verdict": "accept",
+  "digest": "sha256:a7486e4e311284b656d585e7a88b67dd9906a4a31297e218efef2f5579527d37",
+  "note": "All fourteen entries follow scoped owner intent; independent JVM and real fatal-report supervisor checks pass, with seven identical main harness failures and explicit platform limits."
+}
+```
