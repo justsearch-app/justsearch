@@ -13,7 +13,7 @@ contract rather than relabelling the combination scenarios as owner-adopted.
 The startup helper is used by the production setup path. A naive resolution that
 runs initialization before checking reset status is exercised separately in a
 shared clone inside the supplied temporary folder; both checks fail by assertion.
-The merge commit is f047b040e; later tests and formatting remain uncommitted.
+The main merge is committed as 05b381c4d; the RN3 fixture adaptation and refreshed evidence remain uncommitted for the orchestrator.
 The shortcut source stays byte-identical to origin/uiux-shortcut; its existing
 evidence remains valid. No acceptance record is authored by the builder.
 
@@ -57,6 +57,16 @@ evidence remains valid. No acceptance record is authored by the builder.
         "input re-encoding"
       ],
       "whatMoved": "rustfmt only: line wrapping of existing Rust test expressions and argument lists in the touched lib.rs. Inputs, expected values, branches, conditions, ownership, faults and assertions are unchanged."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/boot/boot-lockdown.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The catalog stub became a valid normal-start catalog: the RegistryController envelope and a CoreSurfaceCatalog Library wire entry, checked against the catalog schema and generated Surface wire schema. Only GET /api/registry/surfaces receives the fixture. Every existing mount, lockdown, recovery, reload, debug-route assertion and time bound is unchanged."
     }
   ]
 }

@@ -129,6 +129,11 @@ with before checkouts under the session temporary directory, two Cargo jobs,
 source-only frontend assets, and vitest limited to two workers. Logs remain in
 tmp/wp51-ra7. Real packaged Windows behavior remains unverified.
 
+RN3 fixture refresh after the main merge: uiux-reset-boot-catalog.json reruns the four
+lockdown checks with a valid normal-start Surface wire catalog and the same 97dc55c62
+fail-before revision. Original boot-repair evidence remains for the unchanged Rust
+and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
+
 ```json
 {
   "entries": [
@@ -806,7 +811,7 @@ tmp/wp51-ra7. Real packaged Windows behavior remains unverified.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-boot-repair.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-boot-catalog.json",
       "newChecks": [
         "modules/ui-web/src/boot/boot-lockdown.test.ts#RS4 reset Continue and Try again reload into a mounted app under real lockdown",
         "modules/ui-web/src/boot/boot-lockdown.test.ts#RS4 incomplete and storage-cleanup starts stay gated under real lockdown"
@@ -940,7 +945,7 @@ tmp/wp51-ra7. Real packaged Windows behavior remains unverified.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-boot-repair.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-boot-catalog.json",
       "newChecks": [
         "modules/ui-web/src/boot/boot-lockdown.test.ts#RN3 Engine recovery Retry and both desktop event reloads mount under real lockdown",
         "modules/ui-web/src/boot/boot-lockdown.test.ts#RN3 normal desktop and browser starts and debug routes mount after lockdown"

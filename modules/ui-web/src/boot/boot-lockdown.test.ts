@@ -9,6 +9,26 @@ import { promisify } from 'node:util';
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
+import { surfaceCatalogSchema } from '../api/types/surface';
+
+// RegistryController's envelope and CoreSurfaceCatalog's Library entry, with the
+// precise wire fields also used in SurfaceCatalogClient.test.ts. A normal start
+// needs a nonempty catalog; {} exercises first-install failure retries instead.
+const normalSurfaceCatalog = surfaceCatalogSchema.parse({
+  schemaVersion: '1.0', catalogVersion: 1, namespace: 'registry-surface', primitive: 'Surface',
+  entries: [{
+    id: 'core.library-surface',
+    presentation: { labelKey: 'registry-surface.library-surface.label',
+      descriptionKey: 'registry-surface.library-surface.description', iconHint: null, category: null },
+    audience: 'USER', placement: 'RAIL', altitude: 'PRODUCT',
+    consumes: { resources: ['core.indexed-roots'],
+      operations: ['core.reindex', 'core.add-watched-root', 'core.remove-watched-root',
+        'core.preview-excludes', 'core.apply-excludes'],
+      prompts: [], diagnosticChannels: [], conversationShapes: [] },
+    mountTag: 'jf-library-surface', members: ['core.browse-surface'], riskTier: 'LOW', stateSchema: null,
+    provenance: { tier: 'CORE', contributorId: 'core', version: '1.0', identity: null },
+  }],
+});
 
 declare global {
   interface Window {
@@ -82,7 +102,9 @@ async function open(phase = 'idle', failStatus = false, api = false, desktop = t
     await page.waitForFunction(() => Object.isFrozen(Symbol));
     await route.continue();
   });
-  await page.route(/\/(api|infra|registry)\//, (route) => route.fulfill({ json: {} }));
+  await page.route(/\/(api|infra|registry)\//, (route) => route.fulfill({
+    json: new URL(route.request().url()).pathname === '/api/registry/surfaces' ? normalSurfaceCatalog : {},
+  }));
   await page.goto(`${url}${query || (!desktop && api ? `?api_port=${new URL(url).port}` : '')}`, { waitUntil: 'domcontentloaded' });
   return page;
 }
