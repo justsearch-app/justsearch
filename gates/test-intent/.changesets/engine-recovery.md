@@ -9,7 +9,7 @@ author-session: 01a1563a-7f02-7081-9d04-646e3ac0b504
 
 Owner adopted the E1–E21 scenarios on 2026-10-20. Entries below quote the relevant
 scenarios verbatim. Engine-side queue scenarios E8–E15 belong to a later assignment.
-Coverage is against the merge-base with origin/main, f6d92d768. There are thirteen flagged items;
+Coverage is against the merge-base with origin/main, 4f4e20514. There are twelve flagged items;
 separate entries distinguish new assertions from unchanged test formatting in the same item.
 No acceptance record is written by the builder. Governance tooling is unchanged. The current
 correction refreshes Java execution evidence for the expanded fatal-header checks; all existing
@@ -395,7 +395,7 @@ acceptance on the changed digest.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/engine-recovery-merge-856.json",
+      "evidence": "gates/test-intent/evidence/engine-recovery-merge-821-851.json",
       "newChecks": [
         "modules/shell/src-tauri/src/updater.rs#updater::tests::download_failures_and_rejections_return_to_actionable_error"
       ],
@@ -428,7 +428,7 @@ acceptance on the changed digest.
         "modules/ui-web/src/boot/desktopRecovery.test.ts"
       ],
       "class": "New",
-      "behaviour": "Four added tests cover restart_engine invocation and refused-update reason with usable controls (E3/E5); Java spawn obstacle, retained native frame, crash-folder reveal with spaces and daily restart count (E1/E3/E6/E19); running-but-not-ready cause even when the API responds (E20); and locked-profile explanation with no automatic retry (E7). The existing terminal-recovery assertion changes from \"Try connecting again\" to \"Restart JustSearch\", as E3 requires. Other existing expectations stay. Whole-file execution covers all thirteen cases after the #856 merge. The two administrator-refusal cases from main and every existing branch test are retained byte-for-byte; these are preservation checks. Recovery assertions fail on current main f6d92d768 and all thirteen cases pass on the merged candidate.",
+      "behaviour": "Four added tests cover restart_engine invocation and refused-update reason with usable controls (E3/E5); Java spawn obstacle, retained native frame, crash-folder reveal with spaces and daily restart count (E1/E3/E6/E19); running-but-not-ready cause even when the API responds (E20); and locked-profile explanation with no automatic retry (E7). The existing terminal-recovery assertion changes from \"Try connecting again\" to \"Restart JustSearch\", as E3 requires. Other existing expectations stay. Whole-file execution covers all thirteen cases after the #821/#851 merge. The two administrator-refusal cases from main and every existing branch test are retained byte-for-byte; these are preservation checks. Recovery assertions fail on current main 4f4e20514 and all thirteen cases pass on the merged candidate.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -480,11 +480,30 @@ acceptance on the changed digest.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/engine-recovery-merge-856.json",
+      "evidence": "gates/test-intent/evidence/engine-recovery-merge-821-851.json",
       "newChecks": [
         "modules/ui-web/src/boot/desktopRecovery.test.ts"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/boot/desktopRecovery.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Main added a factory_reset_status IPC stub that deliberately returns idle without consuming the command spy. Its fallback forwarded the command name but dropped all other arguments, hiding the existing crash-folder reveal payload from the spy. The fallback now forwards the original argument list. No input, observation assertion, condition, timeout or expected value changes. The old and new assertion are identical: expect(mocks.invoke).toHaveBeenCalledWith('reveal_in_explorer', { path: 'C:/Users/Name With Spaces/data/crashes' }); The unmodified merge fails that assertion; the transparent proxy passes it. This restores instrumentation rather than weakening the assertion.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-51b072",
+          "scenario": "E1",
+          "quote": "Fresh profile with no crashes folder (including a Windows path with spaces): a native crash of the Engine leaves its JVM fatal-error log in `<dataDir>/crashes/`, and a Java heap OOM leaves the artifact the Engine's JVM flags promise for OOM (named in the change), on Windows and Linux. After repeated crashes, exhaustion and an app relaunch, the first failure's evidence is still there and attributable.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
     }
   ]
 }
@@ -554,6 +573,47 @@ covers all 13 flagged items and requires only fresh independent acceptance; its 
 warning reports third-reviewer tie-breaks on 1 of 8 audited PRs (12.5%).
 Every older evidence artifact and every existing acceptance/rejection record is preserved.
 The merge is the only commit; this changeset and its new execution evidence remain uncommitted.
+
+## Revalidation after #821 and #851 (2026-10-21)
+
+The owner-provided merge is 79b120f72; current main is 4f4e20514. Both mod recovery and
+mod search_shortcut are present. The shell builds without a production change. Factory reset,
+search shortcut and quit modules are byte-identical to main. The production reset gate precedes
+shortcut/updater initialization and Engine supervision; retry/cancel/storage completion use
+AppHandle::request_restart, whose installed Tauri implementation delivers RunEvent::Exit. That
+handler releases the native shortcut before the existing permanent quit/owned-child cleanup path.
+Normal crash retries do not arm a reset, and the boot reset gate precedes Engine recovery UI.
+
+One actual integration-test failure occurred on the unmodified merge: the factory-reset idle
+stub discarded reveal_in_explorer's path argument. The fallback now forwards all original IPC
+arguments, while keeping reset-status handling isolated from the spy. Entry 13 records this
+instrumentation adaptation. Every existing test assertion is byte-identical; no test is disabled,
+weakened or deleted. Before: 64/65 cases pass across 11 files, with the crash-folder reveal assertion
+failing. After: 127/127 pass across 16 related recovery/reset/shortcut/update/indexing-readiness files.
+
+The full candidate Rust run passes all 221 library tests, including both private-Xvfb native
+shortcut probes and reset/startup integration tests. Current main passes 213 library tests. Both
+then fail the exact same seven updater_probe::handoff_tests; after normalizing only libtest thread
+PIDs, each panic body is identical. They are baseline failure, unchanged. The candidate passes its
+complete remaining suite when only those seven named failures are filtered. The first main-clone
+attempt lacked the ignored installed bound-exec fixture and is not treated as product evidence;
+copying the unchanged installed helper supplies the same fixture as the candidate, then the real
+comparison above is rerun. No before-state production code is replaced.
+
+Conformance passes self-test 35/35, dev-runner 50/50 and Tauri 60/60, including exhaustion, delayed
+and manual restart, update holds, manifest replacement and quit. Entries 10 and 12 use the official
+runner's new engine-recovery-merge-821-851.json: the updater error-state check and all 13 boot cases
+pass after, with assertion failures on current main before. Its compatibility patch still only
+extracts the predecessor's inline byte acceptance. All older evidence and every acceptance record
+are retained. Supplemental execution/comparison details are in engine-recovery-merge-821-851.txt.
+A temporary cross-feature probe also passes against the real filesystem and production functions:
+normal JVM spawn preparation keeps existing fatal/heap artifacts; explicit reset deletes them and
+the shortcut choice; awaiting window-storage cleanup blocks spawn preparation; completed reset
+allows a fresh empty crashes folder while retaining models and native-bin/llama-server. Its first
+fixture mistakenly put a retained sentinel at an arbitrary native-bin path (correctly deleted by
+main); the corrected fixture uses the documented runtime location. It is scaffolding only in the
+shared clone, with source/result recorded in the supplemental transcript; no product test is added.
+No Java code changes or Gradle calls are needed; only the shell and related UI tests are run.
 
 ## Acceptance records
 

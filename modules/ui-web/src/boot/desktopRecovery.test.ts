@@ -9,8 +9,8 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('../utils/tauriRuntime.js', () => ({ isTauriRuntime: mocks.native }));
 vi.mock('../api/http', () => ({ resolveApiEndpoint: mocks.endpoint }));
-vi.mock('@tauri-apps/api/core', () => ({ invoke: (command: string) => command === 'factory_reset_status'
-  ? Promise.resolve({ phase: 'idle', remaining: [] }) : mocks.invoke(command) }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: (command: string, ...args: unknown[]) => command === 'factory_reset_status'
+  ? Promise.resolve({ phase: 'idle', remaining: [] }) : mocks.invoke(command, ...args) }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: mocks.listen }));
 
 import { mountBootApplication, resolveBootWithRecovery } from './desktopRecovery.js';
