@@ -494,7 +494,10 @@ fn resolve_app_data_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<
 }
 
 fn maybe_run_factory_reset<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
-    let app_data_dir = resolve_app_data_dir(app)?;
+    reset_app_data(&resolve_app_data_dir(app)?)
+}
+
+fn reset_app_data(app_data_dir: &Path) -> Result<(), String> {
     let marker = app_data_dir.join(RESET_MARKER_FILE);
     if !marker.exists() {
         return Ok(());
@@ -506,7 +509,16 @@ fn maybe_run_factory_reset<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Resu
     // - Delete: everything else (settings, index, logs, telemetry, etc)
     eprintln!("Factory reset marker detected at: {}", marker.display());
 
-    // Best-effort: delete everything except the AI asset folders.
+    // The keystore and its current-wrap replica must both be gone before reset is reported.
+    // Keep the marker on failure so a later launch can retry instead of resurrecting saved keys.
+    let encryption = app_data_dir.join("encryption");
+    match std::fs::remove_dir_all(&encryption) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(format!("Failed to remove encryption keystore {}: {error}", encryption.display())),
+    }
+
+    // Best-effort: delete everything else except the AI asset folders.
     let models_dir = app_data_dir.join("models");
     let native_bin_dir = app_data_dir.join("native-bin");
     let native_llama_dir = native_bin_dir.join("llama-server");
@@ -2096,6 +2108,33 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::tempdir;
+
+    #[test]
+    fn reset_removes_primary_and_replica_before_reporting_success() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join(RESET_MARKER_FILE), "reset").unwrap();
+        fs::create_dir(dir.path().join("encryption")).unwrap();
+        for file in ["keystore.json", "keystore.replica.json"] {
+            fs::write(dir.path().join("encryption").join(file), "wrapped key").unwrap();
+        }
+        assert!(reset_app_data(dir.path()).is_ok());
+        assert!(!dir.path().join("encryption/keystore.json").exists());
+        assert!(!dir.path().join("encryption/keystore.replica.json").exists());
+        assert!(!dir.path().join(RESET_MARKER_FILE).exists());
+    }
+
+    #[test]
+    fn reset_reports_keystore_deletion_failure_and_keeps_retry_marker() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join(RESET_MARKER_FILE), "reset").unwrap();
+        // A file where the encryption directory belongs deterministically refuses remove_dir_all.
+        fs::write(dir.path().join("encryption"), "unavailable directory").unwrap();
+        let result = reset_app_data(dir.path());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("encryption keystore"));
+        assert!(dir.path().join(RESET_MARKER_FILE).exists());
+        assert_eq!(fs::read_to_string(dir.path().join("encryption")).unwrap(), "unavailable directory");
+    }
 
     #[cfg(windows)]
     pub(super) fn owned_sleep_child() -> (std::process::Child, ManagedChildRecord) {

@@ -1,0 +1,14 @@
+--- a/modules/shell/src-tauri/src/lib.rs
++++ b/modules/shell/src-tauri/src/lib.rs
+@@ -494,7 +494,10 @@
+ }
+ 
+ fn maybe_run_factory_reset<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
+-    let app_data_dir = resolve_app_data_dir(app)?;
++    reset_app_data(&resolve_app_data_dir(app)?)
++}
++
++fn reset_app_data(app_data_dir: &Path) -> Result<(), String> {
+     let marker = app_data_dir.join(RESET_MARKER_FILE);
+     if !marker.exists() {
+         return Ok(());
