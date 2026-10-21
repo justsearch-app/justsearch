@@ -1073,7 +1073,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
     }
 
     /** Version stamp for built-in help files. Bump when help content changes. */
-    private static final String HELP_FILES_VERSION = "v3";
+    private static final String HELP_FILES_VERSION = "v4";
 
     /**
      * Auto-ingests built-in help files if not already done for this version.

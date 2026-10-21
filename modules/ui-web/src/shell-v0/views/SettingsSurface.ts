@@ -174,6 +174,19 @@ interface AllSettings {
   settingsMode?: string;
 }
 
+interface SearchShortcutStatus { enabled: boolean; active: boolean; reason: string | null; revision?: number }
+
+function parseSearchShortcutStatus(value: unknown): SearchShortcutStatus {
+  if (value === null || typeof value !== 'object'
+    || !('enabled' in value) || typeof value.enabled !== 'boolean'
+    || !('active' in value) || typeof value.active !== 'boolean'
+    || !('reason' in value) || (value.reason !== null && typeof value.reason !== 'string')
+    || ('revision' in value && (typeof value.revision !== 'number' || !Number.isSafeInteger(value.revision) || value.revision < 0))) {
+    throw new Error('Shortcut status is unavailable.');
+  }
+  return value as SearchShortcutStatus;
+}
+
 export class SettingsSurface extends JfElement {
   static properties = {
     apiBase: { attribute: 'api-base', type: String },
@@ -188,6 +201,9 @@ export class SettingsSurface extends JfElement {
     saving: { state: true },
     autostart: { state: true },
     autostartLoaded: { state: true },
+    searchShortcut: { state: true },
+    searchShortcutBusy: { state: true },
+    searchShortcutError: { state: true },
     updateStatus: { state: true },
     updateBusy: { state: true },
     // Tempdoc 778 — the default-on local feedback-capture flag + its privacy note.
@@ -248,6 +264,11 @@ export class SettingsSurface extends JfElement {
   declare saving: boolean;
   declare autostart: boolean | null;
   declare autostartLoaded: boolean;
+  declare searchShortcut: SearchShortcutStatus | null;
+  declare searchShortcutBusy: boolean;
+  declare searchShortcutError: string | null;
+  private searchShortcutRevision = -1;
+  private searchShortcutUnsub: (() => void) | null = null;
   declare updateStatus: AppUpdateStatus | null;
   declare updateBusy: boolean;
   // Tempdoc 778 — null until loaded from GET /api/feedback/capture; default-on locally.
@@ -344,6 +365,9 @@ export class SettingsSurface extends JfElement {
     this.saving = false;
     this.autostart = null;
     this.autostartLoaded = false;
+    this.searchShortcut = null;
+    this.searchShortcutBusy = false;
+    this.searchShortcutError = null;
     this.updateStatus = null;
     this.updateBusy = false;
     this.feedbackCaptureEnabled = null;
@@ -860,6 +884,7 @@ export class SettingsSurface extends JfElement {
     void this.loadFeedbackCapture();
     if (this.host_.platform.capabilities.has('native-notifications')) {
       void this.loadAutostart();
+      this.searchShortcutUnsub = this.watchSearchShortcut();
       this.appUpdateUnsub = subscribeAppUpdate((status) => {
         this.updateStatus = status;
       });
@@ -973,6 +998,7 @@ export class SettingsSurface extends JfElement {
     this.error = null;
     this.deleteState = 'idle';
     this.confirmText = '';
+    this.searchShortcutError = null;
   }
 
   override disconnectedCallback(): void {
@@ -992,6 +1018,8 @@ export class SettingsSurface extends JfElement {
     this.workspaceProfilesUnsub?.();
     this.appUpdateUnsub?.();
     this.appUpdateUnsub = null;
+    this.searchShortcutUnsub?.();
+    this.searchShortcutUnsub = null;
     this.consentUnsub?.();
     if (this.saveSettingsListener) {
       document.removeEventListener('jf-save-settings', this.saveSettingsListener);
@@ -1084,6 +1112,61 @@ export class SettingsSurface extends JfElement {
       // Plugin not available — leave null
     } finally {
       this.autostartLoaded = true;
+    }
+  }
+
+  private acceptSearchShortcutStatus(value: unknown): void {
+    const status = parseSearchShortcutStatus(value);
+    const revision = status.revision ?? 0;
+    if (revision < this.searchShortcutRevision) return;
+    this.searchShortcutRevision = revision;
+    this.searchShortcut = status;
+  }
+
+  private watchSearchShortcut(): () => void {
+    let stopped = false;
+    let unlisten: (() => void) | null = null;
+    const start = async (): Promise<void> => {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        const stop = await listen('justsearch://search-shortcut-status', (event) => {
+          if (stopped) return;
+          try { this.acceptSearchShortcutStatus(event.payload); }
+          catch (error) { this.searchShortcutError = String(error); }
+        });
+        if (stopped) { stop(); return; }
+        unlisten = stop;
+      } catch {
+        // A snapshot can still show the current state if event subscription is unavailable.
+      }
+      if (!stopped) await this.loadSearchShortcut();
+    };
+    void start();
+    return () => { stopped = true; unlisten?.(); unlisten = null; };
+  }
+
+  private async loadSearchShortcut(): Promise<void> {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      this.acceptSearchShortcutStatus(await invoke('search_shortcut_status'));
+    } catch (error) {
+      this.searchShortcutError = String(error);
+    }
+  }
+
+  private async toggleSearchShortcut(): Promise<void> {
+    if (!this.searchShortcut || this.searchShortcutBusy) return;
+    this.searchShortcutBusy = true;
+    this.searchShortcutError = null;
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      this.acceptSearchShortcutStatus(await invoke('set_search_shortcut_enabled', { enabled: !this.searchShortcut.enabled }));
+    } catch (error) {
+      this.searchShortcutError = String(error);
+      // A failed save leaves registration untouched. Read back rather than guessing at state.
+      await this.loadSearchShortcut();
+    } finally {
+      this.searchShortcutBusy = false;
     }
   }
 
@@ -1710,13 +1793,13 @@ export class SettingsSurface extends JfElement {
   }
 
   private renderDesktop(): TemplateResult | typeof nothing {
-    if (!this.host_.platform.capabilities.has('native-notifications') || !this.autostartLoaded || this.autostart === null) {
+    if (!this.host_.platform.capabilities.has('native-notifications')) {
       return nothing;
     }
     return html`
       <div class="section">
         <h3>${icon({ name: 'power', size: 12 })} Desktop</h3>
-        ${this.renderSettingRow(
+        ${this.autostartLoaded && this.autostart !== null ? this.renderSettingRow(
           'Launch on startup',
           'Start minimized in the system tray',
           html`
@@ -1726,7 +1809,31 @@ export class SettingsSurface extends JfElement {
               @change=${() => void this.toggleAutostart()}
             ></jf-switch>
           `,
-        )}
+        ) : nothing}
+        <div data-testid="settings-search-shortcut">
+          ${this.renderSettingRow(
+            'Global search shortcut',
+            'Alt + Shift + Space',
+            html`<jf-switch
+              .checked=${this.searchShortcut?.enabled ?? false}
+              .disabled=${this.searchShortcutBusy || this.searchShortcut === null}
+              label="Global search shortcut"
+              .description=${[this.searchShortcutError, this.searchShortcut?.reason
+                ? `Shortcut not active. ${this.searchShortcut.reason} Alternatively, run JustSearch with --focus-search.`
+                : 'Alt + Shift + Space. Alternatively, run JustSearch with --focus-search.'].filter(Boolean).join(' ')}
+              @change=${() => void this.toggleSearchShortcut()}
+            ></jf-switch>`,
+          )}
+          <p role="status" aria-live="polite" aria-atomic="true">
+            ${this.searchShortcut === null
+              ? this.searchShortcutError ?? 'Loading shortcut status…'
+              : !this.searchShortcut.enabled ? 'Turned off'
+                : this.searchShortcut.active ? 'Active'
+                  : `Shortcut not active. ${this.searchShortcut.reason ?? 'Registration was refused.'}`}
+            ${this.searchShortcut && this.searchShortcutError ? this.searchShortcutError : nothing}
+          </p>
+          <p>Alternatively, run JustSearch with <code>--focus-search</code>.</p>
+        </div>
       </div>
     `;
   }

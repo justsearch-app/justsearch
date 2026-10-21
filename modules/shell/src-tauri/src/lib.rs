@@ -15,6 +15,7 @@ mod linux_process;
 // function over the register the dev-runner also reads; only the actuator lives in this file.
 mod quit;
 mod session_window;
+mod search_shortcut;
 mod shell_actuator;
 mod supervisor;
 mod updater;
@@ -399,6 +400,12 @@ fn resolve_app_data_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<
     app.path()
         .app_data_dir()
         .map_err(|e| format!("app_data_dir() failed: {e}"))
+}
+
+fn reset_blocks_search(app: &tauri::AppHandle) -> bool {
+    app.try_state::<Arc<BackendState>>().is_some_and(|state| {
+        state.reset_status.lock().expect("reset status mutex poisoned").blocks_backend()
+    })
 }
 
 fn maybe_run_factory_reset<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> factory_reset::Status {
@@ -1522,6 +1529,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(state.clone())
         .manage(update_coordinator.clone())
+        .manage(search_shortcut::SearchShortcut::default())
         .invoke_handler(tauri::generate_handler![
             supervisor_state,
             api_port,
@@ -1543,7 +1551,10 @@ pub fn run() {
             read_plugin_source,
             updater::app_update_status,
             updater::check_for_app_update,
-            updater::install_app_update
+            updater::install_app_update,
+            search_shortcut::search_shortcut_status,
+            search_shortcut::set_search_shortcut_enabled,
+            search_shortcut::take_search_summon
         ])
         .setup(move |app| {
             let session_app = app.handle().clone();
@@ -1551,7 +1562,9 @@ pub fn run() {
             let launch_data_dir = resolve_app_data_dir(app.handle()).ok();
             // Incomplete reset is a recovery-only launch. No backend, updater, or normal
             // data-writing work starts until reset completes or the user cancels it.
-            if !state.reset_status.lock().expect("reset status mutex poisoned").blocks_backend() {
+            let reset_status = state.reset_status.lock().expect("reset status mutex poisoned").clone();
+            search_shortcut::after_factory_reset(&reset_status, || {
+                search_shortcut::initialize(app.handle());
                 update_coordinator.initialize(app.handle());
                 // Best-effort: spawn the bundled headless backend.
                 // If this fails in dev, the UI can still be pointed at an external backend via ?api_port=...
@@ -1572,6 +1585,7 @@ pub fn run() {
                         },
                     );
                     eprintln!("Failed to spawn headless backend: {err}");
+
                 }
                 let reconciliation_app = app.handle().clone();
                 let reconciliation_state = state.clone();
@@ -1593,7 +1607,7 @@ pub fn run() {
                     )
                     .await;
                 });
-            }
+            });
 
             // System tray: icon with Show/Quit menu, left-click to show window.
             let show_i = MenuItem::with_id(app, "show", "Show JustSearch", true, None::<&str>)?;
@@ -1654,8 +1668,16 @@ pub fn run() {
             // Show reset recovery even if restart retained --minimized from autostart.
             // Window-state plugin restores position/size but not visibility (VISIBLE
             // flag is excluded), so we control show/hide here.
-            let start_minimized = std::env::args().any(|a| a == "--minimized");
-            if !start_minimized || state.reset_status.lock().expect("reset status mutex poisoned").phase != factory_reset::Phase::Idle {
+            let launch = search_shortcut::LaunchRequest::from_args(&std::env::args().collect::<Vec<_>>());
+            if reset_blocks_search(app.handle()) {
+                search_shortcut::foreground(app.handle());
+            } else if app.state::<search_shortcut::SearchShortcut>().has_pending() {
+                search_shortcut::foreground(app.handle());
+            } else if launch.focus_search {
+                search_shortcut::summon(app.handle());
+            } else if std::env::args().any(|arg| arg == "--focus-search") && !launch.deep_links.is_empty() {
+                search_shortcut::summon_deep_link(app.handle(), launch.deep_links[0].clone());
+            } else if launch.show_window || state.reset_status.lock().expect("reset status mutex poisoned").phase != factory_reset::Phase::Idle {
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.show();
                     let _ = w.set_focus();
@@ -1670,6 +1692,10 @@ pub fn run() {
             // app's existing event loop.
             let app_handle = app.handle().clone();
             app.deep_link().on_open_url(move |event| {
+                if reset_blocks_search(&app_handle) {
+                    search_shortcut::foreground(&app_handle);
+                    return;
+                }
                 for url in event.urls() {
                     let url_str = url.to_string();
                     if url_str.starts_with("justsearch://") {
@@ -1681,6 +1707,19 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if reset_blocks_search(app) {
+                search_shortcut::foreground(app);
+                return;
+            }
+            let launch = search_shortcut::LaunchRequest::from_args(&argv);
+            if launch.focus_search {
+                search_shortcut::summon(app);
+                return;
+            }
+            if argv.iter().any(|arg| arg == "--focus-search") && !launch.deep_links.is_empty() {
+                search_shortcut::summon_deep_link(app, launch.deep_links[0].clone());
+                return;
+            }
             // Second launch should deterministically focus the existing instance and exit.
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -1757,6 +1796,7 @@ pub fn run() {
         // This fires when app.exit() is called (e.g., from tray menu "Quit").
         .run(move |app, event| {
             if let tauri::RunEvent::Exit = event {
+                search_shortcut::release(app);
                 state_for_close.kill_child();
                 if let Ok(data_dir) = resolve_app_data_dir(app) {
                     cleanup_registered_children_for_terminal(&data_dir);

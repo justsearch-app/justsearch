@@ -1202,6 +1202,37 @@
       "fixtures": []
     },
     {
+      "id": "shell-search-shortcut",
+      "pathVerification": "LITERAL",
+      "encryption": "UNSEALED_NO_JVM_CIPHER",
+      "owner": "SHELL",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        "search-shortcut.v1.json"
+      ],
+      "recoverability": "AUTHORED",
+      "upgradeHandling": "READ_IN_PLACE",
+      "format": "JSON version 1 and enabled boolean",
+      "currentVersion": 1,
+      "readableLegacyVersions": [],
+      "versionAuthority": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "futureVersionRefusalTest": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "ATOMIC_REPLACE",
+      "corruptionPolicy": "FAIL_CLOSED_REPAIR_REQUIRED",
+      "corruptionNote": "Keep unreadable or future-version bytes untouched and leave registration disabled. Settings explains the refusal. An explicit user switch change repairs the preference by atomically replacing it; no automatic default overwrites these bytes.",
+      "reconciliation": "Read before native registration. Missing file defaults on; unreadable or future bytes disable registration and remain untouched until the user explicitly changes the switch. Factory reset removes the file before registration.",
+      "status": "READY",
+      "implementationSources": [
+        "modules/shell/src-tauri/src/search_shortcut.rs",
+        "modules/shell/src-tauri/src/updater.rs"
+      ],
+      "tests": [
+        "modules/shell/src-tauri/src/search_shortcut.rs"
+      ],
+      "fixtures": []
+    },
+    {
       "id": "shell-upgrade-intent",
       "pathVerification": "LITERAL",
       "encryption": "UNSEALED_NO_JVM_CIPHER",
