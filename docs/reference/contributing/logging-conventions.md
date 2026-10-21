@@ -7,7 +7,11 @@ description: "Conventions for log statements, exception handling, MDC usage, and
 
 # Logging Conventions
 
-This document defines how to write log statements in JustSearch. Following these conventions ensures consistent, privacy-safe, and diagnostically useful logs across all three processes (Head, Worker, Brain).
+This document defines how to write log statements in JustSearch's Engine JVM,
+which composes the application and index halves in process
+([ADR-0049](../../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md)).
+The native `llama-server` and extraction children remain separate processes;
+they do not constitute the historical Head/Worker/Brain split.
 
 ## Stack
 
@@ -71,11 +75,12 @@ Use this pattern when the failure can repeat at high frequency (per-query, per-h
 
 ## MDC Keys
 
-Structured JSON logs include MDC (Mapped Diagnostic Context) keys for cross-process correlation. The following keys are defined:
+Structured JSON logs include MDC (Mapped Diagnostic Context) keys for correlation
+across in-process port calls and thread handoffs. The following keys are defined:
 
 | Key | Set by | Where | Purpose |
 |-----|--------|-------|---------|
-| `trace_id` | `MdcContext.request()` | Index-half services (`WorkerIngestService`, `WorkerSearchService`) | W3C trace correlation across the Head→index-half port calls |
+| `trace_id` | `MdcContext.request()` | Index-half services (`WorkerIngestService`, `WorkerSearchService`) | W3C trace correlation across application→index-half port calls |
 | `request_id` | `MdcContext.request()` | Same | Per-request correlation |
 | `span_id` | Not yet populated | — | Reserved for OTel MDC bridge (future) |
 | `stage_id` | `MdcContext.stage()` | Not yet adopted | Pipeline stage identification (future) |
@@ -93,7 +98,8 @@ public MigrationStartResponse startMigration(MigrationStartRequest request, Call
 }
 ```
 
-(Verbatim shape: `modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerIngestService.java:1022`.)
+(Verbatim shape: `WorkerIngestService.startMigration` in
+`modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerIngestService.java`.)
 
 **Important**: catch blocks must be INSIDE the MdcContext scope. In Java try-with-resources, the resource closes BEFORE catch clauses on the same try. Use a nested try/catch to ensure MDC is active during error logging.
 

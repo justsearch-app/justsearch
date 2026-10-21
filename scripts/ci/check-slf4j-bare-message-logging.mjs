@@ -268,7 +268,7 @@ function stripCommentsAndStrings(src) {
 // - Sole argument: the closing `)` immediately after `.getMessage()` (with
 //   optional whitespace) ensures only the bare form is matched, not
 //   parameterized or concatenated forms.
-const BARE_FORM_RE = /\blog\s*\.\s*(error|warn|info|debug|trace)\s*\(\s*[A-Za-z_$][\w$]*\s*\.\s*getMessage\s*\(\s*\)\s*\)/g;
+const BARE_FORM_RE = /\b(?:log|LOG|logger|LOGGER|DEFAULT_LOG|root|schedulerLogger|jetty|javalin|ioJustsearch|lucene|sqlite|captured|wiringLogger|ringLogger|gplLogger)\s*\.\s*(error|warn|info|debug|trace)\s*\(\s*[A-Za-z_$][\w$]*\s*\.\s*getMessage\s*\(\s*\)\s*\)/g;
 
 function findBareFormViolations(text) {
   const stripped = stripCommentsAndStrings(text);

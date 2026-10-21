@@ -2,7 +2,7 @@
 title: NVIDIA GPU Booster Pack (v3)
 type: explanation
 status: draft
-description: "v3 GPU plan (NVML-first), runtime sourcing, self-test, and rollback."
+description: "NVIDIA runtime sourcing, Windows packs, startup selection, self-test, and rollback."
 ---
 
 # NVIDIA GPU Booster Pack (v3)
@@ -10,7 +10,7 @@ description: "v3 GPU plan (NVML-first), runtime sourcing, self-test, and rollbac
 This document describes the supported v3 approach for NVIDIA-only GPU acceleration in JustSearch:
 
 - **Hardware-aware plan selection** (NVML-first).
-- **Offline GPU Booster Pack** distribution (no arbitrary executable downloads).
+- **Registry-pinned runtime downloads** and allowlisted offline GPU Booster Packs on Windows.
 - **Shadow install + self-test + rollback** for runtime variants.
 
 This is designed to align with:
@@ -24,7 +24,7 @@ This is designed to align with:
 This document describes current v3 behavior and is grounded in shipped code paths:
 
 - **Current runtime (v1/v2)**:
-  - The app ships a **CPU-only** `llama-server.exe` runtime payload, pinned to `ggml-org/llama.cpp` prebuilt `b8157` (see `modules/ui/build.gradle.kts`).
+  - The Windows app ships a **CPU-only** `llama-server.exe` runtime payload, pinned to `ggml-org/llama.cpp` prebuilt `b8571` (see `modules/ui/build.gradle.kts`).
   - The active server executable can be overridden via `justsearch.server.exe` / `JUSTSEARCH_SERVER_EXE` (BYO runtime).
 - **Current hardware detection**:
   - v3 exposes an **NVML-first** GPU capability snapshot via `GET /api/gpu/capabilities`.
@@ -39,8 +39,8 @@ This document describes current v3 behavior and is grounded in shipped code path
     - `disallowExternalInferenceServers=true` blocks adopting an already-running external `llama-server` on the configured port.
 - **Current pack import**:
   - Offline pack import supports **models packs** (v2) and **runtime packs** (v3) (install-only; activation is separate).
-  - Runtime variants are installed under `<AI_HOME>/native-bin/llama-server/variants/<variantId>/` and are activated explicitly via `POST /api/ai/runtime/activate`.
-  - Runtime packs may also optionally ship a matching ONNX Runtime native variant under `<AI_HOME>/native-bin/onnxruntime/variants/<variantId>/` (used by the Worker for reranker GPU acceleration when available).
+  - Windows offline runtime packs install under `<AI_HOME>/native-bin/llama-server/variants/<variantId>/`; explicit activation uses `POST /api/ai/runtime/activate`. Separately, discovery and Windows startup can select an installed CUDA variant automatically (see §5). Linux uses an operator-supplied executable and does not support offline runtime packs.
+  - Runtime packs may also optionally ship a matching ONNX Runtime native variant under `<AI_HOME>/native-bin/onnxruntime/variants/<variantId>/` (used by the Engine index half for reranker GPU acceleration when available).
 
 Practical note (allowlisting runtime packs):
 
@@ -58,125 +58,37 @@ Practical note (allowlisting runtime packs):
   `docs/explanation/05-ai-architecture.md`), so the CPU-only binary alone never yields a working
   chat feature.
 - GPU acceleration requires a CUDA-capable runtime plus vendor runtime DLLs (cuBLAS, cuBLASLt, cudart, etc).
-- We maintain security posture by avoiding arbitrary binary downloads:
-  - GPU support is enabled only by importing an allowlisted offline pack.
+- Install AI can download Windows CUDA llama-server, ORT CUDA/native, cuDNN and CUDA runtime archives from registry-pinned URLs after consent. Each asset has a pinned SHA-256. Allowlisted offline packs provide a separate import path.
 
 ## 2. Runtime sourcing (upstream pinned prebuilt)
 
 We already pin an upstream Windows CPU runtime in v1:
 
-- `llama-b8157-bin-win-cpu-x64.zip` (pinned + SHA-256 in `modules/ui/build.gradle.kts`)
+- `llama-b8571-bin-win-cpu-x64.zip` (pinned + SHA-256 in `modules/ui/build.gradle.kts`)
 
-The upstream `ggml-org/llama.cpp` `b8157` release also provides Windows CUDA artifacts suitable for GPU packs:
+Install AI's registry pins the matching CUDA 12.4 runtime and redistributables:
 
-- **CUDA 12.4 (baseline, widest Windows driver compatibility)**:
-  - `llama-b8157-bin-win-cuda-12.4-x64.zip` (≈195 MB)
-  - `cudart-llama-bin-win-cuda-12.4-x64.zip` (≈373 MB)
-- **CUDA 13.1 (optional, newer driver branch)**:
-  - `llama-b8157-bin-win-cuda-13.1-x64.zip` (≈88 MB)
-  - `cudart-llama-bin-win-cuda-13.1-x64.zip` (≈384 MB)
+- `llama-b8571-bin-win-cuda-12.4-x64.zip`
+- `cudart-llama-bin-win-cuda-12.4-x64.zip`
 
-Recommendation (docs + implementation default):
+The URLs, sizes, and hashes are in `model-registry.v2.json` (`cuda-runtime`). The offline
+pack builder accepts upstream ZIP inputs separately; its manifest describes the files it packages.
 
-- Treat **CUDA 12.4** as the first supported GPU Booster Pack variant (widest compatibility).
-- Optionally ship **CUDA 13.1** as a second variant once validated on real NVIDIA hardware, and select it only when the detected driver branch supports CUDA 13.x.
+### 2.1 Offline pack assembly
 
-Notes:
-
-- The GPU Booster Pack should be assembled by combining the **runtime payload** (exe + ggml backends) with the matching **CUDA redistributables** bundle, and including upstream license files.
-- We treat these upstream artifacts as the baseline because v1 already demonstrated “pin known-good upstream builds” is the lowest crash-risk approach.
-
-### 2.1 Exact contents (pinned `b8157` CUDA zips)
-
-This section exists to remove ambiguity when implementing the GPU Booster Pack builder.
-
-#### CUDA runtime zip contents (`llama-b8157-bin-win-cuda-*.zip`)
-
-The upstream CUDA runtime zip contains **top-level** files (no folders). For both CUDA 12.4 and CUDA 13.1, it contains:
-
-- **Executable**
-  - `llama-server.exe`
-- **Runtime DLLs** (adjacent to the EXE)
-  - `llama.dll`
-  - `mtmd.dll`
-  - `ggml.dll`
-  - `ggml-base.dll`
-  - `ggml-cuda.dll`
-  - `ggml-rpc.dll`
-  - `libomp140.x86_64.dll`
-  - `ggml-cpu-x64.dll`
-  - `ggml-cpu-sse42.dll`
-  - `ggml-cpu-haswell.dll`
-  - `ggml-cpu-skylakex.dll`
-  - `ggml-cpu-icelake.dll`
-  - `ggml-cpu-sandybridge.dll`
-  - `ggml-cpu-alderlake.dll`
-  - `ggml-cpu-sapphirerapids.dll`
-  - `ggml-cpu-cannonlake.dll`
-  - `ggml-cpu-cascadelake.dll`
-  - `ggml-cpu-cooperlake.dll`
-  - `ggml-cpu-ivybridge.dll`
-  - `ggml-cpu-piledriver.dll`
-  - `ggml-cpu-zen4.dll`
-
-Note: `libcurl-x64.dll` and all `LICENSE-*` files were removed from the upstream zip starting at b8157. The `LICENSE-curl` removal corresponds to the libcurl removal; no LICENSE files are bundled in this release.
-
-The upstream zip also includes additional executables (bench/tools). In `b8157` these include:
-
-- `llama-batched-bench.exe`
-- `llama-bench.exe`
-- `llama-cli.exe`
-- `llama-completion.exe`
-- `llama-fit-params.exe`
-- `llama-gemma3-cli.exe`
-- `llama-gguf-split.exe`
-- `llama-imatrix.exe`
-- `llama-llava-cli.exe`
-- `llama-minicpmv-cli.exe`
-- `llama-mtmd-cli.exe`
-- `llama-perplexity.exe`
-- `llama-quantize.exe`
-- `llama-qwen2vl-cli.exe`
-- `llama-tokenize.exe`
-- `llama-tts.exe`
-- `rpc-server.exe`
-
-For the GPU Booster Pack we should include **only** `llama-server.exe` + all required adjacent `*.dll` + `LICENSE-*` files (principle of least privilege).
-
-#### CUDA redistributables zip contents (`cudart-llama-bin-win-cuda-*.zip`)
-
-This zip contains only CUDA DLLs:
-
-- CUDA 12.4:
-  - `cudart64_12.dll`
-  - `cublas64_12.dll`
-  - `cublasLt64_12.dll`
-- CUDA 13.1:
-  - `cudart64_13.dll`
-  - `cublas64_13.dll`
-  - `cublasLt64_13.dll`
-
-#### GPU Booster Pack assembly rule
-
-For a given `variantId` (`cuda-12.4` or `cuda-13.1`), the GPU Booster Pack should install a single “adjacent-files” directory under:
-
-- `<AI_HOME>/native-bin/llama-server/variants/<variantId>/`
-
-and include:
-
-- all files listed above (server + DLLs), plus
-- a `runtime-version.txt` written by the pack builder (e.g., `llama.cpp b8157 win-cuda-12.4-x64`).
-
-Dependency note (Windows):
-
-- The upstream runtime zip is the authoritative list of files we start from, but Windows runtime dependencies can vary by build toolchain.
-- If the resulting `llama-server.exe` requires additional runtime DLLs not present in the upstream zip (e.g., MSVC runtime DLLs), treat this as a **self-test failure** and fix it by adjusting the pack recipe (or switching to a different pinned upstream artifact). Do not “paper over” missing DLLs with heuristic PATH hacks.
+`tools/build-gpu-booster-pack.ps1` assembles a Windows runtime pack from a llama runtime ZIP
+and CUDA redistributables. It includes `llama-server.exe`, adjacent runtime DLLs and available
+license/notice files, generates `runtime-version.txt` (variant ID and creation timestamp), and
+writes a size/hash-pinned manifest. The former exhaustive upstream-ZIP
+inventory described the b8157 payload; the current pin is b8571, so use the actual input ZIP
+and emitted manifest for its contents.
 
 ## 3. Compatibility matrix (CUDA variants)
 
 ### 3.1 Driver requirements (Windows)
 
-We gate GPU plan recommendation/activation by NVIDIA driver version.
+Explicit activation uses the policy check and runtime self-test described in §6.2;
+it does not separately gate on NVIDIA driver version.
 
 CUDA 12.4 (specific Windows minimums):
 
@@ -214,7 +126,7 @@ We should document a conservative baseline:
   - it is brittle in minimal environments and can be missing even when an NVIDIA driver is installed
 - NVML is driver-provided (`nvml.dll`) and can be called directly from the app via a binding.
 
-### 4.2 Implementation boundary + safe loading (Windows)
+### 4.2 Implementation boundary + safe loading
 
 NVML access lives in the **Java backend** (the same layer that owns inference lifecycle and policy gates).
 
@@ -225,6 +137,7 @@ Current implementation:
   1. Try `%SystemRoot%\\System32\\nvml.dll` via `System.load(...)`
   2. Else fall back to `System.loadLibrary("nvml")` (best-effort; relies on the DLL search path)
   3. If loading/binding fails: treat NVML as unavailable and proceed with `nvidia-smi` fallback (low confidence) or CPU-only.
+- On Linux, the FFM lookup uses `NativeTargets`' `libnvidia-ml.so.1` name.
 
 ### 4.3 Required detection outputs
 
@@ -267,7 +180,7 @@ Observed `--list-devices` output format (from llama.cpp upstream `common/arg.cpp
 - One line per non-CPU device:
   - `<name>: <description> (<totalMiB> MiB, <freeMiB> MiB free)`
 
-Empirical note (b8157 CUDA runtime on Windows):
+Historical empirical note (b8157 CUDA runtime on Windows):
 
 - On an NVIDIA machine, device names are of the form `CUDA0`, `CUDA1`, … and appear exactly as `ggml_backend_dev_name(dev)` prints them.
 - Example output observed (RTX 4070, driver `591.59`) after extracting the CUDA runtime + cudart DLLs adjacent to `llama-server.exe`:
@@ -321,18 +234,22 @@ This supports gates like:
 
 ## 5. Runtime variants and deterministic selection
 
-### 5.1 Problem (today)
+### 5.1 Current discovery and startup selection
 
-`InferenceConfig` currently scans `native-bin/llama-server` subdirectories and uses `findFirst()` (ordering is not guaranteed). With runtime variants, this becomes nondeterministic.
+`InferenceConfig` prefers an installed CUDA variant when GPU use is requested, otherwise uses
+the canonical baseline. Legacy subdirectories are sorted and the scan skips `variants/`; if no
+baseline is found, a CUDA variant is a final fallback. This is deterministic, not an unordered
+`findFirst()` scan. See [AI Setup + Verification](13-ai-setup-and-verification.md) for the full order.
 
-### 5.2 Target behavior (v3)
+On Windows, `HeadlessApp.maybeAutoSelectCuda12Variant` can also select `variants/cuda12/` at
+startup when GPU layers are positive, no stored-settings or operator executable source at ordinal 300 or higher wins, and the default
+runtime lacks usable CUDA. Linux keeps the operator-supplied runtime.
 
-- Runtime variants should live under fixed directories, e.g.:
-  - `<AI_HOME>/native-bin/llama-server/llama-server.exe` (CPU baseline shipped with the app)
-  - `<AI_HOME>/native-bin/llama-server/variants/cuda-12.4/llama-server.exe` (GPU pack)
-- Active runtime selection must be explicit and deterministic:
-  - Use the existing **server executable override** (`UiSettings.serverExecutablePath` → `-Djustsearch.server.exe`) as the pointer for the active runtime variant.
-  - Simple Mode should set/clear this automatically when switching between CPU and GPU plans.
+### 5.2 Explicit activation
+
+Offline pack import is install-only. `POST /api/ai/runtime/activate` self-tests a selected runtime
+and applies `UiSettings.serverExecutablePath` through the recorded settings/configuration owner.
+An explicit operator configuration can prevent a stored runtime selection from taking effect.
 
 ### 5.3 External llama-server adoption (current behavior vs v3 needs)
 
@@ -348,15 +265,11 @@ Current behavior (today):
   - GPU self-test attribution by PID is not possible
   - adopted servers are still health-monitored; if the external server becomes unhealthy mid-session, inference switches to Offline
 
-v3 implication:
+Current policy behavior:
 
-- Full v3 (auto-activation + self-test + rollback + policy enforcement) strongly prefers/assumes the app **owns** the `llama-server` process.
-
-Decision options (to be finalized for v3):
-
-- **Option A (recommended for full v3)**: disallow external-server adoption whenever activating a runtime variant (GPU plan). If an external server is detected on the port, fail activation with an explicit message (“stop external llama-server first”).
-- **Option B**: keep external adoption for CPU-only/legacy flows, but when `disallowExternalInferenceServers=true`, treat external servers as a hard block (do not attach).
-- **Option C**: always disallow external adoption globally (simplest policy posture, but may impact developer workflows).
+- `disallowExternalInferenceServers=true` refuses adoption. Otherwise a healthy, props-verified
+  external server can be adopted.
+- Runtime activation self-tests its own candidate child process before applying the settings.
 
 ## 6. GPU Booster Pack import workflow
 
@@ -376,8 +289,9 @@ See: `docs/explanation/14-ai-pack-spec.md` and `docs/explanation/15-enterprise-p
 
 Rules:
 
-- A pack can be **installed** even if hardware is incompatible/unknown (useful for staging), but it must not be auto-activated.
-- Auto-activation requires: policy allows Online AI, hardware gate passes (driver + VRAM), and GPU self-test passes.
+- A pack can be **imported** even if hardware is incompatible/unknown (useful for staging); import does not activate it. Startup CUDA selection is a separate path (§5.1).
+- Explicit activation checks that the effective policy allows Online AI and GPU use when a policy snapshot is available. If the policy service is absent, returns null or throws, this check is skipped. There is no separate hardware gate in this path.
+- Activation requires the runtime self-test to pass. For GPU offload it requires NVML to be available, a healthy candidate server to complete a tiny chat request, and a measured VRAM increase of at least 64 MiB; missing NVML or an insufficient/unknown increase is inconclusive and does not activate the variant. An explicit zero-GPU-layer configuration tests CPU execution without requiring a VRAM increase.
 
 ### 6.3 Shadow install + self-test
 
@@ -386,7 +300,7 @@ Workflow:
 1. Import pack → validate allowlist + hashes.
 2. Install runtime into a **new variant directory** (do not modify CPU runtime).
 3. Run a bounded **GPU self-test**:
-   - CLI contract (llama.cpp `b8157`, upstream):
+   - CLI contract (llama.cpp `b8571`, upstream):
      - `-ngl` / `--gpu-layers` / `--n-gpu-layers`: GPU offload (0 = CPU)
      - `-ctk` / `--cache-type-k` and `-ctv` / `--cache-type-v`: KV cache types (for 8GB-class cards we currently recommend `q4_0` / `q4_0`)
      - `--list-devices`: prints names like `CUDA0`

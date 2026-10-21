@@ -31,7 +31,8 @@ package io.justsearch.indexerworker.queue;
  *   <li>V20: Added explicit switch-buffer admission order for exact replay (lane F D1)</li>
  *   <li>V21: Scoped switch-buffer rows to a candidate generation (lane F D1-9)</li>
  *   <li>V22: Retained admitting boundaries for root-relative ingestion exclusions</li>
- *   <li>V23: Transactional job counts and indexed readiness/claim selection</li>
+ *   <li>V23: Monotonic switch-buffer admission count for migration restart fencing</li>
+ *   <li>V24: Transactional job counts and indexed readiness/claim selection</li>
  * </ul>
  */
 public final class SqliteSchema {
@@ -44,7 +45,7 @@ public final class SqliteSchema {
    * Target schema version. The migrate() method will upgrade the database
    * to this version using the migration ladder.
    */
-  public static final int TARGET_VERSION = 23;
+  public static final int TARGET_VERSION = 24;
 
   /** Every re-admission retains REPLACE's full reset, while firing ordinary UPDATE triggers. */
   static final String REENQUEUE_JOB_ON_CONFLICT = """
@@ -58,7 +59,7 @@ public final class SqliteSchema {
         last_diagnostic_summary=NULL, last_outcome_at=NULL
       """;
 
-  static final String[] MIGRATE_V22_TO_V23 = {
+  static final String[] MIGRATE_V23_TO_V24 = {
       """
       CREATE TABLE IF NOT EXISTS job_counts (
         state TEXT PRIMARY KEY, n INTEGER NOT NULL, known_bytes INTEGER NOT NULL,

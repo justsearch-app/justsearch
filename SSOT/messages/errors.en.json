@@ -58,6 +58,7 @@
     "errors.MANIFEST_NOT_CONFIGURED" : "AI model manifest is not configured.",
     "errors.MANIFEST_SHA_REQUIRED" : "Pack manifest SHA-256 is required.",
     "errors.MANIFEST_UNAVAILABLE" : "AI model manifest is unavailable. Check your network connection.",
+    "errors.MEMORIES_UNAVAILABLE" : "Memories are unavailable. Retry after the stored memories can be read.",
     "errors.MODE_SWITCH_FAILED" : "Failed to switch AI mode.",
     "errors.NOT_FOUND" : "The requested resource was not found.",
     "errors.NOT_SUPPORTED" : "This operation is not supported.",

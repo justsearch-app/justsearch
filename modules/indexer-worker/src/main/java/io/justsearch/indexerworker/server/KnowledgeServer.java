@@ -144,6 +144,8 @@ public final class KnowledgeServer implements Closeable {
   private volatile String replaySettledGeneration;
   private List<RootBinding> bootRootBindings = List.of();
   private boolean bootRootBindingsBound;
+  private java.util.function.Supplier<java.util.Collection<Path>> exclusionRoots =
+      () -> bootRootBindings.stream().map(RootBinding::path).toList();
   private volatile String rootReconciliationSettledGeneration;
   /**
    * Task t-20261013-ef3c41, round 7 (S8): the roots the committed boot deferred because the folder
@@ -164,9 +166,12 @@ public final class KnowledgeServer implements Closeable {
   private IndexRootLock indexRootLock;
   private boolean closePrepared;
   private WorkerAppServices pendingAppServices;
+  /** Constructor context, held only while the serialized reload calls its normal factory. */
+  private DefaultWorkerAppServices runtimeReloadSource;
   private DeferredRuntime.PreparedUpgrade pendingDeferredUpgrade;
   private final Object closeLock = new Object();
   private final ReentrantLock runtimeSwapLock = new ReentrantLock();
+  private final AtomicInteger runtimeReloads = new AtomicInteger();
 
   /** Serializes dev service replacement with admin runtime replacement and shutdown. */
   final class DevReplacementLease implements AutoCloseable {
@@ -686,6 +691,12 @@ public final class KnowledgeServer implements Closeable {
     bootRootBindingsBound = true;
   }
 
+  /** Current Head-owned membership, including roots whose native watch is unavailable. */
+  public void bindExclusionRoots(java.util.function.Supplier<java.util.Collection<Path>> roots) {
+    if (running) throw new IllegalStateException("Exclusion roots must precede Worker start");
+    exclusionRoots = Objects.requireNonNull(roots, "roots");
+  }
+
   /** Binds a retained physical-attempt capsule before start. */
   public void bindIndexStartContext(IndexStartContext context) {
     if (running) throw new IllegalStateException("Index start context must precede Worker start");
@@ -1189,6 +1200,32 @@ public final class KnowledgeServer implements Closeable {
       long signalBusMs = (tPhase - tPrev) / 1_000_000;
       tPrev = tPhase;
 
+      // 3. Resolve generation-scoped index path BEFORE opening Lucene.
+      // Production root captured this once; legacy fixture constructors capture at first start.
+      ResolvedConfig rc = startupConfiguration;
+      if (rc == null) {
+        throw new IllegalStateException("ConfigStore not initialized — cannot start KnowledgeServer");
+      }
+
+      this.migrationCutoverMaxFailedJobs = rc.index().migrationCutoverMaxFailedJobs();
+
+      Path effectiveIndexBasePath = rc.paths().indexBasePath();
+
+      recordIndexStartupWait("index root lock at " + effectiveIndexBasePath);
+      awaitIndexStartHarnessBarrier(rc.paths().dataDir(), effectiveIndexBasePath);
+
+      // Acquire a lock for the effective index root to prevent two Workers from mutating the same
+      // indexBasePath (important when justsearch.index.base_path is overridden).
+      this.indexRootLock = new IndexRootLock(effectiveIndexBasePath);
+      this.indexRootLock.acquire();
+
+      var journalWitness = new io.justsearch.indexerworker.queue.MigrationJournalWitness(
+          effectiveIndexBasePath, dataDir.resolve("jobs.db"));
+      IndexGenerationManager genManager = new IndexGenerationManager(effectiveIndexBasePath);
+      boolean unfinishedMigration = recordedIngestionLifecycle.generationPendingAtBoot()
+          || genManager.requiresMigrationJournalForBoot();
+      if (unfinishedMigration) journalWitness.validateUnfinished(dataDir.resolve("jobs.db"));
+
       // 2. Initialize job queue (with corruption triage). Tempdoc 417 Phase 3c: write-failure
       // callback late-binds to WorkerOpsMetricCatalog (constructed later in
       // registerTelemetryGauges); the lambda silently no-ops until the catalog is wired.
@@ -1215,44 +1252,35 @@ public final class KnowledgeServer implements Closeable {
             }
           });
       jobQueue = sqliteQueue;
+      var triageReceipt = journalWitness.triageReceipt();
+      boolean interruptedTriage = triageReceipt != null && !triageReceipt.complete();
       try {
-        jobQueue.open();
+        if (interruptedTriage) handleCorruptDatabase(dbPath, journalWitness);
+        else jobQueue.open();
       } catch (SQLException e) {
+        if (interruptedTriage) throw e;
         // Check for database corruption (SQLite error code 11 = SQLITE_CORRUPT)
         if (e.getErrorCode() == 11) {
+          if (unfinishedMigration) {
+            throw new IOException(
+                io.justsearch.indexerworker.queue.MigrationJournalWitness.REFUSAL
+                    + ": corruption during unfinished migration", e);
+          }
           log.error("Database corruption detected in jobs.db. Initiating triage...", e);
           try {
             jobQueue.close();
           } catch (IOException closeEx) {
             log.warn("Failed to close corrupt database handle", closeEx);
           }
-          handleCorruptDatabase(dbPath);
+          handleCorruptDatabase(dbPath, journalWitness);
         } else {
           throw e;
         }
       }
+      sqliteQueue.attachMigrationJournalWitness(journalWitness);
       tPhase = System.nanoTime();
       long jobQueueMs = (tPhase - tPrev) / 1_000_000;
       tPrev = tPhase;
-
-      // 3. Resolve generation-scoped index path BEFORE opening Lucene.
-      // Production root captured this once; legacy fixture constructors capture at first start.
-      ResolvedConfig rc = startupConfiguration;
-      if (rc == null) {
-        throw new IllegalStateException("ConfigStore not initialized — cannot start KnowledgeServer");
-      }
-
-      this.migrationCutoverMaxFailedJobs = rc.index().migrationCutoverMaxFailedJobs();
-
-      Path effectiveIndexBasePath = rc.paths().indexBasePath();
-
-      recordIndexStartupWait("index root lock at " + effectiveIndexBasePath);
-      awaitIndexStartHarnessBarrier(rc.paths().dataDir(), effectiveIndexBasePath);
-
-      // Acquire a lock for the effective index root to prevent two Workers from mutating the same
-      // indexBasePath (important when justsearch.index.base_path is overridden).
-      this.indexRootLock = new IndexRootLock(effectiveIndexBasePath);
-      this.indexRootLock.acquire();
 
       var bootOwnership = recoveryStartContext != null
               && recoveryStartContext.generationState() != null
@@ -1276,12 +1304,19 @@ public final class KnowledgeServer implements Closeable {
       }
       this.recordedCandidate = candidate.orElse(null);
 
-      IndexGenerationManager genManager = new IndexGenerationManager(effectiveIndexBasePath);
       genManager.reconcileActiveRecoveryOwnership(activeGenerationPath -> {
         if (!IndexRecoveryMarker.exists(activeGenerationPath)) {
           IndexRecoveryMarker.write(activeGenerationPath, "interrupted_backup_first");
         }
       });
+      // Inject after ownership reconciliation so both the baseline and candidate reach the actual
+      // fallback writer. Its next process must then recover the interrupted repair on its own.
+      if ("1".equals(SystemAccess.envVar("JUSTSEARCH_SUPERVISOR_HARNESS"))
+          && Objects.toString(SystemAccess.envVar("JUSTSEARCH_REAL_RECOVERY_SCENARIO"), "")
+              .startsWith("pointer-recovery-")
+          && !Files.exists(effectiveIndexBasePath.resolve("pointer-publication-cut"))) {
+        Files.writeString(effectiveIndexBasePath.resolve("state.json"), "{torn native pointer");
+      }
       IndexGenerationManager.BootLayout boot;
       if (recoveryStartContext != null && recoveryStartContext.generationState() != null) {
         var inspected = genManager.inspectCurrentLayoutForBoot().orElseThrow(
@@ -1929,7 +1964,11 @@ public final class KnowledgeServer implements Closeable {
       // with the actual cause visible nowhere but the (then separate) worker.log. It is a
       // deliberate refusal, not a
       // crash, and it has its own remedy. Other fatal causes stay generic.
-      if (isCorruptIndexCause(e)) {
+      if (e.getMessage() != null && e.getMessage().startsWith(
+          io.justsearch.indexerworker.queue.MigrationJournalWitness.REFUSAL)) {
+        io.justsearch.ipc.WorkerFatalReasonMarker.write(dataDir,
+            io.justsearch.ipc.WorkerFatalReasonMarker.MIGRATION_JOURNAL_UNAVAILABLE);
+      } else if (isCorruptIndexCause(e)) {
         io.justsearch.ipc.WorkerFatalReasonMarker.write(
             dataDir, io.justsearch.ipc.WorkerFatalReasonMarker.INDEX_CORRUPT);
       } else if (isSchemaMismatch(e)) {
@@ -3195,6 +3234,14 @@ public final class KnowledgeServer implements Closeable {
    * {@link DevReloadManager}'s hot-reload path so all three observe the same wiring.
    */
   DefaultWorkerAppServices newAppServices() {
+    if (runtimeReloadSource != null) {
+      var runtime = (RunningRuntime) ingestLifecycle;
+      bindTerminalWriterFaultSource(runtime);
+      return DefaultWorkerAppServices.prepareRuntimeReload(workerExecutors,
+          fixedRuntimeContext(runtime, activeIndexPath),
+          () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
+          embeddingTelemetry, indexingPacing, childControl, serviceConfiguration, runtimeReloadSource);
+    }
     return newAppServices(infraCtx, ingestLifecycle);
   }
 
@@ -3376,6 +3423,7 @@ public final class KnowledgeServer implements Closeable {
    * {@link DefaultWorkerAppServices} with non-null indexingLoop / ingestService).
    */
   private void wireAppServicesPostConstruction(WorkerAppServices svc) {
+    svc.ingestService().useExclusionRoots(() -> exclusionRoots.get());
     svc.ingestService().setProjectionSemanticDeferralSupplier(() -> {
       // A FENCED source writer is open for recovery replay only. A writable Lucene runtime
       // does not grant admission to new projections before recorded authority is settled.
@@ -3466,6 +3514,43 @@ public final class KnowledgeServer implements Closeable {
       this.appServices = null; // The incumbent has actually closed; callers see unavailability.
       newServices.startIndexingLoop();
       publishServingView(newServices);
+      pendingAppServices = null;
+    } catch (Exception | Error failure) {
+      try { closePendingAppServices(); }
+      catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      if (failure instanceof Error fatal) throw fatal;
+      throw new IllegalStateException("Application-service replacement failed; owners retained", failure);
+    }
+  }
+
+  /** Reuses the native handoff so watches and selected models survive a same-generation reload. */
+  private void reconstructAppServicesAfterRuntimeReload(DefaultWorkerAppServices source,
+      io.justsearch.indexerworker.services.WorkerMutationAdmission.FinalFence mutations) {
+    closePendingAppServices();
+    final DefaultWorkerAppServices successor;
+    runtimeReloadSource = source;
+    try {
+      successor = newAppServices();
+    } finally {
+      runtimeReloadSource = null;
+    }
+    pendingAppServices = successor;
+    try {
+      wireAppServicesPostConstruction(successor);
+      if (initialEncoderSet != null) retainProducerModels(successor, initialEncoderSet);
+      if (successor.ownsNativeProducer()) {
+        successor.prepareIndexingLoop();
+        source.installNativeWatcherHandoffTo(successor);
+        mutations.install(successor.mutationOwnerToken());
+        source.close();
+        publishServingView(successor);
+        successor.activatePreparedIndexingLoop();
+        mutations.certifySuccessor();
+      } else {
+        source.close();
+        successor.startIndexingLoop();
+        publishServingView(successor);
+      }
       pendingAppServices = null;
     } catch (Exception | Error failure) {
       try { closePendingAppServices(); }
@@ -3598,34 +3683,95 @@ public final class KnowledgeServer implements Closeable {
       throw new IllegalStateException("Runtime reload refused during encoder recovery or close");
     }
     final long elapsed;
+    runtimeReloads.incrementAndGet();
     runtimeSwapLock.lock();
     try {
-      if (closeStarted || encoderRecoveryReservation != null) {
-        throw new IllegalStateException("Runtime reload refused during encoder recovery or close");
+      for (;;) {
+        if (closeStarted || encoderRecoveryReservation != null) {
+          throw new IllegalStateException("Runtime reload refused during encoder recovery or close");
+        }
+        var migration = indexGenerationManager == null ? null
+            : indexGenerationManager.readStateBestEffort();
+        if (indexGenerationManager != null && migration == null) {
+          throw new IllegalStateException("Runtime reload refused: migration state is unavailable");
+        }
+        if (buildingIndexPath != null || searchLifecycle != ingestLifecycle
+            || (migration != null && (migration.building_generation() != null
+                || "MIGRATING".equals(migration.migration_state())
+                || "SWITCHING".equals(migration.migration_state())))) {
+          throw new IllegalStateException("Runtime reload refused during migration");
+        }
+        ServingView current;
+        publicationLock.writeLock().lock();
+        try {
+          synchronized (servingViewMonitor) {
+            current = servingView;
+            if (current == null || current.retirementListeners.isEmpty()) {
+              // Stop new captures atomically with the last listener check. A subscription whose
+              // registration is still in flight observes retiring and ends itself on registration.
+              if (current != null) current.retiring = true;
+              break;
+            }
+          }
+        } finally {
+          publicationLock.writeLock().unlock();
+        }
+        // Idle observers retain the view. Their existing callbacks must be able to re-enter
+        // lifecycle operations, so notify outside both locks, then recheck the selected owner and
+        // admission guards. Another reload, migration or shutdown may have won while unlocked.
+        runtimeSwapLock.unlock();
+        try { notifyServingViewRetirement(current); }
+        finally { runtimeSwapLock.lock(); }
       }
       try {
         retireServingView();
       } catch (IOException refusal) {
         throw new IllegalStateException("Runtime reload retains active serving holders", refusal);
       }
-      long startNanos = System.nanoTime();
-      LuceneRuntime old = this.ingestLifecycle;
-      if (old instanceof RunningRuntime running) {
-        running.drainAndClose(drainTimeout, reason);
-      } else if (old != null) {
-        try {
-          old.close();
-        } catch (Exception e) {
-          log.warn("swapRuntime: best-effort close of non-RunningRuntime old: {}", e.getMessage());
-        }
+      if (closeStarted || Thread.currentThread().isInterrupted()) {
+        if (servingView != null) restoreServingViewAfterRefusedRetirement(servingView);
+        throw new IllegalStateException("Runtime reload refused during close or interruption");
       }
-      RunningRuntime fresh = opener.get();
-      publishIngestLifecycle(fresh);
-      this.searchLifecycle = fresh;
-      reconstructAppServicesAfterDeferredUpgrade();
-      elapsed = (System.nanoTime() - startNanos) / 1_000_000L;
+      // A previously refused candidate can also retain work against the selected runtime.
+      closePendingAppServices();
+      long startNanos = System.nanoTime();
+      // The loop owns extraction and enrichment/backfill work that has no RPC serving lease.
+      // Its bounded close and admitted mutations must drain before their runtime can close.
+      var source = appServices instanceof DefaultWorkerAppServices producer
+          && producer.ownsNativeProducer() ? producer : null;
+      final io.justsearch.indexerworker.services.WorkerMutationAdmission.FinalFence mutations;
+      try {
+        mutations = source == null ? null : source.closeForRuntimeReload();
+        if (source == null && appServices != null) appServices.close();
+      } catch (InterruptedException | java.util.concurrent.TimeoutException refusal) {
+        if (refusal instanceof InterruptedException) Thread.currentThread().interrupt();
+        if (servingView != null) restoreServingViewAfterRefusedRetirement(servingView);
+        throw new IllegalStateException("Runtime reload retains active producer mutations", refusal);
+      } catch (IOException failure) {
+        throw new IllegalStateException("Runtime reload retains active producers", failure);
+      }
+      try (mutations) {
+        if (closeStarted) throw new IllegalStateException("Runtime reload refused during close");
+        LuceneRuntime old = this.ingestLifecycle;
+        if (old instanceof RunningRuntime running) {
+          running.drainAndClose(drainTimeout, reason);
+        } else if (old != null) {
+          try {
+            old.close();
+          } catch (Exception e) {
+            log.warn("swapRuntime: best-effort close of non-RunningRuntime old: {}", e.getMessage());
+          }
+        }
+        RunningRuntime fresh = opener.get();
+        publishIngestLifecycle(fresh);
+        this.searchLifecycle = fresh;
+        if (source != null) reconstructAppServicesAfterRuntimeReload(source, mutations);
+        else reconstructAppServicesAfterDeferredUpgrade();
+        elapsed = (System.nanoTime() - startNanos) / 1_000_000L;
+      }
     } finally {
       runtimeSwapLock.unlock();
+      runtimeReloads.decrementAndGet();
     }
     notifyRecordedServicesPublished();
     return elapsed;
@@ -6700,6 +6846,19 @@ public final class KnowledgeServer implements Closeable {
     return captureServingView(true);
   }
 
+  /** A planned physical transition is not a failed health observation. */
+  public java.util.Optional<ServingLease> tryCaptureHealthView() {
+    if (!runtimeSwapLock.tryLock()) return java.util.Optional.empty();
+    try {
+      return java.util.Optional.of(captureServingView());
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  /** Includes reloads waiting to acquire the physical transition lock. */
+  public boolean runtimeReloadInProgress() { return runtimeReloads.get() != 0; }
+
   private ServingLease captureServingView(boolean allowAcceptedIndexRecovery) {
     publicationLock.readLock().lock();
     try {
@@ -7518,7 +7677,12 @@ public final class KnowledgeServer implements Closeable {
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
     IOException refusal = null;
     synchronized (servingViewMonitor) {
-      while (retiring.holders != 0) {
+      // Older issued views can share this physical runtime (for example after query settings
+      // publication). Draining only the current view would close their runtime underneath them.
+      while (retiring.holders != 0 || retiredServingViews.stream().anyMatch(view ->
+          (view.holders != 0 || view.cleanupRunning)
+              && (referencesRuntime(view, retiring.ingestRuntime)
+                  || referencesRuntime(view, retiring.searchRuntime)))) {
         long remaining = deadline - System.nanoTime();
         if (remaining <= 0) {
           refusal = new IOException("Index serving view still has active holders; owner retained");
@@ -9579,43 +9743,43 @@ public final class KnowledgeServer implements Closeable {
    * @throws IOException if quarantine or restore operations fail
    * @throws SQLException if re-opening the queue fails
    */
-  private void handleCorruptDatabase(Path dbPath) throws IOException, SQLException {
-    Path corruptPath = dbPath.resolveSibling(dbPath.getFileName() + ".corrupt");
-    Path backupPath = dbPath.resolveSibling(dbPath.getFileName() + ".bak");
-
-    // 1. Quarantine the corrupted file for forensics
-    if (Files.exists(dbPath)) {
-      Files.move(dbPath, corruptPath, StandardCopyOption.REPLACE_EXISTING);
+  private void handleCorruptDatabase(Path dbPath,
+      io.justsearch.indexerworker.queue.MigrationJournalWitness witness) throws IOException, SQLException {
+    var receipt = witness.beginTriage(dbPath);
+    if (receipt.unfinished()) {
+      throw new IOException(io.justsearch.indexerworker.queue.MigrationJournalWitness.REFUSAL
+          + ": recorded triage during unfinished migration");
+    }
+    Path corruptPath = dbPath.resolveSibling(receipt.quarantine());
+    Path backupPath = dbPath.resolveSibling("jobs.db.bak");
+    if (receipt.backup() && !Files.isRegularFile(backupPath)) {
+      throw new IOException("Interrupted jobs.db triage has lost its recorded backup");
+    }
+    // Each receipt owns one quarantine. A resumed restore must never replace its original evidence.
+    if (!Files.exists(corruptPath) && Files.exists(dbPath)) {
+      Files.move(dbPath, corruptPath);
       log.error("Quarantined corrupt database to: {}", corruptPath);
     }
-
-    // WAL sidecar files must be handled together with main DB
-    Path walPath = dbPath.resolveSibling(dbPath.getFileName() + "-wal");
-    Path shmPath = dbPath.resolveSibling(dbPath.getFileName() + "-shm");
-
+    Path walPath = dbPath.resolveSibling("jobs.db-wal");
+    Path corruptWalPath = dbPath.resolveSibling(
+        receipt.quarantine().replace("jobs.db.corrupt", "jobs.db-wal.corrupt"));
     if (Files.exists(walPath)) {
-      Path corruptWalPath = corruptPath.resolveSibling(dbPath.getFileName() + "-wal.corrupt");
-      Files.move(walPath, corruptWalPath, StandardCopyOption.REPLACE_EXISTING);
-      log.warn("Quarantined WAL file to: {}", corruptWalPath);
+      if (!Files.exists(corruptWalPath)) Files.move(walPath, corruptWalPath);
+      else Files.delete(walPath); // Only an unacknowledged, interrupted restore can have made this WAL.
     }
-
-    if (Files.exists(shmPath)) {
-      // SHM is a shared-memory file, safe to delete (will be recreated)
-      Files.deleteIfExists(shmPath);
-      log.debug("Deleted SHM sidecar file");
+    Files.deleteIfExists(dbPath.resolveSibling("jobs.db-shm"));
+    if (receipt.backup()) {
+      // Keep both backup and quarantine through a failed or unsupported atomic replacement.
+      Path temporary = Files.createTempFile(dbPath.getParent(), "jobs.db.restore-", ".tmp");
+      try {
+        Files.copy(backupPath, temporary, StandardCopyOption.REPLACE_EXISTING);
+        try (var channel = java.nio.channels.FileChannel.open(temporary,
+            java.nio.file.StandardOpenOption.WRITE)) { channel.force(true); }
+        Files.move(temporary, dbPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+      } finally { Files.deleteIfExists(temporary); }
     }
-
-    // 2. Attempt recovery from backup
-    if (Files.exists(backupPath)) {
-      Files.copy(backupPath, dbPath, StandardCopyOption.REPLACE_EXISTING);
-      log.warn("Restored database from backup: {}", backupPath);
-    } else {
-      log.warn("No backup found at {}. A fresh database will be created.", backupPath);
-    }
-
-    // 3. Re-open the queue with forced integrity check to validate the restored backup.
-    // SqliteJobQueue.open() is designed to be re-callable after close().
     jobQueue.openWithIntegrityCheck();
+    witness.completeTriage(receipt);
     log.info("Job queue re-opened after triage (integrity validated)");
   }
 

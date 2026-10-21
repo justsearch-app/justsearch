@@ -125,7 +125,7 @@ class VduBatchProcessorModeScopingTest {
   private Fixture fixture(int count) throws Exception {
     VduProcessor processor = mock(VduProcessor.class);
     when(processor.hasVisionCapability()).thenReturn(true);
-    KnowledgeClient client = mock(KnowledgeClient.class);
+    KnowledgeClient client = VduAttemptTestSupport.client();
     List<String> ids = new ArrayList<>();
     for (int i = 0; i < count; i++) {
       Path file = tempDir.resolve("doc-" + i + ".png");

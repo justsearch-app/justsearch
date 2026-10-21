@@ -73,15 +73,16 @@ wired to own state the host should own.
 ## Trust is proportional to provenance; isolation to trust
 
 Every contribution carries a `Provenance` trust tier (`TrustTier`: CORE,
-TRUSTED, UNTRUSTED). Capability and isolation scale with that tier through the
+TRUSTED_PLUGIN, UNTRUSTED_PLUGIN). Capability and isolation scale with that tier through the
 `TrustLattice`, which gates an action on the combination of *who* authored it
 and *how risky* the action is — a most-restrictive default covers any
 unenumerated combination. A CORE contribution declared in JustSearch's own code
-runs with full reach; an UNTRUSTED plugin loaded from a URL runs inside a
+runs with full reach; an UNTRUSTED_PLUGIN frontend module loaded from a URL runs inside a
 tightened compartment and is denied the capabilities (ambient selection,
 clipboard, persistent sessions) whose misuse would be an exfiltration risk. The
 isolation a contributor gets is a function of its trust, decided at composition
-time, not patched in at each call site.
+time, not patched in at each call site. Backend `UNTRUSTED_PLUGIN` operations are refused
+in V1 because the backend sandbox is not implemented.
 
 ## A contribution is inert without a consumer
 

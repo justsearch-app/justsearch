@@ -7,14 +7,14 @@ date: 2026-02-03
 probes:
   - adr-0003-lucene-direct
   - adr-0003-no-search-platform
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0003: Use Lucene Directly Without Search Platform
 
 ## Status
 
-Accepted
+Accepted. See the 2026-10-20 amendment for current ownership and schema validation.
 
 ## Context
 
@@ -89,3 +89,15 @@ See also: [Storage Engine](../explanation/04-storage-engine.md) for full Lucene 
 - JustSearch moves to a client-server model where a hosted search backend is acceptable, removing the desktop footprint constraint.
 
 *Added by tempdoc 269 trigger audit (2026-03).*
+
+## Amendment 2026-10-20: Engine ownership and validator name
+
+The Worker terminology in Consequences predates
+[ADR-0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md). The Engine's
+index half now opens Lucene in process; this is not a separate Worker JVM or a
+promise that search is ready before index initialization finishes.
+`LuceneIndexRuntime` has been deleted. The current validator is
+`IndexSchema.validateIndexableFields` in
+`modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexSchema.java`.
+`ComponentsFactory` in the same package owns the directory/writer construction.
+Direct Lucene ownership remains the decision.

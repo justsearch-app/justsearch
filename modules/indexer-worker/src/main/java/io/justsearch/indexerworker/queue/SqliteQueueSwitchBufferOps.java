@@ -29,6 +29,29 @@ final class SqliteQueueSwitchBufferOps {
   private final Supplier<Connection> connSupplier;
   private final Runnable onWriteFailure;
   private final Runnable errorRecorder;
+  private MigrationJournalWitness admissionWitness;
+
+  void attachAdmissionWitness(MigrationJournalWitness witness) throws SQLException {
+    admissionWitness = witness;
+    try (PreparedStatement update = connSupplier.get().prepareStatement(
+        "UPDATE switch_buffer_admissions SET count = MAX(count, ?) WHERE id = 1")) {
+      update.setLong(1, witness.acknowledged());
+      update.executeUpdate();
+    }
+    acknowledgeAdmissions();
+  }
+
+  long admissions() throws SQLException {
+    try (Statement statement = connSupplier.get().createStatement();
+        ResultSet row = statement.executeQuery("SELECT count FROM switch_buffer_admissions WHERE id = 1")) {
+      if (!row.next()) throw new SQLException("Missing switch-buffer admission counter");
+      return row.getLong(1);
+    }
+  }
+
+  void acknowledgeAdmissions() throws SQLException {
+    if (admissionWitness != null) admissionWitness.acknowledge(admissions());
+  }
 
   /**
    * @param onWriteFailure invoked once per switch-buffer write failure; may be null. Tempdoc 417
@@ -270,6 +293,7 @@ final class SqliteQueueSwitchBufferOps {
       stmt.setLong(5, System.currentTimeMillis());
       stmt.setString(6, java.util.UUID.randomUUID().toString());
       stmt.executeUpdate();
+      if (conn.getAutoCommit()) acknowledgeAdmissions();
       return true;
     }
   }

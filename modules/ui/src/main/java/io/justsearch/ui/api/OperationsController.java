@@ -326,6 +326,7 @@ public final class OperationsController {
         return;
       }
       executionId = eidNode.asText();
+      if (StoreIdRequest.rejectUnsafe(ctx, executionId)) return;
       var keyNode = parsed.get("idempotencyKey");
       if (keyNode != null && !keyNode.isNull() && !keyNode.isTextual()) {
         writeError(ctx, 400, "idempotencyKey must be a string", "BAD_REQUEST");

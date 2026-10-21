@@ -79,7 +79,10 @@ final class SettingsPatch {
       if (ui.pauseIndexingDuringAi() != null) base.setPauseIndexingDuringAi(ui.pauseIndexingDuringAi());
       if (applyMode && ui.mode() != null) base.setMode(ui.mode());
       if (ui.hasSeenTrustLoopNudge() != null) base.setTrustLoopNudgeSeen(ui.hasSeenTrustLoopNudge());
-      if (ui.excludePatterns() != null) base.setExcludePatterns(ui.excludePatterns());
+      if (ui.excludePatterns() != null) {
+        io.justsearch.configuration.excludes.ExclusionPatterns.validateSavedPatterns(ui.excludePatterns());
+        base.setExcludePatterns(ui.excludePatterns());
+      }
       if (ui.chatEnabled() != null) base.setChatEnabled(ui.chatEnabled());
     }
 

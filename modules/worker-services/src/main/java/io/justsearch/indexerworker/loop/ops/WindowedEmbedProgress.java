@@ -56,19 +56,19 @@ public final class WindowedEmbedProgress {
    *     content changed underneath a partial must restart, never blend windows from two revisions
    */
   private static final class Partial {
-    private final long fingerprint;
+    private final String fingerprint;
     private int totalWindows;
     private int nextWindow;
     private double[] sum;
 
-    private Partial(long fingerprint) {
+    private Partial(String fingerprint) {
       this.fingerprint = fingerprint;
     }
   }
 
-  /** Content identity for a partial: length plus hash, so a same-length edit still invalidates. */
-  private static long fingerprintOf(String content) {
-    return ((long) content.length() << 32) ^ (content.hashCode() & 0xFFFFFFFFL);
+  /** Content identity for a partial, including equal-length Java hash collisions. */
+  private static String fingerprintOf(String content) {
+    return io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex(content);
   }
 
   /**
@@ -80,7 +80,7 @@ public final class WindowedEmbedProgress {
     if (partial == null) {
       return 0;
     }
-    if (partial.fingerprint != fingerprintOf(content)) {
+    if (!partial.fingerprint.equals(fingerprintOf(content))) {
       byDocId.remove(docId);
       return 0;
     }
@@ -97,9 +97,9 @@ public final class WindowedEmbedProgress {
    */
   public int record(
       String docId, String content, int totalWindows, int fromWindow, List<float[]> windowVectors) {
-    long fingerprint = fingerprintOf(content);
+    String fingerprint = fingerprintOf(content);
     Partial partial = byDocId.get(docId);
-    if (partial == null || partial.fingerprint != fingerprint) {
+    if (partial == null || !partial.fingerprint.equals(fingerprint)) {
       partial = new Partial(fingerprint);
       byDocId.put(docId, partial);
     }

@@ -157,13 +157,14 @@ function parseLockLine(line) {
 // coordinate are a *real* skew only if they can co-resolve — i.e. both appear
 // on configs of the SAME scope class. Versions confined to disjoint scope
 // classes (e.g. an annotationProcessor-only build vs the runtime build, or the
-// OpenRewrite tool classpath vs product runtime) never share a resolution and
+// PMD tool classpath vs product runtime) never share a resolution and
 // are benign cross-scope differences, not drift. The lockfile already records
 // the config list after `=`, so this needs no extra data.
 function scopeClassOf(config) {
   const c = config.toLowerCase();
   if (c.includes('annotationprocessor')) return 'processor';
-  // Build-tool classpaths that never ship in a product or test artifact.
+  // Build-tool classpaths that never ship in a product or test artifact. The legacy
+  // rewrite scope remains classified for historical lockfiles.
   if (c === 'rewrite' || c.startsWith('spotless') || c.startsWith('pmd') ||
       c.startsWith('checkstyle') || c.startsWith('errorprone') ||
       c.startsWith('jacoco') || c.startsWith('kotlin') ||

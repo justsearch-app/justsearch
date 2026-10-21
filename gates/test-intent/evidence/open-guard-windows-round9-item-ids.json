@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T13:41:20.648Z",
+  "revision": "75bab60ce95c96530f73caa180795e804343595d",
+  "tree": "9458dfc1cee60a8d311a447aadfa1ca60ff25a68",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26100",
+    "node": "v22.23.3",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": true
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"open_guard_tests::windows_reveal_item_ids_identify_exact_target\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11488
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#open_guard_tests::windows_reveal_item_ids_identify_exact_target",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:e4aff5bedda56de721d49363fd25609570aca4a01437dbfd7f8615a83f61ed05",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "open_guard_tests::windows_reveal_item_ids_identify_exact_target",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2a5acba1f837c1997cadd66b8956fdb278796a09e8edec822b9c3de53c25b3b5"
+}

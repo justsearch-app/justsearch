@@ -366,10 +366,21 @@ final class SqliteQueueMigrationOps {
         log.info("V21 to V22: Persisted root-relative ingestion policy boundaries");
       }
       case 23 -> {
-        try (Statement stmt = conn.createStatement()) {
-          for (String sql : SqliteSchema.MIGRATE_V22_TO_V23) stmt.execute(sql);
+        try (Statement statement = conn.createStatement()) {
+          statement.execute("CREATE TABLE IF NOT EXISTS switch_buffer_admissions "
+              + "(id INTEGER PRIMARY KEY CHECK(id = 1), count INTEGER NOT NULL CHECK(count >= 0))");
+          // Replaying a migration after a version rewind must retain admissions, including
+          // those whose buffer rows have already been replayed and removed.
+          statement.execute("INSERT OR IGNORE INTO switch_buffer_admissions VALUES (1, 0)");
+          statement.execute("CREATE TRIGGER IF NOT EXISTS count_switch_buffer_admission AFTER INSERT ON switch_buffer "
+              + "BEGIN UPDATE switch_buffer_admissions SET count = count + 1 WHERE id = 1; END");
         }
-        log.info("V22 to V23: Added transactional job counts and claim/readiness indexes");
+      }
+      case 24 -> {
+        try (Statement stmt = conn.createStatement()) {
+          for (String sql : SqliteSchema.MIGRATE_V23_TO_V24) stmt.execute(sql);
+        }
+        log.info("V23 to V24: Added transactional job counts and claim/readiness indexes");
       }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
