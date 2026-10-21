@@ -1,7 +1,8 @@
 # Folder-protection evidence repair
 
 Task t-20261019-5ec1a1; builder session 01a15776-d065-7d12-8b21-f9e5b2e63fdb.
-The existing rejection record is unchanged. No author acceptance is appended.
+The existing rejection/acceptance records are unchanged. No author acceptance is appended.
+Earlier sections describe reviewed pre-merge revisions; current merge results are in the final section.
 
 ## Implementation
 
@@ -27,7 +28,7 @@ creation permissions; existing link targets receive no repair.
 ## Compatible harness, not fabricated production
 
 The original before comparisons use 4975ceedf, as requested. The computed origin/main merge-base
-in this checkout is c00a0cb24; these are not described as the same revision.
+in that pre-merge checkout was c00a0cb24; these are not described as the same revision.
 No hand-written patch or production overlay is used. The prior patch files and receipts
 using them or bc2a09ede have been retired.
 
@@ -178,3 +179,101 @@ The unchanged linked-runtime preservation replay exited 1 under the generic prod
 because its check passed on both revisions, correctly recorded as preservation.
 `private-folders-windows-api-v3.json` exited 0 with all four cases passing. This includes
 the new native-information guard API check; Windows native execution remains unverified.
+
+## Merge onto main after token PR #825 was squashed
+
+Pinned main: 4f595453517bbf430bf907117f2c60303b7357ba. Merge-only commit:
+75853ca84, with pre-merge branch b932c1224 as its first parent and that main as its
+second parent. No fetch was made after pinning and no rebase was performed.
+Token-only paths match this main byte-for-byte. Cargo's workspace lock updater retained
+main's package versions and added only the shell's direct libc dependency; the Unix
+directory implementation and Windows ACL feature remain this branch's own additions.
+The live project generator rebuilt the route/OpenAPI/client projections after the merge;
+all match main exactly. The offline generator check also passed for all five hermetic sets.
+
+Main now intentionally stores keystore.json plus keystore.replica.json and returns save
+outcomes. The merged implementation retains its full validation, read/restore, save,
+rollback and cleanup logic. Folder preparation runs before exists/load/save filesystem
+access, using main's exception/result mapping. The privacy fixture's old assertion of
+one retained file is replaced with the literal primary+replica filename set. Both bytes
+are checked after interrupted replacement; both files' 0600 modes are checked throughout
+setup, passphrase/recovery changes and repair of a broad restore. These expectation
+changes follow P2/P3 and the quoted merge choice. Existing test inputs and usability
+assertions remain; no main-owned test was edited.
+
+The fresh receipts use pinned main for the ordinary repair and preservation controls.
+The hard-link/iterator controls still compare with the explicitly requested historical
+regression 46816f593. The helper/backend API checks remain supplemental candidate checks
+because main does not define those APIs. Prior receipts and all rejection/acceptance
+records are retained. Main's updated gate exempts the new Java test files from mandatory
+entries; their existing entries/evidence are retained and refreshed anyway.
+
+The unchanged producer is run five times as fresh ES modules in one Node process under
+one js-gradle-slot. It writes each receipt itself; the temporary driver only sets argv,
+selects the before revision, records each actual exit and checks the expected exit.
+The existing token execution-policy adapter continues to enforce whole-producer slot
+ownership, private HOME/DATA/test temp directories and shared-clone before states.
+Neither the producer nor adapter is modified. No overlay or hand-written before patch is
+used. The preservation producer's actual exit 1 is retained as such because before passes.
+
+The installed Engine was started with private HOME/DATA inside the assigned temporary
+root and umask 002. Runtime and encryption were 0700. The first live generator attempt
+returned HTTP 401 for OpenAPI because it received a client-supplied token; the corrected
+run read the boot token from the owner-only manifest without printing it and completed
+successfully. Both Engine processes were stopped and reaped; their isolated HOME/DATA
+were removed and ~/.config/justsearch was confirmed absent. Windows distinct-account
+native behavior remains unverified.
+
+The main KeystoreStartupAvailabilityHttpTest read-only rows originally relied on directory
+mode 0500 alone. The required privacy repair makes that 0700, so the intended real replica
+write failure no longer occurs. The fixture now also denies only the folder-mode repair
+setter for those rows. The directory remains genuinely read-only to the OS, all other
+filesystem operations call through, and every existing assertion/parameter row is unchanged.
+The adaptation receives an identical-fixture preservation replay on pinned main and the
+candidate, covering all eight read-only/blocked/read-error/read-only-filesystem restart/save
+rows. No token-only file is changed by this adaptation.
+
+The post-merge full touched-module invocation used :modules:configuration:test,
+:modules:app-api:test, :modules:app-services:test, :modules:ui:test and the offline
+OpenAPI check, with --continue and -PskipWebBuild=true. It exited 1: configuration
+345 cases (two sandbox-override failures), API 460 cases (no failures, five skips),
+app-services 4,079 cases (one sandbox-override failure, 11 skips), UI 2,124 cases
+(two read-only fixture failures, one 30-second lifecycle timeout, one skip).
+
+The full-suite test execution policy now leaves launcher HOME/DATA overrides unset for configuration
+and app-services contract fixtures; UI tests that may start an Engine remain isolated.
+The recheck passed all 345 configuration cases and all 82 selected runtime/startup cases.
+Of 56 encryption/GPU cases, 55 passed and one relative GPU path case still failed while
+HOME was injected; that exact failure also reproduced on pinned main. Removing both
+launcher overrides for that fixture made all six GPU cases pass on the candidate.
+The unchanged lifecycle test passed in isolation on main (17.672s) and candidate
+(20.502s), with the original 30-second timeout and all 1,296 combinations retained.
+No timeout, assertion or selection condition was weakened.
+
+Full cargo test --locked completed 217 library cases successfully and 131 conformance
+cases successfully, with the seven known updater_probe handoff failures (exit 101).
+Those seven failures reproduced on pinned main after staging its unchanged required
+Linux launch helper; the remaining selected handoff case passed. The first baseline
+attempt lacked that installed helper and failed all eight with ENOENT; it is not used
+as comparison evidence. The Node engine-discovery suite passed 31 cases and had one
+existing platform skip. The project generators/installDist passed; no snapshot differs
+from pinned main. No commit was made after the requested merge.
+
+The corrected GPU fixture run passed all six cases on both the candidate and pinned main,
+with its original no-launcher-override environment. The temporary baseline clone was removed.
+Final receipt validation passed: 13 repair cases pass now and fail by assertion on pinned
+main; four preservation cases pass on both revisions; 11 supplemental API cases pass now;
+two historical regression cases pass now and fail by assertion on 46816f593; all eight
+adapted startup cases pass on both revisions. Each receipt names the unchanged producer
+script digest and matches the final test-file digests; every before overlay/patch list is
+empty. Actual producer exits were 0, 1, 0, 0, 1 (the two before-passing preservation jobs
+retain exit 1). All shared before clones were removed.
+
+The default test-intent CLI resolved its base to the pinned origin/main merge-base and
+exited 1 with exactly one problem: stale acceptance for private-folders.md. The advisory
+rolling audit rate was one third-reviewer tie-break among nine audited PRs (11.1%).
+All three existing private-folder review records are unchanged. All token-only paths
+and generated snapshots match pinned main. HEAD remains the sole requested merge commit;
+the fixture adaptation, refreshed changeset/notes and five new receipts are uncommitted.
+
+The shared origin/main ref advanced during the work to 738e6a443c9d6ce82383e9c938c264a3a20fb506. Per the owner instruction, the merge remains pinned to 4f595453517bbf430bf907117f2c60303b7357ba; no follow-up merge or rebase was made. The default gate still resolves the PR merge-base to the pinned revision.
