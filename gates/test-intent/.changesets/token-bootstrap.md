@@ -682,3 +682,25 @@ like acceptance, must come from another session. No author approval is supplied.
   "note": "All 15 entries hold against owner-adopted T1-T19 with in-scope delegated choices (ADR-0046 at base is superseded by T1/T2/T19); my reruns show the Java and web new checks fail on base f003a5c64 by assertion for the reason under test and pass on 316da8a0a, all 18 surviving dev-mode McpOriginValidationTest cases pass unchanged on both, and adapted stream tests still fail when the real fetch SSE parser drops frames; notes: idleSurfaces now feeds frames only to open streams (transport-forced, not called out in whatMoved), and the launcher and installed-walk receipts were made with JAVA_TOOL_OPTIONS (launcher re-verified without it; walk not rerun)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "463cc439-2e8d-4bc4-a560-ac7077418318",
+  "verdict": "accept",
+  "digest": "sha256:78189d5f6e14b12cb9061bfaac80d9943d80e06a7b63544c6de078695cf6086b",
+  "note": "All 19 flagged items re-reviewed at base 50eafae23: classes and T1/T2/T4/T9/T17 sources hold, ADR-0046's base text is superseded by owner-adopted T1/T2/T19, old assertions survive (17 web transport remaps only), and reruns show the new Java and web checks fail by assertion on the base and pass on the candidate with dev-mode Origin cases intact."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "9a13f402-2547-4f10-a332-f97d01b8add5",
+  "verdict": "accept",
+  "digest": "sha256:78189d5f6e14b12cb9061bfaac80d9943d80e06a7b63544c6de078695cf6086b",
+  "note": "Audit at 86244f7c7 (base 50eafae23): no flagged item, entry or evidence changed since 7df82d2ef and main changed no flagged test; reran Java and web fail-before/preservation at the new base (assertion failures for the reason under test, all McpOriginValidation dev cases and original tests pass on both); non-blocking: header prose names old bases and the HeadlessLauncherProductionModeTest entry now covers a file this PR no longer changes."
+}
+```
