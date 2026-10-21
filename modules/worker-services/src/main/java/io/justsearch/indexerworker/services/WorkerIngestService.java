@@ -2560,7 +2560,7 @@ public final class WorkerIngestService {
             || ctx.engineContext().workId().filter(claim.owner()::equals).isEmpty()) return false;
         try {
           boolean reset = withFileMutationFence(() -> {
-            try { return resetVduStatusToPending(docId, claim.owner(), java.util.Set.of(attemptId)); }
+            try { return resetVduStatusToPending(docId, claim.owner(), Set.of(attemptId)); }
             catch (Exception failure) { throw new IllegalStateException(failure); }
           });
           if (reset) {
@@ -2620,7 +2620,7 @@ public final class WorkerIngestService {
         SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING, RECOVER_VDU_QUERY_LIMIT);
   }
 
-  private boolean resetVduStatusToPending(String docId, java.util.UUID procedureOwner, java.util.Set<String> attemptIds)
+  private boolean resetVduStatusToPending(String docId, java.util.UUID procedureOwner, Set<String> attemptIds)
       throws Exception {
     synchronized (vduMutationMonitor) {
       VduProcessingClaim claim = vduProcessingClaims.get(docId);
@@ -2679,7 +2679,7 @@ public final class WorkerIngestService {
   }
 
   private VduRecoveryResult recoverProcessingDocs(
-      List<String> processingDocIds, java.util.UUID procedureOwner, java.util.Set<String> attemptIds) {
+      List<String> processingDocIds, java.util.UUID procedureOwner, Set<String> attemptIds) {
     // The conditional RMW already compares source/UID/status/retry under the coordinator lock.
     // Keep the same monitor order as claims/results; taking the file fence before this monitor
     // would invert their monitor -> fence order during concurrent cancellation.
