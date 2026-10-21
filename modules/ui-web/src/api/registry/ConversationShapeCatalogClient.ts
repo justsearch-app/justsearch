@@ -18,6 +18,7 @@
  *   in-memory catalog snapshot through this client's `listShapes()`).
  */
 
+import { authorizedFetch } from '../../shell-v0/api/authorizedFetch.js';
 import type {
   ConversationShape,
   ConversationShapeCatalog,
@@ -104,7 +105,7 @@ const FIRST_INSTALL_RETRY_DELAYS_MS = [500, 1000, 2000, 4000];
 
 export async function bootConversationShapeRegistry(
   baseUrl: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = authorizedFetch,
 ): Promise<void> {
   if (bootSucceeded) return;
   if (inFlightBoot) return inFlightBoot;

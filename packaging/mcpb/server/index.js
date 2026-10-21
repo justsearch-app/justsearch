@@ -80,37 +80,6 @@ function healthy(port) {
 }
 
 /**
- * Fetch the desktop session token (GET /api/mcp/token). In prod mode the API
- * requires it on non-GET requests (X-JustSearch-Session); GETs are always
- * allowed, which is exactly what lets a local MCP client bootstrap. Returns
- * null when absent/empty (dev mode / enforcement disabled).
- */
-function fetchSessionToken() {
-  return new Promise((resolve) => {
-    const req = engineRequest(
-      target(),
-      { path: '/api/mcp/token', timeoutMs: HEALTH_TIMEOUT_MS },
-      (res) => {
-        let raw = '';
-        res.setEncoding('utf8');
-        res.on('data', (chunk) => (raw += chunk));
-        res.on('end', () => {
-          try {
-            const token = JSON.parse(raw).token;
-            resolve(typeof token === 'string' && token.length > 0 ? token : null);
-          } catch {
-            resolve(null);
-          }
-        });
-      }
-    );
-    req.on('timeout', () => req.destroy(new Error('timeout')));
-    req.on('error', () => resolve(null));
-    req.end();
-  });
-}
-
-/**
  * Returns { port, engine } or null; appends one line per location tried to triedOut.
  * Order: JUSTSEARCH_API_PORT pin (engine null: the operator named the port), then validated
  * runtime manifests (engine-discovery.cjs; engine is the selected candidate).
@@ -119,14 +88,16 @@ async function discoverEngine(triedOut) {
   const tried = triedOut || [];
   const envPort = Number.parseInt(process.env.JUSTSEARCH_API_PORT || '', 10);
   if (Number.isInteger(envPort) && envPort > 0) {
-    if (await healthy(envPort)) return { port: envPort, engine: null };
+    const token = process.env.JUSTSEARCH_SESSION_TOKEN?.trim();
+    if (!token) throw new Error('JUSTSEARCH_API_PORT requires JUSTSEARCH_SESSION_TOKEN from the Engine owner-only runtime/manifest.json.');
+    if (await healthy(envPort)) return { port: envPort, engine: null, token };
     tried.push(`JUSTSEARCH_API_PORT=${envPort} (not responding)`);
   }
   const { selected, tried: folders } = await selectEngine(standardCandidates());
   tried.push(...describeTried(folders.filter((f) => !f.ok)));
   if (selected) {
     log(`using the Engine in ${selected.dataDir} (${selected.source}, pid ${selected.pid}, port ${selected.port})`);
-    return { port: selected.port, engine: selected };
+    return { port: selected.port, engine: selected, token: selected.token };
   }
   return null;
 }
@@ -207,7 +178,7 @@ function postToServer(message, intercept) {
           state.sessionId = newSession;
         }
 
-        if (status === 404 || status === 400) {
+        if (status === 404 || status === 400 || status === 401) {
           // Streamable HTTP: 404 = session expired/unknown -> re-initialize.
           res.resume();
           const err = new Error(`HTTP ${status} from /mcp (stale session?)`);
@@ -306,7 +277,7 @@ function openGetStream() {
  */
 async function recoverConnection() {
   state.apiToken = null; // the old token never goes to whatever is found next
-  state.engine = null;
+  // Concurrent calls must still prove the old target until discovery replaces it.
   const tried = [];
   const found = await discoverEngine(tried);
   if (found === null) {
@@ -318,7 +289,7 @@ async function recoverConnection() {
   state.port = port;
   state.engine = found.engine;
   state.sessionId = null;
-  state.apiToken = await fetchSessionToken(); // token rotates per app start
+  state.apiToken = found.token; // re-read from the newly proven manifest
   if (!state.initializeParams) return; // nothing to re-establish yet
 
   state.reinitCounter += 1;
@@ -396,7 +367,7 @@ async function main() {
   const { port } = found;
   state.port = port;
   state.engine = found.engine;
-  state.apiToken = await fetchSessionToken();
+  state.apiToken = found.token;
   log(`bridging stdio <-> http://127.0.0.1:${port}/mcp${state.apiToken ? ' (session token attached)' : ''}`);
 
   let stdinBuffer = '';

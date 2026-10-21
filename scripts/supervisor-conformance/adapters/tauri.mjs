@@ -179,7 +179,7 @@ export async function runCase({ testCase, policy, io }) {
       }));
       // Finish the real loop through its ordinary quit request so its owned child is reaped.
       const manifest = io.readJsonIfPresent(path.join(dataDir, 'runtime', 'manifest.json'));
-      await fetch(`http://127.0.0.1:${manifest.head.apiPort}/api/lifecycle/shutdown`, { method: 'POST' });
+      await fetch(`http://127.0.0.1:${manifest.head.apiPort}/api/lifecycle/shutdown`, { method: 'POST', headers: manifest.head.sessionToken ? { 'X-JustSearch-Session': manifest.head.sessionToken } : {} });
       await Promise.race([run.exited, io.sleep(5000)]);
       return { problems };
     }

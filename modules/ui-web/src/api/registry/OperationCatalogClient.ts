@@ -13,6 +13,7 @@
  * `itemOperations` from a Resource's catalog declaration.
  */
 
+import { authorizedFetch } from '../../shell-v0/api/authorizedFetch.js';
 import type {
   Operation,
   OperationCatalog,
@@ -102,7 +103,7 @@ function rebuildIndex(catalog: OperationCatalog): void {
 
 export async function bootOperationRegistry(
   baseUrl: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = authorizedFetch,
 ): Promise<void> {
   if (bootSucceeded) return;
   if (inFlightBoot) return inFlightBoot;
@@ -200,7 +201,7 @@ export function onCatalogChange(listener: () => void): () => void {
  */
 export async function refreshOperationCatalog(
   baseUrl: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = authorizedFetch,
 ): Promise<void> {
   if (!baseUrl) return;
   try {

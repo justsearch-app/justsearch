@@ -12,6 +12,7 @@ be driven through it (verified against a real round).
 | File | What it is |
 |---|---|
 | `index.js` | Verbatim copy of `packaging/mcpb/server/index.js` — the REAL shipped MCPB stdio bridge. Not a second bespoke client: this is the artifact JustSearch actually ships. |
+| `engine-discovery.cjs` | The bridge's shared manifest validation and process/connection proof; also used for the driver's authenticated advisory stream. |
 | `mcp-typed-confirm.mjs` | Thin Node driver: spawns `node index.js` as a child process, speaks newline-delimited JSON-RPC to its stdin/stdout, and drives `initialize` -> `notifications/initialized` -> `tools/call justsearch_ingest`. |
 
 **Why Node, not PowerShell:** an earlier PowerShell driver hung waiting on
@@ -33,6 +34,12 @@ Optional flags: `--port <n>` (sets `JUSTSEARCH_API_PORT` for the bridge; by
 default the bridge discovers the port itself), `--bridge <path>` (default:
 `index.js` next to this script), `--timeout <seconds>` (default 45),
 `--out <file>` (write the raw JSON-RPC frame transcript for evidence).
+
+Normal discovery reads `head.sessionToken` from the owner-only canonical runtime manifest
+only after proving the Engine identity. An explicit `--port` or `JUSTSEARCH_API_PORT`
+requires `JUSTSEARCH_SESSION_TOKEN`; it never takes a credential from another manifest.
+All manual non-public reads, streams and writes below also require the
+`X-JustSearch-Session` header. No HTTP token-bootstrap endpoint exists.
 
 Read the printed `tools/call justsearch_ingest` result and the trailing
 PASS/FAIL line. Per the published TYPED_CONFIRM trust-gate claim
@@ -65,7 +72,9 @@ Resolve the pending authorization with the id (**the body field is
 `body.get("pendingId")`; any other key name for the id 400s):
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:<port>/api/authorizations/approve" `
+$manifest = Get-Content "$env:APPDATA\io.justsearch.shell\runtime\manifest.json" -Raw | ConvertFrom-Json
+$headers = @{ "X-JustSearch-Session" = [string]$manifest.head.sessionToken }
+Invoke-RestMethod -Headers $headers -Method Post -Uri "http://127.0.0.1:<port>/api/authorizations/approve" `
   -ContentType "application/json" -Body (@{ pendingId = "<id from mcp-typed-confirm.mjs's PENDING_ID= line>"; execute = $true } | ConvertTo-Json)
 ```
 

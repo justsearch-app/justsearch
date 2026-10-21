@@ -818,7 +818,8 @@ export class Shell extends JfElement {
       this.shellEventsMultiplex = new MultiplexedStream({
         url: `${this.apiBase.replace(/\/$/, '')}${SHELL_EVENTS_STREAM_PATH}`,
       });
-      if (typeof EventSource !== 'undefined') {
+      // eslint-disable-next-line no-restricted-globals -- Availability probe; requests use authorizedFetch.
+      if (typeof fetch !== 'undefined') {
         this.shellEventsMultiplex.start();
       }
       setSharedShellEventsMultiplex(this.shellEventsMultiplex);

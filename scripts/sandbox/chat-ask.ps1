@@ -41,7 +41,7 @@ param(
 $mf = "$env:APPDATA\io.justsearch.shell\runtime\manifest.json"
 $port = (Get-Content $mf -Raw | ConvertFrom-Json).head.apiPort
 $base = "http://127.0.0.1:$port"
-$tok = (Invoke-RestMethod -UseBasicParsing "$base/api/mcp/token").token
+$tok = [string](Get-Content -LiteralPath $mf -Raw | ConvertFrom-Json).head.sessionToken
 
 $body = @{ question = $Question } | ConvertTo-Json -Compress
 $bytes = [Text.Encoding]::UTF8.GetBytes($body)

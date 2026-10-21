@@ -9,6 +9,7 @@
  * with a structural guard (the lightweight registry-list pattern, AHA: unify only what shares a reason
  * to change). The backend `UIWorkflowEmitter` remains the ONE picker-wire authority.
  */
+import { authorizedFetch } from '../../shell-v0/api/authorizedFetch.js';
 
 /** One workflow as the picker sees it (the lean `/api/registry/workflows` entry). */
 export interface WorkflowCatalogEntry {
@@ -33,7 +34,7 @@ export async function fetchWorkflowCatalog(
   signal?: AbortSignal,
 ): Promise<WorkflowCatalogEntry[]> {
   try {
-    const res = await fetch(`${apiBase}/api/registry/workflows`, { signal });
+    const res = await authorizedFetch(`${apiBase}/api/registry/workflows`, { signal });
     if (!res.ok) return [];
     const body = (await res.json()) as { entries?: unknown };
     const entries = Array.isArray(body.entries) ? body.entries : [];

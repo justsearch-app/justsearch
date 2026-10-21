@@ -38,16 +38,15 @@ MCP server on?" is exactly "which port is the API on?":
   (after `--port` / `JUSTSEARCH_API_PORT` / `JUSTSEARCH_DATA_DIR`), accept it only when the pid is
   alive, `GET /api/runtime/live` on that port reports the same pid and instance, and
   `GET /api/health` answers 200 (an Engine that passes those checks but is still starting,
-  health 503, is re-checked for up to 30 s before it is passed over; no token is fetched before
+  health 503, is re-checked for up to 30 s before it is passed over; no credential is used before
   200), and otherwise fail with a list of every folder they tried. Every request either client
-  sends to a manifest Engine (probes, token, `/mcp`, every tool's requests) goes through one
+  sends to a manifest Engine (public probes, `/mcp`, every tool's requests) goes through one
   function whose keep-alive connections are proven before anything is written on them: the
   manifest still names the same pid and instance, and the operating system reports that pid as
   the owner of the server end of that very connection (Linux `/proc/net/tcp`, Windows
   `netstat -ano`). A reused connection needs no new proof, since a process that binds the port
   later cannot take over an established connection; the OS is asked once per connection. When a
-  proof fails, nothing is sent: the bridge re-discovers, the stdio server reports
-  `ENGINE_GONE` and must be restarted. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
+  proof fails, nothing is sent: both clients re-discover the Engine and re-read its manifest credential. The production server retries only pre-execution refusals; if no proven Engine is available it reports `ENGINE_GONE`. On Windows, when `%APPDATA%` is unset in their environment, they also ask Windows for
   the Roaming folder (so a redirected folder is still found).
 - **Order `scripts/prod/justsearch-mcp.mjs` tries:** `--port`, then `JUSTSEARCH_API_PORT`, then
   the manifest in the legacy `JUSTSEARCH_HOME` folder when set (it wins over
@@ -159,6 +158,29 @@ Remedies:
 - Or skip the project-scope approval flow entirely: pass the server programmatically via SDK
   options (Agent SDK), or via `--mcp-config <file> --strict-mcp-config` on the CLI.
 
+## Session credential
+
+The per-boot credential is published only in the Engine owner's canonical
+`runtime/manifest.json` (`head.sessionToken`). The file is POSIX 0600, or restricted to its
+owner and SYSTEM on Windows. Neither HTTP responses nor stdout provide the credential.
+Bridges take it from the manifest they validated after the live identity and socket-owner proof.
+Discovery probes are unauthenticated public reads. Reconnection re-reads the manifest, including
+when a restarted Engine changes port.
+
+An explicit `--port` or `JUSTSEARCH_API_PORT` override requires `JUSTSEARCH_SESSION_TOKEN`;
+without that variable discovery fails with a message naming it. Such an override is the
+operator's explicit selection and bypasses manifest discovery.
+
+Production authenticates every request, including reads and streams, except `OPTIONS` and
+`GET`/`HEAD` on `/api/health`, `/api/runtime/live`, `/api/runtime/ready`, `/api/status`,
+`/api/runtime/manifest`, and `/.well-known/justsearch/manifest.json`. Public responses redact
+the credential. The removed `/api/mcp/token` route returns 401 without a valid token and 404
+with one. Development mode remains token-free.
+
+Update MCPB to 0.3.1 for this Engine. Older bundles fail with 401 because they bootstrap over
+HTTP. The updated bridge also reads the previous release's manifest and remains compatible
+with that Engine.
+
 ## Transport
 
 Streamable HTTP on the existing Javalin server (loopback-only,
@@ -168,7 +190,7 @@ same JVM as the Head process. No Node.js required.
 **Transport security.** The spec's Streamable-HTTP security clause ("Servers **MUST** validate the
 `Origin` header on all incoming connections to prevent DNS rebinding attacks... If the `Origin`
 header is present and invalid, servers **MUST** respond with HTTP 403 Forbidden") is enforced on
-every method served at `/mcp` — **and on `GET /api/mcp/token`**, the session-token bootstrap — by
+every method served at `/mcp` by
 `ApiSecurityFilters.setupMcpOriginValidation`. The rules:
 
 | `Origin` on the request | Outcome |
@@ -177,7 +199,7 @@ every method served at `/mcp` — **and on `GET /api/mcp/token`**, the session-t
 | loopback (`http(s)://127.0.0.1`, `localhost`, `[::1]`, any port) | served |
 | desktop shell (`tauri://localhost`, `http(s)://tauri.localhost`) | served |
 | `null` (sandboxed/`file://` context) | **403** — no host to verify, and no MCP client produces it |
-| anything else | **403**, JSON-RPC error body with no `id` (plain `{error, errorCode}` on the token route, which is not a JSON-RPC endpoint) |
+| anything else | **403**, JSON-RPC error body with no `id` |
 
 The value is parsed as a URI and its **host component** compared for equality, so a lookalike such
 as `http://127.0.0.1.evil.com` is rejected. This composes with — and does not replace — the

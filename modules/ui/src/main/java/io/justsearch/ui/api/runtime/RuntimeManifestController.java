@@ -21,9 +21,8 @@ import tools.jackson.databind.ObjectMapper;
  * filesystem manifest is gated by filesystem permissions; the HTTP endpoint is
  * reachable by anything that can resolve the loopback port, so serving the
  * token over it would leak the credential to URL/HTML/extension consumers
- * that have no need for it. Tools that need the token continue to use
- * {@code GET /api/mcp/token} (in-process callers) or the stdout emission
- * (the Tauri sidecar's redaction-aware drain).
+ * that have no need for it. Native clients read the credential only from the owner-only
+ * canonical runtime manifest on disk.
  *
  * <p>Returns 503 with a structured {@code SERVICE_UNAVAILABLE} body when the
  * publisher has not yet produced a manifest (e.g., during the brief window
