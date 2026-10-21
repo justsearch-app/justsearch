@@ -51,3 +51,14 @@ selections are unchanged. Script self-tests are outside the gate's product-test 
   "note": "after merge of main a533f0cf0, ci.yml diff is still +8/-0: one new public-claims step running four script self-tests under scripts/; no product test selection changed; Structural rule kept holds"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-session-offuzc33",
+  "verdict": "accept",
+  "digest": "sha256:3d94fa3a3b1b9d20c4981b240913383445e9451077c604ded2a16ef6f64b45a2",
+  "note": "after merge of main 943ed6359, ci.yml diff is +8/-0: one new step running four script self-tests under scripts/; no product test selection added, removed, narrowed or reselected; Structural rule kept holds"
+}
+```
