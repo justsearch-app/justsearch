@@ -230,3 +230,14 @@ Follow-up 3 also pins fail-closed explicit activation and absent-service compati
   "note": "Delta 7f1c1940f..0f21a718f: changeset unchanged; test-file edits are lint-only (unnamed vars, static imports), no assertion removed; 6 evidence files script-produced, ids match entries, 22 repaired checks fail by assertion on 943ed6359 and pass at 5e97d3af4, preserved pass on both; sources unchanged in PR; delegation quote not checked against task record (verifier may not read it)"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "92c9f22d-29a8-406b-a483-46a635641c66",
+  "verdict": "accept",
+  "digest": "sha256:7ea41aa8fdfd819f2ce84223de70aae1dd9671f8d12e4cb4aef65f8d425ee4f1",
+  "note": "Delta e9d666ce4..37275e0b1: changeset unchanged; Java diff only prepends appUpdatesEnabled=true to 3 EffectivePolicy helpers, other args unshifted; 6 evidence files script-produced with current producer digest, ids match entries, 22 repaired checks fail by assertion on ca0e3518e and pass, preserved pass on candidate and base; cited policy doc lines verbatim and unchanged; shard policy stricter only; delegation quote not checked against task record (verifier may not read it)"
+}
+```
