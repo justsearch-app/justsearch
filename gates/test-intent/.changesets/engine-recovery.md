@@ -838,3 +838,14 @@ main comparison and Windows startup-budget analysis, are in
   "note": "All fourteen entries follow scoped owner intent; independent JVM and real fatal-report supervisor checks pass, with seven identical main harness failures and explicit platform limits."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15eb9-aefc-7131-a036-f1bd8ddc091c",
+  "verdict": "reject",
+  "digest": "sha256:8fd3ab3bf70899c11e0581f37ab517a227b0785817e49d892aee533745d90d2b",
+  "note": "Entries 2 and 10 cite evidence whose source digests no longer match the merged candidate, although the independently rerun behavioral checks pass."
+}
+```
