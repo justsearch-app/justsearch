@@ -2803,19 +2803,6 @@
         "x-owning-module": "LifecycleApiModule"
       }
     },
-    "/api/mcp/token": {
-      "get": {
-        "responses": {
-          "200": {
-            "description": "Successful response."
-          }
-        },
-        "summary": "GET /api/mcp/token",
-        "tags": [
-          "mcp"
-        ]
-      }
-    },
     "/api/memory": {
       "get": {
         "responses": {
@@ -4353,8 +4340,8 @@
     }
   },
   "x-justsearch-route-source": {
-    "routeCount": 253,
-    "routeDigest": "sha256:8c31286499d38c5404dab1995d4a60ab86d0f2a87c504ae9212787b5e4419f47"
+    "routeCount": 252,
+    "routeDigest": "sha256:a0deb6b7865b0038433d3714fd26c08c87a69f4bd611fd87a65b9904840e6558"
   },
   "x-justsearch-surface": {
     "classification": "reference-client-structural-inventory",

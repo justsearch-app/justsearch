@@ -1,0 +1,519 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T12:20:33.502Z",
+  "revision": "63bcd183c720e6f72954fb91d7bcc235d640ffc8",
+  "tree": "1e297810cbc1eaa2415e7afce9c938c30a4606a7",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/components/ResourceView.history-reconnect.test.ts\" \"src/shell-v0/components/ResourceView.render.test.ts\" \"src/shell-v0/components/advisory/AdvisoryStore.test.ts\" \"src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts\" \"src/shell-v0/utils/aiInstallPoll.test.ts\" \"src/shell-v0/views/HealthLitView.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/token-base-merge/test-intent-vitest-2075567-1792498827630.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5871
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/activity/idleSurfaces.test.ts",
+      "file": "modules/ui-web/src/activity/idleSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:91283c3ec5f301b3678d1b91174fcd816fcb0869e82da7113ab0b04ddb274160",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "mount, render, timers, and corpus-growth updates send only observations with no person acting",
+          "status": "passed"
+        },
+        {
+          "name": "an untouched shell open on Library: mount, reload, timers, streams, status delivery and a resting pointer send no USER_ACTION request and no presence signal",
+          "status": "passed"
+        },
+        {
+          "name": "an untouched Search v3 window after an answer: the refresh and the automatic name it starts by itself send no USER_ACTION request",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ResourceView.history-reconnect.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/ResourceView.history-reconnect.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1f6df615aeff7a7965ad5fee2c5b307e7503af0b646bf567dc866d9f31b8e33e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ResourceView operation-history snapshot overlap rendering renders keyed convergence and independent unkeyed observations through the real stream path",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/ResourceView.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6b555cce77d8877302852f11ccd0b4a25453b8911a699ce1a8d5723a623d6ff1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders shows a placeholder when resource-id is unknown",
+          "status": "passed"
+        },
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders shows a placeholder when resource-id is empty",
+          "status": "passed"
+        },
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders renders header with localized label key when resource is found",
+          "status": "passed"
+        },
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders exposes connectionState as reactive property",
+          "status": "passed"
+        },
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders prefixes SSE resource endpoints with api-base",
+          "status": "passed"
+        },
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders waits for catalog arrival when mounted before boot completes (slice 3a.2 §B.B.E.1)",
+          "status": "passed"
+        },
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders errors immediately when catalog is populated but id is missing",
+          "status": "passed"
+        },
+        {
+          "name": "ResourceView (jf-resource-view) — placeholders 727 F-4 — opens the api-base-prefixed fetch SSE for an operation-history-shaped resource",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryStore.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryStore.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a018b5c4e88256446029ad2f6d5fa160a44285c11c166dbcbb2cfced9b6308cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "advisoryReducer LIFECYCLE with snapshot replaces the advisory list and stamps lastFrameKind",
+          "status": "passed"
+        },
+        {
+          "name": "advisoryReducer LIFECYCLE with connected preserves the list",
+          "status": "passed"
+        },
+        {
+          "name": "advisoryReducer UPDATE appends a new advisory event and stamps lastFrameKind = update",
+          "status": "passed"
+        },
+        {
+          "name": "advisoryReducer UPDATE with malformed payload preserves the state",
+          "status": "passed"
+        },
+        {
+          "name": "advisoryKey returns the wire-stamped id",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore subscribes synchronously with the current snapshot (empty catalog → empty)",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore P2.2 — discovers advisory Resources from catalog and spawns one stream each",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore P2.2 — non-advisory Resources are ignored (no streams spawned)",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore joins streamed events with persisted ack state from UserStateDocument",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore slice 494 — sourceRenderHint comes from wire record, not Resource",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore P2.2 — aggregates events from multiple advisory Resources sorted by occurredAt",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore P2.2 — isConnected = false until ALL streams connected",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore acknowledgeAll marks every current advisory acknowledged",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore acknowledged list is FIFO-capped at ACKNOWLEDGED_ADVISORIES_CAP",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore UPDATE-stream event appends and bumps unreadCount",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore P2.2 — stop() unsubscribes from catalog AND stops all streams",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore 559 — emitEphemeral injects a local-origin EPHEMERAL record into the snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore 559 — local EPHEMERAL records never inflate the unread count",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore 559 — dropEphemeral removes the local record from the snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore 602 R4 — supersede:true drops the prior same-classId local record",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore 602 R4 — supersede only collapses the SAME classId, not unrelated default toasts",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore 602 R4 — supersede without a prior same-classId record is a no-op append",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore — tempdoc 662 multiplexed path a Resource whose endpoint is recognized subscribes on the multiplexer — no direct SSE request",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore — tempdoc 662 multiplexed path an unrecognized advisory endpoint falls back to its own direct EnvelopeStream",
+          "status": "passed"
+        },
+        {
+          "name": "AdvisoryStore — tempdoc 662 multiplexed path two recognized Resources share the one multiplexed connection (no second socket)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1952fea6ad57f31b40fdc521014a0c055dcc62225d427a4fd71b8d403fdbcce2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "agent stream ownership ignores a new pending frame after done",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership ignores a new pending frame after error",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership ignores frames and cleanup from a replaced send stream",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership ignores frames and cleanup from a replaced workflow stream",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership ignores frames and cleanup from a replaced resume stream",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership ignores frames and cleanup from a replaced fork stream",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership ignores frames and cleanup from a replaced attach stream",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership keeps pending-before-identity AUTO delivery within the current stream",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership does not let a replaced send failure end or reattach the current run",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership does not let a replaced workflow failure end or reattach the current run",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership does not let a replaced resume failure end or reattach the current run",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership does not let a replaced fork failure end or reattach the current run",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership does not let a replaced attach failure end or reattach the current run",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership keeps a live lookup across a same-run reattach without prompting twice",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership does not flush an unidentified old AUTO call into a replacement run",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership finishes local cancellation before a delayed DELETE can clobber a new run",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership ignores a buffered pending frame after destruction",
+          "status": "passed"
+        },
+        {
+          "name": "agent stream ownership still renders historical pending frames without requesting approval",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts",
+      "file": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d459c8b11e74414e81d2e3551e4982ea706e07ff148daa64752ba72816acb9d2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a PENDING job → queued Task (NOT running); read-only (not cancellable)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a PROCESSING job with a FRESH heartbeat → running (575 §14 live owner)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a PROCESSING job with a STALE heartbeat → queued, NOT running (575 §14)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a DONE job → vanishes from the live rail (success is history, not work)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a FAILED job → failed Task",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a RETRY_EXHAUSTED job → failed Task (not the unknown-state fallback), labelled as giving up",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a plain FAILED job keeps the \"Indexing ·\" label — the verb only changes for the exhausted case",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a job that leaves the live set → REMOVED (not marked succeeded)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a present FAILED job stays a single failed task across frames; departs → removed",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) a running job that transitions to FAILED → failed (no duplicate task)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) 1A: reset (empty) then re-appear → queued again, NOT stuck terminal",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) 1B: reconciles against pre-existing substrate job-tasks (remount-safe)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) an in-place FAILED → PENDING flip revives the task to queued",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — projectJobsToTasks (stateless reconcile) does not touch non-job tasks (idxjob: prefix scoping)",
+          "status": "passed"
+        },
+        {
+          "name": "602 R5 — resolved file/folder labels (Tasks tray) resolves a job pathHash to a friendly \"parent/file\" label, relabelling in place",
+          "status": "passed"
+        },
+        {
+          "name": "602 R5 — resolved file/folder labels (Tasks tray) keeps the short-hash fallback when the hash cannot be resolved (found:false)",
+          "status": "passed"
+        },
+        {
+          "name": "602 R5 — resolved file/folder labels (Tasks tray) a bare filename (no parent folder) resolves to just the file name",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — startIndexingJobsBridge (stream → reducer → tasks) projects a snapshot, removes on delete, and survives a reset cycle",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — startIndexingJobsBridge (stream → reducer → tasks) residue #3 — bridge + a second consumer of the same URL share ONE pooled EventSource",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — startIndexingJobsBridge (stream → reducer → tasks) 575 §14: the re-eval tick demotes a job whose heartbeat goes stale (no new frame)",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — startIndexingJobsBridge (stream → reducer → tasks) is a headless no-op when fetch is unavailable and no factory given",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — startIndexingJobsBridge (stream → reducer → tasks) tempdoc 662 — multiplexed path subscribes on the shared multiplexer instead of opening its own EventSource",
+          "status": "passed"
+        },
+        {
+          "name": "§32 #1 — startIndexingJobsBridge (stream → reducer → tasks) tempdoc 662 — multiplexed path ignores a frame for a different streamId on the same multiplexed connection",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts",
+      "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:256a5da4a62906401f28bcffc78024b94dc709a6a0f62b2c781fc228a226ad2e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aiInstallPoll — self-healing, always-on poller (tempdoc 663 §O regression) a failed first fetch does NOT permanently strand the signal — a later tick recovers",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — self-healing, always-on poller (tempdoc 663 §O regression) retains the last-known-good value on a LATER transient failure (never regresses to null)",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — self-healing, always-on poller (tempdoc 663 §O regression) the poller stops when the last subscriber unsubscribes, and resumes fresh for a new subscriber",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — adaptive cadence stays FAST while an install is running",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — adaptive cadence stays FAST while a run is PAUSED — a parked download is still a live subject",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — adaptive cadence stays FAST while the install status is still UNKNOWN (the self-healing retry window)",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — adaptive cadence stays FAST while a runtime activation or a pack import is in flight",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — adaptive cadence slows down when everything is settled and idle",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — adaptive cadence actually spaces the ticks out — an idle machine is not polled at 1 Hz",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — adaptive cadence re-arms the FAST cadence on the very first tick that sees a run start",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll lifecycle cancellation ignores cancelled requests after resubscribe",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll lifecycle cancellation ignores cancelled requests after rebind",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthLitView.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/HealthLitView.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:70bfa3012e9097b9cf3a1c580caff7aa3e5a92bc9cac66b27eef1288b3676f31",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HealthLitView render renders an empty state when no apiBase is set",
+          "status": "passed"
+        },
+        {
+          "name": "HealthLitView render prefixes health SSE with api-base for Tauri asset origins",
+          "status": "passed"
+        },
+        {
+          "name": "HealthLitView render snapshot frame populates Conditions list and renders one StatusCard per condition",
+          "status": "passed"
+        },
+        {
+          "name": "HealthLitView render condition-added / condition-modified / condition-removed deltas keep state in sync",
+          "status": "passed"
+        },
+        {
+          "name": "HealthLitView render blind-monitor UNKNOWN condition renders calm/info with legible wording (tempdoc 600 Design B)",
+          "status": "passed"
+        },
+        {
+          "name": "HealthLitView render occurrence-appended frames render under Recent occurrences",
+          "status": "passed"
+        },
+        {
+          "name": "HealthLitView render reset frame clears local state",
+          "status": "passed"
+        },
+        {
+          "name": "HealthLitView render connection badge debounces the SSE channel (no flicker to a hard down) — 604 Move B",
+          "status": "passed"
+        },
+        {
+          "name": "HealthLitView render connection badge shows a soft \"paused\" (warning, not error) when SSE is down but the backend is reachable — 604 Move B",
+          "status": "passed"
+        },
+        {
+          "name": "HealthLitView render threshold-body conditions render magnitudes",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b1a288623387a6330899c21362d21771241332a5512cec640e4a3c38e3b6d070"
+}

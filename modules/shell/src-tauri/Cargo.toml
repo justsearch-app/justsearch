@@ -32,6 +32,8 @@ tauri = { version = "2", features = ["tray-icon", "devtools"] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-single-instance = "2"
+# 2.4 requires Tauri 2.12; keep the Tauri version locked on main.
+tauri-plugin-global-shortcut = "=2.3.1"
 # Slice 489 §15 — OS-level deep-link plugin enabling `justsearch://...` URLs
 # from external apps (browser, terminal, mail client) to route into the
 # running instance via single-instance plugin handoff.
@@ -52,6 +54,10 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time"]
 # File operations
 open = "5"
 uuid = { version = "1", features = ["v4"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Already used by Tauri; present bypasses Tao's stale hidden/minimized focus guard.
+gtk = "0.18"
 
 [target.'cfg(windows)'.dependencies]
 dunce = "1"

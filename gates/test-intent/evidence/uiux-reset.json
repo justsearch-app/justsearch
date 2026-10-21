@@ -1,0 +1,735 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-19T22:15:27.389Z",
+  "revision": "c00a0cb24b4c6000e090d5d09054c1e7e1d24e2f",
+  "tree": "41312322d435241ceef2577c05a819f9c512ccf4",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5508
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3123
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1311
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1148
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1163
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rn1_models_and_runtime_keep_their_bytes\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1155
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rn3_normal_start_does_not_enumerate_or_modify_stores\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1154
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs7_native_bin_link_is_removed_without_traversing_its_target\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1184
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs7_nested_links_leave_indexed_files_and_other_applications_untouched\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1301
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1296
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_delete_token_roundtrip\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1193
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_delete_token_rejects_wrong\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1126
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_delete_token_single_use\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1061
+    },
+    {
+      "command": "npx vitest run \"src/boot/factoryReset.test.ts\" \"src/shell-v0/views/SettingsSurface.dataReset.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-vitest-4123889-1792448103027.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1736
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f9934275c9b1092322eed04ba700c5099b8cd0279ee6bf68a6586c664d239260",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f9934275c9b1092322eed04ba700c5099b8cd0279ee6bf68a6586c664d239260",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f9934275c9b1092322eed04ba700c5099b8cd0279ee6bf68a6586c664d239260",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f9934275c9b1092322eed04ba700c5099b8cd0279ee6bf68a6586c664d239260",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f9934275c9b1092322eed04ba700c5099b8cd0279ee6bf68a6586c664d239260",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_models_and_runtime_keep_their_bytes",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f9934275c9b1092322eed04ba700c5099b8cd0279ee6bf68a6586c664d239260",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rn1_models_and_runtime_keep_their_bytes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn3_normal_start_does_not_enumerate_or_modify_stores",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f9934275c9b1092322eed04ba700c5099b8cd0279ee6bf68a6586c664d239260",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rn3_normal_start_does_not_enumerate_or_modify_stores",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_native_bin_link_is_removed_without_traversing_its_target",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f9934275c9b1092322eed04ba700c5099b8cd0279ee6bf68a6586c664d239260",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rs7_native_bin_link_is_removed_without_traversing_its_target",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_nested_links_leave_indexed_files_and_other_applications_untouched",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f9934275c9b1092322eed04ba700c5099b8cd0279ee6bf68a6586c664d239260",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rs7_nested_links_leave_indexed_files_and_other_applications_untouched",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart",
+      "file": "modules/shell/src-tauri/src/factory_reset.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:f9934275c9b1092322eed04ba700c5099b8cd0279ee6bf68a6586c664d239260",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/factoryReset.test.ts#RS4 incomplete reset blocks API discovery and offers retry with each remaining path",
+      "file": "modules/ui-web/src/boot/factoryReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:826d50a109b0fb2acee63559a550f6e672d6cb8a9c98d1b5c67d5081805347c1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 reset boot gate RS4 incomplete reset blocks API discovery and offers retry with each remaining path",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/factoryReset.test.ts#RS5 Cancel reset keeps remaining data and restarts without opening ordinary stores",
+      "file": "modules/ui-web/src/boot/factoryReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:826d50a109b0fb2acee63559a550f6e672d6cb8a9c98d1b5c67d5081805347c1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 reset boot gate RS5 Cancel reset keeps remaining data and restarts without opening ordinary stores",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/factoryReset.test.ts#RS6 clears drafts, recents, titles and per-window pointers before acknowledging cleanup",
+      "file": "modules/ui-web/src/boot/factoryReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:826d50a109b0fb2acee63559a550f6e672d6cb8a9c98d1b5c67d5081805347c1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 reset boot gate RS6 clears drafts, recents, titles and per-window pointers before acknowledging cleanup",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/factoryReset.test.ts#RS6 a storage-cleanup failure stays visible and is never acknowledged as complete",
+      "file": "modules/ui-web/src/boot/factoryReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:826d50a109b0fb2acee63559a550f6e672d6cb8a9c98d1b5c67d5081805347c1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 reset boot gate RS6 a storage-cleanup failure stays visible and is never acknowledged as complete",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/factoryReset.test.ts#RS4 completion is announced on the first screen and dismissed only by Continue",
+      "file": "modules/ui-web/src/boot/factoryReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:826d50a109b0fb2acee63559a550f6e672d6cb8a9c98d1b5c67d5081805347c1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 reset boot gate RS4 completion is announced on the first screen and dismissed only by Continue",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/factoryReset.test.ts#RS5 an unavailable reset-status channel blocks startup with a visible error",
+      "file": "modules/ui-web/src/boot/factoryReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:826d50a109b0fb2acee63559a550f6e672d6cb8a9c98d1b5c67d5081805347c1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 reset boot gate RS5 an unavailable reset-status channel blocks startup with a visible error",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/factoryReset.test.ts#RN3 no pending reset preserves window storage and resolves the backend normally",
+      "file": "modules/ui-web/src/boot/factoryReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:826d50a109b0fb2acee63559a550f6e672d6cb8a9c98d1b5c67d5081805347c1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 reset boot gate RN3 no pending reset preserves window storage and resolves the backend normally",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts#RS1 discloses authored stores, permanent loss, preserved assets, automatic timing and a copy path without encryption",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b46bc0dc08b485007ff6a128cad5f72a1225fdca6808f009ae2f9167a69a84f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 Settings reset RS1 discloses authored stores, permanent loss, preserved assets, automatic timing and a copy path without encryption",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts#RS2 Cancel and an incomplete typed confirmation never invoke deletion",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b46bc0dc08b485007ff6a128cad5f72a1225fdca6808f009ae2f9167a69a84f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 Settings reset RS2 Cancel and an incomplete typed confirmation never invoke deletion",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts#RS8 Escape cancels, restores focus, and the typed input has an associated description",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b46bc0dc08b485007ff6a128cad5f72a1225fdca6808f009ae2f9167a69a84f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 Settings reset RS8 Escape cancels, restores focus, and the typed input has an associated description",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts#RS8 browser explains the disabled control in visible text",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b46bc0dc08b485007ff6a128cad5f72a1225fdca6808f009ae2f9167a69a84f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 Settings reset RS8 browser explains the disabled control in visible text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts#RS3 typed confirmation sends the issued token once and describes automatic restart",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b46bc0dc08b485007ff6a128cad5f72a1225fdca6808f009ae2f9167a69a84f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 Settings reset RS3 typed confirmation sends the issued token once and describes automatic restart",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts#RN2 settings-to-defaults remains the separate core.reset-settings operation",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b46bc0dc08b485007ff6a128cad5f72a1225fdca6808f009ae2f9167a69a84f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 Settings reset RN2 settings-to-defaults remains the separate core.reset-settings operation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#tests::test_delete_token_roundtrip",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:4484610cc9a741a7307894e0384bf42cd2c6845d663a49b449e250f53ecf28cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tests::test_delete_token_roundtrip",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#tests::test_delete_token_rejects_wrong",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:4484610cc9a741a7307894e0384bf42cd2c6845d663a49b449e250f53ecf28cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tests::test_delete_token_rejects_wrong",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/lib.rs#tests::test_delete_token_single_use",
+      "file": "modules/shell/src-tauri/src/lib.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:4484610cc9a741a7307894e0384bf42cd2c6845d663a49b449e250f53ecf28cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tests::test_delete_token_single_use",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c00a0cb24",
+    "revision": "c00a0cb24b4c6000e090d5d09054c1e7e1d24e2f",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/uiux-reset-baseline-seam.patch",
+        "contentDigest": "sha256:a7af83b04d0bc8a66973f9afd6d6febf85d312e731c727f7fe944ec3f09f520f"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 5705,
+        "output": "\nrunning 1 test\ntest factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage ... FAILED\n\nfailures:\n\n---- factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage stdout ----\n\nthread 'factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage' (4138081) panicked at src/factory_reset.rs:113:9:\nassertion `left == right` failed: do not claim completion before window storage cleanup\n  left: Idle\n right: AwaitingStorage\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 159 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:947:15\n    |\n947 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.67s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/cargo-target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1188,
+        "output": "\nrunning 1 test\ntest factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry ... FAILED\n\nfailures:\n\n---- factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry stdout ----\n\nthread 'factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry' (4138518) panicked at src/factory_reset.rs:136:9:\nassertion `left == right` failed: a running predecessor is not a completed wipe\n  left: Idle\n right: Incomplete\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 159 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:947:15\n    |\n947 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.15s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/cargo-target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1082,
+        "output": "\nrunning 1 test\ntest factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data ... FAILED\n\nfailures:\n\n---- factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data stdout ----\n\nthread 'factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data' (4139016) panicked at src/factory_reset.rs:164:9:\nassertion `left == right` failed\n  left: Idle\n right: Incomplete\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 159 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:947:15\n    |\n947 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.05s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/cargo-target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1120,
+        "output": "\nrunning 1 test\ntest factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work ... FAILED\n\nfailures:\n\n---- factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work stdout ----\n\nthread 'factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work' (4139419) panicked at src/factory_reset.rs:183:9:\nassertion `left == right` failed: cancellation must make destructive intent non-destructive\n  left: Err(\"No cancel reset command\")\n right: Ok(())\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 159 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:947:15\n    |\n947 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.08s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/cargo-target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1081,
+        "output": "\nrunning 1 test\ntest factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data ... FAILED\n\nfailures:\n\n---- factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data stdout ----\n\nthread 'factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data' (4139809) panicked at src/factory_reset.rs:211:9:\nassertion `left == right` failed\n  left: Idle\n right: AwaitingStorage\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 159 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:947:15\n    |\n947 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.05s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/cargo-target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rn1_models_and_runtime_keep_their_bytes\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1133
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rn3_normal_start_does_not_enumerate_or_modify_stores\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1141
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs7_native_bin_link_is_removed_without_traversing_its_target\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1070,
+        "output": "\nrunning 1 test\ntest factory_reset::tests::rs7_native_bin_link_is_removed_without_traversing_its_target ... FAILED\n\nfailures:\n\n---- factory_reset::tests::rs7_native_bin_link_is_removed_without_traversing_its_target stdout ----\n\nthread 'factory_reset::tests::rs7_native_bin_link_is_removed_without_traversing_its_target' (4141408) panicked at src/factory_reset.rs:286:9:\nassertion `left == right` failed: native-bin link target must never be traversed\n  left: None\n right: Some([117, 110, 116, 111, 117, 99, 104, 101, 100])\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    factory_reset::tests::rs7_native_bin_link_is_removed_without_traversing_its_target\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 159 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:947:15\n    |\n947 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.04s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/cargo-target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs7_nested_links_leave_indexed_files_and_other_applications_untouched\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1053
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 1090,
+        "output": "\nrunning 1 test\ntest factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart ... FAILED\n\nfailures:\n\n---- factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart stdout ----\n\nthread 'factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart' (4142465) panicked at src/factory_reset.rs:340:9:\nassertion `left == right` failed: permission-denied deletion must not complete\n  left: Idle\n right: Incomplete\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 159 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.0 (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/shell/src-tauri)\nwarning: unused import: `Command`\n  --> src/lib.rs:29:20\n   |\n29 | use std::process::{Command, Stdio};\n   |                    ^^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `request_head_shutdown` is never used\n   --> src/lib.rs:207:4\n    |\n207 | fn request_head_shutdown(port: u16, token: &str) -> bool {\n    |    ^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:947:15\n    |\n947 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:517:19\n    |\n134 | impl EngineHost {\n    | --------------- method in this implementation\n...\n517 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:618:8\n    |\n580 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n618 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n621 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1313:10\n     |\n1313 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:1687:4\n     |\n1687 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 12 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.05s\n     Running unittests src/lib.rs (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/cargo-target/debug/deps/shell_lib-dc728de8864d1892)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_delete_token_roundtrip\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1117
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_delete_token_rejects_wrong\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1175
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::test_delete_token_single_use\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 1245
+      },
+      {
+        "command": "npx vitest run \"src/boot/factoryReset.test.ts\" \"src/shell-v0/views/SettingsSurface.dataReset.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-vitest-4123889-1792448125061.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2174,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-vitest-4123889-1792448125061.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage",
+        "classification": "assertion",
+        "detail": "factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage:  ---- factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage stdout ----\n\nthread 'factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage' (4138081) panicked at src/factory_reset.rs:113:9:\nassertion `left == right` failed: do not claim completion before window storage cleanup\n  left: Idle\n right: AwaitingStorage\nnote: run with `RUST_BACKTRACE=1"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry",
+        "classification": "assertion",
+        "detail": "factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry:  ---- factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry stdout ----\n\nthread 'factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry' (4138518) panicked at src/factory_reset.rs:136:9:\nassertion `left == right` failed: a running predecessor is not a completed wipe\n  left: Idle\n right: Incomplete\nnote: run with `RUST_BACKTRACE=1` environment"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data",
+        "classification": "assertion",
+        "detail": "factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data:  ---- factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data stdout ----\n\nthread 'factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data' (4139016) panicked at src/factory_reset.rs:164:9:\nassertion `left == right` failed\n  left: Idle\n right: Incomplete\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    fact"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work",
+        "classification": "assertion",
+        "detail": "factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work:  ---- factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work stdout ----\n\nthread 'factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work' (4139419) panicked at src/factory_reset.rs:183:9:\nassertion `left == right` failed: cancellation must make destructive intent non-destructive\n  left: Err(\"No cancel reset command\")\n right: Ok(())\nnote: run with `RUST_BACKTRACE=1` e"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data",
+        "classification": "assertion",
+        "detail": "factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data:  ---- factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data stdout ----\n\nthread 'factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data' (4139809) panicked at src/factory_reset.rs:211:9:\nassertion `left == right` failed\n  left: Idle\n right: AwaitingStorage\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    factory_"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_models_and_runtime_keep_their_bytes",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn3_normal_start_does_not_enumerate_or_modify_stores",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_native_bin_link_is_removed_without_traversing_its_target",
+        "classification": "assertion",
+        "detail": "factory_reset::tests::rs7_native_bin_link_is_removed_without_traversing_its_target:  ---- factory_reset::tests::rs7_native_bin_link_is_removed_without_traversing_its_target stdout ----\n\nthread 'factory_reset::tests::rs7_native_bin_link_is_removed_without_traversing_its_target' (4141408) panicked at src/factory_reset.rs:286:9:\nassertion `left == right` failed: native-bin link target must never be traversed\n  left: None\n right: Some([117, 110, 116, 111, 117, 99, 104, 101, 100])\nnote: run with `RUS"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_nested_links_leave_indexed_files_and_other_applications_untouched",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart",
+        "classification": "assertion",
+        "detail": "factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart:  ---- factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart stdout ----\n\nthread 'factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart' (4142465) panicked at src/factory_reset.rs:340:9:\nassertion `left == right` failed: permission-denied deletion must not complete\n  left: Idle\n right: Incomplete\nnote: run with `RUST_BACKTRACE=1` environment variable to "
+      },
+      {
+        "id": "modules/ui-web/src/boot/factoryReset.test.ts#RS4 incomplete reset blocks API discovery and offers retry with each remaining path",
+        "classification": "assertion",
+        "detail": "WP5.1 reset boot gate RS4 incomplete reset blocks API discovery and offers retry with each remaining path:  AssertionError: expected 'http://127.0.0.1:40404' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/ui-web/src/boot/factoryReset.test.ts:44:51\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///"
+      },
+      {
+        "id": "modules/ui-web/src/boot/factoryReset.test.ts#RS5 Cancel reset keeps remaining data and restarts without opening ordinary stores",
+        "classification": "assertion",
+        "detail": "WP5.1 reset boot gate RS5 Cancel reset keeps remaining data and restarts without opening ordinary stores:  AssertionError: Cancel reset: expected undefined to be truthy\n    at action (/home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/ui-web/src/boot/factoryReset.test.ts:21:23)\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-int"
+      },
+      {
+        "id": "modules/ui-web/src/boot/factoryReset.test.ts#RS6 clears drafts, recents, titles and per-window pointers before acknowledging cleanup",
+        "classification": "assertion",
+        "detail": "WP5.1 reset boot gate RS6 clears drafts, recents, titles and per-window pointers before acknowledging cleanup:  AssertionError: expected 'http://127.0.0.1:40404' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/ui-web/src/boot/factoryReset.test.ts:81:51\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/modules/ui-"
+      },
+      {
+        "id": "modules/ui-web/src/boot/factoryReset.test.ts#RS6 a storage-cleanup failure stays visible and is never acknowledged as complete",
+        "classification": "assertion",
+        "detail": "WP5.1 reset boot gate RS6 a storage-cleanup failure stays visible and is never acknowledged as complete:  AssertionError: expected 'http://127.0.0.1:40404' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/ui-web/src/boot/factoryReset.test.ts:96:51\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/modules/ui-"
+      },
+      {
+        "id": "modules/ui-web/src/boot/factoryReset.test.ts#RS4 completion is announced on the first screen and dismissed only by Continue",
+        "classification": "assertion",
+        "detail": "WP5.1 reset boot gate RS4 completion is announced on the first screen and dismissed only by Continue:  AssertionError: expected 'http://127.0.0.1:40404' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/ui-web/src/boot/factoryReset.test.ts:105:51\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/modules/ui"
+      },
+      {
+        "id": "modules/ui-web/src/boot/factoryReset.test.ts#RS5 an unavailable reset-status channel blocks startup with a visible error",
+        "classification": "assertion",
+        "detail": "WP5.1 reset boot gate RS5 an unavailable reset-status channel blocks startup with a visible error:  AssertionError: expected 'http://127.0.0.1:40404' to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/ui-web/src/boot/factoryReset.test.ts:119:51\n    at file:///home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/modules/ui"
+      },
+      {
+        "id": "modules/ui-web/src/boot/factoryReset.test.ts#RN3 no pending reset preserves window storage and resolves the backend normally",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts#RS1 discloses authored stores, permanent loss, preserved assets, automatic timing and a copy path without encryption",
+        "classification": "assertion",
+        "detail": "WP5.1 Settings reset RS1 discloses authored stores, permanent loss, preserved assets, automatic timing and a copy path without encryption:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'conversations'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts:53:133\n    at runNextTicks (node:internal"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts#RS2 Cancel and an incomplete typed confirmation never invoke deletion",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts#RS8 Escape cancels, restores focus, and the typed input has an associated description",
+        "classification": "assertion",
+        "detail": "WP5.1 Settings reset RS8 Escape cancels, restores focus, and the typed input has an associated description:  AssertionError: expected null to be <input type=\"text\" …(3)></input> // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts:80:47\n    at runNextTicks (node:internal/pr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts#RS8 browser explains the disabled control in visible text",
+        "classification": "assertion",
+        "detail": "WP5.1 Settings reset RS8 browser explains the disabled control in visible text:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to match /desktop app.*browser/s\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts:95:45\n    at runNextTicks (node:int"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts#RS3 typed confirmation sends the issued token once and describes automatic restart",
+        "classification": "assertion",
+        "detail": "WP5.1 Settings reset RS3 typed confirmation sends the issued token once and describes automatic restart:  AssertionError: expected '\\n      \\n        \\n          \\n     …' to contain 'Restarting'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-reset/tmp/wp51/test-intent-before-RFsQK4/modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts:113:45\n    at runNextTicks (node:internal/pr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts#RN2 settings-to-defaults remains the separate core.reset-settings operation",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#tests::test_delete_token_roundtrip",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#tests::test_delete_token_rejects_wrong",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/lib.rs#tests::test_delete_token_single_use",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:7368f7cbd2b20bcd702abd1dadad6cf6f3ec63c2ea5b5f712ead306c3d5249fb"
+}

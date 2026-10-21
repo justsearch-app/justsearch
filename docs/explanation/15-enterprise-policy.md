@@ -12,7 +12,7 @@ This document describes current **enterprise policy enforcement** using **config
 ## 1. Goals
 
 - Allow enterprise admins to enforce:
-  - **downloads disabled** for Install AI when the effective-policy snapshot succeeds,
+  - **downloads disabled** for Install AI model/runtime downloads (not app updates or dependency-internal traffic),
   - **Online AI disabled** (AI features off),
   - **GPU acceleration disabled** (force CPU-only even if GPU packs are present),
   - allowlists for **pack-import files** (by SHA-256; not Install AI downloads or later model use),
@@ -20,14 +20,24 @@ This document describes current **enterprise policy enforcement** using **config
   - (optional) disallow adopting external inference servers.
 - Provide a deterministic **precedence order**:
   - machine policy → user policy → UI settings → defaults.
-- Reject offline pack digest/hash mismatches. Install AI download-policy checks are best-effort: an unexpected error reading the policy snapshot permits the download to continue.
+- Keep the v1 security posture:
+  - reject offline-pack hash/digest mismatches and packs that are not allowlisted;
+  - a present but unloadable Windows machine policy disables app updates and AI toggles;
+  - Install AI downloads and GPU use fail closed when a configured policy service gives no snapshot; the Online-mode switch does not.
 
 ## 1.1 Implementation status (what is enforced today)
 
 Policy is implemented and exposed via `GET /api/policy/effective`. Enforcement status:
 
+- **App updates (first enforcing release to be named in its release notes)**:
+  - `appUpdatesEnabled=false` forbids automatic and manual app-update checks and installer downloads.
+    Rust enforces it without the Engine, including recovery and qualification autorun. The field is
+    optional in schemaVersion 1: absent or null means allowed. Older releases ignore it; deploy an
+    enforcing version before relying on the restriction. It is independent of `downloadsEnabled`
+    and `JUSTSEARCH_AI_DISABLED` (both affect AI, not app updates).
+
 - **Enforced today (v2)**:
-  - `downloadsEnabled=false` blocks “Install AI” downloads when the snapshot is available. `checkPolicy()` logs unexpected snapshot errors and continues; `policyBlocksDownloads()` returns `false` on an exception. These download checks fail open on unexpected errors.
+  - `downloadsEnabled=false` blocks “Install AI” downloads. A configured policy service that throws or returns no snapshot also blocks start and repair with `403 DOWNLOADS_DISABLED` before acquisition; the background admission recheck fails closed too. Missing policy files retain permissive defaults, and an absent policy service remains permissive for compatibility.
   - `onlineAiEnabled` blocks switching into Online inference mode.
   - Offline pack import allowlisting by manifest digest and file SHA-256 (`allowlists.modelSha256`). The hash allowlist applies on pack import only; Install AI downloads verify registry-pinned hashes but do not enforce this policy allowlist.
 
@@ -101,8 +111,12 @@ Policy constrains settings and defaults. User policy may only tighten machine bo
 
 The policy service merges values as follows:
 
-- **Booleans** (`downloadsEnabled`, `onlineAiEnabled`, `gpuAccelerationEnabled`, `disallowExternalInferenceServers`):
-  - user policy may only tighten: enabled flags are ANDed with the machine/default values, and `disallowExternalInferenceServers` is ORed. A present but unloadable Windows machine policy disables AI toggles and disallows adoption.
+- **Enabled booleans** (`appUpdatesEnabled`, `downloadsEnabled`, `onlineAiEnabled`, `gpuAccelerationEnabled`):
+  - defaults are permissive; machine policy may disable them, and user policy may only further
+    restrict them (logical AND). User `true` cannot override machine `false`.
+  - A present but unloadable Windows machine policy disables app updates and AI toggles and disallows adoption.
+- **`disallowExternalInferenceServers`**:
+  - restrictions combine by logical OR; user `false` cannot override machine `true`.
 - **Allowlists**:
   - if machine policy exists, it is treated as the **authoritative allowlist** source for offline pack import (**empty list = deny all**).
   - when machine policy is absent, user policy `allowlists.packManifestSha256` may be used as the **primary allowlist** (power-user opt-in).
@@ -118,6 +132,7 @@ See allowlist evaluation rules in `docs/explanation/14-ai-pack-spec.md`.
 {
   "schemaVersion": 1,
   "updatedAt": "2025-12-23T00:00:00Z",
+  "appUpdatesEnabled": false,
   "downloadsEnabled": false,
   "onlineAiEnabled": false,
   "gpuAccelerationEnabled": false,
@@ -136,8 +151,27 @@ See allowlist evaluation rules in `docs/explanation/14-ai-pack-spec.md`.
 
 ### 4.2 Field meanings
 
+- `appUpdatesEnabled` (optional, default `true`):
+  - `false` forbids all new app-update metadata requests and installer downloads. User policy is in
+    the shell's app-data directory, passed to the Engine as `JUSTSEARCH_HOME`; Windows machine policy
+    is `%PROGRAMDATA%\JustSearch\policy.v1.json`. Machine policy is not read on Linux.
+  - Rust and `GET /api/policy/effective` use the same merge rules. A missing file permits defaults;
+    malformed, unsupported-version, unreadable or non-regular machine policy fails closed, including
+    dangling symlinks and attribute lookup failures. Broken user policy is diagnosed but ignored.
+  - Policy is read at each discovery and installation, and again before artifact download. A
+    discovery in flight may finish its descriptor, signature and latest-metadata requests. No
+    in-flight request is cancelled. Upgrade intents, accepted sequences and local Engine
+    reconciliation remain intact.
+  - Launch checks are on by default about 30 seconds after chrome mount. Set
+    `JUSTSEARCH_AUTO_UPDATE_CHECK=false` before starting a fresh desktop process to suppress only
+    the automatic check; manual Settings/recovery checks still work when policy allows them.
+  - Discovery requests `release.v1.json`, `release.v1.json.sig` and `latest.json` from the configured
+    GitHub release feed, following download/CDN redirects. Installation rechecks `latest.json` and
+    downloads the signed installer only on request. The contacted hosts see request IP and time;
+    these requests send no document content or queries. Builds without a configured feed make no
+    updater requests; debug builds may configure a runtime feed. Other egress has separate controls.
 - `downloadsEnabled`:
-  - `false` ⇒ Install AI blocks model/runtime downloads if the policy snapshot succeeds; unexpected snapshot errors fail open as described above. This flag does not disable the shell update check or dependency-internal network activity.
+  - `false` ⇒ Install AI blocks model/runtime downloads. A configured policy service that throws or returns no snapshot also blocks downloads as described above. This flag does not disable app-update checks/downloads or dependency-internal network activity. Allowlisted offline pack import remains available.
 - `onlineAiEnabled`:
   - `false` ⇒ Online AI mode must be disabled (CPU or GPU). App should remain usable for search/indexing.
 - `gpuAccelerationEnabled` (optional, default `true`):
@@ -149,7 +183,7 @@ v3 note:
 
 - GPU Booster Pack selection/activation (and its hardware gates) are described in `docs/explanation/16-gpu-booster-pack.md` and rely on NVML-first detection with safe fallbacks.
 - `allowlists.modelSha256`:
-  - when non-empty, each imported pack file must match the active machine and user hash lists. It is enforced on pack import only, not on Install AI downloads or later model use.
+  - offline model-pack import enforces this allowlist: when non-empty, each imported pack file must match the active machine and user hash lists. Install AI downloads verify the SHA-256 pinned in the model registry; the model allowlist is not a second download gate and does not govern later model use.
 - `allowlists.packManifestSha256`:
   - allowlisted offline packs by **manifest digest** (see `docs/explanation/14-ai-pack-spec.md`).
 
@@ -160,7 +194,8 @@ Hash normalization note:
 ### 4.3 Current enforcement points
 
 - **Install AI (v1 downloads)**:
-  - if the snapshot returns `downloadsEnabled=false`, block downloads with `DOWNLOADS_DISABLED`; on an unexpected snapshot exception, continue.
+  - if `downloadsEnabled=false`, or a configured policy service throws or returns no snapshot, refuse start and repair with `403 DOWNLOADS_DISABLED` before acquisition. The background admission recheck also fails closed. Missing policy files retain permissive defaults; an absent policy service remains permissive for compatibility.
+  - if `gpuAccelerationEnabled=false`, or its policy read fails or returns no snapshot, plan CPU variants without CUDA runtime packages or GPU-only chat packages. Policy-caused exclusions say “GPU acceleration is disabled by administrator policy”. Retain installed CUDA files and existing download progress. These admission and planning checks do not cancel transfers already running.
 - **Offline import (v2/v3 AI Pack import)**:
   - enforce `allowlists.packManifestSha256` allowlisting rules:
     - if machine policy exists: it is authoritative (empty list = deny all packs)
@@ -170,7 +205,7 @@ Hash normalization note:
   - enforce `allowlists.modelSha256` when packs contain models.
 - **Online AI runtime**:
   - if `onlineAiEnabled=false`, block switching to Online mode (CPU or GPU).
-  - if `gpuAccelerationEnabled=false`, do not activate GPU runtime variants (force CPU runtime pointer).
+  - if `gpuAccelerationEnabled=false`, reject explicit runtime activation (CPU and GPU variants alike); a configured activation policy service that throws or returns no snapshot also denies activation. Prevent Install AI and boot from automatically selecting CUDA executables or publishing CUDA native paths. A boot policy-load failure also prevents these automatic selections. Keep saved executable and GPU-layer preferences; owned launches apply zero GPU layers and hide CUDA devices while policy forbids GPU acceleration.
 - **External server adoption**:
   - if `disallowExternalInferenceServers=true`, disallow “adopt an already-running llama-server” modes.
 

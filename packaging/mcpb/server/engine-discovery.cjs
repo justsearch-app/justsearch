@@ -473,7 +473,9 @@ async function validateCandidate(candidate, { timeoutMs = PROBE_TIMEOUT_MS, star
     }
     await new Promise((resolve) => setTimeout(resolve, STARTUP_RETRY_MS));
   }
-  return { ...candidate, ok: true, status: 'ok', ...engine, lifecycle: manifest.lifecycle || null };
+  return { ...candidate, ok: true, status: 'ok', ...engine,
+    token: typeof manifest.head.sessionToken === 'string' ? manifest.head.sessionToken : '',
+    lifecycle: manifest.lifecycle || null };
 }
 
 function sameFolder(a, b) {

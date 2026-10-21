@@ -1645,6 +1645,13 @@ def stage_mcp_client_harness(share_dir: Path):
     else:
         print(f"WARNING: MCPB bridge not found at {bridge_src} -- mcp-client/ will be incomplete")
 
+    discovery_src = bridge_src.with_name("engine-discovery.cjs")
+    if discovery_src.exists():
+        shutil.copy2(discovery_src, dst / discovery_src.name)
+        count += 1
+    else:
+        raise FileNotFoundError(f"MCPB discovery helper missing: {discovery_src}")
+
     driver_src = SCRIPT_DIR / "mcp-typed-confirm.mjs"
     if driver_src.exists():
         shutil.copy2(driver_src, dst / "mcp-typed-confirm.mjs")

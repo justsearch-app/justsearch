@@ -70,15 +70,15 @@ describe('authorizedFetch', () => {
     expect(headerOf(fetchSpy.mock.calls[0])).toBe('tok-abc');
   });
 
-  it('leaves GET requests untouched (backend exempts GET; no token round-trip)', async () => {
+  it('attaches the resolved session token to GET requests', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
     mocks.invoke.mockResolvedValue('tok-abc');
 
     const { authorizedFetch } = await import('./authorizedFetch.js');
     await authorizedFetch(`${apiBase}/api/x`);
 
-    expect(headerOf(fetchSpy.mock.calls[0])).toBeUndefined();
-    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(headerOf(fetchSpy.mock.calls[0])).toBe('tok-abc');
+    expect(mocks.invoke).toHaveBeenCalled();
   });
 
   it("preserves the caller's explicit session header", async () => {

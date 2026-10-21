@@ -47,6 +47,7 @@ import { subscribeFeedStalled } from '../substrates/tasks/indexingJobsBridge.js'
 import { subscribeAiState } from '../state/aiStateStore.js';
 import {
   selectIndexingProgress,
+  indexingTaskStatus,
   type EnrichingStageRow,
   type IndexingProgress,
 } from '../state/indexingProgress.js';
@@ -144,25 +145,7 @@ const STAGE_LABELS: Record<EnrichingStageRow['id'], string> = {
 };
 
 /** The empty projection this component starts from, before the first `/api/status` poll lands. */
-const NO_PROGRESS: IndexingProgress = {
-  phase: 'unknown',
-  jobsPending: 0,
-  jobsRunning: 0,
-  jobsQueued: 0,
-  enrichingPercent: null,
-  enrichingPending: 0,
-  blockedPending: 0,
-  enrichingStages: [],
-  enrichingEtaSeconds: null,
-  embeddingPending: 0,
-  vduPending: 0,
-  etaSeconds: null,
-  indexingPercent: null,
-  pendingBytes: null,
-  live: false,
-  // Applicability is UNKNOWN before the first poll — never all-false, which reads as a claim.
-  stages: null,
-};
+const NO_PROGRESS = selectIndexingProgress(null, false, 0, []);
 
 export class TaskList extends JfElement {
   static properties = {
@@ -213,7 +196,7 @@ export class TaskList extends JfElement {
       this.applyProgress(
         selectIndexingProgress(
           s.status,
-          s.snapshotLive,
+          s.indexingStatusLive,
           s.episodeMaxPendingJobs,
           s.enrichSettleSamples,
         ),
@@ -489,11 +472,13 @@ export class TaskList extends JfElement {
   }
 
   private renderTask(t: Task): TemplateResult {
+    const status = indexingTaskStatus(t, this.progress.activity);
+    const confirmed = status === t.status;
     return html`
       <div class="task" data-testid="task-${t.id}">
         <div class="task-row">
-          <span class="status ${t.status}" data-testid="task-status-${t.id}"
-            >${t.status}</span
+          <span class="status ${confirmed ? t.status : 'stale'}" data-testid="task-status-${t.id}"
+            >${status}</span
           >
           ${/* Tempdoc 609 §R (T1.3) — when the task knows its origin surface, the label is a button that
                 returns there ("return to running job"); otherwise a plain span. */ ''}
@@ -519,7 +504,7 @@ export class TaskList extends JfElement {
               </jf-button>`
             : nothing}
         </div>
-        ${t.status === 'running' && t.progress !== undefined
+        ${confirmed && t.status === 'running' && t.progress !== undefined
           ? html`<div class="bar">
               <span style=${`width:${Math.round(t.progress * 100)}%`}></span>
             </div>`
@@ -542,6 +527,7 @@ export class TaskList extends JfElement {
    */
   private renderAggregate(): TemplateResult | typeof nothing {
     const p = this.progress;
+    if (!p.activity.confirmed) return nothing;
     if (this.showingReady) {
       // Round-15 F1 — the terminal card has TWO bodies, and which one is true is decided by the
       // projection's own evidence, never by the absence of queued work: an index whose semantic
@@ -597,6 +583,15 @@ export class TaskList extends JfElement {
           >
             ${indexingCountsLine(p)}
           </div>
+        </div>
+      `;
+    }
+    if (p.phase === 'enriching' && p.activity.enrichmentDeferred) {
+      return html`
+        <div class="aggregate" data-testid="task-aggregate" data-phase="enriching">
+          <div class="counts" data-testid="task-aggregate-counts">${
+            p.enrichingPercent === null ? '' : `${p.enrichingPercent}% · `
+          }${formatCount(p.enrichingPending)} enrichment steps waiting</div>
         </div>
       `;
     }
@@ -662,6 +657,7 @@ export class TaskList extends JfElement {
               </jf-button>`
             : nothing}
         </div>
+        ${this.progress.activity.detail ? html`<div class="counts">${this.progress.activity.detail}</div>` : nothing}
         ${this.renderAggregate()}
         ${this.queueCounts ? html`
           <div class="counts" data-testid="task-queue-totals">
@@ -698,6 +694,7 @@ export class TaskList extends JfElement {
           : nothing}
         ${this.filesOpen && hasDetail
           ? html`<div class="files" data-testid="tasks-files">
+              ${!this.progress.activity.confirmed ? html`<div class="counts">Last observed indexing and enrichment details</div>` : nothing}
               <!-- 813 §20 — machine stages, in the disclosure: the very rows the surface percent
                    sums (enrichingStages), so this is a narrower SCOPE of the same number, never a
                    second derivation. -->
@@ -746,6 +743,7 @@ export class TaskList extends JfElement {
    * panel is up for agent operations alone.
    */
   private headline(): string {
+    if (!this.progress.activity.confirmed || this.progress.activity.detail) return this.progress.activity.summary;
     // Round-15 F1 — "fully searchable" is a claim about COVERAGE, so it may only be made when the
     // projection says coverage supports it. With the semantic stage unable to run, the honest
     // headline keeps the capability lead (§19 W1) and names the limit instead of hiding it.

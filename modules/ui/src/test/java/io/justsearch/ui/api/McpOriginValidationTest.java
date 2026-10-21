@@ -16,6 +16,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * MCP Streamable-HTTP Origin validation — the spec's transport-security MUST: "Servers MUST validate
@@ -27,7 +30,12 @@ import org.junit.jupiter.api.Test;
  * mirror — so a guard registered on the wrong path, or dropped from {@code install()}, fails here.
  */
 @DisplayName("MCP endpoint Origin validation (Streamable HTTP transport security)")
+@ParameterizedClass(name = "production={0}")
+@ValueSource(booleans = {false, true})
 class McpOriginValidationTest {
+
+  @Parameter
+  boolean productionMode;
 
   private HttpClient client;
   private Javalin app;
@@ -281,41 +289,15 @@ class McpOriginValidationTest {
     assertFalse(resp.body().contains("MCP_METHOD_NOT_ALLOWED"), "The 405 handler must not have run");
   }
 
-  // ---- GET /api/mcp/token: the session-token bootstrap, guarded on the same terms ----
-
-  /**
-   * The token route hands out — unauthenticated by construction — the credential that gates every
-   * mutating call, so it belongs to the MCP transport's attack surface. Every legitimate caller is
-   * a native process sending no Origin (the MCPB bridge, {@code justsearch-mcp/discovery.mjs}, the
-   * sandbox probes); the desktop shell reads the token from the runtime manifest instead, and no
-   * {@code ui-web} code calls it — so these two assertions together pin both that the guard bites
-   * and that it costs no real caller anything.
-   */
   @Test
-  @DisplayName("Live: GET /api/mcp/token from a foreign Origin is 403 — the token never leaves")
-  void liveTokenFromForeignOriginIsForbidden() throws Exception {
+  @DisplayName("Removed token endpoint is absent for every Origin")
+  void removedTokenEndpointIsAbsentForEveryOrigin() throws Exception {
     startServerWithProductionFilters();
-    HttpResponse<String> resp = get(LocalApiServer.MCP_TOKEN_PATH, "http://evil.example.com");
-
-    assertEquals(403, resp.statusCode());
-    assertFalse(resp.body().contains("test-token"), "The token must not appear in a denied response: " + resp.body());
-    assertTrue(resp.body().contains("MCP_ORIGIN_FORBIDDEN"), "Body should name the error code: " + resp.body());
-    assertFalse(
-        resp.body().contains("\"jsonrpc\""),
-        "The token route is not JSON-RPC — its deny body uses the repo's {error, errorCode} shape: " + resp.body());
-  }
-
-  @Test
-  @DisplayName("Live: GET /api/mcp/token with absent or loopback Origin is served — no legitimate caller regresses")
-  void liveTokenFromLegitimateCallersIsServed() throws Exception {
-    startServerWithProductionFilters();
-
-    HttpResponse<String> nativeCaller = get(LocalApiServer.MCP_TOKEN_PATH, null);
-    assertEquals(200, nativeCaller.statusCode(), "Native MCP bridges send no Origin");
-    assertTrue(nativeCaller.body().contains("test-token"));
-
-    assertEquals(200, get(LocalApiServer.MCP_TOKEN_PATH, "http://127.0.0.1:5173").statusCode());
-    assertEquals(200, get(LocalApiServer.MCP_TOKEN_PATH, "tauri://localhost").statusCode());
+    for (String origin : new String[] {null, "http://127.0.0.1:5173", "tauri://localhost", "http://evil.example.com"}) {
+      var response = get("/api/mcp/token", origin);
+      assertEquals(404, response.statusCode());
+      assertFalse(response.body().contains("test-token"));
+    }
   }
 
   private HttpResponse<String> get(String path, String origin) throws Exception {
@@ -323,6 +305,9 @@ class McpOriginValidationTest {
         HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
             .timeout(Duration.ofSeconds(3))
             .GET();
+    if (productionMode) {
+      builder.header(LocalApiServer.SESSION_TOKEN_HEADER, "test-token");
+    }
     if (origin != null) {
       builder.header("Origin", origin);
     }
@@ -335,6 +320,9 @@ class McpOriginValidationTest {
             .timeout(Duration.ofSeconds(3))
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"));
+    if (productionMode) {
+      builder.header(LocalApiServer.SESSION_TOKEN_HEADER, "test-token");
+    }
     if (origin != null) {
       builder.header("Origin", origin);
     }
@@ -346,6 +334,9 @@ class McpOriginValidationTest {
         HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/mcp"))
             .timeout(Duration.ofSeconds(3))
             .DELETE();
+    if (productionMode) {
+      builder.header(LocalApiServer.SESSION_TOKEN_HEADER, "test-token");
+    }
     if (origin != null) {
       builder.header("Origin", origin);
     }
@@ -357,7 +348,7 @@ class McpOriginValidationTest {
    * {@code HttpResponseException} mapper that preserves a handler-set body while propagating the
    * status (`LocalApiServer.java:397-399`), then the paired before/after lifecycle hooks (inflight
    * counter + OTel scope, registered at `:489-550` BEFORE `securityFilters.install`), then the
-   * production {@link ApiSecurityFilters#install} (dev mode: no session token, no lease service, no
+   * production {@link ApiSecurityFilters#install} (dev mode without a token, or production with a token, no lease service, no
    * capability gates), then stand-ins for the two methods registered at {@code /mcp}.
    *
    * <p>The mapper and the hook ordering are load-bearing, not decoration: without the mapper the
@@ -382,7 +373,8 @@ class McpOriginValidationTest {
         });
 
     executor = Executors.newSingleThreadExecutor();
-    new ApiSecurityFilters(false, null, new EventBuffer(), executor, null).install(app);
+    new ApiSecurityFilters(productionMode, productionMode ? "test-token" : null,
+        new EventBuffer(), executor, null).install(app);
 
     app.post(LocalApiServer.MCP_ENDPOINT_PATH, ctx -> ctx.json(Map.of("handled", true)));
     app.delete(LocalApiServer.MCP_ENDPOINT_PATH, ctx -> ctx.status(204));
@@ -391,7 +383,6 @@ class McpOriginValidationTest {
     app.get(
         LocalApiServer.MCP_ENDPOINT_PATH,
         io.justsearch.ui.api.mcp.McpProtocolHandler::handleGet);
-    app.get(LocalApiServer.MCP_TOKEN_PATH, ctx -> ctx.json(Map.of("token", "test-token")));
     app.get("/api/status", ctx -> ctx.json(Map.of("status", "ok")));
 
     app.start("127.0.0.1", 0);

@@ -984,7 +984,7 @@
       "id": "runtime-manifest-history",
       "pathVerification": "LITERAL",
       "encryption": "NOT_APPLICABLE",
-      "encryptionNote": "Who is running right now and where: instance id, process ids, loopback ports, the app's own data directory, and reachability/shutdown classification per instance (RuntimeManifestPublisher.java:40). Process bookkeeping only; no user content.",
+      "encryptionNote": "Who is running right now and where: instance id, process ids, loopback ports, the app's own data directory, and reachability/shutdown classification per instance (RuntimeManifestPublisher.java:40). No user content. The per-boot session credential is held only in the owner-only current manifest (POSIX 0600 or Windows owner plus SYSTEM); new instance history strips it. OwnerOnlyFile creates the protected temporary file before RuntimeManifestPublisher writes and replaces the current manifest.",
       "owner": "HEAD",
       "root": "DATA_DIR",
       "ownedPaths": [
@@ -1006,10 +1006,12 @@
       "reconciliation": "PUBLISH_CURRENT_INSTANCE_AND_RETAIN_BOUNDED_HISTORY",
       "status": "READY",
       "implementationSources": [
+        "modules/ui/src/main/java/io/justsearch/ui/runtime/OwnerOnlyFile.java",
         "modules/ui/src/main/java/io/justsearch/ui/runtime/RuntimeManifestPublisher.java",
         "modules/shell/src-tauri/src/shell_actuator.rs"
       ],
       "tests": [
+        "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestCredentialBoundaryTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestPublisherTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestPublisherShutdownClassifyTest.java"
       ],
@@ -1183,6 +1185,70 @@
       ],
       "tests": [
         "modules/shell/src-tauri/src/lib.rs"
+      ],
+      "fixtures": []
+    },
+    {
+      "id": "shell-factory-reset",
+      "pathVerification": "LITERAL",
+      "encryption": "UNSEALED_NO_JVM_CIPHER",
+      "encryptionNote": "Shell-owned reset intent and receipt: format version, phase, remaining failure paths/errors and kept-link paths; no document contents. Settings writes the request while the Engine runs. The Shell reads and rewrites it before starting the Engine and during recovery, without JVM StoreCipher access.",
+      "owner": "SHELL",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        ".justsearch-reset-requested",
+        ".justsearch-reset-status.tmp"
+      ],
+      "recoverability": "AUTHORED",
+      "upgradeHandling": "READ_IN_PLACE",
+      "format": "JSON reset intent/receipt v1 (format_version); unversioned JSON and legacy reset newline intent remain readable as version 0",
+      "currentVersion": 1,
+      "readableLegacyVersions": [0],
+      "versionAuthority": "modules/shell/src-tauri/src/factory_reset.rs",
+      "futureVersionRefusalTest": "modules/shell/src-tauri/src/factory_reset.rs",
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "ATOMIC_REPLACE",
+      "corruptionPolicy": "FAIL_CLOSED_REPAIR_REQUIRED",
+      "corruptionNote": "Future-version, unreadable or non-regular marker bytes are preserved and reported as incomplete, blocking the backend. Explicit cancellation atomically replaces intent with an idle tombstone; automatic recovery never guesses destructive intent. Stale staging bytes are unlinked before a new exclusive staging write.",
+      "reconciliation": "PRESERVE_RESET_INTENT_AND_RESUME_BEFORE_BACKEND_START",
+      "reconciliationNote": "Resume requested/incomplete disk cleanup before opening stores, retain awaiting-storage until acknowledgement, and retain a complete receipt until dismissal. Future versions are kept and refused with an incomplete status explaining that a newer version requested the reset; cancellation remains available. Cancellation persists versioned idle intent so a later launch cannot resume the wipe.",
+      "status": "READY",
+      "implementationSources": [
+        "modules/shell/src-tauri/src/factory_reset.rs"
+      ],
+      "tests": [
+        "modules/shell/src-tauri/src/factory_reset.rs"
+      ],
+      "fixtures": []
+    },
+    {
+      "id": "shell-search-shortcut",
+      "pathVerification": "LITERAL",
+      "encryption": "UNSEALED_NO_JVM_CIPHER",
+      "owner": "SHELL",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        "search-shortcut.v1.json"
+      ],
+      "recoverability": "AUTHORED",
+      "upgradeHandling": "READ_IN_PLACE",
+      "format": "JSON version 1 and enabled boolean",
+      "currentVersion": 1,
+      "readableLegacyVersions": [],
+      "versionAuthority": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "futureVersionRefusalTest": "modules/shell/src-tauri/src/search_shortcut.rs",
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "ATOMIC_REPLACE",
+      "corruptionPolicy": "FAIL_CLOSED_REPAIR_REQUIRED",
+      "corruptionNote": "Keep unreadable or future-version bytes untouched and leave registration disabled. Settings explains the refusal. An explicit user switch change repairs the preference by atomically replacing it; no automatic default overwrites these bytes.",
+      "reconciliation": "Read before native registration. Missing file defaults on; unreadable or future bytes disable registration and remain untouched until the user explicitly changes the switch. Factory reset removes the file before registration.",
+      "status": "READY",
+      "implementationSources": [
+        "modules/shell/src-tauri/src/search_shortcut.rs",
+        "modules/shell/src-tauri/src/updater.rs"
+      ],
+      "tests": [
+        "modules/shell/src-tauri/src/search_shortcut.rs"
       ],
       "fixtures": []
     },
