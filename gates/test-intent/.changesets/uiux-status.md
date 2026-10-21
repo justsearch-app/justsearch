@@ -761,3 +761,14 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
   "note": "Expectations follow the agreed scenarios and delegated compatibility decision. Independent UI/Java evidence reruns passed; 53 baseline assertions fail and 300 adapted-fixture checks pass. Compatibility fails on 8237e63d9 and passes before/after. Test intent only: product fails stale diagnostic, migration, animation and announcement cases."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "wp33-verifier-g9ic134p",
+  "verdict": "accept",
+  "digest": "sha256:bd6dd9c39ac8ae3832758cebf86767c6509b5ef503fd182f0ea1ab4cd6827f25",
+  "note": "Expectations follow S33.1-S33.6 and the delegated compatibility decision. Independent run-evidence reruns pass; 63 baseline UI assertions fail for the repaired behavior, and adapted preservation checks pass. Compatibility passes before/after and assertion-fails on 8237e63d9. Acceptance is of test intent only. Product verdict fails S33.4/S33.6: Library empty-root migration remains current when stale or gone, and Search v3 Ask duplicates indexing announcements."
+}
+```
