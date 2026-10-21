@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-20T09:31:31.057Z",
-  "revision": "f003a5c6476776ed2e56d9e0882f8bbaf55fc731",
-  "tree": "d51ad1ad76df2519b6afcfabb02dde814c0dce67",
+  "createdAt": "2026-10-21T07:13:25.752Z",
+  "revision": "5e97d3af4f3c79119a0ce757f2474321ebb3e67c",
+  "tree": "a6970fe84820031524c10a2c0878dbd54a0693fa",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.AiInstallServicePolicyPreservationTest\" --tests \"io.justsearch.app.services.ai.install.AiInstallServicePolicyTest.absentServiceAndPermissiveServiceKeepAllThreePlans\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3144
+      "durationMs": 5228
     },
     {
       "command": "./gradlew :modules:ui:integrationTest --tests \"io.justsearch.ui.api.AiInstallPolicyIntegrationTest.missingPolicyKeepsPermissiveDefaults\" --tests \"io.justsearch.ui.api.AiInstallPolicyIntegrationTest.allowlistedOfflineImportStillWorksWithDownloadsDisabled\" --tests \"io.justsearch.ui.api.AiInstallPolicyIntegrationTest.corruptDetectedMachinePolicyKeepsFailClosedDefaults\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6301
+      "durationMs": 11494
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServicePolicyPreservationTest.java",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServicePolicyPreservationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d12e963261f098ae1f4e9dc00cec54d32b1e2ab67a4b32d594b622ce49fbb7f0",
+      "contentDigest": "sha256:30d21ced6e865a84503507fa574305e92879630b67111bf87885e8c583c3f5b8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -54,7 +54,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServicePolicyTest.java#absentServiceAndPermissiveServiceKeepAllThreePlans",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServicePolicyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:abfbcc6286f198939fbda9ccd6815c7802de3e0d1b6bac4f5f1d7b06deab00b8",
+      "contentDigest": "sha256:b9c2d9b2631fde917f7e23ee378e713929fb03689c0b94ce356c02effd563603",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -112,5 +112,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:33f3fb930d03a9494a49d83c274891b56206d08597e385b606049300382ff98e"
+  "digest": "sha256:c801e5cf5280b2b7be9b5825da15a97f5eb1de89abd309fd12cab0c6ba676632"
 }
