@@ -1919,3 +1919,14 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
   "note": "All 34 entries preserve or explicitly supersede agreed intent, current receipts are valid, merged frontend claims fail before and pass after, and ConfigStore cleanup passes injected shutdown failures."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15c58-a359-7020-b3b5-9e976071b941",
+  "verdict": "accept",
+  "digest": "sha256:8996e25531d9d243ad8c455e9a46c534352aa7f39d2d4333692605a9bae19918",
+  "note": "All 35 entries preserve or explicitly supersede agreed intent, receipts match current tests, and merged Resource, rail, resolver and responsiveness claims independently fail before and pass after."
+}
+```
