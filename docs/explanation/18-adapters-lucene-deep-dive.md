@@ -19,15 +19,14 @@ This document provides a deep architectural walkthrough for developers who need 
 
 ```text
 io.justsearch.adapters.lucene/
-├── analyzers/          # Analyzer configuration, ICU tokenization, and synonym loading from SSOT catalogs
+├── analyzers/          # Analyzer configuration and ICU tokenization from SSOT catalogs
 ├── commit/             # Commit metadata fingerprinting (SHA-256) and schema parity validation on open
-├── runtime/            # Core search engine runtime — facade, read/write paths, hybrid fusion, chunked RAG retrieval,
-│                       #   query building, faceting, autocomplete, field mapping, NRT commit coordination, and pruning
-└── (interfaces)        # Shard coordination contracts (single-shard implementation)
+└── runtime/            # Core search engine runtime — read/write paths, hybrid fusion, chunked RAG retrieval,
+                        #   query building, faceting, autocomplete, field mapping, NRT commit coordination, and pruning
 ```
 
 The `runtime/` package is the largest. It is organized around focused ops classes — `ReadPathOps`,
-`WritePathOps`, `CommitOps`, `TextQueryOps`, `HybridSearchOps`, `ChunkSearchOps`, `DocumentQueryOps`,
+`WritePathOps`, `CommitOps`, `TextQueryOps`, `HybridSearchOps`, `ChunkSearchOps`, `DocumentFieldOps`,
 `SuggestOps`, `PruneOps`, `FacetingEngine` — with `RunningRuntime`/`RuntimeSession` holding lifecycle.
 (The former `LuceneIndexRuntime` facade was dissolved in tempdoc 320; the ops classes are now the API.)
 
@@ -125,7 +124,7 @@ reads, including the document fetches `CombinedEnrichmentBackfillOps` and `BgeM3
 for every document they enrich. Because indexing is writing continuously, the freshness check in
 step 2 almost always says "new writes", so without step 1 each backfill fetch reopened the
 searcher: a measured 2.9x rise in reopen count and a 15% loss of indexing throughput. The gate is
-a `BooleanSupplier` on `RuntimeSession`, wired by the Worker from `ForegroundLoad.inFlight() > 0`
+a `BooleanSupplier` on `RuntimeSession`, wired by the Engine index half from `ForegroundLoad.inFlight() > 0`
 — the same in-flight gauge the indexing duty cycle reacts to, and the only component that knows a
 search-family RPC is running. An unwired runtime defaults to "always foreground", erring toward
 freshness rather than toward serving a stale searcher; `continuous` never consults it.
@@ -138,7 +137,7 @@ foreground/background distinction threaded from the RPC layer down to the read, 
 change than this seam. An ingest-only measurement cannot observe the residue, so the re-measure
 this mode is waiting on has to include a search-load arm.
 
-An idle Worker in `on_demand` mode performs no reopens at all: the background thread still wakes
+An idle Engine index half in `on_demand` mode performs no reopens at all: the background thread still wakes
 every `background_reopen_ms`, but `DirectoryReader.openIfChanged` returns null on an unchanged
 index, so no reader is swapped and `index.runtime.reopen_count` does not move.
 
@@ -339,7 +338,7 @@ applies this optimization to dense-only search or direct RAG. For current thresh
 
 ### 4B.1 Indexing
 
-SPLADE-v3 encodes documents as sparse term-weight vectors. `FieldMapper`
+The shipped `opensearch-neural-sparse-encoding-multilingual-v1` model encodes documents as sparse term-weight vectors. `FieldMapper`
 stores these as Lucene `FeatureField` entries — one per non-zero term:
 
 ```java
@@ -360,7 +359,7 @@ SPLADE queries are also sparse weight vectors. Each token becomes a
 `FeatureField.newLinearQuery` SHOULD clause in a `BooleanQuery`:
 
 ```java
-// ChunkSearchOps.searchChunksSplade / LuceneIndexRuntime.searchSplade
+// ChunkSearchOps.searchChunksSplade / TextQueryOps.buildSpladeQuery
 BooleanQuery.Builder builder = new BooleanQuery.Builder();
 for (var entry : queryWeights.entrySet()) {
     builder.add(
@@ -398,7 +397,7 @@ this flag.
 
 ### 4B.4 Known Limitation
 
-SPLADE-v3 uses a BERT-base encoder with a 512-token max sequence length
+The shipped multilingual sparse model uses a BERT-multilingual encoder with a 512-token max sequence length
 (configurable via `JUSTSEARCH_SPLADE_MAX_SEQ_LEN`, default 512).
 Documents longer than ~512 tokens lose body terms from the SPLADE
 representation. The search pipeline compensates via parent-length
@@ -459,7 +458,7 @@ When a SIMPLE-mode query returns zero hits, `WorkerSearchService` applies a two-
 
 Both paths set `correctionApplied = true` on the response message and produce scores identical to equivalent exact queries (score parity via shared `buildSimpleContentQuery()` pipeline).
 
-**Key methods in `TextQueryOps`:** `resolveClosestTerm()`, `levenshteinDistance()`, `buildFuzzyTextQuery()`, `buildPerTermFuzzyQuery()`. The facade retains thin delegation stubs for `buildFuzzyTextQuery` and `buildPerTermFuzzyQuery`.
+**Key methods in `TextQueryOps`:** `resolveClosestTerm()`, `levenshteinDistance()`, `buildFuzzyTextQuery()`, `buildPerTermFuzzyQuery()`. `SearchExecutor` calls `TextQueryOps.buildFuzzyTextQuery` and `TextQueryOps.buildPerTermFuzzyQuery`.
 
 ## 6. Pagination and Cursors
 
@@ -566,58 +565,14 @@ boolean hasMore = topDocs.scoreDocs.length > limit;
 
 ## 8. Analyzer System
 
-### 8.1 SsotAnalyzerRegistry
+### 8.1 Current analyzer providers
 
-Loads analyzers from SSOT catalogs with fingerprinting:
+`SsotAnalyzerRegistry` builds `icu` (ICU tokenizer → NFC normalization → lowercase) and
+`keyword` analyzers. The ICU path is locale-invariant. The per-locale synonyms filter and its
+English/German catalogs were removed in tempdoc 581 / ADR-0043; `icu+synonyms` is no longer a provider.
 
-```java
-// Analyzer providers
-Map<String, Function<Locale, Analyzer>> providers = Map.of(
-    "icu+synonyms", locale -> buildIcuWithSynonyms(locale),
-    "icu", locale -> buildIcu(locale),
-    "keyword", locale -> new KeywordAnalyzer()
-);
-```
-
-### 8.2 ICU Tokenizer Pipeline
-
-```text
-Input Text
-    ↓
-ICUTokenizer (Unicode-aware word breaking)
-    ↓
-ICUNormalizer2Filter (Unicode normalization: NFC)
-    ↓
-LowerCaseFilter
-    ↓
-SynonymGraphFilter (optional, locale-specific)
-    ↓
-Token Stream
-```
-
-### 8.3 Synonym Loading
-
-Synonyms loaded from SSOT catalogs:
-- `SSOT/catalogs/synonyms.en.v1.txt`
-- `SSOT/catalogs/synonyms.de.v1.txt`
-
-Format: comma-separated bidirectional expansion
-
-```text
-car,automobile,vehicle
-quick,fast,rapid
-```
-
-### 8.4 Per-Field Analyzers
-
-```java
-Map<String, String> fieldToAnalyzerKey = Map.of(
-    "content", "icu+synonyms",
-    "title", "icu",
-    "tags", "keyword"
-);
-Analyzer perField = analyzerRegistry.buildPerFieldAnalyzer(fieldToAnalyzerKey);
-```
+Per-field mappings use `icu` for content/title and `keyword` where exact tokens are required.
+`synonyms_hash` remains in commit metadata as the SHA-256 of empty bytes for compatibility.
 
 ## 9. Commit Metadata
 
@@ -631,7 +586,7 @@ Analyzer perField = analyzerRegistry.buildPerFieldAnalyzer(fieldToAnalyzerKey);
 Map<String, String> metadata = new HashMap<>();
 // Observability (never compared for parity):
 metadata.put("schema_fp", sha256(canonicalJson(fieldsCatalog)));
-metadata.put("synonyms_hash", sha256(concat(synonymFiles)));
+metadata.put("synonyms_hash", sha256(new byte[0]));
 metadata.put("similarity_fp", sha256(bm25Descriptor));
 metadata.put("grammar_hash", sha256(intentGrammar));
 // ... plus grammar_ver, template_ver, prompt_pack_hash, vector_format, build_state,
@@ -746,41 +701,14 @@ if (twoPhase != null) {
 
 ## 12. Runtime Concurrency Model
 
-`LuceneIndexRuntime` is accessed from multiple threads (port-call threads, commit scheduler, close). The following patterns ensure thread safety without heavy locking:
+`RuntimeSession` owns the shared resources and lifecycle snapshot. `LuceneRuntime` phase types
+(`ReadOnlyRuntime`, `DeferredRuntime`, `RunningRuntime`) expose the operations appropriate to the
+current phase; faceting and folder-browse engines are session-owned final fields. Read/write ops
+use the session's snapshot bridge rather than the deleted facade's volatile accessors.
 
-### 12.1 Volatile Snapshot Accessors
-
-The `facetingEngine` and `folderBrowseEngine` fields are declared `volatile`. Public methods access them through null-guard accessors (`facetingOps()`, `folderBrowseOps()`) that take a local snapshot before use:
-
-```java
-private FacetingEngine facetingOps() {
-  FacetingEngine ops = this.facetingEngine; // local snapshot of volatile
-  if (ops == null) throw new IllegalStateException("FacetingEngine not available");
-  return ops;
-}
-```
-
-The same pattern applies to `readOps()`, `writeOps()`, and `indexingCoordinator()`. `close()` nulls all volatile fields after shutting down components.
-
-### 12.2 Lambda Capture Safety
-
-`FacetingEngine` and `FolderBrowseEngine` receive `Supplier<IndexSearcher>` and `Consumer<IndexSearcher>` lambdas for searcher lifecycle. These lambdas capture `searcherManager` via a local snapshot (not a direct field reference) to prevent NPE if `close()` nulls the field concurrently:
-
-```java
-() -> {
-  SearcherManager mgr = searcherManager; // local snapshot
-  if (mgr == null) throw new IllegalStateException("SearcherManager not available");
-  return mgr.acquire();
-}
-```
-
-### 12.3 WritePathOps Null-Guard
-
-`WritePathOps` receives a `Supplier<IndexWriter>` that captures the runtime's volatile writer field. Both `indexDocument()` and `applyBatch()` null-check the supplier result before use, throwing `IllegalStateException` if the runtime has been closed.
-
-### 12.4 Thread-Safety Annotations
-
-`LuceneIndexRuntime`, `ReadPathOps`, `WritePathOps`, and `FacetingEngine` are annotated with `@ThreadSafe` from `net.jcip.annotations`. `InferenceLifecycleManager` additionally uses `@GuardedBy("lock")` on its `currentMode` field.
+`ReadPathOps`, `WritePathOps`, and `FacetingEngine` carry `@ThreadSafe`. `WritePathOps` obtains the
+writer from a lifecycle snapshot and rejects a missing writer. See
+[Service Lifecycle Pattern](25-service-lifecycle-pattern.md) for phase transitions and ownership.
 
 ## 13. Related Documentation
 

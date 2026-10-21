@@ -147,6 +147,7 @@ class BackfillSchedulerSlowBatchTest {
 
   @BeforeEach
   void wireSlowEmbedBatch() {
+    io.justsearch.indexerworker.loop.ops.BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator);
     for (int i = 0; i < BATCH_DOCS; i++) {
       docIds.add(String.format("doc-%02d", i));
     }

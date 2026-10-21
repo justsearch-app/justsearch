@@ -1,0 +1,151 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T16:58:10.906Z",
+  "revision": "4c59d07c0df208961e71f2620df056695fc6b190",
+  "tree": "ee4aa53d3e3f24522e845a78e310545b036db4b4",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/indexingFreshness.test.ts\" \"src/shell-v0/components/indexingStatusSurfaces.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-vitest-1638378-1792515482984.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3301
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ebfd592dec064239968862d3de84e151be4a88b7e25ab9c4ca675a91b366f404",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S33.4 the store timer expires the worker observation while SSE alone keeps the Engine reachable and fresh status restores it",
+          "status": "passed"
+        },
+        {
+          "name": "S33.4 a status without a worker timestamp expires by receipt age using its reported freshness window",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a4907c83f15504d137016db9b275a69167ae34a64bdc4d80ee5f2fe51ece0e57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 shared status surfaces S33.1 S33.6 every surface says text indexing continues and enrichment waits for energy",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.2 S33.4 all surfaces replace and clear the reason after a fresh observation",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.4 retained stale observations are unconfirmed on every surface",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.4 aged observations with 4 queued files expire on every surface while inference stays live and recover on fresh status",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.4 aged observations with 0 queued files expire on every surface while inference stays live and recover on fresh status",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.1 empty file queues still describe energy-deferred enrichment on every surface",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.2 every surface distinguishes CPU enrichment under game and external GPU holds",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.3 every surface names chat only while that reason is observed",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces N33.3 deferred enrichment retains the measured aggregate without an active progress bar",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.5 Library with no settled documents stays enriching without inventing a percentage",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.6 announces one semantic change once across identical polls",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2f8a0089f1d16f171189abfe322e63c73b1c1340a8cc6108a927a3c08ded3c9b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "BrainSurface — enrichment progress card (807) S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4c59d07c0",
+    "revision": "4c59d07c0df208961e71f2620df056695fc6b190",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/state/indexingFreshness.test.ts\" \"src/shell-v0/components/indexingStatusSurfaces.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-vitest-1638378-1792515487628.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3060,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-vitest-1638378-1792515487628.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+        "classification": "assertion",
+        "detail": "S33.4 the store timer expires the worker observation while SSE alone keeps the Engine reachable and fresh status restores it:  AssertionError: expected { …(4) } to match object { confirmed: false, …(1) }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-agent-steering/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<a | S33.4 a status without a worker timestamp expires by receipt age using"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+        "classification": "assertion",
+        "detail": "WP3.3 shared status surfaces S33.4 aged observations with 4 queued files expire on every surface while inference stays live and recover on fresh status:  AssertionError: jf-status-deck: expected '\\n      Text indexing continues — Idl…' to contain 'Indexing status unconfirmed'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-before-7CxWx9/modules/ui-web/src/shell-v0/components/indexingS | WP3.3 shared status surfaces S33.4 aged obs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts#S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers",
+        "classification": "assertion",
+        "detail": "BrainSurface — enrichment progress card (807) S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers:  AssertionError: expected '\\n      \\n        \\n          \\n    \\…' to contain 'Indexing status unconfirmed'\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/freshness/evidence-tmp/test-intent-before-7CxWx9/modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness."
+      }
+    ]
+  },
+  "digest": "sha256:9470146e68e0853d8133d36e9b80a5b3fc2b770011aae4f2f5e70ab39b337662"
+}

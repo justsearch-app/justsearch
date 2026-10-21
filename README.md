@@ -43,7 +43,7 @@ retrieval quality is benchmarked on English, German, and French (see [Benchmarks
 3. **Launch JustSearch** and point it at a folder. Use **AI Brain → Install AI** to download the optional
    models and runtimes from `github.com` and `huggingface.co`. The dialog shows the exact download size
    for your hardware: about **10 GB** on Windows with a supported NVIDIA GPU, or **2–4 GB** without one.
-   Search and built-in AI inference then work offline; the desktop app also checks for updates on launch
+   Search and built-in AI inference then work offline; the desktop app also checks for updates by default
    when the build embeds a release URL (including CI-built branch candidates and pre-releases; see [Privacy](#privacy)).
 
 Installer SHA-256 (also in [`SHA256SUMS`](https://github.com/justsearch-app/justsearch/releases/download/v0.3.0/SHA256SUMS)):
@@ -66,7 +66,7 @@ build-from-source alternative): [`docs/how-to/verify-your-download.md`](docs/how
 | **Disk** | 261 MB installer + ~0.7 GB installed + **about 10 GB for AI with a supported NVIDIA GPU (2–4 GB without one)** + the search index (grows with your corpus). Plan for **≥ 15 GB free**. |
 | **RAM** | **16 GB recommended.** 8 GB is a conservative floor for keyword/semantic search only (not a benchmarked minimum; chat needs the GPU below regardless of RAM). The on-device chat model (~5.9 GB file) is loaded into memory when answering. |
 | **GPU** | **Required for chat.** Search and semantic ranking run on CPU — no GPU needed for those. Chat requires an NVIDIA GPU with **≥ 8 GB VRAM** (the app needs ~7.5 GB free VRAM to run the chat model). Without a supported NVIDIA GPU, or below that VRAM floor, no install path offers the chat model — chat does **not** fall back to CPU, so the app is search-only. |
-| **Network** | AI downloads and launch-time update checks in desktop builds with an embedded release URL; optional trace export when configured. See [Privacy](#privacy) for all network paths. |
+| **Network** | AI downloads and default launch-time update checks in desktop builds with an embedded release URL; optional trace export when configured. See [Privacy](#privacy) for all network paths and update controls. |
 
 ## Two ways to use it
 
@@ -76,8 +76,10 @@ JustSearch exposes its retrieval over MCP at `POST /mcp` — **in-process Stream
 is already taken it falls back to a random free port. To pin a port, set the `JUSTSEARCH_API_PORT` environment
 variable before launching; the actual port in use is always written as `head.apiPort` in
 `%APPDATA%\io.justsearch.shell\runtime\manifest.json` on Windows, or
-`~/.local/share/io.justsearch.shell/runtime/manifest.json` on Linux
-(`$XDG_DATA_HOME/io.justsearch.shell/runtime/manifest.json` if set). Details + a 2-minute Claude Desktop walkthrough:
+`~/.local/share/io.justsearch.shell/runtime/manifest.json` on Linux (under
+`$XDG_DATA_HOME/io.justsearch.shell/runtime/manifest.json` if `XDG_DATA_HOME` is set).
+For headless/dev launches with a data directory override, use
+`<JUSTSEARCH_DATA_DIR>/runtime/manifest.json`. Details + a 2-minute Claude Desktop walkthrough:
 [`docs/reference/mcp-production-server.md`](docs/reference/mcp-production-server.md). Connect your agent:
 
 - **Claude Code:** `claude mcp add justsearch --transport http http://127.0.0.1:8080/mcp`
@@ -124,7 +126,7 @@ that ships **{true hybrid retrieval × offline search and AI × multilingual × 
 - **Hybrid retrieval, not single-model RAG** — BM25 + dense vectors + SPLADE learned-sparse, fused and reranked
   by a cross-encoder. Most local RAG tools use one embedding model and basic chunking.
 - **Local search and AI** — indexing, retrieval, and built-in inference run on-device and work offline
-  after AI setup. The desktop app also checks for updates; [Privacy](#privacy) names the network paths
+  after AI setup. The desktop app also checks for updates by default; [Privacy](#privacy) names the network paths
   and the optional trace exporter.
 - **Multilingual by construction** — one locale-invariant pipeline (ICU + a multilingual model stack), no
   per-language tuning. Competitive nDCG on German and French, not just English.
@@ -201,8 +203,9 @@ version.
 To **run** the full desktop app, the easy path is the [installer](#install-windows) above; running the
 Engine stack from source is a developer workflow — see [`CONTRIBUTING.md`](CONTRIBUTING.md). The installed
 app offers **Install AI** with your consent (about **10 GB** on Windows or **8 GB** on Linux with a
-supported NVIDIA GPU; **2–4 GB** without one). On Windows this includes a CUDA build of `llama-server`
-that is selected automatically on supported NVIDIA hardware, unless you set your own executable.
+supported NVIDIA GPU; **2–4 GB** without one). On Windows, when downloads and GPU acceleration are
+permitted by policy, this includes a CUDA build of `llama-server` that is selected automatically on
+supported NVIDIA hardware, unless you set your own executable.
 Building from source does not download models: keyword search works without them, and
 `node scripts/dev/doctor.mjs` names the step to the next tier. See [Privacy](#privacy) for downloads,
 update checks, and optional trace export.
@@ -224,11 +227,22 @@ Indexing, retrieval, and built-in AI inference run locally. Network activity has
 
 - **Install AI** downloads models and runtimes from `github.com` and `huggingface.co` (and their download
   redirects), with your consent. Repair and upgrades can download them again. On Windows, supported NVIDIA
-  hardware also gets a CUDA build of `llama-server`, selected automatically unless you chose your own executable.
-- **The desktop app checks for updates on launch** when a release URL is embedded in the build. CI-built
-  installers embed the repository's configured URL, including branch candidates and pre-releases. It fetches
-  signed update metadata from GitHub; GitHub sees your IP address and request time, but the check sends no document content or queries. **There is no off switch yet.**
-  Builds without an embedded release URL do not check; development builds can use an explicitly configured URL.
+  hardware also gets a CUDA build of `llama-server` when downloads and GPU acceleration are permitted by policy, selected automatically unless you chose your own executable.
+- **The desktop app checks for updates by default**, about 30 seconds after the desktop chrome mounts when a release URL is
+  embedded. CI-built installers embed the repository's configured URL, including branch candidates and pre-releases.
+  Discovery fetches `release.v1.json`, `release.v1.json.sig` and `latest.json` from GitHub, following download/CDN redirects;
+  installation rechecks `latest.json` and downloads installer bytes only on request. Contacted hosts see
+  your IP address and request time; these requests send no document content or queries.
+  Set `JUSTSEARCH_AUTO_UPDATE_CHECK=false` before starting a fresh desktop process to suppress automatic
+  checks; Settings and recovery manual checks still work when policy allows them. Set `{"schemaVersion": 1, "appUpdatesEnabled": false}` in
+  `policy.v1.json` to forbid all new updater checks and downloads, including with the Engine down.
+  Windows machine policy is `%PROGRAMDATA%\JustSearch\policy.v1.json`; user policy is in the shell's
+  app-data directory (passed to the Engine as `JUSTSEARCH_HOME`). User policy can only further restrict
+  machine policy. Rust reads policy at each discovery and install, and again before artifact download.
+  A discovery already in flight may finish its metadata requests; disabling updates preserves local
+  upgrade and rollback state. The optional key keeps schemaVersion 1; older releases ignore it, and the
+  first enforcing release will be named in its release notes. These switches cover app updates only.
+  Builds without a configured release URL do not check; debug builds can use an explicitly configured URL.
 - **Trace export is off by default.** Enabling API or index tracing writes local traces. If you also set
   an `OTEL_EXPORTER_OTLP_*ENDPOINT`, traces go to that endpoint, which may be off-device. Traces can include
   file paths and bounded document excerpts. An endpoint alone does not enable tracing. See the

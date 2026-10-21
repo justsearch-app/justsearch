@@ -264,6 +264,8 @@ export interface AiState {
    * assert: stop animating, say "last known", make live-backend-preconditioned controls unavailable.
    */
   snapshotLive: boolean;
+  /** Indexing observation is within its freshness window, independently of inference/SSE contact. */
+  indexingStatusLive: boolean;
   /**
    * Spec A step 9 — the AI readiness reason when the Engine unloaded the chat model for another GPU
    * user (`inference.unloaded_gpu_pressure` / `inference.unloaded_game_mode`), else null. Chat is
@@ -538,6 +540,19 @@ function computeConnection(): AiConnection {
     lastContactMs,
     consecutiveFailures: reachable ? 0 : 1,
   };
+}
+
+function computeIndexingStatusLive(snapshotLive: boolean): boolean {
+  void clockTickSig.get();
+  const status = statusSig.get();
+  const receivedAt = lastStatusSuccessSig.get();
+  if (!snapshotLive || !status || receivedAt === null) return false;
+  // A successful HTTP read may contain an older worker sample. Neither that read nor unrelated
+  // inference/SSE contact renews the sample. Receipt time also bounds older producers without meta
+  // and future timestamps, so an observation cannot remain confirmed indefinitely.
+  const observedAt = Math.min(receivedAt, status.meta?.workerRpcAtMs ?? receivedAt);
+  const freshnessWindow = status.operating?.freshness?.staleAfterMs ?? 30_000;
+  return Date.now() - observedAt <= freshnessWindow;
 }
 
 /**
@@ -959,6 +974,7 @@ function buildSnapshot(): AiState {
     // Tempdoc 807 A.3 — projected once, here, from the verdict just computed above.
     snapshotLive,
     status,
+    indexingStatusLive: computeIndexingStatusLive(snapshotLive),
     inference: inferenceSig.get(),
     lastSettledIndex: lastSettledIndexSig.get(),
     episodeMaxPendingJobs: episodeMaxPendingJobsSig.get(),
@@ -1163,15 +1179,18 @@ function stampEnrichSettleSamples(snap: StatusSnapshot): void {
 }
 
 function checkStaleness(): void {
-  // Tempdoc 649 — two time-derived axes can change between input-signal updates: the poll-freshness
+  // Time-derived axes can change between input-signal updates: the poll-freshness
   // PHASE (data current vs aged out) and contact-based REACHABILITY (the stream stamp is a plain
   // global). Bump the clock tick when EITHER would flip vs the currently-displayed snapshot, so the
   // memoized `computed` re-evaluates — covering both the calm "Catching up…" transition (poll goes
-  // stale while still reachable) and the unreachable transition (all contact ages out).
+  // stale while still reachable), the unreachable transition (all contact ages out), and indexing
+  // observation expiry even while inference/SSE continues confirming contact.
   const current = aiState.get();
   const phaseNow = computePhase();
   const { reachable: reachableNow } = computeReachability();
-  if (phaseNow !== current.phase || reachableNow !== current.connection.reachable) {
+  const indexingStatusLiveNow = computeIndexingStatusLive(isSnapshotLive({ reachable: reachableNow }));
+  if (phaseNow !== current.phase || reachableNow !== current.connection.reachable ||
+      indexingStatusLiveNow !== current.indexingStatusLive) {
     clockTickSig.set(clockTickSig.get() + 1);
   }
 }

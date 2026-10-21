@@ -6,13 +6,14 @@ description: "Keep a short task-oriented MCP surface; the accepted seven-tool li
 date: 2026-04-01
 probes:
   - adr-0015-seven-mcp-tools
-last_reviewed: 2026-09-13
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0015: MCP Tool Surface Design
 
 ## Status
-Accepted
+Accepted. The seven-tool amendment is shipped; see the 2026-10-20 correction
+for the current answer schema.
 
 ## Context
 
@@ -177,3 +178,17 @@ Probe `adr-0015-seven-mcp-tools` now pins exactly seven entries in the same cano
 registry. Removing a required tool or adding an eighth fails the premise. Reassess this
 amendment if tool-selection evidence favors consolidation, if outcome querying acquires
 mutation behavior, or before any eighth entry. A broader tool inventory is not authorized.
+
+## Amendment 2026-10-20: seven tools shipped; no verify_citations parameter
+
+`McpToolSurface.PRODUCTION_TOOL_DEFINITIONS` now registers the seven tools
+accepted on 2026-09-13, including `justsearch_operation_outcome` last. That
+amendment's statement that it did not claim a merge was a statement about its
+review-time candidate, not today's shipped surface.
+
+The original Decision's `verify_citations` parameter was not implemented.
+`ANSWER_SCHEMA` contains `query`, `top_k`, `filters` and `response_format`;
+there is no standalone `match_citations` tool or answer parameter of that name.
+Do not invent one from the historical consolidation rationale. Evidence:
+`modules/ui/src/main/java/io/justsearch/ui/api/mcp/McpToolSurface.java`
+(`ANSWER_SCHEMA`, `PRODUCTION_TOOL_DEFINITIONS`).

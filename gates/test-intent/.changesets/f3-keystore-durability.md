@@ -10,18 +10,25 @@ author-session: f3-builder-20261021
 F3 only: forced atomic keystore publication and a validated replica holding current wraps.
 Sources below quote the agreed scenarios in the original orchestrator assignment.
 
-Durability target (S12): process termination only. Parent-directory flush is missing;
+Durability target (S12): process termination only. Keystore parent-directory flush is missing;
 physical power-loss durability is not claimed. Windows checks are tagged for the hosted lane;
 local evidence records Linux only.
 
 The evidence runner executes from an isolated shared candidate clone. Its temporary before
 worktrees belong to that clone, leaving the source repository metadata untouched. A separate
-shared `before` clone records preservation checks on 50eafae23. Rust before-state checks use
-`f3-reset-before-interface.patch`, a signature-only extraction of the original reset body.
-No repaired behavior is included in that patch. Preservation-before evidence is recorded in
-`f3-keystore-preserved-before.json` and `f3-reset-preserved-before.json`; after evidence is cited
-in the entries below. Unchanged lifecycle, PBKDF2, strict-writer and backup-import checks are
-included in the preservation runs alongside the new checks.
+shared `before` clone records Java preservation checks on 50eafae23. Preservation-before
+evidence is recorded in `f3-keystore-preserved-before.json`; after evidence is cited below.
+Unchanged lifecycle, PBKDF2, strict-writer and backup-import checks are included in these runs.
+
+The merge of origin/main retires F3's old `reset_app_data` repair and its two embedded tests.
+Main's `factory_reset::visit` includes encryption/ among ordinary entries, and `remove_entry`
+recursively deletes its children, including both keystore filenames. A removal error is retained
+in `remaining`; `run_pending` persists Phase::Incomplete and blocks the backend. The existing
+`rs3_wipes_every_authored_store_before_start_and_waits_for_storage` test covers generic store
+removal and the storage-completion gate. `rs4_actual_delete_error_is_reported_and_retried_after_restart`
+exercises a real recursive deletion refusal, durable incomplete status and retry. The new
+`f3-factory-reset-preserved.json` records those unchanged main checks. Obsolete reset evidence
+and its signature-only before-state patch are removed. No Rust source differs from main.
 
 Round 2 follows the orchestrator's decisions after independent verifier cases V5 and V6
 rejected 36d97a92f. The new checks use that exact revision as their before-state. The original
@@ -205,47 +212,6 @@ New round-3 checks use 94c9bb8ec as their before-state. No verifier evidence was
     },
     {
       "items": [
-        "modules/shell/src-tauri/src/lib.rs#cfg(test)"
-      ],
-      "class": "New",
-      "behaviour": "A refused deletion of the encryption directory returns a named error, preserves the retry marker and leaves the obstructing state unchanged. The before-state patch extracts the existing reset body behind the same path-based signature without adding the repair.",
-      "sources": [
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261021-f3",
-          "scenario": "S3b",
-          "quote": "A keystore with no replica (every installation today) loads unchanged, and the next save creates the replica. A successful factory reset removes both files. A failed deletion is reported, not claimed as success.",
-          "label": "agent-drafted, owner-adopted"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/f3-reset-repaired.json",
-      "newChecks": [
-        "modules/shell/src-tauri/src/lib.rs#tests::reset_reports_keystore_deletion_failure_and_keeps_retry_marker"
-      ],
-      "repaired": true
-    },
-    {
-      "items": [
-        "modules/shell/src-tauri/src/lib.rs#cfg(test)"
-      ],
-      "class": "New",
-      "behaviour": "Preservation: successful reset removes both keystore filenames and the reset marker. The test seeds both filenames on the original reset implementation too; its existing recursive deletion already satisfies this case. Existing Rust tests and expectations remain unchanged.",
-      "sources": [
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261021-f3",
-          "scenario": "S3b",
-          "quote": "A keystore with no replica (every installation today) loads unchanged, and the next save creates the replica. A successful factory reset removes both files. A failed deletion is reported, not claimed as success.",
-          "label": "agent-drafted, owner-adopted"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/f3-reset-preserved.json",
-      "newChecks": [
-        "modules/shell/src-tauri/src/lib.rs#tests::reset_removes_primary_and_replica_before_reporting_success"
-      ]
-    },
-    {
-      "items": [
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/KeystoreRollbackTest.java"
       ],
       "class": "New",
@@ -402,6 +368,32 @@ New round-3 checks use 94c9bb8ec as their before-state. No verifier evidence was
         "modules/ui/src/test/java/io/justsearch/ui/api/KeystoreStartupAvailabilityHttpTest.java#validPrimaryLoadsAndWarnsThenRetries"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "Preservation supplied by merged main: all ordinary app-data entries are recursively removed before reset advances to window-storage cleanup; removal failures persist an incomplete status, retain retry intent and keep the backend blocked while reset recovery remains unfinished. Encryption is an ordinary entry under visit, so the recursive removal covers keystore.json and keystore.replica.json without a separate reset path. The existing tests exercise generic store deletion and real permission-denied recursive removal; no Rust oracle or implementation is changed.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261021-f3",
+          "scenario": "S3b",
+          "quote": "A successful factory reset removes both files. A failed deletion is reported, not claimed as success.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Take main's factory-reset design. Don't re-add the old reset_app_data.",
+          "location": "task t-20261021-f3 user turn 7"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f3-factory-reset-preserved.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage",
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart"
+      ]
     }
   ]
 }

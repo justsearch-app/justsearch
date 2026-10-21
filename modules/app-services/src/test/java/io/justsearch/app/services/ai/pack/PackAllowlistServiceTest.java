@@ -30,6 +30,7 @@ class PackAllowlistServiceTest {
             true,
             true,
             true,
+            true,
             false,
             List.of(),
             List.of(),
@@ -60,6 +61,7 @@ class PackAllowlistServiceTest {
         new EffectivePolicy.PolicySource(Path.of("C:\\Users\\x\\policy.v1.json"), false, false, null, null);
     EffectivePolicy eff =
         new EffectivePolicy(
+            true,
             true,
             true,
             true,
@@ -97,6 +99,7 @@ class PackAllowlistServiceTest {
             true,
             true,
             true,
+            true,
             false,
             List.of(),
             List.of(),
@@ -130,6 +133,7 @@ class PackAllowlistServiceTest {
             true,
             true,
             true,
+            true,
             false,
             List.of(),
             List.of(),
@@ -159,6 +163,7 @@ class PackAllowlistServiceTest {
         new EffectivePolicy.PolicySource(Path.of("C:\\Users\\x\\policy.v1.json"), true, true, null, user);
     EffectivePolicy eff =
         new EffectivePolicy(
+            true,
             true,
             true,
             true,
@@ -199,6 +204,7 @@ class PackAllowlistServiceTest {
             true,
             true,
             true,
+            true,
             false,
             List.of(),
             List.of(),
@@ -216,6 +222,7 @@ class PackAllowlistServiceTest {
     user.allowlists.packManifestSha256 = List.of("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
     EffectivePolicy eff2 =
         new EffectivePolicy(
+            true,
             true,
             true,
             true,

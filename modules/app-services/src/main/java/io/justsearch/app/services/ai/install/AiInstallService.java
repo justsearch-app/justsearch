@@ -436,13 +436,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   private void refreshResumableBytesFromDisk() {
     try {
       recordResumableBytes(
-          InstallPlanner.plan(
-              getManifest(),
-              buildHardwareProfile(),
-              installIntent(),
-              declinedPackages(),
-              modelsDir,
-              homeDir));
+          plan(getManifest(), buildInstallHardware()));
     } catch (Exception e) {
       log.debug("AiInstall resumable-bytes probe skipped (best-effort): {}", e.toString());
     }
@@ -457,7 +451,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   public InstallPlanPreview previewInstallPlan() {
     InstallPlanPreview preview = new InstallPlanPreview();
     ModelRegistry registry = getManifest();
-    HardwareProfile hardware = buildHardwareProfile();
+    InstallHardware installHardware = buildInstallHardware();
+    HardwareProfile hardware = installHardware.effective();
     DownloadProfile profile = hardware.downloadProfile();
     InstallIntent intent = installIntent();
     preview.intent = intent.id();
@@ -465,7 +460,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
     // Reuse the PURE planner (no side effects) — tempdoc 381 §F "show the plan before download".
     InstallPlan plan =
-        InstallPlanner.plan(registry, hardware, intent, declinedPackages(), modelsDir, homeDir);
+        InstallPlanner.plan(registry, hardware, intent, declinedPackages(), modelsDir, homeDir,
+            installHardware.policyExcluded());
     // What the download will actually COST: complete files are already excluded by the planner, and
     // `remainingBytes()` also drops the bytes an interrupted run left staged. Stating `totalBytes()`
     // here charged the user for bytes already on their disk (Sandbox round 8).
@@ -602,10 +598,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     }
     try {
       ModelRegistry registry = getManifest();
-      HardwareProfile hardware = buildHardwareProfile();
+      InstallHardware installHardware = buildInstallHardware();
       InstallPlan plan =
-          InstallPlanner.plan(
-              registry, hardware, installIntent(), declinedPackages(), modelsDir, homeDir);
+          plan(registry, installHardware);
       // A successful plan is a DEFINITIVE answer (installed or not) — consume the one-shot now.
       diskRecomputeDone = true;
       // Same disk-is-the-authority reasoning, applied to the OTHER thing a restart forgets: bytes a
@@ -1262,15 +1257,15 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
     // Build hardware profile
     updateState("running", "plan", "Detecting hardware and planning downloads...");
-    HardwareProfile hardware = buildHardwareProfile();
+    InstallHardware installHardware = buildInstallHardware();
+    HardwareProfile hardware = installHardware.effective();
     DownloadProfile profile = hardware.downloadProfile();
     log.info("Hardware profile: gpuDetected={}, cudaFunctional={}, vramBytes={}, profile={}",
         hardware.gpuDetected(), hardware.cudaFunctional(), hardware.vramBytes(), profile);
 
     // Compute download plan
     InstallPlan plan =
-        InstallPlanner.plan(
-            registry, hardware, installIntent(), declinedPackages(), modelsDir, homeDir);
+        plan(registry, installHardware);
     log.info(
         "Install plan: profile={}, downloads={}, skipped={}, alreadyInstalled={}, totalBytes={}",
         plan.profile(),
@@ -1308,7 +1303,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     // Reclaim BITS jobs an earlier crash left in the queue (tempdoc 840). Here rather than at app
     // boot: the set of jobs a sidecar still claims is only knowable once the plan is, and a
     // PowerShell spawn on every cold start buys no timeliness.
-    sweepOrphanedBitsJobsBestEffort(plan);
+    if (installHardware.policyExcluded() == null) sweepOrphanedBitsJobsBestEffort(plan);
 
     // ---- Stages 1-3, once per acquisition stage ------------------------------------------------
     downloadExecutor = new DownloadExecutor(cancelFlag);
@@ -1779,6 +1774,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    * the install.
    */
   private void sweepOrphanedBitsJobsBestEffort(InstallPlan plan) {
+    // A policy-limited plan cannot claim retained CUDA jobs. Leave the queue and its bytes alone;
+    // the ordinary sweep can run again when GPU acceleration is permitted.
+    if (!gpuAccelerationAllowed()) return;
     try {
       Set<String> claimed = new HashSet<>();
       for (InstallPlan.PlannedDownload dl : plan.downloads()) {
@@ -1814,13 +1812,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   private InstallCompleteness recomputeCompletenessFromDiskBestEffort() {
     try {
       InstallPlan plan =
-          InstallPlanner.plan(
-              getManifest(),
-              buildHardwareProfile(),
-              installIntent(),
-              declinedPackages(),
-              modelsDir,
-              homeDir);
+          plan(getManifest(), buildInstallHardware());
       return InstallCompleteness.compute(plan, readInstallContractBestEffort(), declinedPackages());
     } catch (Exception e) {
       log.debug("AiInstall completion disk recompute skipped (best-effort): {}", e.toString());
@@ -2053,6 +2045,24 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   // ---------------------------------------------------------------------------
 
   public HardwareProfile buildHardwareProfile() {
+    return buildInstallHardware().effective();
+  }
+
+  private record InstallHardware(HardwareProfile effective, HardwareProfile policyExcluded) {}
+
+  private InstallHardware buildInstallHardware() {
+    HardwareProfile detected = detectHardwareProfile();
+    return gpuAccelerationAllowed()
+        ? new InstallHardware(detected, null)
+        : new InstallHardware(HardwareProfile.cpuOnly(), detected);
+  }
+
+  private InstallPlan plan(ModelRegistry registry, InstallHardware hardware) {
+    return InstallPlanner.plan(registry, hardware.effective(), installIntent(), declinedPackages(),
+        modelsDir, homeDir, hardware.policyExcluded());
+  }
+
+  private HardwareProfile detectHardwareProfile() {
     // Tempdoc 587: read every GPU fact from the ONE composition seam (GpuCapabilityResolver),
     // which folds the CUDA driver-API probe into the NVML/nvidia-smi VRAM+device merge. This
     // replaces the prior split — a direct GpuDriverApiProbe call for cudaFunctional plus a
@@ -2325,7 +2335,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    *     override was respected
    */
   private boolean applyCudaServerExe() {
-    if (!PlatformPaths.isWindows()) return false;
+    if (!PlatformPaths.isWindows() || !gpuAccelerationAllowed()) return false;
     Path cuda12Exe =
         homeDir
             .resolve("native-bin/llama-server/variants/cuda12")
@@ -2412,6 +2422,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    * next blocker.
    */
   private boolean applyOrtNativePath() {
+    if (!gpuAccelerationAllowed()) return false;
     Path cuda12Dir = homeDir.resolve("native-bin/llama-server/variants/cuda12");
     return writeOrtNativePathSysprop(cuda12Dir);
   }
@@ -2565,17 +2576,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   // ---------------------------------------------------------------------------
 
   private void checkPolicy() {
-    if (policyService == null) return;
-    try {
-      EffectivePolicy p = policyService.snapshot();
-      if (p != null && !p.downloadsEnabled()) {
-        throw new AiInstallException(
-            403, ApiErrorCode.DOWNLOADS_DISABLED, "Downloads disabled by administrator policy.");
-      }
-    } catch (AiInstallException e) {
-      throw e;
-    } catch (Exception e) {
-      log.debug("Policy snapshot failed (best-effort)", e);
+    if (policyBlocksDownloads()) {
+      throw new AiInstallException(
+          403, ApiErrorCode.DOWNLOADS_DISABLED, "Downloads disabled by administrator policy.");
     }
   }
 
@@ -2583,8 +2586,20 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     if (policyService == null) return false;
     try {
       EffectivePolicy p = policyService.snapshot();
-      return p != null && !p.downloadsEnabled();
+      return p == null || !p.downloadsEnabled();
     } catch (Exception e) {
+      log.warn("Policy snapshot failed; downloads disabled", e);
+      return true;
+    }
+  }
+
+  private boolean gpuAccelerationAllowed() {
+    if (policyService == null) return true;
+    try {
+      EffectivePolicy p = policyService.snapshot();
+      return p != null && p.gpuAccelerationEnabled();
+    } catch (Exception e) {
+      log.warn("Policy snapshot failed; GPU acceleration disabled", e);
       return false;
     }
   }

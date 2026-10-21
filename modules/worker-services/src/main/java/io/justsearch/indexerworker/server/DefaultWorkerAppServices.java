@@ -515,6 +515,24 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         deferredSource);
   }
 
+  /** Replaces a stopped loop on the same generation without interrupting physical watches. */
+  public static DefaultWorkerAppServices prepareRuntimeReload(
+      WorkerExecutorRegistrations executors, InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
+      WorkerServiceConfiguration configuration, DefaultWorkerAppServices source) {
+    if (source.indexingLoop == null || source.producerOwnership.ownsLoop()
+        || !source.producerOwnership.ownsWatcher()) {
+      throw new IllegalStateException("Runtime reload source has not stopped its native loop");
+    }
+    var successor = new DefaultWorkerAppServices(executors, ctx, migrationActiveSupplier,
+        embeddingTelemetryEvents, indexingPacing, childControl, configuration, null, source);
+    successor.forcedPaths.addAll(source.forcedPaths);
+    return successor;
+  }
+
   private DefaultWorkerAppServices(
       WorkerExecutorRegistrations executors,
       InfraContext ctx,
@@ -1160,6 +1178,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   public boolean producerClosed() { return producerOwnership.closed(); }
 
+  /** A runtime-bound loop is still owned here, including while stopped for a close retry. */
+  public boolean ownsNativeProducer() {
+    return indexingLoop != null && producerOwnership.ownsLoop();
+  }
+
   /** Physical producer identity shared by wrappers of this exact service view. */
   public Object mutationOwnerToken() { return mutationOwnerToken; }
 
@@ -1672,6 +1695,23 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   @Override
   public void close() throws IOException {
     producerOwnership.close(workerWatcher, indexingLoop);
+  }
+
+  /** Stops native work and retains the watcher behind its mutation fence until replacement. */
+  public WorkerMutationAdmission.FinalFence closeForRuntimeReload()
+      throws IOException, InterruptedException, java.util.concurrent.TimeoutException {
+    var fence = mutationAdmission.beginFinalFence(mutationOwnerToken, 5_000);
+    if (fence == null) {
+      throw new java.util.concurrent.TimeoutException("Old producer mutations are still running");
+    }
+    try {
+      closeNativeLoopRetainingModels();
+      fence.retireCurrentOwner();
+      return fence;
+    } catch (IOException | RuntimeException | Error failure) {
+      fence.close();
+      throw failure;
+    }
   }
 
   // ==================== Sandbox seam (tempdoc 410) ====================

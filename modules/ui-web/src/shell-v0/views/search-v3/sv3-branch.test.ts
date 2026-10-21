@@ -385,7 +385,7 @@ describe('the menu demultiplex', () => {
   });
 });
 
-describe('the KIND the gate reads comes from the RECORD, not from what the turn happened to do', () => {
+describe('the KIND a re-run reads comes from the RECORD, not from what the turn happened to do', () => {
   /**
    * Tempdoc 863 §4.A.5 F1 — the case every hand-built fixture in this file dodges by construction.
    *
@@ -397,7 +397,8 @@ describe('the KIND the gate reads comes from the RECORD, not from what the turn 
    * arrived at through the one shape of delegate run the inference cannot see.
    *
    * The fix is the record declaring the shape that dispatched the turn, so this fixture carries NO
-   * activity at all and the gate still fires. Built from WIRE events through the real projector,
+   * activity at all and the kind is still `agent` — which since WP1.2 S2.5 is what makes the window
+   * re-run it as a Delegate (the acts are offered; their tier is the turn's). Built from WIRE events through the real projector,
    * because a fixture that set `kind` by hand would assert nothing about the derivation.
    */
   const AGENT_SHAPE = { shapeId: 'core.agent-run' };
@@ -410,23 +411,19 @@ describe('the KIND the gate reads comes from the RECORD, not from what the turn 
       wire(stored(3), 'ASSISTANT_MESSAGE', 'The same lock.', ASK_SHAPE),
     ]);
 
-  it('reads a TOOL-LESS delegate turn as an agent turn, and withholds all three on it', () => {
+  it('reads a TOOL-LESS delegate turn as an agent turn, and offers it the acts on its store ids', () => {
     const turns = toolLessDelegateThenAsk();
 
     // The precondition that made this invisible: nothing in the turn's activity says "agent".
     expect(turns[0]?.activity.filter((e) => e.kind === 'tool' || e.kind === 'note')).toEqual([]);
-    // And the record says it anyway.
+    // And the record says it anyway — which is now what makes its Retry/Edit run the AGENT again
+    // (WP1.2 S2.5, `SearchV3View.runBranchAction`), where it used to be what withheld them.
     expect(turns[0]?.kind).toBe('agent');
 
     const lineage = projectSv3TurnLineage(turns, null, 'uc-1', []);
-    expect(lineage[0]?.canEdit).toBe(false);
-    expect(lineage[0]?.branchFromId).toBeNull();
-    expect(sv3BranchMenuItems(lineage, turns[0]!.id, { streaming: false })).toEqual([]);
-
-    // FAILS FOR THE RIGHT REASON: law 1 would have handed all three back, because both halves of
-    // this turn ARE store messages. Only the kind gate refuses.
-    expect(sv3TurnMessageIds(turns[0]!).userMsgId).not.toBeNull();
-    expect(sv3TurnMessageIds(turns[0]!).assistantMsgId).not.toBeNull();
+    expect(lineage[0]?.canEdit).toBe(true);
+    expect(lineage[0]?.branchFromId).toBe(stored(1));
+    expect(lineage[0]?.forkKey).toBe(EMPTY_PREFIX_SENTINEL);
   });
 
   it('reads the ask turn after it as an ask turn, which keeps its own affordances', () => {
@@ -456,31 +453,31 @@ describe('the KIND the gate reads comes from the RECORD, not from what the turn 
   });
 });
 
-describe('an agent turn withholds edit, retry and branch on its KIND (tempdoc 863 §4.A.5 A-8)', () => {
+describe('an agent turn is gated like an ask turn — by its ids, not its KIND (WP1.2 S2.5)', () => {
   /**
-   * Turn 0 is now a turn 863 slice A makes possible: an agent-tier run the CONVERSATION STORE
-   * reconciled, so both its halves are real store ids — the exact shape law 1 alone would hand
-   * `canEdit`/`branchFromId` back for. Turn 1 is an ordinary ask turn, also fully store-backed.
+   * Turn 0 is a turn 863 slice A makes possible: an agent-tier run the CONVERSATION STORE
+   * reconciled, so both its halves are real store ids. 863 §4.A.5 A-8 withheld all three acts on it
+   * by kind, because they re-dispatched through the ask tier; the window now re-runs it as a
+   * Delegate, so laws 1–3 alone decide. Turn 1 is an ordinary ask turn, also fully store-backed.
    */
   const AGENT_THEN_ASK: readonly Sv3Turn[] = [
     { ...recordTurn('t0', 0, 1), kind: 'agent' },
     recordTurn('t1', 2, 3),
   ];
 
-  it('an agent turn with fully valid STORE ids still offers nothing — the kind gate, not law 1', () => {
+  it('an agent turn with fully valid STORE ids offers what the same ask turn offers', () => {
     const lineage = projectSv3TurnLineage(AGENT_THEN_ASK, null, 'base', []);
 
-    // THE CASE LAW 1 CANNOT EXPLAIN. Both of the agent turn's own ids really are store messages —
-    // asserted here so the refusal below cannot be mistaken for the honest-null case where an id is
-    // simply missing. Only the explicit `turn.kind === 'agent'` check in `projectSv3TurnLineage`
-    // refuses what law 1 alone would allow.
     const ids = sv3TurnMessageIds(AGENT_THEN_ASK[0] as Sv3Turn);
     expect(ids.userMsgId).not.toBeNull();
     expect(ids.assistantMsgId).not.toBeNull();
 
-    expect(lineage[0]?.canEdit).toBe(false);
-    expect(lineage[0]?.branchFromId).toBeNull();
-    expect(sv3BranchMenuItems(lineage, 't0', { streaming: false })).toEqual([]);
+    expect(lineage[0]?.canEdit).toBe(true);
+    expect(lineage[0]?.branchFromId).toBe(stored(1));
+    expect(sv3BranchMenuItems(lineage, 't0', { streaming: false })).toEqual([
+      { id: 'retry', label: BRANCH_MENU_RETRY, enabled: true },
+      { id: 'branch', label: BRANCH_MENU_BRANCH, enabled: true },
+    ]);
   });
 
   it('the IDENTICAL turn with kind "ask" offers both — the control proving case 1 is about kind', () => {

@@ -7,13 +7,14 @@ date: 2026-02-07
 probes:
   - adr-0006-citation-scorer-wired
   - adr-0006-citation-match-ops-wired
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-20
 ---
 
 # ADR-0006: Two-Pronged Citation Strategy
 
 ## Status
-Accepted
+Accepted, amended 2026-10-20: verifier-backed rendering narrows the original
+primary/supplementary distinction. See the amendment below for current files.
 
 ## Context
 
@@ -97,3 +98,30 @@ Two things the check surfaced:
   cross-encoder verifier, not the model — but it re-derived that policy instead of reading it
   here. The probes now make the ADR's wiring mechanically visible; the cross-reference gap is
   recorded rather than retro-fixed.
+
+## Amendment 2026-10-20: model labels require verifier backing
+
+The two backend paths remain, but the original Decision and Positive Consequences
+overstate what model-authored labels alone can render. In a grounded answer with
+a known source count, `MarkdownBlock.normalizeLiteralCitationTokens` removes an
+in-range `[N]` if there is no verifier-backed citation for that label. A backed
+label becomes a source-level marker, or is stripped as a duplicate if already
+rendered. Only the sentence-level verifier weave supplies sentence underlining.
+Model placement alone does not attest that the sentence was verified.
+
+This stripping is deliberately bounded: code/pre content and out-of-range labels
+are left alone, and the ungrounded frame or an unknown source count does not use
+this rule. The broad claim that every literal model label is always removed
+would also be wrong. Absence of scorer output does not authorize an unbacked
+in-range citation in a grounded answer with known sources.
+
+The earlier Key files list is historical. Current entry points are:
+
+- Passage construction: `modules/app-inference/src/main/java/io/justsearch/app/inference/OnlineModeOps.java`
+  (`formatContextAsNumberedPassages`).
+- Scoring: `modules/reranker/src/main/java/io/justsearch/reranker/CitationScorer.java`
+  and `CitationScorerConfig.java` in the same package.
+- Index-half integration: `modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java`
+  and `CitationMatchOps.java` in the same package.
+- Rendering and hover cards: `modules/ui-web/src/shell-v0/components/chat/MarkdownBlock.ts`
+  and `CitationHoverCard.ts` in the same directory.

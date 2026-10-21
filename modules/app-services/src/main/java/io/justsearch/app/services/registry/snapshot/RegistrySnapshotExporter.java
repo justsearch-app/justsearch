@@ -36,7 +36,7 @@ import tools.jackson.databind.json.JsonMapper;
  * governance gate reads (tempdoc 560 §5/§6 — the NonEmpty&lt;ConsumerHook&gt; keystone). Governance
  * gates run in Node with no JVM, and the source {@code consumers()} is always empty in production
  * (real consumers are <em>derived</em>), so the truth must be computed in-JVM here and handed across
- * as data — the same {@code tmp/*.json} pattern the {@code module-deps} gate uses.
+ * as a JSON artifact under {@code tmp/}.
  *
  * <p><b>Merged consumer rule.</b> An operation's consumers are its inline {@link ConsumerHook}s
  * union its <em>executor-derived</em> consumers: every {@link ExecutorTag} is a real consuming

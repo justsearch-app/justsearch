@@ -21,6 +21,57 @@
 import { isTauriRuntime } from '../../utils/tauriRuntime.js';
 import { parseUrl } from './parser.js';
 import type { IntentRouter } from './intentRouter.js';
+import { setNativeSearchShortcutActive } from '../commands/KeybindingRegistry.js';
+
+export type SearchSummon = { kind: 'focusSearch' } | { kind: 'deepLink'; url: string };
+
+/** Subscribe before draining; teardown also covers startup and partial subscription failures. */
+export function installSearchSummonBridge(summon: (request: SearchSummon) => Promise<void>): () => void {
+  if (!isTauriRuntime()) return () => {};
+  let disposed = false;
+  let draining = false;
+  let requested = false;
+  let revision = -1;
+  const stops: Array<() => void> = [];
+  const stop = (): void => {
+    if (!disposed) setNativeSearchShortcutActive(false);
+    disposed = true;
+    for (const unsubscribe of stops.splice(0)) unsubscribe();
+  };
+  const updateStatus = (value: unknown): void => {
+    if (disposed || !value || typeof value !== 'object' || !('active' in value) || typeof value.active !== 'boolean') return;
+    const next = 'revision' in value && typeof value.revision === 'number' ? value.revision : 0;
+    if (next < revision) return;
+    revision = next;
+    setNativeSearchShortcutActive(value.active);
+  };
+  const start = async (): Promise<void> => {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const { listen } = await import('@tauri-apps/api/event');
+    const drain = async (): Promise<void> => {
+      requested = true;
+      if (draining || disposed) return;
+      draining = true;
+      try {
+        do {
+          requested = false;
+          const request = await invoke<SearchSummon | null>('take_search_summon');
+          if (request && !disposed) await summon(request);
+        } while (requested && !disposed);
+      } finally { draining = false; }
+    };
+    if (disposed) return;
+    stops.push(await listen('justsearch://search-shortcut-status', (event) => updateStatus(event.payload)));
+    if (disposed) { stop(); return; }
+    stops.push(await listen('justsearch://summon-search', () => { void drain().catch(() => {}); }));
+    if (disposed) { stop(); return; }
+    // Registration status must not delay an otherwise ready focus request.
+    void invoke('search_shortcut_status').then(updateStatus).catch(() => {});
+    await drain();
+  };
+  void start().catch(stop);
+  return stop;
+}
 
 const TAURI_EVENT_NAME = 'justsearch://deep-link';
 
