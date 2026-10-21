@@ -498,18 +498,59 @@ The scenarios are delegated orchestrator choices, not owner words. Linux and Win
       "items": [
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessReserveTest.java"
       ],
-      "class": "Structural rule kept",
-      "rule": "An append in flight at the drain deadline must finish through the storage fence within the remaining allowance, or stop must be refused and instance ownership retained; pending writes cannot append after the drain deadline.",
-      "whySurvives": "The test retains the held append, deadline-sized 150 ms allowance, real timed storage lock, pending writes, settled-writer observation, final append count, platform condition and tag. It observes whether the real fence acquired the lock and requires finish success exactly in that case, otherwise the retain-instance-lock refusal. A zero remaining reserve is accepted only after the measured total allowance has expired; a lost reserve before expiry still fails. This removes the unsupported scheduling assumption that a Windows runner cannot spend the entire allowance before reaching the fence; production deadlines and behavior are unchanged.",
+      "class": "New",
+      "behaviour": "At the drain deadline an append already holding the real recording lock completes at virtual 100 ms inside the 150 ms reserve, leaving a positive 50 ms for the real timed fence before finish returns. Pending writes cannot append afterward. A scripted monotonic clock makes expiry independent of CPU scheduling: missing reserve spends it in the drain and then fails the positive-reserve assertion. A package-private recording-only constructor avoids Windows native observation; production retains System.nanoTime and its own ReentrantLock. The check now runs in the cross-platform lane on Linux and Windows.",
       "sources": [
         {
           "kind": "owner-words",
           "quote": "Never weaken the property it protects (an append in flight at the deadline finishes within the reserve, or the stop is refused).",
           "location": "task t-20261019-91c3ab request (restart-a builder CI repair brief, 2026-10-21)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Make the time it sees controllable: an injectable clock or deadline seam in the witness, if one already exists or can be added minimally. Then an append in flight at the drain deadline must receive a positive reserve, and must finish within it.",
+          "location": "task t-20261019-91c3ab request (orchestrator Windows verifier-rejection follow-up, 2026-10-21)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "The test is Windows-only; if its logic can run on Linux with the Windows parts faked, run it here. Otherwise say plainly that it is unverified until hosted Windows.",
+          "location": "task t-20261019-91c3ab request (orchestrator Windows verifier-rejection follow-up, 2026-10-21)"
         }
       ],
-      "evidence": "gates/test-intent/evidence/restart-worker-witness-reserve-unverified.json",
-      "unresolvedRisks": "UNVERIFIED ON WINDOWS. run-evidence.mjs on Linux with windowsOnly selection records the check as skipped by EnabledOnOs, executed=false, and exits 1. Compilation is not a native execution pass. The supplied Windows CI logs show three original failures at the positive-reserve assertion; an independent Windows run is still required."
+      "evidence": "gates/test-intent/evidence/restart-worker-witness-no-reserve.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessReserveTest.java#anAppendInFlightAtTheDrainDeadlineCanFinishWithinTheFenceReserve"
+      ],
+      "repaired": false,
+      "mutationProof": "The evidence before run is b77d770d2 plus restart-worker-witness-no-reserve.patch: only the recording test seam and removal of the existing drain reserve. Candidate must pass and the no-reserve mutant must fail an assertion. This tests sensitivity, not a claim that b77d770d2 production lacks its reserve.",
+      "unresolvedRisks": "Only process observation is disabled in the harness; the production writer, admission closure, pending queue, finish algorithm and storage lock execute. The clock waits for the real writer unlock before advancing to virtual 100 ms; the real timed tryLock then acquires uncontended storage, so success does not race CPU scheduling against the remaining 50 ms. Native Windows job observation remains unverified by these portable checks; its existing Windows-only tests remain unchanged. The prior skipped evidence restart-worker-witness-reserve-unverified.json is retained as historical unverified evidence."
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessReserveTest.java"
+      ],
+      "class": "New",
+      "behaviour": "When virtual time reaches the full allowance before the fence and an append still owns storage, finish throws the retain-instance-lock instruction. The real recording lock remains held, an immediate retry also refuses, and only releasing and settling the append allows finish to return. Pending writes remain prohibited. The witness does not own or expose app.lock: the assertion concerns what its caller is told to do, not a claim that this class retains a caller-owned lock.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Keep a separate check for the refusal path, where the reserve really expires before the fence: the stop is refused and the instance lock is kept, asserted on the lock itself if the witness exposes it, or else on what the caller is told to do.",
+          "location": "task t-20261019-91c3ab request (orchestrator Windows verifier-rejection follow-up, 2026-10-21)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "The test is Windows-only; if its logic can run on Linux with the Windows parts faked, run it here. Otherwise say plainly that it is unverified until hosted Windows.",
+          "location": "task t-20261019-91c3ab request (orchestrator Windows verifier-rejection follow-up, 2026-10-21)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/restart-worker-witness-no-fence.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessReserveTest.java#anAppendInFlightAtTheDrainDeadlineCanFinishWithinTheFenceReserve",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessReserveTest.java#anExpiredFenceRefusesStopUntilStorageSettlesAndTellsTheCallerToRetainItsLock"
+      ],
+      "repaired": false,
+      "mutationProof": "The evidence before run is b77d770d2 plus restart-worker-witness-no-fence.patch: only the recording test seam and removal of the storage fence. Both checks must fail assertions: missing fence observation in the success case and missing refusal in the expired case. This is an injected sensitivity check, not a production regression at b77d770d2.",
+      "unresolvedRisks": "Native Windows process observation and end-to-end caller instance-lock ownership are outside this witness harness. Refusal, active storage ownership, refusal on retry and recovery after storage settles are directly exercised on Linux without timing assumptions."
     }
   ]
 }

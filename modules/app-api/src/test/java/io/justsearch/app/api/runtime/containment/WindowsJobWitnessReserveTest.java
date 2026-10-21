@@ -2,7 +2,8 @@
 package io.justsearch.app.api.runtime.containment;
 
 import static org.junit.jupiter.api.Assertions.*;
-import java.lang.foreign.*;
+import io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter.EngineIdentity;
+import io.justsearch.app.api.runtime.ledger.LedgerRecordType;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Map;
@@ -10,99 +11,148 @@ import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
-import io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter.EngineIdentity;
-import io.justsearch.app.api.runtime.ledger.LedgerRecordType;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledOnOs;
-import org.junit.jupiter.api.condition.OS;
 
-@EnabledOnOs(OS.WINDOWS)
-@Tag("windows")
+/** The real writer and finish logic, without Windows process observation or wall-clock races. */
+@Tag("cross-platform")
 final class WindowsJobWitnessReserveTest {
-  @Test void anAppendInFlightAtTheDrainDeadlineCanFinishWithinTheFenceReserve() throws Throwable {
-    var kernel = SymbolLookup.libraryLookup("kernel32", Arena.global());
-    var linker = Linker.nativeLinker();
-    var create = linker.downcallHandle(kernel.find("CreateJobObjectW").orElseThrow(),
-        FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-    var close = linker.downcallHandle(kernel.find("CloseHandle").orElseThrow(),
-        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
-    MemorySegment job = (MemorySegment) create.invokeExact(MemorySegment.NULL, MemorySegment.NULL);
-    assertNotEquals(0, job.address()); // Empty job; no process is joined or terminated.
-    var witness = WindowsJobWitness.associate(job);
-    var appends = new java.util.concurrent.atomic.AtomicInteger();
+  private static final Duration ALLOWANCE = Duration.ofMillis(150);
+
+  @Test void anAppendInFlightAtTheDrainDeadlineCanFinishWithinTheFenceReserve() throws Exception {
+    var releaseAppend = new CountDownLatch(1);
+    var appendReturning = new CountDownLatch(1);
+    var storageReleased = new CountDownLatch(1);
+    var fenceReached = new AtomicBoolean();
+    var clockReads = new AtomicInteger();
+    var gate = new ReentrantLock() {
+      @Override public boolean tryLock(long timeout, TimeUnit unit) throws InterruptedException {
+        fenceReached.set(true);
+        assertEquals(Duration.ofMillis(50).toNanos(), unit.toNanos(timeout),
+            "the in-flight append must receive the positive fence reserve");
+        return super.tryLock(timeout, unit);
+      }
+
+      @Override public void unlock() {
+        super.unlock();
+        storageReleased.countDown();
+      }
+    };
+    var witness = new WindowsJobWitness(() -> {
+      int read = clockReads.incrementAndGet();
+      if (read <= 2) return 0; // Start and drain deadline: the append is still blocked.
+      if (read == 3) {
+        releaseAppend.countDown();
+        assertTrue(assertDoesNotThrow(() -> storageReleased.await(5, TimeUnit.SECONDS)),
+            "the append must release its real storage lock before virtual time advances");
+        return Duration.ofMillis(100).toNanos(); // Completes inside the 150 ms reserve.
+      }
+      // A drainer that spends the reserve reaches expiry before its fence call.
+      return ALLOWANCE.toNanos();
+    }, gate);
+    var appends = new AtomicInteger();
+    try {
+      startBlockedAppend(witness, releaseAppend, appendReturning, appends);
+      enqueue(witness);
+      enqueue(witness);
+      assertDoesNotThrow(() -> witness.finish(ALLOWANCE),
+          "an append in flight at the drain deadline must finish within its reserve");
+      assertTrue(fenceReached.get(), "finish must fence storage before returning");
+      assertEquals(0, appendReturning.getCount(), "the append must return before finish succeeds");
+      assertEquals(3, clockReads.get(), "finish must reach the fence before virtual expiry");
+      awaitIdle(witness);
+      assertEquals(1, appends.get(), "pending appends must stop at the drain deadline");
+    } finally {
+      releaseAppend.countDown();
+      witness.close();
+    }
+  }
+
+  @Test void anExpiredFenceRefusesStopUntilStorageSettlesAndTellsTheCallerToRetainItsLock()
+      throws Exception {
+    var releaseAppend = new CountDownLatch(1);
+    var appendReturning = new CountDownLatch(1);
+    var clockReads = new AtomicInteger();
+    var fenceReached = new AtomicBoolean();
+    var gate = new ReentrantLock() {
+      @Override public boolean tryLock(long timeout, TimeUnit unit) throws InterruptedException {
+        fenceReached.set(true);
+        assertEquals(0, timeout, "the reserve has really expired before the fence");
+        return super.tryLock(timeout, unit);
+      }
+    };
+    // Time expires between the drain-deadline read and the fence, independently of CPU speed.
+    var witness = new WindowsJobWitness(
+        () -> clockReads.incrementAndGet() <= 2 ? 0 : ALLOWANCE.toNanos(), gate);
+    var appends = new AtomicInteger();
+    try {
+      startBlockedAppend(witness, releaseAppend, appendReturning, appends);
+      enqueue(witness);
+      assertRetainLockRefusal(witness, ALLOWANCE);
+      assertTrue(fenceReached.get(), "refusal must come from the real storage fence");
+      assertFalse(gate.tryLock(), "the append must still own the storage lock on refusal");
+      assertEquals(1, releaseAppend.getCount(), "storage must remain blocked during refusal");
+      assertEquals(1, appendReturning.getCount(), "the refused append must still be in flight");
+      assertRetainLockRefusal(witness, Duration.ZERO);
+      releaseAppend.countDown();
+      awaitIdle(witness);
+      assertDoesNotThrow(() -> witness.finish(Duration.ZERO),
+          "only settled storage permits the caller to complete stop and release its lock");
+      assertEquals(1, appends.get(), "a refused finish must still prohibit pending appends");
+    } finally {
+      releaseAppend.countDown();
+      witness.close();
+    }
+  }
+
+  private static void assertRetainLockRefusal(WindowsJobWitness witness, Duration allowance) {
+    var refusal = assertThrows(IllegalStateException.class, () -> witness.finish(allowance),
+        "stop must be refused while storage is active, including on a retry");
+    // app.lock belongs to the caller, not this witness. Assert its instruction, not a claim
+    // that this class owns or releases that lock; the real recording lock is checked above.
+    assertEquals("Exit witness storage is still active; retain the instance lock", refusal.getMessage());
+  }
+
+  private static void startBlockedAppend(WindowsJobWitness witness, CountDownLatch release,
+      CountDownLatch returning, AtomicInteger appends) throws Exception {
+    var started = new CountDownLatch(1);
+    witness.attach((type, fields) -> {
+      appends.incrementAndGet();
+      started.countDown();
+      try {
+        release.await();
+        return true;
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        return false;
+      } finally {
+        returning.countDown();
+      }
+    }, new EngineIdentity(1, Optional.empty(), "fence-reserve"));
+    enqueue(witness);
+    assertTrue(started.await(5, TimeUnit.SECONDS), "the append must be in flight before finish");
+  }
+
+  private static void enqueue(WindowsJobWitness witness) throws Exception {
     var enqueue = WindowsJobWitness.class.getDeclaredMethod("enqueue", LedgerRecordType.class, Map.class);
     enqueue.setAccessible(true);
+    enqueue.invoke(witness, LedgerRecordType.LEDGER_GAP, Map.of("reason", "WRITE_FAILED"));
+  }
+
+  private static void awaitIdle(WindowsJobWitness witness) throws Exception {
     var writing = WindowsJobWitness.class.getDeclaredField("writing");
     writing.setAccessible(true);
     var pending = WindowsJobWitness.class.getDeclaredField("pending");
     pending.setAccessible(true);
-    var recordingGate = WindowsJobWitness.class.getDeclaredField("recordingGate");
-    recordingGate.setAccessible(true);
-    var appendStarted = new CountDownLatch(1);
-    var releaseAppend = new CountDownLatch(1);
-    var finishStarted = new AtomicLong();
-    var fenced = new AtomicBoolean();
-    var allowance = Duration.ofMillis(150);
-    // Observe the real fence call, after finish has closed admission and cleared pending work.
-    // Release storage here instead of racing a producer against the drain deadline.
-    recordingGate.set(witness, new ReentrantLock() {
-      @Override public boolean tryLock(long timeout, TimeUnit unit) throws InterruptedException {
-        assertTrue(timeout >= 0 && unit.toNanos(timeout) <= allowance.toNanos(),
-            "the fence must stay within the total allowance");
-        if (timeout == 0) {
-          assertTrue(System.nanoTime() - finishStarted.get() >= allowance.toNanos(),
-              "the in-flight append must receive the reserve until the allowance expires");
-        }
-        releaseAppend.countDown();
-        boolean acquired = super.tryLock(timeout, unit);
-        fenced.set(acquired);
-        return acquired;
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    synchronized (witness) {
+      while (writing.getBoolean(witness) || !((ArrayDeque<?>) pending.get(witness)).isEmpty()) {
+        long left = deadline - System.nanoTime();
+        assertTrue(left > 0, "the writer must finish processing the queue");
+        TimeUnit.NANOSECONDS.timedWait(witness, left);
       }
-    });
-    try {
-      witness.attach((type, fields) -> {
-        appends.incrementAndGet();
-        appendStarted.countDown();
-        try { releaseAppend.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-        return true;
-      }, new EngineIdentity(1, Optional.empty(), "fence-reserve"));
-      enqueue.invoke(witness, LedgerRecordType.LEDGER_GAP, Map.of("reason", "WRITE_FAILED"));
-      assertTrue(appendStarted.await(5, TimeUnit.SECONDS), "the first append must be in flight");
-      for (int i = 0; i < 2; i++) enqueue.invoke(witness, LedgerRecordType.LEDGER_GAP,
-          Map.of("reason", "WRITE_FAILED"));
-      // The whole allowance is the 150 ms reserve, making the drain deadline immediate.
-      finishStarted.set(System.nanoTime());
-      boolean finished;
-      try {
-        witness.finish(allowance);
-        finished = true;
-      } catch (IllegalStateException refused) {
-        assertEquals("Exit witness storage is still active; retain the instance lock",
-            refused.getMessage());
-        finished = false;
-      }
-      // A cold or descheduled Windows runner can consume the allowance before the fence.
-      // Success still requires the real storage lock; otherwise ownership must be retained.
-      assertEquals(fenced.get(), finished,
-          "finish may succeed only after the in-flight append has been fenced");
-      assertEquals(0, releaseAppend.getCount(), "finish must reach the storage fence");
-      // Wait for the writer to settle, so a forbidden pending append cannot escape the count.
-      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-      synchronized (witness) {
-        while (writing.getBoolean(witness) || !((ArrayDeque<?>) pending.get(witness)).isEmpty()) {
-          long left = deadline - System.nanoTime();
-          assertTrue(left > 0, "the writer must finish processing the queue");
-          TimeUnit.NANOSECONDS.timedWait(witness, left);
-        }
-      }
-      assertEquals(1, appends.get(), "only the append in flight may finish after the drain deadline");
-    } finally {
-      releaseAppend.countDown();
-      witness.close();
-      int ignored = (int) close.invokeExact(job);
     }
   }
 }
