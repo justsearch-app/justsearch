@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -272,8 +273,8 @@ class RuntimeActivationServiceTest {
       when(policy.snapshot()).thenReturn(effective);
       var service = new RuntimeActivationService(processExecutors, OnlineAiService.unavailable(),
           intent.settings(), null, policy, null, handle);
-      org.junit.jupiter.api.Assertions.assertSame(failure,
-          org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+      assertSame(failure,
+          assertThrows(IllegalStateException.class,
               () -> service.startActivate("cuda12")));
       assertEquals("failed", service.getActivationStatus().state);
       service.startActivate("cuda12");
@@ -347,10 +348,10 @@ class RuntimeActivationServiceTest {
           intent.settings(), null, policy, null, handle);
 
       var attempt = service.startActivate("cuda12");
-      var completionFailure = org.junit.jupiter.api.Assertions.assertThrows(
+      var completionFailure = assertThrows(
           java.util.concurrent.CompletionException.class,
           () -> attempt.completion().toCompletableFuture().join());
-      org.junit.jupiter.api.Assertions.assertSame(publicationFailure, completionFailure.getCause());
+      assertSame(publicationFailure, completionFailure.getCause());
       assertEquals("RUNTIME_ACTIVATION_FAILED", service.getActivationStatus().errorCode);
       assertEquals(ComponentState.STARTING, handle.snapshot().state());
     }

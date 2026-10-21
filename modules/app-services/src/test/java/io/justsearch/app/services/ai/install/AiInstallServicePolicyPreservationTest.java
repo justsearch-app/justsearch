@@ -35,7 +35,7 @@ final class AiInstallServicePolicyPreservationTest {
       var facts = new GpuCapabilities.Effective(vram > 0, "fixture", GpuCapabilities.Confidence.HIGH,
           null, null, null, 1, vram, vram, 0L,
           new GpuCapabilities.Cuda(vram > 0, "fixture", GpuCapabilities.Confidence.HIGH));
-      try (var gpu = mockConstruction(GpuCapabilityResolver.class,
+      try (var _ = mockConstruction(GpuCapabilityResolver.class,
           (mock, context) -> when(mock.snapshot()).thenReturn(new GpuCapabilities(null, null, facts)))) {
         var service = new AiInstallService(null, null, null, null, home);
         var profile = service.buildHardwareProfile();

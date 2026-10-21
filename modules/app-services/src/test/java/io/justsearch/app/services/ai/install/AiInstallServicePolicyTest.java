@@ -115,7 +115,7 @@ final class AiInstallServicePolicyTest {
   void configuredSnapshotFailureMakesCapableHardwareCpuOnly() throws Exception {
     for (EnterprisePolicyService policy : List.<EnterprisePolicyService>of(
         () -> null, () -> { throw new IllegalStateException("GPU policy read failed"); })) {
-      try (var gpu = capableGpu(12_000_000_000L)) {
+      try (var _ = capableGpu(12_000_000_000L)) {
         assertEquals(DownloadProfile.CPU, service(policy).buildHardwareProfile().downloadProfile());
       }
     }
@@ -143,7 +143,7 @@ final class AiInstallServicePolicyTest {
     Files.writeString(retained, "installed CUDA bytes");
     NativeTargets windows = NativeTargets.forTarget("windows-x86_64");
     try (var target = mockStatic(NativeTargets.class, CALLS_REAL_METHODS);
-         var gpu = capableGpu(vram);
+         var _ = capableGpu(vram);
          var restore = mockStatic(RuntimeRestoreUtil.class);
          var stages = mockConstruction(StagedAcquisition.class,
              (mock, context) -> when(mock.run(anyList(), any())).thenReturn(true))) {
@@ -208,7 +208,7 @@ final class AiInstallServicePolicyTest {
   void absentServiceAndPermissiveServiceKeepAllThreePlans() throws Exception {
     for (EnterprisePolicyService policy : new EnterprisePolicyService[] {null, () -> policy(true, true)}) {
       for (long vram : new long[] {12_000_000_000L, 6_000_000_000L, -1}) {
-        try (var gpu = capableGpu(vram)) {
+        try (var _ = capableGpu(vram)) {
           var hardware = service(policy).buildHardwareProfile();
           assertEquals(vram < 0 ? DownloadProfile.CPU
               : vram > 7_500_000_000L ? DownloadProfile.GPU_FULL : DownloadProfile.GPU_LITE,

@@ -883,7 +883,7 @@ public class HeadlessApp {
       java.util.Objects.requireNonNull(new EnterprisePolicyServiceImpl().snapshot());
     } catch (Exception failure) {
       log.warn("Boot policy load failed; GPU acceleration disabled", failure);
-      System.setProperty("policy.gpu_acceleration_enabled", "false");
+      SystemAccess.setSysProp("policy.gpu_acceleration_enabled", "false");
     }
   }
 

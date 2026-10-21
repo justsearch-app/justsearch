@@ -45,7 +45,7 @@ final class HeadlessAppCudaPolicyTest {
 
   private void assertFailedLoadVeto(boolean throwsException) {
     String prior = System.getProperty("policy.gpu_acceleration_enabled");
-    try (var policy = mockConstruction(EnterprisePolicyServiceImpl.class, (mock, context) -> {
+    try (var _ = mockConstruction(EnterprisePolicyServiceImpl.class, (mock, context) -> {
       if (throwsException) when(mock.snapshot()).thenThrow(new IllegalStateException("load failed"));
       else when(mock.snapshot()).thenReturn(null);
     })) {
@@ -83,7 +83,7 @@ final class HeadlessAppCudaPolicyTest {
     NativeTargets windows = NativeTargets.forTarget("windows-x86_64");
     try (var targets = mockStatic(NativeTargets.class, CALLS_REAL_METHODS);
          var platform = mockStatic(PlatformPaths.class, CALLS_REAL_METHODS);
-         var policy = mockConstruction(EnterprisePolicyServiceImpl.class,
+         var _ = mockConstruction(EnterprisePolicyServiceImpl.class,
              (mock, context) -> when(mock.snapshot()).thenThrow(new IllegalStateException("boot failed")))) {
       targets.when(NativeTargets::current).thenReturn(windows);
       platform.when(PlatformPaths::isWindows).thenReturn(true);
