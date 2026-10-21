@@ -31,8 +31,13 @@ Baseline signature preservation is also run on the unchanged production sources 
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "**The desktop app checks for updates on launch** when a release URL is embedded in the build.",
-          "location": "README.md:228"
+          "quote": "**The desktop app checks for updates by default**, about 30 seconds after the desktop chrome mounts when a release URL is embedded.",
+          "location": "README.md:231-232"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "yes",
+          "location": "task t-20261019-9d870e user turn 2026-10-21, answer to the question: merge the G6 fix, so in-app update checks start working and contact the release server at launch?"
         },
         {
           "kind": "delegated-choice",
@@ -57,8 +62,13 @@ Baseline signature preservation is also run on the unchanged production sources 
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "signed update metadata from GitHub",
-          "location": "README.md:230"
+          "quote": "Discovery fetches `release.v1.json`, `release.v1.json.sig` and `latest.json` from GitHub",
+          "location": "README.md:233"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "yes",
+          "location": "task t-20261019-9d870e user turn 2026-10-21, answer to the question: merge the G6 fix, so in-app update checks start working and contact the release server at launch?"
         },
         {
           "kind": "delegated-choice",
