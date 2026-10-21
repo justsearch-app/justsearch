@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: builder-uiux-status-continuation-20261021
+author-session: builder-uiux-status-followup-6-20261021
 ---
 
 # Test-intent entries
@@ -14,6 +14,8 @@ Third-verifier follow-up: Brain honours explicit stale flags as well as observat
 Fourth-verifier follow-up: all remaining current indexing claims use shared confirmation and hold scope, including Health connection and summary, Brain deferral, file rows, both Search paths and declared liveness. The final durable sweep has original-base and exact-repair-base evidence. Existing fixture adaptations preserve their assertions; independent final acceptance remains required.
 
 Fifth-verifier follow-up: the independent inventory adds worker encoder/passage readiness, stale migration readouts and empty roots, overlay/fallback-dot animations, all indexing live regions, and Brain runtime queue counters. New regression evidence includes both the original and exact repair baseline; existing author evidence is regenerated after final test edits. No acceptance record is authored here.
+
+Sixth-verifier follow-up: Library empty roots and its rebuild/activation panel now use shared observation confirmation, and Search v3 Ask leaves observed-state announcements to the deck while preserving the reachable refusal description. The durable follow-up file has generated original-base evidence below and exact repair-base evidence at `gates/test-intent/evidence/uiux-status-followup-6-af0242136.json`. Existing acceptance records are preserved; the final digest requires independent acceptance.
 
 The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.1–S33.6. Each source retains its original ID in agreedScenario and its verbatim agreed quote.
 
@@ -700,6 +702,44 @@ The gate accepts only letter/digit scenario identifiers: S331–S336 encode S33.
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-status-missed-preservation.json"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "S33.4/S33.6: Library empty roots and rebuild/activation controls qualify retained MIGRATING, SWITCHING and AWAITING_ACCEPTANCE observations after age expiry, explicit worker/indexing staleness, unavailable index and Engine contact loss; fresh observations restore the current wording and a settled empty Library keeps its no-folders state. The gap list and controls remain reachable. Search v3 Ask keeps its refusal description reachable from Send while the deck owns the single indexing announcement; semantic stale/fresh/energy changes announce once and identical polls remain silent. Three assertions fail on af0242136; original-base evidence is also retained. This adds no wire field or scheduling change.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S334",
+          "quote": "S33.4 When a reason clears, its explanation disappears after the next fresh status observation; when status is stale or unavailable, surfaces mark the observation as unconfirmed instead of asserting current activity or quiescence.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.4"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S336",
+          "quote": "S33.6 The same state is described consistently on status deck, task list, Health, Library rows and the overlay; changes are announced once to screen readers, not on every poll.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.6"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX designs and implementation, including WP3.3 automatic-hold wording and read-only status observability; automatic hold actuation remains unchanged.",
+          "choice": "Decision 4: keep operating.indexing as is; the UI words reasons by the work they hold, and the contract docs state that PAUSED with automatic reasons means GPU bulk/enrichment held (no wire state change). Preserve old strict clients by retaining the original public status shape. Explain idle enrichment and interleaved sparse scheduling separately: energy saver defers idle work, GPU holds also defer sparse work between files on CPU. Placement is unreported; CPU-only idle work may continue under GPU holds. Fixed wording is authored once in the shared activity projection; the status deck owns its semantic live announcement.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-status-followup-6.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts"
+      ],
+      "repaired": true
     }
   ]
 }

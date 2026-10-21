@@ -1529,7 +1529,9 @@ export class LibrarySurface extends JfElement {
       ${this.loading
         ? html`<div class="empty">Loading…</div>`
         : this.roots.length === 0
-          ? this.provisional
+          ? !this.indexingActivity.confirmed
+            ? html`<div class="empty">${this.indexingActivity.summary}</div>`
+            : this.provisional
             ? html`<div class="empty">
                 Rebuilding index… your watched folders will reappear when it finishes.
               </div>`
@@ -1584,13 +1586,16 @@ export class LibrarySurface extends JfElement {
     if (!this.reindexCancelKey) return nothing;
     const decision = this.gapDecision;
     const waitingForGaps = this.observedGapKey === this.reindexCancelKey;
+    const confirmed = this.indexingActivity.confirmed;
     return html`<section class="gap-decision" aria-label=${waitingForGaps ? 'Migration gaps' : 'Rebuild control'}>
-      <h3>${waitingForGaps ? 'New index — activation requires your decision' : 'New index is being built'}</h3>
+      <h3>${!confirmed ? this.indexingActivity.summary
+        : waitingForGaps ? 'New index — activation requires your decision' : 'New index is being built'}</h3>
+      ${!confirmed ? html`<p>Rebuild details are last observed; current progress and index availability are unconfirmed.</p>` : nothing}
       ${waitingForGaps && decision ? html`
         <p>${decision.gaps.length} document${decision.gaps.length === 1 ? '' : 's'} could not be
-          included in the new index. Your current index stays available until you accept this list.</p>
+          included in the new index.${confirmed ? ' Your current index stays available until you accept this list.' : nothing}</p>
         <ul>${decision.gaps.map((gap) => html`<li>${gap.unitId}: ${gap.reason}</li>`)}</ul>
-      ` : waitingForGaps ? html`<p>Reading the migration gap list…</p>`
+      ` : !confirmed ? nothing : waitingForGaps ? html`<p>Reading the migration gap list…</p>`
         : html`<p>Your current index stays available during the rebuild.</p>`}
       <div class="actions">
         ${waitingForGaps && decision ? html`
@@ -1604,7 +1609,7 @@ export class LibrarySurface extends JfElement {
       </div>
       ${this.gapDecisionError ? html`<p role="alert">${this.gapDecisionError}</p>` : nothing}
       ${this.reindexCancelError ? html`<p role="alert">${this.reindexCancelError}</p>` : nothing}
-      ${this.reindexCancelRecorded ? html`<p role="status">Rebuild cancellation recorded. Your current index stays available.</p>` : nothing}
+      ${this.reindexCancelRecorded ? html`<p role="status">Rebuild cancellation recorded.</p>` : nothing}
     </section>`;
   }
 }
