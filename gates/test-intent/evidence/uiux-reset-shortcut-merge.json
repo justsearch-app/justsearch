@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-21T07:10:24.206Z",
-  "revision": "05b381c4d0d78eba87c7b570a8ce9505dc6fef07",
-  "tree": "5a5dea2e8ac0541d37ab6dda8026bed98570624d",
+  "createdAt": "2026-10-21T08:12:47.476Z",
+  "revision": "5892d22d373ce5e246b66e01740506f897b43f44",
+  "tree": "fd61a2201bb9deb696c24d9101d10bdaeeb29907",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::m2_incomplete_reset_never_initializes_shortcuts_and_cancel_preserves_saved_choice\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1483
+      "durationMs": 1513
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::m3_completed_reset_removes_shortcut_choice_before_initialization\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3509
+      "durationMs": 3505
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/shell/src-tauri/src/lib.rs#tests::m2_incomplete_reset_never_initializes_shortcuts_and_cancel_preserves_saved_choice",
       "file": "modules/shell/src-tauri/src/lib.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:5ae0b8e38dc467ed234aa1ae494fa9884e57d281c2ef3cc7e2dcaf67327fc01c",
+      "contentDigest": "sha256:ace67dd3566d26e193e116ab9f4809bdfd20f8602bddc397a9c0581562014a1d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/shell/src-tauri/src/lib.rs#tests::m3_completed_reset_removes_shortcut_choice_before_initialization",
       "file": "modules/shell/src-tauri/src/lib.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:5ae0b8e38dc467ed234aa1ae494fa9884e57d281c2ef3cc7e2dcaf67327fc01c",
+      "contentDigest": "sha256:ace67dd3566d26e193e116ab9f4809bdfd20f8602bddc397a9c0581562014a1d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -63,5 +63,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:a299038f84fbd665f1ae5c20a2a1d8c30c552e12a78ab96e2fe4f58174d9ff94"
+  "digest": "sha256:b73feadacba6f09a9b9d11fb376d71fa905bb316ae34e2eec7d184ffe894d822"
 }

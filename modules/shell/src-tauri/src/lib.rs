@@ -1707,6 +1707,8 @@ fn retry_factory_reset(
     if status.phase != factory_reset::Phase::Incomplete {
         return Err("Reset is not incomplete".into());
     }
+    let dir = resolve_app_data_dir(&app)?;
+    factory_reset::retry(&dir)?;
     app.request_restart();
     Ok(())
 }

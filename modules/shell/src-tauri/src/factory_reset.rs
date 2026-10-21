@@ -391,13 +391,39 @@ fn clear_marker(dir: &Path) -> Result<(), String> {
     sync_directory(dir)
 }
 
-pub(crate) fn cancel(dir: &Path) -> Result<(), String> {
-    if read_status(dir).phase != Phase::Incomplete {
-        return Err("Only an incomplete reset can be cancelled".into());
+/// The caller authorizes recovery actions from the displayed, in-memory phase.
+/// A failed status write/read can leave requested, incomplete or idle on disk.
+pub(crate) fn retry(dir: &Path) -> Result<(), String> {
+    let status = load(dir).map_err(|e| {
+        format!(
+            "Cannot retry reset: cannot read {}: {e}",
+            dir.join(MARKER).display()
+        )
+    })?;
+    if status.reason.is_some() {
+        return Err("A newer version of JustSearch left this reset file. Update JustSearch to finish it or cancel reset to keep using this version.".into());
     }
+    // Commit intent before restarting, including when a failed read displayed an
+    // incomplete reset over a cancellation receipt. Surface write errors in place.
+    save(dir, &Status::new(Phase::Requested)).map_err(|e| {
+        format!(
+            "Cannot retry reset: cannot write {}: {e}",
+            dir.join(MARKER).display()
+        )
+    })
+}
+
+pub(crate) fn cancel(dir: &Path) -> Result<(), String> {
+    // The shell checks the displayed phase; reloading it here would reject a
+    // recovery action when persisting the incomplete status previously failed.
     // Never unlink destructive intent: a power loss must not resurrect it after
     // cancellation has allowed new stores to be written. Keep a durable tombstone.
-    save(dir, &Status::new(Phase::Idle))
+    save(dir, &Status::new(Phase::Idle)).map_err(|e| {
+        format!(
+            "Cannot cancel reset: cannot write {}: {e}",
+            dir.join(MARKER).display()
+        )
+    })
 }
 
 pub(crate) fn dismiss(dir: &Path) -> Result<(), String> {
@@ -419,6 +445,160 @@ mod tests {
         let path = dir.join(name);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, bytes).unwrap();
+    }
+
+    // Exercise real permission errors without changing process-wide credentials.
+    #[cfg(unix)]
+    fn recovery_actions_follow_displayed_incomplete(disk_phase: Phase) {
+        use std::os::unix::fs::PermissionsExt;
+        let mut failures = Vec::new();
+        for writable in [false, true] {
+            for action in ["cancel", "retry"] {
+                let dir = temp();
+                seed(dir.path(), "conversations/remaining", b"remaining data");
+                seed(
+                    dir.path(),
+                    "search-shortcut.v1.json",
+                    br#"{"version":1,"enabled":false}"#,
+                );
+                seed(
+                    dir.path(),
+                    MARKER,
+                    serde_json::json!({"format_version": 1, "phase": disk_phase, "remaining": []})
+                        .to_string()
+                        .as_bytes(),
+                );
+                let marker_before = fs::read(dir.path().join(MARKER)).unwrap();
+                // Requested/incomplete: cleanup fails before progress can be persisted.
+                // Cancelled: even reading the idle marker fails, so the screen is incomplete.
+                let shown = if disk_phase == Phase::Idle {
+                    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o000)).unwrap();
+                    read_status(dir.path())
+                } else {
+                    run_pending(dir.path(), || {
+                        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o555)).unwrap();
+                        Err("owned process could not be reconciled".into())
+                    })
+                };
+                fs::set_permissions(
+                    dir.path(),
+                    fs::Permissions::from_mode(if writable { 0o755 } else { 0o555 }),
+                )
+                .unwrap();
+                assert_eq!(shown.phase, Phase::Incomplete);
+                assert_eq!(fs::read(dir.path().join(MARKER)).unwrap(), marker_before);
+                let outcome = if action == "cancel" {
+                    cancel(dir.path())
+                } else {
+                    retry(dir.path())
+                };
+                // Always restore permissions before assertions / TempDir cleanup.
+                fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o755)).unwrap();
+                if writable {
+                    if outcome.is_err() {
+                        failures.push(format!("{action}, {disk_phase:?}: {outcome:?}"));
+                    } else {
+                        let expected = if action == "cancel" {
+                            Phase::Idle
+                        } else {
+                            Phase::Requested
+                        };
+                        if read_status(dir.path()).phase != expected {
+                            failures.push(format!(
+                                "{action}, {disk_phase:?}: expected {expected:?}, got {:?}",
+                                read_status(dir.path()).phase
+                            ));
+                        }
+                        if action == "cancel" {
+                            let normal = run_pending(dir.path(), || {
+                                panic!("cancel must not delete remaining data")
+                            });
+                            assert!(!normal.blocks_backend());
+                        } else {
+                            assert_eq!(
+                                run_pending(dir.path(), || Ok(())).phase,
+                                Phase::AwaitingStorage
+                            );
+                            assert!(!dir.path().join("conversations").exists());
+                            assert!(!dir.path().join("search-shortcut.v1.json").exists());
+                            continue;
+                        }
+                    }
+                } else {
+                    let error = outcome.as_ref().err().map(String::as_str).unwrap_or("");
+                    if !error.contains("Permission denied") {
+                        failures.push(format!("{action}, {disk_phase:?}: expected file permission error, got {outcome:?}"));
+                    }
+                    assert_eq!(fs::read(dir.path().join(MARKER)).unwrap(), marker_before);
+                }
+                assert_eq!(
+                    fs::read(dir.path().join("conversations/remaining")).unwrap(),
+                    b"remaining data"
+                );
+                assert_eq!(
+                    fs::read(dir.path().join("search-shortcut.v1.json")).unwrap(),
+                    br#"{"version":1,"enabled":false}"#
+                );
+            }
+        }
+        assert_eq!(
+            failures,
+            Vec::<String>::new(),
+            "Recovery actions must use the displayed incomplete state"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn m2_requested_marker_recovery_actions_report_write_errors_and_resume_after_repair() {
+        recovery_actions_follow_displayed_incomplete(Phase::Requested);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn m2_incomplete_marker_recovery_actions_report_write_errors_and_resume_after_repair() {
+        recovery_actions_follow_displayed_incomplete(Phase::Incomplete);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn m2_cancelled_marker_recovery_actions_report_write_errors_and_resume_after_repair() {
+        recovery_actions_follow_displayed_incomplete(Phase::Idle);
+    }
+
+    #[test]
+    fn m2_retry_never_overwrites_a_newer_reset_file() {
+        for phase in ["requested", "incomplete", "idle"] {
+            let dir = temp();
+            let marker = format!(r#"{{"format_version":2,"phase":"{phase}"}}"#);
+            seed(dir.path(), MARKER, marker.as_bytes());
+            seed(dir.path(), "remaining", b"keep");
+            let result = retry(dir.path());
+            assert!(result.is_err());
+            assert_eq!(
+                fs::read(dir.path().join(MARKER)).unwrap(),
+                marker.as_bytes()
+            );
+            assert_eq!(fs::read(dir.path().join("remaining")).unwrap(), b"keep");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn m2_retry_never_overwrites_an_unreadable_reset_file() {
+        use std::os::unix::fs::PermissionsExt;
+        for phase in ["requested", "incomplete", "idle"] {
+            let dir = temp();
+            let marker = format!(r#"{{"format_version":2,"phase":"{phase}"}}"#);
+            seed(dir.path(), MARKER, marker.as_bytes());
+            let path = dir.path().join(MARKER);
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
+            assert_eq!(read_status(dir.path()).phase, Phase::Incomplete);
+            let result = retry(dir.path());
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+            assert!(result.is_err());
+            assert_eq!(fs::read(&path).unwrap(), marker.as_bytes());
+        }
     }
 
     #[test]

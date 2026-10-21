@@ -7,7 +7,8 @@ author-session: agent-session-iil745mt
 
 # Test-intent entries
 
-WP5.1 only. Sources are the owner's adopted area5 scenarios, with dot-free gate ids
+WP5.1 only. Sources are the owner's adopted area5 scenarios and explicitly labelled
+delegated choices RA5–RA7, with dot-free gate ids
 S51.n -> RSn and N51.n -> RNn. Quotations retain the scenario text exactly. The
 pass-2 incomplete-reset amendment overrides the earlier normal-start wording.
 
@@ -134,6 +135,18 @@ lockdown checks with a valid normal-start Surface wire catalog and the same 97dc
 fail-before revision. Original boot-repair evidence remains for the unchanged Rust
 and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
 
+Recovery phase repair (2026-10-21): the three new filesystem checks exercise the
+requested/incomplete/cancelled marker against the incomplete phase actually returned
+to the screen, with real Unix permission failures and restored permissions. The
+before-state is e4480da72. Its adapter only exposes the existing restart-only Retry
+command's filesystem behavior as a callable function (no writes); the tests already
+hold the displayed incomplete phase that the command requires. It implements no
+repair. Cancellation retains the existing durable idle receipt so a crash cannot
+resurrect destructive intent. Native desktop IPC/restart remains for independent
+verification; these checks exercise the production reset filesystem functions.
+RA5–RA7 provenance is corrected to delegated-choice with the original design
+delegation, scope and verbatim orchestrator choice. Acceptance records are untouched.
+
 ```json
 {
   "entries": [
@@ -180,7 +193,7 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs3_wipes_every_authored_store_before_start_and_waits_for_storage"
       ],
@@ -215,7 +228,7 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_child_cleanup_failure_preserves_intent_and_stores_until_retry"
       ],
@@ -250,7 +263,7 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_legacy_intent_resumes_and_cancellation_keeps_remaining_data"
       ],
@@ -285,7 +298,7 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_cancel_commits_non_destructive_intent_before_new_work"
       ],
@@ -320,7 +333,7 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs5_interruption_after_disk_wipe_never_erases_successor_data"
       ],
@@ -341,14 +354,15 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "RA5",
-          "quote": "Copies of files that the app restores from its own installation at every start (the bundled OCR runtime, native-bin/tesseract) are removed by the reset like other app data and are restored at the next start; they are not user data and need not be named before or after the reset. Models and the AI runtime stay kept as before.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19 (design agreement)",
+          "delegationScope": "Design and implementation choices within the agreed area 5 reset scenarios. RA5 is an orchestrator decision on 2026-10-20, recorded with the agreed area 5 scenarios in /home/elias/dev/justsearch/tmp/verify/agreed/area5.md; it is not owner-adopted wording and does not widen the agreed reset scope.",
+          "choice": "Copies of files that the app restores from its own installation at every start (the bundled OCR runtime, native-bin/tesseract) are removed by the reset like other app data and are restored at the next start; they are not user data and need not be named before or after the reset. Models and the AI runtime stay kept as before.",
+          "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_models_and_runtime_keep_their_bytes"
       ]
@@ -368,7 +382,7 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn3_normal_start_does_not_enumerate_or_modify_stores"
       ]
@@ -388,7 +402,7 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
         }
       ],
       "behaviour": "A linked native-bin parent is retained as it is; its external runtime and other-application sentinel remain untouched.",
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-links.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-links.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_native_bin_link_is_kept_without_traversing_its_target"
       ],
@@ -409,7 +423,7 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs7_nested_links_leave_indexed_files_and_other_applications_untouched"
       ]
@@ -443,7 +457,7 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-original-shell.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-original-shell.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rs4_actual_delete_error_is_reported_and_retried_after_restart"
       ],
@@ -833,7 +847,7 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-links.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-links.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_links_are_retained_without_traversing_targets"
       ],
@@ -854,7 +868,7 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-links.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-links.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::rn1_kept_parent_link_is_reported_through_storage_completion_and_restart"
       ],
@@ -896,7 +910,7 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-root-retry.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-root-retry.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra2_linked_data_root_is_cleared_without_following_internal_links"
       ],
@@ -917,7 +931,7 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-root-retry.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-root-retry.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra3_retries_storage_recreated_by_a_previous_session_process"
       ],
@@ -959,21 +973,23 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
       "behaviour": "Future-version reset markers are kept unchanged and never clean up processes, data or staging files; status explains that a newer version requested the reset, blocks the backend and still permits cancellation to a durable idle marker. Startup, retry, request, storage acknowledgement and dismissal cannot act on the future marker. RA7 replaces the requested-only message with neutral unreadable-file guidance.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "RA6",
-          "quote": "The reset request and receipt file carries a format version. A file written before this change (the one-line form or unversioned JSON) is read exactly as before. A file from a newer version is never acted on: it is kept, the app says plainly that a newer version requested the reset, and Cancel still works. The store register row describes the file truthfully (read in place with a version, written from Settings while the Engine runs).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19 (design agreement)",
+          "delegationScope": "Design and implementation choices within the agreed area 5 reset scenarios. RA6 is an orchestrator decision on 2026-10-20, recorded with the agreed area 5 scenarios in /home/elias/dev/justsearch/tmp/verify/agreed/area5.md; it is not owner-adopted wording and does not widen the agreed reset scope.",
+          "choice": "The reset request and receipt file carries a format version. A file written before this change (the one-line form or unversioned JSON) is read exactly as before. A file from a newer version is never acted on: it is kept, the app says plainly that a newer version requested the reset, and Cancel still works. The store register row describes the file truthfully (read in place with a version, written from Settings while the Engine runs).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "RA7",
-          "quote": "When the only reason the app is held is a reset file from a newer version (requested or cancelled there), the screen says only what is true: nothing was deleted, a newer version of JustSearch left a reset request this version cannot read, update JustSearch to finish it or cancel it to keep using this version. It does not say data could not be removed or that deleted data cannot be recovered, and it offers no Retry.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19 (design agreement)",
+          "delegationScope": "Design and implementation choices within the agreed area 5 reset scenarios. RA7 is an orchestrator decision on 2026-10-20, recorded with the agreed area 5 scenarios in /home/elias/dev/justsearch/tmp/verify/agreed/area5.md; it is not owner-adopted wording and does not widen the agreed reset scope.",
+          "choice": "When the only reason the app is held is a reset file from a newer version (requested or cancelled there), the screen says only what is true: nothing was deleted, a newer version of JustSearch left a reset request this version cannot read, update JustSearch to finish it or cancel it to keep using this version. It does not say data could not be removed or that deleted data cannot be recovered, and it offers no Retry.",
+          "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-ra6.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-ra6.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_future_version_is_kept_without_cleanup_and_can_be_cancelled"
       ],
@@ -987,14 +1003,15 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
       "behaviour": "Legacy one-line intent and unversioned JSON with or without kept_links retain reset and receipt behavior: pending/incomplete resumes; idle, awaiting-storage and complete never wipe again, and kept-link receipts survive acknowledgement.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "RA6",
-          "quote": "The reset request and receipt file carries a format version. A file written before this change (the one-line form or unversioned JSON) is read exactly as before. A file from a newer version is never acted on: it is kept, the app says plainly that a newer version requested the reset, and Cancel still works. The store register row describes the file truthfully (read in place with a version, written from Settings while the Engine runs).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19 (design agreement)",
+          "delegationScope": "Design and implementation choices within the agreed area 5 reset scenarios. RA6 is an orchestrator decision on 2026-10-20, recorded with the agreed area 5 scenarios in /home/elias/dev/justsearch/tmp/verify/agreed/area5.md; it is not owner-adopted wording and does not widen the agreed reset scope.",
+          "choice": "The reset request and receipt file carries a format version. A file written before this change (the one-line form or unversioned JSON) is read exactly as before. A file from a newer version is never acted on: it is kept, the app says plainly that a newer version requested the reset, and Cancel still works. The store register row describes the file truthfully (read in place with a version, written from Settings while the Engine runs).",
+          "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-ra6.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-ra6.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_legacy_forms_resume_with_the_same_phases_and_receipts"
       ]
@@ -1007,14 +1024,15 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
       "behaviour": "Every marker write carries format_version 1: request, incomplete, cancellation tombstone, disk-cleaned receipt and storage-cleared receipt.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "RA6",
-          "quote": "The reset request and receipt file carries a format version. A file written before this change (the one-line form or unversioned JSON) is read exactly as before. A file from a newer version is never acted on: it is kept, the app says plainly that a newer version requested the reset, and Cancel still works. The store register row describes the file truthfully (read in place with a version, written from Settings while the Engine runs).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19 (design agreement)",
+          "delegationScope": "Design and implementation choices within the agreed area 5 reset scenarios. RA6 is an orchestrator decision on 2026-10-20, recorded with the agreed area 5 scenarios in /home/elias/dev/justsearch/tmp/verify/agreed/area5.md; it is not owner-adopted wording and does not widen the agreed reset scope.",
+          "choice": "The reset request and receipt file carries a format version. A file written before this change (the one-line form or unversioned JSON) is read exactly as before. A file from a newer version is never acted on: it is kept, the app says plainly that a newer version requested the reset, and Cancel still works. The store register row describes the file truthfully (read in place with a version, written from Settings while the Engine runs).",
+          "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7-refresh-ra6.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh-ra6.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra6_every_marker_write_carries_format_version_one"
       ],
@@ -1028,14 +1046,15 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
       "behaviour": "Newer requested and cancelled reset files expose an explicit newer_version reason through status and startup, preserve files, and allow Cancel.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "RA7",
-          "quote": "When the only reason the app is held is a reset file from a newer version (requested or cancelled there), the screen says only what is true: nothing was deleted, a newer version of JustSearch left a reset request this version cannot read, update JustSearch to finish it or cancel it to keep using this version. It does not say data could not be removed or that deleted data cannot be recovered, and it offers no Retry.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19 (design agreement)",
+          "delegationScope": "Design and implementation choices within the agreed area 5 reset scenarios. RA7 is an orchestrator decision on 2026-10-20, recorded with the agreed area 5 scenarios in /home/elias/dev/justsearch/tmp/verify/agreed/area5.md; it is not owner-adopted wording and does not widen the agreed reset scope.",
+          "choice": "When the only reason the app is held is a reset file from a newer version (requested or cancelled there), the screen says only what is true: nothing was deleted, a newer version of JustSearch left a reset request this version cannot read, update JustSearch to finish it or cancel it to keep using this version. It does not say data could not be removed or that deleted data cannot be recovered, and it offers no Retry.",
+          "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra7_future_requested_and_cancelled_files_expose_a_reason_without_deleting"
       ],
@@ -1049,14 +1068,15 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
       "behaviour": "Newer requested and cancelled reset files use the same neutral RA7 message, stating nothing was deleted and update or cancel options.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "RA7",
-          "quote": "When the only reason the app is held is a reset file from a newer version (requested or cancelled there), the screen says only what is true: nothing was deleted, a newer version of JustSearch left a reset request this version cannot read, update JustSearch to finish it or cancel it to keep using this version. It does not say data could not be removed or that deleted data cannot be recovered, and it offers no Retry.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19 (design agreement)",
+          "delegationScope": "Design and implementation choices within the agreed area 5 reset scenarios. RA7 is an orchestrator decision on 2026-10-20, recorded with the agreed area 5 scenarios in /home/elias/dev/justsearch/tmp/verify/agreed/area5.md; it is not owner-adopted wording and does not widen the agreed reset scope.",
+          "choice": "When the only reason the app is held is a reset file from a newer version (requested or cancelled there), the screen says only what is true: nothing was deleted, a newer version of JustSearch left a reset request this version cannot read, update JustSearch to finish it or cancel it to keep using this version. It does not say data could not be removed or that deleted data cannot be recovered, and it offers no Retry.",
+          "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-reset-ra7.json",
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-refresh.json",
       "newChecks": [
         "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::ra7_future_requested_and_cancelled_files_have_the_same_neutral_message"
       ],
@@ -1070,16 +1090,71 @@ and receipt checks. The fixture adaptation is in uiux-reset-shortcut-merge.md.
       "behaviour": "RA7 recovery guidance replaces incomplete-deletion claims and Retry; Cancel remains functional and window data is preserved.",
       "sources": [
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "RA7",
-          "quote": "When the only reason the app is held is a reset file from a newer version (requested or cancelled there), the screen says only what is true: nothing was deleted, a newer version of JustSearch left a reset request this version cannot read, update JustSearch to finish it or cancel it to keep using this version. It does not say data could not be removed or that deleted data cannot be recovered, and it offers no Retry.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19 (design agreement)",
+          "delegationScope": "Design and implementation choices within the agreed area 5 reset scenarios. RA7 is an orchestrator decision on 2026-10-20, recorded with the agreed area 5 scenarios in /home/elias/dev/justsearch/tmp/verify/agreed/area5.md; it is not owner-adopted wording and does not widen the agreed reset scope.",
+          "choice": "When the only reason the app is held is a reset file from a newer version (requested or cancelled there), the screen says only what is true: nothing was deleted, a newer version of JustSearch left a reset request this version cannot read, update JustSearch to finish it or cancel it to keep using this version. It does not say data could not be removed or that deleted data cannot be recovered, and it offers no Retry.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-reset-ra7.json",
       "newChecks": [
         "modules/ui-web/src/boot/factoryReset.newerVersion.test.ts#RA7 a newer reset file shows honest guidance and only Cancel, preserving window data"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "When the screen holds an incomplete reset but the durable marker remains requested, incomplete or cancelled, Cancel preserves remaining data and the shortcut-off choice, and Retry durably requests the wipe before restart. Both report file permission errors without changing the marker while the data root remains unwritable; after write permission is restored, Cancel permits normal startup and Retry completes the disk wipe.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "RS4",
+          "quote": "Finding 1 decided: while a reset is incomplete, the app does not start into normal use; it shows the reset as incomplete, what remains, and offers Retry or Cancel reset (Cancel keeps the remaining data as ordinary data). No new work exists during an incomplete reset, so retries cannot erase it. Verify failure -> restart -> retry and failure -> cancel.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-repair.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::m2_requested_marker_recovery_actions_report_write_errors_and_resume_after_repair",
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::m2_incomplete_marker_recovery_actions_report_write_errors_and_resume_after_repair",
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::m2_cancelled_marker_recovery_actions_report_write_errors_and_resume_after_repair"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/factory_reset.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "The explicit Retry action still refuses newer-version reset files without rewriting them or touching remaining data, for requested, incomplete and cancelled future phases. An unreadable marker is also preserved and Retry reports the read error rather than overwriting unknown intent.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19 (design agreement)",
+          "delegationScope": "Design and implementation choices within the agreed area 5 reset scenarios. RA6 is an orchestrator decision on 2026-10-20, recorded with the agreed area 5 scenarios in /home/elias/dev/justsearch/tmp/verify/agreed/area5.md; it is not owner-adopted wording and does not widen the agreed reset scope.",
+          "choice": "The reset request and receipt file carries a format version. A file written before this change (the one-line form or unversioned JSON) is read exactly as before. A file from a newer version is never acted on: it is kept, the app says plainly that a newer version requested the reset, and Cancel still works. The store register row describes the file truthfully (read in place with a version, written from Settings while the Engine runs).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f user turn 2026-10-19 (design agreement)",
+          "delegationScope": "Design and implementation choices within the agreed area 5 reset scenarios. RA7 is an orchestrator decision on 2026-10-20, recorded with the agreed area 5 scenarios in /home/elias/dev/justsearch/tmp/verify/agreed/area5.md; it is not owner-adopted wording and does not widen the agreed reset scope.",
+          "choice": "When the only reason the app is held is a reset file from a newer version (requested or cancelled there), the screen says only what is true: nothing was deleted, a newer version of JustSearch left a reset request this version cannot read, update JustSearch to finish it or cancel it to keep using this version. It does not say data could not be removed or that deleted data cannot be recovered, and it offers no Retry.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-reset-phase-repair.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::m2_retry_never_overwrites_a_newer_reset_file",
+        "modules/shell/src-tauri/src/factory_reset.rs#factory_reset::tests::m2_retry_never_overwrites_an_unreadable_reset_file"
       ],
       "repaired": true
     }
