@@ -127,3 +127,14 @@ The delegated builder brief supplied scenarios v2, R1–R8. This adds checks wit
   "note": "31 checks/build; CI lint; tmp/verify-http/784a8dafc/report.md"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "codex-auditor-850-20261021",
+  "verdict": "reject",
+  "digest": "sha256:c34f5634793061154fb682afc915e9c91788ad9ba1d96fc73cf728c25ffd5fa8",
+  "note": "behaviour line 21 calls deadline and running-cancellation checks preservation, but both fail on f6a14b5a6 before reaching the opener and are absent from newChecks/evidence; provide genuine before/after preservation evidence or reframe and evidence them as repaired checks. Independent results: tmp/audit-850/ownership-before.json and preservation-and-producers.json."
+}
+```

@@ -78,3 +78,14 @@ author-session: reload-holders-producer-repair
   "note": "31 checks/build; CI lint; tmp/verify-http/784a8dafc/report.md"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "codex-auditor-850-20261021",
+  "verdict": "accept",
+  "digest": "sha256:48fe813421614c39ede40088dbf40cdd616f8beb4cb21bfb78069be65536f576",
+  "note": "New repaired producer checks match resource safety and post-reload admission intent; independently reproduced producer-before-close and repeated-reload health assertions on 18ea761cc, with candidate passes. Fixture signature adaptation preserves failure injection; 48 status checks pass on baseline and candidate. Evidence: tmp/audit-850/."
+}
+```

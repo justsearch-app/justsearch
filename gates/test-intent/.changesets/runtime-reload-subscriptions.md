@@ -107,3 +107,14 @@ The independent real-system rejection identified missing composition coverage. T
   "note": "31 checks/build; CI lint; tmp/verify-http/784a8dafc/report.md"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "codex-auditor-850-20261021",
+  "verdict": "accept",
+  "digest": "sha256:f5754e025c3170acdbc7b597daff7257951ae85445017e484132b187c03b9496",
+  "note": "New repaired HTTP checks follow R1/R2/R3/R4/R5/R7/R8 with declared native mocks and real route/client/lease supplier. Independently reran idle subscription HTTP check: active-holder assertion on f6a14b5a6 and pass on 96040b767; reviewed seven-case cited evidence. Evidence: tmp/audit-850/holders-subscriptions.json."
+}
+```
