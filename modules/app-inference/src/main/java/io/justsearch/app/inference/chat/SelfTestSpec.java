@@ -18,7 +18,7 @@ import java.util.Map;
  * @param port the loopback port the candidate listens on
  * @param healthTimeout how long the candidate may take to become healthy
  * @param probe the caller's checks against the healthy candidate
- * @param environment the captured device plan's child environment overrides
+ * @param environment the captured device plan and private launch key for the child
  */
 public record SelfTestSpec(
     List<String> command,

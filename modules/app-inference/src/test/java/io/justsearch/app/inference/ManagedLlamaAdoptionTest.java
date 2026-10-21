@@ -355,6 +355,41 @@ final class ManagedLlamaAdoptionTest {
     }
   }
 
+  /** K6: both lost-bind paths mint a new environment-only credential on their fresh port. */
+  @Test
+  void lostBindRotatesCredentialsOnInitialAndRecoveryLaunches(@TempDir Path tmp) throws Exception {
+    for (boolean recovery : List.of(false, true)) {
+      Path run = Files.createDirectories(tmp.resolve(Boolean.toString(recovery)));
+      FakeLlamaServer fake = FakeLlamaServer.create(run);
+      try (var control = org.mockito.Mockito.spy(
+          DefaultChildControl.unrecorded(fake.registry()))) {
+        List<String> keys = new java.util.concurrent.CopyOnWriteArrayList<>();
+        org.mockito.Mockito.doAnswer(call -> {
+          io.justsearch.app.api.runtime.child.ChildSpec spec = call.getArgument(0);
+          String key = spec.envOverrides().get("LLAMA_API_KEY");
+          assertTrue(key != null && key.matches("[A-Za-z0-9_-]{43}"),
+              "every lost-bind attempt must carry a private environment credential");
+          assertTrue(spec.argv().stream().noneMatch(arg -> arg.contains(key)));
+          keys.add(key);
+          return call.callRealMethod();
+        }).when(control).start(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        LlamaServerOps ops = ops(control);
+        try {
+          var start = ops.startLlamaServer(request(run, fake, freePort(), Map.of()));
+          assertThrows(ModeTransitionException.class, () -> {
+            if (recovery) ops.waitForServerHealthOnce(start);
+            else ops.waitForServerHealth(start);
+          });
+          assertEquals(2, keys.size(), "one launch and one retry");
+          assertTrue(!keys.getFirst().equals(keys.getLast()), "retry must rotate the key");
+        } finally {
+          ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
+          ops.shutdown();
+        }
+      }
+    }
+  }
+
 
   private static LlamaServerOps ops(ChildControl control) {
     return new LlamaServerOps(

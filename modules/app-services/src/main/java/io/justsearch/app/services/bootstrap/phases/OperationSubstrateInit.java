@@ -193,8 +193,18 @@ public final class OperationSubstrateInit {
                 .isWritable()
             ? io.justsearch.app.observability.ledger.ActionEventJournal.persistent()
             : io.justsearch.app.observability.ledger.ActionEventJournal.disabled();
-    io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry actionLedgerChangeRegistry =
-        new io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry(actionEventJournal);
+    var ledgerDelivery = executors.register(io.justsearch.core.execution.EngineExecutorSpec.virtual(
+        "head.indexing-ledger-sse-delivery", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND, 1));
+    io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry actionLedgerChangeRegistry;
+    try {
+      actionLedgerChangeRegistry = new io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry(
+          actionEventJournal, new io.justsearch.app.observability.stream.SseStreamChannel(
+              io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry.STREAM_ID,
+              ledgerDelivery.openVirtual(), ledgerDelivery::close));
+    } catch (RuntimeException | Error failure) {
+      ledgerDelivery.close();
+      throw failure;
+    }
     // Pre-fork authority is shared with recovery; this phase only adds audit projections.
     io.justsearch.app.services.registry.executor.GlobalHardStop globalHardStop =
         authority.hardStop();

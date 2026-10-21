@@ -98,7 +98,7 @@ fi
 # brought the engine back during the ingest+enrichment wait ON THE PROFILE WE WANT, activating
 # again would tear a healthy engine down and re-run a GPU self-test for nothing. A DIFFERENT
 # profile still activates -- that is a real profile switch.
-ai_status() { curl -s -m 10 -H "Host: 127.0.0.1:$port" "$base/api/ai/runtime/status"; }
+ai_status() { curl -s -m 10 "${hdr[@]}" "$base/api/ai/runtime/status"; }
 # Online AND on the requested profile. Reads the JSON with the same predicate the capture's
 # `read_ai_runtime` uses, so the gate and the artifact cannot disagree.
 ai_ready() {

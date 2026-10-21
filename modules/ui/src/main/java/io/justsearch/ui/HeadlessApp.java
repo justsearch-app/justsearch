@@ -536,7 +536,7 @@ public class HeadlessApp {
       constructedApi = apiServer;
       int port = apiServer.getPort();
 
-      emitPortSignals(port, sessionToken, prodMode);
+      emitPortSignals(port);
 
       return new ApiPhaseResult(bootstrap, apiServer, port, sessionToken);
     } catch (Exception | Error failure) {
@@ -573,8 +573,7 @@ public class HeadlessApp {
   }
 
   @SuppressWarnings("PMD.SystemPrintln")
-  private static void emitPortSignals(
-      int port, String sessionToken, boolean prodMode) {
+  private static void emitPortSignals(int port) {
     // Tempdoc 501 Phase 18: the api-port.txt mirror is gone. The full runtime
     // manifest at <dataDir>/runtime/manifest.json (written by RuntimeManifestPublisher)
     // is now the canonical filesystem transport. Every known consumer
@@ -584,17 +583,6 @@ public class HeadlessApp {
     // The stdout JUSTSEARCH_API_PORT=<port> line below remains as human-readable
     // log output; no tool parses it for discovery (Phase 8 removed the parse-to-
     // state paths from the Tauri shell and dev-runner).
-    log.info(
-        "Preparing stdout signals: prodMode={}, tokenGenerated={}", prodMode, sessionToken != null);
-    if (sessionToken != null) {
-      System.out.println("JUSTSEARCH_SESSION_TOKEN=" + sessionToken);
-      System.out.flush();
-      log.debug("Session token printed to stdout (length={})", sessionToken.length());
-    } else {
-      // Dev mode only: prod mode with no token is refused at ApiSecurityFilters construction
-      // (tempdoc 884 item 23), so the Head never reaches this line with prodMode=true.
-      log.debug("No session token (dev mode); token enforcement is not installed.");
-    }
     System.out.println("JUSTSEARCH_API_PORT=" + port);
     System.out.flush();
   }

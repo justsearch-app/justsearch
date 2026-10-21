@@ -186,7 +186,7 @@ async function applyPort(binding, requestedPort, label) {
   const oldManifest = binding.manifest;
   const oldPort = oldManifest.head.apiPort;
   const token = oldManifest.head.sessionToken;
-  const settingsResponse = await request(oldPort, '/api/settings/v2', null);
+  const settingsResponse = await request(oldPort, '/api/settings/v2', token);
   requireThat(settingsResponse.status === 200 && settingsResponse.body?.witness,
     `${label}: settings read failed: HTTP ${settingsResponse.status} ${settingsResponse.text}`);
 
@@ -245,7 +245,7 @@ async function applyPort(binding, requestedPort, label) {
   }
   await assertOldListenerClosed(oldPort);
 
-  const durable = await request(nextPort, `/api/operation-history/${operationKey}`, null);
+  const durable = await request(nextPort, `/api/operation-history/${operationKey}`, nextManifest.head.sessionToken);
   requireThat(durable.status === 200 && durable.body?.state === 'complete'
       && Number.isInteger(durable.body?.completedAt),
     `${label}: successor did not retain the COMPLETE operation row: ${durable.text}`);
@@ -255,7 +255,7 @@ async function applyPort(binding, requestedPort, label) {
   requireThat(Number.isFinite(supervisorExitPublishedAt)
       && durable.body.completedAt <= supervisorExitPublishedAt,
   `${label}: durable completion did not precede the supervisor's exit publication: ${JSON.stringify(exitObservation)}`);
-  const desired = await request(nextPort, '/api/settings/v2', null);
+  const desired = await request(nextPort, '/api/settings/v2', nextManifest.head.sessionToken);
   requireThat(desired.status === 200 && desired.body?.apiPort === requestedPort,
     `${label}: desired API port disagrees after restart: ${desired.text}`);
   const status = await request(nextPort, '/api/status', null, {}, 20_000);
@@ -263,7 +263,7 @@ async function applyPort(binding, requestedPort, label) {
   requireThat(status.status === 200 && apiComponent?.desiredVersion
       && apiComponent.desiredVersion === apiComponent.appliedVersion,
   `${label}: API desired/applied versions disagree: ${status.text}`);
-  const effective = await request(nextPort, '/api/debug/effective-config', null);
+  const effective = await request(nextPort, '/api/debug/effective-config', nextManifest.head.sessionToken);
   const desiredKey = effectiveKey(effective.body, 'justsearch.api.port');
   const processKey = effectiveKey(effective.body, 'process.apiPort');
   requireThat(effective.status === 200 && desiredKey?.value === requestedPort

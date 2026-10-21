@@ -1861,38 +1861,19 @@ async fn post_head<T: for<'de> Deserialize<'de>>(
     path: &str,
     body: Option<serde_json::Value>,
 ) -> Result<T, String> {
-    let port = backend
-        .get_port()
-        .ok_or_else(|| "Backend is unavailable".to_string())?;
-    let token = backend
-        .get_session_token()
-        .ok_or_else(|| "Backend session token is unavailable".to_string())?;
-    let client = reqwest::Client::builder()
-        .timeout(HEAD_TIMEOUT)
-        .build()
-        .map_err(|error| format!("Failed to create backend client: {error}"))?;
-    let mut request = client
-        .post(format!("http://127.0.0.1:{port}{path}"))
-        .header("X-JustSearch-Session", token);
-    if let Some(body) = body {
-        request = request.json(&body);
-    }
-    let response = request
-        .send()
-        .await
-        .map_err(|error| format!("Backend upgrade handshake failed: {error}"))?;
-    let status = response.status();
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|error| format!("Backend upgrade response failed: {error}"))?;
-    if !status.is_success() {
-        return Err(format!(
-            "Backend rejected upgrade handshake with {status}: {}",
-            String::from_utf8_lossy(&bytes)
-        ));
-    }
-    serde_json::from_slice(&bytes)
+    let host = backend.host.clone();
+    let path = path.to_owned();
+    let response = tokio::task::spawn_blocking(move || {
+        crate::shell_actuator::post(
+            &host,
+            &path,
+            &body.unwrap_or_else(|| serde_json::json!({})),
+            HEAD_TIMEOUT.as_millis() as u64,
+        )
+    })
+    .await
+    .map_err(|error| format!("Backend upgrade task failed: {error}"))??;
+    serde_json::from_value(response)
         .map_err(|error| format!("Backend upgrade response was invalid: {error}"))
 }
 
@@ -2575,6 +2556,81 @@ fn now_epoch_ms() -> u128 {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    // The harness bypasses both startup entry points. A subprocess also prevents any other test
+    // (or the updater plugin) from hiding a missing default provider or changing the trust key.
+    fn in_fresh_process(test: &str) -> bool {
+        let module = module_path!().split_once("::").unwrap().1;
+        let name = format!("{module}::{test}");
+        if std::env::var("JUSTSEARCH_TLS_TEST_CHILD").as_deref() == Ok(name.as_str()) {
+            return true;
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", &name, "--nocapture"])
+            .env("JUSTSEARCH_TLS_TEST_CHILD", &name)
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let ran_exactly_this_test = stdout.lines().any(|line| line == "running 1 test")
+            && stdout
+                .lines()
+                .any(|line| line.starts_with("test result: ok. 1 passed; 0 failed;"));
+        assert_eq!(
+            (output.status.success(), ran_exactly_this_test),
+            (true, true),
+            "fresh-process check failed:\n{}\n{}",
+            stdout,
+            String::from_utf8_lossy(&output.stderr),
+        );
+        false
+    }
+
+    #[test]
+    fn startup_provider_builds_release_and_backend_clients() {
+        if !in_fresh_process("startup_provider_builds_release_and_backend_clients") {
+            return;
+        }
+        assert!(rustls::crypto::CryptoProvider::get_default().is_none());
+        crate::tls::initialize();
+        let first = rustls::crypto::CryptoProvider::get_default().cloned();
+        crate::tls::initialize();
+        // These are the configurations used by check_release and post_head. Keep the clients
+        // local to this child: a global provider installed by another test must not satisfy this.
+        for timeout in [Duration::from_secs(20), HEAD_TIMEOUT] {
+            let client = std::panic::catch_unwind(|| {
+                reqwest::Client::builder().timeout(timeout).build()
+            });
+            assert!(
+                matches!(client, Ok(Ok(_))),
+                "client construction must not panic or fail",
+            );
+        }
+        let first = first.expect("startup must install a provider");
+        assert!(Arc::ptr_eq(
+            &first,
+            rustls::crypto::CryptoProvider::get_default().unwrap(),
+        ));
+    }
+
+    #[test]
+    fn metadata_signature_rejects_wrong_signature() {
+        if !in_fresh_process("metadata_signature_rejects_wrong_signature") {
+            return;
+        }
+        use ring::signature::{Ed25519KeyPair, KeyPair};
+        let key = Ed25519KeyPair::from_seed_unchecked(&[7; 32]).unwrap();
+        std::env::set_var(
+            "JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY",
+            base64::engine::general_purpose::STANDARD.encode(key.public_key().as_ref()),
+        );
+        let bytes = b"signed release metadata";
+        let signature = base64::engine::general_purpose::STANDARD.encode(key.sign(bytes).as_ref());
+        assert!(verify_metadata_signature(bytes, &signature).is_ok());
+        assert_eq!(
+            verify_metadata_signature(b"tampered release metadata", &signature).unwrap_err(),
+            "Release metadata signature verification failed",
+        );
+    }
 
     // The Java loader consumes this identical file. In particular, malformed known AI
     // fields must deny machine-policy updates even though Rust only enforces updates.
@@ -3457,3 +3513,7 @@ mod commit_delivery_tests;
 #[cfg(test)]
 #[path = "updater_actor_hold_witness_tests.rs"]
 mod actor_hold_witness_tests;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "updater_connection_tests.rs"]
+mod connection_tests;

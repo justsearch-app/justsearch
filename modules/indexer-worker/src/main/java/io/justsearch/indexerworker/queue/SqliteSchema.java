@@ -32,6 +32,7 @@ package io.justsearch.indexerworker.queue;
  *   <li>V21: Scoped switch-buffer rows to a candidate generation (lane F D1-9)</li>
  *   <li>V22: Retained admitting boundaries for root-relative ingestion exclusions</li>
  *   <li>V23: Monotonic switch-buffer admission count for migration restart fencing</li>
+ *   <li>V24: Transactional job counts and indexed readiness/claim selection</li>
  * </ul>
  */
 public final class SqliteSchema {
@@ -44,7 +45,54 @@ public final class SqliteSchema {
    * Target schema version. The migrate() method will upgrade the database
    * to this version using the migration ladder.
    */
-  public static final int TARGET_VERSION = 23;
+  public static final int TARGET_VERSION = 24;
+
+  /** Every re-admission retains REPLACE's full reset, while firing ordinary UPDATE triggers. */
+  static final String REENQUEUE_JOB_ON_CONFLICT = """
+      ON CONFLICT(path) DO UPDATE SET
+        state=excluded.state, attempts=excluded.attempts, last_updated=excluded.last_updated,
+        collection=excluded.collection, size_bytes=excluded.size_bytes, scan_id=excluded.scan_id,
+        originator=excluded.originator, transport=excluded.transport, unit_revision=excluded.unit_revision,
+        walk_seen_epoch=excluded.walk_seen_epoch, planned_source_sha256=excluded.planned_source_sha256,
+        ingestion_root=excluded.ingestion_root, error_message=NULL, retry_after=NULL, first_failed_at=NULL,
+        content_hash=NULL, last_outcome_class=NULL, last_reason_code=NULL, last_retry_policy=NULL,
+        last_diagnostic_summary=NULL, last_outcome_at=NULL
+      """;
+
+  static final String[] MIGRATE_V23_TO_V24 = {
+      """
+      CREATE TABLE IF NOT EXISTS job_counts (
+        state TEXT PRIMARY KEY, n INTEGER NOT NULL, known_bytes INTEGER NOT NULL,
+        unknown_size INTEGER NOT NULL
+      )
+      """,
+      "CREATE INDEX IF NOT EXISTS idx_jobs_state_retry ON jobs(state, retry_after)",
+      "CREATE INDEX IF NOT EXISTS idx_jobs_pending_ready ON jobs(last_updated, path) WHERE state='PENDING' AND retry_after IS NULL",
+      "CREATE INDEX IF NOT EXISTS idx_jobs_pending_retry ON jobs(last_updated, path, retry_after) WHERE state='PENDING' AND retry_after IS NOT NULL",
+      """
+      CREATE TRIGGER IF NOT EXISTS jobs_counts_insert AFTER INSERT ON jobs BEGIN
+        INSERT INTO job_counts VALUES(NEW.state,1,COALESCE(NEW.size_bytes,0),NEW.size_bytes IS NULL)
+        ON CONFLICT(state) DO UPDATE SET n=n+1, known_bytes=known_bytes+excluded.known_bytes,
+          unknown_size=unknown_size+excluded.unknown_size;
+      END
+      """,
+      """
+      CREATE TRIGGER IF NOT EXISTS jobs_counts_delete AFTER DELETE ON jobs BEGIN
+        UPDATE job_counts SET n=n-1, known_bytes=known_bytes-COALESCE(OLD.size_bytes,0),
+          unknown_size=unknown_size-(OLD.size_bytes IS NULL) WHERE state=OLD.state;
+      END
+      """,
+      """
+      CREATE TRIGGER IF NOT EXISTS jobs_counts_update AFTER UPDATE OF state,size_bytes ON jobs
+      WHEN OLD.state IS NOT NEW.state OR OLD.size_bytes IS NOT NEW.size_bytes BEGIN
+        UPDATE job_counts SET n=n-1, known_bytes=known_bytes-COALESCE(OLD.size_bytes,0),
+          unknown_size=unknown_size-(OLD.size_bytes IS NULL) WHERE state=OLD.state;
+        INSERT INTO job_counts VALUES(NEW.state,1,COALESCE(NEW.size_bytes,0),NEW.size_bytes IS NULL)
+        ON CONFLICT(state) DO UPDATE SET n=n+1, known_bytes=known_bytes+excluded.known_bytes,
+          unknown_size=unknown_size+excluded.unknown_size;
+      END
+      """
+  };
 
   public static final String MIGRATE_V21_TO_V22_INGESTION_ROOT =
       "ALTER TABLE jobs ADD COLUMN ingestion_root TEXT";

@@ -226,7 +226,7 @@ public final class SubstratePhase {
 
     // Resource + Metric substrates (no cross-deps; independent).
     ResourceSubstrateInit.Output resourceOut =
-        ResourceSubstrateInit.run(BootstrapHelpers.initialRuntimeContext());
+        ResourceSubstrateInit.run(BootstrapHelpers.initialRuntimeContext(), executors);
     MetricSubstrateInit.Output metricsOut = MetricSubstrateInit.run(executors, telemetry);
 
     // Operation substrate — needs handlers + 2 catalogs + capability resolver.

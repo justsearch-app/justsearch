@@ -492,6 +492,32 @@
       "note": "Deliberately no 'expect' count: the claim is 'at least one refusal is still asserted', not a fixed number of cases, so adding a case must not fail the gate. Pairs with the kind:test probe, which pins the method NAME; this one pins that the method still asserts something."
     },
     {
+      "id": "adr-0046-token-route-removed",
+      "adr": "0046",
+      "premise": "No HTTP route dispenses the session token; authenticated requests to the removed bootstrap receive 404. This absence probe complements the real HTTP checks in ProductionRouteTokenWalkTest.",
+      "kind": "grep-absent",
+      "pattern": "MCP_TOKEN_PATH|handleMcpToken",
+      "paths": [
+        "modules/ui/src/main/java/io/justsearch/ui/api/LocalApiServer.java"
+      ]
+    },
+    {
+      "id": "adr-0046-production-route-walk",
+      "adr": "0046",
+      "premise": "Every registered route of a fully booted production Engine is walked; only OPTIONS and GET/HEAD on six public reads are exempt. This probe checks test existence only, not execution or passing behavior.",
+      "kind": "test",
+      "file": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/ProductionRouteTokenWalkTest.java",
+      "test": "io.justsearch.systemtests.ProductionRouteTokenWalkTest#walksEveryRegisteredRouteOnTheRealProductionEngine"
+    },
+    {
+      "id": "adr-0046-owner-only-manifest",
+      "adr": "0046",
+      "premise": "Every publish replaces a readable canonical manifest and leftover temporary file with an owner-only credential file. This probe checks test existence only; Windows ACL and other-account behavior need platform evidence.",
+      "kind": "test",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestCredentialBoundaryTest.java",
+      "test": "io.justsearch.ui.runtime.RuntimeManifestCredentialBoundaryTest#everyPublishReplacesReadableManifestAndLeftoverTempWithOwnerOnlyFile"
+    },
+    {
       "id": "adr-0047-fit-off-explicit",
       "adr": "0047",
       "premise": "The context ladder steps down when a rung produces a hard, detectable launch abort. llama-server defaults '--fit on' and that pass MAXIMIZES rather than fits (measured: 242,944 tokens / 4 GB KV with -c omitted), so a memory-adjusting heuristic running beside an explicit -c could absorb the very abort the step-down reads as its signal. The launch therefore passes '-fit off' unconditionally. Drop that flag and ADR-0047's step-down premise becomes an inference again rather than a property of the launch line.",

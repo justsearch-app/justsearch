@@ -251,6 +251,17 @@ final class LlamaServerCandidateContextTest {
   @Test
   void armedLaunchedChildCleanExitSignalsCapturedOwnerFailure(@TempDir Path tmp) throws Exception {
     HttpServer server = healthyServer();
+    String key = "candidate-fixture-key";
+    server.removeContext("/props");
+    server.createContext("/props", exchange -> {
+      boolean authorized = ("Bearer " + key).equals(
+          exchange.getRequestHeaders().getFirst("Authorization"));
+      byte[] body = "{\"model_path\":\"clean-exit.gguf\",\"n_ctx\":4096}"
+          .getBytes(StandardCharsets.UTF_8);
+      exchange.sendResponseHeaders(authorized ? 200 : 401, authorized ? body.length : -1);
+      if (authorized) exchange.getResponseBody().write(body);
+      exchange.close();
+    });
     Path executable = Path.of(LlamaServerTestAccess.javaArgv(CleanExitChild.class).getFirst());
     Path model = Files.createFile(tmp.resolve("clean-exit.gguf"));
     InferenceConfig inference =
@@ -277,7 +288,8 @@ final class LlamaServerCandidateContextTest {
     try {
       var child = LlamaServerTestAccess.startThroughControl(
           ops, LlamaServerTestAccess.javaArgv(CleanExitChild.class));
-      LlamaServerTestAccess.installChild(ops, start, child);
+      LlamaServerTestAccess.installChild(ops, start, child,
+          new LlamaServerEndpoint(server.getAddress().getPort(), key));
       ops.waitForServerHealth(start);
 
       var exit = child.exit().toCompletableFuture().get(5, TimeUnit.SECONDS);

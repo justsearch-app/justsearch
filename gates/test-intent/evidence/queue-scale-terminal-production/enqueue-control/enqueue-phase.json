@@ -1,0 +1,7 @@
+{
+  "rows": 2005,
+  "pending": 2005,
+  "enqueueSeconds": 0.3336729310103692,
+  "enqueueOverflows": 0,
+  "stalledObserver": false
+}

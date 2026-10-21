@@ -32,11 +32,15 @@ mod binding;
 #[path = "../engine_host.rs"]
 #[allow(dead_code)]
 mod engine_host;
+#[path = "../engine_conn.rs"]
+mod engine_conn;
 #[path = "../engine_probe.rs"]
 mod engine_probe;
 #[path = "../supervisor.rs"]
 #[allow(dead_code)]
 mod supervisor;
+#[path = "../tls.rs"]
+mod tls;
 // Spec F §2.1: the fake engine starts inside its incarnation job exactly as the real Engine does,
 // so the containment cases exercise the production spawn with no Tauri link.
 #[path = "../containment.rs"]
@@ -65,6 +69,7 @@ mod updater_probe {
     include!("support/updater_probe.inc.rs");
 }
 // AppHandle paths are never driven by the conformance binary. Fail explicitly if used.
+#[cfg_attr(test, derive(Default))]
 pub struct BackendState {
     host: Arc<engine_host::EngineHost>,
 }
@@ -106,6 +111,7 @@ fn arg(name: &str) -> Option<String> {
         .and_then(|i| args.get(i + 1).cloned())
 }
 fn main() {
+    tls::initialize();
     #[cfg(target_os = "linux")]
     linux_process::set_bundle_dir(
         &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ui/build/install/ui"),
@@ -355,3 +361,7 @@ fn write_control_result(
     std::fs::write(&tmp, serde_json::to_vec(&payload).unwrap()).unwrap();
     std::fs::rename(tmp, path).unwrap();
 }
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "../engine_conn_test_support.rs"]
+mod engine_conn_test_support;

@@ -11,6 +11,22 @@ This doc answers: "Where is the source of truth for JustSearch API schemas and s
 
 ## HTTP (Local API)
 
+### Production authentication
+
+Every production request requires `X-JustSearch-Session`, including reads and streams, except
+OPTIONS and GET/HEAD on `/api/health`, `/api/runtime/live`, `/api/runtime/ready`, `/api/status`,
+`/api/runtime/manifest`, and `/.well-known/justsearch/manifest.json`. Public responses never carry
+the credential. The only published credential source is the owner-only canonical
+`runtime/manifest.json` (`head.sessionToken`, POSIX 0600; Windows owner and SYSTEM only).
+`GET /api/mcp/token` is removed: 401 without a token, 404 with a valid token. No stdout token
+line is emitted. Browser SSE uses authenticated fetch headers, with no credential in URLs.
+Development mode remains token-free. See [ADR-0046](../decisions/0046-local-api-trust-boundary.md).
+
+The route and OpenAPI captures are generated together with
+`JUSTSEARCH_SESSION_TOKEN` set from that owner-only manifest:
+`node scripts/codegen/gen-api-client.mjs --from-live=http://127.0.0.1:<port>`.
+The prose in this contract map is maintained by hand; the repository has no generator for it.
+
 ### Status publication metadata (additive)
 
 Every head API response carries `X-JustSearch-Status-Epoch` (opaque process identity) and
@@ -81,7 +97,7 @@ uses the component's current configuration and bounded attempt budget.
 The HTTP route returns 202 when accepted, 429 when an attempt is already running,
 409 when recovery is not applicable, 404 for an unknown component, and 503 when
 the owner is unavailable or the budget is exhausted. The normal error envelope
-distinguishes these outcomes. The mutation token and local API trust checks apply.
+distinguishes these outcomes. The session token and local API trust checks apply.
 
 The former `POST /api/worker/restart` route is retained for one release solely to
 return 410 with permanent `ENDPOINT_RETIRED` and the replacement route in its
@@ -491,6 +507,33 @@ Endpoints:
   - **Query params (all optional and additive — a request with none behaves exactly as before).** `?correlationId=<id>` (561 P-B1) keeps rows carrying that loop/session join key; `?originator=<user|agent|system>` keeps that attribution; `?kind=<kind>` (repeatable, 812 D3) keeps only the named kinds; `?limit=<n>` (812 D3) returns the **newest** `n` rows after filtering — default 500, capped at 2000, with an unparseable or non-positive value falling back to the default. Sources: `ActionLedgerController.handleGet` + `ActionEventJournal`.
 - `GET /api/action-ledger/stream` (SSE) — Live read-view of the same projection (G3/G4/G5). Stream-only (no journal fold); rows dedup by `id`. "Snapshot" and "stream" are two reads of one projection, never two code paths. **Tempdoc 662: also reachable multiplexed via `/api/shell-events/stream` below** — the FE shell subscribes there by default; this dedicated endpoint stays live for direct/tooling consumers.
 - `POST /api/action-ledger/events` — Process-spanning ingest (thesis I): the FE folds local effects into the ONE log. Idempotent by event `id` (re-ingest on reload does not duplicate). Body: an effect event (`id`, `effectKind`, `subject`, `occurredAt`). New effects use `fe-effect:<UUIDv4>` (canonical lowercase), minted once and persisted in the existing frontend journal. The local numeric ID still owns undo and causation. Older persisted entries keep their prior `fe-effect:<positive integer>` wire identity (at most 16 digits) to avoid duplication on upgrade; this compatibility does not repair historical collisions between old clients. Other namespaces return 400 before entering the ledger, so client effects cannot claim a server operation/grant/gate identity.
+- `GET /api/indexing-jobs/stream` (SSE; queue-scale contract change, decision 4) — Snapshot `items` is a **window**, containing all PROCESSING rows and the 200 most recent FAILED/RETRY_EXHAUSTED rows. PENDING and DONE rows are absent from snapshots. Clients must use status for queue totals; snapshot length is never a queue count. Live Insert/Update deltas carry committed changes to the window and every terminal outcome, including outcomes outside the window, for activity and scan rollups. Newly inserted PENDING rows may be omitted from the head feed because they cannot already be in the window; state-presence barriers and updates that remove a visible row are preserved. Clients maintain the same bounded view while forwarding terminal events. A resync may replace the window with another snapshot within the same stream; snapshots do not replay terminal activity. Both standalone and multiplexed subscriptions use this contract. Waiting files appear as one aggregate queued entry using `worker.migration.pendingJobsCount` from status; retried files join that entry until claimed. Rail and Resource queue totals come from status, including processing and failure rows outside the displayed window. Head overflow recovery uses a typed continuity-loss cause and immediate, rate-limited resubscription; SSE observers serialize and send off the worker-to-head drain thread. Retired-subscription callbacks cannot change the head or publish live events. Worker subscription-local sequence numbers are rebased at the head on reconnect; its snapshot cursor never moves backward, and older frames within the active subscription are ignored.
+  Re-enqueue of an existing path emits `kind: update` with state PENDING; a new path, when emitted, uses `kind: insert`. Both variants use the same keyed-row semantics.
+
+Terminal activity is accepted through an independent live worker subscription before the row
+view's recoverable handoff. Its empty initial frame acknowledges registration, and snapshots or
+resyncs never replay outcomes. View overflows therefore cannot drop terminal events from activity;
+SSE observer delivery remains asynchronous. Current ingestion outcome rollups read the persisted
+worker ledger directly; historical scan-rollup records retain their decoding/rendering contract.
+
+The queue bookkeeping uses jobs.db **V24**. V23 remains main's monotonic
+`switch_buffer_admissions` counter and restart fence; V24 adds transactional `job_counts`
+and the claim/readiness indexes. The existing transactional ladder upgrades every supported
+older schema, including v13 and main's V23, without changing saved job fields. Reopening
+reconciles counts and preserves the admission high-water. Older binaries refuse V24.
+The unreleased queue branch also used V23: V24 idempotently ensures main's admission-counter
+objects before adding bookkeeping, so those development databases can upgrade without
+discarding jobs or resetting an existing admission counter. Historical V23 execution receipts
+describe that unreleased branch; new migration evidence is explicitly named V24.
+
+The indexing-jobs worker/head bridge carries an optional `state_presence` message on existing
+`IndexingJobsFrame` frames: every snapshot contains the set of states present anywhere in jobs.db;
+the last delta of a commit contains it only when that set changed. An explicitly empty message
+means no states remain; an absent message means no new presence publication. These frames are
+ordering barriers in the path-coalescing handoff. The head invalidates status from this set,
+independently of its row window. This metadata does not add fields to the browser SSE envelopes.
+
+
 - `GET /api/shell-events/stream` (SSE, tempdoc 662) — **The managed connection budget's multiplexer.** Aggregates 7 of the shell's previously-independent always-on streams onto ONE physical connection: `/api/intent/stream`, `/api/advisory/operation-completed/stream`, `/api/advisory/health-recoverable/stream`, `/api/advisory/authorization-pending/stream` (tempdoc 655's long-term design pass — a `REQUIRES_ACK`-classed advisory for a pending MCP/UI approval, complementing the direct ceremony dialog below with a discoverable inbox/toast signal for when the user wasn't looking), `/api/action-ledger/stream`, `/api/indexing-jobs/stream`, and (tempdoc 655) the pending-authorization announcement channel (`system:pending-authorizations` — routing info only: `pendingId`/`operationId`/`sourceTier`/`riskTier`/`gateBehavior`; no args-derived content, see `GET /api/authorizations/pending/{id}` above) — collapsing the browser's HTTP/1.1 ~6-per-host connection-pool consumption that previously starved the cheap `/api/status`/`/api/inference/status` polls under load (tempdoc 649). Every forwarded frame still carries its origin `streamId` (the universal `SseEnvelope` discriminator, unchanged); the FE `MultiplexedStream` demuxes by `streamId` to each consumer's existing reducer. Resume is a **bundle** of the opaque per-channel `?since=<token>` checkpoints (stream, sequence and channel incarnation, encoded by `ResumeTokenCodec`), comma-joined — no new resume protocol. The individual endpoints above stay live for non-shell consumers (tooling, direct API use); see `MultiplexedSseWriter.java` / `ShellEventsStreamController.java` (backend) and `streaming/MultiplexedStream.ts` (FE). Governed by `governance/live-channels.v1.json` + `check-live-channels.mjs` (the connection-budget register/gate).
 - `GET /api/operations/{id}/preview` — Preview face (Slice F2). Returns evaluated `availability` (capability-derived, structural) + `risk` + the predicted gate behavior, computed from the SAME `IntentGateEvaluator` instance the enforcement chokepoint uses — including the live Global Hard Stop (S2/F1). Args-bound consent-capsule verification is correctly deferred to dispatch (the preview has no args/token), so the preview is the structural-prediction read of the one verdict. Unknown operation id → 404.
 - `POST /api/authorizations/approve` — Authorize face (Slice A1). On a user approval of a backend-gated action, mints a single-use, args-bound consent capsule (the max-attenuated Grant). Body: `{pendingId: string, allowAlways?: boolean, execute?: boolean}`. When `allowAlways` is true (thesis IV), also records a durable allow-always grant in `DurableGrantStore` keyed `(operationId, sourceTier)`, so future invocations of that op from that tier auto-approve without re-prompting. Both grant lifecycles are recorded as `grant` ActionEvents (ISSUED/CONSUMED/REVOKED, GRANTED_ALWAYS/REVOKED) in the one log → one audit, one revocation path. Tempdoc 655: `execute: true` additionally dispatches the pending's operation server-side, immediately, using its own stored args — for an approval whose origin (e.g. an MCP tool call) never gave the browser the full args to replay itself.
@@ -897,7 +940,7 @@ and `modules/ui/src/main/java/io/justsearch/ui/api/ResourceApiModule.java`.
 - Response is `OperationInvocationResponse`: `success`, `message`, optional error fields and `structuredData` containing `operationKey`, `operationRecordId` and state metadata. HTTP 200 alone does not imply operation success. Acceptance does not mean indexing completed and supplies no accepted-file count or `scanId`.
 - Poll `GET /api/operation-history/{operationKey}` for durable state, phase, committed units and terminal outcome. A read does not cancel the operation when its client disconnects.
 - Reuse a canonical UUIDv7 `idempotencyKey` with the same public arguments after an interrupted response. Known keys answer from their recorded invocation/outcome without fresh preparation; changed arguments receive HTTP 409 `OPERATION_KEY_REUSED`.
-- MCP bridges send `X-JustSearch-Transport: MCP`; the request owner supplies the MCP client partition and server-resolved identity (anonymous when unresolved). Existing Host/Origin/mutation-token protections apply. HTTP 428 retains the pending authorization, operation key, preparation nonce and approval preview; it is a refusal pending approval, never a successful ingest.
+- MCP bridges send `X-JustSearch-Transport: MCP`; the request owner supplies the MCP client partition and server-resolved identity (anonymous when unresolved). Existing Host/Origin/session-token protections apply. HTTP 428 retains the pending authorization, operation key, preparation nonce and approval preview; it is a refusal pending approval, never a successful ingest.
 
 `DELETE /api/indexing/collections`:
 
@@ -1083,7 +1126,7 @@ JustSearch's loopback HTTP server exposes a minimal OpenAI-compatible surface th
 - Method, body, and most request headers are forwarded. Hop-by-hop headers (`Host`, `Connection`, `Transfer-Encoding`, etc.) are dropped per RFC 7230.
 - Status code, response headers, and body are streamed back unchanged.
 - When `llama-server` is offline (port unset, connect refused, or no chat package installed), the proxy responds `503 SERVICE_UNAVAILABLE` using the project's standard error envelope.
-- Token enforcement: `POST /v1/chat/completions` is subject to the same session-token requirement as the rest of the non-GET API surface in prod mode. Third-party agents read the token from JustSearch's stdout `JUSTSEARCH_SESSION_TOKEN=...` line on launch (or via the Tauri bridge for in-app agents).
+- Token enforcement: `POST /v1/chat/completions` requires the production session token, as do all non-public routes. Third-party agents read `head.sessionToken` from the owner-only canonical runtime manifest (the Tauri bridge supplies it to in-app agents).
 
 **Out of scope:**
 - `/v1/embeddings` — JustSearch's embedding encoder is in-process in the Worker; no HTTP server hosts it.

@@ -1,6 +1,7 @@
 package io.justsearch.indexerworker.queue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -10,18 +11,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * Tempdoc 550 §B.2 anti-drift CONFORMANCE — the real teeth the static {@code operation-surface}
- * gate cannot provide. §B.2 was a divergence between two projections of the one canonical record
- * (the {@code jobs} table): the COUNT projection ({@code queueDepth()} → {@code pendingJobs}) and
- * the LIST projection (the change-stream {@code subscribeWithSnapshot} that backs the rail). The
- * static gate registers surfaces but cannot prove they AGREE. This test does: it asserts, across
- * lifecycle transitions, that {@code queueDepth()} always equals the count of non-terminal
- * (PENDING+PROCESSING) rows the change-stream snapshot surfaces. If the two reads ever drift again
- * (the §B.2 class), this fails. Template: KnowledgeWireContractConformanceTest (cross-representation
- * subset assertion).
- */
-@DisplayName("§B.2 conformance: queueDepth() == change-stream non-terminal row count")
+/** Queue totals remain authoritative while the feed projects only its bounded window. */
+@DisplayName("Queue depth agrees with status; window PROCESSING rows agree with status")
 final class SqliteJobQueueConformanceTest {
 
   @TempDir Path tempDir;
@@ -40,39 +31,43 @@ final class SqliteJobQueueConformanceTest {
     }
   }
 
-  /** The count projection and the list projection agree at every step of a lifecycle sequence. */
+  /** Verify both projections against their appropriate status counts through a full lifecycle. */
   @Test
   void countAndStreamAgreeAcrossTransitions() throws Exception {
-    assertCountEqualsStreamNonTerminal(); // empty: 0 == 0
+    assertCountsAndWindowAgree(); // empty: 0 == 0
 
     jobQueue.enqueue(
         List.of(Path.of("/tmp/a.txt"), Path.of("/tmp/b.txt"), Path.of("/tmp/c.txt")));
-    assertCountEqualsStreamNonTerminal(); // 3 PENDING → depth 3
+    assertCountsAndWindowAgree(); // 3 PENDING → depth 3
 
     var polled = jobQueue.pollPending(2); // 2 → PROCESSING
-    assertCountEqualsStreamNonTerminal(); // 1 PENDING + 2 PROCESSING → depth 3
+    assertCountsAndWindowAgree(); // 1 PENDING + 2 PROCESSING → depth 3
 
     jobQueue.markDone(polled.get(0).path()); // 1 → DONE (terminal)
-    assertCountEqualsStreamNonTerminal(); // 1 PENDING + 1 PROCESSING + 1 DONE → depth 2
+    assertCountsAndWindowAgree(); // 1 PENDING + 1 PROCESSING + 1 DONE → depth 2
   }
 
-  private void assertCountEqualsStreamNonTerminal() throws Exception {
+  private void assertCountsAndWindowAgree() throws Exception {
     long depth = jobQueue.queueDepth();
     var snap = jobQueue.changeStream().subscribeWithSnapshot(d -> {});
     try {
-      long nonTerminal =
+      var counts = jobQueue.jobStateCountsStrict();
+      assertEquals(depth, counts.pendingCount() + counts.processingCount(),
+          "queue depth includes queued work outside the window");
+      assertTrue(snap.items().stream().noneMatch(r -> "PENDING".equals(r.state()) || "DONE".equals(r.state())),
+          "snapshots exclude queued and completed history");
+      long processing =
           snap.items().stream()
               .filter(
                   r -> {
                     String s = r.state();
-                    return "PENDING".equals(s) || "PROCESSING".equals(s);
+                    return "PROCESSING".equals(s);
                   })
               .count();
       assertEquals(
-          depth,
-          nonTerminal,
-          "queueDepth() must equal the change-stream's non-terminal (PENDING+PROCESSING) row count"
-              + " — the §B.2 count↔list invariant");
+          counts.processingCount(),
+          processing,
+          "every PROCESSING row must remain visible even when PENDING and DONE are outside the window");
     } finally {
       snap.subscription().close();
     }

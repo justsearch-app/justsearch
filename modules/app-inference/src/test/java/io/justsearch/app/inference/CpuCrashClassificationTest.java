@@ -29,8 +29,8 @@ final class CpuCrashClassificationTest {
         "cpu-plan");
     Class<?> ownerType = Class.forName(LlamaServerOps.class.getName() + "$ActiveServer");
     var constructor = ownerType.getDeclaredConstructor(LlamaServerOps.StartResult.class,
-        ChildHandle.class, int.class); constructor.setAccessible(true);
-    Object owner = constructor.newInstance(start, null, 8082);
+        ChildHandle.class, LlamaServerEndpoint.class); constructor.setAccessible(true);
+    Object owner = constructor.newInstance(start, null, new LlamaServerEndpoint(8082, null));
     var ops = mock(LlamaServerOps.class, CALLS_REAL_METHODS);
     var describe = LlamaServerOps.class.getDeclaredMethod("describeFailure", ownerType, boolean.class);
     describe.setAccessible(true);

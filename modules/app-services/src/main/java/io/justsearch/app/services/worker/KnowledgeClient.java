@@ -437,6 +437,16 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             java.util.function.Consumer<Throwable> onError,
             Runnable onCompleted, EngineContext engineContext);
 
+    /**
+     * Live terminal outcomes, independent of the recoverable row-view handoff. The initial empty
+     * snapshot is a registration barrier, never history. Acceptance runs synchronously on the
+     * commit publisher; consumers must keep it bounded and send SSE asynchronously.
+     */
+    public abstract IndexingJobsStream subscribeIndexingJobOutcomes(
+            java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame> onFrame,
+            java.util.function.Consumer<Throwable> onError,
+            Runnable onCompleted, EngineContext engineContext);
+
     /** Releases whatever the transport holds. Called from {@link #close()}. */
     protected abstract void closeTransport();
 

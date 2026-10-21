@@ -127,6 +127,13 @@ class TestKnowledgeClient extends KnowledgeClient {
   }
 
   @Override
+  public IndexingJobsStream subscribeIndexingJobOutcomes(
+      Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted,
+      EngineContext engineContext) {
+    throw new UnsupportedOperationException("no job outcomes wired");
+  }
+
+  @Override
   protected void closeTransport() {
     // Nothing held.
   }

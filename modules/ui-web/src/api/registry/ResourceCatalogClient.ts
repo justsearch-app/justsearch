@@ -33,6 +33,7 @@
  * mutability becomes a real concern.
  */
 
+import { authorizedFetch } from '../../shell-v0/api/authorizedFetch.js';
 import type { Resource, ResourceCatalog, Category, Provenance } from '../types/registry.js';
 import { resourceCatalogSchema } from '../types/registry.js';
 import { parseWireContract } from '../schemas.js';
@@ -115,7 +116,7 @@ function rebuildIndex(catalog: ResourceCatalog): void {
  */
 export async function bootResourceRegistry(
   baseUrl: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = authorizedFetch,
 ): Promise<void> {
   if (bootSucceeded) return;
   if (inFlightBoot) return inFlightBoot;
@@ -229,7 +230,7 @@ export function onCatalogChange(listener: () => void): () => void {
  */
 export async function refreshResourceCatalog(
   baseUrl: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = authorizedFetch,
 ): Promise<void> {
   if (!baseUrl) return;
   try {

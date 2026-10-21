@@ -28,6 +28,7 @@ import io.justsearch.app.api.chat.Hold;
 import io.justsearch.app.api.chat.SelfTestSession;
 import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.inference.LlamaDevicePlan;
+import io.justsearch.app.inference.LlamaServerAuthentication;
 import io.justsearch.app.inference.chat.ChildSelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestRun;
 import io.justsearch.app.inference.chat.SelfTestSpec;
@@ -1262,9 +1263,12 @@ public final class RuntimeActivationService
       touch();
     }
 
+    byte[] secret = new byte[32];
+    new java.security.SecureRandom().nextBytes(secret);
+    String apiKey = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(secret);
     String modelId = model.getFileName().toString();
     Long[] afterUsedHolder = new Long[1];
-    SelfTestSpec spec = selfTestSpec(exe, model, port, settings, devices, new SelfTestSpec.Probe() {
+    SelfTestSpec spec = selfTestSpec(exe, model, port, settings, devices, apiKey, new SelfTestSpec.Probe() {
       @Override
       public boolean healthy(int candidatePort) {
         return isHealthy(candidatePort);
@@ -1272,7 +1276,8 @@ public final class RuntimeActivationService
 
       @Override
       public void exercise(int candidatePort) throws Exception {
-        sendTinyChatRequest(candidatePort, modelId);
+        LlamaServerAuthentication.requireEnforcement(http, candidatePort, Duration.ofSeconds(2));
+        sendTinyChatRequest(candidatePort, modelId, apiKey);
         if (devices.gpuLayers() > 0) {
           // Measure GPU allocation only for a GPU probe, while its child lives.
           Thread.sleep(250);
@@ -1321,7 +1326,7 @@ public final class RuntimeActivationService
 
   /** The candidate the chat controller launches (Spec A T38). */
   private SelfTestSpec selfTestSpec(Path exe, Path model, int port, UiSettings settings,
-      LlamaDevicePlan devices, SelfTestSpec.Probe probe) {
+      LlamaDevicePlan devices, String apiKey, SelfTestSpec.Probe probe) {
     List<String> command = new ArrayList<>();
     command.add(exe.toAbsolutePath().toString());
     command.add("-m");
@@ -1377,15 +1382,17 @@ public final class RuntimeActivationService
 
     // Persist logs for debugging failures.
     Path logFile = aiHome.resolve("logs").resolve("llama-server-selftest.log");
+    Map<String, String> environment = new HashMap<>(devices.environment());
+    environment.put("LLAMA_API_KEY", apiKey);
     return new SelfTestSpec(command, exeDir, pathPrefix, logFile, port,
-        Duration.ofMillis(HEALTH_CHECK_TIMEOUT_MS), probe, devices.environment());
+        Duration.ofMillis(HEALTH_CHECK_TIMEOUT_MS), probe, environment);
   }
 
   private boolean isHealthy(int port) {
     try {
       HttpRequest request =
           HttpRequest.newBuilder()
-              .uri(URI.create("http://localhost:" + port + "/health"))
+              .uri(URI.create("http://127.0.0.1:" + port + "/health"))
               .timeout(Duration.ofSeconds(2))
               .GET()
               .build();
@@ -1396,7 +1403,7 @@ public final class RuntimeActivationService
     }
   }
 
-  private void sendTinyChatRequest(int port, String modelId) throws SelfTestException {
+  private void sendTinyChatRequest(int port, String modelId, String apiKey) throws SelfTestException {
     try {
       List<Map<String, Object>> messages =
           List.of(Map.of("role", "user", "content", "Reply with the single word: ok"));
@@ -1407,8 +1414,9 @@ public final class RuntimeActivationService
       String json = MAPPER.writeValueAsString(body);
       HttpRequest request =
           HttpRequest.newBuilder()
-              .uri(URI.create("http://localhost:" + port + "/v1/chat/completions"))
+              .uri(URI.create("http://127.0.0.1:" + port + "/v1/chat/completions"))
               .header("Content-Type", "application/json")
+              .header("Authorization", "Bearer " + apiKey)
               .timeout(Duration.ofSeconds(20))
               .POST(HttpRequest.BodyPublishers.ofString(json))
               .build();
