@@ -1162,6 +1162,18 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         || successor.mutationAdmission != mutationAdmission) {
       throw new IllegalArgumentException("Native watcher successor changed");
     }
+    // Before A can close: every settled DELETE waiting on the fence becomes A's durable root
+    // receipt, through the same call a failed handoff's released callback makes on drained A. The
+    // fence's write lease admits it; the successor's reconciliation settles the receipt.
+    workerWatcher.forEachSettlingDelete((witness, path) -> {
+      try {
+        WatcherCallbacks.deleteAt(preparedWatcherTarget, witness, path);
+      } catch (RuntimeException unrecorded) {
+        // The waiting callback still holds this DELETE and applies or reports it once admitted.
+        log.warn("A waiting watcher DELETE was not recorded before the handoff: {}",
+            unrecorded.getMessage());
+      }
+    });
     producerOwnership.transferWatcherTo(successor.producerOwnership);
     watcherCallbacks.target = successor.preparedWatcherTarget;
   }

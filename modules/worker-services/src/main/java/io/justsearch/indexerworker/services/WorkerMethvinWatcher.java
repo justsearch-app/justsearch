@@ -96,6 +96,9 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   /** A witnessed DELETE waiting out its settle window. */
   private record PendingDelete(RootWatcherRegistry.Subscription witness, Path path, long dueNanos) {}
 
+  /** Settled DELETEs from leaving {@link #pendingDeletes} until their route returns. */
+  private final java.util.Set<PendingDelete> settlingDeletes = ConcurrentHashMap.newKeySet();
+
   private final Consumer<RuntimeException> routingFailureSink;
   private final EventRouter eventRouter;
   private final BiConsumer<RootWatcherRegistry.Subscription, String> witnessedDeletePathSink;
@@ -563,6 +566,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
         continue;
       }
       if (!pendingDeletes.remove(entry.getKey(), pending)) continue;
+      settlingDeletes.add(pending);
       try {
         eventRouter.route(
             pending.witness(), () -> settleDelete(pending.witness(), pending.path()));
@@ -570,6 +574,8 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
         routingFailureSink.accept(failure);
         log.warn("Worker watcher delete confirmation failed for {}: {}", pending.path(),
             failure.getMessage());
+      } finally {
+        settlingDeletes.remove(pending);
       }
     }
     if (!pendingDeletes.isEmpty()) {
@@ -578,6 +584,17 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
               ? DELETE_SETTLE_MS
               : Math.max(0L, TimeUnit.NANOSECONDS.toMillis(nextDueNanos - now) + 1L);
       scheduleDeleteDrain(delayMs);
+    }
+  }
+
+  /**
+   * Hands each settled DELETE whose route has not returned (one waiting on a mutation fence) to
+   * {@code sink} as its witness and normalized path. The DELETE stays with its own route as well.
+   */
+  public void forEachSettlingDelete(BiConsumer<RootWatcherRegistry.Subscription, String> sink) {
+    for (PendingDelete settling : List.copyOf(settlingDeletes)) {
+      sink.accept(settling.witness(),
+          PathNormalizer.normalizePath(settling.path().toAbsolutePath().toString()));
     }
   }
 

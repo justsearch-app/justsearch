@@ -409,10 +409,23 @@ final class RuntimeReloadProducersHttpIntegrationTest {
 
   @Test
   @Timeout(180)
-  void watcherObligationSurvivesProcessDeathDuringNativeReconciliation() throws Exception {
-    assertEquals(71, crashChild("native-reconciliation"), "the selected crash cut must execute");
+  void watcherObligationSurvivesProcessDeathAfterSuccessfulHandoff() throws Exception {
+    // Killed as the old owner's close returns: the handoff is done, reconciliation has not begun.
+    assertEquals(71, crashChild("close"), "the selected crash cut must execute");
+    assertWaitingDeleteRecovered();
+  }
+
+  @Test
+  @Timeout(180)
+  void watcherObligationSurvivesProcessDeathAfterNativeReconciliation() throws Exception {
+    // Killed once the successor's loop is active, still inside the fence the DELETE waits on.
+    assertEquals(71, crashChild("activatePreparedIndexingLoop"), "the selected crash cut must execute");
+    assertWaitingDeleteRecovered();
+  }
+
+  /** After the restart and its watch call, the waiting DELETE has its effect; the sibling stays. */
+  private void assertWaitingDeleteRecovered() throws Exception {
     try (var f = new Fixture()) {
-      assertEquals(1, f.receipts().size(), "the receipt is retired only after its walk commits");
       f.watch(directory.resolve("watched"));
       f.awaitCount("reloadobligationgone", 0);
       f.awaitCount("reloadobligationkept", 1);
@@ -471,22 +484,54 @@ final class RuntimeReloadProducersHttpIntegrationTest {
           assertFalse(gate.hasQueuedThreads() || gate.getReadLockCount() > 0);
           Runtime.getRuntime().halt(71);
         }
-        f.unwatchedFilesWithReceipt();
-        f.useReload(() -> {
-          var fresh = f.reopen();
-          var selected = spy(fresh);
-          var commits = spy(fresh.commitOps());
-          doReturn(commits).when(selected).commitOps();
-          doAnswer(call -> { call.callRealMethod(); Runtime.getRuntime().halt(71); return null; })
-              .when(commits).commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.WATCHER_DELETE);
-          return selected;
+        // A successful native reload with a settled DELETE waiting on its fence, parked at the exit
+        // of the named DefaultWorkerAppServices lifecycle method, where this process then dies.
+        var files = f.watchedFiles();
+        String cut = args[0];
+        new net.bytebuddy.agent.builder.AgentBuilder.Default()
+            .with(net.bytebuddy.agent.builder.AgentBuilder.RedefinitionStrategy.RETRANSFORMATION)
+            .type(net.bytebuddy.matcher.ElementMatchers.named(DefaultWorkerAppServices.class.getName()))
+            .transform((builder, type, loader, module, domain) -> builder.visit(
+                net.bytebuddy.asm.Advice.to(ParkAtExit.class).on(
+                    net.bytebuddy.matcher.ElementMatchers.named(cut)
+                        .and(net.bytebuddy.matcher.ElementMatchers.takesArguments(0)))))
+            .installOn(net.bytebuddy.agent.ByteBuddyAgent.install());
+        var reload = CompletableFuture.supplyAsync(() -> {
+          try {
+            return f.reloadWithSettledDeleteWaiting(files.gone(), () -> {
+              System.setProperty(ParkAtExit.STATE, "armed");
+              return f.reopen();
+            });
+          } catch (Exception failure) {
+            throw new IllegalStateException(failure);
+          }
         });
-        assertReloadSuccess(f.post());
-        System.out.println("crash point not reached: the reload returned without it");
+        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+        while (!"parked".equals(System.getProperty(ParkAtExit.STATE)) && !reload.isDone()
+            && System.nanoTime() < until) Thread.sleep(1);
+        if ("parked".equals(System.getProperty(ParkAtExit.STATE))) Runtime.getRuntime().halt(71);
+        System.out.println("crash point not reached: reload done=" + reload.isDone());
         Runtime.getRuntime().halt(70);
       } catch (Throwable failure) {
         failure.printStackTrace(System.out);
         Runtime.getRuntime().halt(72); // Engine threads must not keep a failed child alive.
+      }
+    }
+  }
+
+  /** Inlined at a lifecycle method's exit once armed: parks that thread so the process dies there. */
+  public static final class ParkAtExit {
+    static final String STATE = "justsearch.test.reloadCrashCut";
+
+    private ParkAtExit() {}
+
+    @net.bytebuddy.asm.Advice.OnMethodExit
+    public static void exit() {
+      if ("armed".equals(System.getProperty(STATE))) {
+        System.setProperty(STATE, "parked");
+        while ("parked".equals(System.getProperty(STATE))) {
+          java.util.concurrent.locks.LockSupport.parkNanos(1_000_000L);
+        }
       }
     }
   }
