@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
   },
-  "createdAt": "2026-10-20T16:15:54.911Z",
-  "revision": "f6a14b5a66e7b879c711ef9ca54280723de2c242",
-  "tree": "e75352de2687507623821b3ea71cdf97d4914c2d",
+  "createdAt": "2026-10-21T03:23:54.810Z",
+  "revision": "3e4a26a98f1e679aa2206668069a08dad1253f02",
+  "tree": "828595eb5431e174dc60e28272f4cfccdbad8769",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPreservationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPublicationBenchmarkTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentRevisionRaceTest.blankCombinedInputStillDoesNotSpendReplacementRetries\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 9117
+      "durationMs": 7047
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPreservationTest.java",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPreservationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:35979ea43d3d87c6d50a5f7d7694c46edc1463864a915b59d2f336723377f7b4",
+      "contentDigest": "sha256:fa6e2a8ba7d19661d18ce522b3f41c3f08e2701663c1c28eb7e474dc6e4cdc60",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -84,5 +84,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:f968f72442aa5993b1bb7c1ac48fc090dde4efab7e5adda30698b1bff82b3f05"
+  "digest": "sha256:201903f453cfbcd8e5d48e3393f9263bb7316deb1b3ba9315eee081ef4913137"
 }
