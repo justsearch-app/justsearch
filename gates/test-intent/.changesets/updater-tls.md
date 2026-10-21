@@ -111,3 +111,14 @@ Baseline signature preservation is also run on the unchanged production sources 
   "note": "Helper now fails an unmatched child name (0 tests) and a no-op TLS install in lib and conformance; a name of another existing test still passes vacuously"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "636bee56-af2a-4ae2-b5c0-150def056b9e",
+  "verdict": "accept",
+  "digest": "sha256:270574436e7cd169deb6712564d3f97d44ef79d363454ecf126ff19685802132",
+  "note": "Post-merge: test block byte-identical, main tests untouched; README 231-233 quotes verbatim at base; evidence fresh (no provider -> assertion, no-op shim); task-record yes not checked"
+}
+```
