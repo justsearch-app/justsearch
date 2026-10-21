@@ -70,3 +70,14 @@ Builder evidence (logs in this checkout's `tmp/xvfb-loop/`):
   "note": "Incidental fits: 7 new checks fail on 56e27e059 (100 starts, no Mesa var) and pass on 0ca21a4b9; real Xvfb start+connect+cleanup ok both ways; abort not reproducible here"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-verifier-xvfb-487c29e26",
+  "verdict": "accept",
+  "digest": "sha256:09221e07998a92835ddc39f34dc244ed97b2696a5eb2cebeb18b94887078d777",
+  "note": "Merge composes: Xvfb fix and #887 atomic activation write touch disjoint lines; 7/7 unit checks pass (5 fail on main pre-fix, 2 preservation pass both); both real X11 cargo tests pass"
+}
+```
