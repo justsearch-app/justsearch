@@ -781,7 +781,7 @@ public final class HeadAssembly implements AutoCloseable {
                 var events =
                     run.get("events") instanceof List<?> list ? list : List.of();
                 Object parent = meta.get("conversationId");
-                try (var ignoredWriting = agentRunStore.conversationWork().start(
+                try (var ignoredWriting = agentRunStore.conversationWork().restore(
                     parent instanceof String id && !id.isBlank() ? id : null)) {
                   if (!meta.isEmpty()) {
                     agentRunStore.runEvents().writeRunMeta(sid.toString(), meta);

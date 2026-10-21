@@ -52,12 +52,15 @@ export interface Conversation {
 
 interface ConversationListState {
   conversations: Conversation[];
+  /** Confirmed by successful DELETE or the Engine list; omission from its recent window is insufficient. */
+  deletedIds: string[];
   activeId: string | null;
   loading: boolean;
 }
 
 let state: ConversationListState = {
   conversations: [],
+  deletedIds: [],
   activeId: null,
   loading: false,
 };
@@ -318,7 +321,13 @@ export async function loadConversations(): Promise<void> {
     // written through when a person acts and erased once a list answer confirms the write.
     const legacy = loadTitles();
     const conversations = rows.map((row) => toConversation(row, request, legacy));
-    state = { ...state, conversations, loading: false };
+    const deletedIds: string[] = Array.isArray(data.deletedIds)
+      ? data.deletedIds.filter((id: unknown): id is string => typeof id === 'string')
+      : state.deletedIds;
+    for (const id of deletedIds) forgetRecentSession(id);
+    state = { ...state, conversations: conversations.filter(c => !deletedIds.includes(c.id)), deletedIds,
+      activeId: state.activeId !== null && deletedIds.includes(state.activeId) ? null : state.activeId,
+      loading: false };
     emit();
     // Both write-throughs the list makes possible, fired AFTER the list has rendered so neither one
     // delays it: the names the backend refused with a 404 while the conversation was still being
@@ -498,7 +507,7 @@ async function adoptLegacyTitles(legacy: Record<string, string>): Promise<void> 
 }
 
 export function setActiveConversation(id: string | null): void {
-  state = { ...state, activeId: id };
+  state = { ...state, activeId: id !== null && state.deletedIds.includes(id) ? null : id };
   emit('claim');
 }
 
@@ -510,7 +519,7 @@ export function setActiveConversation(id: string | null): void {
  * a history entry — see {@link ConversationListChange}.
  */
 export function restoreActiveConversation(id: string | null): void {
-  state = { ...state, activeId: id };
+  state = { ...state, activeId: id !== null && state.deletedIds.includes(id) ? null : id };
   emit('restore');
 }
 
@@ -1019,6 +1028,7 @@ export async function resumeConversation(
           ...(standaloneQuestion !== undefined ? { standaloneQuestion } : {}),
         };
       });
+    if (state.deletedIds.includes(sessionId)) return { sessionId, shapeId, messages: [] };
     if (claim) setActiveConversation(sessionId);
     return {
       sessionId,
@@ -1251,9 +1261,13 @@ export async function deleteConversation(sessionId: string): Promise<boolean> {
     });
     if (!res.ok) return false;
     forgetRecentSession(sessionId);
+    // An older in-flight list cannot undo this successful deletion.
+    listShown = ++listRequests;
     state = {
       ...state,
       conversations: state.conversations.filter((c) => c.id !== sessionId),
+      deletedIds: [...new Set([...state.deletedIds, sessionId])],
+      loading: false,
       activeId: state.activeId === sessionId ? null : state.activeId,
     };
     emit();
@@ -1300,9 +1314,12 @@ export async function deleteConversationWithCascade(
     });
     if (res.ok) {
       forgetRecentSession(sessionId);
+      listShown = ++listRequests;
       state = {
         ...state,
         conversations: state.conversations.filter((c) => c.id !== sessionId),
+        deletedIds: [...new Set([...state.deletedIds, sessionId])],
+        loading: false,
         activeId: state.activeId === sessionId ? null : state.activeId,
       };
       emit();
@@ -1349,7 +1366,7 @@ export function exportConversationMarkdown(
 }
 
 export function __resetConversationListForTest(): void {
-  state = { conversations: [], activeId: null, loading: false };
+  state = { conversations: [], deletedIds: [], activeId: null, loading: false };
   listeners.clear();
   apiBase = '';
   pendingTitles.clear();

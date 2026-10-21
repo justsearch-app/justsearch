@@ -307,7 +307,7 @@ final class ConversationApiAssembly {
                     continue;
                   }
                   String shapeId = c.get("shapeId") == null ? null : c.get("shapeId").toString();
-                  try (var ignoredWriting = conversationStore.conversationWork().start(sid.toString())) {
+                  try (var ignoredWriting = conversationStore.conversationWork().restore(sid.toString())) {
                     if (c.get("messages") instanceof List<?> list) {
                       if (!list.isEmpty()) conversationStore.createSession(sid.toString(), shapeId);
                       for (var msg : list) {

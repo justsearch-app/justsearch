@@ -147,6 +147,9 @@ public final class RunStreamController {
     try (var ignoredWriting = chat.conversationWork(readBody(client.ctx()));
         var work = front == null ? null : front.retain()) {
       streamNewRunOwned(client, work);
+    } catch (io.justsearch.agent.api.conversation.ConversationWork.Refused refused) {
+      client.sendEvent("error", serialize(Map.of(
+          "errorCode", refused.code(), "error", refused.getMessage(), "retryable", false)));
     }
   }
 

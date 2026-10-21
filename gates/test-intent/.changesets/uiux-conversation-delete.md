@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: wp52-cd2-88uo_0zj
+author-session: wp52-cd3-auwty66r
 ---
 
 # WP5.2 conversation deletion
@@ -719,10 +719,219 @@ All checks are durable. Compatibility patch adds signatures only to the before-s
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-conversation-delete-cd2-preservation.json"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts",
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "CD3 removes confirmed deleted sessions, cached turns, open views and last-viewed pointers from both windows after partial cascades and refreshed lists; reports name deleted and failed branches. Captured list/history/thread replies and stale navigation cannot restore deleted content or claims. Deletion cleanup preserves another window’s active-conversation claim.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS1",
+          "quote": "After a delete reported as done, none of these can be listed, opened or found anywhere the app lists conversations or runs, or in any search scope including Agent history:\n  - the conversation's records;\n  - its agent runs and their events;\n  - its agent-history transcripts and pending markers;\n  - its agent-history index documents.\n  This holds after an Engine restart, after unlock and after boot reconciliation, and also for a conversation that consists only of agent runs.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS6",
+          "quote": "A branch cascade that fails partway reports what was and was not deleted, as above.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "CD3: Remember successful deletions in the existing process-wide ConversationWork authority and refuse stale writes before allocating records, using CONVERSATION_DELETED with a reason. The list carries these exact deletedIds because omission from its recent 20 rows cannot establish deletion. Both windows purge confirmed cached state and ignore earlier list/history/thread replies. Explicit backup imports alone can restore identities. No new saved state: markers are lost at Engine restart, when stale first-write ids are again indistinguishable from new ids.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC2: Refuse deletion while the encrypted store is locked.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC1: Refuse live Asks, runs and approval waits. Inside the delete, wait out or cancel the invisible history writer.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-conversation-delete-cd3-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#a deletion refresh clears this window without claiming another windows active conversation",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forgets the open deleted child and cached turns when the next cascade child fails",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts#forgets a cached open conversation when a refreshed list confirms its deletion",
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#clears the old window transcript and pointer after a confirmed local delete",
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#clears the old window transcript and pointer when a refreshed list confirms deletion",
+        "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#a list requested before DELETE cannot resurrect a confirmed deletion",
+        "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#a history response captured before DELETE cannot reclaim its deleted conversation",
+        "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#a stale navigation cannot claim or restore a confirmed deleted identity",
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#a history read already in flight cannot restore deleted cached turns",
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.deletion.test.ts#a thread read already in flight cannot restore deleted interaction events"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/LateConversationWriteTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/LateConversationWriteHttpTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "CD3 refuses SEARCH and managed-run writes after successful deletion with a reason and without allocating new run or conversation content; first-message creation and every authored context/title control observe the same completed-deletion authority. A list identifies confirmed deleted ids independently of its recent window.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS1",
+          "quote": "After a delete reported as done, none of these can be listed, opened or found anywhere the app lists conversations or runs, or in any search scope including Agent history:\n  - the conversation's records;\n  - its agent runs and their events;\n  - its agent-history transcripts and pending markers;\n  - its agent-history index documents.\n  This holds after an Engine restart, after unlock and after boot reconciliation, and also for a conversation that consists only of agent runs.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DS2",
+          "quote": "Deleting while work for that conversation is in flight either is refused with a reason before anything is deleted, or stops or finishes that work first (decision DC1). Work in flight includes:\n  - an Ask streaming in any window or client;\n  - an agent run, in the foreground or background, including one waiting for approval;\n  - a queued history write or a pending history ingest.\n  After a reported success, nothing recreates any part of the conversation, including after a restart.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "CD3: Remember successful deletions in the existing process-wide ConversationWork authority and refuse stale writes before allocating records, using CONVERSATION_DELETED with a reason. The list carries these exact deletedIds because omission from its recent 20 rows cannot establish deletion. Both windows purge confirmed cached state and ignore earlier list/history/thread replies. Explicit backup imports alone can restore identities. No new saved state: markers are lost at Engine restart, when stale first-write ids are again indistinguishable from new ids.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC2: Refuse deletion while the encrypted store is locked.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC1: Refuse live Asks, runs and approval waits. Inside the delete, wait out or cancel the invisible history writer.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-conversation-delete-cd3-java.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/LateConversationWriteHttpTest.java#lateSearchIsRefusedAndCannotRecreateRunOrThread",
+        "modules/ui/src/test/java/io/justsearch/ui/api/LateConversationWriteHttpTest.java#refreshedListIdentifiesConfirmedDeletionsBeyondItsRecentWindow",
+        "modules/ui/src/test/java/io/justsearch/ui/api/LateConversationWriteHttpTest.java#staleManagedStreamIsRefusedWithAReasonBeforeOpeningARun",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/LateConversationWriteTest.java#deletedIdentityCannotBeRecreatedByAFirstMessageOrAnyControl"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "N52.4: explicit backup restoration can reuse a deleted identity, show its restored row, extend its messages and retain skip-existing import behavior. These preservation checks pass on 5a71c91bf and the candidate.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DN4",
+          "quote": "The encrypted backup exports exactly the data that remains; import behaves as today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "CD3: Remember successful deletions in the existing process-wide ConversationWork authority and refuse stale writes before allocating records, using CONVERSATION_DELETED with a reason. The list carries these exact deletedIds because omission from its recent 20 rows cannot establish deletion. Both windows purge confirmed cached state and ignore earlier list/history/thread replies. Explicit backup imports alone can restore identities. No new saved state: markers are lost at Engine restart, when stale first-write ids are again indistinguishable from new ids.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC2: Refuse deletion while the encrypted store is locked.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC1: Refuse live Asks, runs and approval waits. Inside the delete, wait out or cancel the invisible history writer.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-conversation-delete-cd3-preservation-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/conversationDeletionRefresh.test.ts#an authoritative list permits an intentionally restored backup identity"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ConversationRestoreAfterDeleteTest.java"
+      ],
+      "class": "New",
+      "behaviour": "N52.4: explicit backup restoration can reuse a deleted identity, show its restored row, extend its messages and retain skip-existing import behavior. These preservation checks pass on 5a71c91bf and the candidate.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "DN4",
+          "quote": "The encrypted backup exports exactly the data that remains; import behaves as today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "CD3: Remember successful deletions in the existing process-wide ConversationWork authority and refuse stale writes before allocating records, using CONVERSATION_DELETED with a reason. The list carries these exact deletedIds because omission from its recent 20 rows cannot establish deletion. Both windows purge confirmed cached state and ignore earlier list/history/thread replies. Explicit backup imports alone can restore identities. No new saved state: markers are lost at Engine restart, when stale first-write ids are again indistinguishable from new ids.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC2: Refuse deletion while the encrypted store is locked.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Remaining UI/UX work, area 5 user data control, WP5.2 conversation deletion",
+          "choice": "DC1: Refuse live Asks, runs and approval waits. Inside the delete, wait out or cancel the invisible history writer.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-conversation-delete-cd3-preservation-java.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ConversationRestoreAfterDeleteTest.java#explicitBackupImportCanRestoreAndExtendADeletedConversation"
+      ]
     }
   ]
 }
 ```
+
+All CD3 checks are durable. CD3 compatibility scaffolding adds only the old version's missing signatures (including a no-op completed notification); it adds no deletion repair. The test-intent evidence producer is unchanged. A temporary npx shim uses the installed Vitest entry point to repair the producer's dereferenced .bin copy; it changes neither test selection nor product code. Exact-head fail-before evidence and the writer sweep are in tmp/wp52-cd3/.
 
 ## Acceptance records
 

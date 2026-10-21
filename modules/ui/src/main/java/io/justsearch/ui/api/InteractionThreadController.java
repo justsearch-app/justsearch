@@ -319,6 +319,8 @@ public final class InteractionThreadController {
         return;
       }
       ctx.status(201).json(Map.of("id", eventId));
+    } catch (io.justsearch.agent.api.conversation.ConversationWork.Refused refused) {
+      ctx.status(409).json(Map.of("ok", false, "errorCode", refused.code(), "error", refused.getMessage()));
     } catch (Exception e) {
       log.error("Failed to append thread event for {}", conversationId, e);
       ctx.status(500).json(Map.of("error", "Failed to append thread event"));

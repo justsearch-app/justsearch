@@ -212,6 +212,7 @@ export class ConversationHistory extends JfElement {
     // conversation has child branches (HTTP 409), surface a second
     // confirm naming the branches (looked up from the loaded conversations
     // array) and recursively delete them on consent.
+    const labels = new Map(this.conversations.map(row => [row.id, row.title ?? row.firstUserMessage ?? row.id]));
     let declined = false;
     const result = await deleteConversationWithCascade(c.id, async (childIds) => {
       const childLabels = childIds.map((id) => {
@@ -236,7 +237,7 @@ export class ConversationHistory extends JfElement {
     });
     if (!result.ok && !declined) {
       const progress = result.deletedIds?.length
-        ? `${result.deletedIds.length} branch${result.deletedIds.length === 1 ? '' : 'es'} deleted. ` : '';
+        ? `${result.deletedIds.length} branch${result.deletedIds.length === 1 ? '' : 'es'} deleted. Deleted: ${result.deletedIds.map(id => `“${labels.get(id) ?? id}”`).join(', ')}. ` : '';
       const failedRow = this.conversations.find(row => row.id === result.failedId);
       const failed = result.failedId && (result.error || result.deletedIds?.length) ? `Could not delete “${failedRow?.title ?? failedRow?.firstUserMessage ?? result.failedId}”. ` : '';
       emitEphemeralToast({ message: progress + failed + (result.error ?? 'Could not delete the conversation. Try again.'), severity: 'warning' });

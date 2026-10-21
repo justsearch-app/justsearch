@@ -484,7 +484,9 @@ public final class ChatController {
     // One order for both records. The store side already sorts by last activity, so a STABLE sort on
     // the same key leaves it untouched and only decides where the synthesized rows land.
     result.sort((a, b) -> Long.compare(asMillis(b.get("lastActiveAtMs")), asMillis(a.get("lastActiveAtMs"))));
-    ctx.json(Map.of("sessions", result.size() <= limit ? result : result.subList(0, limit)));
+    var writes = conversationStore.conversationWork();
+    ctx.json(Map.of("sessions", result.size() <= limit ? result : result.subList(0, limit),
+        "deletedIds", writes == null ? List.of() : writes.deletedIds()));
   }
 
   /**
@@ -1135,6 +1137,8 @@ public final class ChatController {
         conversationStore.deleteSession(sessionId);
         AgentService agent = agentService.get();
         runsDeleted = agent == null ? 0 : agent.deleteConversationRuns(sessionId);
+        var writes = conversationStore.conversationWork();
+        if (writes != null) writes.completed(sessionId);
       }
       ctx.json(Map.of("ok", true, "agentRunsDeleted", runsDeleted));
     } catch (BranchesPreventDeletionException blocked) {
