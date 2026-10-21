@@ -378,6 +378,31 @@ final class RuntimeReloadProducersHttpIntegrationTest {
   }
 
   @Test
+  void receiptForARootWhoseVolumeReturnsIsAppliedWithoutAWatchCall() throws Exception {
+    try (var f = new Fixture()) {
+      var files = f.unwatchedFilesWithReceipt();
+      Path root = files.root().toAbsolutePath().normalize();
+      var ledger = directory.resolve("index").resolve("root-volumes.properties");
+      String ownVolume = f.recordedVolume(ledger, root);
+      f.recordVolume(ledger, root, "windows-volume:dead");
+      var service = f.server.appServices().ingestService();
+      var held = service.watchRoot(io.justsearch.ipc.WatchRootRequest.newBuilder()
+              .setRootPath(root.toString()).setCollection("default").build(),
+          io.justsearch.indexerworker.services.CallContext.none());
+      assertFalse(held.getWatching(), "precondition: the watch waits for the root's own volume");
+      assertEquals(1, f.receipts().size(), "precondition: the receipt waits with the root");
+      f.recordVolume(ledger, root, ownVolume);
+      // The periodic sync's call finds the volume back; nothing calls watch.
+      service.syncDirectory(io.justsearch.ipc.SyncDirectoryRequest.newBuilder()
+              .setRootPath(root.toString()).setForce(false).build(),
+          io.justsearch.indexerworker.services.CallContext.none());
+      f.awaitCount("reloadobligationgone", 0);
+      f.awaitCount("reloadobligationkept", 1);
+      f.awaitReceipts(0, "the returned root's pending receipt must be applied without a watch call");
+    }
+  }
+
+  @Test
   void failedNativeReloadAndRetryKeepTheRootWatched() throws Exception {
     try (var f = new Fixture()) {
       var files = f.watchedFiles();
@@ -696,6 +721,22 @@ final class RuntimeReloadProducersHttpIntegrationTest {
           io.justsearch.indexerworker.queue.WatcherRootReconciliation.OPERATION, debt.encode()));
       assertEquals(1, count("reloadobligationgone"), "the receipt's delete is not yet applied");
       return files;
+    }
+
+    String recordedVolume(Path ledger, Path root) throws Exception {
+      var entries = new java.util.Properties();
+      try (var in = Files.newInputStream(ledger)) { entries.load(in); }
+      String volume = entries.getProperty(root.toString());
+      assertNotNull(volume, "precondition: the person's add recorded the root's volume");
+      return volume;
+    }
+
+    /** Rewrites the root's recorded volume, as if another volume (or its own) were at its path. */
+    void recordVolume(Path ledger, Path root, String volume) throws Exception {
+      var entries = new java.util.Properties();
+      try (var in = Files.newInputStream(ledger)) { entries.load(in); }
+      entries.setProperty(root.toString(), volume);
+      try (var out = Files.newOutputStream(ledger)) { entries.store(out, null); }
     }
 
     void useReload(java.util.function.Supplier<io.justsearch.adapters.lucene.runtime.RunningRuntime> opener) {

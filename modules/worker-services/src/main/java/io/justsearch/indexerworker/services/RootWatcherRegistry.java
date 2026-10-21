@@ -174,7 +174,9 @@ public final class RootWatcherRegistry {
 
   /**
    * Registers the held watch of {@code root}, if there is one, now that the volume recorded for it
-   * is back at its path. Returns whether a watch was registered.
+   * is back at its path, and queues the writer's pending watcher receipts behind it, so a receipt
+   * that waited for this root is applied without a watch call. Returns whether a watch was
+   * registered.
    */
   synchronized boolean resumeAwaitingVolume(Path root) {
     if (successor != null) return successor.resumeAwaitingVolume(root);
@@ -186,6 +188,9 @@ public final class RootWatcherRegistry {
     WatchResult result = watch(normalized.toString(), collection);
     if (result.watching()) {
       log.info("Root watcher resumed: the volume first seen at {} is back", normalized);
+      if (watcher != null) {
+        watcher.applyPendingReceiptsLater();
+      }
     }
     return result.watching();
   }

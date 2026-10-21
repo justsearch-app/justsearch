@@ -111,6 +111,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   private final BiConsumer<Path, Boolean> reconcileSink;
   private final WorkerBurstDetector burstDetector = new WorkerBurstDetector();
   private final ScheduledExecutorService reconcileExecutor;
+  private volatile Runnable pendingReceipts = () -> {};
   private final Map<Path, PendingReconcile> pendingReconciliations = new ConcurrentHashMap<>();
   /**
    * Round 8 (task t-20261013-ef3c41, S8): how many times each root was removed. A reconcile asked
@@ -512,6 +513,30 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
     } catch (RuntimeException failure) {
       routingFailureSink.accept(failure);
       log.warn("Worker watcher enqueue failed for {}: {}", path, failure.getMessage());
+    }
+  }
+
+  /** Applies the writer's pending watcher receipts; production routes it to the current writer. */
+  public void usePendingReceipts(Runnable apply) {
+    this.pendingReceipts = Objects.requireNonNull(apply, "apply");
+  }
+
+  /**
+   * Queues the writer's pending watcher receipts on this watcher's reconcile thread: a held watch
+   * just resumed inside a walk or sync, which must not apply them inside itself. A refusal or
+   * failure leaves the receipts pending for the next watch, start or reload.
+   */
+  void applyPendingReceiptsLater() {
+    try {
+      reconcileExecutor.execute(() -> {
+        try {
+          pendingReceipts.run();
+        } catch (RuntimeException failure) {
+          log.warn("Pending watcher receipts wait after the watch resumed: {}", failure.getMessage());
+        }
+      });
+    } catch (java.util.concurrent.RejectedExecutionException refused) {
+      log.warn("Pending watcher receipts wait after the watch resumed: {}", refused.getMessage());
     }
   }
 

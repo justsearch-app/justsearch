@@ -329,6 +329,12 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       });
     }
 
+    private void applyPendingReceipts() {
+      try (RoutedTarget routed = acquireTarget()) {
+        routed.target().ingest().reconcilePendingWatcherRoots();
+      }
+    }
+
     private void reconcile(Path root, boolean force) {
       try (RoutedTarget routed = acquireTarget()) {
         Target selected = routed.target();
@@ -777,6 +783,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
           watcherCallbacks::delete, watcherCallbacks::reconcile, watcherCallbacks::upsert,
           ignored -> mutationAdmission.markReplayUncertain(), watcherCallbacks::route,
           watcherCallbacks::delete);
+      workerWatcher.usePendingReceipts(watcherCallbacks::applyPendingReceipts);
       this.rootWatcherRegistry =
           new io.justsearch.indexerworker.services.RootWatcherRegistry(workerWatcher);
     } else {
