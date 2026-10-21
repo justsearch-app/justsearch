@@ -750,6 +750,18 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public long switchBufferDepth() { return switchBufferOps.depth(); }
 
+  public long switchBufferAdmissions() throws SQLException {
+    lock.lock();
+    try { return switchBufferOps.admissions(); }
+    finally { lock.unlock(); }
+  }
+
+  public void attachMigrationJournalWitness(MigrationJournalWitness witness) throws SQLException {
+    lock.lock();
+    try { switchBufferOps.attachAdmissionWitness(witness); }
+    finally { lock.unlock(); }
+  }
+
   /** Returns best-effort counts for PENDING/PROCESSING/DONE/FAILED and PENDING runnable subset. */
   @Override
   public JobQueue.JobStateCounts jobStateCounts() { return switchBufferOps.stateCounts(); }
@@ -2488,6 +2500,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     } else {
       // Restoring auto-commit here could commit work whose rollback was never confirmed.
       connectionFailure = failure;
+    }
+    if (committed) {
+      try { switchBufferOps.acknowledgeAdmissions(); }
+      catch (SQLException witnessFailure) {
+        if (failure == null) failure = witnessFailure;
+        else if (failure != witnessFailure) failure.addSuppressed(witnessFailure);
+      }
     }
     // Materialize confirmed rows while the connection is still available. A reset failure
     // cannot turn a successful commit into rollback or silently omit its projection.

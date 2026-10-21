@@ -1,4 +1,7 @@
 mod binding;
+mod factory_reset;
+#[cfg(windows)]
+mod windows_reveal;
 // Spec F §2: one kill-on-close job per Engine incarnation; the shell itself never joins one.
 mod containment;
 // Reader/writer enabler; lifecycle callers land in Spec F step 6.
@@ -7,13 +10,14 @@ mod engine_conn;
 mod engine_probe;
 #[allow(dead_code)]
 mod exit_ledger;
-mod platform_paths;
-mod native_targets;
 #[cfg(target_os = "linux")]
 mod linux_process;
+mod native_targets;
+mod platform_paths;
 // Lane F stage B item B10: the Engine supervisor (design 7.1). The DECISION half is a pure
 // function over the register the dev-runner also reads; only the actuator lives in this file.
 mod quit;
+mod search_shortcut;
 mod session_window;
 mod shell_actuator;
 mod supervisor;
@@ -24,7 +28,7 @@ use engine_host::{EngineHost, PreparedCommand};
 
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -42,8 +46,6 @@ use tokio::sync::Notify;
 /// Windows CREATE_NO_WINDOW flag - prevents console window from appearing.
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-const RESET_MARKER_FILE: &str = ".justsearch-reset-requested";
 
 /// The webview's signal that a NEW Engine incarnation is answering: everything it cached about the
 /// old one — above all the per-boot session token — is dead (tempdoc 805 G.1).
@@ -90,6 +92,7 @@ struct BackendState {
     session_token_ready: Arc<Notify>,
     /// Single-use token for confirming destructive operations (factory reset).
     delete_token: Mutex<Option<String>>,
+    reset_status: Mutex<factory_reset::Status>,
     /// Tempdoc 501 Phase 17: the tray icon's registered id. The manifest watcher
     /// uses the AppHandle (set separately in `init_tray_context`) to look up the
     /// live `TrayIcon` via `app.tray_by_id(...)`. Direct caching of `TrayIcon` or
@@ -109,6 +112,12 @@ impl Default for BackendState {
             port_ready: Arc::default(),
             session_token_ready: Arc::default(),
             delete_token: Mutex::default(),
+            reset_status: Mutex::new(factory_reset::Status {
+                phase: factory_reset::Phase::Idle,
+                reason: None,
+                remaining: vec![],
+                kept_links: vec![],
+            }),
             tray_id: Mutex::default(),
         }
     }
@@ -252,19 +261,115 @@ fn validate_user_path(path: &str, block_executables: bool) -> Result<(), String>
         }
     }
 
-    // Block executable extensions (open_file only — prevents launching malware via XSS)
     if block_executables {
-        if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
-            const BLOCKED: &[&str] = &[
-                "exe", "bat", "cmd", "ps1", "vbs", "msi", "scr", "com", "lnk", "pif", "wsh", "wsf",
-            ];
-            if BLOCKED.iter().any(|b| ext.eq_ignore_ascii_case(b)) {
-                return Err(format!("Opening .{ext} files is not allowed"));
-            }
-        }
+        validate_document_type(p)?;
     }
 
     Ok(())
+}
+
+// One local-document policy, shared by validation and resolved-target dispatch.
+const OPEN_DOCUMENT_EXTENSIONS: &[&str] = &[
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf", "epub", "txt",
+    "md", "csv", "tsv", "log", "json", "xml", "html", "htm", "eml", "msg", "png", "jpg", "jpeg",
+    "gif", "bmp", "webp", "tif", "tiff", "svg", "mp3", "wav", "m4a", "flac", "mp4", "mov", "mkv",
+    "webm", "markdown", "mdx", "yaml", "yml", "toml", "ini", "conf", "rst", "tex", "srt", "vtt",
+    "ics", "vcf", "mbox", "odg", "dotx", "ppsx", "vsdx", "xps", "mobi", "djvu", "cbz", "heic",
+    "avif", "ico", "psd", "raw", "ogg", "opus", "aac", "wma", "avi", "wmv", "m4v", "mpg", "mpeg",
+    "zip", "7z",
+];
+
+fn validate_document_type(path: &std::path::Path) -> Result<(), String> {
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    if OPEN_DOCUMENT_EXTENSIONS
+        .iter()
+        .any(|allowed| ext.eq_ignore_ascii_case(allowed))
+    {
+        Ok(())
+    } else {
+        let kind = if ext.is_empty() {
+            "files with no extension".to_string()
+        } else {
+            format!(".{ext} files")
+        };
+        Err(format!(
+            "Opening {kind} is not allowed. Use Show in folder instead."
+        ))
+    }
+}
+
+fn is_windows_drive_path(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':'
+}
+
+fn resolve_local_path(path: &str) -> Result<PathBuf, String> {
+    if path.is_empty() || path.chars().any(char::is_control) {
+        return Err("A nonempty local path without control characters is required".into());
+    }
+    validate_user_path(path, false)?;
+    if !is_windows_drive_path(path) && reqwest::Url::parse(path).is_ok() {
+        return Err("URLs cannot be opened as local files".into());
+    }
+    #[cfg(windows)]
+    {
+        // Reject network/device forms BEFORE canonicalize adds its own trusted \\?\ prefix.
+        let normalized = path.replace('\\', "/");
+        if normalized.starts_with("//") {
+            return Err("Network and device paths are not allowed".into());
+        }
+        let rest = if is_windows_drive_path(path) {
+            &path[2..]
+        } else {
+            path
+        };
+        if rest.contains(':') {
+            return Err("Alternate data streams are not allowed".into());
+        }
+    }
+    std::fs::canonicalize(path).map_err(|e| format!("Cannot resolve local path '{path}': {e}"))
+}
+
+fn local_open_target(path: &str) -> Result<PathBuf, String> {
+    let resolved = resolve_local_path(path)?;
+    if !resolved.is_dir() {
+        if !resolved.is_file() {
+            return Err(
+                "Only documents and directories can be opened. Use Show in folder instead.".into(),
+            );
+        }
+        validate_document_type(&resolved)?;
+    }
+    // Residual: the target can still be replaced between this check and OS dispatch.
+    Ok(resolved)
+}
+
+fn reveal_target(path: &str) -> Result<(PathBuf, PathBuf), String> {
+    let resolved = resolve_local_path(path)?;
+    let directory = if resolved.is_dir() {
+        resolved.clone()
+    } else {
+        resolved
+            .parent()
+            .ok_or("The item has no parent directory")?
+            .to_path_buf()
+    };
+    if !directory.is_dir() {
+        return Err("Show in folder requires an existing directory".into());
+    }
+    Ok((resolved, directory))
+}
+
+fn validate_external_url(input: &str) -> Result<reqwest::Url, String> {
+    if input.is_empty() || input.chars().any(char::is_control) || input.trim() != input {
+        return Err("A nonempty URL without whitespace or control characters is required".into());
+    }
+    let url = reqwest::Url::parse(input).map_err(|e| format!("Invalid external URL: {e}"))?;
+    match url.scheme() {
+        "http" | "https" if url.host_str().is_some() => Ok(url),
+        "mailto" if !url.path().is_empty() => Ok(url),
+        scheme => Err(format!("Opening URL scheme '{scheme}' is not allowed")),
+    }
 }
 
 fn classpath_sep() -> &'static str {
@@ -352,68 +457,39 @@ fn resolve_app_data_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<
         .map_err(|e| format!("app_data_dir() failed: {e}"))
 }
 
-fn maybe_run_factory_reset<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
-    let app_data_dir = resolve_app_data_dir(app)?;
-    let marker = app_data_dir.join(RESET_MARKER_FILE);
-    if !marker.exists() {
-        return Ok(());
+/// Recovery must finish before preferences, native shortcuts or normal work start.
+fn after_factory_reset(status: &factory_reset::Status, initialize: impl FnOnce()) {
+    if !status.blocks_backend() {
+        initialize();
     }
+}
 
-    // Locked choice (Option A): preserve BYO AI assets by default.
-    // - Keep: {appDataDir}/models/**
-    // - Keep: {appDataDir}/native-bin/llama-server/**
-    // - Delete: everything else (settings, index, logs, telemetry, etc)
-    eprintln!("Factory reset marker detected at: {}", marker.display());
+fn reset_blocks_search(app: &tauri::AppHandle) -> bool {
+    app.state::<Arc<BackendState>>()
+        .reset_status
+        .lock()
+        .expect("reset status mutex poisoned")
+        .blocks_backend()
+}
 
-    // Best-effort: delete everything except the AI asset folders.
-    let models_dir = app_data_dir.join("models");
-    let native_bin_dir = app_data_dir.join("native-bin");
-    let native_llama_dir = native_bin_dir.join("llama-server");
-
-    // Ensure the kept dirs exist (so path comparisons are stable).
-    let _ = std::fs::create_dir_all(&models_dir);
-    let _ = std::fs::create_dir_all(&native_llama_dir);
-
-    // Delete all top-level entries except models/ and native-bin/ (handled specially).
-    if let Ok(entries) = std::fs::read_dir(&app_data_dir) {
-        for entry in entries.flatten() {
-            let p = entry.path();
-            if p == marker {
-                continue;
-            }
-            if p == models_dir {
-                continue;
-            }
-            if p == native_bin_dir {
-                // Delete everything in native-bin except llama-server/.
-                if let Ok(nentries) = std::fs::read_dir(&native_bin_dir) {
-                    for nentry in nentries.flatten() {
-                        let np = nentry.path();
-                        if np == native_llama_dir {
-                            continue;
-                        }
-                        let _ = if np.is_dir() {
-                            std::fs::remove_dir_all(&np)
-                        } else {
-                            std::fs::remove_file(&np)
-                        };
-                    }
-                }
-                continue;
-            }
-
-            let _ = if p.is_dir() {
-                std::fs::remove_dir_all(&p)
-            } else {
-                std::fs::remove_file(&p)
-            };
-        }
+fn maybe_run_factory_reset<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> factory_reset::Status {
+    match resolve_app_data_dir(app) {
+        Ok(dir) => factory_reset::run_pending(&dir, || {
+            // Reset runs before backend spawn, which normally initializes this path.
+            #[cfg(target_os = "linux")]
+            linux_process::set_bundle_dir(&resolve_headless_dir(app)?);
+            reconcile_registered_children(&dir)
+        }),
+        Err(error) => factory_reset::Status {
+            phase: factory_reset::Phase::Incomplete,
+            reason: None,
+            remaining: vec![factory_reset::Failure {
+                path: "App data directory".into(),
+                error,
+            }],
+            kept_links: vec![],
+        },
     }
-
-    // Clear the marker after attempting the reset to avoid boot loops.
-    let _ = std::fs::remove_file(&marker);
-    eprintln!("Factory reset completed (AI assets preserved).");
-    Ok(())
 }
 
 fn spawn_headless_backend<R: tauri::Runtime>(
@@ -791,7 +867,10 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         .join("native-bin")
         .join("onnxruntime")
         .join("cuda12");
-    if ort_cuda_dir.join(native_targets::library_name("ort-cuda")).exists() {
+    if ort_cuda_dir
+        .join(native_targets::library_name("ort-cuda"))
+        .exists()
+    {
         cmd.env("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", &ort_cuda_dir);
         cmd.env("JUSTSEARCH_GPU_ENABLED", "true");
     }
@@ -965,7 +1044,11 @@ fn reconcile_registered_children(data_dir: &std::path::Path) -> Result<(), Strin
                 return Err("Incomplete managed child identity".into());
             }
             #[cfg(target_os = "linux")]
-            if !child.identity.as_ref().is_some_and(|id| id.valid(child.pid)) {
+            if !child
+                .identity
+                .as_ref()
+                .is_some_and(|id| id.valid(child.pid))
+            {
                 return Err("Incomplete Linux managed child identity".into());
             }
             Ok(child)
@@ -1038,7 +1121,10 @@ try {
 #[cfg(target_os = "linux")]
 fn terminal_kill_if_identity_matches(child: &ManagedChildRecord) -> Result<(), String> {
     linux_process::terminate(
-        child.identity.as_ref().ok_or("Missing Linux managed child identity")?,
+        child
+            .identity
+            .as_ref()
+            .ok_or("Missing Linux managed child identity")?,
         std::path::Path::new(&child.executable),
     )
 }
@@ -1238,40 +1324,288 @@ async fn get_file_metadata(path: String) -> Result<FileMetadata, String> {
     })
 }
 
+// Shell consumers need a plain path, while validation keeps the canonical target.
+#[cfg(windows)]
+fn shell_dispatch_path(target: &Path) -> Result<PathBuf, String> {
+    let simplified = dunce::simplified(target);
+    let mut components = simplified.components();
+    match components.next() {
+        Some(std::path::Component::Prefix(prefix)) => match prefix.kind() {
+            std::path::Prefix::Disk(_) => return Ok(simplified.to_path_buf()),
+            std::path::Prefix::VerbatimUNC(server, share) => {
+                let mut plain = std::ffi::OsString::from(r"\\");
+                plain.push(server);
+                plain.push(r"\");
+                plain.push(share);
+                plain.push(components.as_path());
+                let plain = PathBuf::from(plain);
+                // Check Win32's plain-path interpretation; Rust may add verbatim semantics itself.
+                use std::os::windows::ffi::{OsStrExt, OsStringExt};
+                use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
+                use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
+                use windows_sys::Win32::Storage::FileSystem::{
+                    CreateFileW, GetFinalPathNameByHandleW, FILE_FLAG_BACKUP_SEMANTICS,
+                    FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
+                    OPEN_EXISTING,
+                };
+                let file: Vec<u16> = plain.as_os_str().encode_wide().chain(Some(0)).collect();
+                let handle = unsafe {
+                    CreateFileW(
+                        file.as_ptr(),
+                        FILE_READ_ATTRIBUTES,
+                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                        std::ptr::null(),
+                        OPEN_EXISTING,
+                        FILE_FLAG_BACKUP_SEMANTICS,
+                        std::ptr::null_mut(),
+                    )
+                };
+                if handle == INVALID_HANDLE_VALUE {
+                    return Err(format!(
+                        "Cannot resolve plain UNC target '{}': {}",
+                        plain.display(),
+                        std::io::Error::last_os_error()
+                    ));
+                }
+                let handle = unsafe { OwnedHandle::from_raw_handle(handle) };
+                let size = unsafe {
+                    GetFinalPathNameByHandleW(handle.as_raw_handle(), std::ptr::null_mut(), 0, 0)
+                };
+                if size == 0 {
+                    return Err(format!(
+                        "Cannot identify plain UNC target: {}",
+                        std::io::Error::last_os_error()
+                    ));
+                }
+                let mut name = vec![0u16; size as usize + 1];
+                let size = unsafe {
+                    GetFinalPathNameByHandleW(
+                        handle.as_raw_handle(),
+                        name.as_mut_ptr(),
+                        name.len() as u32,
+                        0,
+                    )
+                };
+                if size == 0 || size as usize >= name.len() {
+                    return Err(format!(
+                        "Cannot identify plain UNC target: {}",
+                        std::io::Error::last_os_error()
+                    ));
+                }
+                let resolved = PathBuf::from(std::ffi::OsString::from_wide(&name[..size as usize]));
+                if resolved == target {
+                    return Ok(plain);
+                }
+            }
+            _ => {}
+        },
+        _ => {}
+    }
+    Err("The resolved target cannot be represented as a non-verbatim Windows shell path".into())
+}
+
+#[cfg(windows)]
+fn windows_shell_open(target: &std::ffi::OsStr) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::RPC_E_CHANGED_MODE;
+    use windows_sys::Win32::System::Com::{
+        CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
+    };
+    use windows_sys::Win32::UI::Shell::{
+        ShellExecuteExW, SEE_MASK_FLAG_NO_UI, SEE_MASK_NOASYNC, SHELLEXECUTEINFOW,
+    };
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    let file: Vec<u16> = target.encode_wide().chain(Some(0)).collect();
+    let verb: Vec<u16> = "open".encode_utf16().chain(Some(0)).collect();
+    let initialized = unsafe {
+        CoInitializeEx(
+            std::ptr::null(),
+            (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32,
+        )
+    };
+    if initialized < 0 && initialized != RPC_E_CHANGED_MODE {
+        return Err(format!(
+            "Could not initialize Windows shell COM: {initialized:#x}"
+        ));
+    }
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+        // The async IPC thread has no Windows message loop; finish shell/DDE work before returning.
+        fMask: SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI,
+        lpVerb: verb.as_ptr(),
+        lpFile: file.as_ptr(),
+        nShow: SW_SHOWNORMAL,
+        ..Default::default()
+    };
+    // Only validated documents and URLs use lpFile. Directories use item IDs below.
+    let result = if unsafe { ShellExecuteExW(&mut info) } != 0 {
+        Ok(())
+    } else {
+        Err(format!(
+            "Windows could not open '{}': {}",
+            target.to_string_lossy(),
+            std::io::Error::last_os_error()
+        ))
+    };
+    if initialized >= 0 {
+        unsafe {
+            CoUninitialize();
+        }
+    }
+    result
+}
+
+#[cfg(windows)]
+fn windows_shell_item(target: &Path, select: bool) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::RPC_E_CHANGED_MODE;
+    use windows_sys::Win32::System::Com::{
+        CoInitializeEx, CoTaskMemFree, CoUninitialize, COINIT_APARTMENTTHREADED,
+        COINIT_DISABLE_OLE1DDE,
+    };
+    use windows_sys::Win32::UI::Shell::{
+        SHOpenFolderAndSelectItems, SHParseDisplayName, ShellExecuteExW, SEE_MASK_FLAG_NO_UI,
+        SEE_MASK_IDLIST, SEE_MASK_NOASYNC, SHELLEXECUTEINFOW,
+    };
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    let file: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
+    let initialized = unsafe {
+        CoInitializeEx(
+            std::ptr::null(),
+            (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32,
+        )
+    };
+    if initialized < 0 && initialized != RPC_E_CHANGED_MODE {
+        return Err(format!(
+            "Could not initialize Windows shell COM: {initialized:#x}"
+        ));
+    }
+    let mut item = std::ptr::null_mut();
+    let parsed = unsafe {
+        SHParseDisplayName(
+            file.as_ptr(),
+            std::ptr::null_mut(),
+            &mut item,
+            0,
+            std::ptr::null_mut(),
+        )
+    };
+    let result = if parsed < 0 || item.is_null() {
+        Err(format!(
+            "Could not identify shell item '{}': {parsed:#x}",
+            target.display()
+        ))
+    } else if select {
+        // Preparation and the exact native parent/count/children arguments are shared with
+        // the item-ID test, independently of Explorer's hosted focus/selection behavior.
+        unsafe {
+            windows_reveal::with_item_ids(item, |parent, count, children| {
+                let opened = SHOpenFolderAndSelectItems(parent, count, children, 0);
+                if opened < 0 {
+                    Err(format!(
+                        "Could not reveal '{}': {opened:#x}",
+                        target.display()
+                    ))
+                } else {
+                    Ok(())
+                }
+            })
+        }
+    } else {
+        let verb: Vec<u16> = "open".encode_utf16().chain(Some(0)).collect();
+        let mut info = SHELLEXECUTEINFOW {
+            cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+            fMask: SEE_MASK_IDLIST | SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI,
+            lpVerb: verb.as_ptr(),
+            lpIDList: item.cast(),
+            // lpFile stays NULL: the shell receives the identified directory, never a name
+            // it could resolve to Invoice.cmd or interpret as Explorer command-line switches.
+            nShow: SW_SHOWNORMAL,
+            ..Default::default()
+        };
+        if unsafe { ShellExecuteExW(&mut info) } != 0 {
+            Ok(())
+        } else {
+            Err(format!(
+                "Windows could not open folder '{}': {}",
+                target.display(),
+                std::io::Error::last_os_error()
+            ))
+        }
+    };
+    unsafe {
+        CoTaskMemFree(item.cast());
+        if initialized >= 0 {
+            CoUninitialize();
+        }
+    }
+    result
+}
+
+// Return the exact path handed to the OS so native tests can observe the real dispatch boundary.
+fn dispatch_open_target(target: &Path) -> Result<PathBuf, String> {
+    #[cfg(windows)]
+    {
+        let target = shell_dispatch_path(target)?;
+        if target.is_dir() {
+            windows_shell_item(&target, false)?;
+        } else {
+            windows_shell_open(target.as_os_str())?;
+        }
+        Ok(target)
+    }
+    #[cfg(not(windows))]
+    {
+        open::that(target).map_err(|e| format!("Failed to open '{}': {e}", target.display()))?;
+        Ok(target.to_path_buf())
+    }
+}
+
+fn dispatch_reveal_target(_item: &Path, directory: &Path) -> Result<PathBuf, String> {
+    #[cfg(windows)]
+    {
+        let target = if _item.is_file() { _item } else { directory };
+        let target = shell_dispatch_path(target)?;
+        if _item.is_file() {
+            windows_shell_item(&target, true)?;
+        } else {
+            windows_shell_item(&target, false)?;
+        }
+        Ok(target)
+    }
+    #[cfg(not(windows))]
+    {
+        open::that(directory)
+            .map_err(|e| format!("Failed to reveal '{}': {e}", directory.display()))?;
+        Ok(directory.to_path_buf())
+    }
+}
+
 #[tauri::command]
 async fn open_file(path: String) -> Result<(), String> {
-    validate_user_path(&path, true)?;
-    open::that(&path).map_err(|e| format!("Failed to open path '{path}': {e}"))?;
-    Ok(())
+    let target = local_open_target(&path)?;
+    dispatch_open_target(&target).map(|_| ())
+}
+
+#[tauri::command]
+async fn open_external_url(url: String) -> Result<(), String> {
+    let target = validate_external_url(&url)?;
+    #[cfg(windows)]
+    {
+        windows_shell_open(std::ffi::OsStr::new(target.as_str()))
+    }
+    #[cfg(not(windows))]
+    {
+        open::that(target.as_str()).map_err(|e| format!("Failed to open URL: {e}"))
+    }
 }
 
 #[tauri::command]
 async fn reveal_in_explorer(path: String) -> Result<(), String> {
-    validate_user_path(&path, false)?;
-    let p = PathBuf::from(&path);
-
-    #[cfg(windows)]
-    {
-        if p.is_dir() {
-            open::that(&path).map_err(|e| format!("Failed to open folder '{path}': {e}"))?;
-            return Ok(());
-        }
-        // Explorer supports: explorer.exe /select,<path>
-        let arg = format!("/select,{}", p.to_string_lossy());
-        Command::new("explorer")
-            .arg(arg)
-            .status()
-            .map_err(|e| format!("Failed to reveal '{path}' in Explorer: {e}"))?;
-        return Ok(());
-    }
-
-    #[cfg(not(windows))]
-    {
-        // Best-effort: open the parent directory.
-        let parent = p.parent().map(|pp| pp.to_path_buf()).unwrap_or(p);
-        open::that(parent).map_err(|e| format!("Failed to reveal '{path}': {e}"))?;
-        Ok(())
-    }
+    let (item, directory) = reveal_target(&path)?;
+    dispatch_reveal_target(&item, &directory).map(|_| ())
 }
 
 /// Phase 1: Generate a single-use token for confirming factory reset.
@@ -1306,19 +1640,100 @@ async fn confirm_delete_data(
     }
 
     let app_data_dir = resolve_app_data_dir(&app)?;
-    std::fs::create_dir_all(&app_data_dir).map_err(|e| {
-        format!(
-            "Failed to create app data dir {}: {e}",
-            app_data_dir.display()
-        )
-    })?;
+    if let Err(error) = factory_reset::request(&app_data_dir) {
+        // A synced rename may have succeeded even if syncing its directory failed.
+        // Never leave an armed marker behind while allowing new work in this renderer.
+        if factory_reset::read_status(&app_data_dir).blocks_backend() {
+            app.request_restart();
+        }
+        return Err(error);
+    }
+    // request_restart delivers Exit, preserving the existing owned-process shutdown path.
+    // On the new launch the reset plugin runs before any WebView or Engine opens stores.
+    app.request_restart();
+    Ok(())
+}
 
-    let marker = app_data_dir.join(RESET_MARKER_FILE);
-    std::fs::write(&marker, b"reset\n")
-        .map_err(|e| format!("Failed to write reset marker {}: {e}", marker.display()))?;
+#[tauri::command]
+fn factory_reset_status(state: tauri::State<'_, Arc<BackendState>>) -> factory_reset::Status {
+    state
+        .reset_status
+        .lock()
+        .expect("reset status mutex poisoned")
+        .clone()
+}
 
-    // Close the app so the reset runs on next launch, before the backend starts.
-    app.exit(0);
+#[tauri::command]
+fn retry_factory_reset(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<BackendState>>,
+) -> Result<(), String> {
+    let status = state
+        .reset_status
+        .lock()
+        .expect("reset status mutex poisoned");
+    if status.phase != factory_reset::Phase::Incomplete {
+        return Err("Reset is not incomplete".into());
+    }
+    let dir = resolve_app_data_dir(&app)?;
+    factory_reset::retry(&dir)?;
+    app.request_restart();
+    Ok(())
+}
+
+#[tauri::command]
+fn cancel_factory_reset(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<BackendState>>,
+) -> Result<(), String> {
+    let mut status = state
+        .reset_status
+        .lock()
+        .expect("reset status mutex poisoned");
+    if status.phase != factory_reset::Phase::Incomplete {
+        return Err("Reset is not incomplete".into());
+    }
+    let dir = resolve_app_data_dir(&app)?;
+    factory_reset::cancel(&dir)?;
+    *status = factory_reset::read_status(&dir);
+    app.request_restart();
+    Ok(())
+}
+
+#[tauri::command]
+fn complete_factory_reset_storage(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<BackendState>>,
+) -> Result<(), String> {
+    let mut status = state
+        .reset_status
+        .lock()
+        .expect("reset status mutex poisoned");
+    if status.phase != factory_reset::Phase::AwaitingStorage {
+        return Err("Reset is not awaiting window storage cleanup".into());
+    }
+    let dir = resolve_app_data_dir(&app)?;
+    factory_reset::storage_cleared(&dir)?;
+    *status = factory_reset::read_status(&dir);
+    app.request_restart();
+    Ok(())
+}
+
+#[tauri::command]
+fn acknowledge_factory_reset(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<BackendState>>,
+) -> Result<(), String> {
+    let mut status = state
+        .reset_status
+        .lock()
+        .expect("reset status mutex poisoned");
+    if status.phase != factory_reset::Phase::Complete {
+        return Err("Reset is not complete".into());
+    }
+    let dir = resolve_app_data_dir(&app)?;
+    factory_reset::dismiss(&dir)?;
+    *status = factory_reset::read_status(&dir);
     Ok(())
 }
 
@@ -1485,6 +1900,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(state.clone())
         .manage(update_coordinator.clone())
+        .manage(search_shortcut::SearchShortcut::default())
         .invoke_handler(tauri::generate_handler![
             supervisor_state,
             api_port,
@@ -1492,64 +1908,80 @@ pub fn run() {
             smoke_run_id,
             get_file_metadata,
             open_file,
+            open_external_url,
             reveal_in_explorer,
             prepare_delete_data,
             confirm_delete_data,
+            factory_reset_status,
+            retry_factory_reset,
+            cancel_factory_reset,
+            complete_factory_reset_storage,
+            acknowledge_factory_reset,
             justsearch_paths,
             get_plugin_dir,
             scan_plugins,
             read_plugin_source,
             updater::app_update_status,
             updater::check_for_app_update,
-            updater::install_app_update
+            updater::install_app_update,
+            search_shortcut::search_shortcut_status,
+            search_shortcut::set_search_shortcut_enabled,
+            search_shortcut::take_search_summon
         ])
         .setup(move |app| {
             let session_app = app.handle().clone();
             state.quit.set_session_exit(move || session_app.exit(0));
-            update_coordinator.initialize(app.handle());
             let launch_data_dir = resolve_app_data_dir(app.handle()).ok();
-            // Best-effort: spawn the bundled headless backend.
-            // If this fails in dev, the UI can still be pointed at an external backend via ?api_port=...
-            if let Err(err) = maybe_run_factory_reset(app.handle()) {
-                eprintln!("Factory reset failed: {err}");
-            }
-            if let Err(err) = start_supervision(app.handle(), state.clone()) {
-                {
-                    state.host.record_spawn_error(err.clone());
+            // Incomplete reset is a recovery-only launch. No backend, updater, or normal
+            // data-writing work starts until reset completes or the user cancels it.
+            let reset_status = state
+                .reset_status
+                .lock()
+                .expect("reset status mutex poisoned")
+                .clone();
+            after_factory_reset(&reset_status, || {
+                search_shortcut::initialize(app.handle());
+                update_coordinator.initialize(app.handle());
+                // Best-effort: spawn the bundled headless backend.
+                // If this fails in dev, the UI can still be pointed at an external backend via ?api_port=...
+                if let Err(err) = start_supervision(app.handle(), state.clone()) {
+                    {
+                        state.host.record_spawn_error(err.clone());
+                    }
+                    // Notify waiters so they don't block forever on spawn error
+                    state.port_ready.notify_waiters();
+                    state.session_token_ready.notify_waiters();
+                    publish_terminal_spawn_failure(
+                        &state.host,
+                        state.binding_snapshot().instance_id,
+                        launch_data_dir.as_deref(),
+                        &err,
+                        |record| {
+                            let _ = app.emit(EVENT_SUPERVISOR_STATE, record);
+                        },
+                    );
+                    eprintln!("Failed to spawn headless backend: {err}");
                 }
-                // Notify waiters so they don't block forever on spawn error
-                state.port_ready.notify_waiters();
-                state.session_token_ready.notify_waiters();
-                publish_terminal_spawn_failure(
-                    &state.host,
-                    state.binding_snapshot().instance_id,
-                    launch_data_dir.as_deref(),
-                    &err,
-                    |record| {
-                        let _ = app.emit(EVENT_SUPERVISOR_STATE, record);
-                    },
-                );
-                eprintln!("Failed to spawn headless backend: {err}");
-            }
-            let reconciliation_app = app.handle().clone();
-            let reconciliation_state = state.clone();
-            let reconciliation_coordinator = update_coordinator.clone();
-            tauri::async_runtime::spawn(async move {
-                reconciliation_coordinator
-                    .reconcile_after_backend_ready(
-                        reconciliation_app.clone(),
-                        reconciliation_state.clone(),
+                let reconciliation_app = app.handle().clone();
+                let reconciliation_state = state.clone();
+                let reconciliation_coordinator = update_coordinator.clone();
+                tauri::async_runtime::spawn(async move {
+                    reconciliation_coordinator
+                        .reconcile_after_backend_ready(
+                            reconciliation_app.clone(),
+                            reconciliation_state.clone(),
+                        )
+                        .await;
+                    // Sandbox qualification lane only; inert unless compiled with the test gate AND
+                    // explicitly opted in at runtime. Sequenced after reconciliation, never
+                    // concurrently: the PASS verdict IS the reconciled phase.
+                    updater::maybe_autorun_qualification(
+                        reconciliation_app,
+                        reconciliation_state,
+                        reconciliation_coordinator.clone(),
                     )
                     .await;
-                // Sandbox qualification lane only; inert unless compiled with the test gate AND
-                // explicitly opted in at runtime. Sequenced after reconciliation, never
-                // concurrently: the PASS verdict IS the reconciled phase.
-                updater::maybe_autorun_qualification(
-                    reconciliation_app,
-                    reconciliation_state,
-                    reconciliation_coordinator.clone(),
-                )
-                .await;
+                });
             });
 
             // System tray: icon with Show/Quit menu, left-click to show window.
@@ -1608,11 +2040,29 @@ pub fn run() {
             }
             let _ = TRAY_CONTEXT.set(app.handle().clone());
 
-            // Show the main window unless launched with --minimized (autostart).
+            // Show reset recovery even if restart retained --minimized from autostart.
             // Window-state plugin restores position/size but not visibility (VISIBLE
             // flag is excluded), so we control show/hide here.
-            let start_minimized = std::env::args().any(|a| a == "--minimized");
-            if !start_minimized {
+            let launch =
+                search_shortcut::LaunchRequest::from_args(&std::env::args().collect::<Vec<_>>());
+            if reset_blocks_search(app.handle()) {
+                search_shortcut::foreground(app.handle());
+            } else if app.state::<search_shortcut::SearchShortcut>().has_pending() {
+                search_shortcut::foreground(app.handle());
+            } else if launch.focus_search {
+                search_shortcut::summon(app.handle());
+            } else if std::env::args().any(|arg| arg == "--focus-search")
+                && !launch.deep_links.is_empty()
+            {
+                search_shortcut::summon_deep_link(app.handle(), launch.deep_links[0].clone());
+            } else if launch.show_window
+                || state
+                    .reset_status
+                    .lock()
+                    .expect("reset status mutex poisoned")
+                    .phase
+                    != factory_reset::Phase::Idle
+            {
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.show();
                     let _ = w.set_focus();
@@ -1627,6 +2077,10 @@ pub fn run() {
             // app's existing event loop.
             let app_handle = app.handle().clone();
             app.deep_link().on_open_url(move |event| {
+                if reset_blocks_search(&app_handle) {
+                    search_shortcut::foreground(&app_handle);
+                    return;
+                }
                 for url in event.urls() {
                     let url_str = url.to_string();
                     if url_str.starts_with("justsearch://") {
@@ -1638,6 +2092,19 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if reset_blocks_search(app) {
+                search_shortcut::foreground(app);
+                return;
+            }
+            let launch = search_shortcut::LaunchRequest::from_args(&argv);
+            if launch.focus_search {
+                search_shortcut::summon(app);
+                return;
+            }
+            if argv.iter().any(|arg| arg == "--focus-search") && !launch.deep_links.is_empty() {
+                search_shortcut::summon_deep_link(app, launch.deep_links[0].clone());
+                return;
+            }
             // Second launch should deterministically focus the existing instance and exit.
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -1660,6 +2127,21 @@ pub fn run() {
                 }
             }
         }))
+        // Plugins initialize before configured WebViews are constructed. Run after
+        // single-instance (a second launch must not wipe a live instance) and before
+        // window-state (which otherwise caches and restores pre-reset settings).
+        .plugin(
+            tauri::plugin::Builder::<tauri::Wry>::new("factory-reset")
+                .setup(|app, _| {
+                    let status = maybe_run_factory_reset(app);
+                    *app.state::<Arc<BackendState>>()
+                        .reset_status
+                        .lock()
+                        .expect("reset status mutex poisoned") = status;
+                    Ok(())
+                })
+                .build(),
+        )
         // Slice 489 §15 — OS-level deep-link plugin (tauri-plugin-deep-link).
         // Pair with single-instance above so all incoming URLs land in the
         // running instance, not a fresh process. The plugin is initialized
@@ -1704,6 +2186,7 @@ pub fn run() {
         // This fires when app.exit() is called (e.g., from tray menu "Quit").
         .run(move |app, event| {
             if let tauri::RunEvent::Exit = event {
+                search_shortcut::release(app);
                 state_for_close.kill_child();
                 if let Ok(data_dir) = resolve_app_data_dir(app) {
                     cleanup_registered_children_for_terminal(&data_dir);
@@ -1748,6 +2231,88 @@ mod tests {
         (child, record)
     }
 
+    #[test]
+    fn m2_incomplete_reset_never_initializes_shortcuts_and_cancel_preserves_saved_choice() {
+        let dir = tempdir().unwrap();
+        let preference = dir.path().join("search-shortcut.v1.json");
+        let saved = br#"{"version":1,"enabled":false}"#;
+        fs::write(&preference, saved).unwrap();
+        factory_reset::request(dir.path()).unwrap();
+        let incomplete =
+            factory_reset::run_pending(dir.path(), || Err("ownership unavailable".into()));
+        assert_eq!(incomplete.phase, factory_reset::Phase::Incomplete);
+        let mut initialized = false;
+        // This is the production setup gate, enclosing shortcut initialization,
+        // preference I/O, updater initialization and backend supervision.
+        after_factory_reset(&incomplete, || {
+            initialized = true;
+            let _ = fs::read(&preference).unwrap();
+            fs::write(
+                &preference,
+                b"normal startup must not write during recovery",
+            )
+            .unwrap();
+        });
+        assert!(
+            !initialized,
+            "recovery must not initialize shortcuts or access their file"
+        );
+        assert_eq!(fs::read(&preference).unwrap(), saved);
+
+        factory_reset::cancel(dir.path()).unwrap();
+        // Cancel requests an automatic shell restart; its next start keeps the off choice.
+        let cancelled =
+            factory_reset::run_pending(dir.path(), || panic!("cancelled reset must not delete"));
+        after_factory_reset(&cancelled, || {
+            initialized = true;
+            assert_eq!(fs::read(&preference).unwrap(), saved);
+        });
+        assert!(
+            initialized,
+            "cancel must allow normal startup on the automatic restart"
+        );
+        assert_eq!(fs::read(&preference).unwrap(), saved);
+    }
+
+    #[test]
+    fn m3_completed_reset_removes_shortcut_choice_before_initialization() {
+        let dir = tempdir().unwrap();
+        let preference = dir.path().join("search-shortcut.v1.json");
+        fs::write(&preference, br#"{"version":1,"enabled":false}"#).unwrap();
+        factory_reset::request(dir.path()).unwrap();
+        let awaiting = factory_reset::run_pending(dir.path(), || Ok(()));
+        assert_eq!(awaiting.phase, factory_reset::Phase::AwaitingStorage);
+        assert!(
+            !preference.exists(),
+            "disk reset must remove the saved shortcut choice"
+        );
+        let mut initialized = false;
+        after_factory_reset(&awaiting, || initialized = true);
+        assert!(
+            !initialized,
+            "shortcut initialization must wait for window storage cleanup"
+        );
+
+        factory_reset::storage_cleared(dir.path()).unwrap();
+        // Storage acknowledgement requests an automatic restart, before registration.
+        let complete =
+            factory_reset::run_pending(dir.path(), || panic!("complete reset must not wipe again"));
+        assert_eq!(complete.phase, factory_reset::Phase::Complete);
+        after_factory_reset(&complete, || {
+            initialized = true;
+            // The preserved SC8 preference test establishes missing-file = on.
+            assert_eq!(
+                fs::read(&preference).unwrap_err().kind(),
+                std::io::ErrorKind::NotFound
+            );
+        });
+        assert!(
+            initialized,
+            "complete reset must allow shortcut registration on restart"
+        );
+        assert!(!preference.exists());
+    }
+
     #[cfg(windows)]
     #[test]
     fn exhaustion_cleans_registered_children() {
@@ -1757,17 +2322,29 @@ mod tests {
         let manifest = serde_json::json!({ "schemaVersion": 2, "children": [{
             "pid": record.pid, "startedAt": record.started_at, "executable": record.executable
         }] });
-        fs::write(dir.path().join("runtime/manifest.json"), manifest.to_string()).unwrap();
+        fs::write(
+            dir.path().join("runtime/manifest.json"),
+            manifest.to_string(),
+        )
+        .unwrap();
         cleanup_after_supervision(&supervisor::Outcome::NoEngine, dir.path());
         assert!(child.try_wait().unwrap().is_none());
         // Q15-I1: this manifest may belong to the incumbent holding the data directory.
-        cleanup_after_supervision(&supervisor::Outcome::Exhausted {
-            reason: "DATA_DIR_LOCKED".into(), exit_code: 2,
-        }, dir.path());
+        cleanup_after_supervision(
+            &supervisor::Outcome::Exhausted {
+                reason: "DATA_DIR_LOCKED".into(),
+                exit_code: 2,
+            },
+            dir.path(),
+        );
         assert!(child.try_wait().unwrap().is_none());
-        cleanup_after_supervision(&supervisor::Outcome::Exhausted {
-            reason: "restart budget exhausted".into(), exit_code: 1,
-        }, dir.path());
+        cleanup_after_supervision(
+            &supervisor::Outcome::Exhausted {
+                reason: "restart budget exhausted".into(),
+                exit_code: 1,
+            },
+            dir.path(),
+        );
         assert!(child.try_wait().unwrap().is_some());
     }
 
@@ -1783,7 +2360,11 @@ mod tests {
             { "pid": record.pid, "startedAt": record.started_at, "executable": record.executable },
             { "pid": mismatch.pid, "startedAt": mismatch.started_at, "executable": mismatch.executable }
         ] });
-        fs::write(dir.path().join("runtime/manifest.json"), manifest.to_string()).unwrap();
+        fs::write(
+            dir.path().join("runtime/manifest.json"),
+            manifest.to_string(),
+        )
+        .unwrap();
         let host = EngineHost::default();
         let error = host
             .admit(PreparedCommand {
@@ -1831,13 +2412,22 @@ mod tests {
         let dir = tempdir().unwrap();
         fs::create_dir(dir.path().join("runtime")).unwrap();
         let path = dir.path().join("runtime/manifest.json");
-        for bad in ["null", "{}", r#"{"schemaVersion":3,"children":[]}"#,
-            r#"{"schemaVersion":2}"#, r#"{"schemaVersion":2,"children":null}"#,
-            r#"{"schemaVersion":2,"children":{}}"#, r#"{"schemaVersion":2,"children":[{}]}"#] {
+        for bad in [
+            "null",
+            "{}",
+            r#"{"schemaVersion":3,"children":[]}"#,
+            r#"{"schemaVersion":2}"#,
+            r#"{"schemaVersion":2,"children":null}"#,
+            r#"{"schemaVersion":2,"children":{}}"#,
+            r#"{"schemaVersion":2,"children":[{}]}"#,
+        ] {
             fs::write(&path, bad).unwrap();
             assert!(reconcile_registered_children(dir.path()).is_err(), "{bad}");
         }
-        for good in [r#"{"schemaVersion":1}"#, r#"{"schemaVersion":2,"children":[]}"#] {
+        for good in [
+            r#"{"schemaVersion":1}"#,
+            r#"{"schemaVersion":2,"children":[]}"#,
+        ] {
             fs::write(&path, good).unwrap();
             reconcile_registered_children(dir.path()).unwrap();
         }
@@ -2119,3 +2709,1055 @@ mod engine_conn_test_support;
 
 #[cfg(all(test, target_os = "linux"))]
 mod session_credential_tests;
+#[cfg(test)]
+mod open_guard_tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    fn fixture(dir: &std::path::Path, name: &str) -> String {
+        let path = dir.join(name);
+        fs::write(&path, "fixture").unwrap();
+        path.to_str().unwrap().to_owned()
+    }
+
+    #[test]
+    fn documents_allow_exact_d1_formats() {
+        let dir = tempdir().unwrap();
+        let expected = [
+            "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf", "epub",
+            "txt", "md", "csv", "tsv", "log", "json", "xml", "html", "htm", "eml", "msg", "png",
+            "jpg", "jpeg", "gif", "bmp", "webp", "tif", "tiff", "svg", "mp3", "wav", "m4a", "flac",
+            "mp4", "mov", "mkv", "webm", "markdown", "mdx", "yaml", "yml", "toml", "ini", "conf",
+            "rst", "tex", "srt", "vtt", "ics", "vcf", "mbox", "odg", "dotx", "ppsx", "vsdx", "xps",
+            "mobi", "djvu", "cbz", "heic", "avif", "ico", "psd", "raw", "ogg", "opus", "aac",
+            "wma", "avi", "wmv", "m4v", "mpg", "mpeg", "zip", "7z",
+        ];
+        assert_eq!(OPEN_DOCUMENT_EXTENSIONS, expected);
+        for ext in expected {
+            for case in [ext.to_string(), ext.to_ascii_uppercase()] {
+                let path = fixture(dir.path(), &format!("document.{case}"));
+                assert!(local_open_target(&path).is_ok(), "document .{case}");
+            }
+        }
+    }
+
+    #[test]
+    fn refuses_unlisted_types_and_names_each_type() {
+        let dir = tempdir().unwrap();
+        let mut failures = Vec::new();
+        for ext in [
+            "hta",
+            "js",
+            "jse",
+            "vbs",
+            "vbe",
+            "wsf",
+            "wsh",
+            "wsc",
+            "cpl",
+            "msc",
+            "msi",
+            "msp",
+            "mst",
+            "scr",
+            "pif",
+            "com",
+            "exe",
+            "bat",
+            "cmd",
+            "ps1",
+            "reg",
+            "inf",
+            "lnk",
+            "url",
+            "scf",
+            "chm",
+            "jar",
+            "appref-ms",
+            "application",
+            "settingcontent-ms",
+            "library-ms",
+            "appx",
+            "msix",
+            "desktop",
+            "kdelnk",
+            "sh",
+            "run",
+            "AppImage",
+            "docm",
+            "xlsm",
+            "pptm",
+            "mht",
+            "mhtml",
+            "py",
+            "rs",
+            "unknown",
+        ] {
+            for case in [ext.to_string(), ext.to_ascii_uppercase()] {
+                let path = fixture(dir.path(), &format!("launcher.{case}"));
+                let result = local_open_target(&path);
+                if !matches!(&result, Err(message) if message.to_ascii_lowercase().contains(&format!(".{}", case.to_ascii_lowercase())))
+                {
+                    failures.push(format!(".{case}: {result:?}"));
+                }
+            }
+        }
+        assert_eq!(failures, Vec::<String>::new(), "unrefused or unnamed types");
+    }
+
+    #[test]
+    fn refuses_extensionless_files() {
+        let dir = tempdir().unwrap();
+        let path = fixture(dir.path(), "launcher");
+        assert!(matches!(local_open_target(&path), Err(e) if e.contains("no extension")));
+    }
+
+    #[test]
+    fn refuses_missing_paths() {
+        let dir = tempdir().unwrap();
+        assert!(
+            matches!(local_open_target(dir.path().join("missing.pdf").to_str().unwrap()), Err(e) if e.contains("resolve"))
+        );
+    }
+
+    #[test]
+    fn urls_accept_only_web_and_mail() {
+        for url in [
+            "http://example.com/a?q=1#fragment",
+            "HTTPS://example.com/?q=1#f",
+            "MAILTO:user@example.com?subject=Hi#f",
+        ] {
+            assert!(validate_external_url(url).is_ok(), "{url}");
+        }
+        // A drive letter is never classified as a URL scheme, on either build host.
+        assert!(is_windows_drive_path("C:\\docs\\report.pdf"));
+        assert!(is_windows_drive_path("c:/docs/report.pdf"));
+        assert!(!is_windows_drive_path("https://example.com"));
+    }
+
+    #[test]
+    fn refuses_other_url_schemes_in_every_case() {
+        let mut failures = Vec::new();
+        for scheme in [
+            "file",
+            "javascript",
+            "vbscript",
+            "data",
+            "ms-settings",
+            "ms-msdt",
+            "search-ms",
+            "shell",
+            "tel",
+            "ftp",
+            "custom",
+        ] {
+            for case in [scheme.to_string(), scheme.to_ascii_uppercase()] {
+                let url = format!("{case}:payload");
+                if validate_external_url(&url).is_ok() {
+                    failures.push(url);
+                }
+            }
+        }
+        assert_eq!(failures, Vec::<String>::new(), "accepted schemes");
+    }
+
+    #[test]
+    fn refuses_malformed_and_control_urls() {
+        let mut failures = Vec::new();
+        for input in [
+            "",
+            "not a URL",
+            "https://",
+            "http://[",
+            "mailto:",
+            " https://example.com",
+            "https://example.com\n",
+            "https://exam\tple.com",
+            "https://example.com/\0x",
+            "mailto:u@example.com\r?subject=x",
+        ] {
+            if validate_external_url(input).is_ok() {
+                failures.push(input);
+            }
+        }
+        assert_eq!(
+            failures,
+            Vec::<&str>::new(),
+            "accepted malformed/control URLs"
+        );
+    }
+
+    #[test]
+    fn refuses_urls_on_local_path() {
+        let mut failures = Vec::new();
+        for input in [
+            "http://example.com/a.pdf",
+            "https://example.com/a.pdf",
+            "mailto:a.pdf",
+            "file:///tmp/a.pdf",
+            "javascript:a.pdf",
+            "vbscript:a.pdf",
+            "ms-msdt:a.pdf",
+            "search-ms:a.pdf",
+            "shell:a.pdf",
+            "TEL:a.pdf",
+            "ms-settings:a.pdf",
+            "data:a.pdf",
+        ] {
+            if local_open_target(input).is_ok() {
+                failures.push(input);
+            }
+        }
+        assert_eq!(failures, Vec::<&str>::new(), "local path accepted URLs");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinks_use_resolved_type_and_target() {
+        use std::os::unix::fs::symlink;
+        let dir = tempdir().unwrap();
+        let document = fixture(dir.path(), "document.odt");
+        let alias = dir.path().join("alias.pdf");
+        symlink(&document, &alias).unwrap();
+        assert_eq!(
+            local_open_target(alias.to_str().unwrap()).unwrap(),
+            fs::canonicalize(&document).unwrap()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_allowed_name_symlink_to_launcher() {
+        use std::os::unix::fs::symlink;
+        let dir = tempdir().unwrap();
+        let launcher = fixture(dir.path(), "launcher.desktop");
+        let alias = dir.path().join("document.pdf");
+        symlink(&launcher, &alias).unwrap();
+        assert!(
+            matches!(local_open_target(alias.to_str().unwrap()), Err(e) if e.contains(".desktop"))
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_dangling_and_looping_links() {
+        use std::os::unix::fs::symlink;
+        let dir = tempdir().unwrap();
+        let dangling = dir.path().join("dangling.pdf");
+        let looping = dir.path().join("loop.pdf");
+        symlink(dir.path().join("absent.pdf"), &dangling).unwrap();
+        symlink(&looping, &looping).unwrap();
+        let outcomes = [
+            local_open_target(dangling.to_str().unwrap()),
+            local_open_target(looping.to_str().unwrap()),
+        ];
+        assert_eq!(
+            outcomes.iter().filter(|r| r.is_ok()).count(),
+            0,
+            "{outcomes:?}"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_colons_are_kept_and_trailing_suffixes_refused() {
+        let dir = tempdir().unwrap();
+        let path = fixture(dir.path(), "report:2026.pdf");
+        assert_eq!(
+            local_open_target(&path).unwrap(),
+            fs::canonicalize(path).unwrap()
+        );
+        let outcomes: Vec<_> = [
+            "launcher.exe.",
+            "launcher.EXE ",
+            "launcher.desktop..",
+            "launcher.sh ",
+        ]
+        .iter()
+        .map(|name| local_open_target(&fixture(dir.path(), name)))
+        .collect();
+        assert_eq!(
+            outcomes.iter().filter(|r| r.is_ok()).count(),
+            0,
+            "{outcomes:?}"
+        );
+    }
+
+    #[test]
+    fn reveal_returns_existing_directory_for_files_and_folders() {
+        let dir = tempdir().unwrap();
+        let path = fixture(dir.path(), "launcher.desktop");
+        let (item, folder) = reveal_target(&path).unwrap();
+        assert_eq!(item, fs::canonicalize(path).unwrap());
+        assert_eq!(folder, fs::canonicalize(dir.path()).unwrap());
+        let (item, folder) = reveal_target(dir.path().to_str().unwrap()).unwrap();
+        assert_eq!(item, folder);
+        assert!(folder.is_dir());
+    }
+
+    #[test]
+    fn refuses_reveal_under_file_or_missing_item() {
+        let dir = tempdir().unwrap();
+        let path = fixture(dir.path(), "launcher.desktop");
+        let outcomes = [
+            reveal_target(&format!("{path}/child")),
+            reveal_target(dir.path().join("absent.pdf").to_str().unwrap()),
+        ];
+        assert_eq!(
+            outcomes.iter().filter(|r| r.is_ok()).count(),
+            0,
+            "{outcomes:?}"
+        );
+    }
+
+    // Each subprocess has its own PATH and marker; parallel tests cannot affect the OS opener.
+    #[cfg(target_os = "linux")]
+    fn run_dispatch_case(case: &str) {
+        if std::env::var_os("OPEN_GUARD_CASE").is_some() {
+            linux_dispatch_worker();
+            return;
+        }
+        let name = match case {
+            "refuse" => "open_guard_tests::linux_commands_refuse_launchers_without_dispatch",
+            "preserve" => {
+                "open_guard_tests::linux_commands_dispatch_resolved_pdf_and_reveal_directory"
+            }
+            "plugin" => "open_guard_tests::direct_plugin_ipc_refuses_paths_reveal_and_tel",
+            "folders" => "open_guard_tests::linux_commands_open_folders_of_any_name",
+            _ => unreachable!(),
+        };
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempdir().unwrap();
+        let opener = dir.path().join("xdg-open");
+        fs::write(
+            &opener,
+            "#!/bin/sh\nprintf '%s\\n' \"$1\" >> \"$OPEN_GUARD_MARKER\"\n",
+        )
+        .unwrap();
+        fs::set_permissions(&opener, fs::Permissions::from_mode(0o755)).unwrap();
+        let result = Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", name, "--nocapture"])
+            .env("OPEN_GUARD_CASE", case)
+            .env(
+                "DBUS_SESSION_BUS_ADDRESS",
+                "unix:path=/nonexistent-open-guard-session-bus",
+            )
+            .env("OPEN_GUARD_DIR", dir.path())
+            .env("OPEN_GUARD_MARKER", dir.path().join("marker"))
+            .env("PATH", dir.path())
+            .output()
+            .unwrap();
+        assert_eq!(
+            result.status.code(),
+            Some(0),
+            "actual command dispatch case {case}:\n{}\n{}",
+            String::from_utf8_lossy(&result.stdout),
+            String::from_utf8_lossy(&result.stderr)
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_commands_refuse_launchers_without_dispatch() {
+        run_dispatch_case("refuse");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_commands_dispatch_resolved_pdf_and_reveal_directory() {
+        run_dispatch_case("preserve");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn direct_plugin_ipc_refuses_paths_reveal_and_tel() {
+        run_dispatch_case("plugin");
+    }
+
+    #[cfg(target_os = "linux")]
+    fn linux_dispatch_worker() {
+        let case = std::env::var("OPEN_GUARD_CASE").unwrap();
+        let dir = PathBuf::from(std::env::var("OPEN_GUARD_DIR").unwrap());
+        let marker = dir.join("marker");
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        match case.as_str() {
+            "refuse" => {
+                let mut results = Vec::new();
+                for name in ["crafted.desktop", "crafted.sh", "crafted.pdf.exe"] {
+                    let path = fixture(&dir, name);
+                    results.push(runtime.block_on(open_file(path)));
+                }
+                for url in [
+                    "javascript:alert(1)",
+                    "FILE:///tmp/launcher.desktop",
+                    "tel:123",
+                ] {
+                    results.push(runtime.block_on(open_external_url(url.into())));
+                }
+                let launcher = fixture(&dir, "parent.desktop");
+                results.push(runtime.block_on(reveal_in_explorer(format!("{launcher}/child"))));
+                assert!(
+                    results.iter().all(Result::is_err) && !marker.exists(),
+                    "refusals: {results:?}; dispatched: {:?}",
+                    fs::read_to_string(&marker)
+                );
+            }
+            "preserve" => {
+                use std::os::unix::fs::symlink;
+                let document = fixture(&dir, "real.pdf");
+                let alias = dir.join("alias.txt");
+                symlink(&document, &alias).unwrap();
+                assert!(runtime
+                    .block_on(open_file(alias.to_string_lossy().into_owned()))
+                    .is_ok());
+                assert!(runtime
+                    .block_on(reveal_in_explorer(document.clone()))
+                    .is_ok());
+                assert!(runtime
+                    .block_on(reveal_in_explorer(dir.to_string_lossy().into_owned()))
+                    .is_ok());
+                for url in [
+                    "http://example.com/?q=1#f",
+                    "https://example.com/?q=1#f",
+                    "mailto:user@example.com?subject=Hi",
+                ] {
+                    assert!(runtime.block_on(open_external_url(url.into())).is_ok());
+                }
+                let expected = format!("{document}\n{}\n{}\nhttp://example.com/?q=1#f\nhttps://example.com/?q=1#f\nmailto:user@example.com?subject=Hi\n", dir.display(), dir.display());
+                assert_eq!(fs::read_to_string(marker).unwrap(), expected);
+            }
+            "folders" => {
+                let mut expected = String::new();
+                let mut results = Vec::new();
+                for name in ["folder", "folder.exe", "folder.desktop"] {
+                    let folder = dir.join(name);
+                    fs::create_dir(&folder).unwrap();
+                    results
+                        .push(runtime.block_on(open_file(folder.to_string_lossy().into_owned())));
+                    results.push(
+                        runtime.block_on(reveal_in_explorer(folder.to_string_lossy().into_owned())),
+                    );
+                    expected.push_str(&format!("{}\n{}\n", folder.display(), folder.display()));
+                }
+                assert_eq!(results, vec![Ok(()); 6]);
+                assert_eq!(fs::read_to_string(marker).unwrap(), expected);
+            }
+            "plugin" => {
+                let app = tauri::test::mock_builder()
+                    .plugin(tauri_plugin_opener::init())
+                    .build(tauri::generate_context!())
+                    .unwrap();
+                let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
+                    .build()
+                    .unwrap();
+                let launcher = fixture(&dir, "crafted.desktop");
+                let mut failures = Vec::new();
+                for (cmd, body) in [
+                    ("open_path", serde_json::json!({"path": launcher})),
+                    (
+                        "reveal_item_in_dir",
+                        serde_json::json!({"paths": [launcher]}),
+                    ),
+                    ("open_url", serde_json::json!({"url": "tel:123"})),
+                    ("open_url", serde_json::json!({"url": "file:///tmp/a.pdf"})),
+                    (
+                        "open_url",
+                        serde_json::json!({"url": "https://example.com", "with": "/bin/sh"}),
+                    ),
+                ] {
+                    let result = tauri::test::get_ipc_response(
+                        &webview,
+                        tauri::webview::InvokeRequest {
+                            cmd: format!("plugin:opener|{cmd}"),
+                            callback: tauri::ipc::CallbackFn(0),
+                            error: tauri::ipc::CallbackFn(1),
+                            url: "tauri://localhost".parse().unwrap(),
+                            body: tauri::ipc::InvokeBody::Json(body),
+                            headers: Default::default(),
+                            invoke_key: tauri::test::INVOKE_KEY.into(),
+                        },
+                    );
+                    let message = result
+                        .as_ref()
+                        .err()
+                        .and_then(|error| error.as_str())
+                        .unwrap_or("");
+                    let expected = if cmd == "open_url" {
+                        "Not allowed to open url ".to_string()
+                    } else {
+                        format!("opener.{cmd} not allowed")
+                    };
+                    if !message.starts_with(&expected) {
+                        failures.push(format!("{cmd}: {result:?}"));
+                    }
+                }
+                assert!(
+                    failures.is_empty() && !marker.exists(),
+                    "plugin accepted {failures:?}; dispatch: {:?}",
+                    fs::read_to_string(&marker)
+                );
+                // The injected link handler still has a usable command and URL scope.
+                for url in [
+                    "http://example.com/?q=1#f",
+                    "https://example.com",
+                    "mailto:user@example.com",
+                ] {
+                    let result = tauri::test::get_ipc_response(
+                        &webview,
+                        tauri::webview::InvokeRequest {
+                            cmd: "plugin:opener|open_url".into(),
+                            callback: tauri::ipc::CallbackFn(0),
+                            error: tauri::ipc::CallbackFn(1),
+                            url: "tauri://localhost".parse().unwrap(),
+                            body: tauri::ipc::InvokeBody::Json(serde_json::json!({"url": url})),
+                            headers: Default::default(),
+                            invoke_key: tauri::test::INVOKE_KEY.into(),
+                        },
+                    );
+                    assert!(result.is_ok(), "allowed plugin link {url}: {result:?}");
+                }
+                let deadline = std::time::Instant::now() + Duration::from_secs(2);
+                loop {
+                    let contents = fs::read_to_string(&marker).unwrap_or_default();
+                    if contents.lines().count() == 3 {
+                        break;
+                    }
+                    assert!(
+                        std::time::Instant::now() < deadline,
+                        "plugin dispatches: {contents:?}"
+                    );
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+            }
+            other => panic!("unknown dispatch case: {other}"),
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_ntfs_short_names_trailing_dots_ads_and_junctions() {
+        use std::os::windows::ffi::OsStrExt;
+        use windows_sys::Win32::Storage::FileSystem::{GetShortPathNameW, GetVolumeInformationW};
+        let dir = tempdir().unwrap();
+        let root: Vec<u16> = format!(
+            "{}\\",
+            dir.path()
+                .components()
+                .next()
+                .unwrap()
+                .as_os_str()
+                .to_string_lossy()
+        )
+        .encode_utf16()
+        .chain(Some(0))
+        .collect();
+        let mut filesystem = [0u16; 32];
+        assert_ne!(
+            unsafe {
+                GetVolumeInformationW(
+                    root.as_ptr(),
+                    std::ptr::null_mut(),
+                    0,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    filesystem.as_mut_ptr(),
+                    filesystem.len() as u32,
+                )
+            },
+            0,
+            "real filesystem query"
+        );
+        assert_eq!(
+            String::from_utf16_lossy(&filesystem).trim_end_matches('\0'),
+            "NTFS",
+            "requires real NTFS"
+        );
+        let launcher = fixture(dir.path(), "long-launcher-name.application");
+        let wide: Vec<u16> = std::ffi::OsStr::new(&launcher)
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        let mut short = vec![0u16; 32768];
+        let len =
+            unsafe { GetShortPathNameW(wide.as_ptr(), short.as_mut_ptr(), short.len() as u32) };
+        assert!(len > 0 && (len as usize) < short.len(), "GetShortPathNameW");
+        let short = String::from_utf16(&short[..len as usize]).unwrap();
+        assert!(
+            short.contains('~'),
+            "8.3 generation must be enabled for this check: {short}"
+        );
+        let mut results = vec![local_open_target(&short)];
+        for suffix in [".", " ", ". "] {
+            results.push(local_open_target(&format!("{launcher}{suffix}")));
+        }
+        let pdf = fixture(dir.path(), "report.pdf");
+        let stream = format!("{pdf}:payload.exe");
+        fs::write(&stream, "stream fixture").unwrap();
+        results.push(local_open_target(&stream));
+        let target_dir = dir.path().join("target");
+        fs::create_dir(&target_dir).unwrap();
+        fixture(&target_dir, "launcher.hta");
+        let junction = dir.path().join("junction");
+        let output = Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&junction)
+            .arg(&target_dir)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        results.push(local_open_target(
+            junction.join("launcher.hta").to_str().unwrap(),
+        ));
+        assert_eq!(
+            results.iter().filter(|r| r.is_ok()).count(),
+            0,
+            "{results:?}"
+        );
+        assert_eq!(
+            local_open_target(&pdf).unwrap(),
+            fs::canonicalize(pdf).unwrap()
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_refuses_mixed_network_device_and_ads_inputs() {
+        let outcomes: Vec<_> = [
+            "/\\server/share/file.pdf",
+            "\\/server/share/file.pdf",
+            "\\\\?\\C:\\file.pdf",
+            "\\\\.\\C:\\file.pdf",
+            r"\\?\GLOBALROOT\Device\HarddiskVolume1\file.pdf",
+            r"\\?\other-verbatim\file.pdf",
+            "C:\\file.pdf:stream",
+        ]
+        .iter()
+        .map(|path| local_open_target(path))
+        .collect();
+        assert_eq!(
+            outcomes.iter().filter(|r| r.is_ok()).count(),
+            0,
+            "{outcomes:?}"
+        );
+    }
+    #[cfg(windows)]
+    #[test]
+    fn windows_symlinks_resolve_document_and_refuse_disguised_launcher() {
+        use std::os::windows::fs::symlink_file;
+        let dir = tempdir().unwrap();
+        let document = fixture(dir.path(), "document.odt");
+        let document_alias = dir.path().join("document-alias.pdf");
+        symlink_file(&document, &document_alias).unwrap();
+        assert_eq!(
+            local_open_target(document_alias.to_str().unwrap()).unwrap(),
+            fs::canonicalize(document).unwrap()
+        );
+        let launcher = fixture(dir.path(), "launcher.exe");
+        let disguised = dir.path().join("disguised.pdf");
+        symlink_file(&launcher, &disguised).unwrap();
+        assert!(
+            matches!(local_open_target(disguised.to_str().unwrap()), Err(e) if e.contains(".exe"))
+        );
+    }
+    #[test]
+    fn refuses_empty_and_control_local_paths() {
+        let outcomes: Vec<_> = [
+            "",
+            "\0",
+            "/tmp/document.pdf\n",
+            "/tmp/doc\tument.pdf",
+            "/tmp/document.pdf\r",
+        ]
+        .iter()
+        .map(|input| local_open_target(input))
+        .collect();
+        assert_eq!(
+            outcomes.iter().filter(|r| r.is_ok()).count(),
+            0,
+            "{outcomes:?}"
+        );
+    }
+    #[test]
+    fn directories_open_regardless_of_name() {
+        let dir = tempdir().unwrap();
+        for name in ["folder", "folder.exe", "folder.desktop", "folder.unknown"] {
+            let folder = dir.path().join(name);
+            fs::create_dir(&folder).unwrap();
+            assert_eq!(
+                local_open_target(folder.to_str().unwrap()),
+                Ok(fs::canonicalize(folder).unwrap())
+            );
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_commands_open_folders_of_any_name() {
+        run_dispatch_case("folders");
+    }
+
+    #[cfg(windows)]
+    mod windows_probe {
+        include!("open_guard_windows.rs");
+    }
+
+    #[cfg(windows)]
+    fn assert_plain_dispatched_path(result: Result<PathBuf, String>, expected: &Path) {
+        assert_eq!(
+            result.as_ref().map(|_| ()),
+            Ok(()),
+            "real dispatch failed: {result:?}"
+        );
+        let dispatched = result.unwrap();
+        assert!(!dispatched
+            .as_os_str()
+            .to_string_lossy()
+            .starts_with(r"\\?\"));
+        assert_eq!(
+            fs::canonicalize(&dispatched).unwrap(),
+            fs::canonicalize(expected).unwrap()
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_real_open_uses_plain_dispatch_path() {
+        let dir = tempdir().unwrap();
+        let path = fixture(dir.path(), "real-document.txt");
+        let _gui = windows_probe::WindowsProbe::new(dir.path(), &[Path::new(&path)]);
+        let target = local_open_target(&path).unwrap();
+        assert_plain_dispatched_path(dispatch_open_target(&target), Path::new(&path));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_real_reveal_uses_plain_dispatch_path_for_file_and_folder() {
+        let dir = tempdir().unwrap();
+        let path = fixture(dir.path(), "real-document.txt");
+        let _gui = windows_probe::WindowsProbe::new(dir.path(), &[Path::new(&path)]);
+        let (item, parent) = reveal_target(&path).unwrap();
+        assert_plain_dispatched_path(dispatch_reveal_target(&item, &parent), Path::new(&path));
+        let folder = dir.path().to_str().unwrap();
+        let (item, directory) = reveal_target(folder).unwrap();
+        assert_plain_dispatched_path(dispatch_reveal_target(&item, &directory), Path::new(folder));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_real_dispatch_handles_brackets_and_question_like_names() {
+        let dir = tempdir().unwrap();
+        let folder = dir.path().join("folder [draft] ？");
+        fs::create_dir(&folder).unwrap();
+        let path = fixture(&folder, "notes[1]？.txt");
+        let _gui = windows_probe::WindowsProbe::new(dir.path(), &[Path::new(&path)]);
+        let target = local_open_target(&path).unwrap();
+        assert_plain_dispatched_path(dispatch_open_target(&target), Path::new(&path));
+        let (item, directory) = reveal_target(&path).unwrap();
+        assert_plain_dispatched_path(dispatch_reveal_target(&item, &directory), Path::new(&path));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_refuses_verbatim_only_dispatch() {
+        let dir = tempdir().unwrap();
+        // A real NTFS name whose trailing dot requires verbatim path semantics.
+        let folder = fs::canonicalize(dir.path()).unwrap().join("verbatim-only.");
+        fs::create_dir(&folder).unwrap();
+        let path = fixture(&folder, "document.txt");
+        let _gui = windows_probe::WindowsProbe::new(dir.path(), &[Path::new(&path)]);
+        let target = fs::canonicalize(path).unwrap();
+        let parent = target.parent().unwrap();
+        let results = [
+            dispatch_open_target(&target),
+            dispatch_reveal_target(&target, parent),
+        ];
+        assert_eq!(results.iter().filter(|result| matches!(result, Err(message) if message.contains("non-verbatim Windows shell path"))).count(), 2, "{results:?}");
+    }
+    #[cfg(windows)]
+    fn windows_open_with_neighbor_cmd(name: &str, directory: bool) {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join(name);
+        if directory {
+            fs::create_dir(&target).unwrap();
+        } else {
+            fs::write(&target, "real document").unwrap();
+        }
+        let marker = dir.path().join("neighbor-ran.txt");
+        fs::write(
+            dir.path().join(format!("{name}.cmd")),
+            format!("@echo neighbor-ran>\"{}\"\r\n", marker.display()),
+        )
+        .unwrap();
+        let checked = local_open_target(target.to_str().unwrap()).unwrap();
+        let gui = windows_probe::WindowsProbe::new(dir.path(), &[target.as_path()]);
+        let result = dispatch_open_target(&checked);
+        assert_eq!(
+            result.as_ref().map(|_| ()),
+            Ok(()),
+            "real dispatch: {result:?}"
+        );
+        let deadline = std::time::Instant::now() + Duration::from_secs(4);
+        while std::time::Instant::now() < deadline && !marker.exists() {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert_eq!(
+            marker.exists(),
+            false,
+            "neighbor .cmd executed for {}",
+            target.display()
+        );
+        assert_plain_dispatched_path(result, &target);
+        if directory {
+            gui.assert_folder(&target, None);
+            let (item, parent) = reveal_target(target.to_str().unwrap()).unwrap();
+            assert_plain_dispatched_path(dispatch_reveal_target(&item, &parent), &target);
+            let deadline = std::time::Instant::now() + Duration::from_secs(4);
+            while std::time::Instant::now() < deadline && !marker.exists() {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            assert_eq!(
+                marker.exists(),
+                false,
+                "neighbor .cmd executed on reveal of {}",
+                target.display()
+            );
+            gui.assert_folder(&target, None);
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_folder_does_not_execute_neighbor_cmd() {
+        windows_open_with_neighbor_cmd("Invoice", true);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_document_does_not_execute_neighbor_cmd() {
+        windows_open_with_neighbor_cmd("report.txt", false);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_bracket_folder_does_not_execute_neighbor_cmd() {
+        windows_open_with_neighbor_cmd("Q3 [draft]", true);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_mapped_unc_drive_opens_document_and_refuses_launcher() {
+        use windows_sys::Win32::Storage::FileSystem::GetLogicalDrives;
+        let drives = unsafe { GetLogicalDrives() };
+        if drives == 0 {
+            panic!(
+                "Cannot enumerate drives: {}",
+                std::io::Error::last_os_error()
+            );
+        }
+        let letter = (b'P'..=b'Z')
+            .rev()
+            .find(|letter| drives & (1 << (letter - b'A')) == 0)
+            .expect("a free drive letter is required for the mapping check")
+            as char;
+        let drive = format!("{letter}:");
+        let mapped = Command::new("net.exe")
+            .args(["use", &drive, r"\\localhost\C$", "/persistent:no"])
+            .output()
+            .unwrap();
+        if !mapped.status.success() {
+            panic!("The UNC mapping check requires \\\\localhost\\C$; no subst fallback can prove VerbatimUNC behavior: {} {}",
+                String::from_utf8_lossy(&mapped.stdout), String::from_utf8_lossy(&mapped.stderr));
+        }
+        // Always remove only this test's successful mapping, including on assertion failure.
+        let result = std::panic::catch_unwind(|| {
+            let document = format!(r"{drive}\Windows\win.ini");
+            let _gui = windows_probe::WindowsProbe::new(
+                Path::new(&format!(r"{drive}\Windows")),
+                &[Path::new(&document)],
+            );
+            let target = local_open_target(&document).unwrap();
+            assert!(
+                matches!(target.components().next(), Some(std::path::Component::Prefix(prefix))
+                if matches!(prefix.kind(), std::path::Prefix::VerbatimUNC(_, _)))
+            );
+            let dispatched = dispatch_open_target(&target);
+            assert_plain_dispatched_path(dispatched, Path::new(&document));
+            let launcher = format!(r"{drive}\Windows\System32\cmd.exe");
+            assert!(
+                matches!(local_open_target(&launcher), Err(message) if message.contains(".exe"))
+            );
+            let folder = format!(r"{drive}\Windows");
+            let target = local_open_target(&folder).unwrap();
+            assert_plain_dispatched_path(dispatch_open_target(&target), Path::new(&folder));
+        });
+        let cleanup = Command::new("net.exe")
+            .args(["use", &drive, "/delete", "/y"])
+            .output()
+            .unwrap();
+        if let Err(failure) = result {
+            if !cleanup.status.success() {
+                eprintln!(
+                    "Mapping cleanup failed for {drive}: {}",
+                    String::from_utf8_lossy(&cleanup.stderr)
+                );
+            }
+            std::panic::resume_unwind(failure);
+        }
+        assert_eq!(
+            cleanup.status.code(),
+            Some(0),
+            "could not remove test mapping {drive}"
+        );
+    }
+    #[cfg(windows)]
+    fn windows_observe_folder(name: &str) {
+        let dir = tempdir().unwrap();
+        let folder = dir.path().join(name);
+        fs::create_dir(&folder).unwrap();
+        let gui = windows_probe::WindowsProbe::new(dir.path(), &[]);
+        let target = local_open_target(folder.to_str().unwrap()).unwrap();
+        assert_plain_dispatched_path(dispatch_open_target(&target), &folder);
+        gui.assert_folder(&folder, None);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_folder_window_control() {
+        windows_observe_folder("plain-folder");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_comma_folder_window_notes() {
+        windows_observe_folder("Q4,notes");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_comma_folder_window_root() {
+        windows_observe_folder("Q6,root");
+    }
+
+    #[cfg(windows)]
+    fn windows_observe_reveal(name: &str) {
+        let dir = tempdir().unwrap();
+        // Retain a decoy: hosted focus can land here even when a different item was revealed.
+        fixture(dir.path(), "000-unrelated.txt");
+        let file = PathBuf::from(fixture(dir.path(), name));
+        let gui = windows_probe::WindowsProbe::new(dir.path(), &[&file]);
+        let (item, parent) = reveal_target(file.to_str().unwrap()).unwrap();
+        assert_plain_dispatched_path(dispatch_reveal_target(&item, &parent), &file);
+        gui.assert_folder(dir.path(), Some(&file));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_plain_reveal_window_control() {
+        windows_observe_reveal("plain.txt");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_comma_reveal_window_and_selection() {
+        windows_observe_reveal("a,b2.txt");
+    }
+
+    #[cfg(windows)]
+    fn windows_pidl_path(
+        item: *const windows_sys::Win32::UI::Shell::Common::ITEMIDLIST,
+    ) -> Result<PathBuf, String> {
+        use std::os::windows::ffi::OsStringExt;
+        use windows_sys::Win32::UI::Shell::SHGetPathFromIDListEx;
+        let mut path = vec![0u16; 32768];
+        if unsafe { SHGetPathFromIDListEx(item, path.as_mut_ptr(), path.len() as u32, 0) } == 0 {
+            return Err("SHGetPathFromIDListEx could not resolve the PIDL".into());
+        }
+        let end = path.iter().position(|unit| *unit == 0).unwrap();
+        Ok(PathBuf::from(std::ffi::OsString::from_wide(&path[..end])))
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_reveal_item_ids_identify_exact_target() {
+        use std::os::windows::ffi::OsStrExt;
+        use windows_sys::Win32::Foundation::RPC_E_CHANGED_MODE;
+        use windows_sys::Win32::System::Com::{
+            CoInitializeEx, CoTaskMemFree, CoUninitialize, COINIT_APARTMENTTHREADED,
+        };
+        use windows_sys::Win32::UI::Shell::{ILCombine, ILFree, SHParseDisplayName};
+        let dir = tempdir().unwrap();
+        let targets: Vec<_> = ["a,b2.txt", "Q3 [draft].txt", "plain.txt"]
+            .iter()
+            .map(|name| {
+                let path = fixture(dir.path(), name);
+                dunce::simplified(&fs::canonicalize(path).unwrap()).to_path_buf()
+            })
+            .collect();
+        let initialized =
+            unsafe { CoInitializeEx(std::ptr::null(), COINIT_APARTMENTTHREADED as u32) };
+        assert!(
+            initialized >= 0 || initialized == RPC_E_CHANGED_MODE,
+            "COM: {initialized:#x}"
+        );
+        let results: Vec<_> = targets
+            .iter()
+            .map(|target| {
+                let wide: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
+                let mut item = std::ptr::null_mut();
+                let parsed = unsafe {
+                    SHParseDisplayName(
+                        wide.as_ptr(),
+                        std::ptr::null_mut(),
+                        &mut item,
+                        0,
+                        std::ptr::null_mut(),
+                    )
+                };
+                let mut paths = None;
+                let result = if parsed < 0 || item.is_null() {
+                    Err(format!("SHParseDisplayName: {parsed:#x}"))
+                } else {
+                    unsafe {
+                        windows_reveal::with_item_ids(item, |parent, count, children| {
+                            if count != 1 || children.is_null() {
+                                return Err(format!("Expected one reveal child, got {count}"));
+                            }
+                            let combined = ILCombine(parent, *children);
+                            if combined.is_null() {
+                                return Err(
+                                    "ILCombine could not reconstruct the reveal target".into()
+                                );
+                            }
+                            let parent_path = windows_pidl_path(parent);
+                            let target_path = windows_pidl_path(combined);
+                            ILFree(combined);
+                            paths = Some((parent_path?, target_path?));
+                            Ok(())
+                        })
+                    }
+                };
+                unsafe { CoTaskMemFree(item.cast()) };
+                result
+                    .and_then(|()| paths.ok_or_else(|| "No reveal arguments observed".to_string()))
+            })
+            .collect();
+        if initialized >= 0 {
+            unsafe { CoUninitialize() };
+        }
+        // Assert only after COM/PIDL cleanup, including when a mutation supplied bad arguments.
+        for (target, result) in targets.iter().zip(results) {
+            assert_eq!(
+                result,
+                Ok((target.parent().unwrap().to_path_buf(), target.clone())),
+                "native reveal IDs for {}",
+                target.display()
+            );
+        }
+    }
+}

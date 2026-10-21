@@ -1,21 +1,21 @@
 {
   "schema": "token-bootstrap-adaptation-audit.v1",
-  "baseline": "fe3753d37e585f35c61ae5f1488a909739d4b47c",
-  "candidate": "63bcd183c720e6f72954fb91d7bcc235d640ffc8",
-  "producerSourceSha256": "33d9ef452ed266972911ba35ea9eb22e430144f6bd9bcf7f1e92a4b5d86dee2b",
+  "baseline": "f6d92d768f86d778ea805012b176c3349705018c",
+  "candidate": "734f9f25ba0f416c55b28f9ae5dca0095d45c62c",
+  "producerSourceSha256": "08226df01a60fe01cdfed9d24e8d7d5de8a7734fd628c8872523c0eb94ade3b0",
   "executionAdapter": "// Execution-policy adapter for run-evidence.mjs; no test results or assertions are changed.\n// Use with node --require <this file> scripts/governance/gates/test-intent/run-evidence.mjs.\nconst cp = require('node:child_process');\nconst fs = require('node:fs');\nconst { syncBuiltinESMExports } = require('node:module');\nconst original = cp.spawnSync;\nconst clones = new Set();\n// Generated only in the caller's temporary directory; never loaded by a product build.\nconst javaPolicy = String.raw`// Test-only execution policy: isolate temporary files and Engine homes without JAVA_TOOL_OPTIONS.\ndef requestedRoot = System.getenv('TOKEN_TEST_TEMP_ROOT')\nif (!requestedRoot) throw new GradleException('TOKEN_TEST_TEMP_ROOT must name the evidence sandbox')\nallprojects { p ->\n  def sandbox = new File(requestedRoot,\n      Integer.toHexString(p.rootDir.absolutePath.hashCode()) + '/' + p.path.replace(':', '_'))\n  tasks.withType(Test).configureEach {\n    def taskRoot = new File(sandbox, name)\n    systemProperty('java.io.tmpdir', new File(taskRoot, 'temp').absolutePath)\n    environment('JUSTSEARCH_HOME', new File(taskRoot, 'home').absolutePath)\n    environment('JUSTSEARCH_DATA_DIR', new File(taskRoot, 'data').absolutePath)\n    doFirst {\n      ['temp', 'home', 'data'].each { new File(taskRoot, it).mkdirs() }\n    }\n  }\n}\n`;\n\ncp.spawnSync = function (command, args, options) {\n  if (typeof command === 'string' && command.startsWith('./gradlew ')) {\n    // The complete producer (candidate, report extraction and before run) holds one slot.\n    const heldLock = fs.readlinkSync(`/proc/${process.ppid}/fd/9`);\n    if (!heldLock.startsWith('/tmp/js-linux-port/gradle.lock')) {\n      throw new Error('Run the complete evidence producer under js-gradle-slot');\n    }\n    const init = require('node:path').join(process.env.TMPDIR, 'token-bootstrap-java-policy.init.gradle');\n    fs.writeFileSync(init, javaPolicy);\n    const quotedInit = \"'\" + init.replaceAll(\"'\", \"'\\\\''\") + \"'\";\n    const actual = `${command} --init-script ${quotedInit} --max-workers=6`;\n    const env = { ...args.env };\n    delete env.JAVA_TOOL_OPTIONS;\n    env.JAVA_OPTS = `${env.JAVA_OPTS ?? ''} -Djava.io.tmpdir=${env.TMPDIR}`.trim();\n    process.stderr.write(`[execution-policy] existing whole-producer slot: ${actual}\\n`);\n    return original(actual, { ...args, env });\n  }\n  if (typeof command === 'string' && command.startsWith('npx vitest run ')) {\n    // Copying node_modules dereferences .bin symlinks; invoke the same installed CLI\n    // at its package location so its relative imports remain valid in isolated clones.\n    const actual = `${command.replace(/^npx vitest run /, \"node node_modules/vitest/vitest.mjs run \")} --maxWorkers=4`;\n    process.stderr.write(`[execution-policy] ${actual}\\n`);\n    const result = original(actual, args);\n    const report = /--outputFile=(\"[^\"\\n]+\")/.exec(command);\n    if (process.env.TOKEN_EVIDENCE_RAW && report) {\n      const file = JSON.parse(report[1]);\n      if (fs.existsSync(file)) fs.copyFileSync(file, `${process.env.TOKEN_EVIDENCE_RAW}-${clones.has(args.cwd.replace(/\\/modules\\/ui-web$/, \"\")) ? \"before\" : \"candidate\"}.json`);\n    }\n    return result;\n  }\n  if (command === 'git' && Array.isArray(args) && args[2] === 'worktree') {\n    if (args[3] === 'add') {\n      const [, , , , , destination, revision] = args;\n      process.stderr.write(`[execution-policy] shared clone ${destination}; detached checkout ${revision}\\n`);\n      const clone = original('git', ['clone', '--quiet', '--shared', '--no-checkout', options.cwd, destination], options);\n      if (clone.status !== 0) return clone;\n      clones.add(destination);\n      return original('git', ['-C', destination, 'checkout', '--quiet', '--detach', revision], options);\n    }\n    if (args[3] === 'remove') {\n      const destination = args[5];\n      if (!clones.delete(destination)) throw new Error(`refusing to remove an unowned clone: ${destination}`);\n      fs.rmSync(destination, { recursive: true });\n      return { status: 0, signal: null, stdout: '', stderr: '' };\n    }\n  }\n  return original(command, args, options);\n};\nsyncBuiltinESMExports();\n",
   "executionEvidence": [
     {
-      "file": "gates/test-intent/evidence/token-bootstrap-merged-web.json",
+      "file": "gates/test-intent/evidence/token-bootstrap-main-20261021-web.json",
       "evidence": {
         "schema": "test-intent-evidence.v1",
         "producer": {
           "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
           "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
         },
-        "createdAt": "2026-10-20T12:20:33.502Z",
-        "revision": "63bcd183c720e6f72954fb91d7bcc235d640ffc8",
-        "tree": "1e297810cbc1eaa2415e7afce9c938c30a4606a7",
+        "createdAt": "2026-10-21T08:48:33.047Z",
+        "revision": "734f9f25ba0f416c55b28f9ae5dca0095d45c62c",
+        "tree": "5807cd31abb587ac1a304b46f4a9a8e363d28248",
         "environment": {
           "platform": "linux",
           "arch": "x64",
@@ -27,10 +27,10 @@
         },
         "runs": [
           {
-            "command": "npx vitest run \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/components/ResourceView.history-reconnect.test.ts\" \"src/shell-v0/components/ResourceView.render.test.ts\" \"src/shell-v0/components/advisory/AdvisoryStore.test.ts\" \"src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts\" \"src/shell-v0/utils/aiInstallPoll.test.ts\" \"src/shell-v0/views/HealthLitView.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/token-base-merge/test-intent-vitest-2075567-1792498827630.json\"",
+            "command": "npx vitest run \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/components/ResourceView.history-reconnect.test.ts\" \"src/shell-v0/components/ResourceView.render.test.ts\" \"src/shell-v0/components/advisory/AdvisoryStore.test.ts\" \"src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts\" \"src/shell-v0/utils/aiInstallPoll.test.ts\" \"src/shell-v0/views/HealthLitView.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/main-20261021/test-intent-vitest-2654763-1792572509379.json\"",
             "cwd": "modules/ui-web",
             "exitCode": 0,
-            "durationMs": 5871
+            "durationMs": 3667
           }
         ],
         "checks": [
@@ -524,7 +524,7 @@
           }
         ],
         "failBefore": null,
-        "digest": "sha256:b1a288623387a6330899c21362d21771241332a5512cec640e4a3c38e3b6d070"
+        "digest": "sha256:578b4cc7b8194343f61f1084a1621be08231f600643139e107aa4f73ea31ab31"
       }
     },
     {
@@ -1044,16 +1044,16 @@
       }
     },
     {
-      "file": "gates/test-intent/evidence/token-bootstrap-merged-base-preservation.json",
+      "file": "gates/test-intent/evidence/token-bootstrap-main-20261021-base-preservation.json",
       "evidence": {
         "schema": "test-intent-evidence.v1",
         "producer": {
           "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
           "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
         },
-        "createdAt": "2026-10-20T12:20:58.036Z",
-        "revision": "fe3753d37e585f35c61ae5f1488a909739d4b47c",
-        "tree": "99072a0e3fc3abeb2d2f660635cd570a9c0d20d4",
+        "createdAt": "2026-10-21T08:48:34.176Z",
+        "revision": "f6d92d768f86d778ea805012b176c3349705018c",
+        "tree": "9e58a50bddef9684b0932c1e86d89e4d80e41c04",
         "environment": {
           "platform": "linux",
           "arch": "x64",
@@ -1065,10 +1065,10 @@
         },
         "runs": [
           {
-            "command": "npx vitest run \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/components/ResourceView.history-reconnect.test.ts\" \"src/shell-v0/components/ResourceView.render.test.ts\" \"src/shell-v0/components/advisory/AdvisoryStore.test.ts\" \"src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts\" \"src/shell-v0/utils/aiInstallPoll.test.ts\" \"src/shell-v0/views/HealthLitView.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/token-base-merge/test-intent-vitest-2079879-1792498854387.json\"",
+            "command": "npx vitest run \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/components/ResourceView.history-reconnect.test.ts\" \"src/shell-v0/components/ResourceView.render.test.ts\" \"src/shell-v0/components/advisory/AdvisoryStore.test.ts\" \"src/shell-v0/controllers/AgentSessionStreamOwnership.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts\" \"src/shell-v0/utils/aiInstallPoll.test.ts\" \"src/shell-v0/views/HealthLitView.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/token-bootstrap/tmp/builder/main-20261021/test-intent-vitest-2655078-1792572510545.json\"",
             "cwd": "modules/ui-web",
             "exitCode": 0,
-            "durationMs": 3648
+            "durationMs": 3630
           }
         ],
         "checks": [
@@ -1562,7 +1562,7 @@
           }
         ],
         "failBefore": null,
-        "digest": "sha256:720438ef41f58d92e61b227c8112e90bdf79ff7b2573fa2f496e73638682be27"
+        "digest": "sha256:da2dedf05688ad5057779b386d319905061ce2a3971483ba894bcb0a86f3d3a4"
       }
     }
   ],

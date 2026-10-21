@@ -5,6 +5,106 @@ This audit repair starts at `b79707136`. The earlier acceptance and rejection re
 remain byte-for-byte unchanged under the changeset's acceptance heading. Their digest
 predates this repair; this author appends no review record.
 
+## Main merge: 2026-10-21
+
+Merged origin/main `f6d92d768f86d778ea805012b176c3349705018c` as the sole new
+commit `734f9f25b` (`Merge origin/main into worktree-token-bootstrap`). Changeset,
+assertion inventory, fresh preservation receipts and this section are later,
+uncommitted author edits. Every pre-existing acceptance/audit record remains
+byte-for-byte unchanged. This section supersedes earlier base references below.
+
+Conflict resolutions (one hunk per file):
+
+- ADR-0046: retain this branch's three additional probes. Main's stable status,
+  last-reviewed date and current-entry-point amendment remain; the amendment now
+  names the sixth, owner-only-file control and the authenticated non-public boundary.
+  Source pointers were checked against the merged code: LocalApiServer.java:620,
+  ApiSecurityFilters.java:167 and HeadlessApp.java:505. The same-user residual is
+  the last adversary in the expanded list, rather than the old third item.
+- Headless runtime guide: combine main's actual printed-port variable with this
+  branch's session header in the install-plan-preview command. Keep main's Linux
+  desktop data-folder explanation and all manifest-only credential instructions.
+- route-manifest.snapshot.json and reference-client-openapi.snapshot.json: no manual
+  JSON merge. Both are replaced by `scripts/codegen/gen-api-client.mjs --from-live`
+  from a fresh, installed production Engine; that generator also writes apiRoutes.ts.
+  It records 252 routes and matching digest
+  `sha256:a0deb6b7865b0038433d3714fd26c08c87a69f4bd611fd87a65b9904840e6558`.
+  Comparing method/path sets with main's snapshot (253 routes), the only removed
+  identity is `GET /api/mcp/token`; no main route is lost otherwise.
+
+The live capture starts the installed native launcher with justsearch.prod=true,
+isolated JUSTSEARCH_HOME and JUSTSEARCH_DATA_DIR, mode mcp-lite and a free port.
+It reads the canonical manifest privately, matches its root pid and the unauthenticated
+/api/runtime/live pid/instanceId before supplying the header to the generator.
+Neither snapshot contains the credential or bootstrap route. Both owned Engine PIDs
+were stopped (2610164 and 2622374). The first temporary capture helper used the wrong
+pid location (head.pid) and exited 1; after checking RuntimeManifest's root pid field,
+the corrected helper and generator exited 0. No product fix or weakened check was needed.
+No live credential was printed.
+
+Checks observed:
+
+- `:modules:ui:installDist` and selected `:modules:ui:test` classes plus
+  `:modules:system-tests:integrationTest --tests io.justsearch.systemtests.ProductionRouteTokenWalkTest`
+  under `js-gradle-slot ./gradlew`: exit 0. 66 selected unit cases and one installed
+  production walk passed, none skipped. Classes: ApiSecurityFiltersTest (6),
+  McpOriginValidationTest (38, both modes), LocalApiUiTokenPolicyTest (11),
+  ProductionRouteTokenBoundaryTest (2), RouteManifestControllerTest (3),
+  HeadlessTokenOutputTest (2), HeadlessLauncherProductionModeTest (2),
+  RuntimeManifestCredentialBoundaryTest (2). An additional mistaken OpenApiProjectionTest
+  filter matched no class; no projection execution is claimed from that first call.
+  The actual renderer/exporter/projection classes are selected in the separate
+  snapshot verification command. JAVA_TOOL_OPTIONS is unset; the temporary init
+  script keeps Test java.io.tmpdir and both Engine home variables in this task's
+  sandbox, and JAVA_OPTS sets the Gradle client's temporary directory there too.
+- Snapshot verification under `js-gradle-slot ./gradlew` exited 0 after waiting
+  for its default slot: `:modules:ui:generateReferenceClientOpenApiSnapshot
+  -PreferenceClientOpenApiCheck=true` reported "reference-client OpenAPI snapshot up
+  to date". The same invocation ran the actual OpenApiRendererTest,
+  OpenApiSnapshotExporterTest and SdkOpenApiProjectionTest classes: 17 passed,
+  none failed or skipped. This is the same task and property invoked by the CI
+  check-reference-client-openapi-regen wrapper, run through the required slot helper.
+- `npm run typecheck` in ui-web: exit 0.
+- `node scripts/codegen/gen-api-client.mjs --check`: exit 0, apiRoutes.ts up to date.
+- `node scripts/ci/check-install-api-contract.mjs`: exit 0.
+- `node scripts/ci/pack-mcpb.mjs --sync`: exit 0, no hash change needed.
+  `check-mcpb-consistency.mjs`: exit 0. Packer tests: 28 assertions passed;
+  MCPB consistency self-test: 13 passed; install-contract self-test: 9 passed;
+  API capture-generator self-test: all 13 checks passed.
+- Four web token files (http, authorizedFetch, AuthenticatedCatalogs,
+  AuthenticatedStream), `npx vitest run ... --maxWorkers=4`: 50 passed, exit 0.
+- Discovery and production/dev MCP ingest Node tests: 33 passed, one existing
+  Windows-known-folder test skipped, zero failures, exit 0. TMPDIR is outside the
+  checkout at /home/elias/.cache/justsearch-token-builder/main-20261021, as required
+  for the bridge test environment. Windows execution is not claimed.
+- `npm --prefix packages/runtime-client test`: build and all ten SDK tests passed,
+  exit 0, none skipped.
+- Docs gates passed: frontend-stack claims, model freshness, privacy claims,
+  canonical links, markdownlint canonical docs, docs-validate and adr-coverage.
+  llmstxt --check initially exited 1 for the merged ADR description; the repository
+  generator updated docs/llms.txt and its repeated --check exited 0.
+- `git diff --check origin/main`: exit 0. The pre-merge `--cached --check` against
+  the old first parent reported whitespace in incoming evidence .patch context lines;
+  these files are unchanged from main and were not rewritten.
+
+Fresh preservation evidence is produced by the repository's D4 runner, never edited
+as JSON: token-bootstrap-main-20261021-web.json records eight adapted candidate
+fixtures at 734f9f25b (100 passed), and token-bootstrap-main-20261021-base-preservation.json
+records the same eight original paths, unmodified, in a detached shared clone of
+f6d92d768 (100 passed). Copied node_modules prevent writes through dependency links.
+The current adaptation inventory uses f6d92d768 and embeds those two receipts plus
+the unchanged engine repair receipt. All 229 original web assertion calls survive,
+including 17 transport observation substitutions; none is unmatched. The same three
+pre-existing additional instrumentation assertions (two web, one Java) remain.
+No test or assertion is added, removed or rewritten by this merge.
+
+The gate covers all 19 flagged items, with five isolated new test exemptions and no
+uncovered items. After this metadata/evidence update, `cli.mjs --pr 825` exits 1 solely
+for acceptance-stale; PR #825 still requires its separate audit after acceptance.
+No author record is appended. The advisory reconsider warning is now one third-reviewer
+tie-break among eight audited PRs (12.5%); it does not fail the gate. Earlier warning
+numbers below are historical.
+
 ## Base merge: 2026-10-20
 
 Merged `origin/worktree-headless-prod` (`fe3753d37e585f35c61ae5f1488a909739d4b47c`)

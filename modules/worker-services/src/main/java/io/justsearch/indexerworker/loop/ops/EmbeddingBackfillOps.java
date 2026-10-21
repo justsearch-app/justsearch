@@ -76,19 +76,21 @@ public final class EmbeddingBackfillOps {
       long t0 = System.nanoTime();
       List<String> batchDocIds = new ArrayList<>(pendingIds.size());
       List<String> batchContents = new ArrayList<>(pendingIds.size());
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, MAX_PARENT_BATCH_CHARS);
       long retainedChars = 0;
-      for (String docId : pendingIds) {
-        String content = context.documentFieldOps().getDocumentContent(docId);
+      for (String docId : batch.ids()) {
+        String content = batch.content(docId);
         if (content == null || content.isBlank()) {
           context.log().warn("Backfill: Document content missing for {}", docId);
           markedFailed +=
-              handleEmbeddingFailure(
-                  context.documentFieldOps(), context.indexingCoordinator(), docId, "Content missing or blank", context.log());
+              batch.failure(docId, SchemaFields.EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeEmbeddingFailureUpdate);
           failed++;
           continue;
         }
         if (!batchContents.isEmpty()
-            && retainedChars + content.length() > MAX_PARENT_BATCH_CHARS) break;
+            && retainedChars + content.length() > MAX_PARENT_BATCH_CHARS) {
+          break;
+        }
         batchDocIds.add(docId);
         batchContents.add(content);
         retainedChars += content.length();
@@ -135,7 +137,7 @@ public final class EmbeddingBackfillOps {
         for (int i = 0; i < batchDocIds.size(); i++) {
           int[] counts =
               embedAndUpdateSingle(
-                  context, embeddingProvider, batchDocIds.get(i), batchContents.get(i));
+                  context, batch, embeddingProvider, batchDocIds.get(i), batchContents.get(i));
           processed += counts[0];
           failed += counts[1];
           markedFailed += counts[2];
@@ -156,14 +158,13 @@ public final class EmbeddingBackfillOps {
           } else {
             context.log().warn("Backfill: Batch returned null vector for {}", docId);
             markedFailed +=
-                handleEmbeddingFailure(
-                    context.documentFieldOps(), context.indexingCoordinator(), docId, "Empty vector in batch", context.log());
+                batch.failure(docId, SchemaFields.EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeEmbeddingFailureUpdate);
             failed++;
           }
         }
         long tListEnd = System.nanoTime();
         if (!batchUpdates.isEmpty()) {
-          var result = context.indexingCoordinator().updateDocumentsBatch(batchUpdates);
+          var result = batch.updateBatch(batchUpdates);
           processed += result.updatedCount();
         }
         long tWriteEnd = System.nanoTime();
@@ -245,7 +246,7 @@ public final class EmbeddingBackfillOps {
   }
 
   private static int[] embedAndUpdateSingle(
-      BackfillContext context, EmbeddingProvider embeddingProvider, String docId, String content) {
+      BackfillContext context, EnrichmentBatch batch, EmbeddingProvider embeddingProvider, String docId, String content) {
     int processed = 0;
     int failed = 0;
     int markedFailed = 0;
@@ -256,55 +257,26 @@ public final class EmbeddingBackfillOps {
         updates.put(SchemaFields.VECTOR, vector);
         updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_COMPLETED);
         updates.put(SchemaFields.EMBEDDING_RETRY_COUNT, "0");
-        context.indexingCoordinator().updateDocument(docId, updates);
-        processed = 1;
+        processed = batch.update(docId, updates) ? 1 : 0;
       } else {
         markedFailed =
-            handleEmbeddingFailure(
-                context.documentFieldOps(), context.indexingCoordinator(), docId, "Empty vector returned", context.log());
+            batch.failure(docId, SchemaFields.EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeEmbeddingFailureUpdate);
         failed = 1;
       }
     } catch (Exception e) {
       context.log().error("Backfill failed for doc {}: {}", docId, e.getMessage());
       markedFailed =
-          handleEmbeddingFailure(context.documentFieldOps(), context.indexingCoordinator(), docId, e.getMessage(), context.log());
+          batch.failure(docId, SchemaFields.EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeEmbeddingFailureUpdate);
       failed = 1;
     }
     return new int[] {processed, failed, markedFailed};
   }
 
-  public static int handleEmbeddingFailure(
-      DocumentFieldOps documentFieldOps, IndexingCoordinator indexingCoordinator, String docId, String reason, Logger log) {
-    try {
-      String retryCountStr = documentFieldOps.getDocumentField(docId, SchemaFields.EMBEDDING_RETRY_COUNT);
-      int currentRetryCount = parseRetryCountOrZero(retryCountStr);
-      Map<String, Object> updates = computeEmbeddingFailureUpdate(currentRetryCount);
-      int retryCount = currentRetryCount + 1;
 
-      if (updates.containsKey(SchemaFields.EMBEDDING_STATUS)) {
-        log.warn("Embedding permanently FAILED for {} after {} retries: {}", docId, retryCount, reason);
-        indexingCoordinator.updateDocument(docId, updates);
-        return 1;
-      } else {
-        log.debug(
-            "Embedding retry {}/{} for {}: {}",
-            retryCount,
-            SchemaFields.EMBEDDING_MAX_RETRIES,
-            docId,
-            reason);
-        indexingCoordinator.updateDocument(docId, updates);
-        return 0;
-      }
-
-    } catch (Exception e) {
-      log.error("Failed to update retry count for {}", docId, e);
-      return 0;
-    }
-  }
 
   /**
    * Pure computation of the retry-count/status update for a parent-doc embedding failure — no I/O.
-   * Used by both {@link #handleEmbeddingFailure} (immediate single-doc write) and the combined
+   * Used by snapshot-bound individual and combined
    * enrichment path ({@code CombinedEnrichmentBackfillOps}, which merges the result into its own
    * single batched write), so the two paths stay in escalation-parity by construction rather than
    * via a hand-ported copy that can drift (tempdoc 700).
@@ -361,8 +333,8 @@ public final class EmbeddingBackfillOps {
       }
 
       // Phase 1: reconstruct chunk text in one batch (distinct parents are read once).
-      Map<String, String> contentByChunkId =
-          context.documentFieldOps().getDocumentContentBatch(pendingChunkIds);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingChunkIds);
+      Map<String, String> contentByChunkId = batch.contents();
       List<String> batchChunkIds = new ArrayList<>(pendingChunkIds.size());
       List<String> batchContents = new ArrayList<>(pendingChunkIds.size());
       for (String chunkId : pendingChunkIds) {
@@ -371,12 +343,7 @@ public final class EmbeddingBackfillOps {
           if (chunkContent == null || chunkContent.isBlank()) {
             context.log().warn("Chunk backfill: Content missing for {}", chunkId);
             markedFailed +=
-                handleChunkEmbeddingFailure(
-                    context.documentFieldOps(),
-                    context.indexingCoordinator(),
-                    chunkId,
-                    "Chunk content missing or blank",
-                    context.log());
+                batch.failure(chunkId, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeChunkEmbeddingFailureUpdate);
             failed++;
             continue;
           }
@@ -385,8 +352,7 @@ public final class EmbeddingBackfillOps {
         } catch (Exception e) {
           context.log().error("Chunk backfill content fetch failed for {}: {}", chunkId, e.getMessage());
           markedFailed +=
-              handleChunkEmbeddingFailure(
-                  context.documentFieldOps(), context.indexingCoordinator(), chunkId, e.getMessage(), context.log());
+              batch.failure(chunkId, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeChunkEmbeddingFailureUpdate);
           failed++;
         }
       }
@@ -428,19 +394,16 @@ public final class EmbeddingBackfillOps {
               updates.put(SchemaFields.CHUNK_VECTOR, vector);
               updates.put(SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_COMPLETED);
               updates.put(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, "0");
-              context.indexingCoordinator().updateDocument(chunkId, updates);
-              processed++;
+              if (batch.update(chunkId, updates)) processed++;
             } else {
               markedFailed +=
-                  handleChunkEmbeddingFailure(
-                      context.documentFieldOps(), context.indexingCoordinator(), chunkId, "Empty vector returned", context.log());
+                  batch.failure(chunkId, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeChunkEmbeddingFailureUpdate);
               failed++;
             }
           } catch (Exception e) {
             context.log().error("Chunk backfill failed for {}: {}", chunkId, e.getMessage());
             markedFailed +=
-                handleChunkEmbeddingFailure(
-                    context.documentFieldOps(), context.indexingCoordinator(), chunkId, e.getMessage(), context.log());
+                batch.failure(chunkId, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeChunkEmbeddingFailureUpdate);
             failed++;
           }
         }
@@ -459,13 +422,12 @@ public final class EmbeddingBackfillOps {
           } else {
             context.log().warn("Chunk backfill: Batch returned null vector for {}", chunkId);
             markedFailed +=
-                handleChunkEmbeddingFailure(
-                    context.documentFieldOps(), context.indexingCoordinator(), chunkId, "Empty vector in batch", context.log());
+                batch.failure(chunkId, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeChunkEmbeddingFailureUpdate);
             failed++;
           }
         }
         if (!batchUpdates.isEmpty()) {
-          var result = context.indexingCoordinator().updateDocumentsBatch(batchUpdates);
+          var result = batch.updateBatch(batchUpdates);
           processed += result.updatedCount();
         }
       }
@@ -497,44 +459,12 @@ public final class EmbeddingBackfillOps {
     }
   }
 
-  public static int handleChunkEmbeddingFailure(
-      DocumentFieldOps documentFieldOps, IndexingCoordinator indexingCoordinator, String chunkId, String reason, Logger log) {
-    try {
-      String retryCountStr =
-          documentFieldOps.getDocumentField(chunkId, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT);
-      int currentRetryCount = parseRetryCountOrZero(retryCountStr);
-      Map<String, Object> updates = computeChunkEmbeddingFailureUpdate(currentRetryCount);
-      int retryCount = currentRetryCount + 1;
 
-      if (updates.containsKey(SchemaFields.CHUNK_EMBEDDING_STATUS)) {
-        log.warn(
-            "Chunk embedding permanently FAILED for {} after {} retries: {}",
-            chunkId,
-            retryCount,
-            reason);
-        indexingCoordinator.updateDocument(chunkId, updates);
-        return 1;
-      } else {
-        log.debug(
-            "Chunk embedding retry {}/{} for {}: {}",
-            retryCount,
-            SchemaFields.EMBEDDING_MAX_RETRIES,
-            chunkId,
-            reason);
-        indexingCoordinator.updateDocument(chunkId, updates);
-        return 0;
-      }
-
-    } catch (Exception e) {
-      log.error("Failed to update chunk retry count for {}", chunkId, e);
-      return 0;
-    }
-  }
 
   /**
    * Pure computation of the retry-count/status update for a chunk-doc embedding failure — no I/O.
    * Mirrors {@link #computeEmbeddingFailureUpdate} for the {@code CHUNK_*} field pair; shared by
-   * {@link #handleChunkEmbeddingFailure} and the combined enrichment path (tempdoc 700).
+   * snapshot-bound individual and combined enrichment publication (tempdoc 700).
    *
    * @param currentRetryCount the chunk's retry count *before* this failure
    * @return field updates: always {@code CHUNK_EMBEDDING_RETRY_COUNT}; additionally {@code
@@ -552,14 +482,5 @@ public final class EmbeddingBackfillOps {
     return updates;
   }
 
-  private static int parseRetryCountOrZero(String retryCountStr) {
-    if (retryCountStr == null || retryCountStr.isBlank()) {
-      return 0;
-    }
-    try {
-      return Integer.parseInt(retryCountStr);
-    } catch (NumberFormatException ignored) {
-      return 0;
-    }
-  }
+
 }

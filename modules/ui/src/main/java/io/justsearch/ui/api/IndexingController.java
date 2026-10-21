@@ -220,13 +220,27 @@ public class IndexingController {
         capped = bc.capped();
       }
       boolean alreadyWatched = false;
+      Map<String, String> overlap = null;
       try {
-        alreadyWatched =
+        List<Path> watchedPaths =
             indexingService().getWatchedRoots(RequestEngineContext.get(ctx)).stream()
-                .anyMatch(
-                    r ->
-                        r.path() != null
-                            && r.path().toAbsolutePath().normalize().equals(resolved));
+                .map(IndexingService.WatchedRoot::path)
+                .filter(java.util.Objects::nonNull)
+                .map(p -> p.toAbsolutePath().normalize())
+                .toList();
+        alreadyWatched = watchedPaths.contains(resolved);
+        // Exact re-add remains idempotent, including legacy nested registrations. The
+        // optional overlap only describes new additions the Engine would refuse.
+        if (!alreadyWatched) {
+          for (Path watched : watchedPaths) {
+            if (resolved.startsWith(watched) || watched.startsWith(resolved)) {
+              overlap = Map.of(
+                  "path", watched.toString(),
+                  "relationship", resolved.startsWith(watched) ? "inside" : "containing");
+              break;
+            }
+          }
+        }
       } catch (Exception e) {
         if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
         log.debug("Preview: watched-roots check failed for {}", resolved, e);
@@ -237,6 +251,7 @@ public class IndexingController {
       out.put("fileCount", fileCount);
       out.put("capped", capped);
       out.put("alreadyWatched", alreadyWatched);
+      if (overlap != null) out.put("overlap", overlap);
       ctx.status(200).json(out);
     } catch (Exception e) {
       if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;

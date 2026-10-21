@@ -1125,6 +1125,50 @@ class HeadAssemblyTest {
     }
   }
 
+  @Test
+  void memoryBackupRefusesFailedCacheAndRecovers() throws Exception {
+    try (var head = newDisconnectedHeadAssembly()) {
+      var keys = head.dataKeyManager();
+      keys.setup("long-test-passphrase".toCharArray());
+      var descriptor = head.authoredStores().stream()
+          .filter(d -> d.store() == StoreCatalog.MEMORIES).findFirst().orElseThrow();
+      var record = new io.justsearch.agent.api.memory.MemoryRecord("old", "preference", "kept", "conv", "chat", java.time.Instant.EPOCH);
+      head.memoryStore().remember(record);
+      var backup = descriptor.source().read();
+      var file = descriptor.dataPath().resolve("memory.json");
+      String saved = Files.readString(file);
+      keys.lock();
+      String broken = "[{\"id\":\"old\",\"content\":\"kept\"},{\"content\":\"bad\"}]";
+      Files.writeString(file, broken);
+      keys.unlock("long-test-passphrase".toCharArray());
+      assertThrows(RuntimeException.class, () -> descriptor.source().read(), "export cannot use a failed cache");
+      assertThrows(RuntimeException.class, () -> descriptor.sink().restore(backup), "restore must not use a failed cache, even for a collision");
+      assertEquals(broken, Files.readString(file));
+      Files.writeString(file, saved);
+      assertEquals(backup, descriptor.source().read());
+      assertEquals(0, descriptor.sink().restore(backup), "skip colliding ids");
+      head.memoryStore().clear();
+      assertEquals(1, descriptor.sink().restore(backup));
+      assertEquals(List.of(record), head.memoryStore().whatItKnows());
+    }
+  }
+
+  @Test
+  void memoryBackupRoundTripPreservesFieldsAndCollisions() throws Exception {
+    try (var head = newDisconnectedHeadAssembly()) {
+      var descriptor = head.authoredStores().stream()
+          .filter(d -> d.store() == StoreCatalog.MEMORIES).findFirst().orElseThrow();
+      var old = new io.justsearch.agent.api.memory.MemoryRecord("old", "preference", "kept", "conv", "chat", java.time.Instant.parse("2026-01-01T00:00:00Z"));
+      head.memoryStore().remember(old);
+      var backup = descriptor.source().read();
+      assertEquals(0, descriptor.sink().restore(backup));
+      head.memoryStore().clear();
+      assertEquals(1, descriptor.sink().restore(backup));
+      assertEquals(List.of(old), head.memoryStore().whatItKnows());
+      assertEquals(backup, descriptor.source().read());
+    }
+  }
+
   private HeadAssembly newDisconnectedHeadAssembly() throws Exception {
     return new HeadAssembly(
         mockOperationStore(),

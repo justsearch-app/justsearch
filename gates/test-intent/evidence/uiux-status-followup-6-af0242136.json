@@ -1,0 +1,75 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T02:30:13.469Z",
+  "revision": "af02421367deb04c5a7f027326f3295d6020a9ed",
+  "tree": "04189d5acde35401af1832d30bbe76610162b979",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/components/indexingStatusFollowup.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/followup-6/test-intent-vitest-2101215-1792549809100.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1740
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:793610b159795f33a0331dfc8ef1acd99137c1dfd4910a362492cf3d82f77011",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 sixth verifier regressions S33.4 S33.6 Library empty roots qualify retained migration and recover on fresh observations",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 sixth verifier regressions S33.4 Library rebuild controls qualify retained build and activation observations",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 sixth verifier regressions S33.6 Search v3 Ask and deck announce indexing changes once and repeat polls silently",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "af0242136",
+    "revision": "af02421367deb04c5a7f027326f3295d6020a9ed",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/components/indexingStatusFollowup.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/followup-6/test-intent-vitest-2101215-1792549811825.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1491,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/followup-6/test-intent-vitest-2101215-1792549811825.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
+        "classification": "assertion",
+        "detail": "WP3.3 sixth verifier regressions S33.4 S33.6 Library empty roots qualify retained migration and recover on fresh observations:  AssertionError: MIGRATING: age: expected false to be true // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/uiux-status/tmp/uiux-status/followup-6/test-intent-before-cxjX4e/modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts:66:64\n    at file:///home/elias/d | WP3.3 sixth verifier regressions S33.4 Library rebuild controls quali"
+      }
+    ]
+  },
+  "digest": "sha256:11895c17ef7180520b9843c808a5514dabc3c7341946a4fe004726601f8141a2"
+}

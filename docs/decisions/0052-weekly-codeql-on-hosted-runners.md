@@ -6,6 +6,7 @@ description: "CodeQL code scanning runs weekly on GitHub-hosted runners and stay
 date: 2026-10-19
 amends:
   - "0044-public-hosted-ci-fact-lanes.md"
+  - "0026-manual-ci-triggering.md"
 probes: "none - scripts/ci/check-workflow-triggers.mjs holds the trigger against workflow-signal-policy.v1.json"
 last_reviewed: 2026-10-19
 ---
@@ -15,7 +16,8 @@ last_reviewed: 2026-10-19
 ## Status
 
 Accepted. Amends [ADR-0044](0044-public-hosted-ci-fact-lanes.md), which keeps specialty workflows
-manually dispatched unless a later ADR changes their trigger posture.
+manually dispatched unless a later ADR changes their trigger posture, and
+[ADR-0026](0026-manual-ci-triggering.md)'s historical manual-only security rule.
 
 ## Context
 

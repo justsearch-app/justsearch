@@ -406,8 +406,8 @@ final class RootLifecycleOps {
             WatchedRootsState.RootProducerFence fence, Object ticket) {}
 
     private WatchInitialization prepareWatchedRoot(String collection, Path path) {
-        if (path == null || !Files.exists(path)) {
-            return null;
+        if (path == null || !Files.isDirectory(path) || !Files.isReadable(path)) {
+            throw new IllegalArgumentException("Path is not an accessible directory: " + path);
         }
 
         Path normalized = path.toAbsolutePath().normalize();
@@ -415,6 +415,17 @@ final class RootLifecycleOps {
                 (collection == null || collection.isBlank())
                         ? IngestCollectionPolicy.DEFAULT_COLLECTION
                         : collection;
+
+        // WP3.4 decision 8: compare under the shared lifecycle lock, before registration.
+        // Exact re-adds (including legacy nested entries) retain their idempotent/retry semantics.
+        if (!watchedRoots.containsKey(normalized)) {
+            watchedRoots.keySet().stream()
+                    .filter(root -> normalized.startsWith(root) || root.startsWith(normalized))
+                    .sorted().findFirst().ifPresent(root -> {
+                        throw new IllegalArgumentException("Folder overlaps an already watched folder: "
+                                + root + ". Remove that registration before adding this folder.");
+                    });
+        }
 
         // Tempdoc 608 — idempotency at the convergence point. A re-add of an already-watched root (whether
         // mid-walk or walk-complete) is a no-op: without this, the duplicate-submit the UI used to invite
@@ -507,13 +518,12 @@ final class RootLifecycleOps {
         Path normalized = path.toAbsolutePath().normalize();
         log.info("Removing watched root: {} (stopping watcher, deleting from index)", normalized);
 
-        // A retained ancestor still owns a watcher/reconciler for this subtree. Its future
-        // effects would recreate the deleted documents, so removal cannot complete yet.
-        if (watchedRoots.keySet().stream()
-                .anyMatch(root -> !root.equals(normalized) && normalized.startsWith(root))) {
-            log.warn("Root removal incomplete for {}: a watched ancestor still owns this subtree", normalized);
-            return -1;
-        }
+        // LA1: an older version could save nested registrations. A retained ancestor still
+        // owns their documents; remove the selected registrations/watchers without deleting data.
+        // A repeat for an absent registration is harmless, including after a lost response.
+        if (watchedRoots.keySet().stream().noneMatch(root -> root.startsWith(normalized))) return 0;
+        boolean coveredByAncestor = watchedRoots.keySet().stream()
+                .anyMatch(root -> !root.equals(normalized) && normalized.startsWith(root));
 
         // Stop every watcher whose persisted root will be removed, including nested roots.
         try {
@@ -531,6 +541,12 @@ final class RootLifecycleOps {
             EngineRefusals.rethrow(e);
             log.warn("Worker unwatch failed for {}", normalized, e);
             return -1;
+        }
+
+        if (coveredByAncestor) {
+            watchedRootsState.removeRootAndNestedAndPersist(normalized);
+            forgetAvailabilityUnder(normalized);
+            return 0;
         }
 
         // 2. Call the index port to delete indexed data

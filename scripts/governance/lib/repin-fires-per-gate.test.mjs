@@ -7,18 +7,18 @@
  * enforcers, each with a covering changeset AND a live exceedance, and asserts each returns
  * `verdict: 'fail'` carrying its own `…-without-repin` rule id.
  *
- * Six gates wire the rule, across seven call sites. Six of the seven are driven here:
- * `module-deps`, `config-surface`, `npm-audit`, `atom-fork-ratchet` (through the shared
+ * Five gates wire the rule, across six call sites. Five of the six are driven here:
+ * `config-surface`, `npm-audit`, `atom-fork-ratchet` (through the shared
  * `makeRatchetGate` factory) and BOTH of `test-efficacy`'s — its strength FLOOR and its no-coverage
- * CEILING, which are separate branches reached by different metrics. The seventh (`dead-code`) is
+ * CEILING, which are separate branches reached by different metrics. The sixth (`dead-code`) is
  * driven by `declared-growth-repin.test.mjs`, which also covers the four-case truth table per gate.
- * Together: 7 of 7 branches exercised.
+ * Together: 6 of 6 branches exercised.
  *
  * `npm-audit` and `test-efficacy` are the FLOOR-shaped gates — the direction where the pin must be
  * LOWERED to accommodate the measured value — so their cases are load-bearing for the
  * `declared-regression` half of the rule, not redundant with the ceiling gates.
  *
- * The file also asserts `--explain` answers for all six rule ids: these gates merge the repin
+ * The file also asserts `--explain` answers for all five rule ids: these gates merge the repin
  * description into their enforcer's RETURN VALUE rather than the registry-declared descriptions
  * module, and `--explain` silently could not see those (tempdoc 918 review B3).
  *
@@ -31,7 +31,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { enforceModuleDeps } from '../gates/module-deps/enforcer.mjs';
 import { enforceConfigSurface } from '../gates/config-surface/enforcer.mjs';
 import { enforceNpmAudit } from '../gates/npm-audit/enforcer.mjs';
 import { enforceTestEfficacy } from '../gates/test-efficacy/enforcer.mjs';
@@ -86,21 +85,6 @@ async function firesFor(label, expectedRuleId, build, expectMessage) {
     failures.push(`${label}: ${e.message}`);
   }
 }
-
-await firesFor('module-deps', 'module-deps/declared-growth-without-repin', () => {
-  const root = scaffold({
-    'tmp/module-deps.json': JSON.stringify({ modules: [{ name: 'core', productionDeps: ['a', 'b', 'c'] }] }),
-    'gates/module-deps/baseline.txt': 'core 1 2026-09-01\n',
-    '_baseline/gates/module-deps/baseline.txt': 'core 1 2026-09-01\n',
-    'gates/module-deps/.changesets/f.md': changeset('declared-growth'),
-  });
-  return call(enforceModuleDeps, root, {
-    id: 'module-deps',
-    baseline: { path: 'gates/module-deps/baseline.txt' },
-    changesetsDir: 'gates/module-deps/.changesets',
-    config: { reportPath: 'tmp/module-deps.json' },
-  });
-});
 
 await firesFor('config-surface', 'config-surface/declared-growth-without-repin', () => {
   const pins = 'yaml_keys 10 2026-09-01\nenv_sysprop_pairs 1 2026-09-01\nconfig_keys 1 2026-09-01\napply_scope 2 2026-09-01\n';
@@ -214,12 +198,11 @@ await firesFor('atom-fork-ratchet (the shared makeRatchetGate factory)',
     });
   }, /Measured 1 raw atom-class rules; the pin in scripts\/ci\/atom-fork-ratchet-baseline\.v1\.json is 0/);
 
-// --- `--explain` answers for every one of the six ids -------------------------------------------
+// --- `--explain` answers for every one of the five ids -------------------------------------------
 
 const ALL_REPIN_RULE_IDS = [
   'dead-code/declared-growth-without-repin',
   'config-surface/declared-growth-without-repin',
-  'module-deps/declared-growth-without-repin',
   'atom-fork-ratchet/declared-growth-without-repin',
   'npm-audit/declared-regression-without-repin',
   'test-efficacy/declared-regression-without-repin',
@@ -269,4 +252,4 @@ if (failures.length > 0) {
   for (const f of failures) console.error(`  ✗ ${f}`);
   process.exit(1);
 }
-console.log(`repin-fires-per-gate.test: all ${passed} checks passed (6 call sites fire, 7 --explain)`);
+console.log(`repin-fires-per-gate.test: all ${passed} checks passed (5 call sites fire, 6 --explain)`);

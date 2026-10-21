@@ -73,6 +73,8 @@ async function showFiles(): Promise<void> {
 /** Set the projection directly — the render-level equivalent of a poll landing. */
 async function setProgress(p: Partial<IndexingProgress>): Promise<void> {
   (host as TaskList).progress = {
+    activity: { summary: 'Indexing status unconfirmed', detail: null,
+      confirmed: (p.phase ?? 'unknown') !== 'unknown' && p.live !== false, enrichmentDeferred: false },
     phase: 'unknown',
     jobsPending: 0,
     jobsRunning: 0,
@@ -86,6 +88,7 @@ async function setProgress(p: Partial<IndexingProgress>): Promise<void> {
     vduPending: 0,
     etaSeconds: null,
     indexingPercent: null,
+    rebuildPercent: null,
     pendingBytes: null,
     live: true,
     stages: { embedding: true, splade: true, ner: true },
@@ -314,10 +317,10 @@ describe('<jf-task-list> — aggregate card (813 §5)', () => {
     expect(q('[data-testid="tasks-disclosure"]')).toBeNull();
   });
 
-  it('says nothing at all on the `unknown` arm — no phase, no bar, no counts', async () => {
+  it('S33.4 unknown indexing is unconfirmed without a phase, bar or counts', async () => {
     upsertMirroredTask({ id: 'idxjob:r1', label: 'agent op', status: 'running' });
     await setProgress({ phase: 'unknown' });
-    expect(text('[data-testid="task-title"]')).toBe('Tasks');
+    expect(text('[data-testid="task-title"]')).toBe('Indexing status unconfirmed');
     expect(q('[data-testid="task-aggregate"]')).toBeNull();
   });
 

@@ -20,8 +20,7 @@
  * can therefore read complete while an undeclared path grows. This gate ratchets what is
  * *declared*; it does not claim to see every effective knob.
  *
- * Baseline format (TSV, per line): `<metric> <count> <date>` — merge-friendly,
- * mirroring gates/module-deps/baseline.txt.
+ * Baseline format (TSV, per line): `<metric> <count> <date>` — merge-friendly.
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';

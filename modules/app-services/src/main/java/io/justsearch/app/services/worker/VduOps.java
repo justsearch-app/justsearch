@@ -24,6 +24,8 @@ final class VduOps {
     private static final Logger log = LoggerFactory.getLogger(VduOps.class);
 
     private final IngestRpcExecutor rpc;
+    private final java.util.concurrent.ConcurrentMap<java.util.UUID, java.util.Set<String>> attempts =
+        new java.util.concurrent.ConcurrentHashMap<>();
 
     VduOps(IngestRpcExecutor rpc) {
         this.rpc = Objects.requireNonNull(rpc, "rpc");
@@ -46,9 +48,15 @@ final class VduOps {
             VduUpdateOutcome outcome,
             String enrichment,
             int pageCount, EngineContext engineContext) {
+        return updateVduResult(docId, extractedContent, outcome, enrichment, pageCount, "", engineContext);
+    }
+
+    boolean updateVduResult(String docId, String extractedContent, VduUpdateOutcome outcome,
+            String enrichment, int pageCount, String attemptId, EngineContext engineContext) {
         var builder =
                 UpdateVduResultRequest.newBuilder()
                         .setDocId(docId)
+                        .setAttemptId(attemptId)
                         .setOutcome(outcome)
                         .setVduEnrichment(enrichment != null ? enrichment : "")
                         .setPageCount(pageCount);
@@ -71,6 +79,7 @@ final class VduOps {
             return false;
         }
 
+        forget(attemptId, engineContext);
         log.debug("updateVduResult success for: {} (outcome={})", docId, outcome);
         return true;
 
@@ -98,10 +107,15 @@ final class VduOps {
 
 
     int markVduProcessing(String docId, int maxRetries, EngineContext engineContext) {
+        return markVduProcessing(docId, maxRetries, java.util.UUID.randomUUID().toString(), engineContext);
+    }
+
+    int markVduProcessing(String docId, int maxRetries, String attemptId, EngineContext engineContext) {
         var request =
                 MarkVduProcessingRequest.newBuilder()
                         .setDocId(docId)
                         .setMaxRetries(maxRetries)
+                        .setAttemptId(attemptId)
                         .build();
 
         var response =
@@ -115,6 +129,11 @@ final class VduOps {
             return -1;
         }
 
+        engineContext.workId().ifPresent(owner -> attempts.compute(owner, (ignored, ids) -> {
+            if (ids == null) ids = java.util.concurrent.ConcurrentHashMap.newKeySet();
+            ids.add(attemptId);
+            return ids;
+        }));
         log.debug(
                 "markVduProcessing success for {}: retry {}", docId, response.getRetryCount());
         return response.getRetryCount();
@@ -122,16 +141,37 @@ final class VduOps {
     }
 
     boolean releaseVduProcessing(String docId, EngineContext engineContext) {
+        return releaseVduProcessing(docId, "", engineContext);
+    }
+
+    boolean releaseVduProcessing(String docId, String attemptId, EngineContext engineContext) {
         boolean released = rpc.execute("releaseVduProcessing",
                 KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
-                calls -> calls.releaseVduProcessing(docId), engineContext);
+                calls -> calls.releaseVduProcessing(docId, attemptId), engineContext);
+        forget(attemptId, engineContext);
         log.debug("releaseVduProcessing {}: released={}", docId, released);
         return released;
     }
 
+    RecoverVduProcessingRequest recoveryRequest(EngineContext context) {
+        var owner = context.workId().orElseThrow();
+        return RecoverVduProcessingRequest.newBuilder().setProcedureOwner(owner.toString())
+            .addAllAttemptIds(attempts.getOrDefault(owner, java.util.Set.of())).build();
+    }
+
+    void retireRecoveryRequest(RecoverVduProcessingRequest request, EngineContext context) {
+        request.getAttemptIdsList().forEach(id -> forget(id, context));
+    }
+
+    private void forget(String attemptId, EngineContext context) {
+        context.workId().ifPresent(owner -> attempts.computeIfPresent(owner, (key, ids) -> {
+            ids.remove(attemptId);
+            return ids.isEmpty() ? null : ids;
+        }));
+    }
+
     int recoverVduProcessingForOwner(EngineContext engineContext) {
-        return recoverVduProcessing(engineContext, RecoverVduProcessingRequest.newBuilder()
-                .setProcedureOwner(engineContext.workId().orElseThrow().toString()).build());
+        return recoverVduProcessing(engineContext, recoveryRequest(engineContext));
     }
 
     int recoverVduProcessing(EngineContext engineContext) {
@@ -143,6 +183,7 @@ final class VduOps {
                 KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
                 calls -> calls.recoverVduProcessing(request), engineContext);
         int recovered = response.getRecoveredCount();
+        retireRecoveryRequest(request, engineContext);
         log.debug("recoverVduProcessing: recovered {} stuck documents", recovered);
         return recovered;
     }

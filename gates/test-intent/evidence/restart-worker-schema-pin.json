@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T01:35:16.013Z",
+  "revision": "bfe0a9cba813b90c58c42b192a09ad140bff56d2",
+  "tree": "a7bc4d41256d674263fe648543ee5c6ff032f389",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.JobQueueMigrationTest.migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4436
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java#migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ff57bf8729658635baff84c1facc27893cfb0aad0b53702ad374bf176abfa711",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:1017d0a5cdca64f7ec868c97334c4346e247d46f7a2c48cc38be8b5f70287484"
+}

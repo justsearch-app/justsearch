@@ -1,0 +1,147 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-20T02:31:29.337Z",
+  "revision": "a3bc6335e5cc29213b9dcacfde8f98315d80fe06",
+  "tree": "f4143cd1a733ae8d746a5d70e4be57fb0d6f39c8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/tmp/test-intent-vitest-27802-1792463471780.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 8569
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps a refused question visible beside newer input through retry and recovery (X15)",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:64fd5b5090a476e0349e6c5080f3f7110faeb11d425ab32f90dd2c227558cd11",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps a refused question visible beside newer input through retry and recovery (X15)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the refused-send reason through failed background retries (X19)",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:64fd5b5090a476e0349e6c5080f3f7110faeb11d425ab32f90dd2c227558cd11",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the refused-send reason through failed background retries (X19)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#re-reads interrupted first history on reattach after reparent and retries failures (X14a)",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:64fd5b5090a476e0349e6c5080f3f7110faeb11d425ab32f90dd2c227558cd11",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) re-reads interrupted first history on reattach after reparent and retries failures (X14a)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#re-reads interrupted first history on reattach after screen switch and retries failures (X14a)",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:64fd5b5090a476e0349e6c5080f3f7110faeb11d425ab32f90dd2c227558cd11",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) re-reads interrupted first history on reattach after screen switch and retries failures (X14a)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#refuses follow-up after an interrupted first history read and a failed re-read (X14b)",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:64fd5b5090a476e0349e6c5080f3f7110faeb11d425ab32f90dd2c227558cd11",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) refuses follow-up after an interrupted first history read and a failed re-read (X14b)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "e45e0b1e2",
+    "revision": "e45e0b1e222af843042ec78700008c3354e5bf0f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/tmp/test-intent-vitest-27802-1792463481699.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7387,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/tmp/test-intent-vitest-27802-1792463481699.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps a refused question visible beside newer input through retry and recovery (X15)",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps a refused question visible beside newer input through retry and recovery (X15):  AssertionError: expected 'Saved context could not be confirmed.…' to contain 'Question not sent'\n    at /home/elias/.cache/agent-method/sessions/agent-session-17dlahpe/tmp/test-intent-before-aCsxjE/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1785:39\n    at file:///home/e"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#keeps the refused-send reason through failed background retries (X19)",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the refused-send reason through failed background retries (X19):  AssertionError: expected 'Saved context could not be confirmed.…' to contain 'Question not sent'\n    at /home/elias/.cache/agent-method/sessions/agent-session-17dlahpe/tmp/test-intent-before-aCsxjE/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1755:39\n    at file:///home/e"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#re-reads interrupted first history on reattach after reparent and retries failures (X14a)",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) re-reads interrupted first history on reattach after reparent and retries failures (X14a):  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-17dlahpe/tmp/test-intent-before-aCsxjE/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1818:41\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#re-reads interrupted first history on reattach after screen switch and retries failures (X14a)",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) re-reads interrupted first history on reattach after screen switch and retries failures (X14a):  AssertionError: expected '' to contain 'Saved context could not be confirmed'\n    at /home/elias/.cache/agent-method/sessions/agent-session-17dlahpe/tmp/test-intent-before-aCsxjE/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts:1818:41\n    at file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts#refuses follow-up after an interrupted first history read and a failed re-read (X14b)",
+        "classification": "assertion",
+        "detail": "the undo never leaves the bar showing a state that is not saved (S2.10) refuses follow-up after an interrupted first history read and a failed re-read (X14b):  AssertionError: expected [ { shapeId: 'core.rag-ask', …(4) } ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/uiux-v3-followups/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/eli"
+      }
+    ]
+  },
+  "digest": "sha256:505a828738be95720aaaa137ca0b08645cbfb3bc875ae752feb34b36ed055662"
+}

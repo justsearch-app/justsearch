@@ -49,14 +49,14 @@ private static final int MAX_WALK_FILES = 500_000;
     ConfigStore store = ConfigStore.globalOrNull();
     ExcludeGlobs excludes =
         ExcludeGlobs.fromRawJsonArray(store == null ? "" : store.get().ui().excludePatterns());
-    List<String> expandedPatterns = excludes.patterns();
+    List<String> savedPatterns = excludes.patterns();
 
     if (excludes.isEmpty()) {
       return new ExcludesResult(
           dryRun, 0, 0, 0, 0, 0, List.of(), false, "No exclude patterns configured");
     }
 
-    int[] perPatternCount = new int[expandedPatterns.size()];
+    int[] perPatternCount = new int[savedPatterns.size()];
     int rootsProcessed = 0;
     AtomicInteger deletedByPathJobs = new AtomicInteger();
     AtomicInteger deletedById = new AtomicInteger();
@@ -71,6 +71,7 @@ private static final int MAX_WALK_FILES = 500_000;
       }
       rootsProcessed++;
 
+      List<Path> deletedPrefixes = new ArrayList<>();
       try {
         Files.walkFileTree(rootPath, new SimpleFileVisitor<>() {
           @Override
@@ -79,15 +80,11 @@ private static final int MAX_WALK_FILES = 500_000;
             if (visited.incrementAndGet() > MAX_WALK_FILES) return FileVisitResult.TERMINATE;
             if (dir.equals(rootPath)) return FileVisitResult.CONTINUE;
             if (excludes.isExcludedDirectory(rootPath, dir)) {
-              matchedFiles.incrementAndGet();
-              int idx = excludes.matchingDirectoryPatternIndex(rootPath, dir);
-              if (idx >= 0) {
-                perPatternCount[idx]++;
-              }
-              if (!dryRun) {
+              if (!dryRun && deletedPrefixes.stream().noneMatch(dir::startsWith)) {
                 deletedByPathJobs.addAndGet(indexing.deleteDocsByPathPrefix(dir, engineContext));
+                deletedPrefixes.add(dir);
               }
-              return FileVisitResult.SKIP_SUBTREE;
+              // Continue walking to count the same file membership every admission path skips.
             }
             return FileVisitResult.CONTINUE;
           }
@@ -101,7 +98,7 @@ private static final int MAX_WALK_FILES = 500_000;
             if (idx >= 0) {
               matchedFiles.incrementAndGet();
               perPatternCount[idx]++;
-              if (!dryRun) {
+              if (!dryRun && deletedPrefixes.stream().noneMatch(file::startsWith)) {
                 boolean ok = indexing.deleteDocById(file.toAbsolutePath().toString(), engineContext);
                 if (ok) {
                   deletedById.incrementAndGet();
@@ -117,19 +114,19 @@ private static final int MAX_WALK_FILES = 500_000;
       }
     }
 
-    List<ExcludesResult.PatternMatch> perPattern = new ArrayList<>(expandedPatterns.size());
-    for (int i = 0; i < expandedPatterns.size(); i++) {
-      perPattern.add(new ExcludesResult.PatternMatch(expandedPatterns.get(i), perPatternCount[i]));
+    List<ExcludesResult.PatternMatch> perPattern = new ArrayList<>(savedPatterns.size());
+    for (int i = 0; i < savedPatterns.size(); i++) {
+      perPattern.add(new ExcludesResult.PatternMatch(savedPatterns.get(i), perPatternCount[i]));
     }
     return new ExcludesResult(
         dryRun,
-        expandedPatterns.size(),
+        savedPatterns.size(),
         rootsProcessed,
         deletedByPathJobs.get(),
         deletedById.get(),
         matchedFiles.get(),
         perPattern,
         visited.get() > MAX_WALK_FILES,
-        null);
+        "Pattern matches are counted in files.");
   }
 }

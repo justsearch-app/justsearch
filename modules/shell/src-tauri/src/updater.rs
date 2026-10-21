@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 use base64::Engine;
 use ring::signature::{UnparsedPublicKey, ED25519};
 use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::UpdaterExt;
@@ -358,7 +359,16 @@ pub fn app_update_status(coordinator: tauri::State<'_, Arc<UpdateCoordinator>>) 
 pub async fn check_for_app_update(
     app: AppHandle,
     coordinator: tauri::State<'_, Arc<UpdateCoordinator>>,
+    automatic: Option<bool>,
 ) -> Result<AppUpdateStatus, String> {
+    match authorize_app_update(&app, automatic.unwrap_or(false)) {
+        Ok(false) => return Ok(coordinator.snapshot()),
+        Ok(true) => (),
+        Err(error) => {
+            set_state(&coordinator, "error", Some(error.clone()));
+            return Err(error);
+        }
+    }
     ensure_no_unresolved_intent(&coordinator)?;
     if coordinator.installing.load(Ordering::Acquire) {
         return Err("An update installation is already in progress".into());
@@ -420,6 +430,7 @@ pub(crate) async fn run_install_now(
     backend: Arc<BackendState>,
     coordinator: Arc<UpdateCoordinator>,
 ) -> Result<(), String> {
+    authorize_app_update(&app, false)?;
     ensure_no_unresolved_intent(&coordinator)?;
     let _install_guard = InstallGuard::begin(&coordinator.installing)?;
     let descriptor = coordinator
@@ -437,7 +448,6 @@ pub(crate) async fn run_install_now(
         .ok_or_else(|| "Authenticated release is no longer available".to_string())?;
     require_closed_set(&descriptor, &update)?;
 
-    set_state(&coordinator, "downloading", None);
     // `on_chunk` and `on_download_finish` are two separate closures alive for the whole call, so
     // shared mutable progress state needs interior mutability rather than two conflicting captures
     // of a bare local. Both closures clone the cheap `Arc`s they need.
@@ -450,6 +460,8 @@ pub(crate) async fn run_install_now(
     let chunk_coordinator = coordinator.clone();
     let finish_progress = progress.clone();
     let finish_coordinator = coordinator.clone();
+    authorize_app_update(&app, false)?;
+    set_state(&coordinator, "downloading", None);
     let bytes = update
         .download(
             move |chunk_len, content_length| {
@@ -1062,7 +1074,314 @@ fn write_qualification_result(app: &AppHandle, verdict: &str, detail: &str) {
     }
 }
 
+/// Authorization is independent of the Engine and never changes durable updater state.
+/// Discovery is one operation; installation reauthorizes immediately before artifact download.
+fn authorize_app_update(app: &AppHandle, automatic: bool) -> Result<bool, String> {
+    let home = crate::resolve_app_data_dir(app)?;
+    authorize_app_update_at(
+        machine_update_policy_path().as_deref(),
+        &home.join("policy.v1.json"),
+        automatic,
+        std::env::var("JUSTSEARCH_AUTO_UPDATE_CHECK")
+            .ok()
+            .as_deref(),
+    )
+}
+
+fn machine_update_policy_path() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        let root = std::env::var("PROGRAMDATA")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| "C:\\ProgramData".into());
+        Some(
+            PathBuf::from(root)
+                .join("JustSearch")
+                .join("policy.v1.json"),
+        )
+    }
+    #[cfg(not(windows))]
+    None
+}
+
+fn authorize_app_update_at(
+    machine: Option<&Path>,
+    user: &Path,
+    automatic: bool,
+    automatic_preference: Option<&str>,
+) -> Result<bool, String> {
+    let machine_allows = match machine.map(read_app_update_policy).transpose() {
+        Ok(value) => value.flatten().unwrap_or(true),
+        Err(error) => return Err(format!(
+            "App updates are blocked by administrator policy: machine policy could not be loaded: {error}"
+        )),
+    };
+    // As in the Engine, a broken user policy is diagnosed by the policy endpoint but
+    // does not override a valid machine policy or the defaults.
+    let user_allows = read_app_update_policy(user).ok().flatten().unwrap_or(true);
+    if !machine_allows || !user_allows {
+        return Err(
+            "App updates are disabled by administrator policy (appUpdatesEnabled=false).".into(),
+        );
+    }
+    Ok(!(automatic && automatic_preference == Some("false")))
+}
+
+/// Read all known field shapes, even though only the update flag is enforced here:
+/// malformed AI/allowlist fields also make the Engine reject a machine policy.
+fn read_app_update_policy(path: &Path) -> Result<Option<bool>, String> {
+    match fs::symlink_metadata(path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            // Missing parents are fine; existing non-directory or dangling parents
+            // mean attributes could not be read, not that policy is absent.
+            for parent in path.ancestors().skip(1) {
+                match fs::symlink_metadata(parent) {
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                    Err(error) => return Err(error.to_string()),
+                    Ok(_) => (),
+                }
+                if !fs::metadata(parent)
+                    .map_err(|error| error.to_string())?
+                    .is_dir()
+                {
+                    return Err("Policy ancestor is not a directory".into());
+                }
+                break;
+            }
+            return Ok(None);
+        }
+        Err(error) => return Err(error.to_string()),
+        Ok(_) => (),
+    }
+    if !fs::metadata(path)
+        .map_err(|error| error.to_string())?
+        .is_file()
+    {
+        return Err("Policy path is not a regular file".into());
+    }
+    let bytes = fs::read(path).map_err(|error| error.to_string())?;
+    let json = policy_json_utf8(&bytes)?;
+    let mut parser = serde_json::Deserializer::from_slice(&json);
+    let policy = AppUpdatePolicy::deserialize(&mut parser).map_err(|error| error.to_string())?;
+    if policy.version != 1 {
+        return Err("Unsupported policy schemaVersion".into());
+    }
+    Ok(Some(policy.allowed.unwrap_or(true)))
+}
+
+// Jackson's file reader detects Unicode BOMs and zero-byte patterns, including
+// UTF-16 output from Windows PowerShell. Preserve valid existing v1 files.
+fn policy_json_utf8(bytes: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>, String> {
+    use std::borrow::Cow;
+    if let Some(utf8) = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]) {
+        return Ok(Cow::Borrowed(utf8));
+    }
+    let (width, little, skip) = if bytes.starts_with(&[0xff, 0xfe, 0, 0]) {
+        (4, true, 4)
+    } else if bytes.starts_with(&[0, 0, 0xfe, 0xff]) {
+        (4, false, 4)
+    } else if bytes.starts_with(&[0xff, 0xfe]) {
+        (2, true, 2)
+    } else if bytes.starts_with(&[0xfe, 0xff]) {
+        (2, false, 2)
+    } else {
+        match bytes.get(..4) {
+            Some([_, 0, 0, 0]) => (4, true, 0),
+            Some([0, 0, 0, _]) => (4, false, 0),
+            Some([_, 0, _, 0]) => (2, true, 0),
+            Some([0, _, 0, _]) => (2, false, 0),
+            _ => return Ok(Cow::Borrowed(bytes)),
+        }
+    };
+    let encoded = &bytes[skip..];
+    if encoded.len() % width != 0 {
+        return Err("Incomplete policy Unicode character".into());
+    }
+    let text = if width == 2 {
+        let units: Vec<u16> = encoded
+            .chunks_exact(2)
+            .map(|chunk| {
+                let pair = [chunk[0], chunk[1]];
+                if little {
+                    u16::from_le_bytes(pair)
+                } else {
+                    u16::from_be_bytes(pair)
+                }
+            })
+            .collect();
+        String::from_utf16(&units).map_err(|error| error.to_string())?
+    } else {
+        let mut text = String::new();
+        for chunk in encoded.chunks_exact(4) {
+            let quad = [chunk[0], chunk[1], chunk[2], chunk[3]];
+            let code = if little {
+                u32::from_le_bytes(quad)
+            } else {
+                u32::from_be_bytes(quad)
+            };
+            text.push(char::from_u32(code).ok_or("Invalid policy Unicode character")?);
+        }
+        text
+    };
+    Ok(Cow::Owned(text.into_bytes()))
+}
+
+struct AppUpdatePolicy {
+    version: i32,
+    allowed: Option<bool>,
+}
+
+impl<'de> Deserialize<'de> for AppUpdatePolicy {
+    fn deserialize<D: serde::Deserializer<'de>>(parser: D) -> Result<Self, D::Error> {
+        struct Fields;
+        impl<'de> serde::de::Visitor<'de> for Fields {
+            type Value = AppUpdatePolicy;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a policy object")
+            }
+            fn visit_map<M: serde::de::MapAccess<'de>>(
+                self,
+                mut fields: M,
+            ) -> Result<Self::Value, M::Error> {
+                use serde::de::Error;
+                let mut policy = AppUpdatePolicy {
+                    version: 0,
+                    allowed: None,
+                };
+                // Validate each occurrence: Jackson rejects a malformed known field even
+                // when a later duplicate replaces it. Valid duplicates keep the last value.
+                while let Some(key) = fields.next_key::<String>()? {
+                    match key.as_str() {
+                        "schemaVersion" => {
+                            let value = fields.next_value::<&RawValue>()?;
+                            policy.version =
+                                policy_schema_version(value).map_err(M::Error::custom)?;
+                        }
+                        "appUpdatesEnabled"
+                        | "downloadsEnabled"
+                        | "onlineAiEnabled"
+                        | "gpuAccelerationEnabled"
+                        | "disallowExternalInferenceServers" => {
+                            let value = fields.next_value::<&RawValue>()?;
+                            let flag = policy_boolean(value).map_err(M::Error::custom)?;
+                            if key == "appUpdatesEnabled" {
+                                policy.allowed = flag;
+                            }
+                        }
+                        "updatedAt" => {
+                            let value = fields.next_value::<&RawValue>()?;
+                            validate_policy_string(value).map_err(M::Error::custom)?;
+                        }
+                        "allowlists" => {
+                            fields.next_value::<Option<UpdatePolicyAllowlists>>()?;
+                        }
+                        _ => {
+                            fields.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                Ok(policy)
+            }
+        }
+        parser.deserialize_map(Fields)
+    }
+}
+
+struct UpdatePolicyAllowlists;
+impl<'de> Deserialize<'de> for UpdatePolicyAllowlists {
+    fn deserialize<D: serde::Deserializer<'de>>(parser: D) -> Result<Self, D::Error> {
+        struct Lists;
+        impl<'de> serde::de::Visitor<'de> for Lists {
+            type Value = UpdatePolicyAllowlists;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a policy allowlist object")
+            }
+            fn visit_map<M: serde::de::MapAccess<'de>>(
+                self,
+                mut fields: M,
+            ) -> Result<Self::Value, M::Error> {
+                use serde::de::Error;
+                while let Some(key) = fields.next_key::<String>()? {
+                    match key.as_str() {
+                        "modelSha256" | "packManifestSha256" => {
+                            if let Some(values) = fields.next_value::<Option<Vec<&RawValue>>>()? {
+                                for value in values {
+                                    validate_policy_string(value).map_err(M::Error::custom)?;
+                                }
+                            }
+                        }
+                        _ => {
+                            fields.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                Ok(UpdatePolicyAllowlists)
+            }
+        }
+        parser.deserialize_map(Lists)
+    }
+}
+
+fn policy_schema_version(value: &RawValue) -> Result<i32, String> {
+    let raw = value.get();
+    if raw == "null" {
+        return Ok(0);
+    }
+    if raw.starts_with('"') {
+        let value: String = serde_json::from_str(raw).map_err(|error| error.to_string())?;
+        return match value.trim_matches(|c| c <= '\u{20}') {
+            "" | "null" => Ok(0),
+            value => value
+                .parse()
+                .map_err(|_| "Invalid policy schemaVersion".into()),
+        };
+    }
+    let number: f64 = raw.parse().map_err(|_| "Invalid policy schemaVersion")?;
+    if !number.is_finite() || number < i32::MIN as f64 || number > i32::MAX as f64 {
+        return Err("Invalid policy schemaVersion".into());
+    }
+    Ok(number as i32)
+}
+
+// Jackson's existing scalar coercions are part of the v1 policy input contract.
+// RawValue retains integer/float spelling and arbitrarily large integers rather
+// than rounding them to f64 before checking their accepted field shape.
+fn policy_boolean(value: &RawValue) -> Result<Option<bool>, String> {
+    let raw = value.get();
+    match raw {
+        "null" => Ok(None),
+        "true" => Ok(Some(true)),
+        "false" => Ok(Some(false)),
+        _ if raw.starts_with('"') => {
+            let value: String = serde_json::from_str(raw).map_err(|error| error.to_string())?;
+            match value.trim_matches(|c| c <= '\u{20}') {
+                "true" | "True" | "TRUE" => Ok(Some(true)),
+                "false" | "False" | "FALSE" => Ok(Some(false)),
+                "" | "null" => Ok(None),
+                _ => Err("Invalid policy boolean".into()),
+            }
+        }
+        _ if raw
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || byte == b'-') =>
+        {
+            Ok(Some(raw != "0" && raw != "-0"))
+        }
+        _ => Err("Invalid policy boolean".into()),
+    }
+}
+
+fn validate_policy_string(value: &RawValue) -> Result<(), String> {
+    if value.get().starts_with(['[', '{']) {
+        Err("Invalid policy string".into())
+    } else {
+        Ok(())
+    }
+}
+
 async fn check_release(app: &AppHandle) -> Result<Option<ReleaseDescriptor>, String> {
+    authorize_app_update(app, false)?;
     let descriptor_url = descriptor_url()?;
     ensure_https(&descriptor_url)?;
     let client = reqwest::Client::builder()
@@ -2052,7 +2371,7 @@ fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, String> {
         .map_err(|error| format!("Failed to parse {}: {error}", path.display()))
 }
 
-fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let parent = path
         .parent()
         .ok_or_else(|| format!("Path has no parent: {}", path.display()))?;
@@ -2237,6 +2556,161 @@ fn now_epoch_ms() -> u128 {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    // The Java loader consumes this identical file. In particular, malformed known AI
+    // fields must deny machine-policy updates even though Rust only enforces updates.
+    #[cfg(unix)]
+    #[test]
+    fn app_update_shared_policy_fixtures() {
+        let fixtures: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../app-services/src/test/resources/policy/app-update-policy-cases.json"
+        ))
+        .unwrap();
+        for fixture in fixtures.as_array().unwrap() {
+            let root = tempdir().unwrap();
+            let machine = materialize_update_policy(
+                root.path().join("machine"),
+                &fixture["machine"],
+                fixture["machineKind"].as_str().unwrap(),
+            );
+            let user = materialize_update_policy(
+                root.path().join("user"),
+                &fixture["user"],
+                fixture["userKind"].as_str().unwrap(),
+            );
+            let result = authorize_app_update_at(Some(&machine), &user, false, None);
+            assert_eq!(
+                result.is_ok(),
+                fixture["allowed"].as_bool().unwrap(),
+                "{}: {result:?}",
+                fixture["name"]
+            );
+            if let Err(error) = result {
+                assert!(error.contains("administrator policy"), "{error}");
+            }
+        }
+    }
+
+    #[test]
+    fn app_update_env_suppresses_only_automatic_checks() {
+        let root = tempdir().unwrap();
+        let user = root.path().join("policy.v1.json");
+        assert_eq!(
+            authorize_app_update_at(None, &user, true, Some("false")),
+            Ok(false)
+        );
+        assert_eq!(
+            authorize_app_update_at(None, &user, false, Some("false")),
+            Ok(true)
+        );
+        for preference in [None, Some("true"), Some(""), Some("FALSE")] {
+            assert_eq!(
+                authorize_app_update_at(None, &user, true, preference),
+                Ok(true)
+            );
+        }
+    }
+
+    #[test]
+    fn app_update_policy_beats_env_and_reloads_without_changing_state() {
+        let root = tempdir().unwrap();
+        let user = root.path().join("policy.v1.json");
+        let sequence = root.path().join("sequence.v1.json");
+        let intent = root.path().join("intent.v1.json");
+        fs::write(
+            &sequence,
+            br#"{"schemaVersion":1,"highestAcceptedSequence":42}"#,
+        )
+        .unwrap();
+        fs::write(&intent, b"durable upgrade intent").unwrap();
+        let before_sequence = fs::read(&sequence).unwrap();
+        let before_intent = fs::read(&intent).unwrap();
+        for allowed in [true, false, true] {
+            fs::write(
+                &user,
+                format!(r#"{{"schemaVersion":1,"appUpdatesEnabled":{allowed}}}"#),
+            )
+            .unwrap();
+            for preference in [None, Some("true"), Some("false")] {
+                for automatic in [true, false] {
+                    let result = authorize_app_update_at(None, &user, automatic, preference);
+                    assert_eq!(
+                        result.is_ok(),
+                        allowed,
+                        "{allowed}, {automatic}, {preference:?}: {result:?}"
+                    );
+                }
+            }
+            assert_eq!(fs::read(&sequence).unwrap(), before_sequence);
+            assert_eq!(fs::read(&intent).unwrap(), before_intent);
+        }
+    }
+
+    #[cfg(unix)]
+    fn materialize_update_policy(
+        path: PathBuf,
+        contents: &serde_json::Value,
+        kind: &str,
+    ) -> PathBuf {
+        match kind {
+            "utf16le" | "utf16be" => {
+                let bytes: Vec<u8> = contents
+                    .as_str()
+                    .unwrap()
+                    .encode_utf16()
+                    .flat_map(|unit| {
+                        if kind == "utf16le" {
+                            unit.to_le_bytes()
+                        } else {
+                            unit.to_be_bytes()
+                        }
+                    })
+                    .collect();
+                fs::write(&path, bytes).unwrap();
+            }
+            "utf32le" | "utf32be" => {
+                let bytes: Vec<u8> = contents
+                    .as_str()
+                    .unwrap()
+                    .chars()
+                    .flat_map(|ch| {
+                        if kind == "utf32le" {
+                            (ch as u32).to_le_bytes()
+                        } else {
+                            (ch as u32).to_be_bytes()
+                        }
+                    })
+                    .collect();
+                fs::write(&path, bytes).unwrap();
+            }
+            "directory" => fs::create_dir(&path).unwrap(),
+            "dangling" => {
+                std::os::unix::fs::symlink(path.with_extension("missing"), &path).unwrap();
+            }
+            "inaccessible" => {
+                fs::write(&path, b"not a directory").unwrap();
+                return path.join("policy.v1.json");
+            }
+            "dangling-parent" => {
+                std::os::unix::fs::symlink(path.with_extension("missing"), &path).unwrap();
+                return path.join("policy.v1.json");
+            }
+            _ => {
+                if let Some(contents) = contents.as_str() {
+                    fs::write(&path, contents).unwrap();
+                }
+                if kind == "unreadable" {
+                    use std::os::unix::fs::PermissionsExt;
+                    fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
+                    assert!(
+                        fs::read(&path).is_err(),
+                        "fixture requires an unprivileged process"
+                    );
+                }
+            }
+        }
+        path
+    }
 
     #[test]
     fn durable_phase_names_are_stable() {

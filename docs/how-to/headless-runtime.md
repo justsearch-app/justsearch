@@ -51,7 +51,8 @@ set JUSTSEARCH_DATA_DIR=%APPDATA%\io.justsearch.shell
 set JUSTSEARCH_HOME=%APPDATA%\io.justsearch.shell
 ```
 
-On Linux, set the corresponding paths in Bash before invoking the launcher:
+On Linux, use the desktop app's default data folder (or its folder under
+`XDG_DATA_HOME` if set):
 
 ```sh
 export JUSTSEARCH_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/io.justsearch.shell"
@@ -100,13 +101,17 @@ on each boot; missing or incorrect tokens receive HTTP `401` on protected reques
 
 ## Confirm the active mode
 
-The launcher prints `JUSTSEARCH_API_PORT=<port>` on stdout and records `head.apiPort` in
-`<data>/runtime/manifest.json`. Bundle launchers default to `8080`, falling back to a free port
-if taken; `JUSTSEARCH_API_PORT` overrides the requested port. The Gradle `runHeadless` task
-defaults to `33221`. Substitute the actual port below (these examples use `33221`):
+The launcher prints `JUSTSEARCH_API_PORT=<port>` when it is up: normally `8080`,
+unless taken or overridden with `JUSTSEARCH_API_PORT` (`33221` for the dev
+`runHeadless` task). The actual port is also recorded as `head.apiPort` in
+`<JUSTSEARCH_DATA_DIR>/runtime/manifest.json`.
+
+The runtime manifest reports the mode. Set the printed port in your terminal
+(replace `8080` below if different):
 
 ```bash
-curl -s http://127.0.0.1:33221/api/runtime/manifest | jq '.mode'
+export JUSTSEARCH_API_PORT=8080
+curl -s "http://127.0.0.1:$JUSTSEARCH_API_PORT/api/runtime/manifest" | jq '.mode'
 # { "intent": "mcp-lite", "realized": "retrieval-only" }
 ```
 
@@ -119,7 +124,8 @@ curl -s http://127.0.0.1:33221/api/runtime/manifest | jq '.mode'
 To see the download weight a mode implies before installing:
 
 ```bash
-curl -s -H "X-JustSearch-Session: $SESSION_TOKEN" http://127.0.0.1:33221/api/ai/install/plan-preview | jq '.tiers'
+curl -s -H "X-JustSearch-Session: $SESSION_TOKEN" \
+  "http://127.0.0.1:$JUSTSEARCH_API_PORT/api/ai/install/plan-preview" | jq '.tiers'
 ```
 
 ## Notes

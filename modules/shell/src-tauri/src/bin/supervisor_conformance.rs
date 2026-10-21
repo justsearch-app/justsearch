@@ -130,9 +130,10 @@ fn main() {
         session_window::start(host.clone(), coordinator.clone()).expect("session window");
     let spawn_host = host.clone();
     let spawn_dir = data_dir.clone();
-    let checkpoint = Arc::new(Mutex::new(None::<supervisor::StateRecord>));
+    let checkpoint = Arc::new(Mutex::new(None::<(supervisor::StateRecord, bool)>));
     let saved = checkpoint.clone();
     let event_host = host.clone();
+    let event_dir = data_dir.clone();
     let actor_thread = Arc::new(Mutex::new(None::<String>));
     let event_actor = actor_thread.clone();
     let mut actuator = shell_actuator::ShellActuator::new(
@@ -159,7 +160,12 @@ fn main() {
                 && record.incarnation >= stop_after
                 && saved.lock().unwrap().is_none()
             {
-                *saved.lock().unwrap() = Some(record.clone());
+                // Teardown may write this file when its HTTP quit falls back. Observe the
+                // restart before posting quit so teardown cannot change the case's answer.
+                *saved.lock().unwrap() = Some((
+                    record.clone(),
+                    event_dir.join("runtime/shutdown-request.v1.json").exists(),
+                ));
                 let _ = event_host.post_stop(
                     "quit",
                     None,
@@ -321,6 +327,8 @@ fn main() {
     .unwrap()
     .records;
     let checkpoint = checkpoint.lock().unwrap().clone();
+    let shutdown_request_at_checkpoint = checkpoint.as_ref().map(|(_, exists)| *exists);
+    let checkpoint = checkpoint.map(|(record, _)| record);
     let last_exit = checkpoint
         .as_ref()
         .and_then(|r| r.last_exit.clone())
@@ -332,7 +340,7 @@ fn main() {
         Outcome::Stopped {reason,exit_code}=>serde_json::json!({"kind":"stopped","reason":reason,"exitCode":exit_code}),
         Outcome::Exhausted {reason,exit_code}=>serde_json::json!({"kind":"exhausted","reason":reason,"exitCode":exit_code}),
         Outcome::NoEngine=>serde_json::json!({"kind":"stopped","reason":"quit"}) },
-        "state":supervisor.state.name(),"checkpoint":checkpoint,"incarnation":supervisor.incarnation,
+        "state":supervisor.state.name(),"checkpoint":checkpoint,"shutdownRequestAtCheckpoint":shutdown_request_at_checkpoint,"incarnation":supervisor.incarnation,
         "restartCount":supervisor.restart_count,"lastExit":last_exit,"forcedKill":forced,
         "requestsWritten":records.iter().filter(|r|r["type"]=="engine-intent" && r["channel"]!="TERMINATE").map(|r|match r["reason"].as_str(){Some("TIMEOUT")=>"hang",Some("ENGINE_RESTART")=>"restart",Some("UPGRADE")=>"upgrade",_=>"quit"}).collect::<Vec<_>>(),
         "policyProfile":if supervisor.policy.harness_active {"harness"} else {"product"}});

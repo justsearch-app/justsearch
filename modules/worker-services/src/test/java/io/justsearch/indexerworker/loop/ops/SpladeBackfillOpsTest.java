@@ -51,6 +51,10 @@ class SpladeBackfillOpsTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
+  @org.junit.jupiter.api.BeforeEach void snapshots() throws Exception {
+    BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, false, java.util.Set.of());
+  }
+
   @Mock DocumentFieldOps documentFieldOps;
   @Mock IndexingCoordinator indexingCoordinator;
   @Mock CommitOps commitOps;
