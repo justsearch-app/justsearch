@@ -9,11 +9,11 @@ author-session: 01a1563a-7f02-7081-9d04-646e3ac0b504
 
 Owner adopted the E1–E21 scenarios on 2026-10-20. Entries below quote the relevant
 scenarios verbatim. Engine-side queue scenarios E8–E15 belong to a later assignment.
-Coverage is against the merge-base with origin/main, 2ba7d810e. There are seven flagged items;
+Coverage is against the merge-base with origin/main, 2ba7d810e. There are thirteen flagged items;
 separate entries distinguish new assertions from unchanged test formatting in the same item.
-No acceptance record is written by the builder. Governance tooling is unchanged by this correction;
-no Java check source changed, so its existing execution evidence remains valid. No Gradle run was
-needed for this correction; the evidence runner's refreshed invocation contains Rust checks only.
+No acceptance record is written by the builder. Governance tooling is unchanged. The current
+correction refreshes Java execution evidence for the expanded fatal-header checks; all existing
+Rust/UI evidence and every appended acceptance record are preserved.
 
 The owner's corrected decision after rejecting 89c6581d5 replaces the preceding prior-health rule:
 "the shared supervisor behaviour stays identical in both (delayed retry after exhaustion, whether
@@ -94,10 +94,15 @@ acceptance on the changed digest.
   "entries": [
     {
       "items": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/JvmCrashEvidenceTest.java"
+        "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/JvmCrashEvidenceTest.java",
+        "modules/app-services/src/test/resources/io/justsearch/app/services/diagnostics/hotspot-fatal-headers/README.md",
+        "modules/app-services/src/test/resources/io/justsearch/app/services/diagnostics/hotspot-fatal-headers/internal.txt",
+        "modules/app-services/src/test/resources/io/justsearch/app/services/diagnostics/hotspot-fatal-headers/native-oom.txt",
+        "modules/app-services/src/test/resources/io/justsearch/app/services/diagnostics/hotspot-fatal-headers/realtime-signal.txt",
+        "modules/app-services/src/test/resources/io/justsearch/app/services/diagnostics/hotspot-fatal-headers/sigsegv.txt"
       ],
       "class": "New",
-      "behaviour": "All three new checks: newest fatal JVM log is an engine crash with its timestamp and exception type and no private paths in the summary (E2); the 64-line summary bound and heap exclusion (E2 preservation controls); export includes only the newest three fatal logs with bounded, redacted text and excludes heap dumps (E2). The whole class is the named execution check; two assertions fail before and all three methods pass after. The formerly crash-JSON-only summary/export omission is repaired. The three/64-line/1MiB limits are bounded text-only implementation choices, not claims that those constants are owner-mandated.",
+      "behaviour": "E2: the newest JVM fatal log displaces an older crash JSON and reaches the public summary for all HotSpot header families (OS signals, Windows EXCEPTION_ names, Internal Error, native Out of Memory Error). Four redacted, actually generated Linux report headers exercise internal errors, native mmap OOM, SIGSEGV and SIGRTMIN+1. Five source-derived numeric-location/POSIX variants cover the no-filename fallback and unknown/realtime signal names. A new control keeps the 64-line/64KiB bounds and rejects malformed lookalikes. All three pre-existing checks are unchanged: Windows exception summary and path exclusion; the line bound and heap exclusion; export of only the newest three bounded, redacted text logs with no heaps. The whole class now executes 13 cases. On fa8f1d8d52f1 the five new internal/OOM/realtime assertions fail while the other eight pass; all 13 pass after. The bounds and safe classification spelling are delegated implementation choices, not owner-mandated constants or display text.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -121,9 +126,17 @@ acceptance on the changed digest.
           "delegationScope": "implementation choices inside the agreed recovery scenarios E1-E21",
           "choice": "E2: find the diagnostics export and the latest-crash summary (they currently look only at crash-*.json); make them include the JVM fatal-error logs in `<dataDir>/crashes/` (bounded: newest few, text only, no heap dumps).",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-51b072 request",
+          "delegationScope": "implementation choices inside the agreed recovery scenarios E1-E21",
+          "choice": "Keep the existing exception-type identifier allowlist: classify multiword HotSpot headers as InternalError or OutOfMemoryError and encode SIGRTMIN+<offset> as SIGRTMIN_<offset>.",
+          "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/engine-recovery-java.json",
+      "evidence": "gates/test-intent/evidence/engine-recovery-fatal-headers.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/JvmCrashEvidenceTest.java"
       ],
@@ -476,6 +489,39 @@ acceptance on the changed digest.
   ]
 }
 ```
+
+## E2 HotSpot fatal-header correction (2026-10-21)
+
+The independent acceptor's real AbortVMOnException report revealed that accepting only SIG/EXCEPTION_
+headers omits HotSpot's Internal Error. Inspection of OpenJDK 25u VMError::report, POSIX signal naming,
+and the Windows exception table establishes the complete header families. Internal Error and native
+Out of Memory Error also have a hexadecimal-ID fallback when no source filename is available.
+POSIX includes SIG<number> and SIGRTMIN+<offset>. There is no additional generic Error header family.
+Source links and generation procedures accompany the redacted test-owned report excerpts.
+
+Four fresh standalone JVMs generated the actual internal, native-OOM, SIGSEGV and real-time signal
+reports; none was an Engine, each had java.io.tmpdir under TMPDIR, exited 1, and was reaped. Native
+OOM was induced by a process-local 384 MiB address-space limit, without exhausting host memory.
+Only headers before SUMMARY are retained; their absolute paths are redacted. Windows cannot run
+here; the existing Windows exception fixture is unchanged. Numeric fallback variants are explicitly
+source-derived, not claimed as real generated reports.
+
+Entry 1 retains E2 as its primary source. Its added delegated detail is: "Keep the existing
+exception-type identifier allowlist: classify multiword HotSpot headers as InternalError or
+OutOfMemoryError and encode SIGRTMIN+<offset> as SIGRTMIN_<offset>." No arbitrary exception message,
+source location or problematic frame enters the public summary. The parser still reads at most
+64 KiB and 64 lines; public summary/value limits and diagnostics export are unchanged. The three
+existing test methods and assertions are unchanged. The new test-owned excerpts/provenance are
+covered by the same entry and named whole-class check.
+
+The manually built before state is a shared detached clone of fa8f1d8d52f1 under TMPDIR, with only
+the candidate checks and their redacted resources overlaid: 13 cases run, five fail by assertion
+(two missing internal/OOM real headers, one realtime public classification, two numeric fallback
+headers), eight pass. Candidate diagnostics selection: 34 cases pass, none skipped. Official D4
+execution evidence is refreshed with the unmodified evidence runner in a disposable shared clone;
+its temporary before checkout writes no registration into the source repository. The runner is
+held under js-gradle-slot for its complete Gradle execution. All older evidence files and every
+acceptance/rejection record are preserved; a new independent acceptance is required for this digest.
 
 ## Acceptance records
 

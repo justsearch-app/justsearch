@@ -11,9 +11,87 @@ import java.time.Instant;
 import java.util.zip.ZipFile;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 final class JvmCrashEvidenceTest {
   @TempDir Path profile;
+
+  @ParameterizedTest
+  @CsvSource({
+      "internal, InternalError",
+      "native-oom, OutOfMemoryError",
+      "sigsegv, SIGSEGV",
+      "realtime-signal, SIGRTMIN_1"
+  })
+  void realHotSpotFatalHeadersAppearInThePublicSummary(String fixture, String expectedType)
+      throws Exception {
+    Path crashes = Files.createDirectories(profile.resolve("crashes"));
+    Files.writeString(crashes.resolve("crash-older.json"), """
+        {"schema":"crash-report.v1","timestamp":"2026-10-19T00:00:00Z",
+         "process":"engine","exception":{"type":"java.lang.RuntimeException"}}
+        """);
+    Path report = crashes.resolve("hs_err_pid42.log");
+    try (var input = getClass().getResourceAsStream("hotspot-fatal-headers/" + fixture + ".txt")) {
+      assertNotNull(input, "Missing real HotSpot report fixture");
+      Files.copy(input, report);
+    }
+    Instant timestamp = Instant.parse("2026-10-21T01:02:03Z");
+    Files.setLastModifiedTime(report, FileTime.from(timestamp));
+    var crash = DiagnosticSummaryComposer.latestCrash(crashes);
+    assertNotNull(crash, "Real HotSpot fatal reports must participate in the latest-crash summary");
+    assertEquals(expectedType, crash.exceptionType());
+    assertEquals(timestamp, crash.timestamp());
+    String summary = new DiagnosticSummaryComposer().compose(
+        new DiagnosticSummaryComposer.Inputs(null, null, null, null, null, crash));
+    assertTrue(summary.contains("latest-crash.process: engine\n"));
+    assertTrue(summary.contains("latest-crash.exception-type: " + expectedType + "\n"));
+    assertFalse(summary.contains("RuntimeException"));
+    assertFalse(summary.contains(".cpp"));
+    assertFalse(summary.contains("libjvm"));
+    assertFalse(summary.contains("pthread_kill"));
+    assertFalse(summary.contains("<path>"));
+    assertFalse(summary.contains("pid="));
+    assertTrue(summary.getBytes(StandardCharsets.UTF_8).length <= DiagnosticSummaryComposer.MAX_UTF8_BYTES);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "Internal Error, InternalError",
+      "Out of Memory Error, OutOfMemoryError",
+      "SIG32, SIG32",
+      "SIGRTMIN, SIGRTMIN",
+      "SIGRTMAX, SIGRTMAX"
+  })
+  void hotSpotNumericLocationAndOtherPosixSignalFormsAreSafeIdentifiers(
+      String headerType, String expectedType) throws Exception {
+    Path crashes = Files.createDirectories(profile.resolve("crashes"));
+    // VMError::report's no-source-location branch; POSIX also names unknown valid signals SIG<n>.
+    Files.writeString(crashes.resolve("hs_err_pid42.log"),
+        "#  " + headerType + " (0xe0000000), pid=42, tid=43\n");
+    var crash = DiagnosticSummaryComposer.latestCrash(crashes);
+    assertNotNull(crash);
+    assertEquals(expectedType, crash.exceptionType());
+    String summary = new DiagnosticSummaryComposer().compose(
+        new DiagnosticSummaryComposer.Inputs(null, null, null, null, null, crash));
+    assertTrue(summary.contains("latest-crash.exception-type: " + expectedType + "\n"));
+    assertFalse(summary.contains("0xe0000000"));
+  }
+
+  @Test
+  void newFatalHeaderKindsKeepTheByteAndLineBoundsAndRejectLookalikes() throws Exception {
+    Path crashes = Files.createDirectories(profile.resolve("crashes"));
+    Path report = crashes.resolve("hs_err_pid42.log");
+    for (String header : new String[] {
+        "# filler\n".repeat(64) + "#  Internal Error (private.cpp:1)\n",
+        "#" + "x".repeat(64 * 1024) + "\n#  Out of Memory Error (private.cpp:1)\n",
+        "#  Internal Error private-path\n",
+        "#  Out of Memory ErrorDetails (private.cpp:1)\n"
+    }) {
+      Files.writeString(report, header);
+      assertNull(DiagnosticSummaryComposer.latestCrash(crashes));
+    }
+  }
 
   @Test
   void fatalJvmReportIsTheLatestCrashWithoutExposingItsPaths() throws Exception {
