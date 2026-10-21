@@ -63,3 +63,14 @@ The delegation below is the owner's authorization. The concrete timeout and diag
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a15f65-f2fa-71d0-aa82-20f16f656cc0",
+  "verdict": "accept",
+  "digest": "sha256:4c7d4ea8dbd3feef285d603b509e3942d26de6fc02c03d15094e34c88f26e446",
+  "note": "Accept both Incidental delegated-choice entries: independent before/after slowdown, early-exit and first/last-child hang checks preserve the oracle and 30-second child bound, with native Windows confirmation still outstanding."
+}
+```
