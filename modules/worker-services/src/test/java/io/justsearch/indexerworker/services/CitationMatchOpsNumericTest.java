@@ -59,6 +59,42 @@ class CitationMatchOpsNumericTest extends io.justsearch.adapters.lucene.runtime.
   }
 
   @Test
+  void repairsLeadingDecimalsOnRawCosineSuppliedAndLookupPaths() throws Exception {
+    index(DOC_A, "The voltage is 5% and 5.");
+    index(DOC_B, "alternative: The voltage is 0.5% and 0.5 and -0.5.");
+    assertAll(List.of(true, false).stream().map(supplied -> () -> {
+      assertAll(List.of(".5", "-.5", "+.5%").stream().map(value -> () -> {
+        String sentence = "The voltage is " + value + ".";
+        var rejected = execute(sentence, List.of(DOC_A),
+            supplied ? List.of("The voltage is 5% and 5.") : List.of(), 0.5);
+        assertEquals(0, rejected.getMatchesCount(), "raw mismatch: " + sentence + ", supplied=" + supplied);
+        assertEquals(1, rejected.getSentencesScored());
+        var selected = execute(sentence, List.of(DOC_A, DOC_B), supplied
+            ? List.of("The voltage is 5% and 5.", "alternative: The voltage is 0.5% and 0.5 and -0.5.")
+            : List.of(), 0.7);
+        assertEquals(1, selected.getMatchesCount());
+        assertEquals(1, selected.getMatches(0).getSourceIndex());
+        assertEquals(DOC_B, selected.getMatches(0).getParentDocId());
+        assertEquals(1, selected.getSentencesScored());
+        assertEquals(0, execute(sentence, List.of(DOC_B), supplied
+            ? List.of("alternative: The voltage is 0.5% and 0.5 and -0.5.") : List.of(), 0.9)
+            .getMatchesCount(), "containment cannot grant a below-threshold verdict");
+      }));
+    }));
+  }
+
+  @Test
+  void withholdsUnsupportedNotationAfterMarkdownSegmentation() {
+    assertAll(List.of("The value is `1e3`.", "The value is 1/2.",
+        "| Value --5 |\n| --- |\n| The value is --5. |", "القيمة ١٫٥.", "The value is 5%%.")
+        .stream().map(answer -> () -> {
+      var result = execute(answer, List.of(DOC_A), List.of("Values are 1, 2, 3, 5 and -5 and 5%."), 0.5);
+      assertEquals(0, result.getMatchesCount(), answer);
+      assertEquals(result.getSentencesTotal(), result.getSentencesScored());
+    }));
+  }
+
+  @Test
   void rejectsMissingYearInLongLookupDocument() throws Exception {
     index(DOC_A, "Vespera Observatory opened in 1883. "
         + "The observatory studies distant stars and retains historical records. ".repeat(400));

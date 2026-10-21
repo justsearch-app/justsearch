@@ -2,9 +2,481 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: uiux-numeric-guard
+author-session: uiux-numeric-guard-nx1
 ---
 
+# NX1 repair contract recorded before implementation
+
+Repair started 2026-10-21 14:38 CEST. Estimate 1–2 h; return for a decision
+at 18:38 CEST (twice the upper estimate). Baseline: 3ec058b1e.
+
+NX1 supersedes the historical explicit-plus rejection below: a plus sign is no
+sign. Minus signs and percentage notation remain significant (F1). Leading
+decimal points are normalized to a zero integer part, including normalized
+non-Latin decimal digits. D8 still treats each range endpoint and date part
+as a value. En/em dashes between numbers separate endpoints; parentheses and
+adjacent sentence punctuation do not invent a sign. Slash-separated three-part
+dates retain their parts; two-part slash notation is ambiguous with fractions.
+
+The sweep found no agreed equivalence for currency notation, separated/repeated
+or dangling signs, repeated/prefix percentages, per-mille notation, other grouping
+or decimal marks, repeated decimal points, exponents, fractions, lexical ordinals,
+superscripts, powers, or standalone dash variants. NG2/NX1 withhold these forms
+even against identical notation; no subvalue may support another claim. Currency
+is withheld rather than guessing whether an intervening sign is unary. Ordinary
+unit suffixes remain ignored under D8. The table lists each discovered form.
+
+| Sentence (literal) | Passage (literal) | Eligible | Decision |
+| --- | --- | --- | --- |
+| The value is .5. | The value is 5. | Reject | NX1/F1 |
+| The value is -.5. | The value is 5. | Reject | NX1/F1 |
+| The value is +.5%. | The value is 5%. | Reject | NX1/F1 |
+| The value is .5. | The value is -.5. | Reject | NX1/F1 |
+| The value is .5%. | The value is .5. | Reject | NX1/F1 |
+| The value is −.5. | The value is 5. | Reject | NX1/F1 |
+| The value is .٥. | The value is 5. | Reject | NX1/F1 |
+| The value is -.５%. | The value is 5%. | Reject | NX1/F1 |
+| The value is .𝟝. | The value is 5. | Reject | NX1/F1 |
+| The value is .5-.7. | The value is 5 and 7. | Reject | NX1/F1 |
+| The value is -.5--.7. | The value is 5 and 7. | Reject | NX1/F1 |
+| The value is 10-.5. | The value is 10 and 5. | Reject | NX1/F1 |
+| The value is 5. | The value is 5%%. | Reject | NX1/F1 |
+| The value is 5. | The value is .5. | Reject | NX1/F1 |
+| The value is 5. | The value is -.5. | Reject | NX1/F1 |
+| The value is 5%. | The value is +.5%. | Reject | NX1/F1 |
+| The value is -.5. | The value is .5. | Reject | NX1/F1 |
+| The value is .5. | The value is .5%. | Reject | NX1/F1 |
+| The value is 5. | The value is −.5. | Reject | NX1/F1 |
+| The value is 5. | The value is .٥. | Reject | NX1/F1 |
+| The value is 5%. | The value is -.５%. | Reject | NX1/F1 |
+| The value is 5. | The value is .𝟝. | Reject | NX1/F1 |
+| The value is 5 and 7. | The value is .5-.7. | Reject | NX1/F1 |
+| The value is 5 and 7. | The value is -.5--.7. | Reject | NX1/F1 |
+| The value is 10 and 5. | The value is 10-.5. | Reject | NX1/F1 |
+| The value is 5%%. | The value is 5. | Reject | NX1/F1 |
+| The value is .5. | The value is 0.5. | Accept | NX1/D8 |
+| The value is +.5%. | The value is 0.5%. | Accept | NX1/D8 |
+| The value is -.5. | The value is -0.5. | Accept | NX1/D8 |
+| The value is +15. | The value is 15. | Accept | NX1/D8 |
+| The value is +000.5. | The value is .5. | Accept | NX1/D8 |
+| The value is −.٥. | The value is -0.5. | Accept | NX1/D8 |
+| The value is .𝟝. | The value is 0.5. | Accept | NX1/D8 |
+| The value is -15. | The value is −15. | Accept | D8/F1 |
+| The value is 15 %. | The value is 15%. | Accept | D8/F1 |
+| The value is 0015 kg. | The value is 15 m. | Accept | D8/F1 |
+| The value is 1,500. | The value is 1500. | Accept | D8/F1 |
+| The value is 1 500. | The value is 1500. | Accept | D8/F1 |
+| The value is 1 500. | The value is 1500. | Accept | D8/F1 |
+| The value is 1 500. | The value is 1500. | Accept | D8/F1 |
+| The value is 12,34. | The value is 12 and 34. | Accept | D8/F1 |
+| The value is 10-20. | The value is 10 and 20. | Accept | D8/F1 |
+| The value is 10–20. | The value is 10 and 20. | Accept | D8/F1 |
+| The value is 10—20. | The value is 10 and 20. | Accept | D8/F1 |
+| The value is 2026-10-21. | The value is 2026 and 10 and 21. | Accept | D8/F1 |
+| The value is 2026/10/21. | The value is 2026 and 10 and 21. | Accept | D8/F1 |
+| The value is (15), [15, 20]; 15!. | The value is 15 and 20. | Accept | D8/F1 |
+| The value is ١٥. | The value is 15. | Accept | D8/F1 |
+| The value is １５. | The value is 15. | Accept | D8/F1 |
+| The value is 𝟙𝟝. | The value is 15. | Accept | D8/F1 |
+| The value is --5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is --5. | The value is --5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is --5. | Reject | NG2/NX1 (unagreed) |
+| The value is ++5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ++5. | The value is ++5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ++5. | Reject | NG2/NX1 (unagreed) |
+| The value is +-5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is +-5. | The value is +-5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is +-5. | Reject | NG2/NX1 (unagreed) |
+| The value is -+5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is -+5. | The value is -+5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is -+5. | Reject | NG2/NX1 (unagreed) |
+| The value is - .5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is - .5. | The value is - .5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is - .5. | Reject | NG2/NX1 (unagreed) |
+| The value is + .5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is + .5. | The value is + .5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is + .5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5-. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5-. | The value is 5-. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5-. | Reject | NG2/NX1 (unagreed) |
+| The value is 5+. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5+. | The value is 5+. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5+. | Reject | NG2/NX1 (unagreed) |
+| The value is 5 % %. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5 % %. | The value is 5 % %. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5 % %. | Reject | NG2/NX1 (unagreed) |
+| The value is 5%%. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5%%. | The value is 5%%. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5%%. | Reject | NG2/NX1 (unagreed) |
+| The value is %5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is %5. | The value is %5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is %5. | Reject | NG2/NX1 (unagreed) |
+| The value is $5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is $5. | The value is $5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is $5. | Reject | NG2/NX1 (unagreed) |
+| The value is -$5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is -$5. | The value is -$5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is -$5. | Reject | NG2/NX1 (unagreed) |
+| The value is $-5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is $-5. | The value is $-5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is $-5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5€. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5€. | The value is 5€. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5€. | Reject | NG2/NX1 (unagreed) |
+| The value is € 5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is € 5. | The value is € 5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is € 5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5‰. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5‰. | The value is 5‰. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5‰. | Reject | NG2/NX1 (unagreed) |
+| The value is 5‱. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5‱. | The value is 5‱. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5‱. | Reject | NG2/NX1 (unagreed) |
+| The value is 1'500. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1'500. | The value is 1'500. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1'500. | Reject | NG2/NX1 (unagreed) |
+| The value is 1’500. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1’500. | The value is 1’500. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1’500. | Reject | NG2/NX1 (unagreed) |
+| The value is 1_500. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1_500. | The value is 1_500. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1_500. | Reject | NG2/NX1 (unagreed) |
+| The value is ١٬٥٠٠. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ١٬٥٠٠. | The value is ١٬٥٠٠. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ١٬٥٠٠. | Reject | NG2/NX1 (unagreed) |
+| The value is ١٫٥. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ١٫٥. | The value is ١٫٥. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ١٫٥. | Reject | NG2/NX1 (unagreed) |
+| The value is １．５. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is １．５. | The value is １．５. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is １．５. | Reject | NG2/NX1 (unagreed) |
+| The value is 1·5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1·5. | The value is 1·5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1·5. | Reject | NG2/NX1 (unagreed) |
+| The value is 1:5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1:5. | The value is 1:5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1:5. | Reject | NG2/NX1 (unagreed) |
+| The value is 1.2.3. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1.2.3. | The value is 1.2.3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1.2.3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1..5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1..5. | The value is 1..5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1..5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5.%. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5.%. | The value is 5.%. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5.%. | Reject | NG2/NX1 (unagreed) |
+| The value is 1e3. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1e3. | The value is 1e3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1e3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1E-3. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1E-3. | The value is 1E-3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1E-3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1e+3. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1e+3. | The value is 1e+3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1e+3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1e. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1e. | The value is 1e. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1e. | Reject | NG2/NX1 (unagreed) |
+| The value is 1e-. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1e-. | The value is 1e-. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1e-. | Reject | NG2/NX1 (unagreed) |
+| The value is 1/2. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1/2. | The value is 1/2. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1/2. | Reject | NG2/NX1 (unagreed) |
+| The value is 1⁄2. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1⁄2. | The value is 1⁄2. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1⁄2. | Reject | NG2/NX1 (unagreed) |
+| The value is ½. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ½. | The value is ½. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ½. | Reject | NG2/NX1 (unagreed) |
+| The value is 1½. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1½. | The value is 1½. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1½. | Reject | NG2/NX1 (unagreed) |
+| The value is 5th. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5th. | The value is 5th. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5th. | Reject | NG2/NX1 (unagreed) |
+| The value is 21st. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 21st. | The value is 21st. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 21st. | Reject | NG2/NX1 (unagreed) |
+| The value is 2nd. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 2nd. | The value is 2nd. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 2nd. | Reject | NG2/NX1 (unagreed) |
+| The value is 3rd. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 3rd. | The value is 3rd. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 3rd. | Reject | NG2/NX1 (unagreed) |
+| The value is 5². | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5². | The value is 5². | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5². | Reject | NG2/NX1 (unagreed) |
+| The value is 2×10^3. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 2×10^3. | The value is 2×10^3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 2×10^3. | Reject | NG2/NX1 (unagreed) |
+| The value is –5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is –5. | The value is –5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is –5. | Reject | NG2/NX1 (unagreed) |
+| The value is —5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is —5. | The value is —5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is —5. | Reject | NG2/NX1 (unagreed) |
+| The value is ‐5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ‐5. | The value is ‐5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ‐5. | Reject | NG2/NX1 (unagreed) |
+| The value is ‑5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ‑5. | The value is ‑5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ‑5. | Reject | NG2/NX1 (unagreed) |
+| The value is －5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is －5. | The value is －5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is －5. | Reject | NG2/NX1 (unagreed) |
+| The value is ＋5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ＋5. | The value is ＋5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ＋5. | Reject | NG2/NX1 (unagreed) |
+
+The repaired scorer tests also exercise the five literal NX1 rejection pairs
+and two acceptance pairs through the cross-encoder loop; raw cosine checks use
+`.5`, `-.5` and `+.5%` against `5% and 5` and reselect the compatible
+`0.5% and 0.5 and -0.5` passage on both supplied and indexed paths.
+Code `1e3`, fraction `1/2`, table-cell `--5`, Arabic `١٫٥` and repeated `5%%`
+remain claims after Markdown segmentation and are withheld.
+
+Additional sweep cases, recorded before their corrective edits:
+
+| Sentence (literal) | Passage (literal) | Eligible | Decision |
+| --- | --- | --- | --- |
+| The value is '15'. | The value is 15. | Accept | D8/NX1 |
+| The value is ‘15’. | The value is 15. | Accept | D8/NX1 |
+| The value is “15”. | The value is 15. | Accept | D8/NX1 |
+| The value is First sentence. 15. | The value is 15. | Accept | D8/NX1 |
+| The value is .5-.7. | The value is 0.5 and 0.7. | Accept | D8/NX1 |
+| The value is 5%-10%. | The value is 5% and 10%. | Accept | D8/NX1 |
+| The value is ±5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ±5. | The value is ±5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ±5. | Reject | NG2/NX1 (unagreed) |
+| The value is ∓5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ∓5. | The value is ∓5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ∓5. | Reject | NG2/NX1 (unagreed) |
+| The value is ⁻5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ⁻5. | The value is ⁻5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ⁻5. | Reject | NG2/NX1 (unagreed) |
+| The value is ⁺5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ⁺5. | The value is ⁺5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ⁺5. | Reject | NG2/NX1 (unagreed) |
+| The value is ₋5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ₋5. | The value is ₋5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ₋5. | Reject | NG2/NX1 (unagreed) |
+| The value is ₊5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ₊5. | The value is ₊5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ₊5. | Reject | NG2/NX1 (unagreed) |
+| The value is ﹢5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ﹢5. | The value is ﹢5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ﹢5. | Reject | NG2/NX1 (unagreed) |
+| The value is ⸺5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ⸺5. | The value is ⸺5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ⸺5. | Reject | NG2/NX1 (unagreed) |
+| The value is 1 500. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1 500. | The value is 1 500. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1 500. | Reject | NG2/NX1 (unagreed) |
+| The value is 1 500. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1 500. | The value is 1 500. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1 500. | Reject | NG2/NX1 (unagreed) |
+| The value is 1․5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1․5. | The value is 1․5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1․5. | Reject | NG2/NX1 (unagreed) |
+| The value is 1⋅5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1⋅5. | The value is 1⋅5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1⋅5. | Reject | NG2/NX1 (unagreed) |
+| The value is 1˙5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 1˙5. | The value is 1˙5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 1˙5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5–. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5–. | The value is 5–. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5–. | Reject | NG2/NX1 (unagreed) |
+| The value is 5—. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5—. | The value is 5—. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5—. | Reject | NG2/NX1 (unagreed) |
+| The value is 5- . | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5- . | The value is 5- . | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5- . | Reject | NG2/NX1 (unagreed) |
+| The value is 5--. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5--. | The value is 5--. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5--. | Reject | NG2/NX1 (unagreed) |
+| The value is -\u200b5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is -\u200b5. | The value is -\u200b5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is -\u200b5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5\u200b%. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5\u200b%. | The value is 5\u200b%. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5\u200b%. | Reject | NG2/NX1 (unagreed) |
+| The value is .\u200b5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is .\u200b5. | The value is .\u200b5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is .\u200b5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5\u20e3. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5\u20e3. | The value is 5\u20e3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5\u20e3. | Reject | NG2/NX1 (unagreed) |
+
+Unicode format/combining characters adjacent to digits and unsupported sign/dash
+variants are withheld; the escaped Unicode sequences above denote the literal
+characters used by the test. Unknown thin/figure-space grouping is withheld.
+A terminal sign/dash must not be silently dropped. Quotation marks around
+numbers and a preceding sentence terminator remain ordinary punctuation.
+
+Final sign sweep, recorded before its corrective edit:
+
+| Sentence (literal) | Passage (literal) | Eligible | Decision |
+| --- | --- | --- | --- |
+| The value is ➖5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ➖5. | The value is ➖5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ➖5. | Reject | NG2/NX1 (unagreed) |
+| The value is ➕5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is ➕5. | The value is ➕5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is ➕5. | Reject | NG2/NX1 (unagreed) |
+| The value is +/-5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is +/-5. | The value is +/-5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is +/-5. | Reject | NG2/NX1 (unagreed) |
+| The value is -/+5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is -/+5. | The value is -/+5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is -/+5. | Reject | NG2/NX1 (unagreed) |
+| The value is -,.5. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is -,.5. | The value is -,.5. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is -,.5. | Reject | NG2/NX1 (unagreed) |
+
+Heavy plus/minus symbols and malformed mixed sign/separator runs have no
+agreed interpretation. They are withheld rather than dropping any prefix.
+
+Range preservation counterexamples, recorded before their corrective edit:
+
+| Sentence (literal) | Passage (literal) | Eligible | Decision |
+| --- | --- | --- | --- |
+| The value is -.5%--.7%. | The value is -0.5% and -0.7%. | Accept | D8/F1/NX1 |
+| The value is 5%--10%. | The value is 5% and -10%. | Accept | D8/F1/NX1 |
+| The value is 5%–10%. | The value is 5% and 10%. | Accept | D8/F1/NX1 |
+| The value is 5%—-10%. | The value is 5% and -10%. | Accept | D8/F1/NX1 |
+| The value is 5kg-10kg. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5kg-10kg. | The value is 5kg-10kg. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5kg-10kg. | Reject | NG2/NX1 (unagreed) |
+| The value is 5°-10°. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is 5°-10°. | The value is 5°-10°. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is 5°-10°. | Reject | NG2/NX1 (unagreed) |
+| The value is JDK-15. | The value is 1, 2, 3, 5, 10, 21, 500 and -5 and 5% and -3. | Reject | NG2/NX1 (unagreed) |
+| The value is JDK-15. | The value is JDK-15. | Reject | NG2/NX1 (unagreed) |
+| The value is 5. | The value is JDK-15. | Reject | NG2/NX1 (unagreed) |
+
+A percent sign ends a value for range/date-separator detection just as a digit
+does. A unit or identifier immediately before a sign/dash does not decide
+whether it is a separator or unary sign; these forms are withheld rather than
+reading an unintended negative endpoint.
+
+# NX1 repair verification observations (builder; no acceptance verdict)
+
+Completed 2026-10-21 15:25 CEST, within the recorded estimate. Production changes
+are confined to NumericConsistency.java; there are no dependency, lockfile,
+frontend, persisted-format or producer-gate changes. Every unknown form listed
+above withholds verification, even against identical notation. The sweep covers
+79 unagreed forms, in addition to the agreed decimal/range/group/date/digit and
+punctuation pairs. A percent sign and a digit both end a range value; unary minus
+and percentage notation survive normalization. Plus is no sign under NX1.
+
+All eight repair methods in `uiux-numeric-guard-nx1-repaired.json` pass on the
+candidate and fail by assertion on 3ec058b1e. Failures include `.5`, `-.5` and
+`+.5%` real CPU matches at 0.9995213151, 0.9988987446 and 0.9990026355 instead of
+an empty match list. Raw cosine baseline assertions report expected zero matches,
+actual one, for all six decimal/supplied-or-lookup combinations. Code, fraction,
+table, Arabic-decimal and repeated-percent cases all execute in the baseline
+assertion group. Rejected claims remain scored; compatible alternatives retain
+the original score/threshold and source identity.
+
+The original 76efc1c10 JSON/XML evidence remains unchanged. Refreshed evidence for
+the two edited old test files is in `uiux-numeric-guard-original-refreshed-repaired.json`
+(seven assertion fail-before checks on 76efc1c10) and
+`uiux-numeric-guard-refreshed-preserved.json` (five passing preservation methods).
+Numeric-free exact matches, all agreed literal compatibility checks, reference
+and ordinal distinctions, Ask and Delegate payload/history, raw HTTP-handler
+counts, WP4.4 passage checks and MCP output pass. Preservation checks also ran
+successfully on the 3ec058b1e shared clone; percentage-range punctuation passed
+there, failed on the first repair candidate and passed after the correction.
+
+Final validation, with each Gradle call inside js-gradle-slot (a containing
+script holds the slot for its sequential Gradle calls):
+
+- Focused reranker and worker-services tests plus their pmdMain: passed on the
+  final production code. Ask/app-services, Delegate/app-agent and UI handler/MCP
+  tests and their pmdMain: passed. No named repair check is skipped.
+- `./gradlew build -x test -PskipWebBuild=true`: BUILD SUCCESSFUL, 1m 33s,
+  332 actionable tasks, normal environment.
+- Frontend `npm run lint`, `npm run typecheck`, `npx vitest run --maxWorkers=4`:
+  exit 0; 549 files / 7207 tests passed. Root UI gates: 28/28 passed.
+- Script-written repair and preservation evidence: exit 0. The changeset gate
+  covers every item; its remaining failure is stale independent acceptance.
+  The previous verifier rejection is preserved byte-for-byte. Its missing
+  `## Acceptance records` heading was restored so the gate can parse the record;
+  no acceptance record was authored or changed by this builder.
+- Audit warning: origin/main currently has 1 tie-break among 9 audited PRs in
+  28 days (11.1%, above one in ten); the orchestrator must report this finding.
+
+The build with the model-test environment enabled exposed an existing
+integrationTest classpath failure: missing
+`ai.onnxruntime.OrtSession$SessionOptions$OptLevel`. It reproduces on origin/main
+738e6a443c9d6ce82383e9c938c264a3a20fb506, whose integration source is unchanged.
+The required normal-environment build passes. Model-gated integration tests
+skipped by that normal build are not counted as passes; the separate unit-source
+CPU model regression checks execute without skips in the repair evidence.
+
+Performance follows the recorded F5 protocol: same six fixtures/hash, model
+hashes, CPU scorer, deadline, two suite warm-ups and five measured suite sums;
+only the measurement test runs during this session's measured intervals, using
+one Gradle worker. CPU: Intel Core i7-12700K, 20 logical CPUs, 31 GiB RAM; Java
+25.0.4.1 and ORT 1.24.3. Baseline/candidate XML is retained as
+`uiux-numeric-guard-nx1-performance-{before,after}.xml`. Final medians are
+193151056 ns and 167168253 ns (ratio 0.86548, within the 10% bound); all six
+fixtures remain scored in all five runs, with identical matched counts. These
+are scorer measurements, not a production Ask performance claim. The first
+measurement overlapped different parallel test workloads (175/432 ms); it was
+not used for acceptance, and its samples remain in tmp/nx1-repair/parallel-checks-*
+for audit.
+
+Recorded resources and all five final suite samples:
+
+```text
+before: NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=8.4619140625
+before: NUMERIC_RUN 0 suiteNanos=183767461 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.4619140625
+before: NUMERIC_RUN 1 suiteNanos=216430063 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.4619140625
+before: NUMERIC_RUN 2 suiteNanos=188330479 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.4619140625
+before: NUMERIC_RUN 3 suiteNanos=200032157 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.4619140625
+before: NUMERIC_RUN 4 suiteNanos=193151056 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.4619140625
+before: NUMERIC_MEDIAN suiteNanos=193151056
+before: MemTotal:       32534604 kB
+before: MemAvailable:   12391596 kB
+before: SwapFree:       29413272 kB
+after: NUMERIC_RESOURCE java=25.0.4.1 ort=1.24.3 os=Linux arch=amd64 processors=20 load=8.3447265625
+after: NUMERIC_RUN 0 suiteNanos=163825491 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.6376953125
+after: NUMERIC_RUN 1 suiteNanos=169612311 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.6376953125
+after: NUMERIC_RUN 2 suiteNanos=167168253 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.6376953125
+after: NUMERIC_RUN 3 suiteNanos=157322369 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.6376953125
+after: NUMERIC_RUN 4 suiteNanos=168531034 scored=[1, 1, 1, 1, 1, 1] matched=[0, 0, 1, 1, 0, 1] load=8.6376953125
+after: NUMERIC_MEDIAN suiteNanos=167168253
+after: MemTotal:       32534604 kB
+after: MemAvailable:   12344256 kB
+after: SwapFree:       29413836 kB
+```
+
+Remaining unverified: live Engine/browser combinations and actual cold Engine
+reload (NG1/NG6/GN3); production Ask timing/scored coverage (NG8); the production
+Ask rag-qa before/after verified-count measurement (NG9). The dev stack was
+explicitly unavailable to this builder. Unit, Worker, file-store/history and
+HTTP-handler checks do not substitute for those live checks.
+
+Tests added or rewritten (all durable):
+
+| File | Scenarios | Status |
+| --- | --- | --- |
+| CitationScorerNumericTest.java | NG1, NG2, NG3, NG5, NG7, GN1 | durable |
+| CitationMatchOpsNumericTest.java | NG1, NG2, NG3, NG5, NG6, NG7, GN1 | durable |
+| NumericConsistencyTokenizationTest.java | NG1, NG2, NG3, NG7 | durable |
+| NumericCitationScorerDecimalIntegrationTest.java | NG1, NG3 | durable |
+
+Manual comparison checkouts were shared clones under the assigned TMPDIR:
+`before` at 3ec058b1e and `origin-main` at 738e6a443c9d6ce82383e9c938c264a3a20fb506.
+Both are removed after comparisons; the evidence tool removes its own before
+worktrees. No corpus, model or installer was copied. No dev stack was started,
+no other session's process was stopped, and no commit, push or publication occurred.
+
+# Historical first implementation and evidence
 # Numeric consistency: contract recorded before implementation
 
 Started 2026-10-21 09:41 CEST. Estimate 4–8 h; return for a decision by
@@ -171,7 +643,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-repaired.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-original-refreshed-repaired.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#rejectsLiteralIncompatiblePairs",
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#reselectsCompatibleWindowAcrossSubBatches",
@@ -215,7 +687,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-preserved.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-refreshed-preserved.json",
       "newChecks": [
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesLiteralCompatiblePairs",
         "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#preservesNumberFreeCorpusAndThreshold"
@@ -271,7 +743,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-repaired.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-original-refreshed-repaired.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#rejectsBothCounterexamplesOnSuppliedAndLookupPaths",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#rejectsMissingYearInLongLookupDocument",
@@ -316,7 +788,7 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-preserved.json",
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-refreshed-preserved.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesReferencesOrdinalsAndNumberFreeCorpus",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#preservesCompatibleNumbersAndOriginalThreshold"
@@ -470,6 +942,92 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "label": "agent-drafted, owner-adopted"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericCitationScorerDecimalIntegrationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "NX1 consumes each leading-decimal value whole; F1 keeps minus and percentage notation; NG2 withholds unagreed notation rather than extracting supporting subvalues. Scores, thresholds and scored counts remain owned by the original producers.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG1",
+          "quote": "A sentence that states a numeric value the chosen passage does not contain as a whole value is not verified against that passage. Applies to Ask and Delegate, cross-encoder and cosine scoring, supplied passages and index lookups, live and after cold reload. Both WP4.4 counterexamples no longer verify against the passage lacking the number.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG2",
+          "quote": "The guard only withholds a verdict; it never grants one. A sentence whose values all appear in the passage gets exactly the verdict it gets today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "An explicit table of accepted and rejected sentence/passage pairs (decision D8) passes: whole values not substrings (99 vs 2099), 1.5 vs 15, signed values, percentages, ranges, dates, the agreed grouping formats, non-Latin digits. Values inside inline code and table cells count as claims.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG7",
+          "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx1-repaired.json",
+      "newChecks": [
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#repairsLeadingDecimalsAndWithholdsUnsupportedNotation",
+        "modules/reranker/src/test/java/io/justsearch/reranker/CitationScorerNumericTest.java#repairsExplicitNx1EquivalencesWithoutChangingScoresOrThresholds",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#repairsLeadingDecimalsOnRawCosineSuppliedAndLookupPaths",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#withholdsUnsupportedNotationAfterMarkdownSegmentation",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#rejectsDroppedDecimalSignsAndSuffixes",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#acceptsOnlyExplicitNx1Equivalences",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#withholdsUnagreedNotationRatherThanSplittingIt",
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericCitationScorerDecimalIntegrationTest.java#rejectsLeadingDecimalCounterexamplesThroughRealModel"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "D8 literal ranges, date parts, groups, digits and adjacent punctuation retain eligibility, including quotations and a preceding sentence terminator.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG2",
+          "quote": "The guard only withholds a verdict; it never grants one. A sentence whose values all appear in the passage gets exactly the verdict it gets today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "An explicit table of accepted and rejected sentence/passage pairs (decision D8) passes: whole values not substrings (99 vs 2099), 1.5 vs 15, signed values, percentages, ranges, dates, the agreed grouping formats, non-Latin digits. Values inside inline code and table cells count as claims.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG7",
+          "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-refreshed-preserved.json",
+      "newChecks": [
+        "modules/reranker/src/test/java/io/justsearch/reranker/NumericConsistencyTokenizationTest.java#preservesAgreedWholeValuesAndPunctuation"
+      ]
     }
   ]
 }
@@ -586,6 +1144,8 @@ Final command results:
 - `McpAnswerLegibilityTest`: fresh baseline and candidate runs passed.
 - Test-intent: only independent acceptance is missing; the rolling reconsider-rate
   warning is recorded above. The builder has not authored an acceptance record.
+
+## Acceptance records
 
 ```json
 {

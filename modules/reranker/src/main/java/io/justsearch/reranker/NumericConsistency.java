@@ -13,9 +13,11 @@ import java.util.regex.Pattern;
 public final class NumericConsistency {
   private static final String SEPARATORS = ", \\u00a0\\u202f";
   private static final Pattern NUMBER = Pattern.compile(
-      "[+\\-]?[0-9]+(?:[" + SEPARATORS + "][0-9]+)*(?:\\.[0-9]+)?(?:[ \\u00a0\\u202f]*[%\\u066a\\uff05])?");
+      "[+\\-]?(?:[0-9]+(?:[" + SEPARATORS + "][0-9]+)*(?:\\.[0-9]+)?|\\.[0-9]+)"
+          + "(?:[ \\u00a0\\u202f]*[%\\u066a\\uff05])?");
   private static final Pattern UNGROUPED_NUMBER =
-      Pattern.compile("[+\\-]?[0-9]+(?:\\.[0-9]+)?(?:[ \\u00a0\\u202f]*[%\\u066a\\uff05])?");
+      Pattern.compile("[+\\-]?(?:[0-9]+(?:\\.[0-9]+)?|\\.[0-9]+)"
+          + "(?:[ \\u00a0\\u202f]*[%\\u066a\\uff05])?");
   private static final Pattern GROUPED_INTEGER =
       Pattern.compile("[0-9]{1,3}(?:,[0-9]{3})+|[0-9]{1,3}(?: [0-9]{3})+"
           + "|[0-9]{1,3}(?:\\u00a0[0-9]{3})+|[0-9]{1,3}(?:\\u202f[0-9]{3})+");
@@ -23,6 +25,20 @@ public final class NumericConsistency {
       Pattern.compile("\\[[1-9][0-9]*\\](?:[ \\t]*\\[[1-9][0-9]*\\])*");
   private static final Pattern ORDINAL = Pattern.compile("(?m)^[ \\t]*[0-9]+[.)][ \\t]+");
   private static final Pattern INLINE_CODE = Pattern.compile("(`+)(.*?)\\1(?!`)", Pattern.DOTALL);
+  // No agreed interpretation for these forms. Never turn their pieces into supporting values.
+  private static final String UNSUPPORTED = "unsupported numeric notation";
+  private static final Pattern SLASH_DATE =
+      Pattern.compile("(?<![0-9/])[0-9]{4}/[0-9]{1,2}/[0-9]{1,2}(?![0-9/])");
+  private static final Pattern UNSUPPORTED_NOTATION = Pattern.compile(
+      "[\\p{No}\\p{Nl}]|\\p{Sc}[ \\u00a0\\u202f+\\-]*\\.?[0-9]"
+          + "|[0-9][ \\u00a0\\u202f]*[\\p{Sc}‰‱]"
+          + "|[0-9]['’][0-9]|[0-9][_٫٬．·․⋅˙:⁄/\\^×]|[_٫٬．·․⋅˙:⁄/\\^×][0-9]"
+          + "|[\\p{M}\\p{Cf}]\\.?[0-9]|[0-9][\\p{M}\\p{Cf}]"
+          + "|[0-9][\\p{Zs}&&[^ \\u00a0\\u202f]][0-9]"
+          + "|[0-9](?:[eE](?![a-zA-Z])|(?:st|nd|rd|th)\\b)"
+          + "|[\\p{L}\\p{So}][\\-–—][+\\-]?\\.?[0-9]"
+          + "|[+\\-][/,][+\\-.,/ \\u00a0\\u202f]*[0-9]"
+          + "|[±∓⁻⁺₋₊﹢＋➕➖\\p{Pd}&&[^\\-–—]][ \\u00a0\\u202f]*[+\\-]?\\.?[0-9]");
 
   private final List<Set<String>> claims;
   private final List<Set<String>> passages;
@@ -43,7 +59,8 @@ public final class NumericConsistency {
 
   public boolean supports(int sentenceIndex, int passageIndex) {
     Set<String> required = claims.get(sentenceIndex);
-    return required.isEmpty() || passages.get(passageIndex).containsAll(required);
+    return required.isEmpty()
+        || (!required.contains(UNSUPPORTED) && passages.get(passageIndex).containsAll(required));
   }
 
   /** Plain scorer entry point; Markdown-aware callers supply claims from their parsed blocks. */
@@ -60,13 +77,16 @@ public final class NumericConsistency {
   public static Set<String> proseValues(String text) {
     if (text == null || text.isEmpty()) return Set.of();
     String numericText = withoutReferences(protectInlineCode(normalizeDigits(text)));
+    numericText = SLASH_DATE.matcher(numericText).replaceAll(match -> match.group().replace('/', ' '));
+    if (UNSUPPORTED_NOTATION.matcher(numericText).find()) return Set.of(UNSUPPORTED);
     Set<String> values = new HashSet<>();
     var matcher = NUMBER.matcher(numericText);
     while (matcher.find()) {
+      if (incompleteNumber(numericText, matcher.start(), matcher.end())) return Set.of(UNSUPPORTED);
       String token = matcher.group();
       // A hyphen between digits separates range endpoints / date parts. A unary sign remains.
       if (token.charAt(0) == '-' && matcher.start() > 0
-          && Character.isDigit(numericText.charAt(matcher.start() - 1))) {
+          && endsNumber(numericText.charAt(matcher.start() - 1))) {
         token = token.substring(1);
       }
       String integer = token.replaceFirst("^[+\\-]", "").split("\\.", 2)[0]
@@ -82,9 +102,61 @@ public final class NumericConsistency {
     return Set.copyOf(values);
   }
 
+  /** Regex search must never resume inside an unsupported signed/decimal/percent expression. */
+  private static boolean incompleteNumber(String text, int start, int end) {
+    int previous = start - 1;
+    while (previous >= 0 && isSpace(text.charAt(previous))) previous--;
+    if (previous >= 0) {
+      char prefix = text.charAt(previous);
+      if ((prefix == '.' && previous == start - 1)
+          || (isPercent(prefix) && text.charAt(start) != '-')) return true;
+      if (prefix == '+' || prefix == '-') {
+        // A second minus may be a negative range endpoint: 5--3 or .5--.3.
+        if (previous != start - 1 || prefix != '-' || previous == 0
+            || !endsNumber(text.charAt(previous - 1))) return true;
+      }
+      if ((prefix == '–' || prefix == '—')
+          && (previous == 0 || !endsNumber(text.charAt(previous - 1)))) return true;
+    }
+    int next = end;
+    while (next < text.length() && isSpace(text.charAt(next))) next++;
+    if (next == text.length()) return false;
+    char suffix = text.charAt(next);
+    if (isPercent(suffix)) return true;
+    if (next == end && suffix == '.') {
+      while (next < text.length() && text.charAt(next) == '.') next++;
+      if (next < text.length()
+          && (Character.isDigit(text.charAt(next)) || isPercent(text.charAt(next)))) return true;
+    }
+    // A dangling sign/range delimiter must not disappear, even when separated by whitespace.
+    if (suffix == '+' || suffix == '-' || suffix == '–' || suffix == '—') {
+      int following = next + 1;
+      while (following < text.length() && isSpace(text.charAt(following))) following++;
+      if (following < text.length() && Character.isLetter(text.charAt(following))) return false;
+      if (following < text.length() && (text.charAt(following) == '-' || text.charAt(following) == '+')) following++;
+      if (following < text.length() && text.charAt(following) == '.') following++;
+      return following == text.length() || !Character.isDigit(text.charAt(following));
+    }
+    return false;
+  }
+
+  private static boolean isSpace(char character) {
+    return Character.isWhitespace(character) || Character.isSpaceChar(character);
+  }
+
+  private static boolean endsNumber(char character) {
+    return Character.isDigit(character) || isPercent(character);
+  }
+
+  private static boolean isPercent(char character) {
+    return character == '%' || character == '\u066a' || character == '\uff05';
+  }
+
   private static String canonical(String token) {
     String compact = token.replaceAll("[" + SEPARATORS + "]", "");
-    int start = compact.charAt(0) == '-' || compact.charAt(0) == '+' ? 1 : 0;
+    if (compact.charAt(0) == '+') compact = compact.substring(1);
+    int start = compact.charAt(0) == '-' ? 1 : 0;
+    if (compact.charAt(start) == '.') compact = compact.substring(0, start) + "0" + compact.substring(start);
     int first = start;
     while (first + 1 < compact.length() && compact.charAt(first) == '0'
         && Character.isDigit(compact.charAt(first + 1))) first++;

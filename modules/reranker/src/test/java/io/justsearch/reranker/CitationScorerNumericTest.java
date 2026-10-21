@@ -56,7 +56,6 @@ class CitationScorerNumericTest {
         new Pair("The value is 1.5.", "The value is 15."),
         new Pair("The value is -15.", "The value is 15."),
         new Pair("The value is 15.", "The value is -15."),
-        new Pair("The value is +15.", "The value is 15."),
         new Pair("The value is 15%.", "The value is 15."),
         new Pair("The value is 15.", "The value is 15%."),
         new Pair("The value is 1.50.", "The value is 1.5."),
@@ -107,6 +106,37 @@ class CitationScorerNumericTest {
       assertEquals(0.976f, result.matches().getFirst().score(), 0.0, pair.toString());
       assertEquals(1, result.sentencesScored());
     }));
+  }
+
+  @Test
+  void repairsLeadingDecimalsAndWithholdsUnsupportedNotation() {
+    List<Pair> pairs = List.of(
+        new Pair("The voltage is .5.", "The voltage is 5."),
+        new Pair("The voltage is -.5.", "The voltage is 5."),
+        new Pair("The voltage is +.5%.", "The voltage is 5%."),
+        new Pair("The voltage is .5.", "The voltage is -.5."),
+        new Pair("The voltage is .5%.", "The voltage is .5."),
+        new Pair("The voltage is 1e3.", "The values are 1 and 3."),
+        new Pair("The voltage is 1/2.", "The values are 1 and 2."),
+        new Pair("The voltage is --5.", "The voltage is -5."),
+        new Pair("The voltage is ١٫٥.", "The values are 1 and 5."));
+    assertAll(pairs.stream().map(pair -> () -> {
+      var result = score(pair.sentence(), List.of(pair.passage()), 0.5);
+      assertEquals(List.of(), result.matches(), pair.toString());
+      assertEquals(1, result.sentencesScored(), pair.toString());
+    }));
+  }
+
+  @Test
+  void repairsExplicitNx1EquivalencesWithoutChangingScoresOrThresholds() {
+    for (Pair pair : List.of(new Pair("The voltage is .5.", "The voltage is 0.5."),
+        new Pair("The voltage is +.5%.", "The voltage is 0.5%."),
+        new Pair("The voltage is +15.", "The voltage is 15."))) {
+      var result = score(pair.sentence(), List.of(pair.passage()), 0.5);
+      assertEquals(1, result.matches().size(), pair.toString());
+      assertEquals(0.976f, result.matches().getFirst().score(), 0.0);
+      assertEquals(List.of(), score(pair.sentence(), List.of(pair.passage()), 0.99).matches());
+    }
   }
 
   @Test
