@@ -147,7 +147,7 @@ class VduChatHoldTest {
   }
 
   private KnowledgeClient client(int count) throws Exception {
-    KnowledgeClient client = mock(KnowledgeClient.class);
+    KnowledgeClient client = VduAttemptTestSupport.client();
     List<String> ids = new ArrayList<>();
     for (int i = 0; i < count; i++) {
       Path file = tempDir.resolve("doc-" + i + ".png");

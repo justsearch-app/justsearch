@@ -74,6 +74,7 @@ class BackfillSchedulerModeRecordingTest {
 
   @BeforeEach
   void wireCommonMocks() {
+    io.justsearch.indexerworker.loop.ops.BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator);
     lenient().when(signalBus.isMainGpuActive()).thenReturn(false);
     lenient().when(signalBus.isEnergyReduced()).thenReturn(false);
     lenient().when(signalBus.shouldYieldGpuBackfill()).thenReturn(false);

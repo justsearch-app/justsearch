@@ -417,42 +417,10 @@ public final class CombinedEnrichmentBackfillOps {
       long t0 = System.nanoTime();
 
       // Phase 1: Batch content fetch (single searcher, all docs)
-      Map<String, String> contentByDocId =
-          context.documentFieldOps().getDocumentContentBatch(pendingIds);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds);
+      Map<String, String> contentByDocId = batch.contents();
 
-      // Phase 1b: Batch status fetch (single searcher, all docs).
-      // Replaces 300-400 individual getDocumentField() calls with one batched read.
-      // All status fields are DocValues-backed (O(1) per read). Chunk text is already reconstructed
-      // by getDocumentContentBatch above, with one parent-content read per distinct parent.
-      // Tempdoc 700: also fetch *_RETRY_COUNT for every enrichment in play, so the failure
-      // branches below can make an escalation decision (increment + FAILED-at-max) from
-      // already-fetched data, without a per-doc read.
-      Set<String> fieldsToFetch = new LinkedHashSet<>();
-      // A chunk may arrive through the SPLADE-status parent cache as well as the dedicated chunk
-      // cache. Once chunk text is reconstructed for both, content shape can no longer distinguish
-      // those routes; use the structural marker for every pending ID.
-      fieldsToFetch.add(SchemaFields.IS_CHUNK);
-      if (embedAvailable) {
-        fieldsToFetch.add(SchemaFields.EMBEDDING_STATUS);
-        fieldsToFetch.add(SchemaFields.EMBEDDING_RETRY_COUNT);
-      }
-      if (spladeAvailable) {
-        fieldsToFetch.add(SchemaFields.SPLADE_STATUS);
-        fieldsToFetch.add(SchemaFields.SPLADE_RETRY_COUNT);
-      }
-      if (nerAvailable) {
-        fieldsToFetch.add(SchemaFields.NER_STATUS);
-        fieldsToFetch.add(SchemaFields.NER_RETRY_COUNT);
-      }
-      if (!chunkDocIds.isEmpty()) {
-        fieldsToFetch.add(SchemaFields.CHUNK_EMBEDDING_STATUS);
-        fieldsToFetch.add(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT);
-      }
-
-      Map<String, Map<String, String>> batchedFields =
-          fieldsToFetch.isEmpty()
-              ? Map.of()
-              : context.documentFieldOps().getDocumentFieldsBatch(pendingIds, fieldsToFetch);
+      Map<String, Map<String, String>> batchedFields = batch.fields();
 
       // Phase 2: Collect docs needing each enrichment
       List<String> embedDocIds = new ArrayList<>();
@@ -1255,7 +1223,7 @@ public final class CombinedEnrichmentBackfillOps {
       }
       int written = 0;
       if (!batchUpdates.isEmpty()) {
-        var result = context.indexingCoordinator().updateDocumentsBatch(batchUpdates);
+        var result = batch.updateBatch(batchUpdates);
         written = result.updatedCount();
       }
       boolean completeBatchWrite = written == batchUpdates.size() && written > 0;

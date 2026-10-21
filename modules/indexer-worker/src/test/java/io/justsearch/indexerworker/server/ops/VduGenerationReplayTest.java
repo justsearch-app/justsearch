@@ -91,7 +91,7 @@ final class VduGenerationReplayTest extends LuceneExecutorTestBase {
       drain(reopened, runtime, () -> true);
 
       assertEquals(0, reopened.switchBufferDepth());
-      verify(runtime.indexingCoordinator()).updateDocument(eq(DOC_ID), anyMap());
+      org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> verify(runtime.indexingCoordinator(), never()).updateDocument(eq(DOC_ID), anyMap()));
       verify(runtime.commitOps(), org.mockito.Mockito.times(2))
           .commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
     }
@@ -125,7 +125,7 @@ final class VduGenerationReplayTest extends LuceneExecutorTestBase {
 
       assertEquals(1, queue.switchBufferDepth());
       assertEquals(before, find(queue, before.key()));
-      verify(runtime.indexingCoordinator()).updateDocument(eq(DOC_ID), anyMap());
+      org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> verify(runtime.indexingCoordinator(), never()).updateDocument(eq(DOC_ID), anyMap()));
       verify(runtime.commitOps()).commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
     }
   }
@@ -166,8 +166,8 @@ final class VduGenerationReplayTest extends LuceneExecutorTestBase {
   }
 
   @Test
-  @DisplayName("deferred replay regenerates VDU chunks after a parent replacement")
-  void deferredReplayRegeneratesAgainstReplacementParent() throws Exception {
+  @DisplayName("deferred legacy replay preserves a replacement and retires its exact journal row")
+  void deferredLegacyReplayKeepsReplacementParent() throws Exception {
     Path dbPath = tempDir.resolve("replacement.db");
     Path indexPath = tempDir.resolve("replacement-index");
     try (RunningRuntime runtime = openRuntime(indexPath);
@@ -196,18 +196,11 @@ final class VduGenerationReplayTest extends LuceneExecutorTestBase {
       runtime.commitOps().maybeRefreshBlocking();
 
       assertEquals(0, queue.switchBufferDepth());
-      assertEquals(
-          VDU_CONTENT,
-          runtime.documentFieldOps().getDocumentField(DOC_ID, SchemaFields.CONTENT));
-      List<LuceneRuntimeTypes.SearchHit> chunks = findChunks(runtime, DOC_ID);
-      assertTrue(chunks.size() > 1);
-      String expectedRevision = ChunkParentRevision.sha256Hex(VDU_CONTENT);
-      assertTrue(
-          chunks.stream()
-              .allMatch(
-                  hit ->
-                      expectedRevision.equals(
-                          hit.fields().get(SchemaFields.CHUNK_PARENT_CONTENT_SHA256))));
+      assertEquals("replacement from resumed source enumeration",
+          runtime.documentFieldOps().getDocumentField(DOC_ID,SchemaFields.CONTENT));
+      assertEquals(SchemaFields.VDU_STATUS_PENDING,
+          runtime.documentFieldOps().getDocumentField(DOC_ID,SchemaFields.VDU_STATUS));
+      assertEquals(0,findChunks(runtime,DOC_ID).size(),"unverifiable VDU chunks must never be generated");
     }
   }
 

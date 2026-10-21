@@ -102,7 +102,7 @@ class VduConcurrentTriggerTest {
       when(work.context()).thenReturn(context);
       when(work.cancellationReason()).thenReturn(Optional.empty());
       when(work.onCancel(any())).thenReturn(() -> {});
-      var client = mock(KnowledgeClient.class);
+      var client = VduAttemptTestSupport.client();
       when(client.countPendingVdu(any())).thenReturn(1);
       when(batch.processPendingFiles(any(), any())).thenReturn(outcome);
       coordinator = new OfflineCoordinator(executors, admission, batch,

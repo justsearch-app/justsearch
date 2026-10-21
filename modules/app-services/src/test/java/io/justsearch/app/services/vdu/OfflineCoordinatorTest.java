@@ -46,7 +46,7 @@ class OfflineCoordinatorTest {
   void setUp() {
     executors = new TestEngineExecutors();
     batch = mock(VduBatchProcessor.class);
-    client = mock(KnowledgeClient.class);
+    client = VduAttemptTestSupport.client();
     capability = new VduCapabilityState();
     context = TestEngineContexts.durableInternal();
     EngineAdmissionService admission = mock(EngineAdmissionService.class);
