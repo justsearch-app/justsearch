@@ -1,6 +1,5 @@
 plugins {
   `java-library`
-  `java-test-fixtures`
   id("jvm-test-suite")
   id("conventions.jvm-base")
 }
