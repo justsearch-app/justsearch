@@ -28,10 +28,14 @@
     "core:window:allow-show",
     "core:window:allow-set-focus",
     "core:window:allow-set-visible-on-all-workspaces",
-    "opener:default",
-    "opener:allow-open-url",
-    "opener:allow-open-path",
-    "opener:allow-reveal-item-in-dir",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "http://*" },
+        { "url": "https://*" },
+        { "url": "mailto:*" }
+      ]
+    },
     "dialog:allow-open",
     "window-state:default",
     "autostart:default",

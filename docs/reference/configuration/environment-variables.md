@@ -40,7 +40,7 @@ Scope:
 | **API & Runtime** | | | |
 | `JUSTSEARCH_API_PORT` | `justsearch.api.port` | Int | Port for the local loopback API. `0` means “ephemeral”. |
 | `JUSTSEARCH_PROD` | `justsearch.prod` | Bool | Enables desktop/prod posture (e.g., session token enforcement for non-GET endpoints). |
-| `JUSTSEARCH_EGRESS_BLOCK_ALL` | `egress.block_all` | Bool | Blocks outgoing network calls (tests/air-gapped posture). |
+| `JUSTSEARCH_EGRESS_BLOCK_ALL` | `egress.block_all` | Bool | Isolated-test configuration flag checked by the launcher smoke driver. It is not a network firewall and does not disable the desktop update check or OTLP export. |
 | **Telemetry** | | | |
 | `JUSTSEARCH_TELEMETRY_FLUSH_MS` | `justsearch.telemetry.flushMs` | Long | Telemetry flush interval in milliseconds (NDJSON exporter). |
 | **Indexing & Search** | | | |
@@ -61,7 +61,7 @@ Scope:
 | `JUSTSEARCH_CHAT_PROFILE` | `justsearch.chat.profile` | String | Chat-model profile (tempdoc 842): selects the llama-server `(model, mmproj)` pair. `standard` (default) is the user-facing Qwen3.5-9B pair; `compact` is the dev-tier small sibling (its own files under `models/compact/`), never part of a user install plan. Unknown values warn-fall-back to `standard`. The dev runner defaults dev stacks to `compact`; packaged/user launches default `standard`. An explicit `JUSTSEARCH_LLM_MODEL_PATH`/`justsearch.llm.model_path` override still wins over the profile. |
 | `JUSTSEARCH_EMBED_BACKEND` | `justsearch.embed.backend` | String | Embedding backend selector: `auto` (default) or `onnx`. Does NOT control GPU/CPU — use `JUSTSEARCH_EMBED_GPU_ENABLED` for GPU offload. |
 | `JUSTSEARCH_MODEL_PATH` | `justsearch.model.path` | Path | Legacy embedding model path. It is not consumed by current ONNX embedding discovery; use `JUSTSEARCH_EMBED_ONNX_MODEL_PATH` for an explicit model override. |
-| `JUSTSEARCH_EMBED_ONNX_MODEL_PATH` | `justsearch.embed.onnx.model_path` | Path | Explicit ONNX embedding model directory (overrides auto-discovery). When unset, `EmbeddingOnnxModelDiscovery` tries `embeddinggemma-300m/` then `embedding/`. |
+| `JUSTSEARCH_EMBED_ONNX_MODEL_PATH` | `justsearch.embed.onnx.model_path` | Path | Explicit ONNX embedding model directory (overrides auto-discovery). When unset, `EmbeddingOnnxModelDiscovery` searches `onnx/gte-multilingual-base/` under the configured model roots. |
 | `JUSTSEARCH_EMBED_GPU_ENABLED` | `justsearch.embed.gpu.enabled` | Bool | Enable GPU acceleration for ONNX embedding inference (default `false`). Preferred over legacy `JUSTSEARCH_EMBED_GPU_LAYERS`. |
 | `JUSTSEARCH_EMBED_GPU_MEM_MB` | `justsearch.embed.gpu_mem_mb` | Int | GPU arena size in MB for ONNX embedding CUDA sessions (default `6144` since 691 §N/F-031 — the default-on long-doc single-pass fragments smaller arenas; 6144 measured zero-OOM and delivers the full dense-revival ceiling. History: 2048 → 3072 (391) → 6144 (691)). |
 | `JUSTSEARCH_EMBED_GPU_LAYERS` | `justsearch.embed.gpu.layers` | Int | Legacy alias for `EMBED_GPU_ENABLED`: any value > 0 is treated as `EMBED_GPU_ENABLED=true`. Use `EMBED_GPU_ENABLED` for new configurations. |
@@ -227,6 +227,30 @@ and VDU still use zero when an override is supplied. The bound is captured when 
 configuration is created; mode changes, profile changes, crash recovery, and VDU exit preserve it.
 Restart the head to change the development override. This is host RAM, separate from the GPU
 KV-cache memory plan.
+
+## Trace output and optional OTLP export
+
+Tracing is off by default: `JUSTSEARCH_HEAD_TRACING_LEVEL` and
+`JUSTSEARCH_INDEX_TRACING_LEVEL` both default to `none`. Set either to `sample` or `detailed`
+(and restart the Engine) to write spans to `<data>/telemetry/traces.ndjson`.
+
+If tracing is enabled, these environment variables also enable OTLP/HTTP export:
+
+| Variable | Behavior |
+|---|---|
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Full trace endpoint URL; takes precedence over the generic endpoint. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Base URL; `/v1/traces` is appended unless already present. |
+| `OTEL_EXPORTER_OTLP_TRACES_HEADERS` / `OTEL_EXPORTER_OTLP_HEADERS` | Comma-separated `key=value` headers; the trace-specific variable takes precedence. |
+| `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` / `OTEL_EXPORTER_OTLP_TIMEOUT` | Export timeout in milliseconds; the trace-specific variable takes precedence. |
+
+An endpoint alone does not enable tracing. Endpoints may be off-device and are not restricted to
+HTTPS or loopback. Spans can include file paths and document excerpts (search spans
+are bounded to 16 documents × 1024 characters). The desktop shell passes the Engine its environment,
+so check inherited `OTEL_*` values before enabling tracing. Leave both levels at `none` to disable
+tracing, or unset both endpoint variables to keep enabled traces on disk only.
+
+These `OTEL_*` values are read directly from the environment by `TracingBootstrap`; the general
+system-property precedence rule above does not apply to them.
 
 ## Additional Runtime Keys (Selected)
 

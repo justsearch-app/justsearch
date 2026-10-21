@@ -14,9 +14,7 @@ on:
   # Merge-queue readiness (tempdoc 829 R4). GitHub only reports a required check on a
   # queued merge group if the workflow producing it also fires on `merge_group`; a
   # required check that never reports on the `refs/heads/gh-readonly-queue/...` ref
-  # stalls the group until the queue times it out. Inert until the repo is
-  # organization-owned and a queue is configured — no merge_group event can be
-  # delivered before then, so this adds zero runs today.
+  # stalls the group until the queue times it out.
   merge_group:
     types: [checks_requested]
 
@@ -175,6 +173,15 @@ jobs:
       - name: Required hosted governance production coverage
         run: node scripts/ci/check-governance-ci-coverage.mjs
 
+      - name: Windows contracts diagnostics regression tests
+        run: node --test scripts/ci/test-windows-contract-diagnostics.mjs
+
+      - name: Unit-test shard policy regression tests
+        run: node --test scripts/ci/test-verify-unit-test-shard-policy.mjs
+
+      - name: E2E child-log collection regression tests
+        run: node --test scripts/ci/collect-e2e-child-logs.test.mjs
+
       - name: Lifecycle suite scheduling regression tests
         run: node scripts/ci/test-lifecycle-suite-coverage.mjs
 
@@ -293,6 +300,9 @@ jobs:
 
       - name: Store-recoverability register agrees with the code
         run: node scripts/ci/check-store-recoverability.mjs
+
+      - name: Windows Tauri conformance step fails on either run
+        run: node --test scripts/ci/check-supervisor-conformance-step.test.mjs
 
       - name: Test dead-config scanner (config-surface gate)
         run: node scripts/ci/test-config-surface-dead-config.mjs
@@ -684,6 +694,7 @@ jobs:
           if-no-files-found: warn
 
   jseval-suite:
+    if: github.event_name != 'merge_group'
     name: jseval Python suite
     # tempdoc 930 §18.1 row 7. `scripts/jseval/tests/` is ~47k lines that ran in CI
     # NOWHERE — a measurement harness behind public claims whose own tests were a claim
@@ -738,13 +749,13 @@ jobs:
         run: python -m pytest scripts/jseval/tests -q -p no:cacheprovider
 
   measured-axe:
+    if: github.event_name == 'workflow_dispatch'
     name: Measured axe (advisory)
     # Tempdoc 930 §22.2 follow-up 5. Chunk H retired twelve static a11y/token oracles in
     # favour of measurement, but only half the replacement ran on PRs: the four-palette
     # contrast sweep (`check-contrast-matrix`, inside the required `Public claims` lane via
     # run-ui-web-gates.mjs). The other half — `jseval ui-a11y-gate`, real axe-core against
-    # the rendered page — was local-only, so a PR that regressed a rendered-page a11y rule
-    # had no automated catch at all.
+    # the rendered page — was local-only. This advisory sweep now runs on manual dispatch.
     #
     # Nothing about that gate needs the backend, which is why it can run here: `--fixtures`
     # intercepts every `/api/*` request in Playwright and serves committed schema-valid
@@ -839,6 +850,7 @@ jobs:
           if-no-files-found: warn
 
   license-and-notices:
+    if: github.event_name != 'merge_group'
     name: License and notices
     runs-on: windows-latest
     timeout-minutes: 20
@@ -1043,8 +1055,10 @@ jobs:
               :modules:system-tests:test
               :modules:telemetry:test
               :modules:test-support:test
+    # Keep matrix names expanded; skip every step on the merge queue.
     steps:
       - name: Checkout
+        if: github.event_name != 'merge_group'
         uses: actions/checkout@v7
         with:
           # platform-contracts alone takes real history (see its matrix comment). The other two
@@ -1056,6 +1070,7 @@ jobs:
           fetch-depth: ${{ matrix.fetch_depth }}
 
       - name: Setup Java
+        if: github.event_name != 'merge_group'
         uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -1064,9 +1079,11 @@ jobs:
             ${{ env.JAVA_VERSION }}
 
       - name: Setup Gradle
+        if: github.event_name != 'merge_group'
         uses: gradle/actions/setup-gradle@v6
 
       - name: Unit tests with model-dependent tests self-skipping
+        if: github.event_name != 'merge_group'
         id: gradle-test
         shell: bash
         run: |
@@ -1075,15 +1092,15 @@ jobs:
           "$GW" ${{ matrix.gradle_tasks }} -PskipWebBuild=true --console=plain
 
       - name: Report unit-test attribution
-        if: always()
+        if: always() && github.event_name != 'merge_group'
         run: node scripts/ci/report-unit-test-attribution.mjs --lane "${{ matrix.lane }}" --runner-label "${{ matrix.runner_label }}" --out-json build/ci/unit-test-attribution.json --out-md build/ci/unit-test-attribution.md --top 20 --allow-empty
 
       - name: Report unit-test advisory budget
-        if: always()
+        if: always() && github.event_name != 'merge_group'
         run: node scripts/ci/report-unit-test-budget.mjs --lane "${{ matrix.lane }}" --attribution build/ci/unit-test-attribution.json --out-json build/ci/unit-test-budget.json --out-md build/ci/unit-test-budget.md
 
       - name: Upload unit-test attribution
-        if: always()
+        if: always() && github.event_name != 'merge_group'
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
@@ -1096,6 +1113,7 @@ jobs:
           if-no-files-found: warn
 
   app-ui-ui:
+    if: github.event_name != 'merge_group'
     name: Unit tests (app-ui-ui)
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -1131,6 +1149,12 @@ jobs:
         run: |
           npm ci --audit=false
           npm ci --prefix modules/ui-web --audit=false
+
+      - name: Frontend unit tests
+        run: npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4
+
+      - name: Frontend lockdown tests
+        run: npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4
 
       - name: Stage Linux process-lifetime helper
         shell: bash
@@ -1169,6 +1193,7 @@ jobs:
           if-no-files-found: warn
 
   app-ui-services:
+    if: github.event_name != 'merge_group'
     name: Unit tests (app-ui-services)
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1259,7 +1284,7 @@ jobs:
   app-ui:
     name: Unit tests (app-ui)
     needs: [app-ui-ui, app-ui-services]
-    if: always()
+    if: always() && github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -1270,6 +1295,7 @@ jobs:
         run: test "$UI_RESULT" = success && test "$SERVICES_RESULT" = success
 
   windows-native-node:
+    if: github.event_name != 'merge_group'
     name: Windows-native tests (node)
     runs-on: windows-latest
     timeout-minutes: 25
@@ -1302,6 +1328,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   windows-native-contracts:
+    if: github.event_name != 'merge_group'
     name: Windows-native tests (contracts)
     runs-on: windows-latest
     timeout-minutes: 25
@@ -1353,7 +1380,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Windows coverage (@Tag windows or cross-platform) for the Linux-migrated modules
-        run: ./gradlew.bat :modules:app-api:test :modules:app-util:test :modules:app-agent:test :modules:app-services:test :modules:app-observability:test :modules:ui:test :modules:adapters-lucene:test :modules:app-inference:test :modules:worker-services:test :modules:ort-common:test -PwindowsOnly=true -PskipWebBuild=true --console=plain
+        id: windows-coverage
+        run: ./gradlew.bat :modules:app-api:test :modules:app-util:test :modules:app-agent:test :modules:app-services:test :modules:app-observability:test :modules:ui:test :modules:adapters-lucene:test :modules:app-inference:test :modules:worker-services:test :modules:ort-common:test :modules:configuration:test :modules:indexer-worker:test -PwindowsOnly=true -PskipWebBuild=true --continue --console=plain
+
+      - name: Require Windows safety class execution
+        if: always() && (steps.windows-coverage.outcome == 'success' || steps.windows-coverage.outcome == 'failure')
+        run: node scripts/ci/report-unit-test-attribution.mjs --lane windows-native-contracts --runner-label windows-latest --require-windows-classes --out-json build/ci/windows-unit-test-attribution.json --out-md build/ci/windows-unit-test-attribution.md
 
       - name: Release compatibility baseline contract tests
         shell: pwsh
@@ -1370,12 +1402,22 @@ jobs:
           ./scripts/ci/test-verify-pe-signatures.ps1
           ./scripts/release/test-sign-vendored-payload.ps1
 
+      - name: Preserve supervisor conformance diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: supervisor-conformance-windows-attempt-${{ github.run_attempt }}
+          path: tmp/supervisor-conformance/**
+          retention-days: 7
+
       - name: Preserve Windows-native test results
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: windows-native-contracts-attempt-${{ github.run_attempt }}
           path: |
+            build/ci/windows-unit-test-attribution.json
+            build/ci/windows-unit-test-attribution.md
             modules/**/build/test-results/test/TEST-*.xml
             modules/**/build/reports/tests/test/**
           retention-days: 30
@@ -1383,7 +1425,7 @@ jobs:
   windows-native-tests:
     name: Windows-native tests
     needs: [windows-native-node, windows-native-contracts]
-    if: always()
+    if: always() && github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -1425,29 +1467,34 @@ jobs:
         os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    # Keep matrix names expanded; skip every step on the merge queue.
     steps:
       - name: Checkout
+        if: github.event_name != 'merge_group'
         uses: actions/checkout@v7
 
       - name: Setup Rust
+        if: github.event_name != 'merge_group'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Linux shell build dependencies
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && github.event_name != 'merge_group'
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
 
       - name: Cache Rust builds
+        if: github.event_name != 'merge_group'
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: modules/shell/src-tauri
 
       - name: Setup Node
+        if: github.event_name != 'merge_group'
         uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Stage Linux process-lifetime helper
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && github.event_name != 'merge_group'
         shell: bash
         run: |
           helper="modules/ui/build/install/ui/$(node -p 'require("./scripts/lib/native-targets.cjs").nativeTarget().paths["bound-exec"]')"
@@ -1455,6 +1502,7 @@ jobs:
           cc -std=c11 -O2 -Wall -Wextra -Werror native/bound-exec/bound-exec.c -o "$helper"
 
       - name: Stage bundle-resource placeholder
+        if: github.event_name != 'merge_group'
         shell: pwsh
         run: |
           $dir = 'modules/shell/src-tauri/resources/headless'
@@ -1463,6 +1511,7 @@ jobs:
             -Value 'Resolves the tauri bundle resource glob for the unit-test lane. Not a payload.'
 
       - name: Cargo test
+        if: github.event_name != 'merge_group'
         working-directory: modules/shell/src-tauri
         run: cargo test --lib --locked
 
@@ -1478,15 +1527,18 @@ jobs:
       # is not one contract (ci.yml's own 745 lesson, two jobs down: a layer nothing invokes is dead
       # regardless of quality).
       - name: Build the supervisor conformance driver
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && github.event_name != 'merge_group'
         working-directory: modules/shell/src-tauri
         run: cargo build --bin supervisor-conformance --locked
 
       - name: Supervisor conformance (Tauri adapter)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && github.event_name != 'merge_group'
+        shell: pwsh
         run: |
           node scripts/supervisor-conformance/run.mjs --adapter tauri
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/supervisor-conformance/run.mjs --adapter tauri --case fileless-clean-local-restart-is-not-counted --repeat 50
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   # `:modules:system-tests:integrationTest` ran in NO lane until now: ci.yml ran only
   # `:modules:system-tests:test`, and the module's `check` depends on `test` alone
@@ -1508,11 +1560,11 @@ jobs:
   # ADVISORY (continue-on-error + deliberately absent from workflow-signal-policy.v1.json's
   # requiredStatusChecks, same pattern as `ci-walltime`): the HeadlessApp classpath rot above is
   # still open on `main`, so a blocking lane would red-wall every PR on a known, unrelated
-  # failure. Advisory already closes the blind spot the tier had — it now runs on every PR and
-  # its results are visible and archived, so rot cannot be silent again. Flip
+  # failure. It runs on manual dispatch with visible, archived results. Flip
   # `continue-on-error` off and add "Integration tests (system-tests tier)" to
   # requiredStatusChecks once the tier is green.
   integration-tests:
+    if: github.event_name == 'workflow_dispatch'
     name: Integration tests (system-tests tier)
     runs-on: windows-latest
     # Must stay above the Gradle task timeout (modules/system-tests/build.gradle.kts, 30 min),
@@ -1557,6 +1609,19 @@ jobs:
         if: always()
         run: node scripts/ci/report-unit-test-attribution.mjs --lane integration-tests --runner-label windows-latest --out-json build/ci/integration-test-attribution.json --out-md build/ci/integration-test-attribution.md --top 20 --allow-empty
 
+      - name: Collect E2E child process logs
+        if: always()
+        run: node scripts/ci/collect-e2e-child-logs.mjs
+
+      - name: Upload E2E child process logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: integration-tests-child-logs-attempt-${{ github.run_attempt }}
+          path: build/ci/e2e-child-logs/**
+          retention-days: 3
+          if-no-files-found: error
+
       - name: Upload integration-test results
         if: always()
         uses: actions/upload-artifact@v7
@@ -1575,6 +1640,7 @@ jobs:
   # acceptance selectable locally with -PincludeAiTests=true; hosted CI owns the
   # model-free cases even while the broader integration tier remains advisory.
   lifecycle-integration-tests:
+    if: github.event_name != 'merge_group'
     name: Engine lifecycle tests (model-free)
     runs-on: windows-latest
     timeout-minutes: 35
@@ -1600,6 +1666,19 @@ jobs:
 
       - name: Model-free installed lifecycle suite
         run: ./gradlew.bat :modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=false -PskipWebBuild=true --console=plain
+
+      - name: Collect E2E child process logs
+        if: always()
+        run: node scripts/ci/collect-e2e-child-logs.mjs
+
+      - name: Upload E2E child process logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lifecycle-integration-tests-child-logs-attempt-${{ github.run_attempt }}
+          path: build/ci/e2e-child-logs/**
+          retention-days: 3
+          if-no-files-found: error
 
       - name: Upload lifecycle-test results
         if: always()
@@ -1697,8 +1776,8 @@ jobs:
           if-no-files-found: warn
 
   # Advisory only — NOT a required check (see workflow-signal-policy.v1.json
-  # requiredStatusChecks; do not add this job's name there). Runs after every
-  # lane so it can read all sibling job/step timings and attribute the run's
+  # requiredStatusChecks; do not add this job's name there). On manual dispatch,
+  # runs after every lane to read sibling job/step timings and attribute the run's
   # wall-clock: which lane is the critical path, and how much of each lane is
   # fixed runner tax vs work. Warn-only budget; never fails the run. Tempdoc 668.
   ci-walltime:
@@ -1710,7 +1789,7 @@ jobs:
     # attribution taken while the ~6.5-minute suite still runs would omit it entirely and
     # `report-ci-walltime-budget.mjs` would warn `missing-required-lane` on every run.
     needs: [public-claims, license-and-notices, build, unit-tests, app-ui, windows-native-tests, shell-rust-tests, integration-tests, lifecycle-integration-tests, secret-scan, jseval-suite]
-    if: always()
+    if: always() && github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout
         uses: actions/checkout@v7

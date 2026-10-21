@@ -890,11 +890,10 @@ export interface ResumedMessage {
    *
    * The live path pins it onto the committed turn so the "Interpreted as: …" transparency line
    * survives the stream (603 C2); carrying it here is what lets a RELOADED turn say the same
-   * thing. Honest limit: the injector writes it to the dispatch context, and no producer persists
-   * it onto the store record today — so this reads a field that is currently always absent
-   * rather than inventing one. It is read defensively (nested `attributes`, both spellings) so
-   * the transparency line appears the moment a producer does start carrying it, instead of the
-   * record and the reader having to be changed together.
+   * thing. `ConversationEngine` persists it as a top-level `standaloneQuestion` on the turn's
+   * outcome row (its answer, or its error) when the follow-up was rewritten; it is still read
+   * defensively (nested `attributes`, both spellings), and an older record without it reads as
+   * absent.
    */
   standaloneQuestion?: string;
 }
@@ -929,6 +928,11 @@ export interface ResumedConversation {
   // encrypted + locked). The transcript must render a "locked → Unlock" notice, NOT an empty
   // thread (an empty thread reads as deleted; §L4: locked must never look deleted).
   locked?: boolean;
+  // True when the read itself FAILED (a server error or no answer) — as opposed to a 404, which is
+  // the backend saying the conversation has no record. Every other field is then "not told", and a
+  // caller that keeps state from an earlier read must not take the empty result for "nothing is
+  // hidden, no floor" (search-v3 keeps what it had).
+  failed?: boolean;
 }
 
 /**
@@ -968,7 +972,11 @@ export async function resumeConversation(
     // locked state so the chat surface renders an unlock affordance instead of an empty (deleted-looking)
     // transcript. Other non-OK responses remain a benign empty resume.
     if (res.status === 423) return { sessionId, shapeId, messages: [], locked: true };
-    if (!res.ok) return { sessionId, shapeId, messages: [] };
+    if (!res.ok) {
+      return res.status === 404
+        ? { sessionId, shapeId, messages: [] }
+        : { sessionId, shapeId, messages: [], failed: true };
+    }
     const data = (await res.json()) as {
       // Tempdoc 941 — the endpoint returns the STORE'S OWN message maps verbatim
       // (`ChatController.handleLoadHistory` → `conversationStore.loadHistory`), so the per-message
@@ -1036,7 +1044,7 @@ export async function resumeConversation(
         : undefined,
     };
   } catch {
-    return { sessionId, shapeId, messages: [] };
+    return { sessionId, shapeId, messages: [], failed: true };
   }
 }
 

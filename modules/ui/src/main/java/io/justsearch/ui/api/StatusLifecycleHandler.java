@@ -374,7 +374,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         reader == null
             ? null
             : new OperatingGpuProjection(
-                reader, OperatingGpuProjection::engineAndDescendants, java.time.Clock.systemUTC());
+                reader, OperatingGpuProjection::engineAndDescendants,
+                () -> Instant.ofEpochMilli(clockMs.getAsLong()));
     gpuMemory = projection == null ? null : new GpuMemoryReaderHold(reader, projection);
     if (previous != null && previous.reader() != reader) previous.reader().close();
     if (projection != null) {

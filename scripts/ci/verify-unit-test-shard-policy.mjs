@@ -11,7 +11,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { workflowJobs, aggregateDependencies } from './check-governance-ci-coverage.mjs';
+import { workflowJobs, aggregateDependencies, runsOnPrAndPush } from './check-governance-ci-coverage.mjs';
 
 const KIND = 'justsearch-unit-test-shard-policy.v1';
 const ALLOWED_PLATFORM_CLASSES = new Set([
@@ -239,18 +239,28 @@ export function validateUnitTestShardPolicy({ policy, workflowText, workflowSign
     const actual = job ? aggregateDependencies(job).sort() : [];
     if (!job || job.name !== aggregate.requiredCheck
         || !sameList(actual, [...aggregate.parts].sort())) {
-      issues.push(`${aggregate.jobId}: aggregate must unconditionally require success from every expected part`);
+      issues.push(`${aggregate.jobId}: aggregate must require success from every expected part on PRs and pushes`);
     }
     for (const part of aggregate.parts) {
       const partJob = jobs.find((j) => j.id === part);
-      if (!partJob || partJob.if || partJob['continue-on-error']
+      if (!partJob || !runsOnPrAndPush(partJob.if) || partJob['continue-on-error']
           || /^        continue-on-error:/m.test(partJob.text)
-          || partJob.runs.some((run) => run.step?.if && run.step.if !== 'always()')) {
+          || partJob.runs.some((run) => {
+            if (!run.step?.if || run.step.if === 'always()') return false;
+            // Coverage attribution must still run after a failed Gradle execution. Its only
+            // permitted bypass is when that execution never ran (an earlier failure/cancel).
+            const coverage = partJob.runs.find(candidate => candidate.step?.id === 'windows-coverage');
+            return !(part === 'windows-native-contracts'
+              && run.text.startsWith('node scripts/ci/report-unit-test-attribution.mjs ')
+              && run.text.includes('--require-windows-classes')
+              && run.step.if === "always() && (steps.windows-coverage.outcome == 'success' || steps.windows-coverage.outcome == 'failure')"
+              && coverage && !coverage.step.if && coverage.text.includes('-PwindowsOnly=true'));
+          })) {
         issues.push(`${part}: required part is missing, conditional or tolerates job/step failure`);
       }
     }
   }
-  for (const part of policy.windowsParts ?? []) {
+  for (const part of [...(policy.windowsParts ?? []), ...policyLanes.filter((lane) => lane.commands)]) {
     const job = jobs.find((j) => j.id === part.jobId);
     const commands = job?.runs.map((r) => r.text).join('\n') ?? '';
     const commandLines = commands.split('\n').map((line) => line.trim());
@@ -258,7 +268,7 @@ export function validateUnitTestShardPolicy({ policy, workflowText, workflowSign
       if (commandLines.filter((line) => line === command).length !== 1) issues.push(`${part.jobId}: expected command exactly once: ${command}`);
     }
     const actualTasks = [...commands.matchAll(/:modules:[\w-]+:test\b/g)].map((m) => m[0]);
-    if (!sameList(actualTasks, part.gradleTasks)) issues.push(`${part.jobId}: Windows Gradle task ownership differs`);
+    if (!sameList(actualTasks, part.gradleTasks)) issues.push(`${part.jobId}: Gradle task ownership differs`);
   }
 
   const workflowLanes = parseUnitTestMatrix(workflowText);

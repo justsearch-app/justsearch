@@ -248,7 +248,7 @@ schedule, per the capability-vs-mandate discipline.
 
 The mechanical-enforcement machinery for the substrate's seven-axis ×
 N-Categories matrix lives in **one kernel** at
-`scripts/contract-governance/`, not as bespoke per-cell scripts. Slice
+`scripts/governance/`. Slice
 `slices/3a-1-8f-governance-runtime.md` ships the substrate; wire ×
 Axis 6 is the first registered enforcer.
 
@@ -260,13 +260,13 @@ Three structural primitives:
    `changesetsDir`, baseline strategy, and applicable axes. The
    `externalEnforcers[]` array hosts non-Category enforcer
    invocations (e.g., the `buf breaking` preflight over
-   `modules/ipc-common/src/main/proto`, migrated from
+   `modules/ipc-common/src/main/proto`, which was migrated from the retired
    `scripts/architecture/run-buf-preflight-win.ps1`; its registry id
    is still `ipc-grpc-buf-breaking`, a name the directory no longer
    earns — the protos declare messages only since lane F item A14).
 2. **Per-axis enforcer plugins** with a uniform interface (see
-   `scripts/contract-governance/lib/enforcer.mjs`). Each enforcer is
-   a function `(target, options) → EnforcerResult`. The protobuf-
+   `scripts/governance/gates/wire/enforcer.mjs`). The wire gate exports
+   `enforceWire(options)`, returning findings and a verdict. Its protobuf-
    Axis-6 enforcer wraps `buf breaking` with `GIT_LFS_SKIP_SMUDGE=1`
    and shallow-clone detection. Future axes (Axis 4 cross-references
    per slice 3a-1-8c; Axis 5 ArchUnit/ESLint per §A.9 of 3a-1-8f) plug
@@ -318,42 +318,29 @@ the runner asserts the truth-table catches it. Self-test failure means
 the gate machinery itself has rotted, not that real contracts have
 broken.
 
-**Activation posture (amended 2026-05-12 per slice 3a-1-8f §B.10):**
-the kernel fires only when explicitly invoked. Two invocation paths
-ship:
+**Activation:** the required **Public claims** job in `.github/workflows/ci.yml`
+runs the wire gate and the governance fixture self-tests. Local equivalents are:
 
-1. **CI**, when a workflow lane explicitly invokes the contract
-   governance gate for `contracts/` or IPC-proto changes. ADR-0044
-   allows the public hosted CI lane to run on pull requests and pushes;
-   self-hosted/specialty workflow activation remains manual unless a
-   later ADR changes it.
-2. **Local invocation**, `node scripts/contract-governance/run.mjs
-   --mode gate --self-test`. Per the pre-merge checks table
-   (docs/reference/contributing/pre-merge-checks.md), this runs alongside the other per-subject pre-merge
-   checks; no wrapper script bundles them. Per slice 3a-1-8f §B.12,
-   the prior three-layer wrapper chain (`gate.ps1` →
-   `local-agent-gate-win.ps1` → DAG runner) was deleted because the
-   inner DAG runner had been broken since 2026-03-16, and reviewing
-   whether a "single canonical gate" affordance was structurally
-   useful concluded it wasn't.
+```bash
+npm ci --prefix scripts/wire-contract --audit=false
+node scripts/governance/run.mjs --gate wire --mode gate --out tmp/wire-gate.sarif
+node scripts/governance/run.mjs --self-test --mode gate
+```
 
-The substrate's mechanical-enforcement claim is **conditional on
-invocation**: the gate catches breaks *when run*. Public hosted CI can
-now provide automatic activation for lanes that include it, but any
-specialty/manual lane still depends on the operator dispatching it. The
-empirical worked example demonstrating the old activation gap (a
-contract-touching commit reaching `main` without the gate firing) is
-slice 3a-1-8f §B.9 (`c815c703b`).
-Operators relying on this substrate should treat `scripts/gate.ps1`
-as load-bearing for pre-merge verification of contract changes.
+These run alongside the other per-subject pre-merge checks in
+`docs/reference/contributing/pre-merge-checks.md`. The prior wrapper chain
+(`gate.ps1` → `local-agent-gate-win.ps1` → DAG runner) was deleted
+(slice 3a-1-8f §B.12). The older activation-gap example in §B.9
+(`c815c703b`) predates the Public claims wiring.
 
 **Convergence:** the V1 standalone `scripts/wire-contract/changelog-check.mjs`
 (per slice 3a-1-8 Phase 5b — CHANGELOG-was-touched proxy) is retired
 by the kernel; its semantics are subsumed by the
 classification-trailer parser + truth-table verdict. The IPC preflight
-(`scripts/architecture/run-buf-preflight-win.ps1`) migrates as an
-`externalEnforcer` registration; npm-pinned buf becomes the canonical
-install.
+(`scripts/architecture/run-buf-preflight-win.ps1`) was migrated to the
+`ipc-grpc-buf-breaking` external-enforcer registration in `contracts/registry.v1.json`;
+the retired script is no longer an entrypoint. The wire gate uses npm-pinned buf
+under `scripts/wire-contract/`.
 
 ## Relationship To The Three Primitives
 

@@ -49,10 +49,6 @@ decision logic is preserved:
 - Large generic UI platforms fail when escape hatches are underfunded.
 - Framework popularity is less important than stable extension boundaries.
 
-For full rationale, see
-`archive/source-tempdocs/421-stack.md` and
-`archive/source-tempdocs/421-reasoning.md`.
-
 ## Library Policy
 
 Libraries should be adopted when they support framework responsibilities:
