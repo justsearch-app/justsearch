@@ -25,7 +25,11 @@
         "maxSkipped": 50
       },
       "jobId": "app-ui-ui",
-      "jobName": "Unit tests (app-ui-ui)"
+      "jobName": "Unit tests (app-ui-ui)",
+      "commands": [
+        "npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4",
+        "npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4"
+      ]
     },
     {
       "lane": "app-ui-services",
@@ -169,7 +173,8 @@
         "./scripts/ci/test-sign-windows.ps1",
         "./scripts/ci/test-sign-windows-diagnostics.ps1",
         "./scripts/ci/test-verify-pe-signatures.ps1",
-        "./scripts/release/test-sign-vendored-payload.ps1"
+        "./scripts/release/test-sign-vendored-payload.ps1",
+        "node scripts/ci/report-unit-test-attribution.mjs --lane windows-native-contracts --runner-label windows-latest --require-windows-classes --out-json build/ci/windows-unit-test-attribution.json --out-md build/ci/windows-unit-test-attribution.md"
       ],
       "gradleTasks": [
         ":modules:app-api:test",
@@ -181,7 +186,69 @@
         ":modules:adapters-lucene:test",
         ":modules:app-inference:test",
         ":modules:worker-services:test",
-        ":modules:ort-common:test"
+        ":modules:ort-common:test",
+        ":modules:configuration:test",
+        ":modules:indexer-worker:test"
+      ],
+      "requiredClasses": [
+        {
+          "name": "io.justsearch.configuration.persistence.AtomicFileWritesTest"
+        },
+        {
+          "name": "io.justsearch.configuration.persistence.ContendedFileReadsTest",
+          "allowedSkips": [
+            {
+              "name": "reopensAfterContentionWhenWriterRotatesThePathBeforePublishingReplacement()",
+              "messageIncludes": "",
+              "reason": "@EnabledOnOs(OS.LINUX): this rotation case runs only on Linux; Gradle records an empty <skipped/> on Windows (run 39334194117)."
+            }
+          ]
+        },
+        {
+          "name": "io.justsearch.configuration.PlatformPathsTest"
+        },
+        {
+          "name": "io.justsearch.app.util.AppInstanceLockExclusionTest"
+        },
+        {
+          "name": "io.justsearch.app.util.AppInstanceLockFailureTest"
+        },
+        {
+          "name": "io.justsearch.app.api.runtime.child.DefaultChildControlTest"
+        },
+        {
+          "name": "io.justsearch.app.api.runtime.containment.WindowsJobWitnessBoundTest"
+        },
+        {
+          "name": "io.justsearch.app.api.runtime.containment.WindowsJobWitnessReserveTest"
+        },
+        {
+          "name": "io.justsearch.indexerworker.extract.ExtractionSandboxCommandTest"
+        },
+        {
+          "name": "io.justsearch.indexerworker.services.RootPresenceGuardTest"
+        },
+        {
+          "name": "io.justsearch.indexerworker.loop.UncertainAbsenceGatesTest"
+        },
+        {
+          "name": "io.justsearch.adapters.lucene.runtime.PruneUncertainAbsenceTest"
+        },
+        {
+          "name": "io.justsearch.indexerworker.services.PruneMissingDifferentVolumeTest",
+          "allowedSkips": [
+            {
+              "name": "aDifferentVolumeAtTheSameLetterAfterARestartPrunesNothing()",
+              "messageIncludes": "needs a second volume besides",
+              "reason": "The test requires a second volume besides the temporary directory; its assumption reports needs a second volume besides."
+            },
+            {
+              "name": "aRootRemovedAndAddedAgainOnAnotherVolumeIsPrunedThere()",
+              "messageIncludes": "needs a second volume besides",
+              "reason": "The test requires a second volume besides the temporary directory; its assumption reports needs a second volume besides."
+            }
+          ]
+        }
       ]
     }
   ],

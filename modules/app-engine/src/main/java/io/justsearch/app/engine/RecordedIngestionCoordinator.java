@@ -190,6 +190,13 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   }
 
   @Override
+  public boolean generationPendingAtBoot() {
+    synchronized (lock) {
+      return operations.openRecords().stream().anyMatch(RecordedIngestionCoordinator::isBulk);
+    }
+  }
+
+  @Override
   public IndexGenerationManager.BootOwnership bootOwnership(JobQueue queue) throws IOException {
     synchronized (lock) {
       var pending = operations.openRecords().stream().filter(row -> isBulk(row)).toList();
@@ -209,9 +216,18 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         boolean complete = walk.isPresent() && walk.orElseThrow().capturedPlan()
             && plan.planHash().equals(walk.orElseThrow().planHash())
             && walk.orElseThrow().enumerationOutcome() == JobQueue.WalkEnumerationOutcome.COMPLETE;
+        // SETTLED is persisted before promotion, so it cannot prove which side of the pointer
+        // boundary survived. BUILDING plus the exact sealed capture proves A still owned serving.
+        var progress = operations.bulkReindexProgress(row.id());
+        boolean previousSourcePointerProven = continuationAuthorized && complete
+            && progress.isPresent()
+            && progress.orElseThrow().phase() == BulkReindexProgress.Phase.BUILDING
+            && progress.orElseThrow().generationId().equals(recordedTarget(row.key()))
+            && progress.orElseThrow().target().equals(plan.target())
+            && progress.orElseThrow().capture().equals(capture(walk.orElseThrow()));
         return new IndexGenerationManager.BootOwnership.Recorded(row.key(), plan.scope().generation(),
             plan.source(), plan.target().fingerprint(), complete, continuationAuthorized,
-            plan.projectionSourceIds());
+            plan.projectionSourceIds(), previousSourcePointerProven);
       } catch (IllegalArgumentException | JobQueue.RecordedWalkGapException invalid) {
         return new IndexGenerationManager.BootOwnership.Fenced();
       }

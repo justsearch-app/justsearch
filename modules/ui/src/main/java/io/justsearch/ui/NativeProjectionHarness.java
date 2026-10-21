@@ -55,6 +55,7 @@ final class NativeProjectionHarness implements ProjectionSeedSource {
   private final Path input;
   private final Fixture fixture;
   private final boolean successor;
+  private final boolean journalLoss;
   private final CountDownLatch sourceEntered = new CountDownLatch(1);
   private final CountDownLatch sourceReleased = new CountDownLatch(1);
   private final AtomicBoolean held = new AtomicBoolean();
@@ -63,11 +64,12 @@ final class NativeProjectionHarness implements ProjectionSeedSource {
   private record Fixture(String phase, List<AcceptedProjection> initial,
       List<AcceptedProjection> finalRows) {}
 
-  private NativeProjectionHarness(Path data) throws IOException {
+  private NativeProjectionHarness(Path data, boolean journalLoss) throws IOException {
+    this.journalLoss = journalLoss;
     this.data = data.toAbsolutePath().normalize();
     input = this.data.resolve("fixtures").resolve("native-projection-source.json");
     fixture = readFixture(input);
-    successor = verifyPriorCut();
+    successor = journalLoss ? verifyPriorJournalLoss() : verifyPriorCut();
     if (!fixture.phase().equals(successor ? "final" : "initial")) {
       throw new IOException("Native source phase does not match the supervised incarnation");
     }
@@ -85,7 +87,11 @@ final class NativeProjectionHarness implements ProjectionSeedSource {
       throw new IllegalArgumentException("Native projection proof requires its exact supervised self-exit cut");
     }
     try {
-      return new NativeProjectionHarness(data);
+      String journalLoss = env.apply("JUSTSEARCH_NATIVE_JOURNAL_LOSS");
+      if (journalLoss != null && !"1".equals(journalLoss)) {
+        throw new IllegalArgumentException("Invalid native journal-loss selection");
+      }
+      return new NativeProjectionHarness(data, "1".equals(journalLoss));
     } catch (IOException invalid) {
       throw new IllegalArgumentException("Native projection fixture is invalid", invalid);
     }
@@ -178,8 +184,15 @@ final class NativeProjectionHarness implements ProjectionSeedSource {
           "native-collection-victim", normalized(collectionFile), false));
       await("initial retained projection", () -> hasHit(bootstrap, context,
           RETAINED_CONTENT, retained.indexId(), false));
-      await("initial real model query", () -> hasHit(bootstrap, context,
-          "native-retained-file", normalized(prefixRoot().resolve("retained.txt")), true));
+      if (!journalLoss) {
+        await("initial real model query", () -> hasHit(bootstrap, context,
+            "native-retained-file", normalized(prefixRoot().resolve("retained.txt")), true));
+      }
+      if (journalLoss) {
+        HarnessBarrierProtocol.await(data, "journal-loss-before-migration",
+            JSON.writeValueAsString(Map.of("pid", ProcessHandle.current().pid(),
+                "sourceGeneration", firstReceipt.generationId())), false, 600);
+      }
       var migration = call(bootstrap, client -> client.startMigration("installed native mixed receipt proof", context));
       require(migration.accepted() && !migration.restartRequired()
           && firstReceipt.generationId().equals(migration.activeGenerationId())
@@ -202,10 +215,22 @@ final class NativeProjectionHarness implements ProjectionSeedSource {
       requireNrt(lateReceipt, late, migration.activeGenerationId());
       await("later A projection", () -> hasHit(bootstrap, context,
           LATE_CONTENT, late.indexId(), false));
+      if (journalLoss) {
+        require(call(bootstrap, client -> client.deleteDocById(
+            normalized(prefixRoot().resolve("retained.txt")), context)), "File deletion was not accepted");
+        var deletion = new AcceptedProjection(SOURCE, retained.documentId(),
+            retained.sourceRevision() + 1, AcceptedProjection.Kind.DELETE, null);
+        var removed = call(bootstrap,
+            client -> client.deleteAndAcknowledge(deletion, ProjectionDurability.NRT, context));
+        requireNrt(removed, deletion, migration.activeGenerationId());
+      }
       var marker = Map.of("scenario", SCENARIO, "pid", ProcessHandle.current().pid(),
           "sourceGeneration", migration.activeGenerationId(),
           "buildingGeneration", migration.buildingGenerationId(), "lateReceipt", lateReceipt);
       HarnessBarrierProtocol.await(data, ACTION_FAMILY, JSON.writeValueAsString(marker), false, 600);
+      if (journalLoss) {
+        HarnessBarrierProtocol.await(data, "journal-loss-cut", JSON.writeValueAsString(marker), true);
+      }
       Fixture finalInput = readFixture(input);
       requireSameRows(finalInput);
       require("final".equals(finalInput.phase()), "Runner did not persist the final complete source");
@@ -275,6 +300,25 @@ final class NativeProjectionHarness implements ProjectionSeedSource {
         || !receipt.path("generationId").equals(actions.path("sourceGeneration"))
         || !"NRT".equals(receipt.path("visibility").asText())) {
       throw new IOException("Native prior cut does not match its action owner");
+    }
+    return true;
+  }
+
+  private boolean verifyPriorJournalLoss() throws IOException {
+    Path actionsPath = HarnessBarrierProtocol.reached(data, ACTION_FAMILY);
+    if (!Files.exists(actionsPath)) return false;
+    JsonNode actions = readBounded(actionsPath);
+    JsonNode cut = readBounded(HarnessBarrierProtocol.reached(data, "journal-loss-cut"));
+    if (!SCENARIO.equals(actions.path("scenario").asText())
+        || actions.path("pid").asLong() <= 0
+        || actions.path("pid").asLong() == ProcessHandle.current().pid()
+        || actions.path("sourceGeneration").asText().isBlank()
+        || actions.path("buildingGeneration").asText().isBlank()
+        || actions.path("sourceGeneration").equals(actions.path("buildingGeneration"))
+        || !cut.path("pid").equals(actions.path("pid"))
+        || !cut.path("sourceGeneration").equals(actions.path("sourceGeneration"))
+        || !cut.path("buildingGeneration").equals(actions.path("buildingGeneration"))) {
+      throw new IOException("Journal-loss cut does not identify its prior migration owner");
     }
     return true;
   }

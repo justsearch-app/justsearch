@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T01:35:23.616Z",
+  "revision": "bfe0a9cba813b90c58c42b192a09ad140bff56d2",
+  "tree": "773ff48a4a2cbc2fbbd25926f1c961d036e10c7d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.PreOpenSchemaMismatchBootTest.interruptedBackupWithAbsentActiveReconcilesAndStartsSourceRebuild\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5819
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PreOpenSchemaMismatchBootTest.java#interruptedBackupWithAbsentActiveReconcilesAndStartsSourceRebuild",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PreOpenSchemaMismatchBootTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e8cbbfa1228109424aa5cb849173e842c34f067c4588e0c10428b4b7eac06ca6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptedBackupWithAbsentActiveReconcilesAndStartsSourceRebuild(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:67a335a20bb3a28865437c778803dea7cb1f40c3316de5f29ef557dd39dc49c3"
+}

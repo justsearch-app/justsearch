@@ -467,6 +467,9 @@ public enum ApiErrorCode {
      */
     STORE_LOCKED(ErrorClass.POLICY),
 
+    /** Stored memories could not be loaded completely; the next access retries the read. */
+    MEMORIES_UNAVAILABLE(ErrorClass.TRANSIENT),
+
     // ── Intent layer (slice 487 §4.4 trust lattice) ────────────────────────
 
     /**

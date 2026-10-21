@@ -45,7 +45,7 @@ export function registerSearchResultActions(): void {
     source: 'core',
     provenance: CORE_PROVENANCE,
     enabled: hasPath,
-    handler: (payload) => void openLocalFile((payload as HitLike).path ?? ''),
+    handler: (payload) => openLocalFile((payload as HitLike).path ?? '').catch(() => { /* Already reported. */ }),
   });
   registerContextAction({
     id: 'search-result.reveal',
@@ -56,7 +56,7 @@ export function registerSearchResultActions(): void {
     source: 'core',
     provenance: CORE_PROVENANCE,
     enabled: hasPath,
-    handler: (payload) => void revealLocalPath((payload as HitLike).path ?? ''),
+    handler: (payload) => revealLocalPath((payload as HitLike).path ?? '').catch(() => { /* Already reported. */ }),
   });
   registerContextAction({
     id: 'search-result.copy-path',

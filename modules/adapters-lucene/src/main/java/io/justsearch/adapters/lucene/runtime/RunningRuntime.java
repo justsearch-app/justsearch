@@ -52,6 +52,11 @@ public final class RunningRuntime implements LuceneRuntime {
     return session.pruneOps;
   }
 
+  /** Binds the Worker's current file policy before admission, without accessing index data. */
+  public void useSourceProcessingPolicy(java.util.function.Predicate<String> allows) {
+    session.sourceProcessingPolicy = Objects.requireNonNull(allows, "allows");
+  }
+
   /**
    * Installs the owning Engine's callback for a Lucene writer that has become permanently unusable.
    * The callback fires at most once for this runtime and never for its intentional drain/close.

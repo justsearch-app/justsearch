@@ -196,7 +196,6 @@ testing {
         implementation(platform(libs.junit.bom))
         implementation(libs.junit.jupiter.api)
         implementation("org.junit.jupiter:junit-jupiter-params:5.14.3")
-        implementation(libs.archunit.junit5)
         implementation(libs.mockito.core)
         implementation(libs.mockito.junit.jupiter)
         // Tempdoc 517 — OTel SDK testing for span-topology assertions

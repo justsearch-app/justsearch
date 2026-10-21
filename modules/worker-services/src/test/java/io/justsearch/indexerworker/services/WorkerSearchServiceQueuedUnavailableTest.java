@@ -132,10 +132,15 @@ final class WorkerSearchServiceQueuedUnavailableTest
     lifecycle = openSearchIndex();
     var provider = transientProvider();
     var service = service(provider);
+    var call = foreground(Duration.ofMillis(1_250));
+    var policy = SearchBudgetPolicy.DEFAULT;
+    assertTrue(call.deadlineNanos() - System.nanoTime()
+        > TimeUnit.MILLISECONDS.toNanos(policy.lexicalReserveMs() + policy.marginMs()),
+        "the timely call must have a positive semantic allowance");
     assertKeywordBudget(service.search(query(auto
         ? pipeline().setSparseEnabled(true).setDenseAuto(true)
         : pipeline().setSparseEnabled(true).setDenseEnabled(true)),
-        foreground(REQUEST_BUDGET)), "loading");
+        call), "loading");
     assertEquals(1, loading.logicalWaits.get(), "one logical models-ready wait, regardless of cancellation slices");
     assertEquals(0, encodes.get());
     loading.countDown();

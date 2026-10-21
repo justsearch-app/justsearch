@@ -178,6 +178,7 @@ final class AgentToolsController {
     try {
       @SuppressWarnings("unchecked")
       Map<String, Object> body = MAPPER.readValue(ctx.body(), Map.class);
+      if (StoreIdRequest.rejectBody(ctx, body)) return;
       Object sessionIdRaw = body.get("sessionId");
       Object callIdRaw = body.get("callId");
       Object successRaw = body.get("success");
