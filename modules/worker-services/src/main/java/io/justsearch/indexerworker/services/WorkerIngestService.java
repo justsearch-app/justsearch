@@ -1686,6 +1686,9 @@ public final class WorkerIngestService {
           // The chunk replacement holds the file-mutation fence, so a prune of this file never
           // sees part of it and no replacement chunk lands after the file was removed.
           String refusal;
+          var policyStore = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+          var policyLock = policyStore == null ? null : policyStore.publicationLock().readLock();
+          if (policyLock != null) policyLock.lock();
           try {
             refusal = withFileMutationFence(() -> {
               try {
@@ -1711,6 +1714,8 @@ public final class WorkerIngestService {
             });
           } catch (java.io.UncheckedIOException e) {
             throw e.getCause();
+          } finally {
+            if (policyLock != null) policyLock.unlock();
           }
           if (refusal != null) {
             vduProcessingClaims.remove(docId, claim);
@@ -2499,33 +2504,40 @@ public final class WorkerIngestService {
           if (ctx.engineContext().workId().isEmpty() || request.getAttemptId().isBlank()) {
             return markVduErrorResponse("VDU requires a procedure owner and unique attempt_id");
           }
-          return withFileMutationFence(() -> {
-            try {
-              ingestLifecycle.commitOps().maybeRefreshBlocking();
-              if (ingestLifecycle.documentFieldOps().excludedProcessingIds(List.of(docId)).contains(docId)) {
-                return markVduErrorResponse("Source is excluded by the current policy");
-              }
-              var input = ingestLifecycle.documentFieldOps().getEnrichmentInputs(List.of(docId)).get(docId);
-              if (input == null) return markVduErrorResponse("Document not found: " + docId);
-              if (input.fields().getOrDefault(SchemaFields.SOURCE_SHA256, "").isBlank()) {
-                refreshLegacyVduSource(docId);
-                return markVduErrorResponse("VDU source revision needs a targeted refresh: " + docId);
-              }
-              var previousClaim = vduProcessingClaims.get(docId);
-              if (previousClaim != null) {
-                if (vduClaimMatches(docId, previousClaim)) {
-                  return markVduErrorResponse("VDU document already has a claim: " + docId);
+          var policyStore = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+          var policyLock = policyStore == null ? null : policyStore.publicationLock().readLock();
+          if (policyLock != null) policyLock.lock();
+          try {
+            return withFileMutationFence(() -> {
+              try {
+                ingestLifecycle.commitOps().maybeRefreshBlocking();
+                if (ingestLifecycle.documentFieldOps().excludedProcessingIds(List.of(docId)).contains(docId)) {
+                  return markVduErrorResponse("Source is excluded by the current policy");
                 }
-                vduProcessingClaims.remove(docId, previousClaim);
+                var input = ingestLifecycle.documentFieldOps().getEnrichmentInputs(List.of(docId)).get(docId);
+                if (input == null) return markVduErrorResponse("Document not found: " + docId);
+                if (input.fields().getOrDefault(SchemaFields.SOURCE_SHA256, "").isBlank()) {
+                  refreshLegacyVduSource(docId);
+                  return markVduErrorResponse("VDU source revision needs a targeted refresh: " + docId);
+                }
+                var previousClaim = vduProcessingClaims.get(docId);
+                if (previousClaim != null) {
+                  if (vduClaimMatches(docId, previousClaim)) {
+                    return markVduErrorResponse("VDU document already has a claim: " + docId);
+                  }
+                  vduProcessingClaims.remove(docId, previousClaim);
+                }
+                return applyMarkVduProcessing(docId, readVduRetryCount(docId), maxRetries,
+                    ctx.engineContext().workId().orElseThrow(), request.getAttemptId(), input.fields());
+              } catch (RuntimeException failure) {
+                throw failure;
+              } catch (Exception failure) {
+                throw new java.io.UncheckedIOException(new IOException(failure.getMessage(), failure));
               }
-              return applyMarkVduProcessing(docId, readVduRetryCount(docId), maxRetries,
-                  ctx.engineContext().workId().orElseThrow(), request.getAttemptId(), input.fields());
-            } catch (RuntimeException failure) {
-              throw failure;
-            } catch (Exception failure) {
-              throw new java.io.UncheckedIOException(new IOException(failure.getMessage(), failure));
-            }
-          });
+            });
+          } finally {
+            if (policyLock != null) policyLock.unlock();
+          }
         } catch (WorkerServiceException failure) {
           throw failure;
         } catch (Exception e) {

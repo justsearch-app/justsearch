@@ -196,15 +196,21 @@ public final class IndexingCoordinator {
       List<Map.Entry<String, Map<String, Object>>> updates,
       Map<String, DocumentFieldOps.EnrichmentInput> inputs) {
     if (updates == null || updates.isEmpty()) return new BatchUpdateResult(0, 0);
-    acquireReadLockTimed();
+    // Keep policy saves ordered with the revision comparison and the complete publication.
+    var store = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    var policyLock = store == null ? null : store.publicationLock().readLock();
+    if (policyLock != null) policyLock.lock();
     try {
-      guardBackpressure();
+      acquireReadLockTimed();
       try {
-        dispatchLock.lock();
-        try { return writeOps.get().updateDocumentsBatchIf(updates, inputs); }
-        finally { dispatchLock.unlock(); }
-      } finally { session.queueDepth.decrementAndGet(); }
-    } finally { releaseWriteBarrierAndReport(); }
+        guardBackpressure();
+        try {
+          dispatchLock.lock();
+          try { return writeOps.get().updateDocumentsBatchIf(updates, inputs); }
+          finally { dispatchLock.unlock(); }
+        } finally { session.queueDepth.decrementAndGet(); }
+      } finally { releaseWriteBarrierAndReport(); }
+    } finally { if (policyLock != null) policyLock.unlock(); }
   }
 
   /** Pass-through convenience. Direct delete, no RMW envelope — takes {@link #dispatchLock}. */

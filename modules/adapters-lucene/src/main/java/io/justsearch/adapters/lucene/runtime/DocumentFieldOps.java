@@ -331,7 +331,7 @@ public final class DocumentFieldOps {
 
   static final Set<String> PARENT_REVISION_FIELDS = Set.of(
       SchemaFields.CONTENT, SchemaFields.CONTENT_SHA256, SchemaFields.SOURCE_SHA256,
-      SchemaFields.DOC_UID);
+      SchemaFields.DOC_UID, SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID);
 
   /** Reads text and comparison proof together; an I/O failure never becomes a blank-content retry. */
   public Map<String, EnrichmentInput> getEnrichmentInputs(List<String> docIds) throws IOException {
