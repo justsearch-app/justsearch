@@ -1,0 +1,5 @@
+{
+  "source": "/home/elias/dev/agent-private/projects/justsearch/tasks/t-20261020-540095/results/verifier-A3b-evidence/engine_probe.py",
+  "sha256": "f53965892b3da4934373d03f148fad2c1e08f77f16ded3da9930a7398d80d700",
+  "adaptation": "Only BASE changed to the task temporary folder; probe logic and JDI source unchanged."
+}

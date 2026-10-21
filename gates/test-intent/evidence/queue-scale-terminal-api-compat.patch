@@ -1,0 +1,17 @@
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
+@@ -437,6 +437,14 @@
+             java.util.function.Consumer<Throwable> onError,
+             Runnable onCompleted, EngineContext engineContext);
+ 
++    // Test-fixture signature shim only. The old product never calls this new subscription.
++    public IndexingJobsStream subscribeIndexingJobOutcomes(
++            java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame> onFrame,
++            java.util.function.Consumer<Throwable> onError,
++            Runnable onCompleted, EngineContext engineContext) {
++        throw new UnsupportedOperationException("No terminal-outcome port before this repair");
++    }
++
+     /** Releases whatever the transport holds. Called from {@link #close()}. */
+     protected abstract void closeTransport();
+ 

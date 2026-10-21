@@ -1,0 +1,14 @@
+{
+  "pid": 3453212,
+  "startTicks": "32847044",
+  "tag": "/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/builder/ci-shard-hang/fixed-events",
+  "ci": "true",
+  "serverOverridePresent": false,
+  "gpuOverridePresent": false,
+  "homeOverridePresent": true,
+  "dataOverridePresent": true,
+  "tmpdir": [
+    "/home/elias/dev/justsearch/.claude/worktrees/queue-scale/tmp/qh"
+  ],
+  "cwd": "/home/elias/dev/justsearch/.claude/worktrees/queue-scale/modules/ui"
+}

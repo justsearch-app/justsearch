@@ -1633,12 +1633,20 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   public IndexingJobsStream subscribeIndexingJobs(
       Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted, EngineContext engineContext) {
     try (var work = admission.attach(engineContext)) {
-      return subscribeIndexingWork(onFrame, onError, work);
+      return subscribeIndexingWork(onFrame, onError, work, false);
+    }
+  }
+
+  @Override
+  public IndexingJobsStream subscribeIndexingJobOutcomes(
+      Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted, EngineContext engineContext) {
+    try (var work = admission.attach(engineContext)) {
+      return subscribeIndexingWork(onFrame, onError, work, true);
     }
   }
 
   private IndexingJobsStream subscribeIndexingWork(Consumer<IndexingJobsFrame> onFrame,
-      Consumer<Throwable> onError, io.justsearch.app.api.EngineWorkHandle work) {
+      Consumer<Throwable> onError, io.justsearch.app.api.EngineWorkHandle work, boolean outcomesOnly) {
     // Legacy supplier-only clients may block during service selection. Do that on the producer
     // thread, after cancellation is registered. Production serving leases are captured here.
     CallView view = servingLeaseSupplier == null
@@ -1730,9 +1738,21 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           () -> {
             try {
               WorkerIngestService ingest = requireService(WorkerAppServices::ingestService);
-              ingest.subscribeIndexingJobs(
+              if (outcomesOnly) {
+                // Terminal acceptance is lossless and independent of view overflow/resubscribe.
+                // Its consumer only appends to the bounded activity store; sockets stay async.
+                ingest.subscribeIndexingJobOutcomes(onFrame, ctx);
+              } else ingest.subscribeIndexingJobs(
                       SubscribeIndexingJobsRequest.newBuilder().build(),
                       frame -> {
+                        // A newly inserted PENDING row cannot already be in the bounded head
+                        // window. Its queue total comes from status. Do not spend handoff slots
+                        // forwarding thousands of no-op enqueues; preserve presence barriers and
+                        // all updates (a retry can remove a formerly visible failure), plus every
+                        // terminal event for the activity ledger.
+                        if (frame.hasDelta() && frame.getDelta().hasInsert()
+                            && "PENDING".equals(frame.getDelta().getInsert().getState())
+                            && !frame.hasStatePresence()) return;
                         if (!flow.publish(frame)) {
                           // Closed, or the consumer stopped draining: stop the producer. The worker
                           // reads this through ctx.cancelled() on its next delta and closes its
@@ -1781,7 +1801,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   }
 
   private static String indexingJobsPath(IndexingJobsFrame frame) {
-    if (!frame.hasDelta()) return null;
+    // State-presence publications must survive path coalescing and retain commit order.
+    if (frame.hasStatePresence() || !frame.hasDelta()) return null;
     return switch (frame.getDelta().getChangeCase()) {
       case INSERT -> frame.getDelta().getInsert().getPathHash();
       case UPDATE -> frame.getDelta().getUpdate().getPathHash();

@@ -234,7 +234,7 @@ final class BoundedHandoff<T> implements AutoCloseable {
         queue.size(),
         backpressure);
     fail(
-        new IllegalStateException(
+        new io.justsearch.app.services.worker.StreamOverflowException(
             name
                 + ": flow bound of "
                 + (queue.remainingCapacity() + queue.size())
@@ -447,6 +447,8 @@ final class BoundedHandoff<T> implements AutoCloseable {
   }
 
   private boolean deliverFrame(T frame) {
+    // A queued delivery can enter here after the outer drain passed its close check.
+    if (closed.get()) return false;
     try {
       sink.accept(frame);
       delivered.incrementAndGet();

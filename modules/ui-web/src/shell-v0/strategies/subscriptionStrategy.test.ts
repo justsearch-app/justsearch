@@ -273,7 +273,7 @@ describe('subscription strategy registry', () => {
     it('snapshot loads items keyed by primaryKey', () => {
       const s = strategyFor(tabularResource())!;
       const items = [
-        { pathHash: 'h1', state: 'PENDING' },
+        { pathHash: 'h1', state: 'FAILED' },
         { pathHash: 'h2', state: 'PROCESSING' },
       ];
       const st = s.reducer(s.initialState, envelope('LIFECYCLE', 1, {
@@ -289,8 +289,9 @@ describe('subscription strategy registry', () => {
       const s = strategyFor(tabularResource())!;
       let st = s.initialState;
       st = s.reducer(st, envelope('UPDATE', 1, {
-        row: { pathHash: 'h1', state: 'PENDING' },
+        row: { pathHash: 'h1', state: 'FAILED' },
       }));
+      expect((st.data as TabularData<{ state: string }>).items.get('h1')?.state).toBe('FAILED');
       st = s.reducer(st, envelope('UPDATE', 2, {
         row: { pathHash: 'h1', state: 'PROCESSING' },
       }));
@@ -305,8 +306,9 @@ describe('subscription strategy registry', () => {
       const s = strategyFor(tabularResource())!;
       let st = s.reducer(s.initialState, envelope('LIFECYCLE', 1, {
         kind: 'snapshot',
-        items: [{ pathHash: 'h1', state: 'DONE' }],
+        items: [{ pathHash: 'h1', state: 'PROCESSING' }],
       }));
+      expect((st.data as TabularData).items.size).toBe(1);
       st = s.reducer(st, envelope('UPDATE', 2, { pathHash: 'h1' }));
       expect((st.data as TabularData).items.size).toBe(0);
     });
@@ -315,10 +317,10 @@ describe('subscription strategy registry', () => {
       const s = strategyFor(tabularResource())!;
       let st = s.reducer(s.initialState, envelope('LIFECYCLE', 1, {
         kind: 'snapshot',
-        items: [{ pathHash: 'h1' }, { pathHash: 'h2' }],
+        items: [{ pathHash: 'h1', state: 'PROCESSING' }, { pathHash: 'h2', state: 'FAILED' }],
       }));
       st = s.reducer(st, envelope('UPDATE', 2, {
-        items: [{ pathHash: 'h3' }],
+        items: [{ pathHash: 'h3', state: 'RETRY_EXHAUSTED' }],
       }));
       const data = st.data as TabularData;
       expect(data.items.size).toBe(1);
