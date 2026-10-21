@@ -219,3 +219,14 @@ Follow-up 3 also pins fail-closed explicit activation and absent-service compati
   "note": "Sources re-reviewed at 8e472cf37: task-request quote verbatim per brief and supports fail-closed downloads/activation; 15-enterprise-policy.md:17 and :32 verbatim at base, file unchanged in PR, :32 supports preserved offline import; no stronger owner source conflicts; delegation quote not checked against task record (verifier may not read it)"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "a92fe57a-596f-4847-b73a-ef2b0d36935b",
+  "verdict": "accept",
+  "digest": "sha256:4db67e439e7008a6b395302678306fc50925f2d625e49c375ede38dde2e31593",
+  "note": "Delta 7f1c1940f..0f21a718f: changeset unchanged; test-file edits are lint-only (unnamed vars, static imports), no assertion removed; 6 evidence files script-produced, ids match entries, 22 repaired checks fail by assertion on 943ed6359 and pass at 5e97d3af4, preserved pass on both; sources unchanged in PR; delegation quote not checked against task record (verifier may not read it)"
+}
+```
