@@ -658,6 +658,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             stub -> stub.submitBatch(request), engineContext);
     }
 
+    /** Conversation deletion requires an applied delete, not a buffered migration operation. */
+    public DeleteByIdResponse deleteHistoryTranscript(Path transcript, EngineContext engineContext) {
+        var request = DeleteByIdRequest.newBuilder()
+            .setDocId(transcript.toAbsolutePath().normalize().toString()).setRequireSettled(true).build();
+        return executeIngestRpc("deleteById", RpcDeadlineCategory.STANDARD,
+            stub -> stub.deleteById(request), engineContext);
+    }
+
     /**
      * Deletes a single document by exact ID (normalized path).
      * Used by file watcher to handle DELETE events.

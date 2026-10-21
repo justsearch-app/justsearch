@@ -76,6 +76,9 @@ public interface ConversationStore {
    */
   void appendMessage(String sessionId, String shapeId, Map<String, Object> message);
 
+  /** Shared writer/deletion exclusion; absent for stores that do not persist. */
+  default ConversationWork conversationWork() { return null; }
+
   /**
    * Tempdoc 734 round-14 F4 — TRUE when the store cannot be read or written right now (encrypted at
    * rest with the data key locked). The read side already answers this honestly ({@code

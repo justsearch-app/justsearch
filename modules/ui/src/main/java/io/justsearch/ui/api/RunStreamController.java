@@ -144,7 +144,8 @@ public final class RunStreamController {
   /** Package-private so the run mechanics are testable without a live Jetty async context. */
   void streamNewRun(SseClient client) {
     var front = RequestEngineWork.get(client.ctx());
-    try (var work = front == null ? null : front.retain()) {
+    try (var ignoredWriting = chat.conversationWork(readBody(client.ctx()));
+        var work = front == null ? null : front.retain()) {
       streamNewRunOwned(client, work);
     }
   }

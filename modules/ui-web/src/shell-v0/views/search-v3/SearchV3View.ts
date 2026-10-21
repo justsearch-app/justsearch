@@ -3747,8 +3747,15 @@ export class SearchV3View extends JfElement {
       // (`{ok:false, childIds}` covers two of them), which is why the reader's own answer is tracked
       // here instead of inferred from it. Nothing was removed on screen, so there is nothing to put
       // back — the re-list is for the CHILDREN a half-broken cascade may really have deleted.
-      if (!declined) emitEphemeralToast({ message: DELETE_FAILED, severity: 'warning' });
-      void loadConversations();
+      if (!declined) {
+        const progress = result.deletedIds?.length
+          ? `${result.deletedIds.length} branch${result.deletedIds.length === 1 ? '' : 'es'} deleted. ` : '';
+        const failed = result.failedId && (result.error || result.deletedIds?.length) ? `Could not delete “${this.conversationLabel(result.failedId)}”. ` : '';
+        emitEphemeralToast({ message: progress + failed + (result.error ?? DELETE_FAILED), severity: 'warning' });
+      }
+      if (result.deletedIds?.length || !['STORE_LOCKED', 'CONVERSATION_BUSY'].includes(result.errorCode ?? '')) {
+        void loadConversations();
+      }
       return;
     }
     // The store deleted it, so now the screen follows. Removing the open conversation routes through

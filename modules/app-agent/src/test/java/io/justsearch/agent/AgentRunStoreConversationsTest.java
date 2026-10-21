@@ -3,6 +3,7 @@ package io.justsearch.agent;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.justsearch.agent.api.encryption.DataKeyState;
 import io.justsearch.agent.api.encryption.KeyLockedException;
@@ -134,7 +135,7 @@ final class AgentRunStoreConversationsTest {
   }
 
   @Test
-  @DisplayName("a locked store deletes NOTHING rather than everything (fail closed)")
+  @DisplayName("deleteFailsClosedWhileLocked(a locked store refuses deletion without removing anything)")
   void deleteFailsClosedWhileLocked() {
     // green-masked-destructive: the delete resolves its targets by READING each run's meta for the
     // join key. A locked store answers "no runs", and the danger to prove absent is the opposite
@@ -146,7 +147,7 @@ final class AgentRunStoreConversationsTest {
     writeRun(store, root, "run-2", "conv-2", "2026-08-01T10:02:00Z", "2026-08-01T10:03:00Z", "q");
 
     key.locked = true;
-    assertEquals(0, store.deleteConversationRuns("conv-1"));
+    assertThrows(KeyLockedException.class, () -> store.deleteConversationRuns("conv-1"));
 
     key.locked = false;
     assertTrue(Files.exists(root.resolve("run-1")), "the target survived the locked attempt");

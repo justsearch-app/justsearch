@@ -170,6 +170,18 @@ public final class ChatController {
             "chat-stream-heartbeat"));
   }
 
+  private io.justsearch.app.services.conversation.ConversationDeletion conversationDeletion;
+
+  public void setConversationDeletion(io.justsearch.app.services.conversation.ConversationDeletion deletion) {
+    this.conversationDeletion = java.util.Objects.requireNonNull(deletion, "deletion");
+  }
+
+  io.justsearch.agent.api.conversation.ConversationWork.Lease conversationWork(Map<String, Object> body) {
+    var gate = conversationStore.conversationWork();
+    Object raw = body.getOrDefault("conversationId", body.get("sessionId"));
+    return gate == null ? () -> {} : gate.start(raw instanceof String id && !id.isBlank() ? id : null);
+  }
+
   /** The residency gate every chat run passes before it streams (Spec A step 9). */
   private volatile ChatResidencyGate residencyGate = ChatResidencyGate.none();
 
@@ -310,10 +322,11 @@ public final class ChatController {
     // Spec A step 9: chat unloaded for another GPU user answers a typed refusal, or reloads for a
     // person, before the stream commits a 200.
     if (!admitResidency(ctx, parsedBody)) return;
-    sseWriter.initSseHeaders(ctx, route);
+
     // Tempdoc 859 D live-defect D2 — the heartbeat wraps the BLOCKING run, and only it: the pre-run
     // refusals above answer and return without ever opening a stream to beat on.
-    try {
+    try (var ignoredWriting = conversationWork(parsedBody)) {
+      sseWriter.initSseHeaders(ctx, route);
       heartbeat.around(
           ctx,
           () ->
@@ -322,6 +335,8 @@ public final class ChatController {
                   parsedBody,
                   readAudience(ctx),
                   sseEvent -> sseWriter.writeEvent(ctx, sseEvent.name(), sseEvent.payload()), engineContext));
+    } catch (io.justsearch.agent.api.conversation.ConversationWork.Refused refused) {
+      ctx.status(409).json(Map.of("ok", false, "errorCode", refused.code(), "error", refused.getMessage()));
     } catch (Exception impossible) {
       // runToSink catches every mid-run failure and reports it ON THE RUN (§15.1.3); the only way
       // out of `around` is therefore a failure of the heartbeat plumbing itself, which must not be
@@ -1101,10 +1116,20 @@ public final class ChatController {
   public void handleDeleteConversation(Context ctx) {
     String sessionId = ctx.pathParam("sessionId");
     if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;
+    if (conversationStore.isLocked()) {
+      ctx.status(LOCKED_STATUS).json(Map.of("ok", false, "errorCode", "STORE_LOCKED",
+          "error", "Unlock chat history before deleting this conversation."));
+      return;
+    }
     try {
-      conversationStore.deleteSession(sessionId);
-      AgentService agent = agentService.get();
-      int runsDeleted = agent == null ? 0 : agent.deleteConversationRuns(sessionId);
+      int runsDeleted;
+      if (conversationDeletion != null) {
+        runsDeleted = conversationDeletion.delete(sessionId);
+      } else {
+        conversationStore.deleteSession(sessionId);
+        AgentService agent = agentService.get();
+        runsDeleted = agent == null ? 0 : agent.deleteConversationRuns(sessionId);
+      }
       ctx.json(Map.of("ok", true, "agentRunsDeleted", runsDeleted));
     } catch (BranchesPreventDeletionException blocked) {
       // Slice 515 FIX-3 — 409 Conflict with the child session ids so the
@@ -1114,6 +1139,15 @@ public final class ChatController {
       err.put("errorCode", "BRANCHES_PREVENT_DELETION");
       err.put("childSessionIds", blocked.childSessionIds());
       ctx.status(409).json(err);
+    } catch (io.justsearch.agent.api.conversation.ConversationWork.Refused refused) {
+      ctx.status(409).json(Map.of("ok", false, "errorCode", refused.code(), "error", refused.getMessage()));
+    } catch (io.justsearch.agent.api.encryption.KeyLockedException locked) {
+      ctx.status(LOCKED_STATUS).json(Map.of("ok", false, "errorCode", "STORE_LOCKED",
+          "error", "Unlock chat history before deleting this conversation."));
+    } catch (RuntimeException failure) {
+      LOG.warn("Conversation {} deletion is incomplete", sessionId, failure);
+      ctx.status(503).json(Map.of("ok", false, "errorCode", "CONVERSATION_DELETE_INCOMPLETE",
+          "error", "Conversation deletion is incomplete. " + message(failure)));
     }
   }
 

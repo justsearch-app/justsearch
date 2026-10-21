@@ -1414,6 +1414,47 @@ describe('deleting a conversation that has branches', () => {
     expect(el.sessions.sessions.map((s) => s.id)).toContain('uc-branch-branch-1');
   });
 
+  it('reports which branch failed after a partially completed cascade', async () => {
+    twoTurnConversation();
+    backend.conversations.push(
+      conversationRow('child-one', 'first branch', { parentSessionId: 'uc-branch', branchPointMessageId: storedId(1) }),
+      conversationRow('child-two', 'second branch', { parentSessionId: 'uc-branch', branchPointMessageId: storedId(1) }),
+    );
+    const fetchBefore = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'DELETE' && String(url).endsWith('/child-two')) return new Response(JSON.stringify({
+        errorCode: 'CONVERSATION_BUSY', error: 'Stop the running agent.',
+      }), { status: 409 });
+      return fetchBefore(url, init);
+    }));
+    const el = await mount();
+    await openConversation(el);
+    const seen = toasts();
+    await discardConversation(el, 'why did the renewal fail?');
+    await answerConfirm(el, true);
+    expect(seen.some(message => message.includes('1 branch deleted.')
+      && message.includes('second branch') && message.includes('Stop the running agent.'))).toBe(true);
+    expect(backend.conversations.map(c => c.sessionId)).toEqual(['uc-branch', 'child-two']);
+  });
+
+  it('displays a refusal from another client without asking to delete branches', async () => {
+    twoTurnConversation();
+    const fetchBefore = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'DELETE') return new Response(JSON.stringify({
+        errorCode: 'CONVERSATION_BUSY', error: 'Stop the running Ask in the other window.',
+      }), { status: 409 });
+      return fetchBefore(url, init);
+    }));
+    const el = await mount();
+    await openConversation(el);
+    const seen = toasts();
+    await discardConversation(el, 'why did the renewal fail?');
+    expect(document.querySelector('jf-confirm-dialog')).toBeNull();
+    expect(seen).toContain('Stop the running Ask in the other window.');
+    expect(el.sessions.sessions.map(s => s.id)).toContain('uc-branch');
+  });
+
   it('says so when the store refuses the delete outright', async () => {
     twoTurnConversation();
     backend.refuse.add('delete');

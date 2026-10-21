@@ -1284,6 +1284,10 @@ export async function deleteConversation(sessionId: string): Promise<boolean> {
 export interface DeleteCascadeResult {
   ok: boolean;
   childIds?: string[];
+  error?: string;
+  errorCode?: string;
+  deletedIds?: string[];
+  failedId?: string;
 }
 
 export async function deleteConversationWithCascade(
@@ -1304,27 +1308,29 @@ export async function deleteConversationWithCascade(
       emit();
       return { ok: true };
     }
-    if (res.status === 409) {
-      let childIds: string[] = [];
-      try {
-        const body = (await res.json()) as { childSessionIds?: string[] };
-        if (Array.isArray(body.childSessionIds)) childIds = body.childSessionIds;
-      } catch {
-        // best-effort body parse; if it fails we still surface the 409
-      }
-      if (!onChildsFound) return { ok: false, childIds };
+    let body: { error?: unknown; errorCode?: string; childSessionIds?: unknown } = {};
+    try { body = await res.json() as typeof body; } catch { /* A failed response may have no JSON. */ }
+    const error = typeof body.error === 'string' && body.error ? body.error : undefined;
+    if (res.status === 409 && (body.errorCode === 'BRANCHES_PREVENT_DELETION'
+      || (body.errorCode === undefined && Array.isArray(body.childSessionIds) && body.childSessionIds.length > 0))) {
+      const childIds = Array.isArray(body.childSessionIds)
+        ? body.childSessionIds.filter((id): id is string => typeof id === 'string') : [];
+      if (!onChildsFound || childIds.length === 0) return { ok: false, childIds };
       const userConfirmed = await onChildsFound(childIds);
       if (!userConfirmed) return { ok: false, childIds };
-      // Sequential cascade delete: children first, then parent. If any
-      // child delete fails, abort the cascade and leave the parent intact.
+      const deletedIds: string[] = [];
       for (const childId of childIds) {
         const childResult = await deleteConversationWithCascade(childId);
-        if (!childResult.ok) return { ok: false, childIds };
+        if (!childResult.ok) return {
+          ...childResult, childIds, deletedIds: [...deletedIds, ...(childResult.deletedIds ?? [])],
+          failedId: childResult.failedId ?? childId,
+        };
+        deletedIds.push(childId);
       }
-      // Retry parent now that branches are gone.
-      return deleteConversationWithCascade(sessionId);
+      const parentResult = await deleteConversationWithCascade(sessionId);
+      return parentResult.ok ? parentResult : { ...parentResult, deletedIds, failedId: sessionId };
     }
-    return { ok: false };
+    return error ? { ok: false, error, ...(body.errorCode ? { errorCode: body.errorCode } : {}) } : { ok: false };
   } catch {
     return { ok: false };
   }

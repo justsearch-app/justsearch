@@ -1084,6 +1084,8 @@ message DeleteByCollectionResponse {
 // Used by file watcher to handle single file deletions.
 
 message DeleteByIdRequest {
+  // Refuse rather than buffer during cutover: the caller must know content is gone now.
+  bool require_settled = 2;
   string doc_id = 1;  // Exact document ID (normalized path, e.g., "d:\docs\file.txt")
 }
 

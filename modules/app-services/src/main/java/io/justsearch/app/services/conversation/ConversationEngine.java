@@ -269,7 +269,14 @@ public final class ConversationEngine {
       boolean background,
       OperationScopeFactory scopeFactory) {
     Objects.requireNonNull(scopeFactory, "scopeFactory");
-    try (var work = admission == null ? null : admission.attach(engineContext)) {
+    Map<String, Object> safeBody = body == null ? Map.of() : body;
+    String conversationId = catalog.findById(shapeId).map(shape -> persistenceKey(shape, safeBody)).orElse(null);
+    if (conversationId == null && safeBody.get("conversationId") instanceof String id && !id.isBlank()) {
+      conversationId = id;
+    }
+    var writers = conversationStore.conversationWork();
+    try (var ignoredWriting = writers == null ? null : writers.start(conversationId);
+        var work = admission == null ? null : admission.attach(engineContext)) {
       EngineContext context = work == null ? engineContext : work.context();
       if (work != null) work.cancellationReason().ifPresent(reason -> {
         throw new io.justsearch.app.api.EngineWorkCancelledException(reason);
