@@ -17,6 +17,7 @@ import io.justsearch.ipc.MatchCitationsResponse;
 import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.reranker.CitationScorer;
 import io.justsearch.reranker.CitationScorerConfig;
+import io.justsearch.reranker.NumericConsistency;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -215,11 +216,18 @@ final class CitationMatchOps {
       return emptyResponse(startTime, "");
     }
 
-    List<String> sentenceList = AnswerSegmentation.splitSentences(answerText.trim());
+    List<NumericConsistency.Claim> claims = AnswerSegmentation.splitClaims(answerText.trim());
+    List<String> sentenceList = claims.stream().map(NumericConsistency.Claim::text).toList();
     var csConfig = citationScorerConfig;
     long deadlineMs = csConfig != null ? csConfig.deadlineBudgetMs() : DEFAULT_DEADLINE_MS;
 
     CrossEncoderProducer crossEncoder = availableCrossEncoder();
+    CitationScorer scorer = getCitationScorer();
+    if (crossEncoder != null && scorer != null) {
+      // Carry code-vs-reference metadata to the real scorer; model input / stored keys stay plain.
+      crossEncoder = (_, passages, ids, cutoff, budget, request) ->
+          scorer.scoreClaims(claims, passages, ids, cutoff, budget, request);
+    }
     if (crossEncoder == null && !switch (embeddingProvider.availability().state()) {
       case READY -> true;
       case STARTING, ABSENT, FAILED -> false;
@@ -319,6 +327,7 @@ final class CitationMatchOps {
         windowVectors.add(embeddingProvider.embedDocument(window, acquisition));
       }
 
+      NumericConsistency numeric = new NumericConsistency(claims, windows);
       List<CitationMatchEntry> matches = new ArrayList<>();
       int sentencesMatched = 0;
       int sentencesScored = 0;
@@ -337,7 +346,7 @@ final class CitationMatchOps {
             continue;
           }
           double sim = VectorUtils.cosine(sentenceVec, windowVec);
-          if (sim > bestSim) {
+          if (sim > bestSim && numeric.supports(si, wi)) {
             bestSim = sim;
             bestWindow = wi;
           }
