@@ -414,3 +414,14 @@ WP3.4, authored from the agreed scenarios and delegated decisions. No acceptance
   "note": "Expectations follow agreed WP3.4, decision 8 and corrected LA1; named checks pass on candidate and assert-fail before (UI rerun used hardlinked dependencies). Test-intent acceptance only; product S34.2 preview and S34.9 dark contrast remain findings."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "ktv9yz16",
+  "verdict": "accept",
+  "digest": "sha256:4f8b4b9f70fca7c40deeb4bba8bc0f110878f77ec91bef0bee0619b68564502e",
+  "note": "Expectations follow agreed WP3.4, decision 8 and corrected LA1. Repaired checks pass on 3895b9660 and assertion-fail on 2d3faef2d. The saturation fixture adaptation preserves all nine refusal oracles and Worker saturation. Acceptance concerns test intent; full UI suite has the same missing-esbuild failure before and after."
+}
+```
