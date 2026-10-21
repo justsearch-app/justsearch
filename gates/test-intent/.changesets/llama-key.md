@@ -556,3 +556,14 @@ K9 remains an execution limitation (no Windows/CUDA host), not a passed check.
   "note": "Accept: all five entries' classes, sources and evidence hold on 2466332bf; the three test files main changed (#800 and others) keep this changeset's delta byte-identical and pass; both delegated choices (401 probe before ready; key per launch with 32-byte base64url) and the kept Linux stop design (I6, documented at base) are within scope for what they pin; I reproduced the ignored-key assertion fail-before on 673b54a1b and saw all flagged classes plus the full app-services suite (4005 tests, 0 failed) pass under an orphan-reaping parent; the K8 wrapper/ignored-key gap, which still reproduces on the candidate (unauthenticated /props 200 after rejection), is stated honestly and not claimed by any entry; non-blocking: the changeset prose still says delivery is blocked, names review head 950a3a2ed and does not cite #858, the assertion audit credits the owner with a tooling permission, and both wrapper checks fail where orphaned processes are not reaped."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "97a39c1e-05d0-44d1-93dd-75a9307ac3d3",
+  "verdict": "accept",
+  "digest": "sha256:2f37dbf297f442569dcb6224374da981c628d00c5c6d97577e8a7b7fded2248f",
+  "note": "Entries 1-7 classed correctly and in scope; live Linux runs of the shipped Engine confirm K1-K4, K6 and K8 (TERM-ignoring and ignored-key descendants ended within the bound, zombie never blocks, decoy and incidental server untouched), and the six descendant-cleanup checks fail on 0109762bc by assertion and pass on the candidate."
+}
+```
