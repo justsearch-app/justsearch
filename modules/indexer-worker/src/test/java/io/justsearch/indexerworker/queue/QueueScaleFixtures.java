@@ -17,24 +17,7 @@ final class QueueScaleFixtures {
     long start = System.nanoTime();
     try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + file);
         var stmt = conn.createStatement()) {
-      try (var ddl = QueueScaleFixtures.class.getResourceAsStream("/queue-scale-v13.sql")) {
-        if (ddl == null) throw new IllegalStateException("Missing v0.3.0 schema");
-        for (String sql : new String(ddl.readAllBytes(), StandardCharsets.UTF_8).split(";")) {
-          if (!sql.isBlank()) stmt.execute(sql);
-        }
-      }
-      if (version == 22) {
-        // Pin this fixture at v22 even when a later binary's migration target advances.
-        var migration = SqliteQueueMigrationOps.class.getDeclaredMethod("applyMigration", Connection.class, int.class);
-        migration.setAccessible(true);
-        conn.setAutoCommit(false);
-        for (int v = 14; v <= 22; v++) migration.invoke(null, conn, v);
-        stmt.execute("PRAGMA user_version = 22");
-        conn.commit();
-        conn.setAutoCommit(true);
-      } else if (version != 13) {
-        throw new IllegalArgumentException("Fixture version must be 13 or 22");
-      }
+      schema(conn, version);
       boolean history = "F2".equals(fixture);
       if (!history && !"F1".equals(fixture)) throw new IllegalArgumentException("Unknown fixture " + fixture);
       int rows = history ? 1_001_000 : 1_000_000;
@@ -53,7 +36,7 @@ final class QueueScaleFixtures {
           + "last_reason_code=CASE WHEN state='DONE' THEN 'SUCCESS' WHEN attempts>0 THEN 'FIXTURE_PARSE' ELSE NULL END, "
           + "last_retry_policy=CASE WHEN state='PENDING' AND attempts>0 THEN 'RETRY_WITH_BACKOFF' ELSE 'NONE' END, "
           + "last_diagnostic_summary='saved fixture detail',last_outcome_at=last_updated");
-      if (version == 22) {
+      if (version >= 22) {
         stmt.executeUpdate("UPDATE jobs SET unit_revision = printf('unit-%s',path), originator='system',transport='internal', "
             + "ingestion_root='/queue-scale',content_hash=CASE WHEN state='DONE' THEN '" + "b".repeat(64) + "' ELSE NULL END");
         if (!history) {
@@ -65,5 +48,24 @@ final class QueueScaleFixtures {
     }
     System.out.printf("Generated %s v%d rows=%d in %.3fs: %s%n", fixture, version,
         "F2".equals(fixture) ? 1_001_000 : 1_000_000, (System.nanoTime() - start) / 1e9, file);
+  }
+
+  /** Start from the released v0.3.0 schema, applying the real ladder through the requested source. */
+  static void schema(Connection conn, int version) throws Exception {
+    if (version < 13 || version > 23) throw new IllegalArgumentException("Fixture version must be 13..23");
+    try (var stmt = conn.createStatement();
+        var ddl = QueueScaleFixtures.class.getResourceAsStream("/queue-scale-v13.sql")) {
+      if (ddl == null) throw new IllegalStateException("Missing v0.3.0 schema");
+      for (String sql : new String(ddl.readAllBytes(), StandardCharsets.UTF_8).split(";")) {
+        if (!sql.isBlank()) stmt.execute(sql);
+      }
+      var migration = SqliteQueueMigrationOps.class.getDeclaredMethod("applyMigration", Connection.class, int.class);
+      migration.setAccessible(true);
+      conn.setAutoCommit(false);
+      for (int v = 14; v <= version; v++) migration.invoke(null, conn, v);
+      stmt.execute("PRAGMA user_version = " + version);
+      conn.commit();
+      conn.setAutoCommit(true);
+    }
   }
 }

@@ -377,6 +377,9 @@ final class SqliteQueueMigrationOps {
         }
       }
       case 24 -> {
+        // An unreleased queue branch also used V23. The idempotent main V23 step repairs
+        // that shape without resetting an existing monotonic admission counter.
+        applyMigration(conn, 23);
         try (Statement stmt = conn.createStatement()) {
           for (String sql : SqliteSchema.MIGRATE_V23_TO_V24) stmt.execute(sql);
         }

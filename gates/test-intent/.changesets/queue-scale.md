@@ -7,7 +7,7 @@ author-session: 01a1562b-b2e9-7510-832f-04ea6ad6da28
 
 # Test-intent entries
 
-Author: builder Codex session 01a1562b-b2e9-7510-832f-04ea6ad6da28. Scope is the final branch diff against merge-base 2ba7d810e with origin/main, not intermediate commit diffs. The user adopted scenarios Q1–Q27 on2026-10-20: “i agree, proceed accordingly”. Every scenario source below is **agent-drafted, owner-adopted**; no brief text is attributed as owner words. Choices are **agent choice** under the separately quoted delegation. Q20 uses its aggregate-queued amendment; Q25–Q27 are included. Q6 retains the agreed whole-call limit: pollPending(16) under10ms p95, including its durable commit. Selection-only timing is additional reporting, not a substitute threshold. Q24 packaged-system verification belongs to the independent verifier, not this test-intent delivery.
+Author: builder Codex session 01a1562b-b2e9-7510-832f-04ea6ad6da28. Scope is the final branch diff against merge-base f6d92d768 with origin/main, not intermediate commit diffs. The user adopted scenarios Q1–Q27 on2026-10-20: “i agree, proceed accordingly”. Every scenario source below is **agent-drafted, owner-adopted**; no brief text is attributed as owner words. Choices are **agent choice** under the separately quoted delegation. Q20 uses its aggregate-queued amendment; Q25–Q27 are included. Q6 retains the agreed whole-call limit: pollPending(16) under10ms p95, including its durable commit. Selection-only timing is additional reporting, not a substitute threshold. Q24 packaged-system verification belongs to the independent verifier, not this test-intent delivery.
 
 For modified files with both retired oracles and added checks, separate entries name the portions. All full-table and per-file-PENDING state/input changes are Obsolete, not hidden as adaptations. Old→new assertion inventories are attached to those entries; remaining original assertions stay unchanged. The two Adaptation entries identify exactly unchanged assertions and old/new transport encoding. Repaired checks require an assertion fail-before; new instrumentation and preservation checks are explicitly identified and do not pretend a missing old API/table was a defect.
 
@@ -98,7 +98,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "delegationQuote": "resume with remaining work autonomously",
           "delegationLocation": "task t-20261020-540095 request",
           "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
-          "choice": "Create the job_counts table, count-maintenance triggers and three claim/readiness indexes in the unreleased jobs.db v23 migration, and retain all existing reset/carry field semantics.",
+          "choice": "Create the job_counts table, count-maintenance triggers and three claim/readiness indexes in the jobs.db v24 migration after main's V23 admission fence, and retain all existing reset/carry field semantics.",
           "label": "agent choice"
         },
         {
@@ -328,16 +328,16 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "delegationQuote": "resume with remaining work autonomously",
           "delegationLocation": "task t-20261020-540095 request",
           "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
-          "choice": "Create the job_counts table, count-maintenance triggers and three claim/readiness indexes in the unreleased jobs.db v23 migration, and retain all existing reset/carry field semantics.",
+          "choice": "Create the job_counts table, count-maintenance triggers and three claim/readiness indexes in the jobs.db v24 migration after main's V23 admission fence, and retain all existing reset/carry field semantics.",
           "label": "agent choice"
         }
       ],
-      "conflictSearch": "decision records searched for a conflict: none. ADR-0028 path hashing/resolution retained; no decision record requires a complete jobs-table snapshot. The prior per-file PENDING rail contract is superseded specifically by owner-adopted amended Q20, not by the implementation.",
+      "conflictSearch": "decision records searched for a conflict: none. ADR-0028 path hashing/resolution retained; no decision record requires a complete jobs-table snapshot. The prior per-file PENDING rail contract is superseded specifically by owner-adopted amended Q20, not by the implementation. The unchanged saved-row and future-version assertions also executed before/after in gates/test-intent/evidence/queue-scale-v24-unit.json; only main's literal target pin changes 23 -> 24.",
       "oldToNew": [
         {
           "test": "JobQueueMigrationTest.migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion",
-          "old": "assertEquals(22,SqliteSchema.TARGET_VERSION)",
-          "new": "assertEquals(23,SqliteSchema.TARGET_VERSION); user_version equality, document_identity_import schema/columns and saved-state checks unchanged"
+          "old": "assertEquals(23,SqliteSchema.TARGET_VERSION) on merged main",
+          "new": "assertEquals(24,SqliteSchema.TARGET_VERSION); user_version equality, document_identity_import schema/columns, saved-state checks and next-version refusal unchanged. Main V23 admission-fence tests remain unchanged."
         }
       ]
     },
@@ -401,7 +401,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "delegationQuote": "resume with remaining work autonomously",
           "delegationLocation": "task t-20261020-540095 request",
           "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
-          "choice": "Create the job_counts table, count-maintenance triggers and three claim/readiness indexes in the unreleased jobs.db v23 migration, and retain all existing reset/carry field semantics.",
+          "choice": "Create the job_counts table, count-maintenance triggers and three claim/readiness indexes in the jobs.db v24 migration after main's V23 admission fence, and retain all existing reset/carry field semantics.",
           "label": "agent choice"
         },
         {
@@ -814,11 +814,10 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
     },
     {
       "items": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsTest.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsTest.java"
       ],
       "class": "New",
-      "behaviour": "New counter instrumentation and migration mechanism preserve exact direct aggregates across random2k/100k operations, all former REPLACE admission paths, row reset/carry metadata/ownership, NULL sizes, terminal states, rollback/reopen and drift repair. V23 injected failure rolls back table/triggers/3indexes/version and next open completes. Existing contract preservation using newly introduced job_counts instrumentation, not claiming the uninstrumented base had a job_counts table.",
+      "behaviour": "New counter instrumentation and migration mechanism preserve exact direct aggregates across random2k/100k operations, all former REPLACE admission paths, row reset/carry metadata/ownership, NULL sizes, terminal states, rollback/reopen and drift repair. Migration coverage is now separately recorded for V24. Existing contract preservation using newly introduced job_counts instrumentation, not claiming the uninstrumented base had a job_counts table.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -860,7 +859,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "delegationQuote": "resume with remaining work autonomously",
           "delegationLocation": "task t-20261020-540095 request",
           "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
-          "choice": "Create the job_counts table, count-maintenance triggers and three claim/readiness indexes in the unreleased jobs.db v23 migration, and retain all existing reset/carry field semantics.",
+          "choice": "Create the job_counts table, count-maintenance triggers and three claim/readiness indexes in the jobs.db v24 migration after main's V23 admission fence, and retain all existing reset/carry field semantics.",
           "label": "agent choice"
         },
         {
@@ -882,8 +881,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
       ],
       "evidence": "gates/test-intent/evidence/queue-scale-harness-current.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsTest.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsTest.java"
       ],
       "repaired": false
     },
@@ -1213,7 +1211,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
         "modules/indexer-worker/build.gradle.kts"
       ],
       "class": "New",
-      "behaviour": "New opt-in million-row measurement selection/heap-agent task. Q1 boot/subscribed/concurrent peak at1GiB and<5MB retained; Q2 10kupdates/commits<1s and bounded churn; Q3 snapshot lock<50ms; Q4 warm status<5ms/no jobs scans; Q5 readiness<1ms; Q6 entire pollPending(16), including commit, <10ms p95 in each of F1, ties, F2,700k due,700k retry-waiting and interleaved cases; selection-only timing is additionally reported; drain640k unique ordered eligible rows with no denied claims and bounded polls. Added one current-v23 reopen/drift measurement. Stress tests stay opt-in.",
+      "behaviour": "New opt-in million-row measurement selection/heap-agent task. Q1 boot/subscribed/concurrent peak at1GiB and<5MB retained; Q2 10kupdates/commits<1s and bounded churn; Q3 snapshot lock<50ms; Q4 warm status<5ms/no jobs scans; Q5 readiness<1ms; Q6 entire pollPending(16), including commit, <10ms p95 in each of F1, ties, F2,700k due,700k retry-waiting and interleaved cases; selection-only timing is additionally reported; drain640k unique ordered eligible rows with no denied claims and bounded polls. Added one current-v23 reopen/drift measurement. Stress tests stay opt-in. The opt-in task also selects the separate V24 migration evidence class; old signed receipts retain their historical V23 labels.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1322,7 +1320,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueScaleEvidenceTest.java"
       ],
       "class": "New",
-      "behaviour": "New million-row v13/v22 upgrade and current-v23 reconciliation instrumentation: every saved-field digest/count/byte/status/ordered16claims equal pre-open, crash leaves version and rows unchanged, next open completes; current drift repair<60s. These preserve saved state using the new v23 bookkeeping, not a claim that old binaries already supported v23.",
+      "behaviour": "New million-row v13/v22 upgrade and current-v23 reconciliation instrumentation: every saved-field digest/count/byte/status/ordered16claims equal pre-open, crash leaves version and rows unchanged, next open completes; current drift repair<60s. These preserve saved state using the new v23 bookkeeping, not a claim that old binaries already supported v23. Historical execution at the unreleased queue V23 is retained verbatim; new V24/main-V23 migration coverage is recorded in the appended V24 entry.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1350,7 +1348,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "delegationQuote": "resume with remaining work autonomously",
           "delegationLocation": "task t-20261020-540095 request",
           "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
-          "choice": "Create the job_counts table, count-maintenance triggers and three claim/readiness indexes in the unreleased jobs.db v23 migration, and retain all existing reset/carry field semantics.",
+          "choice": "Create the job_counts table, count-maintenance triggers and three claim/readiness indexes in the jobs.db v24 migration after main's V23 admission fence, and retain all existing reset/carry field semantics.",
           "label": "agent choice"
         },
         {
@@ -1476,7 +1474,7 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
           "delegationQuote": "resume with remaining work autonomously",
           "delegationLocation": "task t-20261020-540095 request",
           "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
-          "choice": "Create the job_counts table, count-maintenance triggers and three claim/readiness indexes in the unreleased jobs.db v23 migration, and retain all existing reset/carry field semantics.",
+          "choice": "Create the job_counts table, count-maintenance triggers and three claim/readiness indexes in the jobs.db v24 migration after main's V23 admission fence, and retain all existing reset/carry field semantics.",
           "label": "agent choice"
         }
       ],
@@ -1516,9 +1514,9 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
       ],
       "assessment": {
         "purpose": "Supporting generator/agent/crash-child/v0.3.0 schema fixture for opt-in gate; no alternate product oracle or default-suite selection.",
-        "callersAndStateOwners": "Only QueueScaleEvidenceTest and its launched child use these fixtures. SQLite owns jobs/counts; agent measures reachable sizes without materializing jobs; harness owns generated build-directory SQLite files and child identities.",
-        "indirectBehaviours": "FixtureF1/F2 cardinalities/backoff/denied head and v13/v22 schema are asserted by real migration/status/claim checks. Child exits74 inside migration; parent asserts unchanged version/fields and successful next boot. Byte-identical originals remain available to review.",
-        "evidence": "gates/test-intent/evidence/queue-scale-harness-current.json runs Q1/Q12; failed measurements, wrong row counts/fields, wrong exit/version or skipped checks fail. Earlier real tagged runs are retained in task temp; runner evidence carries the final source digests.",
+        "callersAndStateOwners": "Only QueueScaleEvidenceTest and its launched child use these fixtures. SQLite owns jobs/counts; agent measures reachable sizes without materializing jobs; harness owns generated build-directory SQLite files and child identities. QueueScaleV24MigrationEvidenceTest and JobCountsMigrationTest also use the shared v13..23 fixture schema builder.",
+        "indirectBehaviours": "FixtureF1/F2 cardinalities/backoff/denied head and v13/v22 schema are asserted by real migration/status/claim checks. Child exits74 inside migration; parent asserts unchanged version/fields and successful next boot. Byte-identical originals remain available to review. V24 evidence reuses one generated row set, never making a backup/copy, and preserves main V23 counter41; the old v13/v22 fixtures remain supported for the historical scale gates.",
+        "evidence": "gates/test-intent/evidence/queue-scale-harness-current.json runs Q1/Q12; failed measurements, wrong row counts/fields, wrong exit/version or skipped checks fail. Earlier real tagged runs are retained in task temp; runner evidence carries the final source digests. New V24 execution: gates/test-intent/evidence/queue-scale-v24-unit.json and gates/test-intent/evidence/queue-scale-v24-million-migration.json.",
         "unresolvedRisks": "No packaged Engine/Q24 claim; native byte accounting and SQL fixture generation are test instrumentation only."
       },
       "evidence": "gates/test-intent/evidence/queue-scale-harness-current.json"
@@ -1911,6 +1909,115 @@ Execution protocol and compatibility scaffolding: gates/test-intent/evidence/que
         "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/IndexingJobsRegistrationLifecycleTest.java"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "V24 migration preservation: every supported source v13..main V23 preserves saved fields, exact counts and a nonzero main admission counter across upgrade and reopen. Count migration rollback oracle is unchanged except its renumbering: source22 ->23, injected step23 ->24, rollback version22 ->23, absent V23-derived objects ->absent V24-derived objects; pendingBytes(123,1) and pendingReadyCount=2 unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q12",
+          "quote": "Upgrade: a v0.3.0 jobs.db (user_version 13) and a current jobs.db, each with 1M rows, migrate; counts match; claim and status answers and every row's saved fields equal the pre-migration ones; migration time recorded; a crash mid-migration leaves the version unchanged and the next boot completes it.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q13",
+          "quote": "An older binary opening the migrated jobs.db refuses it with the existing message.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Keep main's V23 admission fence unchanged; put queue bookkeeping in V24, and idempotently ensure main's V23 objects during V24 to preserve existing counters and support the unreleased branch's V23 files.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/queue-scale-v24-unit.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java#everySupportedVersionMigratesToV24WithoutChangingSavedRows",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java#failedV24MigrationRollsBackTableTriggersIndexesCountsAndVersion"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Repair the unshipped branch-V23 collision: missing main admission objects are created by V24 while existing jobs/counts remain exact. Before merge repair, a branch-V23-shaped database upgrades but switchBufferAdmissions throws for the missing table; the test's assertDoesNotThrow pins that failure.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q12",
+          "quote": "Upgrade: a v0.3.0 jobs.db (user_version 13) and a current jobs.db, each with 1M rows, migrate; counts match; claim and status answers and every row's saved fields equal the pre-migration ones; migration time recorded; a crash mid-migration leaves the version unchanged and the next boot completes it.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q13",
+          "quote": "An older binary opening the migrated jobs.db refuses it with the existing message.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Keep main's V23 admission fence unchanged; put queue bookkeeping in V24, and idempotently ensure main's V23 objects during V24 to preserve existing counters and support the unreleased branch's V23 files.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/queue-scale-v24-unit.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java#unreleasedQueueV23GainsMainAdmissionFenceWithoutLosingCounts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueScaleV24MigrationEvidenceTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Q12/Q13 V24 instrumentation: generate one F1 million-row v13 database once, crash after V24 DDL and verify rollback to v13, upgrade and compare every saved field by streaming digest, exact counts/bytes/readiness/16 ordered claims and idempotent reopen; remove only V24 objects to reuse the same rows with main V23, repeat crash/upgrade/reopen preserving counter41; compile unmodified main V23 schema/migration code and assert its existing refusal diagnostic in a separate JVM. Each migration/reopen stays under60s. To obey the one-file budget, migration runs through the real transaction entry point with no backup callback, then attaches the connection to SqliteJobQueue for real status/claim calls; small default tests exercise public open/backup/refusal. This adds versioned preservation instrumentation, not an assertion that a V23-only binary already supports V24.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q12",
+          "quote": "Upgrade: a v0.3.0 jobs.db (user_version 13) and a current jobs.db, each with 1M rows, migrate; counts match; claim and status answers and every row's saved fields equal the pre-migration ones; migration time recorded; a crash mid-migration leaves the version unchanged and the next boot completes it.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-540095",
+          "scenario": "Q13",
+          "quote": "An older binary opening the migrated jobs.db refuses it with the existing message.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-540095 request",
+          "delegationScope": "implementation choices inside the agreed queue-scale scenarios Q1-Q27",
+          "choice": "Keep main's V23 admission fence unchanged; put queue bookkeeping in V24, and idempotently ensure main's V23 objects during V24 to preserve existing counters and support the unreleased branch's V23 files.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/queue-scale-v24-million-migration.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueScaleV24MigrationEvidenceTest.java#v13AndMainV23MigrateToV24WithCrashReopenAndOlderBinaryRefusal"
+      ],
+      "repaired": false
     }
   ]
 }

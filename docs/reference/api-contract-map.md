@@ -500,6 +500,16 @@ resyncs never replay outcomes. View overflows therefore cannot drop terminal eve
 SSE observer delivery remains asynchronous. Current ingestion outcome rollups read the persisted
 worker ledger directly; historical scan-rollup records retain their decoding/rendering contract.
 
+The queue bookkeeping uses jobs.db **V24**. V23 remains main's monotonic
+`switch_buffer_admissions` counter and restart fence; V24 adds transactional `job_counts`
+and the claim/readiness indexes. The existing transactional ladder upgrades every supported
+older schema, including v13 and main's V23, without changing saved job fields. Reopening
+reconciles counts and preserves the admission high-water. Older binaries refuse V24.
+The unreleased queue branch also used V23: V24 idempotently ensures main's admission-counter
+objects before adding bookkeeping, so those development databases can upgrade without
+discarding jobs or resetting an existing admission counter. Historical V23 execution receipts
+describe that unreleased branch; new migration evidence is explicitly named V24.
+
 The indexing-jobs worker/head bridge carries an optional `state_presence` message on existing
 `IndexingJobsFrame` frames: every snapshot contains the set of states present anywhere in jobs.db;
 the last delta of a commit contains it only when that set changed. An explicitly empty message

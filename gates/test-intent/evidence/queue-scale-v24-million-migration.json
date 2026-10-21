@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-21T09:09:37.441Z",
+  "revision": "761fd3d3493446d7e6da7c3926b92b76f0a72386",
+  "tree": "dc9d4fa2fce759081893f17b71aac91c72d39357",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": true
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.QueueScaleV24MigrationEvidenceTest.v13AndMainV23MigrateToV24WithCrashReopenAndOlderBinaryRefusal\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 40363
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueScaleV24MigrationEvidenceTest.java#v13AndMainV23MigrateToV24WithCrashReopenAndOlderBinaryRefusal",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueScaleV24MigrationEvidenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ab0f693dc9bb18f5bfc2dad221da8cb8f857f7b7c88c2ee4a0344e6e02566445",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "v13AndMainV23MigrateToV24WithCrashReopenAndOlderBinaryRefusal()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:8660dca08a55b1f55227b2835f0b6c648d93dc90337c26a617d50fc6a33bbc9e"
+}

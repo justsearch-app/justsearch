@@ -203,6 +203,7 @@ tasks.register<Test>("queueScaleEvidence") {
   }
   filter {
     includeTestsMatching("*QueueScaleEvidenceTest")
+    includeTestsMatching("*QueueScaleV24MigrationEvidenceTest")
     includeTestsMatching("*JobCountsTest")
   }
   maxHeapSize = "1g"
