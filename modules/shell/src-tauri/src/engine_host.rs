@@ -311,6 +311,39 @@ impl EngineHost {
             .clone()
     }
 
+    /// One incarnation supplies the port, token and PID. Recheck the owned child after proof:
+    /// on Unix try_wait also detects an exited child whose numeric PID could have been reused.
+    /// Once proven, this connected socket cannot be transferred to a new listener on the port.
+    pub(crate) fn connect_engine(&self, timeout: Duration) -> Result<(std::net::TcpStream, Binding), String> {
+        let (generation, pid, binding) = {
+            let inner = self.inner.lock().expect("engine host mutex poisoned");
+            let child = inner.child.as_ref()
+                .ok_or_else(|| crate::engine_conn::not_proven("no owned Engine"))?;
+            if !matches!(&inner.discovery, Discovery::Bound { pid, instance_id }
+                if *pid == child.child.id() && Some(instance_id) == inner.binding.instance_id.as_ref())
+            {
+                return Err(crate::engine_conn::not_proven("Engine binding unavailable"));
+            }
+            (child.generation, child.child.id(), inner.binding.clone())
+        };
+        let port = binding.port.ok_or_else(|| crate::engine_conn::not_proven("port unavailable"))?;
+        if binding.token.is_none() {
+            return Err(crate::engine_conn::not_proven("session token unavailable"));
+        }
+        let stream = crate::engine_conn::connect_proven(port, pid, timeout)?;
+        let mut inner = self.inner.lock().expect("engine host mutex poisoned");
+        if inner.binding != binding {
+            return Err(crate::engine_conn::not_proven("Engine binding changed"));
+        }
+        let child = inner.child.as_mut()
+            .filter(|child| child.generation == generation)
+            .ok_or_else(|| crate::engine_conn::not_proven("Engine incarnation changed"))?;
+        if !matches!(child.child.try_wait(), Ok(None)) {
+            return Err(crate::engine_conn::not_proven("Engine exited or identity unavailable"));
+        }
+        Ok((stream, binding))
+    }
+
     /// Attribute an HTTP observation only to the same admitted child and binding throughout it.
     pub(crate) fn observe_current_binding(
         &self,

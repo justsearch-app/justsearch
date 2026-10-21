@@ -25,7 +25,7 @@ vi.mock('../../utils/tauriRuntime', () => ({ isTauriRuntime: mocks.isTauriRuntim
 vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }));
 
 const SESSION_HEADER = 'X-JustSearch-Session';
-const apiBase = 'http://test.local';
+const apiBase = 'http://127.0.0.1:43210';
 
 let originalFetch: typeof fetch;
 let fetchSpy: ReturnType<typeof vi.fn>;
@@ -62,7 +62,7 @@ afterEach(() => {
 describe('authorizedFetch', () => {
   it('attaches the session token to a POST when one resolves', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValue('tok-abc');
+    mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:43210', token: 'tok-abc' });
 
     const { authorizedFetch } = await import('./authorizedFetch.js');
     await authorizedFetch(`${apiBase}/api/x`, { method: 'POST', body: '{}' });
@@ -72,7 +72,7 @@ describe('authorizedFetch', () => {
 
   it('attaches the resolved session token to GET requests', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValue('tok-abc');
+    mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:43210', token: 'tok-abc' });
 
     const { authorizedFetch } = await import('./authorizedFetch.js');
     await authorizedFetch(`${apiBase}/api/x`);
@@ -83,7 +83,7 @@ describe('authorizedFetch', () => {
 
   it("preserves the caller's explicit session header", async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValue('tok-abc');
+    mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:43210', token: 'tok-abc' });
 
     const { authorizedFetch } = await import('./authorizedFetch.js');
     await authorizedFetch(`${apiBase}/api/x`, {
@@ -96,7 +96,7 @@ describe('authorizedFetch', () => {
 
   it('keeps other headers when it adds the token', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValue('tok-abc');
+    mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:43210', token: 'tok-abc' });
 
     const { authorizedFetch } = await import('./authorizedFetch.js');
     await authorizedFetch(`${apiBase}/api/x`, {
@@ -113,7 +113,7 @@ describe('authorizedFetch', () => {
 describe('performFetch (host.data.fetch — the covering doFetch seam)', () => {
   it('carries the session header on a non-GET when a token resolves', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValue('tok-data');
+    mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:43210', token: 'tok-data' });
 
     const { createDataApi } = await import('../plugin-api/capabilities/data.js');
     await createDataApi('TRUSTED_PLUGIN', apiBase).fetch('/api/conversations/encryption/export', {
@@ -146,7 +146,7 @@ describe('performFetch (host.data.fetch — the covering doFetch seam)', () => {
 describe('OperationClient default fetch path', () => {
   it('carries the session header on the invoke POST', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValue('tok-op');
+    mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:43210', token: 'tok-op' });
 
     const { OperationClient } = await import('../operations/OperationClient.js');
     await new OperationClient({ apiBase }).invoke('demo.op');
@@ -165,7 +165,7 @@ describe('OperationClient default fetch path', () => {
 
   it('still honours an explicitly injected fetchImpl (testability preserved)', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValue('tok-op');
+    mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:43210', token: 'tok-op' });
     const injected = vi.fn().mockResolvedValue(ok());
 
     const { OperationClient } = await import('../operations/OperationClient.js');
@@ -181,7 +181,7 @@ describe('OperationClient default fetch path', () => {
 describe('session-token resolver caching (804 D3 hazard)', () => {
   it('does NOT cache a Tauri-runtime null — a later call re-attempts and picks the token up', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValueOnce(null).mockResolvedValueOnce('late-token');
+    mocks.invoke.mockResolvedValueOnce(null).mockResolvedValueOnce({ origin: 'http://127.0.0.1:43210', token: 'late-token' });
 
     const { resolveSessionTokenFromTauri, getSessionToken } = await import('../../api/http.js');
 
@@ -195,7 +195,7 @@ describe('session-token resolver caching (804 D3 hazard)', () => {
 
   it('a POST issued before the token exists does not doom later POSTs', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValueOnce(null).mockResolvedValueOnce('late-token');
+    mocks.invoke.mockResolvedValueOnce(null).mockResolvedValueOnce({ origin: 'http://127.0.0.1:43210', token: 'late-token' });
 
     const { authorizedFetch } = await import('./authorizedFetch.js');
     await authorizedFetch(`${apiBase}/api/x`, { method: 'POST' });
@@ -207,7 +207,7 @@ describe('session-token resolver caching (804 D3 hazard)', () => {
 
   it('caches a resolved token (one invoke for many calls)', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValue('tok-once');
+    mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:43210', token: 'tok-once' });
 
     const { authorizedFetch } = await import('./authorizedFetch.js');
     await authorizedFetch(`${apiBase}/api/x`, { method: 'POST' });
@@ -249,7 +249,7 @@ describe('session-token resolver caching (804 D3 hazard)', () => {
     // Tempdoc 805 G.1 — the token is a per-boot fact. Without this the binding latches for the
     // app's lifetime (R11-F2).
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValueOnce('tok-boot-1').mockResolvedValueOnce('tok-boot-2');
+    mocks.invoke.mockResolvedValueOnce({ origin: 'http://127.0.0.1:43210', token: 'tok-boot-1' }).mockResolvedValueOnce({ origin: 'http://127.0.0.1:43210', token: 'tok-boot-2' });
 
     const { resolveSessionTokenFromTauri, getSessionToken, invalidateSessionToken } = await import(
       '../../api/http.js'
@@ -278,7 +278,7 @@ describe('one-shot 401 heal (805 G.1 — a restart the shell has not announced y
 
   it('re-resolves and retries exactly once, then returns the second 401', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValueOnce('tok-dead').mockResolvedValueOnce('tok-live');
+    mocks.invoke.mockResolvedValueOnce({ origin: 'http://127.0.0.1:43210', token: 'tok-dead' }).mockResolvedValueOnce({ origin: 'http://127.0.0.1:43210', token: 'tok-live' });
     fetchSpy.mockResolvedValueOnce(unauthorized()).mockResolvedValueOnce(unauthorized());
 
     const { authorizedFetch } = await import('./authorizedFetch.js');
@@ -293,7 +293,7 @@ describe('one-shot 401 heal (805 G.1 — a restart the shell has not announced y
 
   it('heals a single stale-token 401 and returns the retry response', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValueOnce('tok-dead').mockResolvedValueOnce('tok-live');
+    mocks.invoke.mockResolvedValueOnce({ origin: 'http://127.0.0.1:43210', token: 'tok-dead' }).mockResolvedValueOnce({ origin: 'http://127.0.0.1:43210', token: 'tok-live' });
     fetchSpy.mockResolvedValueOnce(unauthorized()).mockResolvedValueOnce(ok());
 
     const { authorizedFetch } = await import('./authorizedFetch.js');
@@ -306,7 +306,7 @@ describe('one-shot 401 heal (805 G.1 — a restart the shell has not announced y
 
   it('does NOT retry a 401 carrying a different errorCode', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValue('tok-abc');
+    mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:43210', token: 'tok-abc' });
     fetchSpy.mockResolvedValueOnce(unauthorized('AUTH_FORBIDDEN'));
 
     const { authorizedFetch } = await import('./authorizedFetch.js');
@@ -318,7 +318,7 @@ describe('one-shot 401 heal (805 G.1 — a restart the shell has not announced y
 
   it('does NOT retry a non-401 response', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValue('tok-abc');
+    mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:43210', token: 'tok-abc' });
     fetchSpy.mockResolvedValueOnce(
       new Response(JSON.stringify({ errorCode: 'UI_TOKEN_REQUIRED' }), { status: 500 }),
     );
@@ -332,7 +332,7 @@ describe('one-shot 401 heal (805 G.1 — a restart the shell has not announced y
 
   it('leaves a probed response body readable by the caller', async () => {
     mocks.isTauriRuntime.mockReturnValue(true);
-    mocks.invoke.mockResolvedValue('tok-abc');
+    mocks.invoke.mockResolvedValue({ origin: 'http://127.0.0.1:43210', token: 'tok-abc' });
     fetchSpy.mockResolvedValueOnce(unauthorized('AUTH_FORBIDDEN'));
 
     const { authorizedFetch } = await import('./authorizedFetch.js');
