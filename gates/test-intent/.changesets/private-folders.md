@@ -14,9 +14,10 @@ The superseded choice to leave Windows explicit file ACLs untouched is removed: 
 repair of known existing files too. Links and multiply-linked regular files are explicit no-repair exceptions.
 
 Only this branch's private-folder test items and one main keystore fixture adaptation are covered here. Token-only files,
-including their changeset and evidence, match the merged main exactly. Main is pinned to
-`4f595453517bbf430bf907117f2c60303b7357ba` (merge commit `75853ca84`); it is the PR/gate base.
-Repair and preservation receipts were refreshed against that main revision. The separate
+including their changeset and evidence, match the merged main exactly. The current PR/gate base is
+`eae9993ac7ec8fd0e17a0d0c8adb935ee3121741`. The v5 repair and preservation receipts
+refresh the changed runtime harness against that revision; the unchanged supplemental API
+and keystore-startup receipts retain their earlier reviewed revisions. The separate
 hard-link/iterator regression receipt retains the requested historical state `46816f593`.
 No receipt uses hand-written patches or production overlays. Older receipts and every
 review record remain as history. The Windows account-level P9 check remains unverified.
@@ -33,7 +34,7 @@ review record remain as history. The Windows account-level P9 check remains unve
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Post-merge repair controls against pinned main 4f595453517bbf430bf907117f2c60303b7357ba: fresh/restored runtime and encryption folders are private; existing single-link descendants receive 0700/0600 or the protected owner+SYSTEM DACL; symlinks/junctions are skipped, parents unchanged, denied permissions warn without blocking publication. The shell creates private folders and warns once while keeping linked-runtime writers working. The keystore privacy checks now include both main’s primary and recovery replica at setup, passphrase/recovery changes and restored-folder load, preserving the current main save/rollback protocol. All 13 named checks fail by assertion on this main revision and pass on the merged candidate, without production overlays or patches.",
+      "behaviour": "Post-merge repair controls against pinned main eae9993ac7ec8fd0e17a0d0c8adb935ee3121741: fresh/restored runtime and encryption folders are private; existing single-link descendants receive 0700/0600 or the protected owner+SYSTEM DACL; symlinks/junctions are skipped, parents unchanged, denied permissions warn without blocking publication. The shell creates private folders and warns once while keeping linked-runtime writers working. The keystore privacy checks now include both main’s primary and recovery replica at setup, passphrase/recovery changes and restored-folder load, preserving the current main save/rollback protocol. All 13 named checks fail by assertion on this main revision and pass on the merged candidate, without production overlays or patches.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -131,7 +132,7 @@ review record remain as history. The Windows account-level P9 check remains unve
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/private-folders-merge-repair-v4.json",
+      "evidence": "gates/test-intent/evidence/private-folders-merge-repair-v5.json",
       "newChecks": [
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerDirectoryPermissionsTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/EncryptionKeystorePermissionsTest.java#setupReplacementAndRestartKeepPrivateAndUsable",
@@ -157,7 +158,7 @@ review record remain as history. The Windows account-level P9 check remains unve
       "class": "New",
       "repaired": false,
       "preservation": true,
-      "behaviour": "Post-merge preservation controls against pinned main 4f595453517bbf430bf907117f2c60303b7357ba: linked runtime and encryption paths retain successful owner writes/unlock without permission repair through the link or parent. Interrupted keystore replacement preserves both the primary and recovery replica bytes, passphrase/recovery usability and exactly the two durable filenames, without abandoned temporary files. The old single-file count assertion is superseded only because main now intentionally keeps a replica. Both revisions pass all four checks; they are not claimed repairs.",
+      "behaviour": "Post-merge preservation controls against pinned main eae9993ac7ec8fd0e17a0d0c8adb935ee3121741: linked runtime and encryption paths retain successful owner writes/unlock without permission repair through the link or parent. Interrupted keystore replacement preserves both the primary and recovery replica bytes, passphrase/recovery usability and exactly the two durable filenames, without abandoned temporary files. The old single-file count assertion is superseded only because main now intentionally keeps a replica. Both revisions pass all four checks; they are not claimed repairs.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -197,7 +198,7 @@ review record remain as history. The Windows account-level P9 check remains unve
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/private-folders-merge-preservation-v4.json",
+      "evidence": "gates/test-intent/evidence/private-folders-merge-preservation-v5.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/EncryptionKeystorePermissionsTest.java#interruptedReplacementPreservesPassphraseAndRecoveryMaterial",
         "modules/app-services/src/test/java/io/justsearch/app/services/encryption/EncryptionKeystorePermissionsTest.java#linkedEncryptionStillUnlocksWithoutChangingTargetOrParentPermissions",
@@ -288,7 +289,7 @@ review record remain as history. The Windows account-level P9 check remains unve
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Hard-link repair exception and iterator recovery: an existing runtime file hard-linked outside the data folder retains its 0664 mode, bytes and inode alias, with one warning despite repeated publication; parents and target-directory modes remain unchanged, the runtime stays private and the manifest is published owner-only. An injected DirectoryIteratorException from hasNext must produce one warning across repeated repairs, allow publisher construction and manifest publication, and preserve the existing history. Both checks fail by assertion on 46816f593 for the respective outside chmod and escaping iterator error, and pass after. No existing assertion was weakened. Refreshed after the merge; 46816f593 remains the explicitly requested historical regression state, while the current PR base is 4f595453517bbf430bf907117f2c60303b7357ba.",
+      "behaviour": "Hard-link repair exception and iterator recovery: an existing runtime file hard-linked outside the data folder retains its 0664 mode, bytes and inode alias, with one warning despite repeated publication; parents and target-directory modes remain unchanged, the runtime stays private and the manifest is published owner-only. An injected DirectoryIteratorException from hasNext must produce one warning across repeated repairs, allow publisher construction and manifest publication, and preserve the existing history. Both checks fail by assertion on 46816f593 for the respective outside chmod and escaping iterator error, and pass after. No existing assertion was weakened. Refreshed after the merge; 46816f593 remains the explicitly requested historical regression state, while the current PR base is eae9993ac7ec8fd0e17a0d0c8adb935ee3121741.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -313,7 +314,7 @@ review record remain as history. The Windows account-level P9 check remains unve
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/private-folders-merge-hardlinks-iterator-v4.json",
+      "evidence": "gates/test-intent/evidence/private-folders-merge-hardlinks-iterator-v5.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeDirectoryPermissionsTest.java#hardLinkedHistoryKeepsOutsidePermissionsAndWarnsOnceWhilePublishing",
         "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeDirectoryPermissionsTest.java#failingDirectoryIteratorWarnsOnceAndStartupContinuesWithoutDeletingFiles"
@@ -355,6 +356,23 @@ review record remain as history. The Windows account-level P9 check remains unve
       "evidence": "gates/test-intent/evidence/private-folders-merge-startup-fixture-v4.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/KeystoreStartupAvailabilityHttpTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeDirectoryPermissionsTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Rename the unused try-with-resources static mock binding nativeSecurity to the unnamed variable _. The conditional initializer, static-mock answer, resource order, lifetime and automatic close are identical. Every input, precondition, injected failure, assertion, tag and platform condition is unchanged. Main/test PMD and compilation pass for all four touched JVM modules; the focused runtime permission suite passes. The three v5 execution receipts refresh this file’s digest without changing their check selection or before-state assertions.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261019-5ec1a1 request",
+          "quote": "Make the smallest change that keeps the mock's scope and behavior exactly the same; an unnamed `_` resource is one option, if both PMD and Error Prone accept it."
+        }
       ]
     }
   ]

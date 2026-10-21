@@ -189,7 +189,7 @@ class RuntimeDirectoryPermissionsTest {
     Class<?> backend;
     try { backend = Class.forName("io.justsearch.configuration.persistence.WindowsOwnerOnlyDirectory"); }
     catch (ClassNotFoundException beforeState) { backend = null; }
-    try (var nativeSecurity = backend == null ? null : Mockito.mockStatic(backend, invocation -> {
+    try (var _ = backend == null ? null : Mockito.mockStatic(backend, invocation -> {
            if (invocation.getMethod().getName().equals("apply")) {
              repaired.add(invocation.getArgument(0));
              assertFalse((Boolean) invocation.getArgument(1), "existing entries must be repaired");

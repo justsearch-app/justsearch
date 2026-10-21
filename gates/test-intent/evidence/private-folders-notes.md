@@ -277,3 +277,35 @@ and generated snapshots match pinned main. HEAD remains the sole requested merge
 the fixture adaptation, refreshed changeset/notes and five new receipts are uncommitted.
 
 The shared origin/main ref advanced during the work to 738e6a443c9d6ce82383e9c938c264a3a20fb506. Per the owner instruction, the merge remains pinned to 4f595453517bbf430bf907117f2c60303b7357ba; no follow-up merge or rebase was made. The default gate still resolves the PR merge-base to the pinned revision.
+
+## PMD static-mock resource adaptation (PR #873)
+
+The only test-code change renames the unused `nativeSecurity` resource to `_` in
+`windowsRepairIncludesExistingFilesAndSkipsEveryReparsePoint`. Its conditional static-mock
+initializer, answer, resource ordering, scope and automatic close are identical. Every
+assertion, input, fault injection, platform condition and test selection is unchanged.
+
+One `js-gradle-slot ./gradlew ... --continue` invocation ran `pmdMain`, `pmdTest`,
+`compileJava` and `compileTestJava` for configuration, app-api, app-services and ui, plus
+`:modules:ui:test --tests '*RuntimeDirectoryPermissionsTest*'`. It exited 0 with
+BUILD SUCCESSFUL: all eight PMD reports contain zero violations, and all 10 runtime
+permission tests passed without skips. No additional PMD fix was needed.
+
+The unchanged evidence producer and token-bootstrap execution-policy adapter ran whole
+under `js-gradle-slot`, with JAVA_TOOL_OPTIONS unset and all temporary files and shared
+before clones below `/home/elias/.cache/justsearch-private-folders-builder`. The three
+new v5 receipts retain the previous check selections; v4 receipts and every review
+record remain unchanged. The repair/preservation before-state is the current PR
+merge-base `eae9993ac7ec8fd0e17a0d0c8adb935ee3121741`; the explicitly requested historical
+hard-link/iterator regression state remains `46816f593`.
+
+- `private-folders-merge-repair-v5.json`: producer exit 0; all 13 candidate checks
+  passed, and all 13 before-state checks failed by assertion.
+- `private-folders-merge-preservation-v5.json`: producer exit 1 because its four
+  before-state controls passed; all four checks passed on both revisions. This is
+  preservation evidence, not a producer pass or a fail-before claim.
+- `private-folders-merge-hardlinks-iterator-v5.json`: producer exit 0; both candidate
+  checks passed, and both historical before-state checks failed by assertion.
+
+No receipt uses a production overlay or hand-written patch. The producer removed all
+three before clones. No Engine was started for these permission tests.
