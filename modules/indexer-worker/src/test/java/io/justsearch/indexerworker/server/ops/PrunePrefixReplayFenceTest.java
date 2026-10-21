@@ -709,7 +709,6 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
     bufferPrune(null);
     assertTrue(queue.putSwitchBuffer("vdu_update:" + key(gone), "VDU_UPDATE",
         vduPayload(key(gone), content)));
-    var before = buffered();
     Files.delete(gone);
 
     KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(bestEffort(runtime, publisher));

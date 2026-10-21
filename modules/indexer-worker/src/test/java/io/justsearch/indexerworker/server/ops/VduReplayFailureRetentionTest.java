@@ -26,7 +26,6 @@ import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
-import io.justsearch.indexerworker.services.LanguageUtils;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.indexing.chunking.ChunkSplitter;
@@ -208,25 +207,6 @@ final class VduReplayFailureRetentionTest {
       assertTrue(commitSawBufferedOperation.get(), "commit must observe the durable replay row");
       assertEquals(0, queue.switchBufferDepth());
     }
-  }
-
-  private Map<String, Object> chunkDeclaration() {
-    return Map.of(
-        SchemaFields.CHUNK_TOTAL, 18,
-        SchemaFields.CHUNK_PARENT_CONTENT_SHA256, CONTENT_SHA256);
-  }
-
-  private Map<String, Object> terminalParentUpdate() {
-    String preview = CONTENT.strip().substring(0, ChunkSplitter.CONTENT_PREVIEW_MAX_CHARS);
-    return Map.of(
-        SchemaFields.VDU_PROCESSED, "true",
-        SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_COMPLETED,
-        SchemaFields.CONTENT, CONTENT,
-        SchemaFields.CONTENT_SHA256, CONTENT_SHA256,
-        SchemaFields.CONTENT_PREVIEW, preview,
-        SchemaFields.LANGUAGE, LanguageUtils.resolveLanguage(preview),
-        SchemaFields.EXTRACTION_METHOD, SchemaFields.EXTRACTION_METHOD_VDU,
-        SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
   }
 
   private RunningRuntime mockRuntime(

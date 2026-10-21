@@ -86,7 +86,7 @@ final class VduResultReplayParityTest extends LuceneExecutorTestBase {
       ParentSnapshot liveSnapshot = readCommitted(liveIndex);
       ParentSnapshot replaySnapshot = readCommitted(replayIndex);
       assertEquals(liveSnapshot, replaySnapshot);
-      assertExpected(scenario, replaySnapshot);
+      assertExpected(replaySnapshot);
     }
   }
 
@@ -358,7 +358,7 @@ final class VduResultReplayParityTest extends LuceneExecutorTestBase {
     }
   }
 
-  private void assertExpected(OutcomeCase scenario, ParentSnapshot snapshot) {
+  private void assertExpected(ParentSnapshot snapshot) {
     assertEquals(PARENT_UID, snapshot.docUid());
     assertEquals(SchemaFields.VDU_STATUS_PENDING,snapshot.vduStatus());
     assertEquals("0",snapshot.vduProcessed());

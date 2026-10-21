@@ -75,7 +75,7 @@ final class LegacyVduSourceRefreshTest extends LuceneExecutorTestBase {
   }
   private static CallContext context() { var base=CallContext.none();return new CallContext(null,null,null,base.engineContext().withWorkId(UUID.randomUUID()),base.provenance(),base.childLifetime()); }
   private static void optional(Object builder,String name,String value) throws Exception {
-    try { builder.getClass().getMethod(name,String.class).invoke(builder,value); }catch(NoSuchMethodException baseline) { }
+    try { builder.getClass().getMethod(name,String.class).invoke(builder,value); }catch(NoSuchMethodException baseline) { /* the setter does not exist on the baseline build */ }
   }
   private static void seed(RunningRuntime runtime,String id,String uid,String source,String content) {
     Map<String,Object> fields=new HashMap<>();fields.put(SchemaFields.DOC_ID,id);fields.put(SchemaFields.DOC_UID,uid);fields.put(SchemaFields.CONTENT,content);

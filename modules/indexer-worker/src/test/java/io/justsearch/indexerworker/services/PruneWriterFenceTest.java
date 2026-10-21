@@ -297,8 +297,8 @@ final class PruneWriterFenceTest extends LuceneExecutorTestBase {
     var service = service(loopWithFence(), ingest);
     addRoot(service);
     String content = "Recognised text with enough words for several chunks. ".repeat(400);
-    var base=CallContext.none();var ctx=new CallContext(null,null,null,base.engineContext().withWorkId(java.util.UUID.randomUUID()),base.provenance(),base.childLifetime());
-    String attempt=java.util.UUID.randomUUID().toString();
+    var base=CallContext.none();var ctx=new CallContext(null,null,null,base.engineContext().withWorkId(UUID.randomUUID()),base.provenance(),base.childLifetime());
+    String attempt=UUID.randomUUID().toString();
     assertTrue(service.markVduProcessing(io.justsearch.ipc.MarkVduProcessingRequest.newBuilder().setDocId(path).setAttemptId(attempt).build(),ctx).getSuccess());
 
     Thread[] vduThread = new Thread[1];
