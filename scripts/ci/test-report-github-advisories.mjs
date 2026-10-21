@@ -33,6 +33,17 @@ assert.deepEqual(
 
 const batches = buildAffectsBatches(['a@1.0.0', 'b@1.0.0', 'c@1.0.0'], { maxSpecs: 2 });
 assert.deepEqual(batches, [['a@1.0.0', 'b@1.0.0'], ['c@1.0.0']]);
+for (const specs of [
+  ['a@1.0.0', 'a@2.0.0', 'b@1.0.0', 'b@2.0.0'],
+  ['@scope/a@1.0.0', 'b@1.0.0', '@scope/a@2.0.0', 'b@2.0.0'],
+]) {
+  const batches = buildAffectsBatches(specs);
+  assert.deepEqual(batches.flat(), specs);
+  for (const batch of batches) {
+    const names = batch.map(spec => spec.slice(0, spec.lastIndexOf('@')));
+    assert.equal(new Set(names).size, batch.length, 'different versions of a package must be in separate requests');
+  }
+}
 
 const advisory = (id, severity = 'high') => ({
   ghsa_id: id,
@@ -73,6 +84,14 @@ const attributed = await queryGitHubAdvisories(['lodash@4.17.20', 'lodash@4.17.1
 assert.deepEqual(attributed[0].affected, [
   { package: 'lodash', version: '4.17.19' }, { package: 'lodash', version: '4.17.20' },
 ], 'retain each queried version of the matching package, never attribute unrelated packages');
+const exact = await queryGitHubAdvisories(['lodash@4.17.20', 'lodash@4.17.21', 'unrelated@1.0.0'], {
+  fetchImpl: async (url) => ({ ok: true, json: async () =>
+    url.searchParams.get('affects').split(',').includes('lodash@4.17.20')
+      ? [advisory('GHSA-35JH-R3H4-6JHM')] : [] }),
+  retries: 0, timeoutSignalFactory: () => undefined,
+});
+assert.deepEqual(exact[0].affected, [{ package: 'lodash', version: '4.17.20' }],
+  'a safe version beside a vulnerable version is never attributed its advisory');
 await assert.rejects(queryGitHubAdvisories(['unrelated@1.0.0'], {
   fetchImpl: async () => ({ ok: true, json: async () => [advisory('GHSA-35JH-R3H4-6JHM')] }),
   retries: 0, timeoutSignalFactory: () => undefined,

@@ -129,6 +129,42 @@ author-session: ci-one-run-builder-20261021
           "location": "task ci-one-run request; repair brief R2, 2026-10-21"
         }
       ]
+    },
+    {
+      "items": [
+        "scripts/ci/classify-changes.test.mjs",
+        "scripts/ci/one-run-policy.test.mjs",
+        "scripts/ci/test-report-github-advisories.mjs",
+        "scripts/dev/run-gh.test.mjs",
+        "scripts/ci/auto-merge-guard.test.mjs"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Use traced dev-runner inputs in place of the Java-lane implication without changing the static reader drift guard; require enqueue messages to equal the squash preview; verify exact per-version advisory attribution and both queued auto-merge guard races. The guard executes only a script from the trusted base commit. The configuration contention flake joins the PR-only exclusion list and still runs on main.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Replace the coarse \"Java selects dev-runner\" rule with the exact traced inputs (keep the static drift guard and the audit at zero gaps).",
+          "location": "task ci-one-run request; fix-round G1, 2026-10-21"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Send exactly the previewed subject and body; take them from the preview's own output or compute them the same way, and test that subject and body equal the preview.",
+          "location": "task ci-one-run request; fix-round G2, 2026-10-21"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Make attribution exact: query different versions of the same package in separate batches, so GitHub's own matching decides which version an advisory belongs to.",
+          "location": "task ci-one-run request; fix-round G3, 2026-10-21"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "The guard must leave auto-merge alone when the PR's head is no longer the head this event was for (a later run handles it) or when auto-merge was enabled after this workflow run was created (GraphQL autoMergeRequest.enabledAt against the run's created_at).",
+          "location": "task ci-one-run request; fix-round G4, 2026-10-21"
+        }
+      ]
     }
   ]
 }

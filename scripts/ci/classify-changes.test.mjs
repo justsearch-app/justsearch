@@ -10,6 +10,7 @@ test('O1 docs and agent files need no scoped lanes', () => {
   assert.deepEqual(selected(['docs/reference/testing/test-intent.md', 'docs/reference/legal/ai-runtime-and-model-redistribution.md', 'AGENTS.md', '.claude/settings.json']), []);
 });
 for (const [path, lanes] of [
+  ['.gitignore', ['devrunner', 'windows', 'jseval']],
   ['modules/ui-web/src/api/statusPoll.ts', ['ui', 'services', 'lifecycle', 'build']],
   ['modules/ui-web/scripts/dev-all.cjs', ['devrunner', 'ui', 'services']],
   ['governance/supervision-contract.v1.json', ['services', 'rust']],
@@ -29,12 +30,12 @@ for (const [path, lanes] of [
   for (const lane of lanes) assert.ok(classifyPaths([path])[lane], lane);
 });
 test('O4 Java closure excludes unrelated lanes', () => {
-  assert.deepEqual(selected(['modules/core/src/main/java/Core.java']), ['build', 'ui', 'services', 'search', 'platform', 'windows', 'devrunner', 'lifecycle', 'integration', 'jseval']);
+  assert.deepEqual(selected(['modules/core/src/main/java/Core.java']), ['build', 'ui', 'services', 'search', 'platform', 'windows', 'lifecycle', 'integration', 'jseval']);
   assert.equal(classifyPaths(['modules/ui/src/main/java/UI.java']).search, false);
 });
-test('O5 dev-runner lanes conservatively include Java and spread-out runtime inputs', () => {
+test('O5 dev-runner lanes follow their inputs rather than the Java closure', () => {
   for (const path of ['scripts/dev/dev-runner.cjs', 'scripts/lib/engine-discovery.mjs', 'native/bound-exec/bound-exec.c', 'scripts/supervisor-conformance/run.mjs']) assert.ok(classifyPaths([path]).devrunner, path);
-  assert.equal(classifyPaths(['modules/core/src/main/java/Core.java']).devrunner, true);
+  assert.equal(classifyPaths(['modules/core/src/main/java/Core.java']).devrunner, false);
 });
 test('mixed changes take the union', () => {
   assert.deepEqual(selected(['scripts/jseval/jseval/main.py', 'modules/ui-web/src/api/statusPoll.ts']), [...new Set([...selected(['scripts/jseval/jseval/main.py']), ...selected(['modules/ui-web/src/api/statusPoll.ts'])])].sort((a,b) => LANES.indexOf(a)-LANES.indexOf(b)));
@@ -55,12 +56,15 @@ test('git failure selects every lane', () => all(classifyDiff({ ...event, git: (
 for (const path of [
   'governance/config-apply.v1.json', 'governance/worktree-lifecycle.v1.json',
   'governance/fixtures/exit-ledger/cases/children-basic/children.v1.jsonl',
-]) test(`governance data is a shared input: ${path}`, () => all(classifyPaths([path])));
+]) test(`governance data keeps its non-dev-runner consumers: ${path}`, () => {
+  const result = classifyPaths([path]);
+  for (const lane of LANES.filter(lane => lane !== 'devrunner')) assert.ok(result[lane], lane);
+});
 for (const path of [
   'modules/ui/build.gradle.kts',
-  'modules/app-inference/src/main/java/io/justsearch/app/inference/LlamaServerOps.java',
-  'modules/app-services/src/main/java/io/justsearch/app/services/ai/runtime/RuntimeActivationService.java',
-  'scripts/jseval/jseval/backend.py',
+  'modules/shell/src-tauri/src/engine_host.rs',
+  'modules/shell/src-tauri/src/shell_actuator.rs',
+  'scripts/jseval/lane-f/e-crash-evidence.mjs',
 ]) test(`spread-out dev-runner input: ${path}`, () => {
   assert.ok(classifyPaths([path]).devrunner);
   assert.ok(classifyPaths([path]).windows);
@@ -146,9 +150,10 @@ test('tracked repository paths named by Java, Node and Rust tests select their r
   assert.deepEqual([...gaps].sort(), []);
 });
 
-test('shared non-module inputs selecting a Java lane also select both Windows lanes', () => {
-  for (const path of ['gates/config-surface/sysaccess-allowlist.txt', 'gates/test-efficacy/strength-baseline.v1.json', 'scripts/release/app-release-assets.mjs']) {
+test('Java-only and gate changes do not select dev-runner or its PR conformance', () => {
+  for (const path of ['modules/core/src/main/java/Core.java', 'modules/app-inference/src/main/java/io/justsearch/app/inference/LlamaServerOps.java', 'modules/app-services/src/main/java/io/justsearch/app/services/ai/runtime/RuntimeActivationService.java', 'gates/config-surface/sysaccess-allowlist.txt', 'gates/test-efficacy/strength-baseline.v1.json', 'scripts/release/app-release-assets.mjs', 'scripts/jseval/jseval/backend.py', 'governance/config-apply.v1.json']) {
     const result = classifyPaths([path]);
-    assert.ok(result.devrunner && result.windows, path);
+    assert.equal(result.devrunner, false, path);
+    assert.equal(result.rust, path.startsWith('governance/'), path);
   }
 });

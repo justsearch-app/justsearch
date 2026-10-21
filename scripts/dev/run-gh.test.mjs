@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { buildSquashMessagePreview } from '../ci/preview-squash-message.mjs';
 import {
   decodeChecksExit,
   isUnregistered,
@@ -248,7 +249,7 @@ run('parseEnqueueArgs accepts only a PR number and optional repository slug', ()
   assert.throws(() => parseEnqueueArgs(['933', '--repo', 'invalid']), /owner\/repo/);
 });
 
-const snapshot = { headRefOid: 'a'.repeat(40), title: 'Validated title', body: 'Body\nwith lines', isDraft: false, mergeable: 'MERGEABLE' };
+const snapshot = { headRefOid: 'a'.repeat(40), title: 'Validated title', body: 'Body\r\nwith lines', isDraft: false, mergeable: 'MERGEABLE' };
 const snapshotResult = (value = snapshot) => ({ status: 0, stdout: JSON.stringify(value) });
 run('enqueue binds squash auto-merge to the validated head, title and body', () => {
   const calls = [];
@@ -261,7 +262,13 @@ run('enqueue binds squash auto-merge to the validated head, title and body', () 
   });
   assert.equal(code, 0);
   assert.deepEqual(calls.map((c) => c.args[1]), ['view', '--pr', 'check', 'view', 'merge']);
-  assert.deepEqual(calls.at(-1).args, ['pr', 'merge', '933', '--squash', '--auto', '--match-head-commit', snapshot.headRefOid, '--subject', snapshot.title, '--body', snapshot.body, '--repo', 'justsearch-app/justsearch']);
+  const preview = buildSquashMessagePreview({
+    repo: { squash_merge_commit_title: 'PR_TITLE', squash_merge_commit_message: 'PR_BODY' },
+    pr: { ...snapshot, number: 933 },
+  });
+  assert.deepEqual(preview.errors, []);
+  assert.equal(preview.proposedCommit.title, 'Validated title (#933)');
+  assert.deepEqual(calls.at(-1).args, ['pr', 'merge', '933', '--squash', '--auto', '--match-head-commit', snapshot.headRefOid, '--subject', preview.proposedCommit.title, '--body', preview.proposedCommit.body, '--repo', 'justsearch-app/justsearch']);
 });
 for (const update of [{ headRefOid: 'b'.repeat(40) }, { title: 'edited' }, { body: 'edited' }, { isDraft: true }, { mergeable: 'CONFLICTING' }, { mergeable: 'UNKNOWN' }]) {
   run(`enqueue refuses changed snapshot ${JSON.stringify(update)}`, () => {

@@ -59,6 +59,7 @@
 
 import path from 'node:path';
 import fs from 'node:fs';
+import { buildPublicSquashRecord } from '../ci/lib/squash-message-projection.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -427,8 +428,10 @@ export function enqueuePullRequest(bin, prNumber, repo = null, {
     writeError('run-gh enqueue: PR changed during validation; enqueue again.\n');
     return 2;
   }
+  // Use the preview's projection, including GitHub's PR-number suffix and LF body.
+  const preview = buildPublicSquashRecord({ pr: { ...after.value, number: prNumber } });
   const mergeArgs = ['pr', 'merge', String(prNumber), '--squash', '--auto',
-    '--match-head-commit', after.value.headRefOid, '--subject', after.value.title, '--body', after.value.body];
+    '--match-head-commit', after.value.headRefOid, '--subject', preview.expectedLandedSubject, '--body', preview.body];
   if (repo) mergeArgs.push('--repo', repo);
   const result = run(bin, mergeArgs, { stdio: 'inherit', windowsHide: true });
   return childFailure('squash auto-merge request', result, writeError);

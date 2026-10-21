@@ -10,3 +10,4 @@ devrunner	scripts/dev/test-dev-runner-stop-round4.mjs	recovery check passes with
 devrunner	scripts/dev/test-dev-runner-stop-recovery.mjs	spawn capture retains the exited wrapper identity, and its identity stop ends nothing else
 gradle	modules/telemetry	io.justsearch.telemetry.TracingBootstrapGlobalRegistrationFailureTest.indexFactoryReusesLiveProviderAfterComponentClose
 gradle	modules/worker-services	io.justsearch.indexerworker.loop.pacing.BulkDutyFloorUnderDeviceGateTest.bulkKeepsItsShareOfSeatsUnderAConstantForegroundStream
+gradle	modules/configuration	io.justsearch.configuration.persistence.ContendedFileReadsTest.reopensAfterContentionWhenWriterRotatesThePathBeforePublishingReplacement

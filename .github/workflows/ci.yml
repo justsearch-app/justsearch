@@ -188,7 +188,7 @@ jobs:
           python scripts/agent-analytics/test_otlp_sink.py
 
       - name: Change classifier and scheduling tests
-        run: node --test scripts/ci/classify-changes.test.mjs scripts/ci/one-run-policy.test.mjs
+        run: node --test scripts/ci/classify-changes.test.mjs scripts/ci/one-run-policy.test.mjs scripts/ci/auto-merge-guard.test.mjs
 
       - name: Workflow trigger policy guard
         run: node scripts/ci/check-workflow-triggers.mjs

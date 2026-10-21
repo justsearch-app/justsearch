@@ -49,7 +49,11 @@ export function buildAffectsBatches(specs, { maxEncodedQueryLength = 6500, maxSp
     const queryLength = new URLSearchParams({
       ecosystem: 'npm', affects: candidate.join(','), per_page: '100', page: '1',
     }).toString().length;
-    if (current.length > 0 && (candidate.length > maxSpecs || queryLength > maxEncodedQueryLength)) {
+    // A response identifies packages, not which queried version matched. Keep
+    // each package in at most one spec per request so GitHub decides the version.
+    const name = spec.slice(0, spec.lastIndexOf('@'));
+    const repeatsPackage = current.some(entry => entry.slice(0, entry.lastIndexOf('@')) === name);
+    if (current.length > 0 && (repeatsPackage || candidate.length > maxSpecs || queryLength > maxEncodedQueryLength)) {
       batches.push(current);
       current = [spec];
     } else {
@@ -152,8 +156,8 @@ export async function queryGitHubAdvisories(specs, {
           throw new Error(`GitHub advisory ${advisory.ghsa_id} has no package attribution`);
         }
         const names = new Set(row.vulnerabilities.filter((v) => v?.package?.ecosystem === 'npm').map((v) => v.package.name));
-        // No semver library is a declared direct dependency. Conservatively keep
-        // every queried version of the matching package; never silently miss one.
+        // Batches contain one version per package. GitHub's affects filter has
+        // already matched that version; no local approximation of its range.
         const affected = batch.flatMap((spec) => {
           const at = spec.lastIndexOf('@');
           const name = spec.slice(0, at);

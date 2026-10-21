@@ -70,6 +70,10 @@ test('the synchronize guard cannot execute PR code and has only its required per
   const guard = load(read('.github/workflows/auto-merge-guard.yml'));
   assert.deepEqual(guard.on, { pull_request_target: { types: ['synchronize'] } });
   assert.deepEqual(guard.permissions, { 'pull-requests': 'write', contents: 'read' });
-  assert.ok(!read('.github/workflows/auto-merge-guard.yml').includes('actions/checkout'));
-  assert.match(guard.jobs['disable-auto-merge'].steps[0].with.script, /disablePullRequestAutoMerge/);
+  const [checkout, script] = guard.jobs['disable-auto-merge'].steps;
+  assert.equal(checkout.uses, 'actions/checkout@v7');
+  assert.equal(checkout.with.ref, '${{ github.event.pull_request.base.sha }}');
+  assert.equal(checkout.with['persist-credentials'], false);
+  assert.match(script.with.script, /require\('\.\/scripts\/ci\/auto-merge-guard\.cjs'\)/);
+  assert.match(script.with.script, /await guardAutoMerge\(\{ github, context, core \}\)/);
 });
