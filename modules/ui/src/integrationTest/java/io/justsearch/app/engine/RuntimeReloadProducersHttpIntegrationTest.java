@@ -311,6 +311,272 @@ final class RuntimeReloadProducersHttpIntegrationTest {
     }
   }
 
+  @Test
+  void failedOpenerKeepsTheWaitingWatcherDeleteUntilRetry() throws Exception {
+    try (var f = new Fixture()) {
+      var files = f.watchedFiles();
+      var refused = f.reloadWithSettledDeleteWaiting(files.gone(), () -> {
+        throw new IllegalStateException("injected failed opener after native drain");
+      });
+      assertEquals(500, refused.statusCode(), refused.body());
+      f.awaitReceipts(1, "a failed opener must keep the waiting watcher delete as a durable obligation");
+      f.useNormalReload();
+      assertReloadSuccess(f.post());
+      f.awaitCount("reloadobligationgone", 0);
+      f.awaitCount("reloadobligationkept", 1);
+      f.awaitReceipts(0, "only the applied root walk retires the obligation");
+    }
+  }
+
+  @Test
+  void failedReconstructionKeepsTheWaitingWatcherDeleteUntilRetry() throws Exception {
+    try (var f = new Fixture()) {
+      var files = f.watchedFiles();
+      var old = f.spyProducer();
+      // A's close follows the watcher handoff to B: the replacement fails after B was installed.
+      doThrow(new java.io.IOException("injected reconstruction failure after watcher handoff"))
+          .doCallRealMethod().when(old).close();
+      var refused = f.reloadWithSettledDeleteWaiting(files.gone(), f::reopen);
+      assertEquals(500, refused.statusCode(), refused.body());
+      f.awaitReceipts(1, "a failed reconstruction must keep the waiting watcher delete as a durable obligation");
+      f.useNormalReload();
+      assertReloadSuccess(f.post());
+      f.awaitCount("reloadobligationgone", 0);
+      f.awaitCount("reloadobligationkept", 1);
+      f.awaitReceipts(0, "only the applied root walk retires the obligation");
+    }
+  }
+
+  @Test
+  void successfulNativeReloadDischargesAnExistingWatcherReceipt() throws Exception {
+    try (var f = new Fixture()) {
+      f.unwatchedFilesWithReceipt();
+      assertReloadSuccess(f.post());
+      // No extra watch call and no waiting: the reload returns after the root's obligation is met.
+      assertEquals(0, f.count("reloadobligationgone"),
+          "a successful native reload must discharge the existing receipt before it returns");
+      assertEquals(1, f.count("reloadobligationkept"));
+      assertEquals(List.of(), f.receipts());
+    }
+  }
+
+  @Test
+  void receiptForAnUnavailableRootWaitsWithoutFailingTheReload() throws Exception {
+    try (var f = new Fixture()) {
+      var files = f.unwatchedFilesWithReceipt();
+      Path away = files.root().resolveSibling(files.root().getFileName() + "-away");
+      Files.move(files.root(), away);
+      assertReloadSuccess(f.post());
+      assertEquals(1, f.receipts().size(), "the unavailable root's receipt must stay pending");
+      assertEquals(1, f.count("reloadobligationgone"), "nothing is applied to an unavailable root");
+      Files.move(away, files.root());
+      assertReloadSuccess(f.post());
+      assertEquals(List.of(), f.receipts());
+      assertEquals(0, f.count("reloadobligationgone"));
+      assertEquals(1, f.count("reloadobligationkept"));
+    }
+  }
+
+  @Test
+  void receiptForARootWhoseVolumeReturnsIsAppliedWithoutAWatchCall() throws Exception {
+    try (var f = new Fixture()) {
+      var files = f.unwatchedFilesWithReceipt();
+      Path root = files.root().toAbsolutePath().normalize();
+      var ledger = directory.resolve("index").resolve("root-volumes.properties");
+      String ownVolume = f.recordedVolume(ledger, root);
+      f.recordVolume(ledger, root, "windows-volume:dead");
+      var service = f.server.appServices().ingestService();
+      var held = service.watchRoot(io.justsearch.ipc.WatchRootRequest.newBuilder()
+              .setRootPath(root.toString()).setCollection("default").build(),
+          io.justsearch.indexerworker.services.CallContext.none());
+      assertFalse(held.getWatching(), "precondition: the watch waits for the root's own volume");
+      assertEquals(1, f.receipts().size(), "precondition: the receipt waits with the root");
+      f.recordVolume(ledger, root, ownVolume);
+      // The periodic sync's call finds the volume back; nothing calls watch.
+      service.syncDirectory(io.justsearch.ipc.SyncDirectoryRequest.newBuilder()
+              .setRootPath(root.toString()).setForce(false).build(),
+          io.justsearch.indexerworker.services.CallContext.none());
+      f.awaitCount("reloadobligationgone", 0);
+      f.awaitCount("reloadobligationkept", 1);
+      f.awaitReceipts(0, "the returned root's pending receipt must be applied without a watch call");
+    }
+  }
+
+  @Test
+  void failedNativeReloadAndRetryKeepTheRootWatched() throws Exception {
+    try (var f = new Fixture()) {
+      var files = f.watchedFiles();
+      f.useReload(() -> { throw new IllegalStateException("injected failed opener"); });
+      var refused = f.post();
+      assertEquals(500, refused.statusCode(), refused.body());
+      f.useNormalReload();
+      assertReloadSuccess(f.post());
+      Files.delete(files.gone());
+      Files.writeString(files.root().resolve("added.txt"), "reloadobligationadded after retry");
+      f.awaitCount("reloadobligationgone", 0);
+      f.awaitCount("reloadobligationadded", 1);
+      f.awaitCount("reloadobligationkept", 1);
+    }
+  }
+
+  @Test
+  @Timeout(180)
+  void watcherObligationSurvivesProcessDeathAfterFailedHandoff() throws Exception {
+    assertEquals(71, crashChild("failed-handoff"), "the selected crash cut must execute");
+    try (var f = new Fixture()) {
+      assertEquals(1, f.receipts().size(), "the waiting delete must be durable before process death");
+      f.watch(directory.resolve("watched"));
+      f.awaitCount("reloadobligationgone", 0);
+      f.awaitCount("reloadobligationkept", 1);
+      f.awaitReceipts(0, "the applied reconciliation retires its receipt after the search effect");
+    }
+  }
+
+  @Test
+  @Timeout(180)
+  void watcherObligationSurvivesProcessDeathAfterSuccessfulHandoff() throws Exception {
+    // Killed as the old owner's close returns: the handoff is done, reconciliation has not begun.
+    assertEquals(71, crashChild("close"), "the selected crash cut must execute");
+    assertWaitingDeleteRecovered();
+  }
+
+  @Test
+  @Timeout(180)
+  void watcherObligationSurvivesProcessDeathAfterNativeReconciliation() throws Exception {
+    // Killed once the successor's loop is active, still inside the fence the DELETE waits on.
+    assertEquals(71, crashChild("activatePreparedIndexingLoop"), "the selected crash cut must execute");
+    assertWaitingDeleteRecovered();
+  }
+
+  @Test
+  @Timeout(240)
+  void automaticRootRestoreAppliesTheWaitingDeleteWithoutAWatchCall() throws Exception {
+    assertEquals(71, crashChild("persisted.close"), "the selected crash cut must execute");
+    // The restart restores the persisted root by itself (no watch call): the pending receipt
+    // must be applied within awaitCount's bound, not left to a later periodic sync.
+    try (var f = new Fixture(true)) {
+      f.awaitCount("reloadobligationgone", 0);
+      f.awaitCount("reloadobligationkept", 1);
+      f.awaitReceipts(0, "the applied reconciliation retires its receipt after the search effect");
+    }
+  }
+
+  /** After the restart and its watch call, the waiting DELETE has its effect; the sibling stays. */
+  private void assertWaitingDeleteRecovered() throws Exception {
+    try (var f = new Fixture()) {
+      f.watch(directory.resolve("watched"));
+      f.awaitCount("reloadobligationgone", 0);
+      f.awaitCount("reloadobligationkept", 1);
+      f.awaitReceipts(0, "the applied reconciliation retires its receipt after the search effect");
+    }
+  }
+
+  private int crashChild(String cut) throws Exception {
+    Path output = directory.resolve("child-" + cut + ".log");
+    Path arguments = directory.resolve("child.args");
+    Files.writeString(arguments, "-cp\n\"" + System.getProperty("java.class.path")
+        .replace("\\", "\\\\").replace("\"", "\\\"") + "\"\n");
+    String java = Path.of(System.getProperty("java.home"), "bin",
+        System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString();
+    Process child = new ProcessBuilder(java, "--enable-native-access=ALL-UNNAMED", "@" + arguments,
+        CrashChild.class.getName(), cut, directory.toString())
+        .redirectErrorStream(true).redirectOutput(output.toFile()).start();
+    try {
+      assertTrue(child.waitFor(120, TimeUnit.SECONDS), "owned crash child must exit");
+      assertEquals(71, child.exitValue(), () -> "crash point not reached: " + tail(output));
+      return child.exitValue();
+    } finally {
+      if (child.isAlive()) {
+        child.destroyForcibly();
+        assertTrue(child.waitFor(10, TimeUnit.SECONDS));
+      }
+    }
+  }
+
+  private static String tail(Path log) {
+    try {
+      var lines = Files.readAllLines(log);
+      return String.join("\n", lines.subList(Math.max(0, lines.size() - 40), lines.size()));
+    } catch (Exception failure) { return failure.toString(); }
+  }
+
+  /** Runs one real Engine in its own JVM and halts it at the selected durability boundary. */
+  static final class CrashChild {
+    public static void main(String[] args) {
+      try {
+        var test = new RuntimeReloadProducersHttpIntegrationTest();
+        test.directory = Path.of(args[1]);
+        boolean persisted = args[0].startsWith("persisted.");
+        var f = test.new Fixture(persisted);
+        if ("failed-handoff".equals(args[0])) {
+          var files = f.watchedFiles();
+          var gate = (java.util.concurrent.locks.ReentrantReadWriteLock)
+              field(((DefaultWorkerAppServices) f.server.appServices()).mutationAdmission(), "lock");
+          var refused = f.reloadWithSettledDeleteWaiting(files.gone(), () -> {
+            throw new IllegalStateException("injected failed opener before process death");
+          });
+          assertEquals(500, refused.statusCode(), refused.body());
+          // The released callback has finished once it neither waits for nor holds admission.
+          long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+          while ((gate.hasQueuedThreads() || gate.getReadLockCount() > 0)
+              && System.nanoTime() < until) Thread.sleep(5);
+          assertFalse(gate.hasQueuedThreads() || gate.getReadLockCount() > 0);
+          Runtime.getRuntime().halt(71);
+        }
+        // A successful native reload with a settled DELETE waiting on its fence, parked at the exit
+        // of the named DefaultWorkerAppServices lifecycle method, where this process then dies.
+        var files = persisted ? f.persistedFiles() : f.watchedFiles();
+        String cut = args[0].substring(args[0].indexOf('.') + 1);
+        new net.bytebuddy.agent.builder.AgentBuilder.Default()
+            .with(net.bytebuddy.agent.builder.AgentBuilder.RedefinitionStrategy.RETRANSFORMATION)
+            .type(net.bytebuddy.matcher.ElementMatchers.named(DefaultWorkerAppServices.class.getName()))
+            .transform((builder, type, loader, module, domain) -> builder.visit(
+                net.bytebuddy.asm.Advice.to(ParkAtExit.class).on(
+                    net.bytebuddy.matcher.ElementMatchers.named(cut)
+                        .and(net.bytebuddy.matcher.ElementMatchers.takesArguments(0)))))
+            .installOn(net.bytebuddy.agent.ByteBuddyAgent.install());
+        var reload = CompletableFuture.supplyAsync(() -> {
+          try {
+            return f.reloadWithSettledDeleteWaiting(files.gone(), () -> {
+              System.setProperty(ParkAtExit.STATE, "armed");
+              return f.reopen();
+            });
+          } catch (Exception failure) {
+            throw new IllegalStateException(failure);
+          }
+        });
+        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+        while (!"parked".equals(System.getProperty(ParkAtExit.STATE)) && !reload.isDone()
+            && System.nanoTime() < until) Thread.sleep(1);
+        if ("parked".equals(System.getProperty(ParkAtExit.STATE))) Runtime.getRuntime().halt(71);
+        System.out.println("crash point not reached: reload done=" + reload.isDone());
+        Runtime.getRuntime().halt(70);
+      } catch (Throwable failure) {
+        failure.printStackTrace(System.out);
+        Runtime.getRuntime().halt(72); // Engine threads must not keep a failed child alive.
+      }
+    }
+  }
+
+  /** Inlined at a lifecycle method's exit once armed: parks that thread so the process dies there. */
+  public static final class ParkAtExit {
+    static final String STATE = "justsearch.test.reloadCrashCut";
+
+    private ParkAtExit() {}
+
+    @net.bytebuddy.asm.Advice.OnMethodExit
+    public static void exit() {
+      if ("armed".equals(System.getProperty(STATE))) {
+        System.setProperty(STATE, "parked");
+        while ("parked".equals(System.getProperty(STATE))) {
+          java.util.concurrent.locks.LockSupport.parkNanos(1_000_000L);
+        }
+      }
+    }
+  }
+
+  private record WatchedFiles(Path root, Path gone, Path kept) {}
+
   private final class Fixture implements AutoCloseable {
     final ConfigStore previous = ConfigStore.globalOrNull();
     final EngineRoot root;
@@ -320,7 +586,13 @@ final class RuntimeReloadProducersHttpIntegrationTest {
     final Javalin http;
     final HttpClient transport = HttpClient.newHttpClient();
 
-    Fixture() throws Exception {
+    Fixture() throws Exception { this(false); }
+
+    /**
+     * {@code production}: root membership persists in the data folder and the bootstrap's automatic
+     * root producers run, so a restart restores and re-watches persisted roots by itself.
+     */
+    Fixture(boolean production) throws Exception {
       var builder = ResolvedConfig.builder();
       builder.putDefault(EnvRegistry.DATA_DIR.configKey(), directory.resolve("data").toString());
       builder.putDefault(EnvRegistry.INDEX_BASE_PATH.configKey(), directory.resolve("index").toString());
@@ -341,11 +613,12 @@ final class RuntimeReloadProducersHttpIntegrationTest {
                 encoders, configuration);
             built.set(result);
             return result;
-          }, 5_000, 100, ignored -> {}, () -> {}, OperationAuthority.inMemory());
+          }, 5_000, 100, ignored -> {}, () -> {}, production
+              ? OperationAuthority.load(directory.resolve("data")) : OperationAuthority.inMemory());
       var config = new KnowledgeServerConfig(false, directory.resolve("data"), directory, directory,
           5_000L, 5_000L, 1, 5_000L, 1_000L, 300_000L, 100, 5_000L, 0);
       bootstrap = new KnowledgeServerBootstrap(root.executors(), config, null, root.components(),
-          root.indexComponent(), root, false, root.publicationLock());
+          root.indexComponent(), root, production, root.publicationLock());
       bootstrap.startInitial(ignored -> {});
       server = built.get();
       assertTrue(server.awaitIndexRecoveryModels(10_000));
@@ -367,6 +640,153 @@ final class RuntimeReloadProducersHttpIntegrationTest {
           mock(TimeSeriesController.class), mock(SessionPoliciesController.class), ctx -> {},
           ctx -> handler.invoke(api, ctx));
       http.start("127.0.0.1", 0);
+    }
+
+    io.justsearch.indexerworker.queue.SwitchBufferCapableQueue queue() throws Exception {
+      return (io.justsearch.indexerworker.queue.SwitchBufferCapableQueue) field(server, "jobQueue");
+    }
+
+    List<io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp> receipts()
+        throws Exception {
+      return queue().listSwitchBufferOpsStrict().stream()
+          .filter(op -> io.justsearch.indexerworker.queue.WatcherRootReconciliation.OPERATION
+              .equals(op.op()))
+          .toList();
+    }
+
+    void awaitReceipts(int expected, String message) throws Exception {
+      long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+      while (receipts().size() != expected && System.nanoTime() < until) Thread.sleep(25);
+      assertEquals(expected, receipts().size(), message);
+    }
+
+    long count(String marker) { return client.search(marker, 10, CONTEXT).getResultsCount(); }
+
+    void awaitCount(String marker, long expected) throws Exception {
+      long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+      while (count(marker) != expected && System.nanoTime() < until) Thread.sleep(50);
+      assertEquals(expected, count(marker), marker);
+    }
+
+    void watch(Path root) {
+      var registration = server.appServices().ingestService().watchRoot(
+          io.justsearch.ipc.WatchRootRequest.newBuilder().setRootPath(root.toString())
+              .setRootAdded(true).setCollection("default").build(),
+          io.justsearch.indexerworker.services.CallContext.none());
+      assertTrue(registration.getWatching(), registration.getErrorMessage());
+    }
+
+    private WatchedFiles files(boolean watched) throws Exception {
+      Path root = Files.createDirectories(directory.resolve("watched"));
+      var files = new WatchedFiles(root,
+          Files.writeString(root.resolve("gone.txt"), "reloadobligationgone distinct content"),
+          Files.writeString(root.resolve("kept.txt"), "reloadobligationkept distinct content"));
+      if (watched) watch(root);
+      assertEquals(2, client.submitBatch(List.of(files.gone(), files.kept()), CONTEXT)
+          .getAcceptedCount());
+      awaitCount("reloadobligationgone", 1);
+      awaitCount("reloadobligationkept", 1);
+      return files;
+    }
+
+    WatchedFiles watchedFiles() throws Exception { return files(true); }
+
+    /** Both files indexed under a root the person added, so its membership persists. */
+    WatchedFiles persistedFiles() throws Exception {
+      Path root = Files.createDirectories(directory.resolve("watched"));
+      var files = new WatchedFiles(root,
+          Files.writeString(root.resolve("gone.txt"), "reloadobligationgone distinct content"),
+          Files.writeString(root.resolve("kept.txt"), "reloadobligationkept distinct content"));
+      client.addWatchedRoot("default", root, CONTEXT);
+      awaitCount("reloadobligationgone", 1);
+      awaitCount("reloadobligationkept", 1);
+      return files;
+    }
+
+    /** A durable receipt as a failed or interrupted earlier reload leaves it for a watched root. */
+    WatchedFiles unwatchedFilesWithReceipt() throws Exception {
+      var files = files(false);
+      Files.delete(files.gone());
+      watch(files.root());
+      var registry = inherited(server.appServices().ingestService(), "rootWatcherRegistry");
+      var lookup = registry.getClass().getDeclaredMethod("subscription", Path.class);
+      lookup.setAccessible(true);
+      var subscription = lookup.invoke(registry, files.root());
+      var identity = subscription.getClass().getDeclaredMethod("rootIdentity");
+      identity.setAccessible(true);
+      var debt = new io.justsearch.indexerworker.queue.WatcherRootReconciliation(
+          files.root().toAbsolutePath().normalize().toString(),
+          identity.invoke(subscription).toString(), "default");
+      assertTrue(queue().putSwitchBuffer(debt.key(),
+          io.justsearch.indexerworker.queue.WatcherRootReconciliation.OPERATION, debt.encode()));
+      assertEquals(1, count("reloadobligationgone"), "the receipt's delete is not yet applied");
+      return files;
+    }
+
+    String recordedVolume(Path ledger, Path root) throws Exception {
+      var entries = new java.util.Properties();
+      try (var in = Files.newInputStream(ledger)) { entries.load(in); }
+      String volume = entries.getProperty(root.toString());
+      assertNotNull(volume, "precondition: the person's add recorded the root's volume");
+      return volume;
+    }
+
+    /** Rewrites the root's recorded volume, as if another volume (or its own) were at its path. */
+    void recordVolume(Path ledger, Path root, String volume) throws Exception {
+      var entries = new java.util.Properties();
+      try (var in = Files.newInputStream(ledger)) { entries.load(in); }
+      entries.setProperty(root.toString(), volume);
+      try (var out = Files.newOutputStream(ledger)) { entries.store(out, null); }
+    }
+
+    void useReload(java.util.function.Supplier<io.justsearch.adapters.lucene.runtime.RunningRuntime> opener) {
+      server.appServices().ingestService().setRuntimeReloadTrigger(
+          reason -> server.swapRuntime(opener, Duration.ofSeconds(30), reason));
+    }
+
+    void useNormalReload() { useReload(this::reopen); }
+
+    io.justsearch.adapters.lucene.runtime.RunningRuntime reopen() {
+      try {
+        var build = KnowledgeServer.class.getDeclaredMethod("buildIndexRuntime", Path.class,
+            java.util.function.Supplier.class);
+        build.setAccessible(true);
+        java.util.function.Supplier<Optional<?>> none = Optional::empty;
+        return ((io.justsearch.adapters.lucene.runtime.LuceneRuntimeBuilder)
+            build.invoke(server, field(server, "activeIndexPath"), none)).open();
+      } catch (Exception failure) { throw new AssertionError(failure); }
+    }
+
+    /** Deletes the file, lets its DELETE settle behind the native fence, then runs the opener. */
+    HttpResponse<String> reloadWithSettledDeleteWaiting(Path file,
+        java.util.function.Supplier<io.justsearch.adapters.lucene.runtime.RunningRuntime> opener)
+        throws Exception {
+      var services = server.appServices();
+      var pending = (java.util.Map<?, ?>) inherited(inherited(services, "workerWatcher"),
+          "pendingDeletes");
+      var gate = (java.util.concurrent.locks.ReentrantReadWriteLock)
+          field(((DefaultWorkerAppServices) services).mutationAdmission(), "lock");
+      Files.delete(file);
+      long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      while (!pending.containsKey(file) && System.nanoTime() < until) Thread.sleep(5);
+      assertTrue(pending.containsKey(file), "the watcher must hold the DELETE before the reload");
+      var waiting = new java.util.concurrent.atomic.AtomicBoolean();
+      useReload(() -> {
+        try {
+          long settle = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+          while (!(pending.isEmpty() && gate.hasQueuedThreads()) && System.nanoTime() < settle) {
+            Thread.sleep(10);
+          }
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new IllegalStateException(interrupted);
+        }
+        waiting.set(pending.isEmpty() && gate.hasQueuedThreads());
+        return opener.get();
+      });
+      var response = post();
+      assertTrue(waiting.get(), "the settled DELETE must wait behind the reload's mutation fence");
+      return response;
     }
 
     DefaultWorkerAppServices spyProducer() throws Exception {
@@ -424,6 +844,18 @@ final class RuntimeReloadProducersHttpIntegrationTest {
     var field = target.getClass().getDeclaredField(name);
     field.setAccessible(true);
     return field.get(target);
+  }
+
+  /** Reads a declared field through Mockito spy subclasses as well. */
+  private static Object inherited(Object target, String name) throws Exception {
+    for (Class<?> type = target.getClass(); type != null; type = type.getSuperclass()) {
+      try {
+        var field = type.getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(target);
+      } catch (NoSuchFieldException next) { /* look in the superclass */ }
+    }
+    throw new NoSuchFieldException(name);
   }
 
   private static void set(Object target, String name, Object value) throws Exception {

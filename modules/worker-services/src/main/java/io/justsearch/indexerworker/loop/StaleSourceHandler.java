@@ -6,6 +6,7 @@ import io.justsearch.indexerworker.identity.DocumentIdentityStore;
 import io.justsearch.indexerworker.services.ConfirmedDeletionMarker;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import java.nio.file.Path;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,6 +26,7 @@ public final class StaleSourceHandler {
 
   private final IndexingCoordinator indexingCoordinator;
   private final ConfirmedDeletionMarker deletionMarker;
+  private final Supplier<IndexingCoordinator> activeLexicalSource;
 
   public StaleSourceHandler(IndexingCoordinator indexingCoordinator) {
     this(indexingCoordinator, DocumentIdentityStore.UNAVAILABLE);
@@ -32,8 +34,19 @@ public final class StaleSourceHandler {
 
   public StaleSourceHandler(
       IndexingCoordinator indexingCoordinator, DocumentIdentityStore identityStore) {
+    this(indexingCoordinator, identityStore, () -> null);
+  }
+
+  /**
+   * {@code activeLexicalSource} is the serving generation A while a Green producer projects its
+   * text to A, or null. A retired source leaves A as well: A keeps serving, and a refused
+   * candidate leaves A in charge, so A must not keep text whose source A's policy retired.
+   */
+  public StaleSourceHandler(IndexingCoordinator indexingCoordinator,
+      DocumentIdentityStore identityStore, Supplier<IndexingCoordinator> activeLexicalSource) {
     this.indexingCoordinator = indexingCoordinator;
     this.deletionMarker = new ConfirmedDeletionMarker(identityStore);
+    this.activeLexicalSource = activeLexicalSource;
   }
 
   /**
@@ -46,6 +59,8 @@ public final class StaleSourceHandler {
   public int deleteMissingSource(Path filePath) {
     try {
       String normalizedPath = PathNormalizer.normalizePath(filePath.toAbsolutePath().toString());
+      IndexingCoordinator active = activeLexicalSource.get();
+      if (active != null) active.deleteByIdAndChunks(normalizedPath); // A before Green, as writes
       indexingCoordinator.deleteByIdAndChunks(normalizedPath);
       // Tempdoc 931 §C.6 — a confirmed deletion point: the document left the index because its
       // source is gone. The marker re-verifies absence, so the DELETED classification that reaches

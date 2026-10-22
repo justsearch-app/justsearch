@@ -667,3 +667,42 @@ describe('<jf-task-list> — enrichment estimate (813 §20)', () => {
   });
 });
 
+
+it('keeps retry waiting visible without showing progress or a ready claim', async () => {
+  const detail = '8 files waiting. Next retry: 10/21/2026, 10:00:00 PM.';
+  await setProgress({ phase: 'waiting', jobsPending: 8, live: true,
+    activity: { summary: 'Waiting to retry', detail, confirmed: true, enrichmentDeferred: false } });
+  expect(host.hasAttribute('data-empty')).toBe(false);
+  expect(text('[data-testid="task-title"]')).toBe('Waiting to retry');
+  expect(host.shadowRoot?.textContent).toContain(detail);
+  expect(q('[role="progressbar"]')).toBeNull();
+  expect(host.shadowRoot?.textContent).not.toContain('Everything is indexed');
+  __feedForTest({ status: INDEXING_SNAPSHOT });
+  await flush();
+  __feedForTest({ status: READY_SNAPSHOT });
+  await flush();
+  expect((host as TaskList).showingReady).toBe(true);
+  __feedForTest({ status: snapshot({ core: { indexState: 'WAITING', pendingJobs: 8 },
+    failure: { nextRetryAtMs: Date.now() + 60_000 } }) });
+  await flush();
+  expect((host as TaskList).showingReady).toBe(false);
+  expect(text('[data-testid="task-title"]')).toBe('Waiting to retry');
+  expect(q('[role="progressbar"]')).toBeNull();
+});
+
+it('terminal failures withdraw the completion window and remain visible as errors', async () => {
+  __feedForTest({ status: INDEXING_SNAPSHOT });
+  await flush();
+  __feedForTest({ status: READY_SNAPSHOT });
+  await flush();
+  expect((host as TaskList).showingReady).toBe(true);
+  __feedForTest({ status: snapshot({ core: { indexState: 'ERROR', pendingJobs: 0, indexHealthy: false },
+    failure: { failedJobs: 2 }, migration: { pendingJobsCount: 0, processingJobsCount: 0 } }) });
+  await flush();
+  expect((host as TaskList).showingReady).toBe(false);
+  expect(host.hasAttribute('data-empty')).toBe(false);
+  expect(text('[data-testid="task-title"]')).toBe('Indexing error');
+  expect(host.shadowRoot?.textContent).toContain('2 files could not be indexed.');
+  expect(host.shadowRoot?.textContent).not.toContain('Everything is indexed');
+  expect(q('[role="progressbar"]')).toBeNull();
+});

@@ -25,7 +25,9 @@ def snapshot(client, expected):
     response = client.get('/api/status', timeout=5)
     response.raise_for_status()
     raw = response.json()
-    if raw.get('workerRpcStale') is True:
+    if (raw.get('workerRpcStale') is True
+            or (raw.get('meta') or {}).get('workerRpcStale') is True
+            or 'indexing' in (((raw.get('operating') or {}).get('freshness') or {}).get('staleSources') or [])):
         raise ValueError('stale status')
     s = flatten_status(dict(raw))
     keys = ['indexedDocuments', 'chunkEmbeddingCompletedCount',
@@ -33,7 +35,15 @@ def snapshot(client, expected):
             'spladePendingCount', 'pendingNerCount']
     if any(type(s.get(k)) not in (int, float) or s[k] < 0 for k in keys):
         raise ValueError('missing numeric indexing counters')
-    active = s['indexedDocuments'] < expected or any(s[k] > 0 for k in keys[2:])
+    # A serving corpus below the target and a retry backlog are unfinished, not runnable work.
+    # The Worker owns file eligibility; reachable enrichment can still run between retries.
+    enrichment = (
+        s.get('embeddingEnabled', True) and s.get('embeddingAvailable', True)
+        and (s['embeddingPendingCount'] > 0 or s['chunkEmbeddingPendingCount'] > 0)
+        or s.get('spladeEnabled', True) and s.get('spladeAvailable', True) and s['spladePendingCount'] > 0
+        or s.get('nerEnabled', True) and s.get('nerAvailable', True) and s['pendingNerCount'] > 0
+    )
+    active = s.get('indexState') != 'FAILED' and (s.get('indexState') == 'INDEXING' or enrichment)
     return {'observedAtMs': time.time() * 1000, 'active': active,
             **{k: s[k] for k in keys}, 'raw': raw}
 

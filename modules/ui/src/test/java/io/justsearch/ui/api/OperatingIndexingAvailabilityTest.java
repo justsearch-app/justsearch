@@ -175,7 +175,7 @@ final class OperatingIndexingAvailabilityTest {
   }
 
   private static CoreIndexView core(long pendingJobs) {
-    return new CoreIndexView(true, 3_000, pendingJobs, "SERVING", 0, 0);
+    return new CoreIndexView(true, 3_000, pendingJobs, pendingJobs > 0 ? "INDEXING" : "IDLE", 0, 0);
   }
 
   private static WorkerOperationalView worker(CoreIndexView core, EnrichmentProgressView e) {

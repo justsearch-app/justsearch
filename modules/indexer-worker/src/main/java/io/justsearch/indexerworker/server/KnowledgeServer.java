@@ -44,6 +44,7 @@ import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferDelete;
 import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
 import io.justsearch.indexerworker.identity.DocumentIdentityStore;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps;
@@ -353,6 +354,13 @@ public final class KnowledgeServer implements Closeable {
   // Generated from the register (tempdoc 575 §17 Face A) — single source, cannot drift.
   private static final long STALE_PROCESSING_MS = LivenessWindows.REAPER_STALE_MS; // 5 min liveness window
   private static final long REAP_INTERVAL_MS = 2 * 60_000L; // check every 2 min (poll cadence, not a window)
+  /** How long a refused recorded candidate's cleanup retries each second after readiness. */
+  private static final long REFUSAL_SETTLE_BOUND_MS = 60_000L;
+  /** Held by the one loop that retries refusal cleanup every second; the reaper tick yields. */
+  private final AtomicBoolean refusalCleanupRetrying = new AtomicBoolean();
+  /** The last refusal cleanup failure logged as an error; repeats log at debug. */
+  private volatile String lastRefusalCleanupFailure;
+  private static final long EARLY_REFUSAL_FENCE_WAIT_MS = 100L;
   private java.util.concurrent.ScheduledExecutorService stuckJobReaper;
   private java.util.concurrent.ScheduledFuture<?> stuckJobReapTask;
   /** How often a root the committed boot deferred is checked for its recorded volume (round 7). */
@@ -2133,15 +2141,52 @@ public final class KnowledgeServer implements Closeable {
     deferredModelInit.whenComplete((ignored, failure) -> {
       var reaper = stuckJobReaper;
       if (closeStarted || reaper == null) return;
+      // A recovery boot has no cutover monitor; its cleanup retries as promptly, within the same
+      // bound counted from here, the point at which cleanup can first run.
+      long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(REFUSAL_SETTLE_BOUND_MS);
       try {
-        reaper.execute(this::reconcileRefusedCandidateSafely);
+        reaper.execute(() -> retryRefusedCandidateCleanup(deadline));
       } catch (java.util.concurrent.RejectedExecutionException closing) {
         if (!closeStarted) log.warn("Refused candidate completion maintenance could not start", closing);
       }
     });
   }
 
+  /**
+   * As {@link #settleRefusedRecordedCandidate}, without holding the reaper's thread: one attempt,
+   * then the next a second later while the refused candidate awaits cleanup and the bound lasts.
+   * The reaper's own tick keeps retrying after the bound.
+   */
+  private void retryRefusedCandidateCleanup(long deadlineNanos) {
+    if (refusalCleanupRetrying.compareAndSet(false, true)) retryRefusedCandidateCleanupOwned(deadlineNanos);
+  }
+
+  /** One step of the retry loop that owns {@link #refusalCleanupRetrying}. */
+  private void retryRefusedCandidateCleanupOwned(long deadlineNanos) {
+    boolean settled;
+    try {
+      settled = reconcileRefusedRecordedCandidate();
+    } catch (RuntimeException failure) {
+      log.error("Refused candidate maintenance will retry", failure);
+      settled = false;
+    }
+    var reaper = stuckJobReaper;
+    if (settled || closeStarted || !running || reaper == null
+        || System.nanoTime() >= deadlineNanos || !refusedCandidateAwaitsCleanup()) {
+      refusalCleanupRetrying.set(false);
+      return;
+    }
+    try {
+      reaper.schedule(() -> retryRefusedCandidateCleanupOwned(deadlineNanos), 1, TimeUnit.SECONDS);
+    } catch (java.util.concurrent.RejectedExecutionException closing) {
+      refusalCleanupRetrying.set(false);
+      if (!closeStarted) log.warn("Refused candidate cleanup retry could not be scheduled", closing);
+    }
+  }
+
   private void reconcileRefusedCandidateSafely() {
+    // The prompt retry loop, while it runs, already retries every second.
+    if (refusalCleanupRetrying.get()) return;
     try {
       reconcileRefusedRecordedCandidate();
     } catch (RuntimeException failure) {
@@ -3498,6 +3543,9 @@ public final class KnowledgeServer implements Closeable {
    * registered wrapper — see {@code EngineKnowledgeClient}, which holds a supplier for exactly this
    * reason. Mirrors {@code DevReloadManager.performReload}'s swap.
    */
+  // A failed opener/reconstruction must not discard the retiring watcher's root authority.
+  private io.justsearch.indexerworker.services.WorkerIngestService reloadRootAuthority;
+
   private void reconstructAppServicesAfterDeferredUpgrade() {
     log.info("Reconstructing appServices after DeferredRuntime.prepareWriterUpgrade()");
     closePendingAppServices();
@@ -3512,9 +3560,14 @@ public final class KnowledgeServer implements Closeable {
       }
       if (oldServices != null) oldServices.close();
       this.appServices = null; // The incumbent has actually closed; callers see unavailability.
+      if (reloadRootAuthority != null) {
+        newServices.ingestService().reconcileReloadedWatcherRootsFrom(reloadRootAuthority);
+        reloadRootAuthority.handWatchedRootsTo(newServices.ingestService());
+      }
       newServices.startIndexingLoop();
       publishServingView(newServices);
       pendingAppServices = null;
+      reloadRootAuthority = null;
     } catch (Exception | Error failure) {
       try { closePendingAppServices(); }
       catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
@@ -3535,14 +3588,18 @@ public final class KnowledgeServer implements Closeable {
       runtimeReloadSource = null;
     }
     pendingAppServices = successor;
+    boolean handedOff = false;
     try {
       wireAppServicesPostConstruction(successor);
       if (initialEncoderSet != null) retainProducerModels(successor, initialEncoderSet);
       if (successor.ownsNativeProducer()) {
         successor.prepareIndexingLoop();
+        handedOff = true;
         source.installNativeWatcherHandoffTo(successor);
         mutations.install(successor.mutationOwnerToken());
         source.close();
+        // The same durable root obligations the closing path discharges, before B is published.
+        successor.ingestService().reconcilePendingWatcherRoots();
         publishServingView(successor);
         successor.activatePreparedIndexingLoop();
         mutations.certifySuccessor();
@@ -3553,6 +3610,8 @@ public final class KnowledgeServer implements Closeable {
       }
       pendingAppServices = null;
     } catch (Exception | Error failure) {
+      try { if (handedOff) source.withdrawNativeWatcherHandoff(mutations); }
+      catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
       try { closePendingAppServices(); }
       catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
       if (failure instanceof Error fatal) throw fatal;
@@ -3623,6 +3682,14 @@ public final class KnowledgeServer implements Closeable {
         pendingDeferredUpgrade = null;
         // Only a no-throw gate opens after B is publicly selected; no jobs were claimed before it.
         candidate.activatePreparedIndexingLoop();
+        // A root watched while only the reader served (an automatic restore at start) gets its
+        // pending watcher receipts applied now that a writer serves it. A failure keeps them
+        // pending for the next watch, start or reload; it must not undo the published upgrade.
+        try {
+          candidate.ingestService().reconcilePendingWatcherRoots();
+        } catch (RuntimeException pending) {
+          log.warn("Pending watcher receipts wait after the writer upgrade: {}", pending.getMessage());
+        }
       } catch (RuntimeException | Error failure) {
         try { closePendingAppServices(); }
         catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
@@ -3739,6 +3806,11 @@ public final class KnowledgeServer implements Closeable {
       // Its bounded close and admitted mutations must drain before their runtime can close.
       var source = appServices instanceof DefaultWorkerAppServices producer
           && producer.ownsNativeProducer() ? producer : null;
+      // Only the closing path hands roots over by registry; a native handoff shares its registry.
+      if (source == null && reloadRootAuthority == null
+          && appServices instanceof DefaultWorkerAppServices current) {
+        reloadRootAuthority = current.ingestService();
+      }
       final io.justsearch.indexerworker.services.WorkerMutationAdmission.FinalFence mutations;
       try {
         mutations = source == null ? null : source.closeForRuntimeReload();
@@ -8328,6 +8400,10 @@ public final class KnowledgeServer implements Closeable {
     }
     final int cutoverMaxFailedJobs = recordedCandidate == null ? migrationCutoverMaxFailedJobs
         : recordedCandidate.configuration().index().migrationCutoverMaxFailedJobs();
+    // Refusal cleanup of this monitor's candidate retries promptly until this bound, counted
+    // from the monitor's start at readiness; the stuck-job reaper keeps retrying after it.
+    final long settleDeadline = System.nanoTime()
+        + TimeUnit.MILLISECONDS.toNanos(REFUSAL_SETTLE_BOUND_MS);
     migrationCutoverThread =
         new Thread(
             () -> {
@@ -8345,7 +8421,7 @@ public final class KnowledgeServer implements Closeable {
                         MIGRATION_SWITCHING_MAX_DURATION_MS,
                         cutoverMaxFailedJobs,
                         () -> ingestLifecycle,
-                        this::finalizeEmbeddingRebuildBeforeCutover,
+                        this::finalizeOrRefuseRecordedCandidateBeforeCutover,
                         this::drainSwitchBufferBestEffort,
                         log,
                          this::enterSwitchingWithMutationAdmission,
@@ -8380,10 +8456,17 @@ public final class KnowledgeServer implements Closeable {
                            @Override public void transition(String point) throws IOException, InterruptedException {
                              migrationTransition(point);
                            }
+
+                           @Override public boolean refuseUncertifiable() {
+                             return refuseUncertifiableRecordedCandidate(false,
+                                 EARLY_REFUSAL_FENCE_WAIT_MS);
+                           }
                          }));
               } finally {
-                try { reconcileRefusedRecordedCandidate(); }
-                catch (RuntimeException failure) {
+                try {
+                  observeFailedRecordedCandidate();
+                  settleRefusedRecordedCandidate(settleDeadline);
+                } catch (RuntimeException failure) {
                   log.error("Refused candidate cutover cleanup will retry", failure);
                 }
               }
@@ -8391,6 +8474,70 @@ public final class KnowledgeServer implements Closeable {
             "migration-cutover");
     migrationCutoverThread.setDaemon(true);
     migrationCutoverThread.start();
+  }
+
+  /**
+   * Retries the refused-candidate cleanup once a second until it restores A or the bound passes.
+   * A FAILED pointer becomes a refusal only after the Engine records it, and a claimed row
+   * settles only at the writer's next batch boundary; neither should wait for the reaper.
+   */
+  private void settleRefusedRecordedCandidate(long deadlineNanos) {
+    if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded)) return;
+    // One retry loop per cleanup: one already running retries for this monitor too.
+    if (!refusalCleanupRetrying.compareAndSet(false, true)) return;
+    try {
+      while (true) {
+        if (reconcileRefusedRecordedCandidate() || closeStarted || !running) return;
+        if (!refusedCandidateAwaitsCleanup() || System.nanoTime() >= deadlineNanos) return;
+        try {
+          Thread.sleep(1_000);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          return;
+        }
+      }
+    } finally {
+      refusalCleanupRetrying.set(false);
+    }
+  }
+
+  /** A recorded boot whose FAILED pointer still names its candidate. */
+  private boolean refusedCandidateAwaitsCleanup() {
+    if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded)) {
+      return false;
+    }
+    var state = indexGenerationManager == null ? null : indexGenerationManager.readStateBestEffort();
+    return state != null && "FAILED".equals(state.migration_state())
+        && state.building_generation() != null;
+  }
+
+  /**
+   * A FAILED pointer is a precommit refusal only once the application records it. Ask the
+   * recorded owner to observe it now, so cleanup follows at once instead of at the next reaper
+   * tick, minutes later.
+   */
+  private void observeFailedRecordedCandidate() {
+    if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
+        || recordedCandidatePrecommitRefused()) return;
+    String candidate;
+    try {
+      candidate = IndexGenerationManager.recordedGenerationId(recorded.operationKey());
+    } catch (IOException invalid) {
+      return; // The ordinary reaper path reports an operation key it cannot map.
+    }
+    RecordedIngestionLifecycle.Attachment attachment;
+    runtimeSwapLock.lock();
+    try {
+      var state = indexGenerationManager.readStateBestEffort();
+      boolean failedCandidate = !closeStarted && running && state != null
+          && "FAILED".equals(state.migration_state())
+          && candidate.equals(state.building_generation());
+      attachment = failedCandidate ? recordedIngestionAttachment : null;
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+    // As in notifyRecordedServicesPublished: the callback runs outside the runtime lock.
+    if (attachment != null) attachment.servicesPublished();
   }
 
   private boolean recordedCandidatePrecommitRefused() {
@@ -8530,9 +8677,10 @@ public final class KnowledgeServer implements Closeable {
           covered.add(unit);
         }
       } else if ("DELETE".equals(op.op())) {
-        String unit = DocumentIdentityStore.pathHash(op.payload());
+        String path = SwitchBufferDelete.decode(op.payload()).path();
+        String unit = DocumentIdentityStore.pathHash(path);
         if (ingestLifecycle.documentFieldOps()
-            .getDocumentField(op.payload(), SchemaFields.DOC_ID) != null) {
+            .getDocumentField(path, SchemaFields.DOC_ID) != null) {
           addCandidateGap(gaps, rowGaps, op, unit, "DELETE_NOT_APPLIED");
         } else {
           covered.add(unit);
@@ -8939,21 +9087,21 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /** The application has durably refused B while A is still the pointer. Retire Green first. */
-  private void reconcileRefusedRecordedCandidate() {
+  private boolean reconcileRefusedRecordedCandidate() {
     if (!recordedCandidatePrecommitRefused() || closeStarted || encoderRecoveryReservation != null
         || recoveryStartContext != null
-        && recoveryStartContext.recoveryAttempt()) return;
+        && recoveryStartContext.recoveryAttempt()) return false;
     CompletableFuture<Void> composition = deferredModelInit;
-    if (composition != null && !composition.isDone()) return;
+    if (composition != null && !composition.isDone()) return false;
     boolean restart = false;
     runtimeSwapLock.lock();
     try {
       if (closeStarted || encoderRecoveryReservation != null
           || recoveryStartContext != null && recoveryStartContext.recoveryAttempt()
           || !(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
-          || !(appServices instanceof DefaultWorkerAppServices producer)) return;
+          || !(appServices instanceof DefaultWorkerAppServices producer)) return false;
       IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
-      if (state == null || !recorded.sourceGeneration().equals(state.active_generation())) return;
+      if (state == null || !recorded.sourceGeneration().equals(state.active_generation())) return false;
       if (state.building_generation() == null) {
         // A process restart loses the volatile cleanup flag. The refused operation key still
         // identifies its exact retired B, including the pointer-before-mark crash cut.
@@ -8968,25 +9116,44 @@ public final class KnowledgeServer implements Closeable {
       } else {
         try {
           if (!IndexGenerationManager.recordedGenerationId(recorded.operationKey())
-              .equals(state.building_generation())) return;
+              .equals(state.building_generation())) return false;
           if (!(searchLifecycle instanceof RunningRuntime source)
               || !indexGenerationManager.resolveGenerationPathStrict(state.active_generation())
                   .equals(activeIndexPath)) {
             throw new IOException("Refused candidate has no exact writable source generation");
           }
+          // A recovery (FENCED) boot never starts its indexing loop, yet this producer writes
+          // surviving A, and an accepted admission hands over only once A's writer commits it.
+          // Once the refused walk is sealed it issues no candidate claim, so the queue holds
+          // only A's own work, which the boot after cleanup would run anyway: run it now, or
+          // cleanup would wait for A forever. Every attempt below still fences and parks it.
+          if (generationBootDisposition == IndexGenerationManager.BootDisposition.FENCED
+              && ingestLifecycle == source && refusedRecordedWalkSealed(recorded.operationKey())) {
+            producer.startIndexingLoop();
+          }
           // Keep the scoped journal and Green alive until every accepted candidate mutation is
           // certified on surviving A. The same producer fence excludes a later file admission.
           try (var fence = producer.mutationAdmission().beginFinalFence(
               producer.mutationOwnerToken(), 10_000)) {
-            if (fence == null || !producer.mutationAdmission().replayCertain()) {
+            // An uncertain watcher latch does not block rollback. Every latch source is a
+            // filesystem observation this producer could not record; nothing is deleted or
+            // approved on it here. The restart after cleanup replaces the producer, and the new
+            // owner's root registration walk and periodic sync reconcile A from the roots.
+            if (fence == null) {
               throw new IOException("Refused candidate mutation admission is not settled");
             }
-            var counts = jobQueue.jobStateCountsStrict();
-            if (counts.processingCount() != 0 || counts.pendingCount() != 0
-                || !producer.pauseProducerForCutover(10_000)) {
+            // Pending rows are path work on the shared queue, not B effects. They stay durable
+            // A work, and an accepted admission waits for A's writer to commit it; only a
+            // claimed row could still publish a late write during this attempt.
+            // Pause first: the writer returns to its pause point between batches, so a claim it
+            // was finishing settles instead of failing this attempt.
+            if (!producer.pauseProducerForCutover(10_000)) {
               throw new IOException("Refused candidate writer has not settled");
             }
             try {
+              if (jobQueue.jobStateCountsStrict().processingCount() != 0) {
+                throw new IOException("Refused candidate writer has not settled");
+              }
               producer.commitActiveLexicalProjectionForCutover();
               if (!KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
                   new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
@@ -8994,9 +9161,11 @@ public final class KnowledgeServer implements Closeable {
                       JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log,
                       System.nanoTime() + TimeUnit.SECONDS.toNanos(10),
                       state.building_generation(), ignored -> true)
-                      .withPublisher(producer.ingestService()))) {
+                      .withPublisher(producer.ingestService()),
+                  () -> migrationHaltCut("migration-refusal-after-source-commit"))) {
                 throw new IOException("Refused candidate still has unproved source mutations");
               }
+              migrationTransition("migration-refusal-after-journal-ack");
               // Producer close joins the actual Green writer before its B model lease can leave.
               producer.close();
               if (recordedCandidateInPlace) {
@@ -9006,11 +9175,13 @@ public final class KnowledgeServer implements Closeable {
                 candidateModels.close();
                 candidateModels = null;
               }
-              if (recordedCandidateInPlace) return; // A recompose failed; retain exact owners.
+              if (recordedCandidateInPlace) return false; // A recompose failed; retain exact owners.
               if (ingestLifecycle != null && ingestLifecycle != searchLifecycle) ingestLifecycle.close();
               indexGenerationManager.abandonBuildingGeneration("recorded candidate refused");
+              migrationTransition("migration-refusal-after-abandonment");
               indexGenerationManager.retireRefusedRecordedGeneration(
                   recorded.operationKey(), recorded.sourceGeneration());
+              migrationTransition("migration-refusal-after-retirement");
               restart = true;
             } finally {
               if (!producer.producerClosed()) producer.resumeProducerAfterCutover();
@@ -9024,7 +9195,14 @@ public final class KnowledgeServer implements Closeable {
           if (encoderComponent != null) encoderComponent.transition(
               io.justsearch.core.component.ComponentState.UNAVAILABLE, null,
               "Refused candidate cleanup requires recovery: " + failure.getMessage());
-          log.error("Refused candidate still owns its Green resources", failure);
+          // Cleanup retries every second while it waits: report each distinct reason once.
+          String reason = failure.toString();
+          if (!reason.equals(lastRefusalCleanupFailure)) {
+            lastRefusalCleanupFailure = reason;
+            log.error("Refused candidate still owns its Green resources", failure);
+          } else {
+            log.debug("Refused candidate still owns its Green resources: {}", reason);
+          }
         }
       }
     } finally {
@@ -9034,7 +9212,126 @@ public final class KnowledgeServer implements Closeable {
       notifyRecordedServicesPublished();
       migrationRestartAction.run();
     }
+    return restart;
   }
+
+  /** The refused operation's captured walk can issue no further claim. */
+  private boolean refusedRecordedWalkSealed(String operationKey) {
+    return jobQueue.recordedWalk(operationKey).isEmpty()
+        || jobQueue.sealedRecordedWalkReceipt(operationKey).isPresent();
+  }
+
+  /**
+   * The SWITCHING finalization step of a recorded candidate. Two candidates can never certify,
+   * so waiting only spends the whole SWITCHING deadline: one whose producer latched an
+   * unrecorded watcher mutation (the latch never clears in this process), and one that is
+   * provably empty while an embedding model is configured (it never earns the embedding stamp,
+   * and an empty index is never attested). Both are refused now, before the pointer moves, and
+   * the ordinary refused-candidate cleanup restores A.
+   */
+  private boolean finalizeOrRefuseRecordedCandidateBeforeCutover() {
+    if (refuseUncertifiableRecordedCandidate(false, 10_000)) return false;
+    if (finalizeEmbeddingRebuildBeforeCutover()) return true;
+    refuseUncertifiableRecordedCandidate(true, 10_000);
+    return false;
+  }
+
+  /**
+   * Writes FAILED under the promotion lock order when the recorded candidate cannot certify: a
+   * latched producer in MIGRATING or SWITCHING, an empty candidate only in SWITCHING. The fence
+   * waits at most {@code fenceWaitMs} for in-flight mutations while the swap lock is held; the
+   * cutover loop's early check passes a short wait and simply retries on its next pass, so a
+   * long root walk never stalls the Engine's calls behind the swap lock.
+   */
+  private boolean refuseUncertifiableRecordedCandidate(boolean refuseProvablyEmpty,
+      long fenceWaitMs) {
+    if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
+        || !(appServices instanceof DefaultWorkerAppServices observed)) {
+      return false;
+    }
+    // Unfenced pre-check: an ordinary candidate still earning its stamp never takes the fence.
+    if (observed.mutationAdmission().replayCertain() && !(refuseProvablyEmpty
+        && ingestLifecycle instanceof RunningRuntime observedGreen
+        && observedGreen.indexCountOps().docCount() == 0L)) {
+      return false;
+    }
+    try {
+      runtimeSwapLock.lockInterruptibly();
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
+    try {
+      if (closeStarted || encoderRecoveryReservation != null
+          || (recoveryStartContext != null && recoveryStartContext.recoveryAttempt())
+          || !(appServices instanceof DefaultWorkerAppServices producer)) return false;
+      try (var fence = producer.mutationAdmission().beginFinalFence(
+          producer.mutationOwnerToken(), fenceWaitMs)) {
+        if (fence == null) return false;
+        var state = indexGenerationManager.readStateBestEffort();
+        String candidate = IndexGenerationManager.recordedGenerationId(recorded.operationKey());
+        // The latch refuses from MIGRATING too (it never clears in this process); emptiness is
+        // judged only in SWITCHING, after finalization tried to earn the stamp.
+        String phase = state == null ? null : state.migration_state();
+        if (!("SWITCHING".equals(phase) || (!refuseProvablyEmpty && "MIGRATING".equals(phase)))
+            || Boolean.TRUE.equals(state.migration_paused())
+            || !recorded.sourceGeneration().equals(state.active_generation())
+            || !candidate.equals(state.building_generation())) return false;
+        String reason;
+        if (!producer.mutationAdmission().replayCertain()) {
+          reason = "an unrecorded watcher mutation prevents certified promotion";
+        } else if (refuseProvablyEmpty && recordedCandidateProvablyEmpty(recorded, candidate)) {
+          reason = "the candidate is empty and an empty index cannot earn the embedding stamp";
+        } else {
+          return false;
+        }
+        log.warn("Recorded candidate {} refused before the pointer moved: {}", candidate, reason);
+        indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+        return true;
+      }
+    } catch (IOException | RuntimeException unavailable) {
+      log.warn("Cannot decide whether the SWITCHING candidate can certify", unavailable);
+      return false;
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return false;
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  /**
+   * Provably empty: the captured walk closed complete with no planned unit, no recorded claim
+   * was issued, no queue row is pending or claimed, no projection source seeds the candidate,
+   * every accepted journal obligation for B is a removal (which leaves an empty B empty; the
+   * refusal cleanup still settles it on A before acknowledging it), and B holds no document.
+   * An UPSERT, projection, VDU result or root sync could add content, so it is never empty.
+   * Anything unreadable or still moving is not empty.
+   */
+  private boolean recordedCandidateProvablyEmpty(
+      IndexGenerationManager.BootOwnership.Recorded recorded, String candidate) throws IOException {
+    if (!(ingestLifecycle instanceof RunningRuntime green) || green == searchLifecycle
+        || recordedCandidateInPlace || buildingIndexPath == null
+        || !indexGenerationManager.resolveGenerationPathStrict(candidate).equals(buildingIndexPath)
+        || !migrationEnumeratorDone || migrationEnumeratorRunning.get()
+        || !expectedProjectionSourceIds().isEmpty()) return false;
+    var walk = jobQueue.recordedWalk(recorded.operationKey()).orElse(null);
+    if (walk == null || !walk.capturedPlan()
+        || walk.enumerationOutcome() != JobQueue.WalkEnumerationOutcome.COMPLETE
+        || walk.plannedUnits() == null || walk.plannedUnits() != 0L
+        || jobQueue.hasIssuedRecordedClaims(recorded.operationKey())) return false;
+    var counts = jobQueue.jobStateCountsStrict();
+    if (counts.pendingCount() != 0 || counts.processingCount() != 0
+        || !(jobQueue instanceof SwitchBufferCapableQueue journal)
+        || !journal.listSwitchBufferOpsStrictForGeneration(candidate).stream()
+            .allMatch(op -> REMOVAL_JOURNAL_OPS.contains(op.op()))) return false;
+    green.commitOps().maybeRefreshBlocking();
+    return green.indexCountOps().docCountOrThrow() == 0L;
+  }
+
+  /** Journal kinds that only remove rows: replayed on a zero-document B they change nothing. */
+  private static final Set<String> REMOVAL_JOURNAL_OPS =
+      Set.of("DELETE", "DELETE_PREFIX", "DELETE_COLLECTION", "PRUNE_PREFIX");
 
   /** State transition and producer admission use one lock order: runtime, mutation, generation. */
   private void enterSwitchingWithMutationAdmission(IndexGenerationManager.State observed)

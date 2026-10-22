@@ -138,6 +138,60 @@ public interface SwitchBufferCapableQueue extends JobQueue {
         && matchesAcceptedFileProjection(path, unitRevision, sourceSha256);
   }
 
+  /** What the path's own queue row says about an accepted file admission on a generation. */
+  enum SourceFileWork {
+    /**
+     * The writer of this admission, or of a later one that replaced it, committed exactly the
+     * bytes the generation holds ({@code indexedSourceSha256}).
+     */
+    COMMITTED,
+    /**
+     * The row is pending (a fresh admission, or a retry that is due) or claimed: its writer will
+     * judge the file as it is when it runs. It is no effect until that writer commits.
+     */
+    OUTSTANDING,
+    /**
+     * The row's writer failed, terminally or with a retry waiting out a back-off. That outcome is
+     * for the file state the writer ran on and is no effect; nothing is in flight.
+     */
+    FAILED,
+    /**
+     * The row's last writer ended it by the generation's normal policy for a source that is not
+     * indexable as it was then: not a regular file, excluded, or too large. That handling is the
+     * generation's committed effect for the file in that state.
+     */
+    POLICY,
+    /** No row, or a finished row that wrote nothing the generation holds. */
+    NONE
+  }
+
+  /**
+   * The path's row judged against the generation whose committed source witness is {@code
+   * indexedSourceSha256}. A finished row alone never proves an effect: a retired, refused or
+   * skipped row wrote nothing.
+   */
+  default SourceFileWork sourceFileWork(String path, String indexedSourceSha256) {
+    throw new UnsupportedOperationException("Queue admission ownership evidence is unavailable");
+  }
+
+  /**
+   * Refusal cleanup only: admits {@code entry} to the source as the job whose unit revision is
+   * {@code admission}, the name refusal cleanup gives one file state of the path. Returns 1 when
+   * accepted. The queue row is the durable record of that admission.
+   */
+  default int enqueueRefusalCleanupAdmission(
+      JobQueue.EnqueueEntry entry, String collection, String admission) {
+    return enqueueEntries(List.of(entry), collection);
+  }
+
+  /**
+   * Refusal cleanup only: whether {@code path}'s queue row is still the admission named {@code
+   * admission}. A restart keeps the answer, so it keeps the same job and its retry deadline.
+   */
+  default boolean holdsRefusalCleanupAdmission(String path, String admission) {
+    return false;
+  }
+
   /**
    * Exact captured-plan evidence for a file already removed by a later broad replay receipt.
    * This is read-only: the retained sealed walk row must remain available for its owner to

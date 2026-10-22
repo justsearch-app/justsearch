@@ -63,7 +63,7 @@ tasks.named<ProcessResources>("processResources") {
   }
 }
 
-tasks.named<Test>("test") {
+tasks.withType<Test>().matching { it.name == "test" || it.name.startsWith("ciUnitTest") }.configureEach {
   inputs.files(
     rootProject.file("scripts/dev/dev-runner.cjs"),
     rootProject.file("scripts/dev/test-dev-runner-head-java-opts.mjs"),

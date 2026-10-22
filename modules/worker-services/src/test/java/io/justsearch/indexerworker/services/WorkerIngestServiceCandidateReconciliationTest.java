@@ -29,6 +29,7 @@ import io.justsearch.indexerworker.ingest.IngestionSkipPolicy;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferDelete;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.ipc.DeleteByCollectionRequest;
@@ -203,8 +204,11 @@ final class WorkerIngestServiceCandidateReconciliationTest {
         eq(fixture.buildingGeneration), entry.capture(), eq("research"));
     assertEquals(added, entry.getValue().path());
     assertEquals(root, entry.getValue().ingestionRoot());
+    var deletedReceipt = ArgumentCaptor.forClass(String.class);
     verify(fixture.queue).putSwitchBufferForGeneration(
-        fixture.buildingGeneration, IngestResponses.switchBufferPathKey(deleted), "DELETE", deleted);
+        eq(fixture.buildingGeneration), eq(IngestResponses.switchBufferPathKey(deleted)), eq("DELETE"), deletedReceipt.capture());
+    assertEquals(deleted, SwitchBufferDelete.decode(deletedReceipt.getValue()).path());
+    assertEquals(SwitchBufferDelete.Origin.WATCHER, SwitchBufferDelete.decode(deletedReceipt.getValue()).origin());
     verify(fixture.servingWriter).deleteByIdAndChunks(deleted);
     verify(fixture.candidateWriter).deleteByIdAndChunks(deleted);
     verify(fixture.servingCommit).commitAndTrack(
@@ -321,11 +325,17 @@ final class WorkerIngestServiceCandidateReconciliationTest {
     assertEquals("", collectionResponse.getError());
     assertEquals(1, collectionResponse.getDeletedDocs());
 
+    var watchedReceipt = ArgumentCaptor.forClass(String.class);
     order.verify(fixture.queue).putSwitchBufferForGeneration(
-        fixture.buildingGeneration, IngestResponses.switchBufferPathKey(watched), "DELETE", watched);
+        eq(fixture.buildingGeneration), eq(IngestResponses.switchBufferPathKey(watched)), eq("DELETE"), watchedReceipt.capture());
+    assertEquals(watched, SwitchBufferDelete.decode(watchedReceipt.getValue()).path());
+    assertEquals(SwitchBufferDelete.Origin.WATCHER, SwitchBufferDelete.decode(watchedReceipt.getValue()).origin());
     order.verify(fixture.candidateWriter).deleteByIdAndChunks(watched);
+    var directReceipt = ArgumentCaptor.forClass(String.class);
     order.verify(fixture.queue).putSwitchBufferForGeneration(
-        fixture.buildingGeneration, IngestResponses.switchBufferPathKey(direct), "DELETE", direct);
+        eq(fixture.buildingGeneration), eq(IngestResponses.switchBufferPathKey(direct)), eq("DELETE"), directReceipt.capture());
+    assertEquals(direct, SwitchBufferDelete.decode(directReceipt.getValue()).path());
+    assertEquals(SwitchBufferDelete.Origin.EXPLICIT, SwitchBufferDelete.decode(directReceipt.getValue()).origin());
     order.verify(fixture.candidateWriter).deleteByIdAndChunks(direct);
     order.verify(fixture.queue).deleteByExactPath(direct);
     order.verify(fixture.servingCommit).commitAndTrack(

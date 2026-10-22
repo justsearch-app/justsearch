@@ -67,6 +67,57 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class IndexingLoopTest {
 
+  // task a5fbcb round 7, F3: while a Green producer projects text to A, a source A's policy
+  // retires leaves A too; a refused candidate leaves A serving, so A must not keep it
+  @Test
+  void missingSourceRetiresTheActiveGenerationsTextToo() throws Exception {
+    var outcomes = new TypedIngestionOutcomeTests();
+    Path file = Files.createTempDirectory("js-missing-active").resolve("gone.txt");
+    RecordingQueue queue = new RecordingQueue();
+    IndexingLoop loop = outcomes.newLoop(queue, outcomes.providerReturning("unused"));
+    IndexingCoordinator activeWrites = wireActive(loop);
+
+    outcomes.invokeExtractJob(loop, file);
+
+    assertEquals(IngestionReasonCodes.DELETED_OR_MISSING, queue.lastOutcome.reasonCode());
+    assertEquals(List.of(io.justsearch.indexerworker.util.PathNormalizer.normalizePath(
+            file.toAbsolutePath().toString())),
+        deletesOn(activeWrites), "A no longer serves the deleted source");
+    verify(queue.indexingCoordinator).deleteByIdAndChunks(anyString());
+  }
+
+  // task a5fbcb round 7, F2: a folder that replaced the source retires its text from A too
+  @Test
+  void nonRegularSourceRetiresTheActiveGenerationsTextToo() throws Exception {
+    var outcomes = new TypedIngestionOutcomeTests();
+    Path directory = Files.createTempDirectory("js-non-regular-active");
+    RecordingQueue queue = new RecordingQueue();
+    IndexingLoop loop = outcomes.newLoop(queue, mock(ContentExtractorProvider.class));
+    IndexingCoordinator activeWrites = wireActive(loop);
+
+    outcomes.invokeExtractJob(loop, directory);
+
+    assertEquals(IngestionReasonCodes.NON_REGULAR_SOURCE, queue.lastOutcome.reasonCode());
+    assertEquals(List.of(io.justsearch.indexerworker.util.PathNormalizer.normalizePath(
+            directory.toAbsolutePath().toString())),
+        deletesOn(activeWrites), "A no longer serves the replaced source's text");
+  }
+
+  private static IndexingCoordinator wireActive(IndexingLoop loop) {
+    RunningRuntime active = mock(RunningRuntime.class);
+    IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
+    when(active.indexingCoordinator()).thenReturn(activeWrites);
+    loop.wireActiveLexicalSource(active);
+    return activeWrites;
+  }
+
+  private static List<Object> deletesOn(IndexingCoordinator writes) {
+    return mockingDetails(writes).getInvocations().stream()
+        .filter(call -> "deleteByIdAndChunks".equals(call.getMethod().getName()))
+        .map(call -> call.getArgument(0))
+        .toList();
+  }
+
   // ==================== Mockito Smoke Test ====================
 
   @Nested
