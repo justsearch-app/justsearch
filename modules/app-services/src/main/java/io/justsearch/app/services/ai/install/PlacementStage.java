@@ -45,8 +45,10 @@ final class PlacementStage {
    * @return the user-facing failure message, or {@code null} when the item is in place. Failures are
    *     returned rather than thrown because one file failing must not end the set — the caller marks
    *     the package failed and moves to the next item.
+   * @param keptArchiveVerified the acquisition stage hashed the kept archive at the target in this
+   *     run; it is applied without hashing it again
    */
-  String place(InstallPlan.PlannedDownload dl) {
+  String place(InstallPlan.PlannedDownload dl, boolean keptArchiveVerified) {
     if (dl == null || dl.targetPath() == null || dl.targetPath().isBlank()) {
       return "Failed to finalize: missing target path";
     }
@@ -56,7 +58,14 @@ final class PlacementStage {
     Path targetFile = modelsDir.resolve(dl.targetPath()).normalize();
     Path partialFile = InstallPlanner.partialPathFor(targetFile);
     try {
-      if (Files.exists(targetFile, LinkOption.NOFOLLOW_LINKS)) {
+      if (dl.extract()) {
+        io.justsearch.configuration.model.ArchiveExtractionState.requireSafeFile(targetFile);
+      }
+      if (keptArchiveVerified && dl.extract()) {
+        if (!Files.isRegularFile(targetFile, LinkOption.NOFOLLOW_LINKS)) {
+          return "Failed to finalize: refusing to replace non-regular target " + targetFile;
+        }
+      } else if (Files.exists(targetFile, LinkOption.NOFOLLOW_LINKS)) {
         if (Files.isSymbolicLink(targetFile)
             || !Files.isRegularFile(targetFile, LinkOption.NOFOLLOW_LINKS)) {
           return "Failed to finalize: refusing to replace non-regular target " + targetFile;
@@ -67,7 +76,7 @@ final class PlacementStage {
         try {
           DownloadExecutor.verify(targetFile, dl.sizeBytes(), dl.sha256());
         } catch (Exception mismatch) {
-          if (!isRepairableModelTarget(targetFile, dl)) {
+          if (!dl.extract() && !isRepairableModelTarget(targetFile, dl)) {
             return "Failed to finalize: refusing to replace existing target with different bytes";
           }
           // A corrupt selected ONNX file can be repaired in its candidate-owned directory.
@@ -77,7 +86,11 @@ final class PlacementStage {
             return "Failed to finalize: refusing symbolic-link staging file " + partialFile;
           }
           DownloadExecutor.verify(partialFile, dl.sizeBytes(), dl.sha256());
-          replaceCandidateTarget(partialFile, targetFile);
+          if (dl.extract()) {
+            ArchiveExtractor.replace(partialFile, targetFile);
+          } else {
+            replaceCandidateTarget(partialFile, targetFile);
+          }
           replacedCandidate = true;
         }
         if (!replacedCandidate) {
@@ -105,13 +118,12 @@ final class PlacementStage {
       }
     }
 
-    // Tempdoc 374 alpha.15 fix B: archive extraction. The cuda-runtime package ships its DLLs in a
-    // single zip (too large for the NSIS installer payload). After download + SHA verification the
-    // zip is expanded into the same directory; the archive itself stays on disk so the planner's
-    // isAlreadyInstalled check skips re-download next time.
+    // Archive promotion alone never claims installation. Apply publishes its receipt only after
+    // every output is complete, and a local failure remains repairable from the kept verified ZIP.
     if (dl.extract()) {
       try {
-        AiInstallService.extractZipInPlace(targetFile, targetFile.getParent());
+        ArchiveExtractor.apply(
+            targetFile, targetFile.getParent(), dl.sha256(), dl.destinationArchives());
       } catch (IOException e) {
         return "Failed to extract " + targetFile.getFileName() + ": " + e.getMessage();
       }

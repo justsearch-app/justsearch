@@ -321,21 +321,17 @@ final class ResourceApiModule implements ApiModule {
     // Tempdoc 561 P-A/P-B (correction): the unified thread is a READ-TIME projection over the
     // records that already exist — ConversationStore (chat) + AgentRunStore (agent, via
     // AgentService) — joined by conversationId. No new store.
+    // Use the live authored-store cipher (727), and the SAME exclusion authority as the delete
+    // route. These stores share files but are distinct objects: private gates cannot coordinate.
+    var threadConversations = new io.justsearch.app.services.conversation.FileConversationStore(
+        indexBasePath.resolveSibling("conversations"),
+        headAssembly.storeCipher(
+            io.justsearch.agent.api.encryption.StoreCatalog.CONVERSATIONS.recoverability()));
+    if (headAssembly.agentRunStore() != null) {
+      threadConversations.useConversationWork(headAssembly.agentRunStore().conversationWork());
+    }
     this.interactionThreadController =
-        new InteractionThreadController(headAssembly.operationAttempts(),
-            // Tempdoc 727 (fix): the live cipher — a projection of StoreCatalog.CONVERSATIONS's
-            // recoverability class (AUTHORED), same as ConversationApiAssembly's build (:204-209),
-            // NOT the single-arg ctor's disabled() default. The single-arg ctor permanently disables
-            // the cipher (key.enabled() always false), so StoreCipher.open throws KeyLockedException
-            // on the FIRST sealed line unconditionally — once encryption is enabled this 500'd
-            // GET /api/thread/{id} for EVERY read, unlock or not. ConversationApiAssembly builds its
-            // own correctly-ciphered FileConversationStore instance over the same conversationsPath;
-            // consolidating the two instances into one is a follow-up (bigger diff/risk than this
-            // release-branch fix — see LocalApiServer :198/:242 construction order).
-            new io.justsearch.app.services.conversation.FileConversationStore(
-                indexBasePath.resolveSibling("conversations"),
-                headAssembly.storeCipher(
-                    io.justsearch.agent.api.encryption.StoreCatalog.CONVERSATIONS.recoverability())),
+        new InteractionThreadController(headAssembly.operationAttempts(), threadConversations,
             headAssembly.core().agent() != null
                 ? headAssembly.core().agent()
                 : io.justsearch.agent.api.AgentService.unavailable(),

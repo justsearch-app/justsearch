@@ -4,6 +4,7 @@ package io.justsearch.app.services.conversation;
 import io.justsearch.configuration.persistence.StoreIds;
 import io.justsearch.agent.api.conversation.BranchesPreventDeletionException;
 import io.justsearch.agent.api.conversation.ConversationStore;
+import io.justsearch.agent.api.conversation.ConversationWork;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
 import io.justsearch.configuration.persistence.CorruptDurableStoreException;
 import io.justsearch.configuration.persistence.StoreFormatVersions;
@@ -51,6 +52,9 @@ public final class FileConversationStore implements ConversationStore {
       java.util.concurrent.ConcurrentHashMap.newKeySet();
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
+  private ConversationWork conversationWork = new ConversationWork();
+  private static final String DELETE_INTENT = "deletion.json";
+
   private final Path rootDir;
   private final io.justsearch.agent.api.encryption.StoreCipher cipher;
 
@@ -67,6 +71,57 @@ public final class FileConversationStore implements ConversationStore {
   public FileConversationStore(Path rootDir, io.justsearch.agent.api.encryption.StoreCipher cipher) {
     this.rootDir = Objects.requireNonNull(rootDir, "rootDir");
     this.cipher = Objects.requireNonNull(cipher, "cipher");
+  }
+
+  @Override
+  public ConversationWork conversationWork() { return conversationWork; }
+
+  /** Composition binds the run store's authority before exposing either store to clients. */
+  public void useConversationWork(ConversationWork work) {
+    this.conversationWork = Objects.requireNonNull(work, "work");
+    pendingDeletions().keySet().forEach(work::markIncomplete);
+  }
+
+  /** Persist the exact run identities before destroying any of their join metadata. */
+  void prepareDeletion(String id, List<String> runIds) {
+    StoreIds.requireValid(id);
+    runIds.forEach(StoreIds::requireValid);
+    try {
+      AtomicFileWrites.replaceStrict(resolveSessionDir(id).resolve(DELETE_INTENT),
+          MAPPER.writeValueAsBytes(Map.of("schemaVersion", 1, "runIds", runIds)));
+      conversationWork.markIncomplete(id);
+    } catch (IOException e) { throw new UncheckedIOException("Cannot record conversation deletion", e); }
+  }
+
+  /** Intents contain identities only; their presence keeps an interrupted delete listed. */
+  public Map<String, List<String>> pendingDeletions() {
+    if (!Files.isDirectory(rootDir)) return Map.of();
+    Map<String, List<String>> pending = new LinkedHashMap<>();
+    try (var dirs = Files.list(rootDir)) {
+      for (Path dir : dirs.filter(Files::isDirectory).filter(FileConversationStore::isValidSessionEntry).toList()) {
+        Path intent = dir.resolve(DELETE_INTENT);
+        if (!Files.exists(intent)) continue;
+        var json = MAPPER.readTree(Files.readString(intent, StandardCharsets.UTF_8));
+        if (!json.path("runIds").isArray()) throw new IOException("Invalid conversation deletion intent");
+        List<String> ids = new ArrayList<>();
+        for (var value : json.path("runIds")) {
+          String id = value.asString();
+          StoreIds.requireValid(id);
+          ids.add(id);
+        }
+        pending.put(dir.getFileName().toString(), List.copyOf(ids));
+      }
+    } catch (IOException e) { throw new UncheckedIOException("Cannot read pending conversation deletions", e); }
+    return pending;
+  }
+
+  void checkDeletion(String sessionId) {
+    StoreIds.requireValid(sessionId);
+    if (isLocked()) throw new io.justsearch.agent.api.encryption.KeyLockedException();
+    if (!sessionId.startsWith(THROWAWAY_SESSION_PREFIX)) {
+      List<String> children = findChildBranches(sessionId);
+      if (!children.isEmpty()) throw new BranchesPreventDeletionException(sessionId, children);
+    }
   }
 
   @Override
@@ -194,25 +249,42 @@ public final class FileConversationStore implements ConversationStore {
   }
 
   @Override
-  public void appendMessage(String sessionId, String shapeId, Map<String, Object> message) {
+  public void createSession(String sessionId, String shapeId) {
     StoreIds.requireValid(sessionId);
-    Path sessionDir = resolveSessionDir(sessionId);
-    try {
-      Files.createDirectories(sessionDir);
-      // Slice 513: ensure id + hash are present before write. The store is the
-      // authoritative source — callers don't need to know about hash semantics.
-      Map<String, Object> enriched = enrichMessage(message, shapeId);
-      String json = MAPPER.writeValueAsString(enriched);
-      Path messagesFile = sessionDir.resolve("messages.jsonl");
-      Files.writeString(
-          messagesFile,
-          cipher.seal(json) + "\n",
-          StandardCharsets.UTF_8,
-          StandardOpenOption.CREATE,
-          StandardOpenOption.APPEND);
-      updateMeta(sessionDir, shapeId, enriched);
-    } catch (IOException e) {
-      throw new UncheckedIOException("Failed to append message for session " + sessionId, e);
+    try (var ignoredWriting = conversationWork.start(sessionId)) {
+      if (isLocked()) throw new io.justsearch.agent.api.encryption.KeyLockedException();
+      synchronized (titleWrites) {
+        if (readMeta(sessionId) != null) return;
+        var meta = new LinkedHashMap<String, Object>();
+        meta.put("shapeId", shapeId == null ? "" : shapeId);
+        meta.put("createdAtMs", System.currentTimeMillis());
+        writeMetaAtomic(resolveSessionDir(sessionId), meta, sessionId, true);
+      }
+    }
+  }
+
+  @Override
+  public void appendMessage(String sessionId, String shapeId, Map<String, Object> message) {
+    try (var ignoredWriting = conversationWork.start(sessionId)) {
+      StoreIds.requireValid(sessionId);
+      Path sessionDir = resolveSessionDir(sessionId);
+      try {
+        requireSession(sessionId);
+        // Slice 513: ensure id + hash are present before write. The store is the
+        // authoritative source — callers don't need to know about hash semantics.
+        Map<String, Object> enriched = enrichMessage(message, shapeId);
+        String json = MAPPER.writeValueAsString(enriched);
+        Path messagesFile = sessionDir.resolve("messages.jsonl");
+        Files.writeString(
+            messagesFile,
+            cipher.seal(json) + "\n",
+            StandardCharsets.UTF_8,
+            StandardOpenOption.CREATE,
+            StandardOpenOption.APPEND);
+        updateMeta(sessionDir, shapeId, enriched);
+      } catch (IOException e) {
+        throw new UncheckedIOException("Failed to append message for session " + sessionId, e);
+      }
     }
   }
 
@@ -273,7 +345,13 @@ public final class FileConversationStore implements ConversationStore {
         if (!isValidSessionEntry(sessionDir) || !Files.isDirectory(sessionDir)) continue;
         String sessionId = sessionDir.getFileName().toString();
         Path metaFile = sessionDir.resolve("meta.json");
-        if (!Files.exists(metaFile)) continue;
+        if (!Files.exists(metaFile)) {
+          if (Files.exists(sessionDir.resolve(DELETE_INTENT))) {
+            summaries.add(new SessionSummary(sessionId, "core.agent-run", 0, 0, 0,
+                "Deletion incomplete — retry deleting this conversation"));
+          }
+          continue;
+        }
         {
           Map<String, Object> meta = readRawMeta(metaFile);
           String metaShape = (String) meta.getOrDefault("shapeId", "");
@@ -324,49 +402,51 @@ public final class FileConversationStore implements ConversationStore {
   @Override
   public void branchFrom(
       String parentSessionId, String branchPointMessageId, String newSessionId) {
-    StoreIds.requireValid(parentSessionId);
-    StoreIds.requireValid(newSessionId);
-    Objects.requireNonNull(parentSessionId, "parentSessionId");
-    Objects.requireNonNull(branchPointMessageId, "branchPointMessageId");
-    Objects.requireNonNull(newSessionId, "newSessionId");
-    Map<String, Object> parentMeta = readMeta(parentSessionId);
-    if (parentMeta == null) {
-      throw new IllegalArgumentException(
-          "Parent session not found: " + parentSessionId);
-    }
-    // Tempdoc 610 Phase A — the empty-prefix sentinel intentionally references
-    // NO real parent message (it inherits nothing), so skip the existence
-    // validation for it. loadHistory special-cases the sentinel to an empty
-    // prefix.
-    if (!EMPTY_PREFIX_SENTINEL.equals(branchPointMessageId)) {
-      // Slice 515 FIX-2 — validate the branch-point id exists in the parent's
-      // resolved history. Silent fallback to full-parent prefix was a footgun.
-      // loadHistory walks any further ancestors via the seen-cycle guard, so
-      // this also tolerates chained branches.
-      boolean branchPointFound = false;
-      for (Map<String, Object> msg : loadHistory(parentSessionId)) {
-        if (branchPointMessageId.equals(msg.get("id"))) {
-          branchPointFound = true;
-          break;
+    try (var ignoredWriting = conversationWork.start(parentSessionId); var ignoredDestination = conversationWork.start(newSessionId)) {
+      StoreIds.requireValid(parentSessionId);
+      StoreIds.requireValid(newSessionId);
+      Objects.requireNonNull(parentSessionId, "parentSessionId");
+      Objects.requireNonNull(branchPointMessageId, "branchPointMessageId");
+      Objects.requireNonNull(newSessionId, "newSessionId");
+      Map<String, Object> parentMeta = readMeta(parentSessionId);
+      if (parentMeta == null) {
+        throw new IllegalArgumentException(
+            "Parent session not found: " + parentSessionId);
+      }
+      // Tempdoc 610 Phase A — the empty-prefix sentinel intentionally references
+      // NO real parent message (it inherits nothing), so skip the existence
+      // validation for it. loadHistory special-cases the sentinel to an empty
+      // prefix.
+      if (!EMPTY_PREFIX_SENTINEL.equals(branchPointMessageId)) {
+        // Slice 515 FIX-2 — validate the branch-point id exists in the parent's
+        // resolved history. Silent fallback to full-parent prefix was a footgun.
+        // loadHistory walks any further ancestors via the seen-cycle guard, so
+        // this also tolerates chained branches.
+        boolean branchPointFound = false;
+        for (Map<String, Object> msg : loadHistory(parentSessionId)) {
+          if (branchPointMessageId.equals(msg.get("id"))) {
+            branchPointFound = true;
+            break;
+          }
+        }
+        if (!branchPointFound) {
+          throw new IllegalArgumentException(
+              "Branch point message id not found in parent: " + branchPointMessageId);
         }
       }
-      if (!branchPointFound) {
-        throw new IllegalArgumentException(
-            "Branch point message id not found in parent: " + branchPointMessageId);
-      }
+      Path newSessionDir = resolveSessionDir(newSessionId);
+      Map<String, Object> meta = new LinkedHashMap<>();
+      long now = System.currentTimeMillis();
+      meta.put("createdAtMs", now);
+      meta.put("lastActiveAtMs", now);
+      meta.put("shapeId", parentMeta.getOrDefault("shapeId", ""));
+      meta.put("messageCount", 0);
+      Object preview = parentMeta.get("firstUserMessage");
+      if (preview instanceof String s && !s.isEmpty()) meta.put("firstUserMessage", s);
+      meta.put("parentSessionId", parentSessionId);
+      meta.put("branchPointMessageId", branchPointMessageId);
+      writeMetaAtomic(newSessionDir, meta, newSessionId, true);
     }
-    Path newSessionDir = resolveSessionDir(newSessionId);
-    Map<String, Object> meta = new LinkedHashMap<>();
-    long now = System.currentTimeMillis();
-    meta.put("createdAtMs", now);
-    meta.put("lastActiveAtMs", now);
-    meta.put("shapeId", parentMeta.getOrDefault("shapeId", ""));
-    meta.put("messageCount", 0);
-    Object preview = parentMeta.get("firstUserMessage");
-    if (preview instanceof String s && !s.isEmpty()) meta.put("firstUserMessage", s);
-    meta.put("parentSessionId", parentSessionId);
-    meta.put("branchPointMessageId", branchPointMessageId);
-    writeMetaAtomic(newSessionDir, meta, newSessionId);
   }
 
   @Override
@@ -401,29 +481,24 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void setContextFloor(String sessionId, String floorMessageId) {
-    StoreIds.requireValid(sessionId);
-    // Tempdoc 610 Phase C — persist (or clear) the effective-context floor in
-    // meta.json, atomically, mirroring the branchFrom meta-write pattern.
-    Path sessionDir = resolveSessionDir(sessionId);
-    Map<String, Object> existing = readMeta(sessionId);
-    boolean clearing = floorMessageId == null || floorMessageId.isBlank();
-    if (existing == null && clearing) {
-      // Nothing to clear on an unknown session; don't materialise an empty one.
-      return;
+    try (var ignoredWriting = conversationWork.start(sessionId)) {
+      StoreIds.requireValid(sessionId);
+      // Tempdoc 610 Phase C — persist (or clear) the effective-context floor in
+      // meta.json, atomically, mirroring the branchFrom meta-write pattern.
+      Path sessionDir = resolveSessionDir(sessionId);
+      Map<String, Object> existing = readMeta(sessionId);
+      boolean clearing = floorMessageId == null || floorMessageId.isBlank();
+      if (existing == null && clearing) return;
+      Map<String, Object> meta = new LinkedHashMap<>(requireSession(sessionId));
+      // A plain rewind carries no summary — clear any prior compaction summary.
+      meta.remove("contextFloorSummary");
+      if (clearing) {
+        meta.remove("contextFloor");
+      } else {
+        meta.put("contextFloor", floorMessageId);
+      }
+      writeMetaAtomic(sessionDir, meta, sessionId);
     }
-    Map<String, Object> meta =
-        existing == null ? new LinkedHashMap<>() : new LinkedHashMap<>(existing);
-    // A plain rewind carries no summary — clear any prior compaction summary.
-    meta.remove("contextFloorSummary");
-    if (clearing) {
-      meta.remove("contextFloor");
-    } else {
-      meta.put("contextFloor", floorMessageId);
-    }
-    if (existing == null) {
-      meta.putIfAbsent("createdAtMs", System.currentTimeMillis());
-    }
-    writeMetaAtomic(sessionDir, meta, sessionId);
   }
 
   /** Orders title writes, so a write made only while untitled cannot interleave with a rename. */
@@ -431,32 +506,33 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void setTitle(String sessionId, String title, String titleSource) {
-    StoreIds.requireValid(sessionId);
-    synchronized (titleWrites) {
-      writeTitle(sessionId, readMeta(sessionId), title, titleSource);
+    try (var ignoredWriting = conversationWork.start(sessionId)) {
+      StoreIds.requireValid(sessionId);
+      synchronized (titleWrites) {
+        writeTitle(sessionId, readMeta(sessionId), title, titleSource);
+      }
     }
   }
 
   @Override
   public boolean setTitleIfUntitled(String sessionId, String title, String titleSource) {
-    StoreIds.requireValid(sessionId);
-    if (title == null || title.isBlank()) return false;
-    synchronized (titleWrites) {
-      Map<String, Object> existing = readMeta(sessionId);
-      if (existing == null) return false;
-      Object named = existing.get("title");
-      if (named instanceof String s && !s.isBlank()) return false;
-      writeTitle(sessionId, existing, title, titleSource);
-      return true;
+    try (var ignoredWriting = conversationWork.start(sessionId)) {
+      StoreIds.requireValid(sessionId);
+      if (title == null || title.isBlank()) return false;
+      synchronized (titleWrites) {
+        Map<String, Object> existing = readMeta(sessionId);
+        if (existing == null) return false;
+        Object named = existing.get("title");
+        if (named instanceof String s && !s.isBlank()) return false;
+        writeTitle(sessionId, existing, title, titleSource);
+        return true;
+      }
     }
   }
 
   private void writeTitle(
       String sessionId, Map<String, Object> existing, String title, String titleSource) {
-    // Tempdoc 838 — the scalar-meta-field write, mirroring setContextFloor, with ONE deliberate
-    // divergence: an unknown session is left alone rather than materialised. setContextFloor mints a
-    // meta for an id it has never seen; doing that here would create a zero-message conversation that
-    // listSessions then lists — a row that names nothing. The controller answers 404 for that case.
+    // Late auto-title replies and idempotent clear-title calls leave missing sessions alone.
     if (existing == null) return;
     Map<String, Object> meta = new LinkedHashMap<>(existing);
     if (title == null || title.isBlank()) {
@@ -475,34 +551,33 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void compactContext(String sessionId, String floorMessageId, String summaryText) {
-    StoreIds.requireValid(sessionId);
-    // Tempdoc 610 Phase D — like setContextFloor, but attach the summary of the
-    // messages above the floor. loadEffectiveContext prepends it.
-    if (floorMessageId == null || floorMessageId.isBlank()) {
-      return;
+    try (var ignoredWriting = conversationWork.start(sessionId)) {
+      StoreIds.requireValid(sessionId);
+      // Tempdoc 610 Phase D — like setContextFloor, but attach the summary of the
+      // messages above the floor. loadEffectiveContext prepends it.
+      if (floorMessageId == null || floorMessageId.isBlank()) {
+        return;
+      }
+      Path sessionDir = resolveSessionDir(sessionId);
+      Map<String, Object> meta = new LinkedHashMap<>(requireSession(sessionId));
+      meta.put("contextFloor", floorMessageId);
+      if (summaryText != null && !summaryText.isBlank()) {
+        meta.put("contextFloorSummary", summaryText);
+      } else {
+        meta.remove("contextFloorSummary");
+      }
+      writeMetaAtomic(sessionDir, meta, sessionId);
     }
-    Path sessionDir = resolveSessionDir(sessionId);
-    Map<String, Object> existing = readMeta(sessionId);
-    Map<String, Object> meta =
-        existing == null ? new LinkedHashMap<>() : new LinkedHashMap<>(existing);
-    meta.put("contextFloor", floorMessageId);
-    if (summaryText != null && !summaryText.isBlank()) {
-      meta.put("contextFloorSummary", summaryText);
-    } else {
-      meta.remove("contextFloorSummary");
-    }
-    if (existing == null) {
-      meta.putIfAbsent("createdAtMs", System.currentTimeMillis());
-    }
-    writeMetaAtomic(sessionDir, meta, sessionId);
   }
 
   @Override
   public void excludeMessage(String sessionId, String messageId, boolean excluded) {
-    StoreIds.requireValid(sessionId);
-    // Tempdoc 610 §E.3 — toggle a message id in the meta.json excludedMessageIds list. Excluded
-    // messages stay in the transcript (loadHistory) but are dropped from loadEffectiveContext.
-    toggleStringInMeta(sessionId, "excludedMessageIds", messageId, excluded);
+    try (var ignoredWriting = conversationWork.start(sessionId)) {
+      StoreIds.requireValid(sessionId);
+      // Tempdoc 610 §E.3 — toggle a message id in the meta.json excludedMessageIds list. Excluded
+      // messages stay in the transcript (loadHistory) but are dropped from loadEffectiveContext.
+      toggleStringInMeta(sessionId, "excludedMessageIds", messageId, excluded);
+    }
   }
 
   @Override
@@ -513,10 +588,12 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void excludeSource(String sessionId, String sourceId, boolean excluded) {
-    StoreIds.requireValid(sessionId);
-    // Tempdoc 610 §J.3 — toggle a retrieved-source id in the meta.json excludedSourceIds list. The
-    // engine seeds these onto each turn's context; the Worker drops the matching chunks pre-search.
-    toggleStringInMeta(sessionId, "excludedSourceIds", sourceId, excluded);
+    try (var ignoredWriting = conversationWork.start(sessionId)) {
+      StoreIds.requireValid(sessionId);
+      // Tempdoc 610 §J.3 — toggle a retrieved-source id in the meta.json excludedSourceIds list. The
+      // engine seeds these onto each turn's context; the Worker drops the matching chunks pre-search.
+      toggleStringInMeta(sessionId, "excludedSourceIds", sourceId, excluded);
+    }
   }
 
   @Override
@@ -528,22 +605,14 @@ public final class FileConversationStore implements ConversationStore {
   @Override
   public void setTurnOpen(String sessionId, boolean open) {
     StoreIds.requireValid(sessionId);
-    // Tempdoc 834 §4.3 — one boolean on meta.json, written through the same atomic path the floor
-    // and exclusion toggles use. Written only for sessions that already exist (a turn cannot be
-    // open on a conversation with no record); clearing an unknown session is a no-op.
-    Map<String, Object> existing = readMeta(sessionId);
-    if (existing == null && !open) {
-      return;
+    try (var ignoredWriting = conversationWork.start(sessionId)) {
+      Map<String, Object> existing = readMeta(sessionId);
+      if (existing == null && !open) return;
+      Map<String, Object> meta = new LinkedHashMap<>(requireSession(sessionId));
+      if (open) meta.put("turnOpen", true);
+      else meta.remove("turnOpen");
+      writeMetaAtomic(resolveSessionDir(sessionId), meta, sessionId);
     }
-    Map<String, Object> meta =
-        existing == null ? new LinkedHashMap<>() : new LinkedHashMap<>(existing);
-    if (open) {
-      meta.put("turnOpen", true);
-      meta.putIfAbsent("createdAtMs", System.currentTimeMillis());
-    } else {
-      meta.remove("turnOpen");
-    }
-    writeMetaAtomic(resolveSessionDir(sessionId), meta, sessionId);
   }
 
   @Override
@@ -559,8 +628,7 @@ public final class FileConversationStore implements ConversationStore {
     Path sessionDir = resolveSessionDir(sessionId);
     Map<String, Object> existing = readMeta(sessionId);
     if (existing == null && !present) return; // nothing to remove on an unknown session
-    Map<String, Object> meta =
-        existing == null ? new LinkedHashMap<>() : new LinkedHashMap<>(existing);
+    Map<String, Object> meta = new LinkedHashMap<>(requireSession(sessionId));
     Object raw = meta.get(key);
     java.util.LinkedHashSet<Object> ids = new java.util.LinkedHashSet<>();
     if (raw instanceof List<?> l) ids.addAll(l);
@@ -573,9 +641,6 @@ public final class FileConversationStore implements ConversationStore {
       meta.remove(key);
     } else {
       meta.put(key, new ArrayList<>(ids));
-    }
-    if (existing == null) {
-      meta.putIfAbsent("createdAtMs", System.currentTimeMillis());
     }
     writeMetaAtomic(sessionDir, meta, sessionId);
   }
@@ -593,7 +658,19 @@ public final class FileConversationStore implements ConversationStore {
     return ids;
   }
 
+  private Map<String, Object> requireSession(String sessionId) {
+    Map<String, Object> meta = readMeta(sessionId);
+    if (meta == null) throw new IllegalArgumentException("No such conversation: " + sessionId);
+    return meta;
+  }
+
   private void writeMetaAtomic(Path sessionDir, Map<String, Object> meta, String sessionId) {
+    writeMetaAtomic(sessionDir, meta, sessionId, false);
+  }
+
+  private void writeMetaAtomic(
+      Path sessionDir, Map<String, Object> meta, String sessionId, boolean creating) {
+    if (!creating) requireSession(sessionId);
     try {
       AtomicFileWrites.replace(
           sessionDir.resolve("meta.json"),
@@ -707,7 +784,8 @@ public final class FileConversationStore implements ConversationStore {
 
   private Map<String, Object> readMeta(String sessionId) {
     Path metaFile = resolveSessionDir(sessionId).resolve("meta.json");
-    if (!Files.exists(metaFile)) return null;
+    // An inaccessible path is inconclusive; reading it must surface the error.
+    if (Files.notExists(metaFile)) return null;
     try {
       Map<String, Object> meta = readRawMeta(metaFile);
       // Tempdoc 629 (LAYER): decrypt the content fields. KeyLockedException propagates (the conversation
@@ -751,33 +829,29 @@ public final class FileConversationStore implements ConversationStore {
 
   @Override
   public void deleteSession(String sessionId) {
-    StoreIds.requireValid(sessionId);
-    Path sessionDir = resolveSessionDir(sessionId);
-    if (!Files.isDirectory(sessionDir)) return;
-    // Slice 515 FIX-3 — block deletion when child branches exist. The
-    // alternative (eagerly copying parent's prefix into branches before
-    // deletion) is more user-friendly but more complex; deferred per
-    // tempdoc 515. Throwaway title sessions bypass the check since they're
-    // internal cleanup. Prefix is canonicalised on the interface
-    // (slice 516 FIX-T4) so the producer + consumer share one source.
-    if (!sessionId.startsWith(THROWAWAY_SESSION_PREFIX)) {
-      List<String> children = findChildBranches(sessionId);
-      if (!children.isEmpty()) {
-        throw new BranchesPreventDeletionException(sessionId, children);
-      }
+    try (var ignoredDeleting = conversationWork.delete(sessionId)) {
+      checkDeletion(sessionId);
+      deleteContents(sessionId);
     }
+  }
+
+  /** Caller owns deletion exclusion. Keep the durable intent until every content file is gone. */
+  void deleteContents(String sessionId) {
+    Path sessionDir = resolveSessionDir(sessionId);
+    if (!Files.exists(sessionDir)) return;
     try {
       try (var walker = Files.walk(sessionDir)) {
-        walker.sorted(Comparator.reverseOrder()).forEach(p -> {
-          try {
-            Files.deleteIfExists(p);
-          } catch (IOException e) {
-            LOG.debug("Failed to delete {}", p, e);
-          }
-        });
+        for (Path path : walker.sorted(Comparator.reverseOrder()).toList()) {
+          if (path.equals(sessionDir) || path.equals(sessionDir.resolve(DELETE_INTENT))
+              || path.equals(sessionDir.resolve("meta.json"))) continue;
+          Files.deleteIfExists(path);
+        }
       }
+      Files.deleteIfExists(sessionDir.resolve("meta.json"));
+      Files.deleteIfExists(sessionDir.resolve(DELETE_INTENT));
+      Files.deleteIfExists(sessionDir);
     } catch (IOException e) {
-      LOG.warn("Failed to delete session directory {}", sessionDir, e);
+      throw new UncheckedIOException("Conversation deletion is incomplete; retry deleting it", e);
     }
   }
 
@@ -800,14 +874,10 @@ public final class FileConversationStore implements ConversationStore {
   private void updateMeta(Path sessionDir, String shapeId, Map<String, Object> message) {
     Path metaFile = sessionDir.resolve("meta.json");
     try {
-      Map<String, Object> meta;
-      if (Files.exists(metaFile)) {
-        Map<String, Object> existing = readRawMeta(metaFile);
-        meta = new LinkedHashMap<>(existing);
-      } else {
-        meta = new LinkedHashMap<>();
-        meta.put("createdAtMs", System.currentTimeMillis());
+      if (!Files.isRegularFile(metaFile)) {
+        throw new IllegalArgumentException("No such conversation: " + sessionDir.getFileName());
       }
+      Map<String, Object> meta = new LinkedHashMap<>(readRawMeta(metaFile));
       // Tempdoc 863 §4.A.5 A-10.1 — FIRST WINS. This was an unconditional overwrite on every append,
       // so a conversation's declared shape was really "the shape of its most recent turn". That is
       // the wrong fact to store: `listSessions(shapeId, …)` filters rows by it and

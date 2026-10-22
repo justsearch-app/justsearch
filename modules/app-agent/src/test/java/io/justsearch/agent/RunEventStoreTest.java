@@ -31,6 +31,7 @@ class RunEventStoreTest {
   @Test
   void writesVersionedEventsAndRefusesFutureRecordsWithoutChangingBytes() throws Exception {
     var store = new RunEventStore(tempDir.resolve("runs"));
+    store.writeRunMeta("s1", Map.of("sessionId", "s1"));
     store.appendEvent("s1", "agent_run", "started", Map.of());
     String current = Files.readString(store.eventsPath("s1"));
     assertTrue(current.contains("\"schemaVersion\":1"));
@@ -46,6 +47,7 @@ class RunEventStoreTest {
   @Test
   void appendFailureIsObservableInsteadOfLookingLikeASuccessfulEmptyWrite() throws Exception {
     var store = new RunEventStore(tempDir.resolve("runs"));
+    store.writeRunMeta("s1", Map.of("sessionId", "s1"));
     Files.createDirectories(store.eventsPath("s1"));
     assertThrows(
         CorruptDurableStoreException.class,
@@ -55,6 +57,7 @@ class RunEventStoreTest {
   @Test
   void appendRawEventsPreservesTimestampsAndTypes() {
     var store = new RunEventStore(tempDir.resolve("runs"));
+    store.writeRunMeta("s1", Map.of("sessionId", "s1"));
     store.appendRawEvents(
         "s1",
         List.of(
@@ -72,6 +75,7 @@ class RunEventStoreTest {
   @Test
   void appendRawEventsDoesNotFireListeners() {
     var store = new RunEventStore(tempDir.resolve("runs"));
+    store.writeRunMeta("s1", Map.of("sessionId", "s1"));
     var fired = new AtomicInteger(0);
     store.addEventListener((sid, ev) -> fired.incrementAndGet());
     store.appendRawEvents("s1", List.of(record("2020-01-01T00:00:00Z", "agent_run", "x", Map.of())));
@@ -85,6 +89,7 @@ class RunEventStoreTest {
     // sink) -> readEvents. The restored ledger must match (count + per-record timestamp + eventType),
     // not the meta-only empty shell the old sink produced.
     var src = new RunEventStore(tempDir.resolve("src"));
+    src.writeRunMeta("s1", Map.of("sessionId", "s1"));
     src.appendEvent("s1", "agent_run", "session_started", Map.of("a", 1));
     src.appendEvent("s1", "agent_run", "tool_call", Map.of("a", 2));
     List<Map<String, Object>> exported = src.readEvents("s1");
@@ -96,6 +101,7 @@ class RunEventStoreTest {
         mapper.readValue(containerJson, new TypeReference<List<Map<String, Object>>>() {});
 
     var dst = new RunEventStore(tempDir.resolve("dst"));
+    dst.writeRunMeta("s1", Map.of("sessionId", "s1"));
     dst.appendRawEvents("s1", viaJson);
     List<Map<String, Object>> restored = dst.readEvents("s1");
     assertEquals(exported.size(), restored.size(), "every exported event is restored");

@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Pins the alpha.15 zip-extract logic in {@link AiInstallService#extractZipInPlace}.
+ * Pins the alpha.15 zip-extract logic, now in {@link ArchiveExtractor}.
  *
  * <p>Used by the {@code cuda-runtime} package to expand bundled CUDA DLLs (cuFFT et al.) into
  * the cuda12 variant directory after Install AI download. The DLLs are too large for the NSIS
@@ -33,7 +33,7 @@ final class AiInstallServiceExtractTest {
     Path target = tmp.resolve("cuda12");
     Files.createDirectories(target);
 
-    AiInstallService.extractZipInPlace(zipFile, target);
+    ArchiveInstallRepairTest.extract(zipFile, target);
 
     assertTrue(Files.isRegularFile(target.resolve("cufft64_11.dll")));
     assertTrue(Files.isRegularFile(target.resolve("curand64_10.dll")));
@@ -48,10 +48,10 @@ final class AiInstallServiceExtractTest {
     Path target = tmp.resolve("cuda12");
     Files.createDirectories(target);
 
-    AiInstallService.extractZipInPlace(zipFile, target);
+    ArchiveInstallRepairTest.extract(zipFile, target);
     long firstMtime = Files.getLastModifiedTime(target.resolve("cufft64_11.dll")).toMillis();
 
-    AiInstallService.extractZipInPlace(zipFile, target);
+    ArchiveInstallRepairTest.extract(zipFile, target);
     long secondMtime = Files.getLastModifiedTime(target.resolve("cufft64_11.dll")).toMillis();
 
     assertEquals(firstMtime, secondMtime, "second extract should not overwrite existing entries");
@@ -76,7 +76,7 @@ final class AiInstallServiceExtractTest {
 
     IOException ex =
         assertThrows(
-            IOException.class, () -> AiInstallService.extractZipInPlace(zipFile, target));
+            IOException.class, () -> ArchiveInstallRepairTest.extract(zipFile, target));
     assertTrue(
         ex.getMessage().toLowerCase().contains("escape"),
         "error message should reference the directory-escape attempt: " + ex.getMessage());
@@ -90,7 +90,7 @@ final class AiInstallServiceExtractTest {
   void missingZipThrows() {
     Path missing = tmp.resolve("does-not-exist.zip");
     Path target = tmp.resolve("dst");
-    assertThrows(IOException.class, () -> AiInstallService.extractZipInPlace(missing, target));
+    assertThrows(IOException.class, () -> ArchiveInstallRepairTest.extract(missing, target));
   }
 
   /**
@@ -109,7 +109,7 @@ final class AiInstallServiceExtractTest {
     Path target = tmp.resolve("nest");
     Files.createDirectories(target);
 
-    AiInstallService.extractZipInPlace(zipFile, target);
+    ArchiveInstallRepairTest.extract(zipFile, target);
 
     assertTrue(Files.isRegularFile(target.resolve("lib/x64/foo.dll")));
     assertTrue(Files.isRegularFile(target.resolve("include/foo.h")));
