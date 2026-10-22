@@ -1,0 +1,22 @@
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ArchiveExtractor.java b/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ArchiveExtractor.java
+new file mode 100644
+index 000000000..91ee91b9d
+--- /dev/null
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ArchiveExtractor.java
+@@ -0,0 +1,16 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.app.services.ai.install;
++
++import java.io.IOException;
++import java.nio.file.Path;
++import java.util.Map;
++
++/** Test-intent compatibility declaration only: the before-state's unchanged extraction. */
++final class ArchiveExtractor {
++  private ArchiveExtractor() {}
++
++  static void apply(Path archive, Path target, String verifiedSha256, Map<String, String> listedArchives)
++      throws IOException {
++    AiInstallService.extractZipInPlace(archive, target);
++  }
++}
