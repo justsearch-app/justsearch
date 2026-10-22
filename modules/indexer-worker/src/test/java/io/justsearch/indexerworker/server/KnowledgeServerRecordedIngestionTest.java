@@ -770,6 +770,8 @@ final class KnowledgeServerRecordedIngestionTest {
         new io.justsearch.indexerworker.services.WorkerMutationAdmission(owner));
     org.mockito.Mockito.when(producer.mutationOwnerToken()).thenReturn(owner);
     org.mockito.Mockito.when(producer.pauseProducerForCutover(10_000)).thenReturn(true);
+    var publisher = VouchingRootAuthority.publisher();
+    org.mockito.Mockito.when(producer.ingestService()).thenReturn(publisher);
     var closed = new AtomicBoolean();
     org.mockito.Mockito.doAnswer(invocation -> { closed.set(true); return null; })
         .when(producer).close();
@@ -805,10 +807,10 @@ final class KnowledgeServerRecordedIngestionTest {
     reconcile.setAccessible(true);
     reconcile.invoke(server);
 
-    var order = org.mockito.Mockito.inOrder(producer, queue, green, manager);
+    var order = org.mockito.Mockito.inOrder(producer, fields, queue, green, manager);
     order.verify(producer).commitActiveLexicalProjectionForCutover();
-    order.verify(queue).matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash,
-        hash);
+    order.verify(fields).getDocumentFieldOrThrow(file.toString(),
+        io.justsearch.indexing.SchemaFields.SOURCE_SHA256);
     order.verify(queue).removeReplayedSwitchBufferOps(List.of(version));
     order.verify(producer).close();
     order.verify(green).close();
@@ -840,6 +842,9 @@ final class KnowledgeServerRecordedIngestionTest {
         "a".repeat(64), active, List.of()).building_generation();
     org.mockito.Mockito.when(lifecycle.recordedPrecommitRefused(operation)).thenReturn(true);
     var source = org.mockito.Mockito.mock(RunningRuntime.class);
+    // Refused recovery commits A before acknowledging the journal, even with nothing to apply.
+    org.mockito.Mockito.when(source.commitOps()).thenReturn(
+        org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.CommitOps.class));
     var green = org.mockito.Mockito.mock(RunningRuntime.class);
     var owner = new Object();
     var producer = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
