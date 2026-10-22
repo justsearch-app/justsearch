@@ -171,6 +171,12 @@ public final class ChatController {
   }
 
   private io.justsearch.app.services.conversation.ConversationDeletion conversationDeletion;
+  private String engineInstanceId;
+
+  /** Reuses the runtime manifest's boot identity; absent identity means clients cannot cache. */
+  void setEngineInstanceId(String instanceId) {
+    this.engineInstanceId = java.util.Objects.requireNonNull(instanceId, "instanceId");
+  }
 
   public void setConversationDeletion(io.justsearch.app.services.conversation.ConversationDeletion deletion) {
     this.conversationDeletion = java.util.Objects.requireNonNull(deletion, "deletion");
@@ -488,8 +494,19 @@ public final class ChatController {
     // the same key leaves it untouched and only decides where the synthesized rows land.
     result.sort((a, b) -> Long.compare(asMillis(b.get("lastActiveAtMs")), asMillis(a.get("lastActiveAtMs"))));
     var writes = conversationStore.conversationWork();
-    ctx.json(Map.of("sessions", result.size() <= limit ? result : result.subList(0, limit),
-        "deletedIds", writes == null ? List.of() : writes.deletedIds()));
+    Map<String, Object> response = new LinkedHashMap<>();
+    response.put("sessions", result.size() <= limit ? result : result.subList(0, limit));
+    response.put("deletedIds", List.of());
+    if (writes != null) {
+      // A deletion must not advance the count between sampling its markers and its count: that
+      // could hide a marker-window gap from a window retaining an earlier exists answer.
+      synchronized (writes) {
+        response.put("deletedIds", writes.deletedIds());
+        response.put("deletionCount", writes.deletionCount());
+      }
+    }
+    if (engineInstanceId != null) response.put("instanceId", engineInstanceId);
+    ctx.json(response);
   }
 
   /**

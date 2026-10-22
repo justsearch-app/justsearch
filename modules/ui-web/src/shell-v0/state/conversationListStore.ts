@@ -307,6 +307,47 @@ function watchOtherWindowsLegacyTitles(): void {
 // Engine's full history: only these held identities can need a missing-row confirmation.
 const serverConversations = new Set<string>();
 
+// Confirmations live only in this window and this Engine run. More than 100 deletions between
+// list answers can hide a missed delete, starting a new generation even in the same run.
+let existenceGeneration: { instanceId: string; deletionCount: number } | null = null;
+const confirmedExisting = new Set<string>();
+const existenceReads = new Map<string, Promise<boolean | null>>();
+
+function observeDeletionWindow(instanceId: unknown, deletionCount: unknown): void {
+  const valid = typeof instanceId === 'string' && instanceId.trim() !== ''
+    && typeof deletionCount === 'number' && Number.isSafeInteger(deletionCount) && deletionCount >= 0;
+  if (!valid || !existenceGeneration || existenceGeneration.instanceId !== instanceId
+    || deletionCount < existenceGeneration.deletionCount
+    || deletionCount - existenceGeneration.deletionCount > 100) {
+    confirmedExisting.clear();
+    existenceReads.clear();
+    existenceGeneration = valid ? { instanceId, deletionCount } : null;
+  } else {
+    existenceGeneration.deletionCount = deletionCount;
+  }
+}
+
+/** Concurrent refreshes share one exact read; only an explicit boolean is an answer. */
+function readConversationExists(id: string, request: number): Promise<boolean | null> {
+  const pending = existenceReads.get(id);
+  // A shared positive is reusable, but an absence read before this refresh may predate a restore.
+  if (pending) return pending.then(exists => exists === false && request >= listShown
+    ? readConversationExists(id, request) : exists);
+  const read = (async () => {
+    try {
+      const answer = await authorizedFetch(`${apiBase}/api/chat/conversations/${encodeURIComponent(id)}/history?existsOnly=true`);
+      if (!answer.ok) return null;
+      const exists: unknown = (await answer.json()).exists;
+      return typeof exists === 'boolean' ? exists : null;
+    } catch { return null; }
+  })();
+  existenceReads.set(id, read);
+  void read.finally(() => {
+    if (existenceReads.get(id) === read) existenceReads.delete(id);
+  });
+  return read;
+}
+
 export function rememberServerConversation(id: string): void {
   if (serverConversations.has(id)) return;
   if (!state.deletedIds.includes(id)) serverConversations.add(id);
@@ -334,10 +375,16 @@ export async function loadConversations(): Promise<void> {
     const markers: string[] = Array.isArray(data.deletedIds)
       ? data.deletedIds.filter((id: unknown): id is string => typeof id === 'string')
       : [];
-    const missing = [...serverConversations].filter(id => !listed.has(id) && !markers.includes(id));
+    observeDeletionWindow(data.instanceId, data.deletionCount);
+    const generation = existenceGeneration;
+    const missing = [...serverConversations].filter(id => !listed.has(id) && !markers.includes(id)
+      && !confirmedExisting.has(id));
     const deletedIds = [...new Set([...state.deletedIds.filter(id => !listed.has(id)), ...markers])];
     for (const id of listed) serverConversations.add(id);
-    for (const id of deletedIds) serverConversations.delete(id);
+    for (const id of deletedIds) {
+      serverConversations.delete(id);
+      confirmedExisting.delete(id);
+    }
     for (const id of deletedIds) forgetRecentSession(id);
     state = { ...state, conversations: conversations.filter(c => !deletedIds.includes(c.id)), deletedIds,
       activeId: state.activeId !== null && deletedIds.includes(state.activeId) ? null : state.activeId,
@@ -356,16 +403,17 @@ export async function loadConversations(): Promise<void> {
     // Apply each exact answer independently: one unavailable read must not delay the list or
     // another confirmed absence. A limited list, failed read or old-server reply proves nothing.
     await Promise.all(missing.map(async id => {
-      try {
-        const answer = await authorizedFetch(`${apiBase}/api/chat/conversations/${encodeURIComponent(id)}/history?existsOnly=true`);
-        if (!answer.ok || (await answer.json()).exists !== false || request < listShown) return;
-        serverConversations.delete(id);
-        forgetRecentSession(id);
-        state = { ...state, conversations: state.conversations.filter(c => c.id !== id),
-          deletedIds: [...new Set([...state.deletedIds, id])],
-          activeId: state.activeId === id ? null : state.activeId };
-        emit();
-      } catch { /* Keep the held conversation when existence could not be determined. */ }
+      const exists = await readConversationExists(id, request);
+      if (generation !== existenceGeneration) return;
+      if (exists === true && generation !== null && serverConversations.has(id)) confirmedExisting.add(id);
+      if (exists !== false || request < listShown) return;
+      serverConversations.delete(id);
+      confirmedExisting.delete(id);
+      forgetRecentSession(id);
+      state = { ...state, conversations: state.conversations.filter(c => c.id !== id),
+        deletedIds: [...new Set([...state.deletedIds, id])],
+        activeId: state.activeId === id ? null : state.activeId };
+      emit();
     }));
   } catch {
     state = { ...state, loading: false };
@@ -1403,6 +1451,9 @@ export function __resetConversationListForTest(): void {
   state = { conversations: [], deletedIds: [], activeId: null, loading: false };
   listeners.clear();
   serverConversations.clear();
+  existenceGeneration = null;
+  confirmedExisting.clear();
+  existenceReads.clear();
   apiBase = '';
   pendingTitles.clear();
   adoptBlockedIds.clear();
