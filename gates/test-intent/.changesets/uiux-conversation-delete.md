@@ -956,3 +956,14 @@ All CD3 checks are durable. CD3 compatibility scaffolding adds only the old vers
   "note": "Reviewed baseline tests, agreed scenarios and sources before the diff. Independently replayed 37 repair checks: all passed without skips and failed by assertion before. All 146 preservation cases passed on both versions. Test intent accepted; product verification fails S52.1/S52.2 for accepted queued background work recreating a deleted conversation and S52.3 for locked run-only listing."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-7ljkbx2z",
+  "verdict": "reject",
+  "digest": "sha256:41572e5297d5234ab458420310ffdf5bb43a937269a79354aea9ef36a58e6783",
+  "note": "Sources and adaptation oracles reviewed against the supplied S52/N52 and DC/CD decisions. Reject current execution evidence: UnifiedChatView.deletion.test.ts, a thread read already in flight cannot restore deleted interaction events, repeatedly throws TypeError: release is not a function before its behavioral assertion on exact snapshot 4cab228fe. Reproduced in the full suite, isolated with no cache, and the independent run-evidence replay. The real-browser delayed-response behavior passes; that does not make the named check a pass."
+}
+```
