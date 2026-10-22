@@ -891,6 +891,100 @@
   "audience" : "USER",
   "consumers" : [ ]
 }, {
+  "id": "core.indexing-pause",
+  "type": "operation",
+  "presentation": {
+    "labelKey": "ops.indexing-pause.label",
+    "descriptionKey": "ops.indexing-pause.description"
+  },
+  "intf": {
+    "inputs": {
+      "type": "object",
+      "properties": {
+        "untilEpochMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "result": {
+      "type": "object"
+    },
+    "errors": [],
+    "uiHints": {}
+  },
+  "policy": {
+    "risk": "LOW",
+    "confirm": {
+      "kind": "NONE"
+    },
+    "audit": "METADATA_ONLY",
+    "undoSupported": false,
+    "inverseOperationId": null
+  },
+  "availability": {},
+  "lineage": {
+    "affects": [],
+    "supersedes": []
+  },
+  "provenance": {
+    "tier": "CORE",
+    "contributorId": "core",
+    "version": "1.0"
+  },
+  "executors": [
+    "UI"
+  ],
+  "audience": "USER",
+  "consumers": []
+}, {
+  "id": "core.indexing-resume",
+  "type": "operation",
+  "presentation": {
+    "labelKey": "ops.indexing-resume.label",
+    "descriptionKey": "ops.indexing-resume.description"
+  },
+  "intf": {
+    "inputs": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "result": {
+      "type": "object"
+    },
+    "errors": [],
+    "uiHints": {}
+  },
+  "policy": {
+    "risk": "LOW",
+    "confirm": {
+      "kind": "NONE"
+    },
+    "audit": "METADATA_ONLY",
+    "undoSupported": false,
+    "inverseOperationId": null
+  },
+  "availability": {},
+  "lineage": {
+    "affects": [],
+    "supersedes": []
+  },
+  "provenance": {
+    "tier": "CORE",
+    "contributorId": "core",
+    "version": "1.0"
+  },
+  "executors": [
+    "UI"
+  ],
+  "audience": "USER",
+  "consumers": []
+}, {
   "id" : "core.trigger-offline-processing",
   "type" : "operation",
   "presentation" : {

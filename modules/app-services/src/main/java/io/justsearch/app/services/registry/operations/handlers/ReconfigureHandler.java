@@ -136,13 +136,22 @@ public final class ReconfigureHandler implements OperationHandler {
     if (!record.key().equals(envelope.settings().operationKey())) {
       throw new IllegalArgumentException("Reconfigure operation identity mismatch");
     }
-    return OperationExecution.finished(
-        service().applyAccepted(envelope.settings(), envelope.modeIntent(),
-            Objects.requireNonNull(context, "context"), record,
-            envelope.refreshInference()
-                ? new SettingsCandidateContext(replay.servingProfileId() == null ? null
-                    : ChatModelProfile.resolve(replay.servingProfileId()), true)
-                : SettingsCandidateContext.NONE));
+    try {
+      return OperationExecution.finished(
+          service().applyAccepted(envelope.settings(), envelope.modeIntent(),
+              Objects.requireNonNull(context, "context"), record,
+              envelope.refreshInference()
+                  ? new SettingsCandidateContext(replay.servingProfileId() == null ? null
+                      : ChatModelProfile.resolve(replay.servingProfileId()), true)
+                  : SettingsCandidateContext.NONE));
+    } catch (OperationPreparationRefused refused) {
+      // This key has already been accepted. Persist its typed refusal so replay cannot turn a
+      // conflict into UNCAUGHT_EXCEPTION. A terminal key cannot be retried as a fresh mutation.
+      OperationResult result = refused.refusal();
+      return OperationExecution.finished(new OperationResult(result.success(), result.message(),
+          result.executionId(), result.structuredData(), result.errorCode(), result.errorDetails(),
+          java.util.Optional.of(false)));
+    }
   }
 
   private SettingsService service() {

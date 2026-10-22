@@ -210,16 +210,27 @@ const env = {
 if (pointerPublication) {
   env.JUSTSEARCH_POINTER_PUBLICATION_CUT = pointerPublication[2];
   env.JUSTSEARCH_POINTER_CUT_PHASE = pointerPublication[1] === 'replacement' ? 'MIGRATING' : 'IDLE';
+  // Pin the hosted-CI model condition: the tracked model manifests without any weights. A
+  // discovered embedding model changes how a replacement ends (an empty candidate cannot earn
+  // the embedding stamp and is refused), so a host's real models must never decide the outcome.
+  const manifestOnlyModels = path.join(work, 'models-manifest-only');
+  const tracked = spawnSync('git', ['ls-files', '-z', '--', 'models'], { cwd: repo, encoding: 'utf8' });
+  if (tracked.status !== 0) throw new Error(`cannot list tracked model manifests: ${tracked.stderr}`);
+  // A checkout that tracks weights (through LFS) must still yield manifests only.
+  const weights = /\.(onnx|gguf)$|onnx_data$/i;
+  for (const file of tracked.stdout.split('\0').filter(name => name && !weights.test(name))) {
+    const target = path.join(manifestOnlyModels, path.relative('models', file));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(path.join(repo, file), target);
+  }
+  env.JUSTSEARCH_MODELS_DIR = manifestOnlyModels;
   const corpus = path.join(work, 'pointer-corpus');
   fs.mkdirSync(corpus, { recursive: true });
   fs.writeFileSync(path.join(corpus, 'probe.txt'), 'pointerdurabilitymarker quokka', { flag: 'wx' });
-  // Replacement ingests once through the API. Restoring a persisted watcher during a
-  // crashed migration hits a separate cutover-refusal bug, outside the R1 pointer contract.
-  if (pointerPublication[1] !== 'replacement') {
-    fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({
-      schemaVersion: 1, roots: [{ path: corpus }],
-    }), { flag: 'wx' });
-  }
+  // The probe lives in a watched root, as a user's files do: a rebuild recaptures watched roots.
+  fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({
+    schemaVersion: 1, roots: [{ path: corpus }],
+  }), { flag: 'wx' });
   if (pointerPublication[1] === 'recovery') preparePointerRecovery(indexBase);
 }
 if (queryReconfigureMode) {

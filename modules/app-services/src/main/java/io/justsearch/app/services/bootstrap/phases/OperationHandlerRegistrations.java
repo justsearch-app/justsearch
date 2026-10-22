@@ -148,6 +148,12 @@ public final class OperationHandlerRegistrations {
     handlers.register(
         CoreOperationCatalog.SET_CHAT_ENABLED,
         new SetChatEnabledHandler(runtimeSpecStoreSupplier, runtimeReconcilerSupplier));
+    handlers.register(CoreOperationCatalog.PAUSE_INDEXING,
+        new io.justsearch.app.services.registry.operations.handlers.IndexingPauseHandler(
+            runtimeSpecStoreSupplier, true));
+    handlers.register(CoreOperationCatalog.RESUME_INDEXING,
+        new io.justsearch.app.services.registry.operations.handlers.IndexingPauseHandler(
+            runtimeSpecStoreSupplier, false));
     handlers.register(
         CoreOperationCatalog.SWITCH_INFERENCE_MODE,
         new SwitchInferenceModeHandler(runtimeSpecStoreSupplier, runtimeReconcilerSupplier));

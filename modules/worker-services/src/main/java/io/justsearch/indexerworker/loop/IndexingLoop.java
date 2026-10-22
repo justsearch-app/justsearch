@@ -681,14 +681,33 @@ public class IndexingLoop implements Closeable {
     }
     log.info("Indexing loop running");
 
+    var hold = signalBus.indexingHold();
+    io.justsearch.core.scheduling.IndexingHold.Lease lease = null;
+    try {
     while (running.get() && !Thread.currentThread().isInterrupted()) {
       try {
-        awaitCutoverResume();
+        if (lease != null && hold.held()) {
+          // Retain ownership across batches: buffered writes must be published before quiet.
+          if (!finishIdleCommit()) {
+            Thread.sleep(50L);
+            continue;
+          }
+          commitOps.maybeRefreshBlocking();
+          lease.close();
+          lease = null;
+        }
+        if (awaitCutoverResume(lease)) lease = null;
         if (!running.get()) break;
 
-        // CRITICAL: Handle GPU state transitions for Hybrid Inference
-        // Must unload embedding model when Main claims GPU, reload when released
+        // Resource handoff for foreground search/Ask remains live while processing is held.
         embeddingLifecycle.handleGpuStateTransition();
+
+        if (hold != null && lease == null) lease = hold.tryAcquire();
+        if (hold != null && lease == null) {
+          // Keep cycling through cutover/upgrade coordination while processing admission is closed.
+          Thread.sleep(50L);
+          continue;
+        }
 
         if (!journal.retryBatchReturns()) {
           if (!sleepBrieflyAfterError()) break;
@@ -823,13 +842,15 @@ public class IndexingLoop implements Closeable {
       }
     }
 
-    finalizeShutdownCommit();
-
+    } finally {
+      try { finalizeShutdownCommit(); }
+      finally { if (lease != null) lease.close(); }
+    }
     log.info("Indexing loop stopped");
   }
 
   /** Commit buffered effects before outcomes; retry already committed outcomes on every idle cycle. */
-  private void finishIdleCommit() {
+  private boolean finishIdleCommit() {
     try {
       if (indexedSinceCommit > 0) {
         commitActiveLexicalSource(CommitReason.INDEXING_LOOP_IDLE);
@@ -842,8 +863,10 @@ public class IndexingLoop implements Closeable {
       // A failed SQL outcome write can outlive its successful index commit. With no new index
       // work there is nothing to commit, but the exact committed transition still needs retry.
       journal.drainPending();
+      return true;
     } catch (RuntimeException e) {
       log.error("Failed to commit index or record outcomes on idle", e);
+      return false;
     }
   }
 
@@ -1174,9 +1197,13 @@ public class IndexingLoop implements Closeable {
     }
   }
 
-  private void awaitCutoverResume() throws InterruptedException {
+  private boolean awaitCutoverResume(io.justsearch.core.scheduling.IndexingHold.Lease lease)
+      throws InterruptedException {
     synchronized (cutoverPauseMonitor) {
-      if (!cutoverPauseRequested) return;
+      if (!cutoverPauseRequested) return false;
+      if (!finishIdleCommit()) throw new IllegalStateException("Cutover publication failed");
+      commitOps.maybeRefreshBlocking();
+      if (lease != null) lease.close();
       cutoverPaused = true;
       transitionToPaused();
       cutoverPauseMonitor.notifyAll();
@@ -1189,6 +1216,7 @@ public class IndexingLoop implements Closeable {
         if (running.get()) transitionToIdle();
         cutoverPauseMonitor.notifyAll();
       }
+      return true;
     }
   }
 

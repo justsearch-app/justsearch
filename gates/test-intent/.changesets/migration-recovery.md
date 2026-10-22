@@ -740,7 +740,7 @@ builder.
           "delegationQuote": "actually work on everything i gave you though, dont just stop at arbitrary milestones or something like that",
           "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:16:56Z",
           "delegationScope": "The #822 follow-up defect, an interrupted migration that never ends, and its agreed outcomes M2, M5 and M8: a cut before promotion ends in a clean failure with A kept and B retired; only a promoted B completes forward.",
-          "choice": "The #822 pointer-publication checks judge a replacement cut by the pointer the cut recorded. A cut before promotion (MIGRATING, A serving, B building) must end in the terminal clean refusal (FAILED, BULK_GENERATION_REFUSED), with A still serving its content, B's directory and pointer fields gone, an exactly empty journal and no RUNNING operation; a cut whose pointer already serves B must still complete forward. Every HTTP call after the cut goes to the Engine incarnation running at that moment.",
+          "choice": "The #822 pointer-publication checks judge a replacement cut by the state after the supervised restart, never by the pointer the cut recorded. Exactly one clean outcome must hold: B promoted and the operation COMPLETE (forward completion is correct even for a cut before promotion), or the clean refusal (FAILED, BULK_GENERATION_REFUSED) with A still serving its content, which an unrecorded watcher mutation produces. Both need B's or A's directory settled, an exactly empty journal and no RUNNING operation. Every HTTP call after the cut goes to the Engine incarnation running at that moment.",
           "label": "agent choice"
         },
         {
@@ -765,7 +765,7 @@ builder.
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "conflictSearch": "Task t-20261020-a5fbcb decisions searched: M1, M2, M5 and M8 and the later rounds agree that an interrupted migration before promotion ends in a clean failure; none keeps forward completion for a pre-promotion cut. The removed expectation is that a replacement pointer-publication cut taken while the pointer is MIGRATING (A active, B building) recovers to a COMPLETE operation, and that any FAILED outcome is wrong (pointer-publication-scenario.mjs before this change, 'recorded migration did not recover'). The forward-completion expectation for a cut whose pointer already serves B is kept. Entry class: the requested 'Changed' is not one of the gate's classes, so the changed expectation is recorded, as round 7 did, as this Obsolete entry plus the New entry that follows."
+      "conflictSearch": "Task t-20261020-a5fbcb decisions searched: M1, M2, M5 and M8 describe an interrupted migration before promotion ending in a clean failure. Main's hosted CI (run 39750061965, no model weights) showed the product resumes a recorded pre-promotion replacement forward, as bulk-state-before-binding expects, so forward completion before promotion is correct; the clean refusal comes from an unrecorded watcher mutation blocking certified promotion. The removed expectation is that a replacement pointer-publication cut taken while the pointer is MIGRATING (A active, B building) must recover to a COMPLETE operation and that any FAILED outcome is wrong (pointer-publication-scenario.mjs before round 14, 'recorded migration did not recover'). Forward completion stays one of the two accepted outcomes. Entry class: the requested 'Changed' is not one of the gate's classes, so the changed expectation is recorded, as round 7 did, as this Obsolete entry plus the New entry that follows."
     },
     {
       "items": [
@@ -775,14 +775,14 @@ builder.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Round 14, the #822 pointer-publication checks. A replacement cut whose recorded pointer is MIGRATING with A active and B building (replacement before-backup, after-backup and after-publication) ends after the supervised restart in the clean refusal: the pointer IDLE on the same A with no building or previous generation, B's directory absent, B's operation FAILED with BULK_GENERATION_REFUSED, no RUNNING operation, an empty switch_buffer journal, the current Engine's operation history reporting it failed, and A still returning the ingested pointerdurabilitymarker file to a search. A cut whose pointer already serves B must complete forward. Every HTTP call after the cut is made to the Engine incarnation that is running then (supervisor and manifest re-read on each call), so a restart that recovery requests cannot leave the check on a superseded port. The first-publication and recovery cases are unchanged. The checks name the whole classes because their cases are parameterized; the before state is 02d6efc5b, whose product equals the candidate's and whose script still demands COMPLETE, so the replacement cases fail there on the candidate's real behaviour.",
+      "behaviour": "Round 14, the #822 pointer-publication checks. A replacement cut whose recorded pointer is MIGRATING with A active and B building (replacement before-backup, after-backup and after-publication) is judged by the state after the supervised restart, and exactly one clean outcome must hold. (a) Forward completion, correct even before promotion: the pointer IDLE on B with no building or previous generation, B's operation COMPLETE and reported complete by the current Engine, no RUNNING operation, an empty switch_buffer journal, A's directory retired, and B returning the pointerdurabilitymarker file to a search. (b) The clean refusal, which an unrecorded watcher mutation produces: the pointer IDLE on the same A with no building or previous generation, B's directory absent, B's operation FAILED with BULK_GENERATION_REFUSED and reported failed by the current Engine, no RUNNING operation, an empty journal, and A still returning the file. Anything else fails with the failed conditions named. The probe file lives in a watched root, and the writer runs on a manifest-only models folder (the tracked manifests, no weights, as on hosted CI) so a host's models cannot decide the outcome. Every HTTP call after the cut is made to the Engine incarnation that is running then (supervisor and manifest re-read on each call), so a restart that recovery requests cannot leave the check on a superseded port. The first-publication and recovery cases are unchanged. The checks name the whole classes because their cases are parameterized; the before state is 02d6efc5b, whose product equals the candidate's and whose script still demands COMPLETE, so the replacement cases fail there on the candidate's real behaviour.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "actually work on everything i gave you though, dont just stop at arbitrary milestones or something like that",
           "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:16:56Z",
           "delegationScope": "The #822 follow-up defect, an interrupted migration that never ends, and its agreed outcomes M2, M5 and M8: a cut before promotion ends in a clean failure with A kept and B retired; only a promoted B completes forward.",
-          "choice": "The #822 pointer-publication checks judge a replacement cut by the pointer the cut recorded. A cut before promotion (MIGRATING, A serving, B building) must end in the terminal clean refusal (FAILED, BULK_GENERATION_REFUSED), with A still serving its content, B's directory and pointer fields gone, an exactly empty journal and no RUNNING operation; a cut whose pointer already serves B must still complete forward. Every HTTP call after the cut goes to the Engine incarnation running at that moment.",
+          "choice": "The #822 pointer-publication checks judge a replacement cut by the state after the supervised restart, never by the pointer the cut recorded. Exactly one clean outcome must hold: B promoted and the operation COMPLETE (forward completion is correct even for a cut before promotion), or the clean refusal (FAILED, BULK_GENERATION_REFUSED) with A still serving its content, which an unrecorded watcher mutation produces. Both need B's or A's directory settled, an exactly empty journal and no RUNNING operation. Every HTTP call after the cut goes to the Engine incarnation running at that moment.",
           "label": "agent choice"
         },
         {
@@ -841,5 +841,16 @@ builder.
   "verdict": "accept",
   "digest": "sha256:44a7a8b33dc66e3ecc47a1818786bc78c89746885c0621f8ea841e5c8a0928d6",
   "note": "Verified 9370e8d37: pointer repairs and split suite complete; 14 failures match main; promoted helper branch unexercised, separate forward proof passes."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-pointer",
+  "verdict": "accept",
+  "digest": "sha256:9b325acacd48724b62bcacc9f3be7561de7576a2548117f8eea4dbd9780f9d69",
+  "note": "Verified 6a777c80f on Linux: 27 pointer cases, 50 isolated oracle checks, CI lint, and clarified V4 trace (tracked read-only bootstrap copies; Engine private models; no weights or main/home access). Builder fail-before evidence not independently reproduced."
 }
 ```

@@ -482,7 +482,9 @@
       "affects" : [ "INDEXING" ],
       "pendingJobs" : 12,
       "agingReleaseAt" : null,
-      "sampledAt" : "2025-01-01T00:00:00Z"
+      "sampledAt" : "2025-01-01T00:00:00Z",
+      "untilEpochMs" : null,
+      "waitingForResume" : false
     },
     "gpu" : {
       "profile" : "P12",
