@@ -130,6 +130,8 @@ public class IndexingLoop implements Closeable {
   private final IndexingPipelineMetricCatalog pipelineCatalog;
   private final OperationalMetrics metrics = OperationalMetrics.getInstance();
   private final AtomicBoolean running = new AtomicBoolean(false);
+  // Wake cooperative stop without interrupting an owner of Lucene NIO channels.
+  private final Object stopMonitor = new Object();
   private final WorkerIngestionAuthority ingestionAuthority = new WorkerIngestionAuthority();
   // Tempdoc 410 review fix #1: counts outcome-aware queue write failures (rollback). Persistent
   // increments here mean recoverStuckJobs is bearing more load than usual; surface the signal
@@ -890,7 +892,7 @@ public class IndexingLoop implements Closeable {
 
   /**
    * Back-off after a recovered error to avoid a tight failure loop (tempdoc 588; shared by the
-   * Exception and Error recovery paths). Returns {@code false} if interrupted (caller should break).
+   * Exception and Error recovery paths). Returns {@code false} if stopped or interrupted.
    */
   private boolean sleepBrieflyAfterError() {
     return sleepAfterError(ERROR_BACKOFF_MS);
@@ -898,11 +900,25 @@ public class IndexingLoop implements Closeable {
 
   private boolean sleepAfterError(long delayMs) {
     try {
-      Thread.sleep(delayMs);
-      return true;
+      synchronized (stopMonitor) {
+        long remainingNs = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(delayMs);
+        long deadline = System.nanoTime() + remainingNs;
+        while (running.get() && remainingNs > 0) {
+          java.util.concurrent.TimeUnit.NANOSECONDS.timedWait(stopMonitor, remainingNs);
+          remainingNs = deadline - System.nanoTime();
+        }
+        return running.get();
+      }
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
       return false;
+    }
+  }
+
+  private void requestStop() {
+    synchronized (stopMonitor) {
+      running.set(false);
+      stopMonitor.notifyAll();
     }
   }
 
@@ -1213,7 +1229,7 @@ public class IndexingLoop implements Closeable {
     if (!isRunning()) {
       return true;
     }
-    running.set(false);
+    requestStop();
     Thread thread = loopThread;
     if (thread != null) {
       try {
@@ -1312,7 +1328,7 @@ public class IndexingLoop implements Closeable {
   private void closeOwnedResources(boolean closeNer) throws IOException {
     log.info("Stopping IndexingLoop...");
     synchronized (probePublicationMonitor) {
-      running.set(false);
+      requestStop();
       activationGate.countDown();
       // A late gate release cannot re-publish this loop's probe after close clears it.
       signalBus.setPendingIngestProbe(null);
@@ -1382,11 +1398,11 @@ public class IndexingLoop implements Closeable {
     // DO NOT call loopThread.interrupt() — Lucene uses NIO channels internally, and
     // Thread.interrupt() causes ClosedByInterruptException which permanently closes
     // the IndexWriter. Instead, rely on the loop's natural running-flag check (every
-    // iteration, including idle sleeps of 100ms-1s).
+    // iteration, including idle sleeps of 100ms-1s), and wake its outage pause cooperatively.
     // The loop thread may complete its current iteration (up to one batch) before it
     // observes running=false and exits. This is safe because the externalCleanup
     // callback calls deleteAll() which wipes the index unconditionally.
-    running.set(false);
+    requestStop();
     if (loopThread != null) {
       loopThread.join(10_000);
       if (loopThread.isAlive()) {

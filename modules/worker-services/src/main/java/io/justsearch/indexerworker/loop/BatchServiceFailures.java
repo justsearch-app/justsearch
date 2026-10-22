@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.loop;
 
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
+import io.justsearch.adapters.lucene.runtime.IndexWriterUnavailableException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -104,6 +105,7 @@ final class BatchServiceFailures {
   }
 
   private static boolean provenOutage(Throwable failure) {
+    if (failure instanceof IndexWriterUnavailableException) return true;
     // DISK_IO can concern one document; CONFIGURATION includes document validation failures.
     if (failure instanceof IndexRuntimeIOException indexError) {
       return switch (indexError.reason()) {

@@ -81,7 +81,7 @@ public final class WritePathOps {
       LifecycleSnapshot snap = session.snapshot;
       IndexWriter w = snap != null ? snap.writer() : null;
       if (w == null) {
-        throw new IllegalStateException(
+        throw new IndexWriterUnavailableException(
             "IndexWriter not available (runtime not started or closed)");
       }
       String idValue = asString(fields.get(idField));
@@ -120,7 +120,7 @@ public final class WritePathOps {
       LifecycleSnapshot snap = session.snapshot;
       IndexWriter w = snap != null ? snap.writer() : null;
       if (w == null) {
-        throw new IllegalStateException(
+        throw new IndexWriterUnavailableException(
             "IndexWriter not available (runtime not started or closed)");
       }
       if (!hardDeletes.isEmpty()) {
@@ -163,7 +163,7 @@ public final class WritePathOps {
       LifecycleSnapshot snap = session.snapshot;
       IndexWriter w = snap != null ? snap.writer() : null;
       if (w == null) {
-        throw new IllegalStateException("IndexWriter not available (runtime not started or closed)");
+        throw new IndexWriterUnavailableException("IndexWriter not available (runtime not started or closed)");
       }
       w.deleteDocuments(new Term(idField, id));
       session.pendingDocs.incrementAndGet();
@@ -254,7 +254,7 @@ public final class WritePathOps {
       LifecycleSnapshot snap = session.snapshot;
       IndexWriter w = snap != null ? snap.writer() : null;
       if (w == null) {
-        throw new IllegalStateException("IndexWriter not available (runtime not started or closed)");
+        throw new IndexWriterUnavailableException("IndexWriter not available (runtime not started or closed)");
       }
       w.deleteDocuments(query);
       // Tempdoc 809 finding 3: publish the bulk-deletion signal AFTER the delete is submitted, so
@@ -289,7 +289,7 @@ public final class WritePathOps {
     LifecycleSnapshot snap = session.snapshot;
     IndexWriter w = snap != null ? snap.writer() : null;
     if (w == null) {
-      throw new IllegalStateException("IndexWriter not available (runtime not started or closed)");
+      throw new IndexWriterUnavailableException("IndexWriter not available (runtime not started or closed)");
     }
     Query query = QueryFilterBuilder.excludingAcceptedSurvivors(
         new TermQuery(new Term(SchemaFields.COLLECTION, collection)), fileIds, List.of());
@@ -601,7 +601,7 @@ public final class WritePathOps {
     }
     LifecycleSnapshot rmwSnap = session.snapshot;
     if (rmwSnap == null || rmwSnap.writer() == null) {
-      throw new IllegalStateException("IndexWriter not available during read-modify-write");
+      throw new IndexWriterUnavailableException("IndexWriter not available during read-modify-write");
     }
     rmwSnap.writer().updateDocument(new Term(idField, docId), newDoc);
     // Account per completed mutation, including the applied prefix of a batch that later fails.
@@ -1139,7 +1139,7 @@ public final class WritePathOps {
     LifecycleSnapshot snap = session.snapshot;
     IndexWriter w = snap != null ? snap.writer() : null;
     if (w == null) {
-      throw new IllegalStateException("IndexWriter not available (runtime not started or closed)");
+      throw new IndexWriterUnavailableException("IndexWriter not available (runtime not started or closed)");
     }
     try {
       w.forceMergeDeletes(true);
@@ -1161,7 +1161,7 @@ public final class WritePathOps {
       LifecycleSnapshot snap = session.snapshot;
       IndexWriter w = snap != null ? snap.writer() : null;
       if (w == null) {
-        throw new IllegalStateException("IndexWriter not available (runtime not started or closed)");
+        throw new IndexWriterUnavailableException("IndexWriter not available (runtime not started or closed)");
       }
       w.deleteAll();
       session.bulkDeleteEpoch.incrementAndGet(); // tempdoc 809 finding 3 — see deleteByPathPrefix

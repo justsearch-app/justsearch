@@ -111,7 +111,7 @@ public final class CommitOps {
         try {
           LifecycleSnapshot snap = session.snapshot;
           IndexWriter w = snap != null ? snap.writer() : null;
-          if (w == null) throw new IllegalStateException("IndexWriter not available");
+          if (w == null) throw new IndexWriterUnavailableException("IndexWriter not available");
           long pendingAtCommit = session.pendingDocs.get();
           w.setLiveCommitData(ud != null ? ud.entrySet() : Collections.emptyList());
           long start = System.nanoTime();
