@@ -1,3 +1,4 @@
+import { skipPrFlake } from '../ci/pr-flakes.mjs';
 // Round-4 repairs at the real CLI and injected stop boundary. CPU-only fixture processes.
 // Identity-only stops, as on the integration side since 58a51a608: no tree inspection exists; each
 // stop phase re-reads the recorded identities in one batched lookup.
@@ -110,6 +111,7 @@ testWindows('the batched identity lookup supplies fresh identities across stop p
 });
 let failed = 0, skipped = 0;
 try { for (const [name, fn, prerequisite] of tests) {
+    if (skipPrFlake('scripts/dev/test-dev-runner-stop-round4.mjs', name)) { skipped++; continue; }
   if (prerequisite && !['win32', 'linux'].includes(process.platform)) { skipped++; console.log('SKIP ' + name + ': ' + prerequisite); continue; }
   try { await fn(); console.log('PASS ' + name); }
   catch (e) { failed++; console.error('FAIL ' + name + ': ' + e.stack); } } }

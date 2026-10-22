@@ -1,0 +1,550 @@
+{
+  "$schema": "https://ssot.justsearch/v1/schemas/indexing/field-catalog.schema.json",
+  "version": "1.0.0",
+  "fields": [
+    {
+      "id": "doc_id",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "id",
+        "sort"
+      ]
+    },
+    {
+      "id": "doc_uid",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "sort",
+        "tiebreak"
+      ]
+    },
+    {
+      "id": "path",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "filter",
+        "sort"
+      ]
+    },
+    {
+      "id": "title",
+      "type": "text",
+      "stored": true,
+      "docValues": false,
+      "roles": [
+        "highlight"
+      ],
+      "analyzer": "icu"
+    },
+    {
+      "id": "author",
+      "type": "text",
+      "stored": true,
+      "docValues": false,
+      "roles": [],
+      "analyzer": "icu"
+    },
+    {
+      "id": "content",
+      "type": "text",
+      "stored": true,
+      "docValues": false,
+      "roles": [
+        "highlight"
+      ],
+      "analyzer": "icu"
+    },
+    {
+      "id": "content_sha256",
+      "type": "keyword",
+      "stored": true,
+      "docValues": false,
+      "roles": []
+    },
+    {
+      "id": "content_preview",
+      "type": "text",
+      "stored": true,
+      "docValues": false,
+      "roles": [
+        "highlight"
+      ],
+      "analyzer": "icu"
+    },
+    {
+      "id": "mime",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "filter",
+        "facet"
+      ]
+    },
+    {
+      "id": "mime_base",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "filter",
+        "facet"
+      ]
+    },
+    {
+      "id": "file_kind",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "filter",
+        "facet"
+      ]
+    },
+    {
+      "id": "language",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "filter",
+        "facet"
+      ]
+    },
+    {
+      "id": "parent_token_count",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "filter",
+        "sort"
+      ]
+    },
+    {
+      "id": "collection",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "filter",
+        "facet"
+      ]
+    },
+    {
+      "id": "created_at",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "filter",
+        "sort"
+      ]
+    },
+    {
+      "id": "modified_at",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "filter",
+        "sort"
+      ]
+    },
+    {
+      "id": "size_bytes",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "filter",
+        "sort"
+      ]
+    },
+    {
+      "id": "source_sha256",
+      "type": "keyword",
+      "stored": true,
+      "docValues": false,
+      "roles": []
+    },
+    {
+      "id": "ocr_present",
+      "type": "boolean",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "filter"
+      ]
+    },
+    {
+      "id": "vector",
+      "type": "vector",
+      "stored": false,
+      "docValues": false,
+      "roles": [
+        "vector"
+      ],
+      "rmwPolicy": "preserve-reread-or-reset:embedding_status",
+      "vector": {
+        "dimension": 768
+      }
+    },
+    {
+      "id": "chunk_vector",
+      "type": "vector",
+      "stored": false,
+      "docValues": false,
+      "roles": [
+        "chunk_vector"
+      ],
+      "rmwPolicy": "preserve-reread-or-reset:chunk_embedding_status",
+      "vector": {
+        "dimension": 768
+      }
+    },
+    {
+      "id": "embedding_status",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "filter"
+      ]
+    },
+    {
+      "id": "embedding_retry_count",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "chunk_embedding_status",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter"]
+    },
+    {
+      "id": "chunk_embedding_retry_count",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "vdu_status",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": [
+        "filter"
+      ]
+    },
+    {
+      "id": "vdu_retry_count",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "vdu_processed",
+      "type": "boolean",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter"]
+    },
+    {
+      "id": "vdu_enrichment",
+      "type": "text",
+      "stored": true,
+      "docValues": false,
+      "roles": ["highlight"],
+      "analyzer": "icu"
+    },
+    {
+      "id": "vdu_page_count",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "vdu_demand_kind",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter"]
+    },
+    {
+      "id": "is_chunk",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter"]
+    },
+    {
+      "id": "parent_doc_id",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter"]
+    },
+    {
+      "id": "chunk_index",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "chunk_total",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "chunk_content",
+      "type": "text",
+      "stored": false,
+      "docValues": false,
+      "roles": ["highlight"],
+      "analyzer": "icu",
+      "rmwPolicy": "rederive-parent-slice"
+    },
+    {
+      "id": "chunk_start_char",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "chunk_end_char",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "chunk_parent_content_sha256",
+      "type": "keyword",
+      "stored": true,
+      "docValues": false,
+      "roles": []
+    },
+    {
+      "id": "chunk_start_line",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "chunk_end_line",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "chunk_heading_text",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter"]
+    },
+    {
+      "id": "chunk_heading_level",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter"]
+    },
+    {
+      "id": "filename",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter"]
+    },
+    {
+      "id": "indexed_at",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "ner_status",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter"]
+    },
+    {
+      "id": "ner_retry_count",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "entity_persons_raw",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "multiValued": true,
+      "roles": ["filter", "facet"]
+    },
+    {
+      "id": "entity_organizations_raw",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "multiValued": true,
+      "roles": ["filter", "facet"]
+    },
+    {
+      "id": "entity_locations_raw",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "multiValued": true,
+      "roles": ["filter", "facet"]
+    },
+    {
+      "id": "splade",
+      "type": "splade",
+      "stored": false,
+      "docValues": false,
+      "roles": [],
+      "rmwPolicy": "reset-status:splade_status",
+      "multiValued": false
+    },
+    {
+      "id": "splade_status",
+      "type": "keyword",
+      "stored": false,
+      "docValues": true,
+      "roles": ["filter"],
+      "multiValued": false
+    },
+    {
+      "id": "splade_retry_count",
+      "type": "long",
+      "stored": false,
+      "docValues": true,
+      "roles": [],
+      "multiValued": false
+    },
+    {
+      "id": "extraction_method",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter"]
+    },
+    {
+      "id": "extraction_quality_score",
+      "type": "double",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "visual_extraction_evidence",
+      "type": "text",
+      "stored": true,
+      "docValues": false,
+      "roles": [],
+      "analyzer": "icu"
+    },
+    {
+      "id": "extraction_status",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "facet"]
+    },
+    {
+      "id": "content_truncated",
+      "type": "boolean",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter"]
+    },
+    {
+      "id": "extraction_reason_code",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "facet"]
+    },
+    {
+      "id": "extraction_policy_id",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter"]
+    },
+    {
+      "id": "extraction_parser_id",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter"]
+    },
+    {
+      "id": "embedded_resource_count",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "parser_warnings_count",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    },
+    {
+      "id": "meta_source",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "facet"]
+    },
+    {
+      "id": "meta_author",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "facet"]
+    },
+    {
+      "id": "meta_category",
+      "type": "keyword",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "facet"]
+    },
+    {
+      "id": "meta_published_at",
+      "type": "long",
+      "stored": true,
+      "docValues": true,
+      "roles": ["filter", "sort"]
+    }
+  ]
+}

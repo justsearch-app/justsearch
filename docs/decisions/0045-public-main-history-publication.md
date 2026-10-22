@@ -138,8 +138,7 @@ evidence rather than the durable review index.
 
 Publishers manage and validate that comment with
 `scripts/ci/pr-review-record.mjs`, then preview the public title/body with
-`scripts/ci/preview-squash-message.mjs` before entering the ordinary merge
-queue. No publication step temporarily moves rich review text through the PR
+`scripts/ci/preview-squash-message.mjs` before enabling squash auto-merge. No publication step temporarily moves rich review text through the PR
 body or restores it after enqueue. The command is maintainer-run; this amendment
 does not add a write-capable workflow, required check, or CI permission.
 
@@ -159,13 +158,13 @@ The managed comment is the chosen durable surface because PR comments remain
 on the Conversation timeline and have stable links and visible edit history.
 Check runs are not the authority because GitHub archives them after 400 days
 and deletes them ten days later. A future check may project freshness and link
-to the comment, but only after its pull-request and merge-group event behavior
+to the comment, but only after its pull-request event behavior
 is proven. See GitHub's documentation for [issue comments](https://docs.github.com/en/rest/issues/comments)
 and [check retention](https://docs.github.com/en/pull-requests/reference/status-checks#retention-of-checks).
 
 ## Amendment: validate the agent merge effect — 2026-09-05
 
-Repository-owned agent CLI publication now enters the merge queue through
+Repository-owned agent CLI publication enables validated squash auto-merge through
 `scripts/dev/run-gh.mjs enqueue <PR>`. The gateway runs the squash preview and
 managed-review check against live GitHub state and refuses to invoke `gh pr merge`
 when either check or its process boundary fails. A shared pre-tool hook blocks the
@@ -179,19 +178,16 @@ atomic: GitHub exposes no compare-and-swap precondition for PR metadata or issue
 comments, so the authenticated owner must avoid concurrent edits during that short
 window.
 
-A hosted required check remains deferred. `issue_comment` and
-`pull_request_target` workflows run at the default-branch SHA, while a merge-queue
-required check must also report on the synthetic `merge_group` SHA. GitHub does not
-document a complete PR-membership list in the merge-group event. Do not create a
-write-capable Checks projection until metadata refresh and every grouped PR can be
-bound to those SHAs without relying on queue-ref naming conventions.
+A hosted review-record check remains deferred. The maintainer-run gateway enforces freshness
+before publication. [ADR-0053](0053-one-pr-ci-run-and-squash-auto-merge.md) binds the enable request
+to the validated head, title and body and disables auto-merge after a new push.
 
 ## Amendment: agent-system replaces the merge-guard hook — 2026-10-05
 
 JustSearch adopted agent-system and retired its own agent layer, including the shared pre-tool hook
 that refused direct `gh pr merge` spellings and its regression. The gateway itself is unchanged:
 `scripts/dev/run-gh.mjs enqueue <PR>` still validates the live squash and managed review records
-before requesting the merge queue, and its regression stays in hosted CI. What replaces the hook is
+before enabling squash auto-merge, and its regression stays in hosted CI. What replaces the hook is
 agent-system's publication rule (builders never publish; pushing, opening or merging a pull request
 needs the user's request) and project knowledge naming the gateway as the only merge path. The
 probe for the retired hook is removed; the gateway probe remains.
