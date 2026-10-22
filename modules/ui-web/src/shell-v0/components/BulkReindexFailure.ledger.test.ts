@@ -8,7 +8,7 @@ import { renderEventRow } from './eventRow.js';
 vi.mock('../api/authorizedFetch.js', () => ({ authorizedFetch: (...args: unknown[]) => fetch(...args as Parameters<typeof fetch>) }));
 
 const key = '019940c0-0000-7000-8000-000000000001';
-const message = 'The rebuild or migration could not safely start or resume the new index; check index health and current settings before starting a new rebuild.';
+const message = 'The rebuild or migration could not safely start or resume the new index; check index health and current settings before starting a new rebuild. (Code: BULK_GENERATION_REFUSED)';
 
 afterEach(() => { document.body.innerHTML = ''; vi.unstubAllGlobals(); });
 
@@ -24,6 +24,7 @@ it('shows the recorded refusal sentence and code in the shared Activity and agen
     const detail = host.querySelector('jf-operation-outcome-detail');
     expect(detail?.shadowRoot?.textContent).toContain(message);
     expect(detail?.shadowRoot?.textContent).toContain('Code: BULK_GENERATION_REFUSED');
+  expect(detail?.shadowRoot?.textContent?.split('Code: BULK_GENERATION_REFUSED')).toHaveLength(2);
   });
   expect(fetchMock).toHaveBeenCalledWith(`http://127.0.0.1:33221/api/operation-history/${key}`);
 });

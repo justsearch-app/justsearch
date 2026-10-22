@@ -1759,9 +1759,7 @@ export class LibrarySurface extends JfElement {
       ${this.renderHeader()}
       ${this.renderReindexDecision()}
       ${this.bulkOutcome?.state === 'failed' && this.bulkOutcome.message ? html`
-        <div class="action-message" role="alert">${this.bulkOutcome.message}
-          <small>Code: ${this.bulkOutcome.result?.code ?? this.bulkOutcome.reason}</small>
-        </div>` : nothing}
+        <div class="action-message" role="alert">${this.bulkOutcome.message}</div>` : nothing}
       <div class="action-message" role="status" aria-live="polite">${this.actionMessage ?? ''}</div>
       ${this.reindexOutcome ? html`<div class="action-message" role=${this.reindexOutcomeError ? 'alert' : 'status'}>
         ${this.reindexOutcome}
@@ -1930,9 +1928,9 @@ export class LibrarySurface extends JfElement {
           .onActivate=${() => void this.cancelCurrentReindex()}>Cancel rebuild</jf-button>
       </div>
       ${this.gapDecisionError ? html`<p role="alert">${this.gapDecisionError}
-        ${this.gapDecisionErrorCode ? html`<small style="display: block">Code: ${this.gapDecisionErrorCode}</small>` : nothing}</p>` : nothing}
+        ${this.gapDecisionErrorCode && !this.gapDecisionError.endsWith(` (Code: ${this.gapDecisionErrorCode})`) ? html`<small style="display: block">Code: ${this.gapDecisionErrorCode}</small>` : nothing}</p>` : nothing}
       ${this.reindexCancelError ? html`<p role="alert">${this.reindexCancelError}
-        ${this.reindexCancelErrorCode ? html`<small style="display: block">Code: ${this.reindexCancelErrorCode}</small>` : nothing}</p>` : nothing}
+        ${this.reindexCancelErrorCode && !this.reindexCancelError.endsWith(` (Code: ${this.reindexCancelErrorCode})`) ? html`<small style="display: block">Code: ${this.reindexCancelErrorCode}</small>` : nothing}</p>` : nothing}
       ${this.reindexCancelRecorded ? html`<p role="status">Rebuild cancellation recorded.</p>` : nothing}
     </section>`;
   }

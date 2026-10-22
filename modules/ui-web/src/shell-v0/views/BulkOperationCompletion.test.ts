@@ -11,7 +11,7 @@ import { __feedForTest, __resetAiStateForTest, type StatusSnapshot } from '../st
 
 vi.mock('../api/authorizedFetch.js', () => ({ authorizedFetch: (...args: Parameters<typeof fetch>) => fetch(...args) }));
 const key = '0194f72c-0000-7000-8000-000000000001';
-const message = 'The rebuild or migration could not safely start or resume the new index; check index health and current settings before starting a new rebuild.';
+const message = 'The rebuild or migration could not safely start or resume the new index; check index health and current settings before starting a new rebuild. (Code: BULK_GENERATION_REFUSED)';
 let terminal = false;
 let reads = 0;
 
@@ -48,6 +48,7 @@ async function showsLaterFailure(el: HealthSurface | BrainSurface) {
   const detail = el.shadowRoot!.querySelector('jf-operation-outcome-detail');
   expect(detail?.shadowRoot?.textContent).toContain(message);
   expect(detail?.shadowRoot?.textContent).toContain('Code: BULK_GENERATION_REFUSED');
+  expect(detail?.shadowRoot?.textContent?.split('Code: BULK_GENERATION_REFUSED')).toHaveLength(2);
   const finishedReads = reads;
   await vi.advanceTimersByTimeAsync(8_000);
   expect(reads, 'terminal outcomes stop polling').toBe(finishedReads);

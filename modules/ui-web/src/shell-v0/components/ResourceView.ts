@@ -107,7 +107,7 @@ const operationHistoryColumns: TableColumn[] = [
       const row = value as Record<string, unknown>;
       return html`<span style="white-space: normal; overflow-wrap: anywhere">
         ${row.message ?? ''}
-        ${row.diagnosticsLink ? html`<small style="display: block">Code: ${row.diagnosticsLink}</small>` : ''}
+        ${row.diagnosticsLink && !row.message ? html`<small style="display: block">Code: ${row.diagnosticsLink}</small>` : ''}
       </span>`;
     },
   },

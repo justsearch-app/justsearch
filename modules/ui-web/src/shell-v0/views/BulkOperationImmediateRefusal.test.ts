@@ -24,9 +24,9 @@ import { getOperationClient } from '../operations/OperationClient.js';
 
 const key = '0194f72c-0000-7000-8000-000000000001';
 const code = 'RECOVERY_AUTHORIZATION_REFUSED';
-const message = 'The rebuild or migration could not validate its permissions or prepared model files; this request did not replace the existing index, so review access and model files before starting a new rebuild.';
+const message = 'The rebuild or migration could not validate its permissions or prepared model files; this request did not replace the existing index, so review access and model files before starting a new rebuild. (Code: RECOVERY_AUTHORIZATION_REFUSED)';
 const laterCode = 'BULK_GENERATION_REFUSED';
-const laterMessage = 'The rebuild or migration could not safely start or resume the new index; check index health and current settings before starting a new rebuild.';
+const laterMessage = 'The rebuild or migration could not safely start or resume the new index; check index health and current settings before starting a new rebuild. (Code: BULK_GENERATION_REFUSED)';
 const nativeFetch = globalThis.fetch.bind(globalThis);
 let server: ReturnType<typeof createServer>;
 let base: string;
@@ -150,7 +150,8 @@ it.each(['health', 'brain', 'health-recommended', 'activation'] as const)(
     await pump(el);
     // A refusal's sentence and its code must both be visible; a typed event alone is insufficient.
     expect.soft([...el.shadowRoot!.querySelectorAll('jf-error-alert')].map(e => e.textContent).join(' ')).toContain(message);
-    expect.soft([...el.shadowRoot!.querySelectorAll('jf-error-alert small')].map(e => e.textContent).join(' ')).toContain(`Code: ${code}`);
+    expect.soft([...el.shadowRoot!.querySelectorAll('jf-error-alert')].map(e => e.textContent).join(' ')).toContain(`Code: ${code}`);
+    expect([...el.shadowRoot!.querySelectorAll('jf-error-alert')].map(e => e.textContent).join(' ').split(`Code: ${code}`)).toHaveLength(2);
     accepted = true;
     await click();
     await vi.waitFor(() => expect(reads).toBeGreaterThan(0)); await pump(el);
@@ -159,7 +160,7 @@ it.each(['health', 'brain', 'health-recommended', 'activation'] as const)(
     await vi.waitFor(() => {
       const detail = el.shadowRoot!.querySelector('jf-operation-outcome-detail');
       expect(detail?.shadowRoot?.textContent).toContain(laterMessage);
-      expect(detail?.shadowRoot?.querySelector('small')?.textContent).toContain(`Code: ${laterCode}`);
+      expect(detail?.shadowRoot?.textContent?.split(`Code: ${laterCode}`)).toHaveLength(2);
     }, { timeout: 6_000 });
   }, 10_000,
 );

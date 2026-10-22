@@ -2236,7 +2236,8 @@ public final class McpToolSurface {
   /** Both MCP delivery tiers describe the same known facts; absent metadata stays absent. */
   private static Map<String, Object> errorContent(Map<String, Object> failure) {
     var text = new StringBuilder((String) failure.get("error"));
-    if (failure.containsKey("errorCode")) {
+    if (failure.containsKey("errorCode")
+        && !text.toString().endsWith(" (Code: " + failure.get("errorCode") + ")")) {
       text.append("\nError code: ").append(failure.get("errorCode")).append('.');
     }
     if (failure.containsKey("errorClass")) {

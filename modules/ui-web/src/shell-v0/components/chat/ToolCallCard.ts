@@ -556,9 +556,6 @@ export class ToolCallCard extends JfElement {
               ? this.renderLineageFramedOutput(tc)
               : nothing}
             ${searchProjection ? this.renderSearchBody(searchProjection) : nothing}
-            ${isCompleted && tc.success === false && tc.errorCode
-              ? html`<small style="display: block">Code: ${tc.errorCode}</small>`
-              : nothing}
             ${/* Tempdoc 878 §D.4 — the model-visibility note sits OUTSIDE the two body branches,
                 because it is a fact about the tool RESULT and not about the raw-output panel. Riding
                 it on the lineage frame left the search card — the bulkiest output, and so the one

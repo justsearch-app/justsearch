@@ -10,7 +10,7 @@ import './ToolCallCard.js';
 // Java-produced refusal payload, with its operation identifier replaced by a fixed test UUID.
 const completion = {
   callId: 'call', success: false,
-  output: 'The rebuild or migration could not safely start or resume the new index; check index health and current settings before starting a new rebuild.',
+  output: 'The rebuild or migration could not safely start or resume the new index; check index health and current settings before starting a new rebuild. (Code: BULK_GENERATION_REFUSED)',
   executionId: '', errorCode: 'BULK_GENERATION_REFUSED', retryable: false,
   structuredData: { operationKey: '00000000-0000-7000-8000-000000000001' },
 };
@@ -58,5 +58,6 @@ it.each(['flat', 'nested'] as const)('shows the sentence and support code from a
   expect(card.toolCall?.status).toBe('completed');
   expect(card.expanded).toBe(true);
   expect(card.shadowRoot!.querySelector('.tool-output')?.textContent).toBe(completion.output);
-  expect(card.shadowRoot!.querySelector('small')?.textContent).toBe(`Code: ${completion.errorCode}`);
+  expect(card.shadowRoot!.textContent).toContain(`(Code: ${completion.errorCode})`);
+  expect(card.shadowRoot!.textContent?.split(`Code: ${completion.errorCode}`)).toHaveLength(2);
 });

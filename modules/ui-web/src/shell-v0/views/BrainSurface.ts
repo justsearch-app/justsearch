@@ -1698,7 +1698,7 @@ export class BrainSurface extends JfElement {
     return html`
       ${this.bulkError ? html`<jf-error-alert tone="error" .onDismiss=${() => (this.bulkError = null)}>
         ${this.bulkError.message}
-        ${this.bulkError.errorCode ? html`<small style="display: block">Code: ${this.bulkError.errorCode}</small>` : nothing}
+        ${this.bulkError.errorCode && !this.bulkError.message.endsWith(` (Code: ${this.bulkError.errorCode})`) ? html`<small style="display: block">Code: ${this.bulkError.errorCode}</small>` : nothing}
       </jf-error-alert>` : nothing}
       ${this.bulkOutcomeKey ? html`<jf-operation-outcome-detail
         operation-key=${this.bulkOutcomeKey} api-base=${this.apiBase}></jf-operation-outcome-detail>` : nothing}

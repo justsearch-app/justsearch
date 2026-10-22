@@ -72,7 +72,9 @@ final class BulkReindexFailureProjectionTest {
           () -> assertFalse(message.contains("searchable"), "a refusal cannot establish source health or current availability"),
           () -> assertFalse(message.contains("unchanged"), "the source may have received normal indexing updates"),
           () -> {
-            if (!code.equals("cancelled")) assertFalse(message.contains(code), "keep the support code separate");
+            String detail = "(Code: " + code + ")";
+            assertTrue(message.contains(detail), "the explanation carries the support code");
+            assertEquals(message.indexOf(detail), message.lastIndexOf(detail));
             if (code.equals("BULK_GENERATION_REFUSED")) {
               assertFalse(message.contains("did not replace"), "the observed serving generation may have changed");
             } else {

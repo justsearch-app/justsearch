@@ -7,7 +7,7 @@ import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { __feedForTest, __resetAiStateForTest, type StatusSnapshot } from '../state/aiStateStore.js';
 
 const key = '0194f72c-0000-7000-8000-000000000001';
-const message = 'The rebuild or migration stopped before activating the new index and settings; this request did not replace the existing index, so review settings and index health before retrying activation.';
+const message = 'The rebuild or migration stopped before activating the new index and settings; this request did not replace the existing index, so review settings and index health before retrying activation. (Code: ACTIVATION_PRECOMMIT_REFUSED)';
 const failure = { state: 'failed', historySince: 0, message, reason: 'ACTIVATION_PRECOMMIT_REFUSED', result: { code: 'ACTIVATION_PRECOMMIT_REFUSED' } };
 function feed(migrationState: string) {
   __feedForTest({ status: { worker: { core: { indexHealthy: true, indexState: 'IDLE' },
@@ -22,7 +22,7 @@ afterEach(() => { document.body.replaceChildren(); __resetAiStateForTest(); vi.r
 it.each(['rebuild', 'cancel', 'accept-gaps'] as const)('Library shows the terminal %s outcome with its code', async (action) => {
   const code = action === 'cancel' ? 'cancelled' : 'ACTIVATION_PRECOMMIT_REFUSED';
   const sentence = action === 'cancel'
-    ? 'The rebuild or migration was cancelled before activation; this request did not replace the existing index, and you can start a new rebuild when ready.'
+    ? 'The rebuild or migration was cancelled before activation; this request did not replace the existing index, and you can start a new rebuild when ready. (Code: cancelled)'
     : message;
   const terminal = { ...failure, message: sentence, reason: code, result: { code } };
   let outcome: object = action === 'accept-gaps'
@@ -50,7 +50,7 @@ it.each(['rebuild', 'cancel', 'accept-gaps'] as const)('Library shows the termin
   }
   await pump(el);
   expect([...el.shadowRoot!.querySelectorAll('[role="alert"]')].map(el => el.textContent).join(' ')).toContain(sentence);
-  expect(el.shadowRoot!.textContent).toContain(`Code: ${code}`);
+  expect(el.shadowRoot!.textContent?.split(`Code: ${code}`)).toHaveLength(2);
   expect(el.shadowRoot!.querySelector('jf-button[label="Cancel rebuild"]')).toBeNull();
   if (action !== 'rebuild') expect(invoke).toHaveBeenCalledWith(`core.${action === 'cancel' ? 'cancel-reindex' : 'accept-gaps'}`,
     expect.objectContaining({ reindexKey: key }), { consented: true });

@@ -71,7 +71,7 @@ export class OperationOutcomeDetail extends JfElement {
     const outcome = this.outcome;
     const code = outcome?.result?.code ?? outcome?.reason;
     return html`${outcome?.message ? html`<div role="alert">${outcome.message}</div>` : ''}
-      ${code ? html`<small>Code: ${code}</small>` : ''}`;
+      ${code && !outcome?.message ? html`<small>Code: ${code}</small>` : ''}`;
   }
 }
 

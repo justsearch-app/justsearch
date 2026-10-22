@@ -31,7 +31,7 @@ final class BulkReindexFailureTransportTest {
   @TempDir Path temp;
   private static final JsonMapper JSON = JsonMapper.builder().build();
   private static final String MESSAGE = "The rebuild or migration could not safely start or resume the new index; "
-      + "check index health and current settings before starting a new rebuild.";
+      + "check index health and current settings before starting a new rebuild. (Code: BULK_GENERATION_REFUSED)";
 
   @ParameterizedTest(name = "{0}")
   @ValueSource(strings = {"http-outcome", "http-history", "mcp-text", "mcp-structured"})

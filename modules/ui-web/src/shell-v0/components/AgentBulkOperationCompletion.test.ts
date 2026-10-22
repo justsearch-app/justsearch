@@ -7,7 +7,7 @@ import { renderEventRow } from './eventRow.js';
 
 vi.mock('../api/authorizedFetch.js', () => ({ authorizedFetch: (...args: Parameters<typeof fetch>) => fetch(...args) }));
 const key = '0194f72c-0000-7000-8000-000000000001';
-const message = 'The rebuild or migration could not safely start or resume the new index; check index health and current settings before starting a new rebuild.';
+const message = 'The rebuild or migration could not safely start or resume the new index; check index health and current settings before starting a new rebuild. (Code: BULK_GENERATION_REFUSED)';
 afterEach(() => { document.body.replaceChildren(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 it('an accepted agent tool row follows the operation through to its later refusal', async () => {
@@ -27,6 +27,7 @@ it('an accepted agent tool row follows the operation through to its later refusa
   await vi.advanceTimersByTimeAsync(4_000);
   expect(host.querySelector('jf-operation-outcome-detail')?.shadowRoot?.textContent).toContain(message);
   expect(host.querySelector('jf-operation-outcome-detail')?.shadowRoot?.textContent).toContain('Code: BULK_GENERATION_REFUSED');
+  expect(host.querySelector('jf-operation-outcome-detail')?.shadowRoot?.textContent?.split('Code: BULK_GENERATION_REFUSED')).toHaveLength(2);
   await vi.advanceTimersByTimeAsync(8_000);
   expect(fetch).toHaveBeenCalledTimes(2);
 });

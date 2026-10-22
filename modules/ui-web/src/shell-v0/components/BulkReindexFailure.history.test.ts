@@ -141,19 +141,19 @@ describe('Bulk rebuild refusal history rendering', () => {
     await source.open();
     const failure = { ...entry('019940c0-0000-7000-8000-000000000001', 'FAILURE'),
       operationId: 'core.bulk-reindex', diagnosticsLink: 'BULK_GENERATION_REFUSED',
-      message: 'The rebuild or migration could not safely start or resume the new index; check index health and current settings before starting a new rebuild.' };
+      message: 'The rebuild or migration could not safely start or resume the new index; check index health and current settings before starting a new rebuild. (Code: BULK_GENERATION_REFUSED)' };
     await source.emitFrame(envelope(1, 'LIFECYCLE', { kind: 'snapshot', entries: [failure] }));
     await settle(el);
     let row = el.shadowRoot!.querySelector('jf-table')!.shadowRoot!.querySelector('.row')!;
     expect(row.textContent).toContain(failure.message);
-    expect(row.textContent).toContain('Code: BULK_GENERATION_REFUSED');
+    expect(row.textContent?.split('Code: BULK_GENERATION_REFUSED')).toHaveLength(2);
     expect(row.querySelector('[title="[object Object]"]')).toBeNull();
     await source.emitFrame(envelope(2, 'UPDATE', { ...failure,
-      diagnosticsLink: 'BULK_CAPTURE_FAILED', message: 'The rebuild or migration could not finish collecting files; check source folder availability before retrying.' }));
+      diagnosticsLink: 'BULK_CAPTURE_FAILED', message: 'The rebuild or migration could not finish collecting files; this request did not replace the existing index, so check source folder availability before starting a new rebuild. (Code: BULK_CAPTURE_FAILED)' }));
     await settle(el);
     row = el.shadowRoot!.querySelector('jf-table')!.shadowRoot!.querySelector('.row')!;
     expect(row.textContent).toContain('could not finish collecting files');
-    expect(row.textContent).toContain('Code: BULK_CAPTURE_FAILED');
+    expect(row.textContent?.split('Code: BULK_CAPTURE_FAILED')).toHaveLength(2);
     expect(row.textContent).not.toContain('BULK_GENERATION_REFUSED');
   });
 });
