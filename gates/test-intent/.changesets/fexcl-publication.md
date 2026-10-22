@@ -7,12 +7,15 @@ author-session: cc6d91b2-5314-42fd-867b-dbc2d8a68699
 
 # Test-intent entries
 
-The exclusion scenarios and publication ordering are from the bounded F-excl assignment.
-Independent acceptance is left to the verifier.
+The exclusion scenarios and publication ordering are from the orchestrator's bounded F-excl builder assignment.
+Independent acceptance is left to the verifier. The delegated choices enforce the existing
+exclusion setting, explicit Apply ordering and test isolation without changing an established contract.
 
-Round 5 uses PR base `d05fb4bbac5cb97d8ea58245e6d11e3d11fdce87` (merge-base with
-`origin/main`). Preservation checks execute on both that base and the candidate; their
+Round 5 evidence was recorded against `d05fb4bba`
+(`d05fb4bbac5cb97d8ea58245e6d11e3d11fdce87`), the PR base at that time.
+Preservation checks were recorded on that base and the then-candidate; their
 base-side evidence is `gates/test-intent/evidence/fexcl-round5-preservation-base.json`.
+These historical records do not claim reruns against a later PR base.
 The prior acceptance in commit `3ce1b8da8` is historical and does not accept these changes.
 The enrichment entry uses its separately regenerated evidence after making the new
 parameterized display names explicit. The initial repair batch remains evidence only
@@ -56,29 +59,17 @@ Gradle uses its defaults of one fork and no fork recycling):
       "behaviour": "Every dense, chunk, sparse, NER, combined, late-chunking and BGE-M3 success, failure and fallback publication drops excluded work without changing its pending stages, retries, text or artifacts; unaffected items publish and removing the exclusion makes pending work runnable. Parent and chunk cases also exclude by a stored source path that differs from the document id.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task F-excl request X1",
-          "quote": "An exclusion saved after an enrichment pass read the policy and before it publishes means the pass publishes nothing for the excluded document."
+          "kind": "defect-source",
+          "safeguard": "no leak across a requested scope",
+          "reproduction": "A file the user excluded must not be processed or published. gates/test-intent/evidence/fexcl-round5-enrichment.json records assertion fail-before at d05fb4bba for EnrichmentExclusionPublicationTest#exclusionSavedDuringInferencePublishesNothing, #excludedInferenceFailureCannotSpendRetries, #excludedFallbackCannotPublish and #sourcePathDifferentFromDocumentIdIsExcluded: excluded work published COMPLETED enrichment or spent retries, including when the stored path differs from the id."
         },
         {
-          "kind": "owner-words",
-          "location": "task F-excl request X2",
-          "quote": "The same holds for every enrichment publication path, not only combined enrichment."
-        },
-        {
-          "kind": "owner-words",
-          "location": "task F-excl request X3",
-          "quote": "Documents that are not excluded publish exactly as today."
-        },
-        {
-          "kind": "owner-words",
-          "location": "task F-excl request X1",
-          "quote": "The document then goes through the normal exclusion handling, the same as a document excluded before the pass started."
-        },
-        {
-          "kind": "owner-words",
-          "location": "task F-excl user turn 8",
-          "quote": "Add a case where the path field differs from the id."
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:20Z",
+          "delegationScope": "all remaining work the user had assigned to this session, which the user later extended with \"work on everything i gave you though, dont just stop at arbitrary milestones\"; it includes fixing the indexing findings from the review swarm the user asked for (\"do that\", 2026-10-20). The user validates afterwards.",
+          "choice": "An exclusion saved while an enrichment pass is in progress stops that pass from publishing or spending retries for the excluded document, including when its stored path differs from its id, while unaffected and later-unexcluded work remains runnable.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/fexcl-round5-enrichment.json",
@@ -95,17 +86,20 @@ Gradle uses its defaults of one fork and no fork recycling):
       ],
       "class": "New",
       "repaired": false,
-      "behaviour": "Preservation against the PR base: A save between the VDU exclusion check and publication publishes its snapshot promptly; explicit Apply waits for that publication and then removes the document and its chunks. This covers successful VDU output and retry-limit error enrichment.",
+      "behaviour": "Preservation at the recorded base d05fb4bba: A save between the VDU exclusion check and publication publishes its snapshot promptly; explicit Apply waits for that publication and then removes the document and its chunks. This covers successful VDU output and retry-limit error enrichment.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task F-excl user turn 4",
-          "quote": "Keep the deadlock fix: no config lock held across the fence or any slow wait, and a non-blocking snapshot read of the policy at publication, inside the fence."
+          "kind": "defect-source",
+          "safeguard": "no leak across a requested scope",
+          "reproduction": "A file the user excluded must not remain published after explicit Apply. gates/test-intent/evidence/fexcl-round2.json records assertion fail-before at 226be391d for VduExclusionPublicationFenceTest#explicitApplyFollowsInFlightVduPublication: a settings save timed out while publication held the config lock. The round-5 evidence for this entry is preservation: both recorded-base d05fb4bba and candidate runs pass; it claims no fail-before at that base."
         },
         {
-          "kind": "owner-words",
-          "location": "task F-excl user turn 4",
-          "quote": "Ordering now comes from Apply. Show that Apply's removal of excluded documents goes through the same fence (or a stronger order), so it runs after any publication that read the old snapshot and removes that publication's enrichment."
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:20Z",
+          "delegationScope": "all remaining work the user had assigned to this session, which the user later extended with \"work on everything i gave you though, dont just stop at arbitrary milestones\"; it includes fixing the indexing findings from the review swarm the user asked for (\"do that\", 2026-10-20). The user validates afterwards.",
+          "choice": "A settings save can finish during VDU publication, and explicit Apply runs after that publication under the fence and removes the excluded document and its chunks.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/fexcl-round5-preservation.json",
@@ -119,12 +113,20 @@ Gradle uses its defaults of one fork and no fork recycling):
       ],
       "class": "New",
       "repaired": false,
-      "behaviour": "Preservation against the PR base: VDU result and claim calls, a loop writer holding the existing fair file fence, and a competing settings save all finish.",
+      "behaviour": "Preservation at the recorded base d05fb4bba: VDU result and claim calls, a loop writer holding the existing fair file fence, and a competing settings save all finish.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task F-excl user turn 8",
-          "quote": "Where a check is a preservation check that passes on main (for example \"all threads finish\"), classify it accordingly instead."
+          "kind": "defect-source",
+          "safeguard": "no leak across a requested scope",
+          "reproduction": "Enforcing the requested exclusion scope must remain possible during publication. gates/test-intent/evidence/fexcl-round2.json records bounded assertion fail-before at 226be391d for VduPolicySaveDeadlockTest#vduSaveAndLoopWriterAllFinish: loop writer, VDU and settings-save threads failed to finish because of a lock cycle. The round-5 evidence for this entry is preservation on recorded-base d05fb4bba and candidate, both passing."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:20Z",
+          "delegationScope": "all remaining work the user had assigned to this session, which the user later extended with \"work on everything i gave you though, dont just stop at arbitrary milestones\"; it includes fixing the indexing findings from the review swarm the user asked for (\"do that\", 2026-10-20). The user validates afterwards.",
+          "choice": "VDU publication and claims, the loop writer and a competing settings save all finish without a lock-order deadlock.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/fexcl-round5-preservation.json",
@@ -138,17 +140,20 @@ Gradle uses its defaults of one fork and no fork recycling):
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "A real Engine batch publication is paused after reading the old policy. An exclusion save completes without waiting for the writer. Explicit Apply uses the production ExcludesService/Engine deletion port, waits behind publication, and removes the just-published vector, entities, VDU enrichment, parent/chunks and search result.",
+      "behaviour": "Checks ordering through the real Engine: batch publication pauses after its policy hook reads the old snapshot inside the fence; an exclusion save completes, then explicit Apply waits behind publication under the same fence and removes the just-published enrichment, parent/chunks and search result. At the recorded base d05fb4bba, the hook is never consulted and the check fails waiting for it. This check does not establish that the policy answer suppresses publication; EnrichmentExclusionPublicationTest pins that behaviour.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task F-excl user turn 4",
-          "quote": "Add a check: a save lands between the snapshot read and the publication, then Apply runs, and the excluded document ends with no enrichment and out of search."
+          "kind": "defect-source",
+          "safeguard": "no leak across a requested scope",
+          "reproduction": "A file the user excluded must not remain published or searchable after explicit Apply. gates/test-intent/evidence/fexcl-round5-repairs.json records assertion fail-before at d05fb4bba for EngineExclusionApplyPublicationTest#explicitApplyRemovesEnrichmentPublishedAfterAnExclusionSave: the policy hook was never consulted, so the wait for that hook failed before the ordered save/publication/Apply exercise. This check demonstrates ordering on the candidate; EnrichmentExclusionPublicationTest pins whether the policy answer prevents publication."
         },
         {
-          "kind": "owner-words",
-          "location": "task F-excl user turn 4",
-          "quote": "Decision: keep explicit Apply, and Preview stays non-destructive."
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:20Z",
+          "delegationScope": "all remaining work the user had assigned to this session, which the user later extended with \"work on everything i gave you though, dont just stop at arbitrary milestones\"; it includes fixing the indexing findings from the review swarm the user asked for (\"do that\", 2026-10-20). The user validates afterwards.",
+          "choice": "Explicit Apply runs after an in-flight Engine publication under the fence and removes the excluded document, its enrichment and its search result.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/fexcl-round5-repairs.json",
@@ -162,17 +167,20 @@ Gradle uses its defaults of one fork and no fork recycling):
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Publication policy reads do not queue behind a settings writer; this repairs the blocking read present at the PR base.",
+      "behaviour": "Publication policy reads do not queue behind a settings writer; this repairs the blocking read present at the recorded base d05fb4bba.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task F-excl user turn 3",
-          "quote": "The deadlock check fails (hangs, bounded by a timeout in the test) on 226be391d and passes after."
+          "kind": "defect-source",
+          "safeguard": "no leak across a requested scope",
+          "reproduction": "Enforcing the requested exclusion scope must not block behind a settings writer at publication. gates/test-intent/evidence/fexcl-round5-repairs.json records assertion fail-before at d05fb4bba for VduPolicySaveDeadlockTest#publicationPolicyReadDoesNotQueueBehindSavingWriter: the policy read timed out behind the saving writer. gates/test-intent/evidence/fexcl-round2.json also records that assertion failure at 226be391d."
         },
         {
-          "kind": "owner-words",
-          "location": "task F-excl user turn 3",
-          "quote": "At publication, inside the fence, read the exclusion policy from the current immutable config snapshot, through a read that can't block behind a queued writer."
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:20Z",
+          "delegationScope": "all remaining work the user had assigned to this session, which the user later extended with \"work on everything i gave you though, dont just stop at arbitrary milestones\"; it includes fixing the indexing findings from the review swarm the user asked for (\"do that\", 2026-10-20). The user validates afterwards.",
+          "choice": "The exclusion-policy snapshot read at publication completes without waiting behind a queued settings writer.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/fexcl-round5-repairs.json",
@@ -190,19 +198,17 @@ Gradle uses its defaults of one fork and no fork recycling):
       "behaviour": "The harness scopes platform data-directory and user-home properties to its own fixture for the full Engine lifetime, including restart, restores both after close, and persists watched folders only in its own data directory. Legacy migration never reads the real user profile. Overlapping harness startup is refused before changing process properties.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task F-excl user turn 8",
-          "quote": "EngineTestHarness must make the Engine's roots, operations and any other resolveDataDir() user land in the harness's own data folder, never under user.home."
+          "kind": "defect-source",
+          "safeguard": "no leak across a requested scope",
+          "reproduction": "Tests must not write outside their requested scope into the user's real profile. gates/test-intent/evidence/fexcl-round5-repairs.json records assertion fail-before at d05fb4bba for EngineTestHarnessIsolationTest#watchedRootsStayInsideHarnessDataDirectory: watched_roots.json appeared under sandboxed user.home instead of the harness data directory. The sandbox reproduced the previously observed real-profile leak without touching the real profile."
         },
         {
-          "kind": "owner-words",
-          "location": "task F-excl user turn 8",
-          "quote": "set it for the harness's lifetime and restore it on close."
-        },
-        {
-          "kind": "owner-words",
-          "location": "task F-excl user turn 8",
-          "quote": "two harnesses in one JVM at once must not see each other's folder."
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:20Z",
+          "delegationScope": "all remaining work the user had assigned to this session, which the user later extended with \"work on everything i gave you though, dont just stop at arbitrary milestones\"; it includes fixing the indexing findings from the review swarm the user asked for (\"do that\", 2026-10-20). The user validates afterwards.",
+          "choice": "Engine tests run with their own data folder and home and never read or write the user's real profile.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/fexcl-round5-repairs.json",
@@ -216,12 +222,20 @@ Gradle uses its defaults of one fork and no fork recycling):
       ],
       "class": "New",
       "repaired": false,
-      "behaviour": "Preservation against the PR base: failed harness startup leaves the caller's data-directory and user-home properties unchanged.",
+      "behaviour": "Preservation at the recorded base d05fb4bba: failed harness startup leaves the caller's data-directory and user-home properties unchanged.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task F-excl user turn 8",
-          "quote": "set it for the harness's lifetime and restore it on close."
+          "kind": "defect-source",
+          "safeguard": "no leak across a requested scope",
+          "reproduction": "Tests must not write outside their requested scope into the user's real profile or leave process properties redirecting later tests. The related scope leak is recorded as assertion fail-before at d05fb4bba in gates/test-intent/evidence/fexcl-round5-repairs.json for EngineTestHarnessIsolationTest#watchedRootsStayInsideHarnessDataDirectory. This entry's #failedStartupRestoresProperties is a preservation check: gates/test-intent/evidence/fexcl-round5-preservation-base.json and fexcl-round5-preservation.json record passes, not a fail-before."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i agree, i will be going to sleep now though, so i want you to proceed with all remaining work fully autonomously. ill validate once im awake again.",
+          "delegationLocation": "task t-20261018-6108b0 user turn 2026-10-18T21:20Z",
+          "delegationScope": "all remaining work the user had assigned to this session, which the user later extended with \"work on everything i gave you though, dont just stop at arbitrary milestones\"; it includes fixing the indexing findings from the review swarm the user asked for (\"do that\", 2026-10-20). The user validates afterwards.",
+          "choice": "Failed Engine harness startup leaves the caller's data-folder and home properties unchanged.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/fexcl-round5-preservation.json",
