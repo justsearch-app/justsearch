@@ -341,7 +341,7 @@ export class CitationsPanel extends JfElement {
     .score.low { color: var(--text-warning); }
     /* Tempdoc 603 C1 — the per-source GROUNDING (faithfulness) badge. Cited → tier colour; uncited → muted
        (never the alarming warning colour — "retrieved, not cited" is neutral, not a fault). */
-    .grounding { font-size: var(--font-size-xs); font-weight: 500; white-space: nowrap; }
+    .grounding { font-size: var(--font-size-xs); font-weight: 500; white-space: normal; }
     .grounding.high { color: var(--text-tint); }
     .grounding.medium { color: var(--text-secondary); }
     .grounding.uncited { color: var(--text-secondary); font-style: italic; }
@@ -353,7 +353,7 @@ export class CitationsPanel extends JfElement {
     .inclusion {
       font-size: var(--font-size-xs);
       font-weight: 500;
-      white-space: nowrap;
+      white-space: normal;
       color: var(--text-secondary);
     }
     .inclusion.dropped { color: var(--text-warning); }

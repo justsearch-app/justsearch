@@ -202,6 +202,66 @@ The builder has not authored an acceptance record.
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-coverage-repairs.test.ts#HN3 keeps the mixed-source Delegate panel neutral live and cold"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.reflow.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "HC8 layout repair: use the existing collapsed rail when the host cannot fit an expanded sidebar and the reading column; allow reopening as an overlay without squeezing the answer. Automatic reflow preserves the saved sidebar choice and chosen width. Layout repair authored by builder-uiux-coverage-layout-20261022.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "HC8",
+          "quote": "The coverage note stays readable without overflow at about 360 px, at 200 % text zoom, in both themes and in forced colors; it is reachable as text on the turn and is not re-announced on each streamed frame.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Implement the agreed designs; orchestrator D1 divides WP4.2 into frontend coverage WP4.2a and the other packages.",
+          "choice": "Decision D1: four packages; WP4.2a is coverage only, frontend only. S10.7 (unfinished check) belongs to WP4.3. Order after pass 2: 4.5 and 4.2a first, then 4.2b, then 4.3.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-coverage-layout.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.reflow.test.ts#HC8 yields the sidebar at 320 px without overwriting the saved expanded choice",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.reflow.test.ts#HC8 yields the sidebar at 360 px without overwriting the saved expanded choice",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.reflow.test.ts#HC8 yields the sidebar at 480 px without overwriting the saved expanded choice",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.reflow.test.ts#HC8 lets the reader reopen and dismiss the narrow sidebar and keeps that choice on a wide remount"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.reflow.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Keep the existing saved collapsed-sidebar preference through narrow/wide reflow and a new mount.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "HC8",
+          "quote": "The coverage note stays readable without overflow at about 360 px, at 200 % text zoom, in both themes and in forced colors; it is reachable as text on the turn and is not re-announced on each streamed frame.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Implement the agreed designs; orchestrator D1 divides WP4.2 into frontend coverage WP4.2a and the other packages.",
+          "choice": "Decision D1: four packages; WP4.2a is coverage only, frontend only. S10.7 (unfinished check) belongs to WP4.3. Order after pass 2: 4.5 and 4.2a first, then 4.2b, then 4.3.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-coverage-layout-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.reflow.test.ts#HC8 keeps a saved collapsed choice through reflow and remount"
+      ]
     }
   ]
 }

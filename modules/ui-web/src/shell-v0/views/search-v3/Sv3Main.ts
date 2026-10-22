@@ -797,6 +797,7 @@ export class Sv3Main extends JfElement {
       .sv3-citations {
         display: block;
         margin: var(--space-2) 0 0;
+        overflow-wrap: anywhere;
       }
       .coverage-note {
         margin: var(--space-2) 0 0;
