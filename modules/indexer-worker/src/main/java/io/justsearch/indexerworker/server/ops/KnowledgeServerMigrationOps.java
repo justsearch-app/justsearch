@@ -1169,6 +1169,14 @@ public final class KnowledgeServerMigrationOps {
                   throw new IllegalStateException("Buffered exact queue deletion failed");
                 }
                 mutatedLucene = true;
+              } else if (refusedSourceRecovery
+                  && uncertainBeneathItsRoot(context.publisher(), deletion)) {
+                // The root vouches, but the path's own state cannot be confirmed (a folder on the
+                // way cannot be listed): nothing is admitted or removed on A, Green and the
+                // receipt stay until the path can be judged.
+                allApplied = false;
+                context.log().warn("Refused candidate keeps a DELETE whose path cannot be "
+                    + "confirmed beneath its root: key={}", op.key());
               } else {
                 WorkerIngestService authority = context.publisher() != null
                     ? context.publisher() : replayService(context);
@@ -1881,6 +1889,24 @@ public final class KnowledgeServerMigrationOps {
     }
     return new CleanupPathState(CleanupPathKind.REGULAR,
         before + '/' + (sha == null ? "unreadable" : sha), sha);
+  }
+
+  /**
+   * Refusal cleanup only: whether a conditional (watcher or legacy) DELETE's path is {@link
+   * CleanupPathKind#UNCERTAIN} to {@link #observeForCleanup} while the folder that answers for it,
+   * the root its replay judges it under, still vouches. A withdrawn or uncertain root is not this
+   * case: its replay leaves the delete to that root's reconciliation.
+   */
+  private static boolean uncertainBeneathItsRoot(WorkerIngestService publisher,
+      SwitchBufferDelete deletion) {
+    if (publisher == null || publisher.rootCheck() == null) return false;
+    Path file = Path.of(deletion.path()).toAbsolutePath().normalize();
+    Path root = publisher.bufferedDeleteRoot(deletion);
+    if (observeForCleanup(publisher, file, root).kind() != CleanupPathKind.UNCERTAIN) return false;
+    boolean asRoot = io.justsearch.indexerworker.loop.SourcePresence.answersAsRoot(file, root);
+    Path folder = asRoot ? root.toAbsolutePath().normalize() : file.getParent();
+    return folder != null && (asRoot ? publisher.rootCheck().vouches(folder)
+        : publisher.rootCheck().vouchesForFile(folder));
   }
 
   /**

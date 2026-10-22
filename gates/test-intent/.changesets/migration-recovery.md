@@ -642,6 +642,47 @@ builder.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aFolderSeenThroughAnUnreadableSubfolderOfTheRootSettlesNothing",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RefusedRecoveryRetiredAdmissionTest.java#aRestartKeepsTheBackedOffAdmissionOfAnUnchangedState"
       ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RefusedCleanupConditionalDeleteTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Round 12, failing on 6f5da7167 and passing after. Refusal cleanup replays an accepted watcher DELETE receipt on surviving A against the path's state as refusal cleanup confirms it now. A holds root/nested/source.txt; nested is replaced by a folder that can be traversed but not listed, with a folder at source.txt, while the watched root vouches: the path is uncertain, so cleanup does not settle, keeps the receipt, queues nothing, and A keeps the file's text after any queued A job runs through the real batch extractor (before: the replay queued the folder as a reappeared source, settled and acknowledged the receipt, and A's policy then removed the text).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M10",
+          "quote": "A result is confirmed only when the watched root is present, readable and on its recorded volume, and every parent folder from the root down to the path can be read. Anything else is uncertain, which means fail-closed.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/migration-recovery-r12-repaired.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RefusedCleanupConditionalDeleteTest.java#conditionalDeleteCannotRetireAThroughAnUnlistableParent"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RefusedCleanupConditionalDeleteTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 12 preservation, passing on 6f5da7167 and after. The same layout with a listable parent is a confirmed non-regular source: refusal cleanup settles the receipt, queues the folder once for A, and A's normal policy removes the replaced file's text.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-a5fbcb",
+          "scenario": "M1",
+          "quote": "The file's state includes its kind. For a path that is no longer a regular file, A's policy-terminal outcome for that current state settles it, with no bytes needed. A must not keep serving the replaced file's old content, unless the normal product (outside migration) also keeps it for a path that became a directory.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/migration-recovery-r12-preserve.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RefusedCleanupConditionalDeleteTest.java#conditionalDeleteRetiresAWhenTheParentIsListable"
+      ]
     }
   ]
 }
