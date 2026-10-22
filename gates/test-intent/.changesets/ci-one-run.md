@@ -100,9 +100,12 @@ author-session: ci-one-run-builder-20261021
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "quote": "Then split the step across two Windows jobs under the existing \"Windows-native tests\" aggregate, balanced from measured task times, so that with today's worst case (15.6 min) each part's step stays under about 9 min. Every test the step runs today must still run in exactly one part (add a check for it, like the Linux shard policy does). Keep the dev-runner and conformance steps in the job the classifier selects them for.",
-          "location": "task ci-one-run request; fix round H1, 2026-10-21"
+          "kind": "delegated-choice",
+          "delegationQuote": "agreed to all",
+          "delegationLocation": "task t-20261020-5d7302 agreement",
+          "delegationScope": "Scoped CI scenarios and delivery timing",
+          "choice": "Split Windows contracts into two jobs balanced by measured task times under the existing Windows-native tests aggregate; check that every existing test runs in exactly one part, and keep dev-runner and conformance steps in their selected job.",
+          "label": "agent choice"
         }
       ]
     },
@@ -129,14 +132,20 @@ author-session: ci-one-run-builder-20261021
       "whatMoved": "Move the repository-wide Vite scan, the action-ledger documentation check and the registry-projected legal table check into always-on Public claims so docs-only PRs retain those assertions. Action-ledger kind and limit checks read the Java declarations directly. Preserve every other controller assertion. Split expensive Java test source sets into measured per-class Test tasks with the same JVM and module configurations; nested classes remain together and unlisted classes are assigned automatically. Local test tasks remain complete.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Tests that are cheap static scans of the whole repository (for example the vite-launcher scan over docs) move into the always-on Public claims lane instead of making docs select the dev-runner lane. Keep a test in its lane where it needs that lane's runtime.",
-          "location": "task ci-one-run request; repair brief R1a, 2026-10-21"
+          "kind": "delegated-choice",
+          "delegationQuote": "keep the light qeue, i agree with the rest. proceed autonomously",
+          "delegationLocation": "task t-20261020-5d7302 agreement",
+          "delegationScope": "Autonomous implementation of the agreed CI changes",
+          "choice": "Move cheap repository-wide static scans into always-on Public claims; keep checks that need a lane runtime in that lane.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Split each Linux Java unit lane over 12 min into shards so no shard should exceed about 10 min, balanced from the per-class timings in tmp/ci-attribution/ (the attribution artifacts of the candidate's own hosted run).",
-          "location": "task ci-one-run request; repair brief R2, 2026-10-21"
+          "kind": "delegated-choice",
+          "delegationQuote": "agreed to all",
+          "delegationLocation": "task t-20261020-5d7302 agreement",
+          "delegationScope": "Scoped Java lanes and delivery timing",
+          "choice": "Split Linux Java unit lanes over 12 minutes into shards balanced by measured per-class timings, targeting at most about 10 minutes per shard.",
+          "label": "agent choice"
         }
       ]
     },
@@ -155,34 +164,52 @@ author-session: ci-one-run-builder-20261021
       "whatMoved": "Use traced dev-runner inputs in place of the Java-lane implication and expand the indexed static reader audit to joined paths and frontend/notice inputs; require enqueue messages to equal the squash preview; verify exact per-package/version advisory attribution against each package's own vulnerable range and both queued auto-merge guard races, comparing enqueue time with the synchronize payload's updated_at without anonymous requests and disabling on uncertain metadata. Retry the guard read and disable operations three times with short backoff; a failed disable names the PR and says auto-merge is still on. The guard executes only a script from the trusted base commit. The configuration contention flake joins the PR-only exclusion list and still runs on main.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Attribute an advisory to a package and version only when the advisory's own vulnerable package entry names that package and the queried version matches.",
-          "location": "task ci-one-run request; fix round K5, 2026-10-21"
+          "kind": "delegated-choice",
+          "delegationQuote": "yes",
+          "delegationLocation": "task t-20261020-5d7302 agreement",
+          "delegationScope": "Advisory gate blocking only PR-introduced vulnerabilities",
+          "choice": "Attribute an advisory only to the package named by its own vulnerable entry and a queried version that matches.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Replace the coarse \"Java selects dev-runner\" rule with the exact traced inputs (keep the static drift guard and the audit at zero gaps).",
-          "location": "task ci-one-run request; fix-round G1, 2026-10-21"
+          "kind": "delegated-choice",
+          "delegationQuote": "agreed to all",
+          "delegationLocation": "task t-20261020-5d7302 agreement",
+          "delegationScope": "Lane selection from the inputs each lane reads",
+          "choice": "Replace the coarse Java-selects-dev-runner rule with exact traced inputs; preserve the static drift guard and zero-gap audit.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Send exactly the previewed subject and body; take them from the preview's own output or compute them the same way, and test that subject and body equal the preview.",
-          "location": "task ci-one-run request; fix-round G2, 2026-10-21"
+          "kind": "delegated-choice",
+          "delegationQuote": "yes",
+          "delegationLocation": "task t-20261020-5d7302 agreement",
+          "delegationScope": "Squash auto-merge with the previewed message",
+          "choice": "Send exactly the previewed subject and body, obtained from the preview output or computed identically; test equality with the preview.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Make attribution exact: query different versions of the same package in separate batches, so GitHub's own matching decides which version an advisory belongs to.",
-          "location": "task ci-one-run request; fix-round G3, 2026-10-21"
+          "kind": "delegated-choice",
+          "delegationQuote": "yes",
+          "delegationLocation": "task t-20261020-5d7302 agreement",
+          "delegationScope": "Advisory gate blocking only PR-introduced vulnerabilities",
+          "choice": "Query different versions of the same package in separate batches so GitHub matching determines exact advisory attribution.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "The guard must leave auto-merge alone when the PR's head is no longer the head this event was for (a later run handles it) or when auto-merge was enabled after this workflow run was created (GraphQL autoMergeRequest.enabledAt against the run's created_at).",
-          "location": "task ci-one-run request; fix-round G4, 2026-10-21"
+          "kind": "delegated-choice",
+          "delegationQuote": "yes",
+          "delegationLocation": "task t-20261020-5d7302 agreement",
+          "delegationScope": "Auto-merge bound to the validated PR head",
+          "choice": "Leave auto-merge enabled when the PR head has changed again or auto-merge was enabled after workflow creation; compare enabledAt against the run created_at.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Compare enabledAt with the event's own pull_request.updated_at from the payload (the time of the push) instead; make no extra request. (b) Fail closed: if a timestamp is missing or invalid, or anything is uncertain, disable auto-merge (losing a re-enqueue is the lesser harm). Only \"head changed again\" and \"enabled after this push\" leave it alone. Update the tests to match.",
-          "location": "task ci-one-run request; fix round H2, 2026-10-21"
+          "kind": "delegated-choice",
+          "delegationQuote": "yes",
+          "delegationLocation": "task t-20261020-5d7302 agreement",
+          "delegationScope": "Auto-merge bound to the validated PR head",
+          "choice": "Compare enabledAt against the synchronize payload pull_request.updated_at instead, without an extra request. Disable auto-merge on missing or invalid timestamps or other uncertainty; leave it enabled only when the head changed again or it was enabled after the push.",
+          "label": "agent choice"
         }
       ]
     }
@@ -193,3 +220,25 @@ author-session: ci-one-run-builder-20261021
 ## Acceptance records
 
 Pending independent acceptance by the orchestrator or verifier; the builder cannot accept.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "orchestrator",
+  "session": "justsearch-03",
+  "verdict": "reject",
+  "digest": "sha256:764a52e5c78509866b52e15ddd64063e6837da04c9c5994f619d01431df7bd19",
+  "note": "Nine owner-words sources quote orchestrator fix-round briefs (H1, R1a, R2, K5, G1-G4, H2), not the owner's words. Recast them as delegated-choice quoting the owner's delegation; the scenario sources are owner-adopted and fine."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "orchestrator",
+  "session": "justsearch-03",
+  "verdict": "accept",
+  "digest": "sha256:69dafaa13a50f5c92ab3feae221765e8ff56cecab70b57d94a520e1b74dff92a",
+  "note": "Re-reviewed after the reject: the nine fix-round choices are now delegated-choice sources quoting the owner's words, which the task record holds (light queue and autonomy 2026-10-20; 'yes' to the direction and 'agreed to all' 2026-10-21); each choice lies within its delegation. Scenario sources match the agreed r2 text. Verification: verifier r4 (full) and r5 (focused) on this candidate passed."
+}
+```
