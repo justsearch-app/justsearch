@@ -7,6 +7,8 @@ import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.agent.api.AgentRequest;
 import io.justsearch.agent.api.AgentService;
+import io.justsearch.agent.api.conversation.ConversationStore;
+import io.justsearch.agent.api.conversation.ConversationWork;
 import io.justsearch.agent.api.registry.InvocationProvenance;
 import io.justsearch.agent.api.registry.ExecutorTag;
 import io.justsearch.agent.api.registry.OperationExecution;
@@ -16,7 +18,6 @@ import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.operations.OperationReceipt;
 import java.time.Clock;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
@@ -48,7 +49,8 @@ public final class BackgroundRunService {
   private final OperationAttemptRunner attempts;
   private final Object timerLock = new Object();
   // Bounded by the registered scheduler queue. Handles are live capabilities, not a second ledger.
-  private final java.util.Set<OperationAttemptRunner.PreparedAttempt> pending = new java.util.HashSet<>();
+  private final Map<OperationAttemptRunner.PreparedAttempt, ConversationWork.Lease> pending = new java.util.HashMap<>();
+  private final ConversationStore conversations;
 
   private static final Logger LOG = LoggerFactory.getLogger(BackgroundRunService.class);
 
@@ -67,6 +69,14 @@ public final class BackgroundRunService {
       AgentService agentService,
       EngineExecutorRegistry processExecutors,
       io.justsearch.app.api.EngineAdmissionService admission) {
+    this(attempts, agentService, processExecutors, admission, null);
+  }
+
+  public BackgroundRunService(
+      OperationAttemptRunner attempts, AgentService agentService,
+      EngineExecutorRegistry processExecutors,
+      io.justsearch.app.api.EngineAdmissionService admission, ConversationStore conversations) {
+    this.conversations = conversations;
     this.attempts = Objects.requireNonNull(attempts, "attempts");
     this.agentService = Objects.requireNonNull(agentService, "agentService");
     attempts.reconcile(OperationKind.SCHEDULED_RUN, this::reconcileInterrupted);
@@ -135,8 +145,10 @@ public final class BackgroundRunService {
    */
   public String runInBackground(AgentRequest request, EngineContext engineContext) {
     EngineContext child = freshChild(engineContext);
-    var prepared = accept(null, request, Duration.ZERO, child);
-    return runAccepted(request, child, prepared).executionId().orElse(null);
+    try (var ignoredConversation = reserveConversation(request)) {
+      var prepared = accept(null, request, Duration.ZERO, child);
+      return runAccepted(request, child, prepared).executionId().orElse(null);
+    }
   }
 
   private OperationAttemptRunner.PreparedAttempt accept(
@@ -162,7 +174,8 @@ public final class BackgroundRunService {
 
   private OperationResult runAccepted(AgentRequest request, EngineContext child,
       OperationAttemptRunner.PreparedAttempt prepared) {
-    try (var work = admission == null ? null : admission.admit(child, false)) {
+    try (var ignoredConversation = reserveConversation(request);
+        var work = admission == null ? null : admission.admit(child, false)) {
       return attempts.start(prepared, handle -> {
         AtomicReference<String> sessionId = new AtomicReference<>();
         Consumer<AgentEvent> capture = event -> {
@@ -216,31 +229,60 @@ public final class BackgroundRunService {
       String operationKey, AgentRequest request, Duration delay, EngineContext engineContext) {
     Objects.requireNonNull(delay, "delay");
     EngineContext child = freshChild(engineContext);
-    var prepared = accept(operationKey, request, delay, child);
-    if (prepared.existing()) return prepared;
+    var conversation = reserveConversation(request);
+    OperationAttemptRunner.PreparedAttempt prepared = null;
+    boolean transferred = false;
     try {
+      prepared = accept(operationKey, request, delay, child);
+      if (prepared.existing()) return prepared;
       synchronized (timerLock) {
         if (closed.get()) throw new RejectedExecutionException("Background scheduler is closed");
-        pending.add(prepared);
-        var unused =
-            scheduler.schedule(
-                () -> fire(request, child, prepared),
-                Math.max(0, delay.toMillis()),
-                java.util.concurrent.TimeUnit.MILLISECONDS);
+        pending.put(prepared, conversation);
+        var accepted = prepared;
+        var unused = scheduler.schedule(
+            () -> fire(request, child, accepted),
+            Math.max(0, delay.toMillis()), java.util.concurrent.TimeUnit.MILLISECONDS);
+        transferred = true;
       }
+      return prepared;
     } catch (RuntimeException failure) {
-      synchronized (timerLock) { pending.remove(prepared); }
-      reject(prepared, failure);
+      if (prepared != null) {
+        synchronized (timerLock) { pending.remove(prepared); }
+        reject(prepared, failure);
+      }
+      throw failure;
+    } finally {
+      if (!transferred) conversation.close();
+    }
+  }
+
+  // Acquire before acceptance and retain through queueing and execution. Re-check on dispatch too:
+  // an externally removed conversation must never be re-created by an older accepted request.
+  private ConversationWork.Lease reserveConversation(AgentRequest request) {
+    Objects.requireNonNull(request, "request");
+    String id = request.conversationId();
+    if (id == null || conversations == null) return () -> {};
+    var gate = conversations.conversationWork();
+    var lease = gate == null ? (ConversationWork.Lease) () -> {} : gate.start(id);
+    try {
+      if (conversations.isLocked()) throw new io.justsearch.agent.api.encryption.KeyLockedException();
+      if (conversations.getSessionMeta(id).isEmpty() && agentService.lifecycles(id).isEmpty()) {
+        throw new ConversationWork.Refused("CONVERSATION_NOT_FOUND", "This conversation no longer exists.");
+      }
+      return lease;
+    } catch (RuntimeException | Error failure) {
+      lease.close();
       throw failure;
     }
-    return prepared;
   }
 
   private void fire(AgentRequest request, EngineContext child, OperationAttemptRunner.PreparedAttempt prepared) {
+    ConversationWork.Lease conversation;
     synchronized (timerLock) {
-      if (!pending.remove(prepared)) return; // Shutdown already owns its no-effect refusal.
+      conversation = pending.remove(prepared);
+      if (conversation == null) return; // Shutdown already owns its no-effect refusal.
     }
-    try { runAccepted(request, child, prepared); }
+    try (conversation) { runAccepted(request, child, prepared); }
     catch (RuntimeException failure) {
       // The runner owns its durable failed outcome; logging also exposes failed outcome persistence.
       LOG.warn("Background agent run failed", failure);
@@ -249,21 +291,22 @@ public final class BackgroundRunService {
 
   /** Stop the scheduler and truthfully refuse each accepted timer that will never run. */
   public void shutdown() {
-    List<OperationAttemptRunner.PreparedAttempt> cancelled;
+    Map<OperationAttemptRunner.PreparedAttempt, ConversationWork.Lease> cancelled;
     synchronized (timerLock) {
       if (!closed.compareAndSet(false, true)) return;
-      cancelled = List.copyOf(pending);
+      cancelled = Map.copyOf(pending);
       pending.clear();
       scheduler.shutdownNow();
     }
     RuntimeException failure = null;
     try {
-      for (var prepared : cancelled) {
+      for (var entry : cancelled.entrySet()) {
+        var prepared = entry.getKey();
         try { attempts.rejectBeforeStart(prepared, "ENGINE_SHUTDOWN"); }
         catch (RuntimeException persistenceFailure) {
           if (failure == null) failure = persistenceFailure;
           else failure.addSuppressed(persistenceFailure);
-        }
+        } finally { entry.getValue().close(); }
       }
     } finally { schedulerRegistration.close(); }
     if (failure != null) throw failure;

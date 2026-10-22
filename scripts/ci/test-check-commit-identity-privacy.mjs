@@ -64,13 +64,30 @@ function installHookFixture(repo) {
   fs.mkdirSync(ciDir, { recursive: true });
   fs.copyFileSync(CHECK_SCRIPT, path.join(ciDir, 'check-commit-identity-privacy.mjs'));
   fs.writeFileSync(path.join(ciDir, 'repo-history-policy.v1.json'), `${JSON.stringify(POLICY, null, 2)}\n`);
+  const governanceDir = path.join(repo, 'scripts', 'governance');
+  fs.mkdirSync(governanceDir, { recursive: true });
+  for (const [script, name, args] of [
+    [path.join(governanceDir, 'run.mjs'), 'test-intent', ['--gate', 'test-intent', '--mode', 'gate']],
+    [path.join(ciDir, 'check-store-recoverability.mjs'), 'store-recoverability', []],
+  ]) {
+    fs.writeFileSync(script, `import assert from 'node:assert/strict';
+import fs from 'node:fs';
+assert.deepEqual(process.argv.slice(2), ${JSON.stringify(args)});
+fs.appendFileSync('gate-calls.txt', '${name}\\n');
+if (process.env.FAIL_PUSH_GATE === '${name}') {
+  console.log('${name} failure stdout');
+  console.error('${name} failure stderr');
+  process.exit(1);
+}
+`);
+  }
   const hooksDir = path.join(repo, '.githooks');
   fs.mkdirSync(hooksDir, { recursive: true });
   fs.copyFileSync(HOOK_SOURCE, path.join(hooksDir, 'pre-push'));
   return path.join(hooksDir, 'pre-push');
 }
 
-function runHook(repo, hook, remoteUrl, input, captureFile) {
+function runHook(repo, hook, remoteUrl, input, captureFile, env = {}) {
   const fakeBin = path.join(repo, 'fake-bin');
   fs.mkdirSync(fakeBin, { recursive: true });
   const fakeGitLfs = path.join(fakeBin, 'git-lfs');
@@ -89,7 +106,7 @@ function runHook(repo, hook, remoteUrl, input, captureFile) {
   return childProcess.spawnSync(HOOK_SHELL, ['-c', command], {
     cwd: repo,
     encoding: 'utf8',
-    env: process.env,
+    env: { ...process.env, JUSTSEARCH_SKIP_PUSH_GATES: '', FAIL_PUSH_GATE: '', ...env },
     input,
     windowsHide: true,
   });
@@ -288,6 +305,69 @@ try {
     result = runHook(repo, hook, remoteUrl, deletion, capture);
     assert.equal(result.status, 0, result.stderr);
     assert.equal(fs.readFileSync(capture, 'utf8'), deletion);
+  }
+
+  {
+    const repo = makeRepo();
+    const remote = makeBareRepo();
+    temporaryRepos.push(repo, remote);
+    const base = commit(repo, {
+      authorName: 'Contributor', authorEmail: CONTRIBUTOR_EMAIL, message: 'gate base',
+    });
+    git(repo, ['remote', 'add', 'origin', remote]);
+    git(repo, ['push', '-q', 'origin', `${base}:refs/heads/main`]);
+    const hook = installHookFixture(repo);
+    const capture = path.join(repo, 'git-lfs-stdin.txt');
+    const calls = path.join(repo, 'gate-calls.txt');
+    const remoteUrl = pathToFileURL(remote).href;
+    const topic = `refs/heads/main ${base} refs/heads/topic ${ZERO_SHA}\n`;
+    const main = `refs/heads/topic ${base} refs/heads/main ${ZERO_SHA}\n`;
+    const deletion = `(delete) ${ZERO_SHA} refs/heads/topic ${base}\n`;
+    const tag = `refs/tags/v1 ${base} refs/tags/v1 ${ZERO_SHA}\n`;
+    function run(input, env = {}) {
+      fs.rmSync(capture, { force: true });
+      fs.rmSync(calls, { force: true });
+      return runHook(repo, hook, remoteUrl, input, capture, env);
+    }
+    for (const input of [topic, main + deletion + tag + topic]) {
+      const result = run(input);
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(fs.readFileSync(calls, 'utf8'), 'test-intent\nstore-recoverability\n');
+      assert.equal(fs.readFileSync(capture, 'utf8'), input);
+    }
+    for (const failed of ['test-intent', 'store-recoverability']) {
+      const result = run(topic, { FAIL_PUSH_GATE: failed });
+      assert.equal(result.status, 1, result.stderr);
+      assert.match(result.stderr, new RegExp(`pre-push: .*${failed}.*failed`));
+      assert.match(result.stdout, new RegExp(`${failed} failure stdout`));
+      assert.match(result.stderr, new RegExp(`${failed} failure stderr`));
+      assert.ok(!fs.existsSync(capture), 'a failed gate blocks LFS');
+    }
+    for (const input of ['', main, deletion, tag, main + deletion + tag]) {
+      const result = run(input, { FAIL_PUSH_GATE: 'test-intent' });
+      assert.equal(result.status, 0, result.stderr);
+      assert.ok(!fs.existsSync(calls), 'non-topic updates do not run gates');
+      assert.equal(fs.readFileSync(capture, 'utf8'), input);
+    }
+    let result = run(topic, { JUSTSEARCH_SKIP_PUSH_GATES: '1', FAIL_PUSH_GATE: 'test-intent' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /pre-push: .*skipped.*JUSTSEARCH_SKIP_PUSH_GATES=1/);
+    assert.ok(!fs.existsSync(calls));
+    assert.equal(fs.readFileSync(capture, 'utf8'), topic);
+    result = run(topic, { JUSTSEARCH_SKIP_PUSH_GATES: 'true', FAIL_PUSH_GATE: 'test-intent' });
+    assert.equal(result.status, 1, 'only the exact value 1 bypasses gates');
+    const privateHead = commit(repo, {
+      authorName: 'eliasjustus', authorEmail: PRIVATE_EMAIL,
+      committerName: 'Build Bot', committerEmail: 'bot@example.invalid',
+      message: 'privacy still applies when gates are skipped',
+    });
+    result = run(`refs/heads/topic ${privateHead} refs/heads/topic ${ZERO_SHA}\n`, {
+      JUSTSEARCH_SKIP_PUSH_GATES: '1',
+    });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /owner author identity/);
+    assert.ok(!fs.existsSync(calls));
+    assert.ok(!fs.existsSync(capture));
   }
 
   {

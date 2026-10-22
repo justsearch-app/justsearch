@@ -21,6 +21,7 @@ class ConversationInvalidFoldersTest {
   @Test
   void omitsInvalidLegacyFoldersWithoutReadingOrChangingTheirFilesAndWarnsOnce() throws Exception {
     var store = new FileConversationStore(tmp);
+    store.createSession("valid-legacy", "core.free-chat");
     store.appendMessage("valid-legacy", "core.free-chat", Map.of("role", "user", "content", "keep"));
     String meta = "{\"shapeId\":\"core.free-chat\",\"messageCount\":1}";
     for (String id : List.of(" ", "\t", "\u2028")) {

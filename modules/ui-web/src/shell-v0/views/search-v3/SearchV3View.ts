@@ -189,6 +189,7 @@ import {
 // conversation, so identity, existence, title and its markdown export come from here — this window
 // mints none of them.
 import {
+  rememberServerConversation,
   branchConversation,
   clearContextFloor,
   compactContext,
@@ -1042,6 +1043,7 @@ export class SearchV3View extends JfElement {
     // subscription fires immediately with whatever is already loaded; the fetch refreshes it.
     setConversationApiBase(this.apiBase || '');
     this.convListUnsubscribe = subscribeConversationList((state, change) => {
+      this.forgetDeletedConversations(state.deletedIds);
       this.sessions = mergeStoreConversations(this.sessions, state.conversations);
       // The ROWS as well as the projection (852 S3): the version pager is read from the store's own
       // parent pointers, which `mergeStoreConversations` deliberately does not carry across.
@@ -3018,6 +3020,7 @@ export class SearchV3View extends JfElement {
       },
       {
         onDelta: (text) => {
+          if (text) rememberServerConversation(ref.sessionId);
           this.sessions = appendTurnDelta(this.sessions, ref, text);
         },
         onEvidence: (evidence) => {
@@ -3772,7 +3775,7 @@ export class SearchV3View extends JfElement {
     // re-derived after the await — the reader's press is what is being answered, and by the time the
     // store answers it has already deleted the conversation regardless of what has started since.
     if (removeSession(this.sessions, id, gate) === this.sessions) return;
-    void this.deleteThroughStore(id, gate);
+    void this.deleteThroughStore(id);
   }
 
   /**
@@ -3795,7 +3798,8 @@ export class SearchV3View extends JfElement {
    * Nothing leaves the list until the store says it left — including the conversation the reader
    * pressed delete on, which is why removing it on screen happens HERE and not at the press.
    */
-  private async deleteThroughStore(id: string, gate: Sv3RunGate): Promise<void> {
+  private async deleteThroughStore(id: string): Promise<void> {
+    const labels = new Map(this.sessions.sessions.map(s => [s.id, this.conversationLabel(s.id)]));
     let cascaded: readonly string[] = [];
     let declined = false;
     const result = await deleteConversationWithCascade(id, async (childIds) => {
@@ -3812,27 +3816,35 @@ export class SearchV3View extends JfElement {
       declined = !consented;
       return consented;
     });
+    this.forgetDeletedConversations(result.ok ? [id, ...cascaded] : result.deletedIds ?? []);
     if (!result.ok) {
       // A DECLINED cascade is NOT a failure — the reader was asked and said no — and it is the ONE
       // silent case. A plain refusal and a consented cascade that then broke halfway are both real
       // failures and both must say so; the store function's return cannot tell the three apart
       // (`{ok:false, childIds}` covers two of them), which is why the reader's own answer is tracked
-      // here instead of inferred from it. Nothing was removed on screen, so there is nothing to put
-      // back — the re-list is for the CHILDREN a half-broken cascade may really have deleted.
-      if (!declined) emitEphemeralToast({ message: DELETE_FAILED, severity: 'warning' });
-      void loadConversations();
+      // here instead of inferred from it. Successfully deleted children have already left the window;
+      // the refresh reconciles the remaining server rows.
+      if (!declined) {
+        const progress = result.deletedIds?.length
+          ? `${result.deletedIds.length} branch${result.deletedIds.length === 1 ? '' : 'es'} deleted. Deleted: ${result.deletedIds.map(gone => `“${labels.get(gone) ?? gone}”`).join(', ')}. ` : '';
+        const failed = result.failedId && (result.error || result.deletedIds?.length) ? `Could not delete “${this.conversationLabel(result.failedId)}”. ` : '';
+        emitEphemeralToast({ message: progress + failed + (result.error ?? DELETE_FAILED), severity: 'warning' });
+      }
+      if (result.deletedIds?.length || !['STORE_LOCKED', 'CONVERSATION_BUSY'].includes(result.errorCode ?? '')) {
+        void loadConversations();
+      }
       return;
     }
-    // The store deleted it, so now the screen follows. Removing the open conversation routes through
-    // New session first, so the window leaves the transcript the way every other exit from it does —
-    // an emptied pane and nothing claimed — rather than a partial teardown free to forget a pointer.
-    // The children go with it: the list must not keep offering conversations the store no longer has.
-    for (const gone of [id, ...cascaded]) {
-      // The STATE half only: the sidebar places the keyboard after a discard (tempdoc 831), so this
-      // window must not move focus on this path — see {@link startFreshSession}.
-      if (this.sessions.activeId === gone) this.startFreshSession();
+  }
+
+  /** A server-confirmed deletion also retires this window's transcript and restore pointer. */
+  private forgetDeletedConversations(ids: readonly string[]): void {
+    for (const gone of ids) {
+      if (this.sessions.activeId === gone) this.resetToHero();
+      if (readLastViewedConversation() === gone) clearLastViewedConversation();
       if (this.renamingId === gone) this.renamingId = null;
-      this.sessions = removeSession(this.sessions, gone, gate);
+      // Server confirmation wins even over stale local run state: the content is already gone.
+      this.sessions = { ...this.sessions, sessions: this.sessions.sessions.filter(s => s.id !== gone) };
     }
   }
 

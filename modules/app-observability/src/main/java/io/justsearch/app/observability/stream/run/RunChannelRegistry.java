@@ -103,6 +103,16 @@ public final class RunChannelRegistry {
     return entry.channel;
   }
 
+  /** Drop retired replay and record hints when their owning conversation is deleted. */
+  public synchronized void forgetConversation(String conversationId) {
+    if (entries.values().stream().anyMatch(e -> !e.base.retired()
+        && conversationId.equals(e.base.descriptor().conversationId()))) {
+      throw new IllegalStateException("Stop the running Ask or agent before deleting this conversation.");
+    }
+    entries.entrySet().removeIf(e -> conversationId.equals(e.getValue().base.descriptor().conversationId()));
+    tombstones.entrySet().removeIf(e -> conversationId.equals(e.getValue().conversationId()));
+  }
+
   /** The channel for {@code id} while it is observable (live, or retired inside its linger). */
   public synchronized Optional<RunChannel> find(RunId id) {
     if (id == null) {

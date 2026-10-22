@@ -5,6 +5,7 @@
  * projector stays a pure, dependency-free function (the projection-not-fork discipline).
  */
 import { z } from 'zod';
+import { rememberServerConversation } from '../state/conversationListStore.js';
 import type { ThreadEvent } from './unifiedThreadProjection.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 
@@ -246,6 +247,7 @@ export async function fetchUnifiedThread(
       );
     }
 
+    if (events.length > 0 || (parsed.data.lifecycles?.length ?? 0) > 0) rememberServerConversation(conversationId);
     return {
       events,
       lifecycles: (parsed.data.lifecycles ?? []) as ThreadLifecycle[],

@@ -1,0 +1,106 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:8da42ee1a620dc332b5d412dc72c20f34fe6aad073a2036857a60555b9ec33a9"
+  },
+  "createdAt": "2026-10-22T05:11:21.028Z",
+  "revision": "c1cd13378d6a79a9aad776beeee28071e1c1c4a3",
+  "tree": "6b03261302a1d6da47f8e6a2765b3baf45b88025",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/controllers/AgentSessionController.deletion.test.ts\" \"src/shell-v0/state/conversationServerIdentity.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/uiux-conversation-delete/tmp/cd4/evidence-tmp/test-intent-vitest-2410663-1792645880006.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1020
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#a run identity alone does not assert that a local first write has landed",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ad3f33fd01029f5685174ad34b9ee28e5aafec5785b84e713d2ac7204d4de906",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a run identity alone does not assert that a local first write has landed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#a legacy run identity alone does not assert that a local first write has landed",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ad3f33fd01029f5685174ad34b9ee28e5aafec5785b84e713d2ac7204d4de906",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a legacy run identity alone does not assert that a local first write has landed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts#an exported replay alone never asserts that a local conversation exists on the Engine",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.deletion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ad3f33fd01029f5685174ad34b9ee28e5aafec5785b84e713d2ac7204d4de906",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an exported replay alone never asserts that a local conversation exists on the Engine",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts#an empty history read does not assert that a local first write happened",
+      "file": "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:85dcb039ed6fcb4385c9af1ab499c6559001fcde1c77a566baff92a002d58c79",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an empty history read does not assert that a local first write happened",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts#a title still waiting for the first write never turns a local id into server ownership",
+      "file": "modules/ui-web/src/shell-v0/state/conversationServerIdentity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:85dcb039ed6fcb4385c9af1ab499c6559001fcde1c77a566baff92a002d58c79",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a title still waiting for the first write never turns a local id into server ownership",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:285f25cfe6d15188fb2d1177289efff17deb968944bfbe86bb273e4fc4cc5852"
+}

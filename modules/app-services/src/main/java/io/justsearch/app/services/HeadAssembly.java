@@ -780,19 +780,23 @@ public final class HeadAssembly implements AutoCloseable {
                 }
                 var events =
                     run.get("events") instanceof List<?> list ? list : List.of();
-                if (!meta.isEmpty()) {
-                  agentRunStore.runEvents().writeRunMeta(sid.toString(), meta);
-                }
-                if (!events.isEmpty()) {
-                  agentRunStore.runEvents().appendRawEvents(sid.toString(), events);
-                  // 629 (#E): make the restored run SEARCHABLE — replay its terminal event into the
-                  // agent-history index (import doesn't fire the live listener). Fail-soft, off-hot-path.
-                  if (agentHistoryIndexer != null) {
-                    agentHistoryIndexer.reindexRestoredRun(sid.toString(), events);
+                Object parent = meta.get("conversationId");
+                try (var ignoredWriting = agentRunStore.conversationWork().restore(
+                    parent instanceof String id && !id.isBlank() ? id : null)) {
+                  if (!meta.isEmpty()) {
+                    agentRunStore.runEvents().writeRunMeta(sid.toString(), meta);
                   }
-                }
-                if (!meta.isEmpty() || !events.isEmpty()) {
-                  restored++;
+                  if (!events.isEmpty()) {
+                    agentRunStore.runEvents().appendRawEvents(sid.toString(), events);
+                    // 629 (#E): make the restored run SEARCHABLE — replay its terminal event into the
+                    // agent-history index (import doesn't fire the live listener). Fail-soft, off-hot-path.
+                    if (agentHistoryIndexer != null) {
+                      agentHistoryIndexer.reindexRestoredRun(sid.toString(), events);
+                    }
+                  }
+                  if (!meta.isEmpty() || !events.isEmpty()) {
+                    restored++;
+                  }
                 }
               }
               return restored;
@@ -1428,6 +1432,11 @@ public final class HeadAssembly implements AutoCloseable {
    */
   public io.justsearch.agent.api.memory.MemoryStore memoryStore() {
     return memoryStore;
+  }
+
+  /** Shared history writer used by the conversation deletion coordinator. */
+  public io.justsearch.app.services.agenthistory.AgentHistoryIndexer agentHistoryIndexer() {
+    return agentHistoryIndexer;
   }
 
   /**
