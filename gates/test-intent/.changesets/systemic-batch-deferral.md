@@ -862,3 +862,14 @@ round-nine evidence producer. Final result: all96 targeted executions pass witho
   "note": "I10 fails: a read-only or missing shared parser snapshot directory charges healthy files and schedules minute-scale retries."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a16585-720a-78c2-b38e-8de352cd24ad",
+  "verdict": "reject",
+  "digest": "sha256:60a64dd4b44817787216b1209d4751ce61f7791bf3f29a1121eabcb823287443",
+  "note": "Native identity-store limits still charge healthy files despite a passing canary, while document-path classification, renewable poison grace and parser-child logging also violate the agreed scenarios."
+}
+```
