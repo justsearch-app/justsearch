@@ -357,9 +357,12 @@ final class IndexStatusOps {
     }
 
     boolean loopFailed = indexingLoop != null && indexingLoop.hasFailed();
+    long outagePauseUntilMs = indexingLoop == null ? 0L : indexingLoop.serviceOutagePausedUntilMs();
     String state;
     if (loopFailed) {
       state = IndexingLoop.LoopState.FAILED.name();
+    } else if (outagePauseUntilMs > 0) {
+      state = "WAITING";
     } else if (counts.processingCount() > 0 || counts.pendingReadyCount() > 0) {
       state = "INDEXING";
     } else if (queueDepth > 0) {
@@ -388,7 +391,7 @@ final class IndexStatusOps {
                 healthy,
                 state,
                 jobQueue.pendingBytes()))
-        .setFailure(buildFailure(failures))
+        .setFailure(buildFailure(failures, outagePauseUntilMs))
         .setMigration(
             buildMigration(
                 stateSnapshot, activeDocCount, buildingDocCount, counts, processingJobsCount))
@@ -612,7 +615,7 @@ final class IndexStatusOps {
     return out;
   }
 
-  private FailureStatus buildFailure(JobQueue.FailureSummary failures) {
+  private FailureStatus buildFailure(JobQueue.FailureSummary failures, long outagePauseUntilMs) {
     return FailureStatus.newBuilder()
         .setFailedCount(failures == null ? 0L : failures.failedCount())
         .setLastFailedPath(
@@ -628,9 +631,8 @@ final class IndexStatusOps {
                 ? 0L
                 : failures.lastFailedAtMs())
         .setNextRetryAtMs(
-            failures == null || failures.nextRetryAtMs() == null
-                ? 0L
-                : failures.nextRetryAtMs())
+            outagePauseUntilMs > 0 ? outagePauseUntilMs
+                : failures == null || failures.nextRetryAtMs() == null ? 0L : failures.nextRetryAtMs())
         .setSearchesZeroResultCount(metrics.getSearchesZeroResultCount())
         .putAllFailedByFileKind(metrics.getFailedByFileKind())
         .build();

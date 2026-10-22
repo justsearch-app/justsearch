@@ -47,7 +47,9 @@ final class SharedServiceAvailabilityTest extends LuceneExecutorTestBase {
     IDENTITY_CORRUPT,
     PATH_CLOSED, PATH_CONNECTION_LOST, PATH_READ_ONLY, PATH_SCHEMA_LOST, PATH_OPEN_FAILED,
     EXTRACTOR_CLOSED, EXTRACTION_EXECUTOR_CLOSED, EXTRACTION_SANDBOX_CLOSED,
-    EXTRACTION_START_FAILED, EXTRACTION_READER_CLOSED, EXTRACTOR_CLOSING, EXTRACTION_SANDBOX_CLOSING
+    EXTRACTION_START_FAILED, EXTRACTION_READER_CLOSED, EXTRACTOR_CLOSING, EXTRACTION_SANDBOX_CLOSING,
+    EXTRACTOR_REGISTRY_CLOSED, EXTRACTOR_REGISTRY_EMPTY, EXTRACTOR_REGISTRY_CLOSING,
+    EXTRACTOR_POLICY_CLOSED, EXTRACTOR_STRUCTURED_CLOSED
   }
 
   @org.junit.jupiter.api.Timeout(45)
@@ -232,6 +234,57 @@ final class SharedServiceAvailabilityTest extends LuceneExecutorTestBase {
             default -> { }
           }
         }
+        case EXTRACTOR_REGISTRY_CLOSED, EXTRACTOR_REGISTRY_EMPTY, EXTRACTOR_REGISTRY_CLOSING,
+            EXTRACTOR_POLICY_CLOSED, EXTRACTOR_STRUCTURED_CLOSED -> {
+          ContentExtractorProvider provider;
+          if (state == State.EXTRACTOR_STRUCTURED_CLOSED) {
+            var structured = new StructuredContentExtractor();
+            structured.close(); provider = structured;
+          } else {
+            var tika = new PolicyDrivenTikaExtractor(java.util.concurrent.Executors::newFixedThreadPool);
+            owned.add(tika);
+            if (state == State.EXTRACTOR_POLICY_CLOSED) { tika.close(); provider = tika; }
+            else {
+              var registry = ExtractorContributionRegistry.withCoreTika(tika);
+              owned.add(registry); provider = registry;
+              if (state == State.EXTRACTOR_REGISTRY_CLOSED) {
+                Path healthy = Path.of(System.getProperty("justsearch.test.outageCorpus", temp.resolve("sources").toString()))
+                    .resolve("capped-backlog-0.txt");
+                Files.createDirectories(healthy.getParent());
+                if (!Files.exists(healthy)) Files.writeString(healthy, "healthy readable content");
+                assertTrue(registry.extractArtifact(healthy).result().content().contains("healthy readable content"));
+                registry.close();
+                var signal = assertThrows(IllegalStateException.class, () -> registry.extractArtifact(healthy));
+                assertEquals("Extractor registry is closed", signal.getMessage());
+              } else if (state == State.EXTRACTOR_REGISTRY_EMPTY) registry.uninstall("core.tika");
+              else {
+                registry.uninstall("core.tika");
+                var entered = new java.util.concurrent.CountDownLatch(1);
+                var retired = new java.util.concurrent.CountDownLatch(1);
+                ContentExtractorProvider blocked = mock(ContentExtractorProvider.class);
+                when(blocked.extract(any())).thenAnswer(call -> {
+                  entered.countDown();
+                  assertTrue(retired.await(10, java.util.concurrent.TimeUnit.SECONDS));
+                  throw new java.io.IOException("provider retired during extraction");
+                });
+                registry.install(ExtractorContributionRegistry.ExtractorContribution.catchAll("core.retiring",
+                    ExtractorContributionRegistry.ExtractorTrust.CORE, blocked));
+                closing = new Thread(() -> {
+                  try {
+                    assertTrue(entered.await(10, java.util.concurrent.TimeUnit.SECONDS));
+                    registry.close();
+                  } catch (Throwable failure) { closeError.set(failure); }
+                  finally { retired.countDown(); }
+                }, "availability-registry-close");
+                closing.start();
+              }
+            }
+          }
+          var registration = extractionExecutors.register(new EngineExecutorSpec("availability-registry",
+              EngineExecutorSpec.Kind.BACKGROUND, EngineExecutorSpec.Mode.PLATFORM, 1, 8, 2));
+          var service = new TimeboxedContentExtractor(registration, provider, Duration.ofSeconds(5), null);
+          owned.add(service); extractor.set(service);
+        }
         case EXTRACTOR_CLOSED, EXTRACTION_EXECUTOR_CLOSED, EXTRACTION_SANDBOX_CLOSED,
             EXTRACTION_START_FAILED, EXTRACTION_READER_CLOSED, EXTRACTOR_CLOSING,
             EXTRACTION_SANDBOX_CLOSING -> {
@@ -350,7 +403,13 @@ final class SharedServiceAvailabilityTest extends LuceneExecutorTestBase {
               TikaExtractionPolicy.defaults(), null, Duration.ofSeconds(5), 1, 10, null);
         }
         var service = new TimeboxedContentExtractor(registration, healthy, Duration.ofSeconds(5), null);
-        owned.add(service); extractor.set(service);
+        owned.add(service);
+        if (healthy instanceof PersistentExtractionSandbox) {
+          // Publish a ready replacement: cold parser startup is not outage-recovery latency.
+          Path corpus = Path.of(System.getProperty("justsearch.test.outageCorpus", temp.resolve("sources").toString()));
+          service.extractArtifact(corpus.resolve("capped-backlog-0.txt"));
+        }
+        extractor.set(service);
       }
 
     }

@@ -25,6 +25,7 @@ import io.justsearch.indexerworker.extract.TimeboxedContentExtractor;
 import io.justsearch.indexerworker.extract.TimeboxedContentExtractor.ExtractionTimeoutException;
 import io.justsearch.indexerworker.extract.ValidatedExtractionArtifact;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
@@ -132,6 +133,8 @@ public class IndexingLoop implements Closeable {
   private final AtomicBoolean running = new AtomicBoolean(false);
   // Wake cooperative stop without interrupting an owner of Lucene NIO channels.
   private final Object stopMonitor = new Object();
+  private volatile long serviceOutagePausedUntilMs;
+  private final BatchServiceFailures queueFailures = new BatchServiceFailures();
   private final WorkerIngestionAuthority ingestionAuthority = new WorkerIngestionAuthority();
   // Tempdoc 410 review fix #1: counts outcome-aware queue write failures (rollback). Persistent
   // increments here mean recoverStuckJobs is bearing more load than usual; surface the signal
@@ -693,12 +696,13 @@ public class IndexingLoop implements Closeable {
         embeddingLifecycle.handleGpuStateTransition();
 
         if (!journal.retryBatchReturns()) {
-          if (!sleepBrieflyAfterError()) break;
+          if (!pauseAfterQueueFailure(journal.batchReturnFailure())) break;
           continue;
         }
 
         // Poll for pending jobs
         List<JobQueue.IndexJob> jobs = jobQueue.pollPending(pacing().pollBatchSize());
+        if (journal.commitWriteFailure() == null) queueFailures.success();
 
         if (jobs.isEmpty()) {
           if (jobQueue.pollPendingBudgetExhausted()) continue;
@@ -711,6 +715,10 @@ public class IndexingLoop implements Closeable {
           }
 
           finishIdleCommit();
+          if (journal.commitWriteFailure() != null) {
+            if (!pauseAfterQueueFailure(journal.commitWriteFailure())) break;
+            continue;
+          }
 
           // Tempdoc 516 Slice 4d (W6): BackfillScheduler owns the per-cycle backfill
           // orchestration (combined enrichment tight loop + per-stage fallback + disambiguation
@@ -755,7 +763,7 @@ public class IndexingLoop implements Closeable {
               log.warn("Could not extend service-outage deferrals; pausing anyway", extendFailure);
             }
           }
-          if (!sleepAfterError(Math.max(0, retryAtMs - System.currentTimeMillis()))) break;
+          if (!pauseForServiceOutage(retryAtMs)) break;
         }
 
         // Time-based commit strategy (every 10s or when buffer is full)
@@ -791,6 +799,11 @@ public class IndexingLoop implements Closeable {
           }
         }
 
+        if (journal.commitWriteFailure() != null) {
+          if (!pauseAfterQueueFailure(journal.commitWriteFailure())) break;
+          continue;
+        }
+
         // Tempdoc 516 Slice 4d (W6): time-gated interleaved SPLADE/BGE-M3 backfill is owned
         // by the scheduler (tempdoc 278 item 4a). Limits primary-indexing overhead (~13%).
         backfillScheduler.runInterleavedSplade(now);
@@ -813,6 +826,8 @@ public class IndexingLoop implements Closeable {
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         break;
+      } catch (IngestionServiceUnavailableException | OutcomeWriteException unavailable) {
+        if (!pauseAfterQueueFailure(unavailable)) break;
       } catch (Exception e) {
         log.error("Unexpected error in indexing loop", e);
         if (!sleepBrieflyAfterError()) {
@@ -912,6 +927,30 @@ public class IndexingLoop implements Closeable {
    */
   private boolean sleepBrieflyAfterError() {
     return sleepAfterError(ERROR_BACKOFF_MS);
+  }
+
+  /** Actual cooperative outage pause, independent of how much fresh work is still ready. */
+  public long serviceOutagePausedUntilMs() {
+    long deadline = serviceOutagePausedUntilMs;
+    return running.get() && deadline > System.currentTimeMillis() ? deadline : 0L;
+  }
+
+  private boolean pauseAfterQueueFailure(Throwable failure) {
+    queueFailures.begin();
+    queueFailures.unavailable(failure, ignored -> {});
+    long delay = queueFailures.prepareRetry(Math.max(writer.retryDelayMs(), extractor.retryDelayMs()));
+    long deadline = System.currentTimeMillis() + delay;
+    queueFailures.finish(deadline);
+    return pauseForServiceOutage(deadline);
+  }
+
+  private boolean pauseForServiceOutage(long deadline) {
+    serviceOutagePausedUntilMs = deadline;
+    try {
+      return sleepAfterError(Math.max(0, deadline - System.currentTimeMillis()));
+    } finally {
+      serviceOutagePausedUntilMs = 0L;
+    }
   }
 
   private boolean sleepAfterError(long delayMs) {

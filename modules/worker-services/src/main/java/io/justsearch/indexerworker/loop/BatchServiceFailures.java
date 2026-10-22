@@ -88,12 +88,16 @@ final class BatchServiceFailures {
 
   // Classify both services before persisting outcomes so their rows and the loop share one deadline.
   long prepareRetry() {
+    return prepareRetry(0);
+  }
+
+  long prepareRetry(long minimumDelayMs) {
     active = false;
     boolean ambiguous = pending.stream().anyMatch(f -> !f.unavailable() && !provenOutage(f.error()));
     if (!succeeded && ambiguous) ambiguousBatches = Math.min(4, ambiguousBatches + 1);
     if (pending.stream().anyMatch(this::systemic)) {
-      delayMs = nextDelayMs;
-      nextDelayMs = Math.min(MAX_DELAY_MS, nextDelayMs * 2);
+      delayMs = Math.max(nextDelayMs, Math.min(MAX_DELAY_MS, minimumDelayMs));
+      nextDelayMs = Math.min(MAX_DELAY_MS, delayMs * 2);
     }
     return delayMs;
   }

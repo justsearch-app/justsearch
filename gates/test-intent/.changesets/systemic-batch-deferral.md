@@ -398,7 +398,7 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java"
       ],
       "class": "New",
-      "behaviour": "Every audited shared ingestion availability state defers healthy files without attempts beyond grace, with bounded shared deadlines, WAITING status and prompt recovery through a running loop; document poison, source access ladders and revive remain unchanged.",
+      "behaviour": "Every audited shared ingestion availability state defers healthy files without attempts beyond grace, with bounded shared deadlines, WAITING status and prompt recovery through a running loop; document poison, source access ladders and revive remain unchanged. Round eight extends the original32-state matrix with closed/empty/closing registry and retired Tika/structured providers; each remains an uncounted, paced outage and recovers promptly.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -426,11 +426,88 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
           "delegationScope": "Audit shared ingestion services and repair availability signals, preserving document poison/source retry behavior, prior pacing/status/recovery and schema.",
           "choice": "Retain Lucene IndexWriterUnavailableException and provenance-tagged IndexRuntimeIOException. Gate every coordinator mutation under the existing write barrier and session close-state monitor before accessing collaborators; distinguish actual writer/Directory closure from an arbitrary analyzer AlreadyClosedException. Component-open IO has no document input and is shared index IO. Use an IllegalStateException-compatible IngestionServiceUnavailableException for identity/path store and timebox availability. Store closed flags and JDBC isClosed checks run under their existing connection locks on every API. Classify known SQLite infrastructure primary result codes at fixed-SQL service boundaries, including schema/permission/connection failures; constraints, mismatched/oversized values, range and unknown codes remain ambiguous. Move path recording into the batched dependency failure boundary. Extraction submission/closed sandbox and child startup/reader rejection are service failures; keep SandboxExtractionException compatibility with a dedicated unavailable subtype, original causes and cleanup. Child crash/OOM/protocol/parser/file failures retain existing per-file semantics. Give extraction availability its own bounded service history, so successful identity resolution cannot reset an extraction outage. Recheck the timebox closed flag before classifying failed futures and the parser-pool flag before classifying EOF/IO from an in-flight request; serialize child startup/publication with closing so a slot waiter cannot create a child after close enumerates owned children. Preserve DRAINING precedence after a runtime has drained, rather than changing that existing typed signal to absent-writer. Existing service success resets its own history; restart preserves durable attempts/deadlines and resets only in-memory counters. Recovery in the matrix routes to reopened real services, matching owner replacement during cutover; no automatic recreation or deletion of production stores. Before compares exact final test source to1baf378a8; fixture uses real stores/runtimes, native SQLite/FS faults and controlled lifecycle state. Existing typed states are preservation cases; untyped states fail assertions. No schema/status changes; preserve acceptance bytes.",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Status must say WAITING whenever the loop is in a service-outage pause, not only when every row is deferred.",
+          "location": "task t-20261020-c2e24a user turn Round 8"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "A sustained queue outage must follow the same 1-8 s capped backoff and the summarized logging, and must never lose or charge a row.",
+          "location": "task t-20261020-c2e24a user turn Round 8"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Type it as unavailable like the other services, add it to the audit table and the parameterized test, and re-check the table for any other component on the extraction path (registry, parser lookup, sandbox pool, timebox executor) that has a closed or closing state.",
+          "location": "task t-20261020-c2e24a user turn Round 8"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Repair the actual outage-pause status, persistent jobs.db availability retries and extraction lifecycle boundaries while retaining all prior U17/U19 scenarios, schemas and acceptance records.",
+          "choice": "Publish a volatile absolute service-outage pause deadline only around the cooperative wait and clear it in finally; the status path reads it once, uses WAITING ahead of raw ready/processing counts and reports that actual resume deadline as next retry. Keep queue slices honest, including fresh rows; a stopped loop exposes no outage pause. This explicitly supersedes the earlier choice to derive status solely from deferred row counts; no schema or wire-protocol change. Queue poll availability SQL errors now propagate a typed IngestionServiceUnavailableException instead of being logged and mistaken for an empty queue. Closed/lost queue connections are checked under the queue lock, including JDBC isClosed. Reuse BatchServiceFailures for queue control recovery, growing 1/2/4/8 seconds, retaining the current writer/extractor cap when cleanup fails after an existing outage pause. Reset queue history only after successful queue control with no outstanding failed committed outcome; a read-only query does not prove outcome writes are healthy. Failed exact claim returns and committed ledger writes retain their owners/transitions, rate-limit their summaries to once per minute and pause through the same cooperative stop monitor. No per-file attempt is spent by queue failures. Registry closed/select/empty-provider states throw the existing IllegalStateException-compatible unavailable type under the registry monitor; an admitted provider failure racing registry close is reclassified under the same monitor. A populated registry with no handler for one file remains a file-specific parser/routing error. Input factory close now records closed under its own monitor and rejects subsequent prepare/snapshot admission, preventing retired Tika/structured providers from silently creating new scratch after close. Existing timebox and parser-pool typed propagation, poison/parser/source policies and selective deadline extension are unchanged. In-memory pause/backoff/log counters reset on worker restart; durable attempts, claims and retry deadlines remain the queue authority. New matrix cases reopen/rebind real owners for recovery, with no production auto-recreation. Exact-source before comparison is 29f2a76f8; prior32 matrix cases are preservation checks and five added extraction lifecycle cases are repair checks. Recovery publishes a replacement parser pool only after a real healthy parse proves it ready; keep the existing nine-second completion oracle, without counting cold parser startup as outage-recovery latency. The preliminary baseline showed four original pool states safely deferring, then missing that completion budget while a cold child started; final exact-source matrix reruns all37 cases on the reused baseline. Queue growth probes observe poll/drain counts before asserting intervals, then require the actual pause; no baseline setup waits for repaired behavior.",
+          "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-service-audit.json",
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-outage-boundaries.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A real outage pause reports WAITING even with48 fresh rows and16 deferred rows; recovery clears the pause. Persistent read-only jobs.db, initial claim failures and committed-outcome failures retain rows/owners without attempts, grow to the eight-second cap, summarize logs and recover within seconds.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U17",
+          "quote": "A failure of the writer or identity store for a whole batch defers its rows without charging per-file attempts, with a retry within seconds; after recovery they are claimed at once; one bad file does not starve healthy later files.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Status must say WAITING whenever the loop is in a service-outage pause, not only when every row is deferred.",
+          "location": "task t-20261020-c2e24a user turn Round 8"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "A sustained queue outage must follow the same 1-8 s capped backoff and the summarized logging, and must never lose or charge a row.",
+          "location": "task t-20261020-c2e24a user turn Round 8"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Type it as unavailable like the other services, add it to the audit table and the parameterized test, and re-check the table for any other component on the extraction path (registry, parser lookup, sandbox pool, timebox executor) that has a closed or closing state.",
+          "location": "task t-20261020-c2e24a user turn Round 8"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "resume with remaining work autonomously",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Repair the actual outage-pause status, persistent jobs.db availability retries and extraction lifecycle boundaries while retaining all prior U17/U19 scenarios, schemas and acceptance records.",
+          "choice": "Publish a volatile absolute service-outage pause deadline only around the cooperative wait and clear it in finally; the status path reads it once, uses WAITING ahead of raw ready/processing counts and reports that actual resume deadline as next retry. Keep queue slices honest, including fresh rows; a stopped loop exposes no outage pause. This explicitly supersedes the earlier choice to derive status solely from deferred row counts; no schema or wire-protocol change. Queue poll availability SQL errors now propagate a typed IngestionServiceUnavailableException instead of being logged and mistaken for an empty queue. Closed/lost queue connections are checked under the queue lock, including JDBC isClosed. Reuse BatchServiceFailures for queue control recovery, growing 1/2/4/8 seconds, retaining the current writer/extractor cap when cleanup fails after an existing outage pause. Reset queue history only after successful queue control with no outstanding failed committed outcome; a read-only query does not prove outcome writes are healthy. Failed exact claim returns and committed ledger writes retain their owners/transitions, rate-limit their summaries to once per minute and pause through the same cooperative stop monitor. No per-file attempt is spent by queue failures. Registry closed/select/empty-provider states throw the existing IllegalStateException-compatible unavailable type under the registry monitor; an admitted provider failure racing registry close is reclassified under the same monitor. A populated registry with no handler for one file remains a file-specific parser/routing error. Input factory close now records closed under its own monitor and rejects subsequent prepare/snapshot admission, preventing retired Tika/structured providers from silently creating new scratch after close. Existing timebox and parser-pool typed propagation, poison/parser/source policies and selective deadline extension are unchanged. In-memory pause/backoff/log counters reset on worker restart; durable attempts, claims and retry deadlines remain the queue authority. New matrix cases reopen/rebind real owners for recovery, with no production auto-recreation. Exact-source before comparison is 29f2a76f8; prior32 matrix cases are preservation checks and five added extraction lifecycle cases are repair checks. The additional committed-outcome check injects real SQLite READONLY only at markDoneTransitions and restores query_only afterward, keeping claim polls available so the check actually reaches the outcome boundary. A whole-connection outage placed before poll was correctly intercepted by the new poll guard, so that earlier fixture never reached its intended drain assertion. The corrected check also asserts native code8, minute-rate outcome summaries, retained PROCESSING claims, and recovery without repeating Lucene writes. No production change was needed for this correction.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/systemic-batch-deferral-outage-boundaries.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java#publicStatusDuringActualEarlyOutagePauseWithFreshLaterBacklog",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java#persistentJobsReadonlyAfterFourthBatchRetainsOutagePacingAndBoundedLogs",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java#readonlyQueuePollUsesGrowingServicePauseAndRecoversWithoutCharging",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java#readonlyCommittedQueueOutcomesKeepOwnersAndUseGrowingPause"
       ],
       "repaired": true
     }
@@ -438,6 +515,8 @@ Round six copies verifier D5's64-row capped-backlog case with only the required 
 }
 ```
 
+
+Round eight validates the three verifier failures through a running loop and real SQLite or extractor boundaries. Production sources remain identical across the full-module invocation and a later fixture-only correction. All87 targeted U17/U19 cases pass without skips, including the37-case availability matrix. The original32 matrix states pass before; five added states and four queue/status checks fail their intended before assertions. Both modules' full suites ran; one additional fixture was corrected to inject READONLY at outcome writes instead of being intercepted by the repaired poll guard. The four methods in that changed file were rerun before and after, and both modules' main/test compile and PMD were repeated. Unaffected83 results and full-module execution are retained under source/self-digest guards. Fixed temp roots/corpus and the same cached before checkout are reused; no broad Engine/UI/system run or acceptance edit is added.
 
 ## Round seven shared-service availability audit
 
@@ -533,6 +612,57 @@ Additional equivalences and exclusions checked from code:
   OutcomeWriteException and outer loop recovery retain claims; an extension failure retains the
   orchestrator's bounded pause and minute-rate warning. This round does not alter that handler,
   ledger commit ordering, background sync/watcher revive, file locks or source read policy.
+
+
+The retained SharedServiceAvailabilityTest baseline matches its final test source and JUnit hashes:32 original states pass and five new states fail the availability assertions. Its original producer raw SHA256 is 8ad595f238f3cde4e3f31f28df7acfa04159e089ab386e3bc2eb88cfb3f4610e. The four methods in ServiceOutageBoundaryTest are compared again after the outcome-boundary fixture correction. The final producer verifies the prior evidence self-digest, unchanged production and other test hashes, and intended baseline failure messages before retaining unaffected results. Both actual Gradle invocations remain in the execution evidence; the earlier fixture failure is preserved as superseded evidence rather than relabelled as a pass.
+
+## Round eight extraction and queue audit (baseline29f2a76f8)
+
+The table below extends the round-seven table; its original32 parameter values remain in the
+same running-loop matrix. ISU still means IngestionServiceUnavailableException, a subtype of
+IllegalStateException. Before exceptions/results below come from boundary-source inspection;
+exact observed before and after assertions are in the round-eight execution evidence. Original
+scenario adoption remains2026-10-20, owner quote "i agree, proceed accordingly".
+
+| State / path | Before | Now | Running-loop check |
+| --- | --- | --- | --- |
+| Closed contribution registry, still wired through open timebox (D7 I10) | IllegalStateException, wrapped into terminal ExtractionException: FAILED/attempt1 | ISU under registry monitor, preserved by timebox: uncounted deferral | SharedServiceAvailabilityTest: EXTRACTOR_REGISTRY_CLOSED |
+| Empty registry before providers install / after last uninstall | IllegalStateException, terminal parser failure | ISU under registry monitor; retain rows until wiring returns | EXTRACTOR_REGISTRY_EMPTY |
+| Registry closes after selecting an admitted provider, whose work then fails | IOException / parser failure after retirement, charged as a file | Registry rechecks closed under its own monitor before classifying failed work: ISU with cause | EXTRACTOR_REGISTRY_CLOSING |
+| Closed PolicyDrivenTikaExtractor | close removed input scratch but no state gate; later extraction could succeed/recreate scratch | Its shared input factory rejects admission after close with ISU under the factory monitor | EXTRACTOR_POLICY_CLOSED |
+| Closed StructuredContentExtractor | Same absence of a state gate, parser still accepted input | Same factory gate, ISU | EXTRACTOR_STRUCTURED_CLOSED |
+| Populated registry/parser lookup with no matching handler for one file | IllegalStateException / per-file terminal extraction failure | Unchanged file-specific routing failure; empty registry is separately unavailable | Existing ExtractorContributionRegistryTest + poison preservation checks |
+| In-process and routing sandbox facade close | Forwards close to owned registry/provider/pool; no independent lifecycle state | Required production delegates now reject retired admission; routing lookup propagates closed-registry ISU | Registry/provider matrix + existing extraction sandbox tests |
+| AutoDetectParser / OwnedTikaParsers graph lookup | Immutable constructed parser graph, no close/closing API | Unchanged; no independent retired state | Existing structured/parser suites |
+| Timebox closed/closing, retired/saturated executor | ISU or EngineExecutorRejectedException; failed futures recheck closed under executor monitor | Unchanged | EXTRACTOR_CLOSED, EXTRACTOR_CLOSING, EXTRACTION_EXECUTOR_CLOSED |
+| Persistent parser pool closed/closing, reader rejected, child startup failed | ISU / SSU; startup and slot publication serialize with close | Unchanged | EXTRACTION_SANDBOX_CLOSED/CLOSING, EXTRACTION_READER_CLOSED, EXTRACTION_START_FAILED |
+| Parser request crash, hang, OOM, malformed response, unsupported source | Can originate in a single document; existing parser/source outcome | Unchanged file ladder/terminal policy; no free retries based on child replacement | Existing single/all-poison, sandbox and U19 checks |
+| Optional OCR executor/helper capacity unavailable | Preserves already extracted lexical text with OCR diagnostics | Unchanged optional enhancement fallback | Existing OCR/extractor suites |
+| jobs.db closed/not opened, closing/cleanup unresolved, JDBC connection lost | Untyped IllegalStateException or SQLite error; some poll errors logged as empty queue | ISU from existing queue lock and JDBC isClosed; poll availability SQL failures propagate ISU with cause | Queue lifecycle source audit; new initial read-only poll boundary below |
+| jobs.db read-only during durable batch return (D7 I9) | First8s pause, then fixed1s retry and warning every retry | Queue history retains eight-second cap; exact claims retained; minute summaries | ServiceOutageBoundaryTest.persistentJobsReadonlyAfterFourthBatchRetainsOutagePacingAndBoundedLogs |
+| jobs.db read-only at initial claim | SQL poll error logged, empty queue, constant idle retry | Typed SQL availability signal -> queue1/2/4/8s cooperative pause | readonlyQueuePollUsesGrowingServicePauseAndRecoversWithoutCharging |
+| jobs.db outcome writes read-only after successful Lucene writes, while polls remain available | Retained committed transitions, but repeated idle SQL fallback logs/retries | Retain same commit ownership/transitions, capped queue pause, minute summaries | readonlyCommittedQueueOutcomesKeepOwnersAndUseGrowingPause |
+| Outage pause with16 deferred +48 still-fresh rows (D7 I7) | INDEXING despite actual paused owner/zero processing | WAITING from loop pause deadline, truthful raw ready count48, future next retry; clear on resume/stop | publicStatusDuringActualEarlyOutagePauseWithFreshLaterBacklog |
+
+Factory admission is checked before opening source bytes and again before creating snapshots.
+Already admitted, successfully finishing parses may complete; registry retirement converts failed
+in-flight work to service unavailability. Active snapshot cleanup remains owned by the existing
+prepared input; a close does not delete live source data or consume document attempts. Registry
+install/uninstall and selection share the existing monitor. Install-id/trust validation errors keep
+their configuration-error behavior and are not interpreted by message text.
+
+Queue open still owns checked constructor/open errors: an unsuccessful open is not a published
+usable queue. Queued loop operations serialize against close under the existing ReentrantLock.
+Native SQLite availability classification reuses the store boundary result-code classifier, without
+message matching. Claims and already committed ledger transitions are retained until SQL succeeds;
+no replacement database, schema version or destructive recovery is introduced. Queue-return and
+commit failure histories live only for this loop process; restart's existing claim recovery remains
+the authority. The extension UPDATE still runs selectively and still pauses if SQL rejects it.
+
+The new status rule deliberately supersedes round six's allowance for fresh work to imply INDEXING
+during a service pause. Fresh rows remain counted as ready, while loop ownership supplies the
+separate WAITING state and resume deadline. Foreground duty-cycle pauses and cutover pauses do not
+publish this service-outage deadline. The replacement parser pool is probed with the fixed healthy source before publication, retaining the original nine-second completion oracle. The first baseline showed four pool states safely deferring but timing out while a cold replacement child started; those results are preliminary environment/fixture failures, not repair proof. Final exact-source checks rerun on the same cached baseline; two extra queue probes now assert pacing before waiting for the new pause. The first full module run executed1975 worker-services and1508 indexer-worker cases. Its only failures were the known JDK launcher-NOTE oracle and one additional fixture that made the connection read-only before polling, so the repaired poll guard correctly prevented reaching its intended outcome-write boundary. Production sources remain byte-identical. After isolating READONLY at the outcome call, the evidence producer rechecks all four methods in that changed test file before and after, reruns both modules' main/test compile and PMD, and retains the unaffected83 targeted results and full-module execution under source/self-digest guards. The unchanged37-case matrix is reused, including its32 baseline preservation passes. No acceptance record below was changed.
 
 ## Acceptance records
 

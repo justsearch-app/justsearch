@@ -26,6 +26,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReentrantLock;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
+import io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException;
 import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionRetryLadder;
 import io.justsearch.indexerworker.util.PathNormalizer;
@@ -1945,8 +1946,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       return result;
     } catch (SQLException e) {
-      log.error("Failed to poll pending jobs", e);
-      return List.of();
+      throw SqliteServiceAvailability.failure("Failed to poll pending jobs", e);
     } finally {
       unlockAfterChanges();
     }
@@ -3892,10 +3892,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private void ensureOpen() {
-    if (connectionFailure != null) throw new IllegalStateException(
+    if (connectionFailure != null) throw new IngestionServiceUnavailableException(
         "SqliteJobQueue connection cleanup remains unresolved", connectionFailure);
-    if (connection == null) {
-      throw new IllegalStateException("SqliteJobQueue is not open");
+    try { SqliteServiceAvailability.requireOpen(connection, false); }
+    catch (SQLException failure) {
+      throw new IngestionServiceUnavailableException("Cannot inspect queue connection", failure);
     }
   }
 
