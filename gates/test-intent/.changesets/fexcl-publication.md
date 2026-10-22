@@ -248,3 +248,25 @@ Gradle uses its defaults of one fork and no fork recycling):
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-verifier-fexcl-9aefc5ed2",
+  "verdict": "accept",
+  "digest": "sha256:5eb99a9a329bc4e96953043db87a64cec703ce4e92fc3e1c62401fe2c0c42a65",
+  "note": "9aefc5ed2 (changeset-only since acccf63cc): delegation quotes verbatim, choices within delegated scope as labelled agent reading, no conflicting source or contract change; X1-X6 evidence unchanged"
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "claude-auditor-fexcl-9aefc5ed2",
+  "verdict": "accept",
+  "digest": "sha256:5eb99a9a329bc4e96953043db87a64cec703ce4e92fc3e1c62401fe2c0c42a65",
+  "note": "Text-only: deadlock entries cite no hang; delegation scope quotes verified verbatim with UTC times; swarm stated as analysis-only; earlier runs and mutations still apply"
+}
+```
