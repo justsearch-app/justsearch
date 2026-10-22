@@ -7155,12 +7155,11 @@ public final class KnowledgeServer implements Closeable {
   /** No legacy job can be claimed between the lossless migration and this atomic repair. */
   private void prepareRelease030Recovery() throws IOException, SQLException {
     if (!bootRootBindingsBound || !(jobQueue instanceof SqliteJobQueue queue)
-        || !(appServices instanceof DefaultWorkerAppServices services)) return;
+        || !(appServices instanceof DefaultWorkerAppServices)) return;
     release030Recovery = Release030RecoveryState.load(dataDir.resolve("jobs.db"));
     if (release030Recovery == null) return;
-    var state = indexGenerationManager.readStateBestEffort();
-    // Native cutover stays in its own path; keep the debt scheduled until preparation is safe.
-    if (state == null || !"IDLE".equals(state.migration_state())) return;
+    // Boundaries and the selective jobs repair do not depend on the index migration phase.
+    // Preparing before claims lets native cutover drain; directory recovery still waits for IDLE.
     if (!release030Recovery.preparedFor(queue.release030RecoveryIdentity())) {
       List<Path> roots = new ArrayList<>(bootRootBindings.stream().map(RootBinding::path).toList());
       var collections = startupConfiguration.collections();
@@ -7172,7 +7171,7 @@ public final class KnowledgeServer implements Closeable {
       String identity = queue.prepareRelease030Recovery(roots);
       release030Recovery.prepared(roots, identity);
     }
-    queue.prepareRelease030ExplicitFiles(services.ingestService()::seedRelease030ExplicitFile);
+    queue.prepareRelease030ExplicitFiles();
   }
 
   private void recoverRelease030RootsSafely() {
@@ -7184,23 +7183,26 @@ public final class KnowledgeServer implements Closeable {
     try {
       if (!release030Recovery.preparedFor(queue.release030RecoveryIdentity())) prepareRelease030Recovery();
       if (!(ingestLifecycle instanceof RunningRuntime runtime) || !runtime.isAcceptingWrites()) return;
-      boolean explicitReady = queue.prepareRelease030ExplicitFiles(
-          services.ingestService()::seedRelease030ExplicitFile);
+      boolean explicitReady = queue.prepareRelease030ExplicitFiles();
       for (Path root : release030Recovery.pendingRoots()) {
         if (closeStarted) return;
-        var currentRoots = new ArrayList<>(exclusionRoots.get());
-        currentRoots.addAll(configuredRoots(startupConfiguration.collections()));
-        if (currentRoots.stream().noneMatch(current -> current.toAbsolutePath().normalize()
-            .equals(root.toAbsolutePath().normalize()))) {
-          release030Recovery.completed(root); // A removed root no longer authorizes a walk.
-          continue;
+        try {
+          var currentRoots = new ArrayList<>(exclusionRoots.get());
+          currentRoots.addAll(configuredRoots(startupConfiguration.collections()));
+          if (currentRoots.stream().noneMatch(current -> current.toAbsolutePath().normalize()
+              .equals(root.toAbsolutePath().normalize()))) {
+            release030Recovery.completed(root); // A removed root no longer authorizes a walk.
+            continue;
+          }
+          if (!release030Recovery.ready(root, System.currentTimeMillis())) continue;
+          var result = services.ingestService().recoverRelease030Root(root, release030Collection(root),
+              () -> closeStarted || Thread.currentThread().isInterrupted());
+          if (result.getError().isBlank() && !result.getSkipped()
+              && !result.getDeleteDetectionUnverified()) release030Recovery.completed(root);
+          else if (result.getDeleteDetectionUnverified()) release030Recovery.deferred(root, System.currentTimeMillis());
+        } catch (IOException | RuntimeException unavailable) {
+          log.warn("0.3.0 recovery of {} will resume: {}", root, unavailable.toString());
         }
-        if (!release030Recovery.ready(root, System.currentTimeMillis())) continue;
-        var result = services.ingestService().recoverRelease030Root(root, release030Collection(root),
-            () -> closeStarted || Thread.currentThread().isInterrupted());
-        if (result.getError().isBlank() && !result.getSkipped()
-            && !result.getDeleteDetectionUnverified()) release030Recovery.completed(root);
-        else if (result.getDeleteDetectionUnverified()) release030Recovery.deferred(root, System.currentTimeMillis());
       }
       if (explicitReady && release030Recovery.pendingRoots().isEmpty()) {
         release030Recovery.finish();
@@ -9542,7 +9544,8 @@ public final class KnowledgeServer implements Closeable {
         if (settled.processingCount() != 0 || settled.pendingReadyCount() != 0
             || settled.pendingBackoffCount() != 0 || !current.mutationAdmission().replayCertain()
             || (recorded == null && cutoverMaxFailedJobs >= 0
-                && settled.failedCount() > cutoverMaxFailedJobs)
+                && Math.max(0L, settled.failedCount() - jobQueue.unownedFailureCount())
+                    > cutoverMaxFailedJobs)
             || !finalizeEmbeddingRebuildBeforeCutover()) return null;
         migrationTransition("migration-green-drained");
         current.commitActiveLexicalProjectionForCutover();
@@ -9596,7 +9599,8 @@ public final class KnowledgeServer implements Closeable {
               if (counts.processingCount() != 0 || counts.pendingReadyCount() != 0
                   || counts.pendingBackoffCount() != 0
                   || (recorded == null && cutoverMaxFailedJobs >= 0
-                      && counts.failedCount() > cutoverMaxFailedJobs)) {
+                      && Math.max(0L, counts.failedCount() - jobQueue.unownedFailureCount())
+                          > cutoverMaxFailedJobs)) {
                 throw new IOException("Green changed during cutover preparation");
               }
               try (var transfer = current.prepareProducerTransferTo(nextServices)) {

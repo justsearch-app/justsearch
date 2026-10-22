@@ -323,7 +323,10 @@ public final class KnowledgeServerMigrationOps {
         if (!context.liveCutover().recorded()) {
           long failedJobs;
           try {
-            failedJobs = context.jobQueue().failureSummary().failedCount();
+            // U12: terminal pre-boundary rows are retained, but cannot veto this cutover.
+            // Newly admitted migration work has a boundary and still counts against the limit.
+            failedJobs = Math.max(0L, context.jobQueue().failureSummary().failedCount()
+                - context.jobQueue().unownedFailureCount());
           } catch (Exception e) {
             context.log().warn(
                 "Migration cutover blocked: failed jobs count is unreadable (keeping Blue active): {}",
@@ -1021,8 +1024,10 @@ public final class KnowledgeServerMigrationOps {
     Set<SwitchBufferCapableQueue.SwitchBufferOp> fileAuthorizingDeletes;
     Map<SwitchBufferCapableQueue.SwitchBufferOp, List<String>> fileSurvivorExclusions;
     ReplayDeleteOrder deleteOrder;
+    Set<SwitchBufferCapableQueue.SwitchBufferOp> supersededLegacyFiles;
     try {
       deleteOrder = replayDeleteOrder(context, ops, exactRead);
+      supersededLegacyFiles = supersededLegacyFiles(context, ops);
       fileAuthorizingDeletes = exactRead ? fileRelatedBroadDeletes(context, ops, deleteOrder) : Set.of();
       fileSurvivorExclusions = replayFileSurvivorExclusions(context, ops, fileAuthorizingDeletes);
     } catch (IOException | RuntimeException invalid) {
@@ -1037,6 +1042,7 @@ public final class KnowledgeServerMigrationOps {
     AtomicReference<RuntimeException> pruneCutFailure = new AtomicReference<>();
 
     for (SwitchBufferCapableQueue.SwitchBufferOp op : ops) {
+      if (supersededLegacyFiles.contains(op)) continue;
       if (op.op() == null || op.payload() == null) {
         allApplied = false;
         continue;
@@ -1658,6 +1664,34 @@ public final class KnowledgeServerMigrationOps {
       Thread.currentThread().interrupt();
       return false;
     }
+  }
+
+  /** Older unscoped work must not renew the revision of a later accepted file admission. */
+  private static Set<SwitchBufferCapableQueue.SwitchBufferOp> supersededLegacyFiles(
+      DrainSwitchBufferContext context, List<SwitchBufferCapableQueue.SwitchBufferOp> ops) {
+    Set<String> laterAccepted = new java.util.HashSet<>();
+    Set<SwitchBufferCapableQueue.SwitchBufferOp> superseded = new java.util.HashSet<>();
+    for (var op : ops.reversed()) {
+      if (context.approvedGapVersions().contains(op)) continue;
+      boolean legacy = op.generation() == null || op.generation().isBlank();
+      if ("UPSERT".equalsIgnoreCase(op.op())) {
+        var upsert = SwitchBufferUpsert.decode(op.payload());
+        if (upsert.sourceSha256() != null && !legacy
+            && op.generation().equals(context.replayGeneration())
+            && op.key().equals("path:" + upsert.path())
+            && Path.of(upsert.path()).normalize().toString().equals(upsert.path())) {
+          laterAccepted.add(upsert.path());
+        } else if (upsert.sourceSha256() == null && legacy
+            && laterAccepted.contains(upsert.path())) {
+          superseded.add(op);
+        }
+      } else if (legacy && "DELETE".equalsIgnoreCase(op.op())) {
+        var deletion = SwitchBufferDelete.decode(op.payload());
+        if (deletion.origin() == SwitchBufferDelete.Origin.LEGACY
+            && laterAccepted.contains(deletion.path())) superseded.add(op);
+      }
+    }
+    return superseded;
   }
 
   private static boolean enqueueBufferedUpserts(DrainSwitchBufferContext context,

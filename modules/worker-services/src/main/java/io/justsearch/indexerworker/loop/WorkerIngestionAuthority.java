@@ -108,14 +108,18 @@ final class WorkerIngestionAuthority {
     // (refined decision 2): admission records nothing for a root; only the person's add does.
     Path normalizedFile = filePath.toAbsolutePath().normalize();
     Path answering = SourcePresence.vouchingFolder(normalizedFile, root);
-    boolean admitted = SourcePresence.answersAsRoot(normalizedFile, root)
-        ? rootCheck.admits(answering)
-        : rootCheck.admitsFile(answering);
+    boolean rooted = SourcePresence.answersAsRoot(normalizedFile, root);
+    boolean exactRecovery = !rooted && rootCheck.isRelease030ExactFile(normalizedFile);
+    boolean admitted = exactRecovery || (rooted ? rootCheck.admits(answering) : rootCheck.admitsFile(answering));
     if (!admitted) {
       return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE, rootUnavailable());
     }
 
     if (!freshness.regularFile()) {
+      if (exactRecovery) {
+        return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE,
+            sourceUnreadable(filePath, null));
+      }
       // Task t-20261013-ef3c41 (S9): a file replaced by a folder or a link (dangling or not) is no
       // longer the indexed source. Its old text is retired instead of staying searchable forever;
       // the walks never follow links, so nothing is indexed in its place.

@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.core.execution.TestEngineExecutors;
-import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -43,15 +42,10 @@ final class Release030ChallengerRecoveryTest {
       try (models; var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
         Path explicit = root.resolve("explicit.txt");
         assertTrue(search(server, "apricot").contains(key(explicit)), "indexed explicit-file precondition");
-        assertFalse(server.appServices().ingestService().seedRelease030ExplicitFile(explicit),
-            "F1: indexed evidence must refuse the replacement folder");
-        var queue = queue(server);
-        var claims = queue.pollPending(128);
-        try {
-          assertTrue(claims.stream().noneMatch(job -> job.path().equals(explicit)),
-              "unproven exact files cannot bypass admission, including without volume identity");
-        } finally { queue.returnUnfinishedClaims(claims); }
         activate(server);
+        await(() -> count(root, "path='" + key(explicit)
+            + "' AND state='PENDING' AND retry_after>0") == 1,
+            "unavailable exact files wait on the retry ladder without deletion", 20);
         assertTrue(Files.exists(checkpoint(root)), "unproven exact-file admission retains recovery debt");
         assertTrue(search(server, "apricot").contains(key(explicit)), "uncertainty never deletes old content");
         assertEquals(0, count(root, "path='" + key(explicit) + "' AND state='DONE'"));
@@ -75,17 +69,18 @@ final class Release030ChallengerRecoveryTest {
       try (models) {
         try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
           stopRecovery(server);
-          sql(root, "UPDATE jobs SET retry_after=4102444800000 WHERE state='PENDING' AND path<>'" + key(file) + "'");
+          sql(root, "UPDATE jobs SET retry_after=4102444800000 WHERE state='PENDING' "
+              + "AND retry_after IS NULL AND path<>'" + key(file) + "'");
           var queue = queue(server);
           var claims = queue.pollPending(1);
           assertEquals(1, claims.size());
           assertEquals(key(file), key(claims.getFirst().path()));
           assertEquals(1, count(root, "path='" + key(file) + "' AND state='PROCESSING'"));
+          // The pause isolated this claim only; other exact paths must also resolve before
+          // the shared checkpoint can clear. Original parser/I/O waits are left untouched.
+          sql(root, "UPDATE jobs SET retry_after=NULL WHERE retry_after=4102444800000");
           Files.move(folder, held);
-          await(() -> !server.appServices().ingestService().seedRelease030ExplicitFile(file),
-              "the in-flight file's parent is now unavailable");
-          assertFalse(queue.prepareRelease030ExplicitFiles(server.appServices().ingestService()::seedRelease030ExplicitFile),
-              "F2: PROCESSING is still explicit-file recovery debt");
+          assertFalse(Files.exists(file), "the issued exact file is now unavailable");
           activate(server);
           recover(server);
           assertTrue(Files.exists(checkpoint(root)), "in-flight admission cannot clear the checkpoint");
@@ -152,7 +147,7 @@ final class Release030ChallengerRecoveryTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"migrating", "switching"})
-  void interruptedUpgradeDefersUnpreparedClaimsAndPreparesWhenIdle(String fixture, @TempDir Path temporary)
+  void interruptedUpgradePreparesBeforeClaimsAndCompletesNativeCutover(String fixture, @TempDir Path temporary)
       throws Exception {
     Path root = Release030Fixture.unpack(fixture, temporary);
     // Add C1's stated input: an independently queued explicit path in the v13 database.
@@ -165,21 +160,16 @@ final class Release030ChallengerRecoveryTest {
     try {
       var models = new ReleasedModelIdentities(root);
       try (models; var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
-        stopRecovery(server);
-        assertEquals(1, count(root, "path='" + key(pending) + "' AND state='PENDING'"),
-            "F4: an unprepared v13 explicit job must remain pending, never claimed unread");
-        var claims = queue(server).pollPending(100);
-        assertTrue(claims.stream().noneMatch(claim -> claim.ingestionRoot() == null),
-            "F4: native migration cannot claim unprepared legacy jobs");
-        assertEquals(0, count(root, "last_reason_code='MISSING_INGESTION_BOUNDARY'"),
-            "F4: jobs must not become done unread during interrupted migration");
-        // Exercise the preparation trigger, not native cutover (explicitly deferred by the brief).
-        new IndexGenerationManager(root.resolve("data/index/default"))
-            .updateMigrationState(IndexGenerationManager.MigrationState.IDLE);
-        activate(server);
-        recover(server);
+        Release030ExactFileRecoveryTest.activateNative(server);
+        var resumed = server.appServices().ingestService().resumeMigration(
+            io.justsearch.ipc.MigrationResumeRequest.getDefaultInstance(),
+            io.justsearch.indexerworker.services.CallContext.none());
+        assertTrue(resumed.getAccepted(), resumed.getError());
+        await(() -> "IDLE".equals(state(root).migration_state())
+            && search(server, "nativequeuedcopper").contains(key(pending)),
+            "the native interrupted migration actually completes", 30);
+        assertEquals(0, count(root, "last_reason_code='MISSING_INGESTION_BOUNDARY'"));
         assertEquals(0, count(root, "state IN ('PENDING','PROCESSING','RETRY_EXHAUSTED') AND ingestion_root IS NULL"));
-        assertTrue(!Files.exists(checkpoint(root)) || Files.readString(checkpoint(root)).contains("prepared=true"));
       }
     } finally { ConfigStore.restoreGlobal(installed, previous); }
   }
@@ -207,8 +197,8 @@ final class Release030ChallengerRecoveryTest {
         activate(server);
         var result = server.appServices().ingestService().recoverRelease030Root(root.resolve("roots/alpha"), null, () -> false);
         assertFalse(result.getDeleteDetectionUnverified(), "F5: excluded unreadable entries are outside recovery debt");
-        recover(server);
-        assertFalse(Files.exists(checkpoint(root)), "eligible work completes without the excluded source");
+        await(() -> { recover(server); return !Files.exists(checkpoint(root)); },
+            "eligible exact work resolves and root recovery completes without the excluded source");
       }
     } finally {
       Files.setPosixFilePermissions(file, permissions);

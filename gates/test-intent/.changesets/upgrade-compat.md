@@ -203,13 +203,13 @@ New isolated scenario tests retain the gate's independent verification requireme
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030UpgradeProbeTest.java"
       ],
       "class": "New",
-      "behaviour": "Preserve the interrupted fixtures without repairing them. The opt-in scale probe also rejects parser-failed new work: extraction-call counts alone cannot establish successful indexing. Named JUnit evidence covers the interrupted-fixture preservation and compilation; actual opt-in scale execution, failed attempts and strengthened repeat are recorded in the builder report.",
+      "behaviour": "Preserve the captured serving identity and job rows while the interrupted fixtures remain paused. Round 3 separately requires and checks actual public resumption/completion in Release030ExactFileRecoveryTest; full retirement beyond those cases stays deferred. The opt-in scale probe also rejects parser-failed new work: extraction-call counts alone cannot establish successful indexing. Named JUnit evidence covers the interrupted-fixture preservation and compilation; actual opt-in scale execution, failed attempts and strengthened repeat are recorded in the builder report.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "resume with remaining work autonomously",
           "delegationLocation": "task t-20261020-c2e24a request",
-          "delegationScope": "Exercise and report interrupted migration fixtures without repairing them.",
+          "delegationScope": "Historical round-1 preservation scope; round 3 additionally requires actual resumption/completion in a separate check.",
           "choice": "Boot the authentic MIGRATING and SWITCHING fixtures and preserve their serving index identity and legacy job rows; compare reported disposition with baseline.",
           "label": "agent choice"
         },
@@ -238,7 +238,7 @@ New isolated scenario tests retain the gate's independent verification requireme
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java"
       ],
       "class": "New",
-      "behaviour": "Test the five C1 findings through real boot, a held issued claim, v13 backup restore and production SQLITE_CORRUPT triage, native interrupted fixtures before/after an IDLE trigger, and excluded versus included unreadable paths. Ten parameterized cases must fail at their intended assertions on round-1 code and pass after. Excluded indexed rows are retained without blocking completion; included unreadable rows retain searchable content and durable debt with bounded full-walk retries through restart.",
+      "behaviour": "Preserve the five C1 outcomes through real boot, a held PROCESSING claim, v13 backup restore and production SQLITE_CORRUPT triage, actual public resumption/completion of both native interrupted fixtures, and excluded versus included unreadable paths. Round 3 removes parent-sampling admission and the manual IDLE trigger: unavailable exact files keep searchable content and durable debt on ordinary retry-until-available; roots and all active exact work must resolve before the checkpoint clears. The claim-isolation pause is released without changing original parser/I/O waits; asynchronous completion is awaited.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -286,8 +286,8 @@ New isolated scenario tests retain the gate's independent verification requireme
           "kind": "delegated-choice",
           "delegationQuote": "this guard belongs in this PR, because it is a data-loss path that the upgrade opens.",
           "delegationLocation": "task t-20261020-c2e24a request",
-          "delegationScope": "Minimal hold on unprepared legacy claims and later preparation when native migration reaches IDLE; full native migration retirement stays deferred.",
-          "choice": "Retain the durable sidecar and scheduled recovery through native MIGRATING/SWITCHING; hold null-boundary legacy claims until atomic preparation and reset the claim cursor afterward.",
+          "delegationScope": "Minimal protection against retiring unread legacy jobs during native migrations; round 3 requires preparation before claims and real fixture cutover completion.",
+          "choice": "Retain the durable sidecar; prepare boundaries and selective retry repair in every native migration phase before claims. Directory walks still await IDLE; exact files can proceed without root preparation or inferred parent identity.",
           "label": "agent choice"
         },
         {
@@ -295,15 +295,164 @@ New isolated scenario tests retain the gate's independent verification requireme
           "delegationQuote": "Treat each as a claim to test: write the failing test first (on your round-1 code), then fix it, then show it passes.",
           "delegationLocation": "task t-20261020-c2e24a request",
           "delegationScope": "The five C1 claims, preserving round-1 behavior and avoiding queue schema changes.",
-          "choice": "Seed exact-file folders only on indexed disk evidence, and hold refused exact paths before claim even when the platform exposes no volume ID; include PROCESSING and retry-exhausted exact paths in admission debt; bind preparation to a transactional SQLite application_id generation plus database file identity; exclude paths before readability/prune uncertainty, and persist a one-minute cooldown for incomplete included-root walks. No parent ingestion authority is added.",
+          "choice": "Keep the C1 database-generation/file-identity binding, PROCESSING/exhausted exact debt, exclusions-before-readability and durable one-minute root cooldown. Round 3 supersedes sample-based exact admission: protect exact queued files from uncertain deletion and use normal retry-until-available. No parent authority or queue schema change.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Adopt this or something better, and write the decision and its reason in the changeset.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Repair the four C2 findings while preserving agreed scenarios and round-1/round-2 behavior, without a queue schema change.",
+          "choice": "A legacy exact file outside roots is admitted only when regular, present and readable under current exclusions. Negative observations use ordinary I/O retry-until-available and never delete or mark done; the durable checkpoint remains until active exact work resolves. The shared queue supplies exact-path protection to every serving runtime, including cutover successors. No parent sampling or volume identity is inferred or recorded: a queued update invalidates its only indexed stamp, and an empty sample proves no drive identity. Positive exact-file read authority needs neither inference nor parent authority. Prepare atomic boundaries/repair independently of native migration phase before claims; root reconciliation still waits for IDLE. Only a database carrying the existing 0.3.0 recovery marker or persisted header generation may exempt its unowned pre-boundary terminal rows from native cutover (U12); main-built databases retain the full configured failure budget, and admitted migration failures still count. Apply the same count at the monitor, the final producer fence, and pointer publication. A legacy unscoped UPSERT or originless DELETE superseded by a later witnessed admission for the same exact path/current generation does not re-enqueue and replace that newer revision; final replay still verifies the newer accepted effect and retains all versions until promotion. Preserve accepted ordering and keep later legacy work live. Native tests use dimension-correct deterministic vectors through real backfill/certification because the fixture helper suppresses heavyweight model initialization; they never edit migration state or waive commit verification. Keep the merged unitRevision and preserveRetryWaits enqueue arguments; a preservation test checks both.",
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/upgrade-compat-round2.json",
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round3.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ChallengerRecoveryTest.java"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "C2 findings 1\u20134: an isolated queued update becomes searchable across restart; a never-indexed missing exact file remains recoverable and indexes after return; the authentic MIGRATING and SWITCHING fixtures complete through public resume without manual state changes and retain the original terminal failure; nonnumeric/overflowed root cooldowns retain old search and cannot starve another root. A partial native Green missing an unavailable exact file must preserve Blue search until that exact file returns, then complete normally. Every repair case fails at its intended assertion on da5d6059d. The enqueue merge preservation case passes before and after.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U7",
+          "quote": "Jobs 0.3.0 left PENDING or PROCESSING (including a root with more than 200k indexed files and about 700k queued jobs) are not marked done unread: every never-indexed file is indexed or queued with its root after the upgrade, and an indexed file with a queued update shows the new content in search.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U8",
+          "quote": "A queued explicitly added file outside any watched root is kept and indexed, without granting broader ingestion authority.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U11",
+          "quote": "Never delete on uncertainty: an unplugged drive, another volume on the same Windows letter, denied access or unreadable root evidence at the first start leaves that root's indexed rows searchable and undeleted through boot, sync, watcher and queued processing; its recovery waits until the root is confirmed, then runs. Other roots become current.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U12",
+          "quote": "0.3.0's failed and retry-exhausted rows, including one whose path is under no root, do not block the upgrade, and no cutover depends on them.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U18",
+          "quote": "Upgrade repair: 0.3.0 rows waiting on long write-failure retries and retry-exhausted rows become claimable on the first start and get indexed; parser-timeout and I/O-failure rows keep their retry times. A crash during the repair leaves it idempotent.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U19",
+          "quote": "A genuinely locked or unreadable single file still uses the retry ladder and retry-until-available; background sync and watcher re-enqueue still revive retry-exhausted rows.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Adopt this or something better, and write the decision and its reason in the changeset.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Repair the four C2 findings while preserving agreed scenarios and round-1/round-2 behavior, without a queue schema change.",
+          "choice": "A legacy exact file outside roots is admitted only when regular, present and readable under current exclusions. Negative observations use ordinary I/O retry-until-available and never delete or mark done; the durable checkpoint remains until active exact work resolves. The shared queue supplies exact-path protection to every serving runtime, including cutover successors. No parent sampling or volume identity is inferred or recorded: a queued update invalidates its only indexed stamp, and an empty sample proves no drive identity. Positive exact-file read authority needs neither inference nor parent authority. Prepare atomic boundaries/repair independently of native migration phase before claims; root reconciliation still waits for IDLE. Only a database carrying the existing 0.3.0 recovery marker or persisted header generation may exempt its unowned pre-boundary terminal rows from native cutover (U12); main-built databases retain the full configured failure budget, and admitted migration failures still count. Apply the same count at the monitor, the final producer fence, and pointer publication. A legacy unscoped UPSERT or originless DELETE superseded by a later witnessed admission for the same exact path/current generation does not re-enqueue and replace that newer revision; final replay still verifies the newer accepted effect and retains all versions until promotion. Preserve accepted ordering and keep later legacy work live. Native tests use dimension-correct deterministic vectors through real backfill/certification because the fixture helper suppresses heavyweight model initialization; they never edit migration state or waive commit verification. Keep the merged unitRevision and preserveRetryWaits enqueue arguments; a preservation test checks both.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round3.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ExactFileRecoveryTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CorruptRecoveryValueTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Invalid root status, checkpoint format and malformed escaped values neither stop boot nor drop uncertain debt. An unavailable root retains searchable old content while an independent healthy root becomes current after bounded conservative recovery. Each case is an intended assertion failure on da5d6059d.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U11",
+          "quote": "Never delete on uncertainty: an unplugged drive, another volume on the same Windows letter, denied access or unreadable root evidence at the first start leaves that root's indexed rows searchable and undeleted through boot, sync, watcher and queued processing; its recovery waits until the root is confirmed, then runs. Other roots become current.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261020-c2e24a",
+          "scenario": "U14b",
+          "quote": "Engine killed during recovery of 0.3.0's queued work or during the upgrade repair: after restart the recovery resumes and ends in the same state as an uninterrupted run (only the transitions U7 and U18 define), nothing is deleted, and no full reindex starts.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Adopt this or something better, and write the decision and its reason in the changeset.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Repair the four C2 findings while preserving agreed scenarios and round-1/round-2 behavior, without a queue schema change.",
+          "choice": "An invalid per-root cooldown/status retains that root with a persisted one-minute retry and does not abort later roots. A malformed checkpoint format or invalid Properties escape makes its database binding uncertain: repeat the existing idempotent preparation, reconstruct configured-root debt, and persist one bounded cooldown before any recovery walk. Invalid status never means done. Catch each root failure separately so one inaccessible state/write cannot starve others. This prevents both destructive assumptions and ten-second retry loops; no database schema change.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round3.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030CorruptRecoveryValueTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Added one exact in-order verification of the new read-only legacy-exact-path query before the existing watcher journal assertion. All existing delete effects, journal ordering, counts, inputs, faults and no-more-interactions assertions remain unchanged. The original fixture passes in a direct standard JUnit Platform selection against the Gradle-compiled matched baseline; the adapted fixture passes in the candidate Gradle task. The combined before task's init/CLI filter intersection selected neither service class; that failed attempt is retained.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Keep all round 1 and round 2 behavior.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Preserve existing native cutover limits and the original mutation-order/count checks while adding the upgrade observer.",
+          "choice": "Use the existing 0.3.0 database marker/header identity to scope the unowned-terminal exception. Keep the existing installer-budget test unchanged as a preservation check on da5d6059d and the candidate. In the existing delete-order fixture, verify exactly one read-only isRelease030ExactFile query before the journal and retain every existing mutation/count/order/no-more-interactions assertion. Run the original fixture before and the adapted fixture after.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveInstallerMigrationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preserve the unchanged installer-budget test: after a live installer changes the limit, the next failed native migration on a main-built database must retain its serving generation and enter FAILED at the configured limit. Its existing settlement/model-owner preservation test also runs unchanged. Both pass before and after.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Keep all round 1 and round 2 behavior.",
+          "delegationLocation": "task t-20261020-c2e24a request",
+          "delegationScope": "Preserve existing native cutover limits and the original mutation-order/count checks while adding the upgrade observer.",
+          "choice": "Use the existing 0.3.0 database marker/header identity to scope the unowned-terminal exception. Keep the existing installer-budget test unchanged as a preservation check on da5d6059d and the candidate. In the existing delete-order fixture, verify exactly one read-only isRelease030ExactFile query before the journal and retain every existing mutation/count/order/no-more-interactions assertion. Run the original fixture before and the adapted fixture after.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/upgrade-compat-round3.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerLiveInstallerMigrationTest.java"
+      ]
     }
   ]
 }

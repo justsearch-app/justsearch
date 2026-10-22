@@ -754,7 +754,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   /** Release-v13 claims remain queued until their policy boundaries have been prepared. */
   private boolean requiresRelease030Boundary;
   private boolean release030ExplicitFilesPrepared = true;
-  private Set<String> unadmittedRelease030ExplicitFiles = Set.of();
+  private final Set<Path> release030ExactFiles = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+  @Override
+  public boolean isRelease030ExactFile(Path file) {
+    return file != null && release030ExactFiles.contains(file.toAbsolutePath().normalize());
+  }
 
   /**
    * Initializes the database schema and runs migrations.
@@ -775,6 +780,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     var recovery = Release030RecoveryState.load(dbPath);
     requiresRelease030Boundary = recovery != null && !recovery.preparedFor(release030RecoveryIdentity());
     release030ExplicitFilesPrepared = recovery == null;
+    release030ExactFiles.clear();
     // Create base tables if they don't exist
     try (Statement stmt = connection.createStatement()) {
       stmt.execute(SqliteSchema.CREATE_JOBS_TABLE);
@@ -1226,10 +1232,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   /** Bounded iteration over exact legacy files outside roots; never expands their parents. */
-  public boolean prepareRelease030ExplicitFiles(java.util.function.Predicate<Path> admission)
-      throws SQLException {
+  public boolean prepareRelease030ExplicitFiles() throws SQLException {
     String cursor = "";
-    Set<String> unadmitted = new HashSet<>();
+    boolean active = false;
     while (true) {
       List<Path> paths = new ArrayList<>();
       lockTimed();
@@ -1245,17 +1250,18 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
         if (paths.isEmpty()) {
-          unadmittedRelease030ExplicitFiles = Set.copyOf(unadmitted);
           release030ExplicitFilesPrepared = true;
           claimCursor = null;
-          return unadmitted.isEmpty();
+          if (!active) release030ExactFiles.clear();
+          return !active;
         }
       } finally {
         unlockAfterChanges();
       }
-      for (Path path : paths) {
-        if (!admission.test(path)) unadmitted.add(PathNormalizer.normalizeKey(path));
-      }
+      // Protection is shared by every producer/serving runtime using this queue, including
+      // the successor composed during cutover. Unavailable exact files use normal I/O retries.
+      active = true;
+      release030ExactFiles.addAll(paths);
       cursor = PathNormalizer.normalizeKey(paths.getLast());
     }
   }
@@ -2061,11 +2067,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                     checkedWalkVersion=walkVersion;
                   }
                   if (requiresRelease030Boundary && row.ingestionRoot() == null) continue;
-                  // A platform without volume IDs cannot turn refused legacy evidence into
-                  // absence. Keep the exact path unclaimed until its admission is confirmed.
-                  if (row.key().path().equals(row.ingestionRoot())
-                      && (!release030ExplicitFilesPrepared
-                          || unadmittedRelease030ExplicitFiles.contains(row.key().path()))) continue;
+                  // All exact paths must have their no-deletion protection before any claim.
+                  if (!release030ExplicitFilesPrepared && row.key().path().equals(row.ingestionRoot())) continue;
                   if (activeClaims.containsKey(row.key().path()) || !pendingWalkAllowsClaim(row,claimableWalks)) continue;
                   var decision = recordedClaimDecision(row.scanId(), row.walkEpoch(), row.plannedHash());
                   if (decision == RecordedClaimDecision.DENY) continue;
@@ -3643,6 +3646,30 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       }
     } catch (SQLException e) {
       log.warn("Incremental vacuum check failed", e);
+    }
+  }
+
+  @Override
+  public long unownedFailureCount() {
+    lock.lock();
+    try {
+      ensureOpen();
+      // Only a database captured by the 0.3.0 repair can identify unowned rows as legacy.
+      // A main-built database retains its ordinary failure budget, even for unbound rows.
+      try (var query = connection.createStatement(); var identity = query.executeQuery("PRAGMA application_id")) {
+        if (!identity.next()) throw new SQLException("Missing queue database identity");
+        if (!requiresRelease030Boundary && identity.getInt(1) == 0) return 0L;
+      }
+      try (Statement stmt = connection.createStatement();
+          ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM jobs WHERE ingestion_root IS NULL "
+              + "AND state IN ('FAILED','RETRY_EXHAUSTED')")) {
+        return rs.next() ? rs.getLong(1) : 0L;
+      }
+    } catch (SQLException failure) {
+      recordDbError();
+      throw new IllegalStateException("Cannot count legacy unowned failures", failure);
+    } finally {
+      unlockAfterChanges();
     }
   }
 

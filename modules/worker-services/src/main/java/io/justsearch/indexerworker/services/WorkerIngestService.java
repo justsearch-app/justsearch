@@ -213,6 +213,7 @@ public final class WorkerIngestService {
     this.rootVolumes = RootVolumeLedger.under(indexBasePath);
     this.rootWitness = RootWitness.of(rootVolumes, this::registeredRootIdentity,
         folder -> rootWatcherRegistry.declaresRootCovering(folder));
+    if (jobQueue != null) this.rootWitness.useRelease030ExactFiles(jobQueue::isRelease030ExactFile);
     this.migrationOps = new MigrationControlOps(this.indexGenerationManager);
     this.upgradeQuiescence =
         new WorkerUpgradeQuiescence(jobQueue, indexingLoop, this.indexGenerationManager);
@@ -1038,25 +1039,6 @@ public final class WorkerIngestService {
       return false;
     }
     return rootWitness.provenOnRecordedVolume(root);
-  }
-
-  /** Exact release-v13 queued files retain explicit-file admission under today's exclusions. */
-  public boolean seedRelease030ExplicitFile(Path file) {
-    if (isUserExcluded(file, file)
-        || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(file, file)) return true;
-    Path parent = file.toAbsolutePath().normalize().getParent();
-    if (parent == null) return false;
-    try {
-      // Never replace a known volume with the drive currently occupying its path.
-      if (rootVolumes.recordedFor(parent).isEmpty()
-          && rootVolumes.recordedFileFolder(parent).isEmpty()) {
-        if (!indexedFilesOnDrive(parent)) return false;
-        rootWitness.recordExplicitFileFolder(parent);
-      }
-      return rootWitness.admitsFile(parent);
-    } catch (IOException unavailable) {
-      return false;
-    }
   }
 
   /** Resume a checkpointed root using bounded admissions, retaining unrelated retry deadlines. */

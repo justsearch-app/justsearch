@@ -267,6 +267,9 @@ public interface JobQueue extends Closeable {
     }
   }
 
+  /** Exact release-v13 work still being recovered; grants no parent-folder authority. */
+  default boolean isRelease030ExactFile(Path file) { return false; }
+
   /**
    * A path to enqueue plus the byte size observed at enqueue time (tempdoc 813 Slice B).
    *
@@ -834,6 +837,11 @@ public interface JobQueue extends Closeable {
    */
   default FailureSummary failureSummary() {
     return new FailureSummary(0L, null, null, null, null);
+  }
+
+  /** Terminal jobs predating ingestion boundaries are not failures of a native migration. */
+  default long unownedFailureCount() {
+    return 0L;
   }
 
   /**

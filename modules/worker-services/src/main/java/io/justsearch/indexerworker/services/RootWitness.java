@@ -57,9 +57,18 @@ public final class RootWitness implements SourcePresence.RootCheck {
   private final ConcurrentHashMap<Path, Answer> admitted = new ConcurrentHashMap<>();
   private final ConcurrentHashMap<Path, FileFolderAnswer> fileFolders = new ConcurrentHashMap<>();
 
+  private volatile java.util.function.Predicate<Path> release030ExactFiles = ignored -> false;
+
   private record Answer(boolean yes, long expiresNanos) {}
 
   private record FileFolderAnswer(boolean vouching, Answer answer) {}
+
+  void useRelease030ExactFiles(java.util.function.Predicate<Path> exactFiles) {
+    release030ExactFiles = java.util.Objects.requireNonNull(exactFiles, "exactFiles");
+  }
+
+  @Override
+  public boolean isRelease030ExactFile(Path file) { return release030ExactFiles.test(file); }
 
   private RootWitness(RootVolumeLedger volumes, Function<Path, RootIdentity> registered,
       java.util.function.Predicate<Path> declaredRootCovers) {
