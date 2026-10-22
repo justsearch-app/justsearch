@@ -579,3 +579,14 @@ Additional equivalences and exclusions checked from code:
   "note": "U17 fails: a real closed SqliteDocumentIdentityStore charges both healthy rows and schedules minute-scale retries after three grace batches."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1635f-98be-7772-a266-db83c062e197",
+  "verdict": "reject",
+  "digest": "sha256:708f2167481acfa9583c87bf8435b5cb1f83c9591d83df36d8fad19caedfa1e2",
+  "note": "I7 reports INDEXING during a real outage pause, I9 retries and logs every second with persistent queue READONLY, and I10 misses a closed extractor registry that terminally fails healthy files."
+}
+```
