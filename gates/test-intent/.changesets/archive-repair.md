@@ -57,3 +57,14 @@ ArchiveReplacementWindowsTest and ArchiveInstallWindowsPreservationTest (a home 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "aaeb370d-6c8e-4db5-b90b-6f4a4229e389",
+  "verdict": "accept",
+  "digest": "sha256:405fd1e178891da87bc611149c57170b1a97415929695f473eeea3363ccb31bc",
+  "note": "Fail-before reproduced independently on d05fb4bba (51/51 AssertionFailedError), 51/51 pass on 2e6160506; expectations match the agreed scenarios; owner-words and delegation locations not checkable by the verifier"
+}
+```
