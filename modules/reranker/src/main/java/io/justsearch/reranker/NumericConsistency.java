@@ -15,9 +15,9 @@ public final class NumericConsistency {
   private static final String SEPARATORS = ", \\u00a0\\u202f";
   private static final String GROUPED_NUMBER =
       "[0-9]{1,3}(?:(?:,[0-9]{3})+|(?: [0-9]{3})+)(?:\\.[0-9]+)?";
-  // A complete grouped value ends at whitespace; later quantities cannot change its value.
+  // Read grouped values atomically: an ending cannot make a shorter group match instead.
   // Otherwise consume adjacent digit groups and decimal points whole, never decimal pieces.
-  private static final Pattern NUMBER = Pattern.compile(GROUPED_NUMBER + "(?=\\p{Zs})"
+  private static final Pattern NUMBER = Pattern.compile("(?>" + GROUPED_NUMBER + ")(?![0-9]|[.,][0-9])"
       + "|(?:[0-9]+|\\.[0-9]+)(?:[.,\\p{Zs}][0-9]+)*");
   private static final Pattern UNGROUPED_NUMBER = Pattern.compile("[0-9]+(?:\\.[0-9]+)*");
   private static final Pattern PLAIN_NUMBER = Pattern.compile(

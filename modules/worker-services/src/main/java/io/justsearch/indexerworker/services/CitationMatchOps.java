@@ -216,7 +216,7 @@ final class CitationMatchOps {
       return emptyResponse(startTime, "");
     }
 
-    List<NumericConsistency.Claim> claims = AnswerSegmentation.splitClaims(answerText.trim());
+    List<NumericConsistency.Claim> claims = AnswerSegmentation.splitClaims(answerText);
     List<String> sentenceList = claims.stream().map(NumericConsistency.Claim::text).toList();
     var csConfig = citationScorerConfig;
     long deadlineMs = csConfig != null ? csConfig.deadlineBudgetMs() : DEFAULT_DEADLINE_MS;

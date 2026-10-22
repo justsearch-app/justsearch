@@ -198,8 +198,9 @@ public final class AnswerSegmentation {
   }
 
   private static String protectCode(String literal) {
-    // Same length as the visible key: the sentence offsets remain valid in both strings.
-    return literal.replace('[', '(').replace(']', ')');
+    // Protect ASCII and NFKC-compatible brackets in place, keeping visible sentence offsets.
+    return literal.replace('[', '(').replace(']', ')')
+        .replace('［', '(').replace('］', ')').replace('﹇', '(').replace('﹈', ')');
   }
 
   /**

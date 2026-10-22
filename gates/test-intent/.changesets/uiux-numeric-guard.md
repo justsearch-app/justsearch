@@ -2,15 +2,41 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: uiux-numeric-guard-nx3a
+author-session: uiux-numeric-guard-nx3b
 ---
+
+# NX3b literal contract (recorded before implementation)
+
+Start 2026-10-22 16:57:56 UTC; estimate 1–2 h; return by 19:57:56 UTC.
+Before-state 5e74587b1. The following is agent-adopted under the delegation
+quoted in the intent entries below, not owner-adopted scenario wording.
+Tests expand grouped rows across all named separators/endings and feed the
+production segmenter into real cross-encoder selection and raw cosine
+supplied/indexed matching. Existing NX3/NX3a tests remain unchanged.
+
+### Clarification NX3b (orchestrator, 2026-10-22, agent-adopted under the user's NX3 decision and the user's standing "don't ask when you know better"; after the fifth verifier's counterexamples V6-F1 and V6-F2)
+
+- A grouped number is read whole, whatever follows its last group: a full stop, comma, closing bracket or quote, line end, end of text, whitespace or a word. "1 200 000." is 1200000, never 1200 and 000. This holds for every separator NX3/NX3a already accept (space, no-break space, narrow no-break space, comma, Arabic group separator) and after NFKC.
+- A bracketed number inside code is a value, in every bracket form NFKC maps to ASCII brackets (for example ［４］, ﹇4﹈, ［⑫］), exactly as code [4] is today. Outside code, such brackets stay reference markers (NG4 unchanged).
+
+| Case | Expected |
+|---|---|
+| claim 1200 vs "contains 1 200 000." (also NBSP, narrow NBSP, comma groups; at text end, before ")", '"', newline, a word) | withheld |
+| claim 1200000 vs each of those passages | supported as before NX3a |
+| claim "1 200 000" vs passage "1200000." | supported |
+| claim 1200 vs "1,200 5kg bags" (NX3a) | supported (must keep) |
+| code ［４］ / ［4］ / ﹇4﹈ vs "contains [5]." or no number | withheld |
+| code ［４］ vs "contains [4]." | supported |
+| ASCII code [4] vs [5] / [4] | withheld / supported (must keep) |
+| prose citation markers [4], ［４］ outside code | not stated values (NG4, must keep) |
+| Arabic decimal, full-width time/group cases from NX3a; the 96-pair NX3 table; number-free text | unchanged (must keep) |
 
 # NX3a literal table (recorded before implementation)
 
 Observed start 2026-10-22 13:10:33 UTC; estimate 1–2 h; return by 16:10:33 UTC
 (the assignment's 3 h deadline). Before-state e9f080f32.
 
-Source (agent-drafted, owner-adopted), clarification NX3a:
+Source (agent choice under the standing delegation), clarification NX3a:
 “Before reading numbers on either side, normalise compatibility forms (Unicode NFKC: full-width digits and punctuation such as "：", "，", "．" become their plain forms) and the Arabic separators (U+066B ARABIC DECIMAL SEPARATOR is a decimal point, U+066C ARABIC THOUSANDS SEPARATOR is a group separator). Then NX3 applies unchanged: "1٫5" is the decimal 1.5 (5 is not in it), "1：30" is a time and is skipped, "5，000" is the grouped 5000.”
 “A grouped number is read the same whatever follows it after whitespace: "1,200 5kg bags" contains 1200 (and a non-plain 5kg).”
 
@@ -1441,18 +1467,20 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "quote": "A plain number in the claim is a whole run of digits (non-Latin digits normalised as before), optionally with the agreed groups of three and at most one decimal point, that stands alone: bounded on each side by whitespace, the start or end of the text, or ordinary sentence punctuation (. , ; : ! ? quotes, brackets) that is not itself part of a number. A sentence-final period is punctuation (\"in 2019.\" is 2019)."
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "NG3",
-          "quote": "Before reading numbers on either side, normalise compatibility forms (Unicode NFKC: full-width digits and punctuation such as \"：\", \"，\", \"．\" become their plain forms) and the Arabic separators (U+066B ARABIC DECIMAL SEPARATOR is a decimal point, U+066C ARABIC THOUSANDS SEPARATOR is a group separator). Then NX3 applies unchanged: \"1٫5\" is the decimal 1.5 (5 is not in it), \"1：30\" is a time and is skipped, \"5，000\" is the grouped 5000.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "don't ask when you know better",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Clarify the user's adopted NX3 plain-number guard within WP4.5, including NX3a compatibility/separator normalization and NX3b whole grouping and code/reference preservation. Preserve NX3's number-form scope, thresholds, sentence keys and historical verdicts; this is not a delegation to replace the established contract.",
+          "choice": "Before reading numbers on either side, normalise compatibility forms (Unicode NFKC: full-width digits and punctuation such as \"：\", \"，\", \"．\" become their plain forms) and the Arabic separators (U+066B ARABIC DECIMAL SEPARATOR is a decimal point, U+066C ARABIC THOUSANDS SEPARATOR is a group separator). Then NX3 applies unchanged: \"1٫5\" is the decimal 1.5 (5 is not in it), \"1：30\" is a time and is skipped, \"5，000\" is the grouped 5000.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "NG3",
-          "quote": "A grouped number is read the same whatever follows it after whitespace: \"1,200 5kg bags\" contains 1200 (and a non-plain 5kg).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "don't ask when you know better",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Clarify the user's adopted NX3 plain-number guard within WP4.5, including NX3a compatibility/separator normalization and NX3b whole grouping and code/reference preservation. Preserve NX3's number-form scope, thresholds, sentence keys and historical verdicts; this is not a delegation to replace the established contract.",
+          "choice": "A grouped number is read the same whatever follows it after whitespace: \"1,200 5kg bags\" contains 1200 (and a non-plain 5kg).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3a-repaired.json",
@@ -1667,18 +1695,20 @@ and its existing native runtime; no dependency lock or frontend manifest changes
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "NG3",
-          "quote": "Before reading numbers on either side, normalise compatibility forms (Unicode NFKC: full-width digits and punctuation such as \"：\", \"，\", \"．\" become their plain forms) and the Arabic separators (U+066B ARABIC DECIMAL SEPARATOR is a decimal point, U+066C ARABIC THOUSANDS SEPARATOR is a group separator). Then NX3 applies unchanged: \"1٫5\" is the decimal 1.5 (5 is not in it), \"1：30\" is a time and is skipped, \"5，000\" is the grouped 5000.",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "don't ask when you know better",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Clarify the user's adopted NX3 plain-number guard within WP4.5, including NX3a compatibility/separator normalization and NX3b whole grouping and code/reference preservation. Preserve NX3's number-form scope, thresholds, sentence keys and historical verdicts; this is not a delegation to replace the established contract.",
+          "choice": "Before reading numbers on either side, normalise compatibility forms (Unicode NFKC: full-width digits and punctuation such as \"：\", \"，\", \"．\" become their plain forms) and the Arabic separators (U+066B ARABIC DECIMAL SEPARATOR is a decimal point, U+066C ARABIC THOUSANDS SEPARATOR is a group separator). Then NX3 applies unchanged: \"1٫5\" is the decimal 1.5 (5 is not in it), \"1：30\" is a time and is skipped, \"5，000\" is the grouped 5000.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261019-bd718f",
-          "scenario": "NG3",
-          "quote": "A grouped number is read the same whatever follows it after whitespace: \"1,200 5kg bags\" contains 1200 (and a non-plain 5kg).",
-          "label": "agent-drafted, owner-adopted"
+          "kind": "delegated-choice",
+          "delegationQuote": "don't ask when you know better",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Clarify the user's adopted NX3 plain-number guard within WP4.5, including NX3a compatibility/separator normalization and NX3b whole grouping and code/reference preservation. Preserve NX3's number-form scope, thresholds, sentence keys and historical verdicts; this is not a delegation to replace the established contract.",
+          "choice": "A grouped number is read the same whatever follows it after whitespace: \"1,200 5kg bags\" contains 1200 (and a non-plain 5kg).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3a-repaired.json",
@@ -1688,6 +1718,137 @@ and its existing native runtime; no dependency lock or frontend manifest changes
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/CitationMatchOpsNumericTest.java#appliesNx3aNormalizationAndGroupedBoundaries"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3bTest.java"
+      ],
+      "class": "New",
+      "behaviour": "NX3b whole grouped values and compatibility code brackets retain numeric containment through production segmentation, real cross-encoder selection and raw cosine supplied/indexed paths. Existing reference, threshold, score, key and scored-count controls retain their verdicts. Model logits/embeddings are fixed to isolate guard eligibility.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG1",
+          "quote": "A sentence that states a numeric value the chosen passage does not contain as a whole value is not verified against that passage. Applies to Ask and Delegate, cross-encoder and cosine scoring, supplied passages and index lookups, live and after cold reload. Both WP4.4 counterexamples no longer verify against the passage lacking the number.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG2",
+          "quote": "The guard only withholds a verdict; it never grants one. A sentence whose values all appear in the passage gets exactly the verdict it gets today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "An explicit table of accepted and rejected sentence/passage pairs (decision D8) passes: whole values not substrings (99 vs 2099), 1.5 vs 15, signed values, percentages, ranges, dates, the agreed grouping formats, non-Latin digits. Values inside inline code and table cells count as claims.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG4",
+          "quote": "Reference literals such as [4], list numbering and the answer's own markers are not treated as stated values.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG6",
+          "quote": "After the guard, the match list, the matched-sentence count, the marks, the source grades, the coverage note and the frame agree; a rejected sentence still counts as scored, never as not scored. Holds on Ask, Delegate and the raw citation API (RetrieveContextController.java:335-345).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG7",
+          "quote": "Sentences in other languages and non-Latin digits neither crash the check nor change the result except as the table in S13.3 says.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "don't ask when you know better",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Clarify the user's adopted NX3 plain-number guard within WP4.5, including NX3a compatibility/separator normalization and NX3b whole grouping and code/reference preservation. Preserve NX3's number-form scope, thresholds, sentence keys and historical verdicts; this is not a delegation to replace the established contract.",
+          "choice": "A grouped number is read whole, whatever follows its last group: a full stop, comma, closing bracket or quote, line end, end of text, whitespace or a word. \"1 200 000.\" is 1200000, never 1200 and 000. This holds for every separator NX3/NX3a already accept (space, no-break space, narrow no-break space, comma, Arabic group separator) and after NFKC.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "don't ask when you know better",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Clarify the user's adopted NX3 plain-number guard within WP4.5, including NX3a compatibility/separator normalization and NX3b whole grouping and code/reference preservation. Preserve NX3's number-form scope, thresholds, sentence keys and historical verdicts; this is not a delegation to replace the established contract.",
+          "choice": "A bracketed number inside code is a value, in every bracket form NFKC maps to ASCII brackets (for example ［４］, ﹇4﹈, ［⑫］), exactly as code [4] is today. Outside code, such brackets stay reference markers (NG4 unchanged).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3b-repaired.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3bTest.java#readsNx3bGroupedValuesWholeAtEveryEnding",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3bTest.java#retainsNx3bWholeGroupedClaims",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3bTest.java#retainsNx3bCompatibilityCodeValuesThroughSegmentation"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3bTest.java"
+      ],
+      "class": "New",
+      "behaviour": "NX3b whole grouped values and compatibility code brackets retain numeric containment through production segmentation, real cross-encoder selection and raw cosine supplied/indexed paths. Existing reference, threshold, score, key and scored-count controls retain their verdicts. Model logits/embeddings are fixed to isolate guard eligibility.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG2",
+          "quote": "The guard only withholds a verdict; it never grants one. A sentence whose values all appear in the passage gets exactly the verdict it gets today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG3",
+          "quote": "An explicit table of accepted and rejected sentence/passage pairs (decision D8) passes: whole values not substrings (99 vs 2099), 1.5 vs 15, signed values, percentages, ranges, dates, the agreed grouping formats, non-Latin digits. Values inside inline code and table cells count as claims.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "NG4",
+          "quote": "Reference literals such as [4], list numbering and the answer's own markers are not treated as stated values.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "GN1",
+          "quote": "Sentences without numbers get exactly the same matches as before on a fixed corpus.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "don't ask when you know better",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Clarify the user's adopted NX3 plain-number guard within WP4.5, including NX3a compatibility/separator normalization and NX3b whole grouping and code/reference preservation. Preserve NX3's number-form scope, thresholds, sentence keys and historical verdicts; this is not a delegation to replace the established contract.",
+          "choice": "A grouped number is read whole, whatever follows its last group: a full stop, comma, closing bracket or quote, line end, end of text, whitespace or a word. \"1 200 000.\" is 1200000, never 1200 and 000. This holds for every separator NX3/NX3a already accept (space, no-break space, narrow no-break space, comma, Arabic group separator) and after NFKC.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "don't ask when you know better",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "Clarify the user's adopted NX3 plain-number guard within WP4.5, including NX3a compatibility/separator normalization and NX3b whole grouping and code/reference preservation. Preserve NX3's number-form scope, thresholds, sentence keys and historical verdicts; this is not a delegation to replace the established contract.",
+          "choice": "A bracketed number inside code is a value, in every bracket form NFKC maps to ASCII brackets (for example ［４］, ﹇4﹈, ［⑫］), exactly as code [4] is today. Outside code, such brackets stay reference markers (NG4 unchanged).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/uiux-numeric-guard-nx3b-preserved.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/NumericCitationNx3bTest.java#preservesNx3bAsciiReferencesAndNx3aControls"
+      ]
     }
   ]
 }
@@ -2032,6 +2193,70 @@ Still unverified under this assignment's unavailable-stack constraint: full
 live/cold Engine/browser NG1/NG6 combinations, browser legacy-record rendering
 (GN3), production Ask timing/coverage (NG8), and production Ask rag-qa counts (NG9).
 Component/frontend checks do not substitute for those running-system checks.
+
+## NX3b builder observations (2026-10-22; no acceptance verdict)
+
+Production changes: NumericConsistency reads grouped runs atomically and rejects
+numeric continuations; AnswerSegmentation protects both NFKC-compatible bracket
+pairs in place; CitationMatchOps preserves Markdown indentation before parsing.
+The last one-line deletion was required by the code-value rule: the first candidate
+exposed first-line indented code being converted into prose by answerText.trim().
+An unchanged-baseline ASCII diagnostic reproduces this on both Worker scorers,
+supplied and indexed, so the failing case was retained and repaired.
+
+The new durable NumericCitationNx3bTest expands all NX3b table rows into 250
+pair/context checks. Every pair reaches direct cross-encoder selection and both
+Worker scorer branches on supplied/indexed passages. Fixed logits/embeddings
+isolate guard eligibility; scores, thresholds, sentence keys and scored/matched
+counts are asserted. Inline, fenced and indented code include ASCII and compatible
+brackets. The original 96-pair NX3 table is literal preservation data in this file.
+No existing test file was edited or case dropped.
+
+All three repair methods assertion-fail on 5e74587b1, zero skips; the preservation
+method passes there. Before logs show a 0.9760000109672546 incompatible CE match,
+raw cosine expected zero but got one, and missing compatible grouped matches.
+The separate first-line ASCII diagnostic also assertion-fails on 5e74587b1.
+
+Candidate numeric/segmentation suite: 91 tests pass, zero skips. Explicit read-only
+CPU-model suite: four pass, zero skips. Preservation: 75 pass before and after,
+zero skips, including GN1 exact corpus matches, NG4–NG6, WP4.4 passage/source checks,
+history/file-store reload, Delegate mapping, HTTP-handler counts and MCP output.
+run-evidence.mjs uses default link mode and --before 5e74587b1: all three repair
+checks pass after and assertion-fail before; the separate preservation check passes.
+Evidence is uiux-numeric-guard-nx3b-{repaired,preserved}.json.
+
+The first scorer timing comparison failed: 181283975 → 212019371 ns, ratio 1.169543.
+The after invocation included the larger native-model suite. That failed observation
+is retained as nx3b-performance-{before,after}.xml. A single paired comparison then
+used the identical measurement-only Gradle selection on both trees, unchanged six
+fixtures/model hashes, CPU-only, one worker, two warm-up suites and five timed suite
+sums. Median 186967941 → 184742493 ns, ratio 0.988097; all six fixtures remain scored
+in every run. Reported load 6.26 → 6.08 on 20 processors. Both observations remain;
+the paired XML is nx3b-controlled-performance-{before,after}.xml. This is scorer
+measurement; it does not verify production Ask NG8 or rag-qa NG9.
+
+Five-module pmdMain passes. build -x test -PskipWebBuild=true succeeds in 2m 38s
+(332 actionable tasks); optional integration skips are not claimed as passes.
+All Gradle commands, including containing scripts, used js-gradle-slot. Frontend
+lint/typecheck pass, Vitest 563 files / 7285 tests pass, root UI gates 28/28 pass.
+Register-family gates pass 3/3, wire passes after the required dedicated npm ci.
+Gitleaks passes the evidence directory and new test source after only relabeling
+its four new tokenizer.json hash separators, preserving the digests and timings.
+No package.json, lockfile, gate, threshold or existing expectation was weakened.
+
+The four NX3a warrants in entries 11/14 now use delegated-choice, quote the
+standing delegation and state its scope; NX3b warrants use the same provenance.
+Test-intent resolves sources/coverage/evidence and awaits independent acceptance.
+Every historical evidence artifact and every acceptance record is unchanged.
+No acceptance, commit or push was authored by this builder.
+
+Before production identities match 5e74587b1 for all three changed production files.
+The private shared clone and all managed before checkouts are removed; no models,
+corpora, installers or dependency directories were copied. Shared resources were
+Gradle/npm caches and slot locks plus read-only CPU-model files. No owner app,
+dev stack, GPU or display service was used or stopped. .agents/preflight is absent.
+Remaining unverified: full live/cold Engine/browser NG1/NG6 combinations, browser
+legacy-history rendering (GN3), production Ask NG8 and NG9.
 
 ## Acceptance records
 
