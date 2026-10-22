@@ -6414,16 +6414,10 @@ export class UnifiedChatView extends JfElement {
         // "Interpreted as: …" line persists past the live stream (mirrors citations/ragMeta).
         if (this.rewriteNote) msg.standaloneQuestion = this.rewriteNote.standalone;
         // Tempdoc 941 R19-F1 — the `done` payload carries the substrate's authoritative answer
-        // (`ConversationEngine.emitDone` -> `finalResponse`). Streamed `chunk` text is the same
-        // text arriving incrementally, so prefer it when we have it; but when no chunk text
-        // accumulated in this view (a handler throw is swallowed by `consumeShapeStream`, a
-        // reconnect drops the chunk frames, or the shape answers in one shot) the turn used to be
-        // dropped at the `streamingText.trim()` guard below: no message, no notice, no error, and
-        // the composer already cleared. Read the contract field instead of losing the answer —
-        // same house pattern as `AgentSessionController.onDone`.
-        const settledText = this.streamingText.trim()
-          ? this.streamingText
-          : (donePayload?.finalResponse ?? '');
+        // (`ConversationEngine.emitDone` -> `finalResponse`). Chunks can include rejected
+        // extraction attempts, so only the terminal answer belongs in the completed card and
+        // subsequent context. Fall back to chunks only when the terminal omits its answer.
+        const settledText = donePayload?.finalResponse ?? this.streamingText;
         msg.content = settledText;
         if (settledText.trim()) {
           this.thread = [...this.thread, msg];

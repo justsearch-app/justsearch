@@ -14,6 +14,7 @@
  */
 
 import { css, html, type TemplateResult, nothing } from 'lit';
+import { repeat } from 'lit/directives/repeat.js';
 import { JfElement } from '../../primitives/JfElement.js';
 import {
   AdvisoryStore,
@@ -490,7 +491,7 @@ export class AdvisoryToastHost extends JfElement {
           +${overflow} earlier ${overflow === 1 ? 'notification' : 'notifications'}
         </div>`
       : nothing}
-    ${stack.map((t) => {
+    ${repeat(stack, (t) => t.record.key, (t) => {
       // 559 Authority III — local-origin records render their literal message +
       // severity tone + plain callback action (no advisory class chrome / meta).
       const isLocal = t.record.origin === 'local';

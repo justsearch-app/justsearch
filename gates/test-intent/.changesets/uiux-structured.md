@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261019-bd718f
 author-role: builder
-author-session: 5ha3t9t3
+author-session: r3qplcrx
 ---
 
 # Test-intent entries
@@ -375,12 +375,131 @@ All checks are durable. UI expectations add Structured behavior; the Engine entr
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.structuredOutcome.test.ts"
       ],
       "repaired": true
+    },
+    {
+      "class": "New",
+      "evidence": "gates/test-intent/evidence/uiux-structured-live-output-repair.json",
+      "repaired": true,
+      "items": [
+        "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.identity.test.ts"
+      ],
+      "behaviour": "XD2: a success toast followed by a failure keeps the failure in its original polite live-region node when the older toast expires, without changing the expired success node to failure text. Both toast timers and the store subscription are cleaned up.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT9",
+          "quote": "S14.9 [XT9] (S3.8, ch. 10) The schema box has a label and is reachable by keyboard; multi-line editing never sends by accident; it is readable in both themes, under forced colours and at narrow width with the document pane open, and does not hide the transcript's last turn. Its text survives switching mode or conversation in the same tab; on reload as decision D3b. One tab's schema is never shown in or sent by another tab.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XD2",
+          "quote": "XT9: when a Structured request completes or fails, assistive technology is told once, politely (reuse the live-region mechanism Search v3 already uses; no new announcer), and focus does not move unasked.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/advisory/AdvisoryToastHost.identity.test.ts"
+      ]
+    },
+    {
+      "class": "New",
+      "evidence": "gates/test-intent/evidence/uiux-structured-live-output-repair.json",
+      "repaired": true,
+      "items": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.acceptedOutput.test.ts"
+      ],
+      "behaviour": "XT2/XT3/XT10/XN1 and finding 5: after type-invalid or malformed extraction attempts, the old window shows and forwards only the accepted final answer in Structured and Ask follow-ups. Branches forward the accepted inherited answer. Preserve chunk-only terminals when finalResponse is omitted; an explicitly empty finalResponse never completes rejected chunks. Streams and reactive work settle before teardown.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT2",
+          "quote": "S14.2 [XT2] (S3.2, ch. 9) A Structured send runs one extraction with the typed instruction and the box's schema. The result is shown as literal text: Markdown, HTML and citation-like strings inside the JSON stay literal and copyable, and no citation marks are added. The documents it was taken from stay reachable as sources. It reads the same live, after reload and after an Engine restart, including after a validation retry: rejected attempts are never joined to or shown as the result. Extract turns saved by the old window open in Search v3 with the same output.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT3",
+          "quote": "S14.3 [XT3] (ch. 4, new; broken today) Only output that parses as JSON and conforms to the schema (required fields present, declared types) is reported as a completed extraction. Malformed output with matching braces, valid JSON that violates the schema, and a schema the backend cannot apply each end in a retry or a visible failure with a reason. Holds in both windows (shared Engine). Decision D10.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT10",
+          "quote": "S14.10 [XT10] (S3.9) A Structured follow-up sends the conversation's context the way Ask does: excluded messages and the context floor are honoured (S2.0), so \"extract the dates from the answer above\" works.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XN1",
+          "quote": "XN1 The old window's Structured option works as today, except the shared Engine repairs of S14.3 and S14.4.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "XT2",
+          "quote": "After validation rejects an attempt and a replacement succeeds, subsequent Ask/Structured context and inherited branch context use the accepted answer. History, unified-thread and API readers distinguish rejected attempts from completed answers, live and after restart. Use contradictory facts in the rejected and accepted outputs to check this.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D3: after reload Retry/Edit prepare the instruction using the current schema and stated inputs and wait for send.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D3b: schema is per-window memory only; reload discards it.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D7: no-file extraction reads typed text and this conversation.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D10: validate parse and schema conformance in the shared Engine with its existing networknt dependency.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "allright i agree. you dont need to wait for my opinion regarding the designs, i agree with you on them. you can proceed with implementation after the designs.",
+          "delegationLocation": "task t-20261019-bd718f agreement",
+          "delegationScope": "The remaining UI/UX designs, including WP1.3a Structured mode and the adopted scenarios and pass-2 findings.",
+          "choice": "D11: refuse omitted Extract inputs rather than silently skipping or cutting.",
+          "label": "agent choice"
+        }
+      ],
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/UnifiedChatView.acceptedOutput.test.ts"
+      ]
     }
   ]
 }
 ```
 
 Repair entries appended by builder session 5ha3t9t3 on 2026-10-22. Original entries and verifier records are retained. These additions require independent acceptance on the final digest.
+
+Follow-up entries appended by builder session r3qplcrx on 2026-10-22. Existing entries and acceptance records are retained. Both new test files are durable; evidence records ten assertion failures before, thirteen passes after, including three preservation controls. Independent acceptance is pending.
 
 ## Acceptance records
 
